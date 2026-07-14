@@ -1,0 +1,146 @@
+import json
+from decimal import Decimal
+
+from src import admin, ingress
+
+
+def request(method, path, body=None, cookies=None):
+    return {
+        "requestContext": {"http": {"method": method, "path": path}},
+        "headers": {"host": "dapier.example.test"},
+        "cookies": cookies or [],
+        "body": json.dumps(body) if body is not None else None,
+    }
+
+
+def test_login_creates_signed_http_only_session(monkeypatch):
+    monkeypatch.setenv("LEGACY_ADMIN_LOGIN_ENABLED", "true")
+    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "correct-password"})
+
+    response = admin.login(request("POST", "/api/admin/session", {"username": "admin", "password": "correct-password"}))
+
+    assert response["statusCode"] == 200
+    assert "correct-password" not in response["body"]
+    assert response["cookies"][0].startswith("dapier_session=")
+    assert "HttpOnly" in response["cookies"][0]
+    assert "Secure" in response["cookies"][0]
+
+
+def configure_oidc(monkeypatch):
+    monkeypatch.setenv("AUTH_BASE_URL", "https://auth.example.test")
+    monkeypatch.setenv("AUTH_CLIENT_ID", "dapier-client")
+    monkeypatch.setenv("AUTH_CALLBACK_URL", "https://dapier.example.test/auth/callback")
+    monkeypatch.setenv("AUTH_LOGOUT_URL", "https://dapier.example.test/")
+    monkeypatch.setenv("AUTH_ISSUER", "https://issuer.example.test/pool")
+    monkeypatch.setenv("AUTH_JWKS_URL", "https://issuer.example.test/pool/.well-known/jwks.json")
+
+
+def test_oidc_login_uses_pkce_and_verified_callback_creates_session(monkeypatch):
+    configure_oidc(monkeypatch)
+    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
+    start = admin.auth_login(request("GET", "/auth/login"))
+    assert start["statusCode"] == 302
+    from urllib.parse import parse_qs, urlparse
+
+    query = parse_qs(urlparse(start["headers"]["location"]).query)
+    assert query["code_challenge_method"] == ["S256"]
+    assert query["code_challenge"][0]
+    state_cookie = start["cookies"][0].split(";", 1)[0]
+    pending = admin._verify(state_cookie.split("=", 1)[1], kind="oidc")
+    monkeypatch.setattr(admin, "_exchange_auth_code", lambda code, verifier: {"id_token": "signed-token"})
+    monkeypatch.setattr(admin, "_verify_id_token", lambda token: {
+        "sub": "person-1", "email": "Person@DataTalks.Club",
+        "email_verified": True, "nonce": pending["nonce"],
+    })
+    event = request("GET", "/auth/callback", cookies=[state_cookie])
+    event["queryStringParameters"] = {"code": "valid-code", "state": query["state"][0]}
+    callback = admin.auth_callback(event)
+    assert callback["statusCode"] == 302
+    assert callback["headers"]["location"] == "/"
+    session_cookie = next(value for value in callback["cookies"] if value.startswith("dapier_session="))
+    session = admin._verify(session_cookie.split(";", 1)[0].split("=", 1)[1])
+    assert session["sub"] == "person@datatalks.club"
+
+
+def test_oidc_callback_rejects_invalid_state(monkeypatch):
+    configure_oidc(monkeypatch)
+    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
+    response = admin.auth_callback(request("GET", "/auth/callback"))
+    assert response["statusCode"] == 400
+
+
+def test_admin_api_rejects_unauthenticated_request(monkeypatch):
+    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "correct-password"})
+
+    response = admin.route(request("GET", "/api/admin/overview"), "GET", "/api/admin/overview")
+
+    assert response["statusCode"] == 401
+
+
+def test_save_slack_secret_is_write_only(monkeypatch):
+    writes = []
+
+    class Secrets:
+        def create_secret(self, **kwargs):
+            writes.append(kwargs)
+
+    monkeypatch.setattr(admin.boto3, "client", lambda service: Secrets())
+    token = "xoxb-123456789012345678901234"
+
+    response = admin.save_secret("slack", request("PUT", "/api/admin/secrets/slack", {"token": token}))
+
+    assert response["statusCode"] == 200
+    assert token not in response["body"]
+    assert writes[0]["Name"] == "dapier/slack"
+    assert json.loads(writes[0]["SecretString"])["token"] == token
+
+
+def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
+    secrets = []
+    records = []
+
+    class Secrets:
+        def create_secret(self, **kwargs):
+            secrets.append(kwargs)
+
+    class Table:
+        def put_item(self, **kwargs):
+            records.append(kwargs["Item"])
+
+    class Dynamo:
+        def Table(self, _name):
+            return Table()
+
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(admin.boto3, "client", lambda service: Secrets())
+    monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
+    body = {
+        "connection_id": "team-dropbox",
+        "provider": "dropbox",
+        "display_name": "Team Dropbox",
+        "client_id": "client-id",
+        "client_secret": "client-secret",
+        "scopes": ["files.metadata.read"],
+    }
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", body))
+
+    assert response["statusCode"] == 200
+    assert "client-secret" not in response["body"]
+    assert "client_secret" not in records[0]
+    assert json.loads(secrets[0]["SecretString"])["client_secret"] == "client-secret"
+
+
+def test_root_serves_console_with_security_headers():
+    response = ingress.handler(request("GET", "/"), None)
+
+    assert response["statusCode"] == 200
+    assert "Dapier" in response["body"]
+    assert response["headers"]["content-type"].startswith("text/html")
+    assert "frame-ancestors 'none'" in response["headers"]["content-security-policy"]
+
+
+def test_json_response_serializes_dynamodb_numbers():
+    response = admin._json_response(200, {"expires_at": Decimal("1791655833")})
+
+    assert json.loads(response["body"])["expires_at"] == 1791655833

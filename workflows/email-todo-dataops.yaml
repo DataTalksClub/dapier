@@ -1,0 +1,13 @@
+id: email-todo-dataops
+enabled: true
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route:
+      equals: todo
+actions:
+  - id: create-intake
+    type: dataops
+    url_env: DATAOPS_INTAKE_URL
+    auth_secret_id: dapier/dataops

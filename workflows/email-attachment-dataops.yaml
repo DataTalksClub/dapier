@@ -1,0 +1,13 @@
+id: email-attachment-dataops
+enabled: true
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route:
+      equals: invoice-attachment
+actions:
+  - id: create-invoice-intake
+    type: dataops
+    url_env: DATAOPS_INTAKE_URL
+    auth_secret_id: dapier/dataops

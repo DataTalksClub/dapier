@@ -1,0 +1,10 @@
+id: custom-demo
+enabled: false
+trigger:
+  connector: custom
+  event: received
+  filters: {}
+actions:
+  - type: webhook
+    url: https://example.com/hooks/dapier
+    timeout_seconds: 10
