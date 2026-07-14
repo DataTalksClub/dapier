@@ -1,0 +1,47 @@
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dapier-sandbox
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: aws-actions/setup-sam@v2
+      - run: make test
+      - run: sam validate --lint
+      - run: sam build --config-env sandbox
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: aws-actions/setup-sam@v2
+      - uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: arn:aws:iam::817685572750:role/dapier-github-actions-deploy
+          role-session-name: dapier-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - run: sam build --config-env sandbox
+      - run: sam deploy --config-env sandbox
+      - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health

@@ -11,6 +11,7 @@ cached = true
 resolve_s3 = true
 resolve_image_repos = true
 capabilities = "CAPABILITY_IAM"
+role_arn = "arn:aws:iam::817685572750:role/dapier-cloudformation-service"
 confirm_changeset = false
 fail_on_empty_changeset = false
 parameter_overrides = "DomainName=dapier.dtcdev.click DomainCertificateArn=arn:aws:acm:eu-west-1:817685572750:certificate/df237eb8-9d9a-4d48-8aa3-2fbe99018cd9 HostedZoneId=Z05963572WVWFHDQZH5NE HtmlRendererImageUri=817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer:20260712-lambda InboundEmailTopicArn=arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events DatamailerInboundBucketName=datamailer-sandbox-817685572750-inbound-mail YouTubeChannelIds=UCDvErgK0j5ur3aLgn6U-LqQ DataOpsIntakeUrl=https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents AuthClientId=27nrp6tnvfudml89teggb9haur AuthIssuer=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_H7nJu52Bs AuthJwksUrl=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_H7nJu52Bs/.well-known/jwks.json"
