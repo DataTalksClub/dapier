@@ -66,7 +66,20 @@ def test_oidc_callback_rejects_invalid_state(monkeypatch):
     configure_oidc(monkeypatch)
     monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
     response = admin.auth_callback(request("GET", "/auth/callback"))
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 303
+    assert response["headers"]["location"] == "/auth/error"
+    assert response["headers"]["cache-control"] == "no-store"
+    assert response["headers"]["referrer-policy"] == "no-referrer"
+    assert response["body"] == ""
+
+
+def test_oidc_error_page_is_hardened():
+    response = admin.auth_error()
+    assert response["statusCode"] == 403
+    assert "Dapier" in response["body"]
+    assert response["headers"]["cache-control"] == "no-store"
+    assert response["headers"]["referrer-policy"] == "no-referrer"
+    assert "default-src 'none'" in response["headers"]["content-security-policy"]
 
 
 def test_admin_api_rejects_unauthenticated_request(monkeypatch):

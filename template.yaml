@@ -126,6 +126,9 @@ Resources:
         AuthCallback:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /auth/callback, Method: GET}
+        AuthError:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /auth/error, Method: GET}
         AuthLogout:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /auth/logout, Method: GET}

@@ -59,8 +59,12 @@ def _json_response(status, body, *, cookies=None, headers=None):
     return response
 
 
-def _redirect(location, *, cookies=None):
-    response = {"statusCode": 302, "headers": {"location": location}, "body": ""}
+def _redirect(location, *, cookies=None, status=302, headers=None):
+    response = {
+        "statusCode": status,
+        "headers": {"location": location, **(headers or {})},
+        "body": "",
+    }
     if cookies:
         response["cookies"] = cookies
     return response
@@ -194,21 +198,44 @@ def auth_callback(event):
     code, state = query.get("code", ""), query.get("state", "")
     clear_state = f"{AUTH_STATE_COOKIE}=; Path=/auth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
     if not pending or not code or not hmac.compare_digest(state, pending.get("state", "")):
-        return _json_response(400, {"error": "Invalid or expired login state"}, cookies=[clear_state])
+        return _auth_error_redirect(clear_state)
     try:
         claims = _verify_id_token(_exchange_auth_code(code, pending["verifier"])["id_token"])
     except Exception:
-        return _json_response(401, {"error": "Login verification failed"}, cookies=[clear_state])
+        return _auth_error_redirect(clear_state)
     if not hmac.compare_digest(str(claims.get("nonce", "")), pending.get("nonce", "")):
-        return _json_response(401, {"error": "Identity token nonce mismatch"}, cookies=[clear_state])
+        return _auth_error_redirect(clear_state)
     email = claims.get("email")
     if not isinstance(email, str) or claims.get("email_verified") is not True:
-        return _json_response(401, {"error": "A verified email address is required"}, cookies=[clear_state])
+        return _auth_error_redirect(clear_state)
     token = _sign({"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS})
     return _redirect(
         "/",
         cookies=[clear_state, f"{SESSION_COOKIE}={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax"],
     )
+
+
+def _auth_error_redirect(clear_state):
+    return _redirect(
+        "/auth/error",
+        status=303,
+        cookies=[clear_state],
+        headers={"cache-control": "no-store", "referrer-policy": "no-referrer"},
+    )
+
+
+def auth_error():
+    return {
+        "statusCode": 403,
+        "headers": {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "referrer-policy": "no-referrer",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+        },
+        "body": """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign-in error · Dapier</title><style>body{margin:0;font:16px system-ui;background:#f5f7fa;color:#172033}main{max-width:32rem;margin:10vh auto;padding:2rem;background:white;border:1px solid #dce2ea;border-radius:.75rem}a{color:#1769aa;font-weight:600}</style></head><body><main><h1>Sign-in error</h1><p>Authentication could not be completed. No account changes were made.</p><p><a href="/auth/login">Try again</a></p></main></body></html>""",
+    }
 
 
 def auth_logout():
@@ -465,6 +492,8 @@ def route(event, method, path):
         return auth_login(event)
     if method == "GET" and path == "/auth/callback":
         return auth_callback(event)
+    if method == "GET" and path == "/auth/error":
+        return auth_error()
     if method == "GET" and path == "/auth/logout":
         return auth_logout()
     if method == "POST" and path == "/api/admin/session" and os.environ.get("LEGACY_ADMIN_LOGIN_ENABLED", "").lower() in ("1", "true", "yes"):
