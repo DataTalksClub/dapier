@@ -4,7 +4,7 @@ build:
 	sam build --config-env sandbox
 
 deploy:
-	sam deploy --config-env sandbox
+	scripts/deploy.sh
 
 validate:
 	sam validate --lint

@@ -43,5 +43,5 @@ jobs:
           role-session-name: dapier-deploy
           aws-region: ${{ env.AWS_REGION }}
       - run: sam build --config-env sandbox
-      - run: sam deploy --config-env sandbox
+      - run: scripts/deploy.sh
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
