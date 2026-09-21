@@ -141,9 +141,10 @@ def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri
         "code": code,
         "grant_type": "authorization_code",
         "client_id": client_id,
-        "client_secret": client_secret,
         "redirect_uri": redirect_uri,
     }
+    if client_secret:
+        fields["client_secret"] = client_secret
     if code_verifier is not None:
         fields["code_verifier"] = code_verifier
     data = _form_post(spec["token_url"], fields, transport=transport)
@@ -155,12 +156,14 @@ def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri
 def refresh_access_token(provider_name, *, refresh_token, client_id, client_secret, transport=None):
     """Refresh an access token. May omit ``refresh_token`` on rotation."""
     spec = get(provider_name)
-    data = _form_post(spec["token_url"], {
+    fields = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
         "client_id": client_id,
-        "client_secret": client_secret,
-    }, transport=transport)
+    }
+    if client_secret:
+        fields["client_secret"] = client_secret
+    data = _form_post(spec["token_url"], fields, transport=transport)
     if "access_token" not in data:
         raise ProviderError("refresh response did not include an access token")
     return data

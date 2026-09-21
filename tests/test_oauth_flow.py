@@ -45,11 +45,14 @@ class TokenResponse:
         return False
 
 
-def configure(monkeypatch, token_payload=None, token_status=200):
+def configure(monkeypatch, token_payload=None, token_status=200,
+                channel_payload=None, channel_status=200):
     connections = ConnectionsTable()
     executions = ExecutionsTable()
     stored = {}
     requests = []
+    if channel_payload is None:
+        channel_payload = {"items": [{"id": "UC1", "snippet": {"title": "Ch"}}]}
 
     class Dynamo:
         def Table(self, name):
@@ -59,6 +62,8 @@ def configure(monkeypatch, token_payload=None, token_status=200):
 
     def fake_urlopen(request, timeout=15):
         requests.append(request)
+        if "youtube/v3/channels" in request.full_url:
+            return TokenResponse(channel_payload, status=channel_status)
         return TokenResponse(token_payload, status=token_status)
 
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
@@ -181,6 +186,8 @@ def test_callback_success_is_single_use(monkeypatch):
     assert updated["status"] == "connected"
     assert updated["granted_scopes"] == [YOUTUBE_SCOPE]
     assert updated["connected_by"] == "subject-1"
+    assert updated["verified_account_id"] == "UC1"
+    assert updated["account_title"] == "Ch"
     assert any(key.startswith("oauth-state:") for key in executions.items)
 
     replay = admin.oauth_callback(event)
@@ -250,5 +257,82 @@ def test_callback_rejects_expired_state(monkeypatch):
     result = admin.oauth_callback({
         "cookies": [f"dapier_oauth_state={stale}"],
         "queryStringParameters": {"code": "c", "state": stale},
+    })
+    assert result["statusCode"] == 400
+
+
+def test_callback_rejects_wrong_provider_account(monkeypatch):
+    connections, _, stored, _ = configure(
+        monkeypatch,
+        token_payload={"access_token": "at", "refresh_token": "rt",
+                       "expires_in": 3600, "scope": YOUTUBE_SCOPE},
+        channel_payload={"items": [{"id": "UCDvErgK0j5ur3aLgn6U-LqQ", "snippet": {"title": "DTC"}}]},
+    )
+    seed_connection(connections, expected_account_id="UC-personal")
+    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
+    response = admin.oauth_start(start_event(), "youtube-personal")
+    result = admin.oauth_callback(callback_event(response))
+    assert result["statusCode"] == 409
+    assert stored["oauth#youtube-personal"] == {"client_secret": "client-secret"}
+    assert connections.items["youtube-personal"]["status"] == "ready"
+    assert connections.items["youtube-personal"]["verified_account_id"] is None
+
+
+def test_callback_fails_closed_when_verification_fails(monkeypatch):
+    connections, _, stored, _ = configure(
+        monkeypatch,
+        token_payload={"access_token": "at", "refresh_token": "rt",
+                       "expires_in": 3600, "scope": YOUTUBE_SCOPE},
+        channel_payload={"error": {"code": 403, "message": "insufficient authentication scopes"}},
+        channel_status=403,
+    )
+    seed_connection(connections)
+    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
+    response = admin.oauth_start(start_event(), "youtube-personal")
+    result = admin.oauth_callback(callback_event(response))
+    assert result["statusCode"] == 400
+    assert "verify" in json.loads(result["body"])["error"].lower()
+    assert stored["oauth#youtube-personal"] == {"client_secret": "client-secret"}
+    assert connections.items["youtube-personal"]["status"] == "ready"
+
+
+def test_cookieless_cli_callback_succeeds(monkeypatch):
+    import time as _time
+
+    connections, executions, stored, _ = configure(
+        monkeypatch,
+        token_payload={"access_token": "at", "refresh_token": "rt",
+                       "expires_in": 3600, "scope": YOUTUBE_SCOPE},
+    )
+    seed_connection(connections)
+    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
+    state = admin._sign({
+        "kind": "oauth", "connection_id": "youtube-personal",
+        "redirect_uri": CALLBACK_URL, "code_verifier": "verifier",
+        "jti": "cli-flow-1", "operator_subject": "subject-1",
+        "exp": int(_time.time()) + 600,
+    })
+    result = admin.oauth_callback({
+        "cookies": [],
+        "headers": {},
+        "queryStringParameters": {"code": "auth-code", "state": state},
+    })
+    assert result["statusCode"] == 302
+    assert connections.items["youtube-personal"]["status"] == "connected"
+    assert connections.items["youtube-personal"]["connected_by"] == "subject-1"
+
+
+def test_cookieless_callback_without_subject_is_rejected(monkeypatch):
+    import time as _time
+
+    configure(monkeypatch)
+    state = admin._sign({
+        "kind": "oauth", "connection_id": "youtube-personal",
+        "redirect_uri": CALLBACK_URL, "exp": int(_time.time()) + 600,
+    })
+    result = admin.oauth_callback({
+        "cookies": [],
+        "headers": {},
+        "queryStringParameters": {"code": "auth-code", "state": state},
     })
     assert result["statusCode"] == 400

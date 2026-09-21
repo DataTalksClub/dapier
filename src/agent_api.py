@@ -8,12 +8,14 @@ expiry, scope, and verified provider account ID over TLS with
 Dapier. Browser session cookies are not accepted here (no CSRF surface).
 """
 
+import base64
+import hashlib
 import json
 import os
 import re
 import time
 
-from . import audit, authz, connections, tokens
+from . import audit, authz, connections, oauth_providers, tokens
 from .connections import BindingError
 from .dtc_auth import verify_id_token
 from .tokens import TokenError
@@ -87,6 +89,7 @@ def authenticate(event):
     subject = claims.get("sub")
     if not subject:
         return None, _json_response(401, {"error": "Invalid DTC identity"})
+    event["_dtc_claims"] = claims
     return str(subject), None
 
 
@@ -222,11 +225,199 @@ def show_connection(event, connection_id):
 
 
 def route(event, method, path):
+    if method == "GET" and path == "/api/agent/config":
+        return public_config()
     if method == "POST" and path == "/api/agent/token":
         return issue_token(event)
     if method == "GET" and path == "/api/agent/connections":
         return list_for_caller(event)
     match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)", path)
-    if method == "GET" and match:
+    if match and method == "GET":
         return show_connection(event, match.group(1))
+    connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
+    if connect_match and method == "POST":
+        return start_connect(event, connect_match.group(1))
+    if method == "POST" and path == "/api/agent/connections/import":
+        return import_connection(event)
     return _json_response(404, {"error": "Not found"})
+
+
+def public_config():
+    from .dtc_auth import auth_config
+
+    config = auth_config()
+    return _json_response(200, {
+        "auth_base_url": config["base_url"],
+        "cli_client_id": config["cli_client_id"],
+        "issuer": config["issuer"],
+        "jwks_url": config["jwks_url"],
+    })
+
+
+def _b64encode(value):
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
+
+
+def start_connect(event, connection_id):
+    """Initiate a CLI-bound provider consent. Returns the authorize URL.
+
+    Allowed for operators (by stable subject or email claim) or callers with
+    a ``connect`` grant for the requested agent. The signed state binds the
+    operator subject and PKCE verifier, so the public callback can complete
+    the flow without a browser session cookie.
+    """
+    subject, error = authenticate(event)
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    try:
+        agent = authz.validate_agent(body.get("agent", ""))
+    except ValueError as exc:
+        return _json_response(400, {"error": str(exc)})
+
+    from . import admin as admin_module
+
+    connections_table, grants_table = _tables()
+    connection = connections.get_connection(connections_table, connection_id)
+    if not connection:
+        return _json_response(404, {"error": "Connection not found"})
+    claims = event.get("_dtc_claims") or {}
+    email = claims.get("email", "")
+    allowed = (
+        subject in _operator_subjects()
+        or (email and email.lower() in _operator_emails())
+        or authz.check_grant(grants_table, subject=subject, agent=agent,
+                             connection_id=connection_id, operation="connect")
+    )
+    if not allowed:
+        audit.emit(connection_id, audit.CALLBACK, subject, agent=agent,
+                   outcome="denied-not-authorized")
+        return _json_response(403, {"error": "Not authorized to connect this connection"})
+    redirect_uri = admin_module.oauth_callback_url()
+    if not redirect_uri:
+        return _json_response(503, {"error": "OAuth callback URL is not configured"})
+    try:
+        scopes = oauth_providers.normalize_scopes(connection["provider"], connection.get("scopes"))
+    except oauth_providers.ProviderError as exc:
+        return _json_response(400, {"error": str(exc)})
+    verifier = _b64encode(os.urandom(48))
+    challenge = _b64encode(hashlib.sha256(verifier.encode()).digest())
+    state = admin_module._sign({
+        "kind": "oauth",
+        "connection_id": connection_id,
+        "redirect_uri": redirect_uri,
+        "code_verifier": verifier,
+        "jti": _b64encode(os.urandom(16)),
+        "operator_subject": subject,
+        "exp": int(time.time()) + 600,
+    })
+    audit.emit(connection_id, audit.CALLBACK, subject, agent=agent, outcome="connect-started")
+    return _json_response(200, {
+        "connection_id": connection_id,
+        "authorize_url": oauth_providers.authorization_url(
+            connection["provider"],
+            client_id=connection["client_id"],
+            redirect_uri=redirect_uri,
+            scopes=scopes,
+            state=state,
+            code_challenge=challenge,
+        ),
+        "expires_in": 600,
+    })
+
+
+def _operator_subjects():
+    return {part.strip() for part in os.environ.get("OPERATOR_SUBJECTS", "").split(",") if part.strip()}
+
+
+def _operator_emails():
+    return {part.strip().lower() for part in os.environ.get("OPERATOR_EMAILS", "").split(",") if part.strip()}
+
+
+def import_core(body, *, operator_subject, connections_table):
+    """Shared operator import. Returns ``(status_code, payload)``.
+
+    Transfers the supplied refresh credential without logging it, verifies
+    refresh + provider account before storing, and binds the connection.
+    Existing backups are never touched.
+    """
+    from .credentials import put_credential
+
+    if not isinstance(body.get("authorized_user"), dict):
+        return 400, {"error": "An authorized-user credential object is required"}
+    try:
+        fields = connections.validate_new_connection(body)
+    except connections.ConnectionError as exc:
+        return 400, {"error": str(exc)}
+    refresh_token = body["authorized_user"].get("refresh_token")
+    if not refresh_token:
+        return 400, {"error": "The authorized-user object has no refresh token"}
+
+    try:
+        token_data = oauth_providers.refresh_access_token(
+            fields["provider"],
+            refresh_token=refresh_token,
+            client_id=fields["client_id"],
+            client_secret=fields["client_secret"],
+        )
+    except oauth_providers.ProviderError as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="error", error=str(exc))
+        return 400, {"error": f"Refresh check failed: {exc}"}
+    try:
+        account_id, account_title = oauth_providers.verify_account(
+            fields["provider"], token_data["access_token"],
+        )
+    except oauth_providers.ProviderError as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="error", error=str(exc))
+        return 400, {"error": f"Could not verify the provider account: {exc}"}
+
+    previous = connections.get_connection(connections_table, fields["connection_id"])
+    try:
+        item = connections.build_item(fields, owner_subject=operator_subject, previous=previous)
+        connections.check_binding(item, account_id)
+        item = connections.mark_connected(
+            item, verified_account_id=account_id, account_title=account_title,
+            granted_scopes=fields["scopes"], connected_by=operator_subject,
+        )
+    except connections.ConnectionError as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="denied-account-mismatch", error=str(exc))
+        status = 409 if isinstance(exc, connections.BindingError) else 400
+        return status, {"error": str(exc)}
+    stored = {
+        "client_secret": fields["client_secret"],
+        **oauth_providers.normalize_token_data(
+            token_data, previous_refresh_token=refresh_token,
+        ),
+    }
+    put_credential(item["credential_id"], stored, provider=item["provider"])
+    connections.put_connection(connections_table, item)
+    audit.emit(item["connection_id"], audit.IMPORT, operator_subject, outcome="ok")
+    return 200, connections.public_view(item)
+
+
+def import_connection(event):
+    subject, error = authenticate(event)
+    if error:
+        return error
+    claims = event.get("_dtc_claims") or {}
+    email = str(claims.get("email", "")).lower()
+    if subject not in _operator_subjects() and email not in _operator_emails():
+        audit.emit("unknown", audit.IMPORT, subject, outcome="denied-not-operator")
+        return _json_response(403, {"error": "Operator authorization required"})
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    connections_table, _ = _tables()
+    status, payload = import_core(body, operator_subject=subject, connections_table=connections_table)
+    return _json_response(status, payload)

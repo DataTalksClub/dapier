@@ -466,6 +466,17 @@ def _connection(connection_id):
     )
 
 
+def import_connection(event, operator):
+    """One-time operator import of an existing provider credential (cookie path)."""
+    try:
+        body = _request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    status, payload = agent_api.import_core(body, operator_subject=operator, connections_table=connections_table)
+    return _json_response(status, payload)
+
+
 def revoke_connection_tokens(connection_id, operator):
     from . import tokens as token_lifecycle
 
@@ -546,7 +557,16 @@ def oauth_callback(event):
     query = event.get("queryStringParameters") or {}
     state = query.get("state", "")
     payload = _verify(state, "oauth")
-    if not payload or not hmac.compare_digest(state, _cookie(event, OAUTH_COOKIE)):
+    if not payload:
+        return _json_response(400, {"error": "Invalid or expired OAuth state"})
+    cookie_state = _cookie(event, OAUTH_COOKIE)
+    if cookie_state:
+        if not hmac.compare_digest(state, cookie_state):
+            return _json_response(400, {"error": "Invalid or expired OAuth state"})
+    elif not payload.get("operator_subject") or not payload.get("jti"):
+        # Cookieless callbacks only for CLI-initiated flows, where the signed
+        # state binds the operator subject and is single-use. Browser flows
+        # always carry the state cookie set by oauth_start.
         return _json_response(400, {"error": "Invalid or expired OAuth state"})
     if query.get("error"):
         return _redirect(f"/?oauth={urllib.parse.quote(query['error'])}")
@@ -594,6 +614,20 @@ def oauth_callback(event):
             })
     else:
         granted = requested
+    try:
+        account_id, account_title = oauth_providers.verify_account(
+            connection["provider"], token_data["access_token"],
+        )
+    except oauth_providers.ProviderError as exc:
+        _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
+                     outcome="error", error=str(exc))
+        return _json_response(400, {"error": f"Could not verify the provider account: {exc}"})
+    try:
+        connection_model.check_binding(connection, account_id)
+    except connection_model.BindingError as exc:
+        _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
+                     outcome="denied-account-mismatch", error=str(exc))
+        return _json_response(409, {"error": str(exc)})
     stored = {
         "client_secret": previous.get("client_secret"),
         **oauth_providers.normalize_token_data(
@@ -604,8 +638,8 @@ def oauth_callback(event):
     try:
         updated = connection_model.mark_connected(
             connection,
-            verified_account_id=connection.get("verified_account_id"),
-            account_title=connection.get("account_title"),
+            verified_account_id=account_id,
+            account_title=account_title,
             granted_scopes=sorted(granted),
             connected_by=operator,
         )
@@ -658,6 +692,8 @@ def route(event, method, path):
         return save_credential(path.rsplit("/", 1)[1], event)
     if method == "PUT" and path == "/api/admin/connections":
         return save_connection(event)
+    if method == "POST" and path == "/api/admin/connections/import":
+        return import_connection(event, operator_subject)
     if method == "GET" and path == "/api/admin/grants":
         return list_grants(event)
     if method == "PUT" and path == "/api/admin/grants":
