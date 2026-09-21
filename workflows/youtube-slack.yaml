@@ -9,7 +9,7 @@ trigger:
 actions:
   - id: notify-slack
     type: slack
-    token_secret_id: dapier/slack
+    credential_id: slack
     channel: C01BQC114P2
     text: |-
       New video on our YouTube channel!

@@ -78,7 +78,7 @@
       </section>
 
       <section class="view" data-page="credentials">
-        <div class="section-heading"><div><h2>Service credentials</h2><p>Encrypted in AWS Secrets Manager</p></div></div>
+        <div class="section-heading"><div><h2>Service credentials</h2><p>Protected by DynamoDB encryption at rest</p></div></div>
         <div id="credential-list" class="credential-list"></div>
       </section>
 
@@ -91,7 +91,7 @@
 
   <dialog id="credential-dialog">
     <form id="credential-form" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">Secrets Manager</p><h2 id="credential-title">Add credential</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="dialog-head"><div><p class="eyebrow">Credentials table</p><h2 id="credential-title">Add credential</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
       <input type="hidden" name="provider">
       <label id="credential-field-label">Token<input name="value" type="password" autocomplete="off" required></label>
       <p id="credential-error" class="form-error" role="alert"></p>

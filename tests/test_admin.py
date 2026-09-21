@@ -90,31 +90,21 @@ def test_admin_api_rejects_unauthenticated_request(monkeypatch):
     assert response["statusCode"] == 401
 
 
-def test_save_slack_secret_is_write_only(monkeypatch):
+def test_save_slack_credential_is_write_only(monkeypatch):
     writes = []
-
-    class Secrets:
-        def create_secret(self, **kwargs):
-            writes.append(kwargs)
-
-    monkeypatch.setattr(admin.boto3, "client", lambda service: Secrets())
+    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
     token = "xoxb-123456789012345678901234"
 
-    response = admin.save_secret("slack", request("PUT", "/api/admin/secrets/slack", {"token": token}))
+    response = admin.save_credential("slack", request("PUT", "/api/admin/credentials/slack", {"token": token}))
 
     assert response["statusCode"] == 200
     assert token not in response["body"]
-    assert writes[0]["Name"] == "dapier/slack"
-    assert json.loads(writes[0]["SecretString"])["token"] == token
+    assert writes[0] == ("slack", {"token": token}, {"provider": "slack"})
 
 
 def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
-    secrets = []
+    credentials = []
     records = []
-
-    class Secrets:
-        def create_secret(self, **kwargs):
-            secrets.append(kwargs)
 
     class Table:
         def put_item(self, **kwargs):
@@ -125,7 +115,7 @@ def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
             return Table()
 
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
-    monkeypatch.setattr(admin.boto3, "client", lambda service: Secrets())
+    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
     monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
     body = {
         "connection_id": "team-dropbox",
@@ -141,7 +131,8 @@ def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
     assert response["statusCode"] == 200
     assert "client-secret" not in response["body"]
     assert "client_secret" not in records[0]
-    assert json.loads(secrets[0]["SecretString"])["client_secret"] == "client-secret"
+    assert records[0]["credential_id"] == "oauth#team-dropbox"
+    assert credentials[0] == ("oauth#team-dropbox", {"client_secret": "client-secret"}, {"provider": "dropbox"})
 
 
 def test_root_serves_console_with_security_headers():

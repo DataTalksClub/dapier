@@ -18,9 +18,12 @@ SES -> Datamailer worker -> SNS -------------------------------------> SQS
                               DataOps API                       Slack API       HTML renderer
 ```
 
-Connections, OAuth tokens, cursors, and idempotency records are stored in DynamoDB.
-Secrets belong in Secrets Manager. SQS provides retries and dead-letter queues;
-CloudWatch alarms track worker failures and visible DLQ messages.
+Connections, app credentials, OAuth tokens, cursors, and idempotency records are
+stored in DynamoDB. DynamoDB's default AWS-owned encryption protects records at
+rest, while narrowly scoped IAM policies control application access. Generated
+infrastructure secrets such as session signing and webhook verification values
+remain in Secrets Manager. SQS provides retries and dead-letter queues; CloudWatch
+alarms track worker failures and visible DLQ messages.
 
 The proposed shared-auth OAuth token factory and agent CLI are specified in
 [docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md).
@@ -85,10 +88,14 @@ aws secretsmanager get-secret-value \
 
 The **Credentials** view accepts the Slack bot token used by Dapier and the
 Mailchimp API key used by DataOps. The values are write-only: the browser sends
-them over HTTPS to the administration API, which stores them in AWS Secrets
-Manager and returns only presence and update metadata. The **Connections** view
-configures OAuth clients for Dropbox and YouTube; OAuth client secrets and tokens
-use the same write-only storage boundary.
+them over HTTPS to the administration API, which stores them in the dedicated
+DynamoDB credentials table and returns only presence and update metadata. The
+**Connections** view configures OAuth clients for Dropbox and YouTube; OAuth
+client secrets and tokens use the same write-only storage boundary.
+
+The `CredentialsTableName` and `CredentialsTableArn` stack outputs allow
+authorized consumers such as DataOps to receive exact-table, read-only IAM
+access without sharing Dapier's administration permissions.
 
 ## Connector plan
 
@@ -101,7 +108,8 @@ use the same write-only storage boundary.
   its normalized SNS events feed Dapier's event queue.
 - **OAuth:** authenticated start/callback endpoints and connection storage are
   available from the administration console. OAuth credentials and tokens are stored
-  in Secrets Manager; DynamoDB contains non-secret connection metadata only.
+  in the dedicated credentials table; the general connections table contains
+  non-secret connection metadata only.
 
 Workflow files are packaged at deployment time. A deployment is therefore the audit
 trail and rollback mechanism for configuration changes.

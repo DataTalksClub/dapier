@@ -108,8 +108,8 @@ function renderConnections(connections) {
 
 function renderCredentials(credentials) {
   const labels = {
-    slack: { name: 'Slack bot', secret: 'dapier/slack', icon: 'message-square' },
-    mailchimp: { name: 'Mailchimp', secret: 'dataops-v1/mailchimp', icon: 'send' },
+    slack: { name: 'Slack bot', secret: 'credential: slack', icon: 'message-square' },
+    mailchimp: { name: 'Mailchimp', secret: 'credential: mailchimp', icon: 'send' },
   };
   $('#credential-list').innerHTML = credentials.map((credential) => {
     const item = labels[credential.provider];
@@ -183,7 +183,7 @@ $('#credential-form').addEventListener('submit', async (event) => {
   const field = provider === 'slack' ? 'token' : 'api_key';
   $('#credential-error').textContent = '';
   try {
-    await api(`/api/admin/secrets/${provider}`, { method: 'PUT', body: JSON.stringify({ [field]: form.value.value }) });
+    await api(`/api/admin/credentials/${provider}`, { method: 'PUT', body: JSON.stringify({ [field]: form.value.value }) });
     form.value.value = '';
     $('#credential-dialog').close();
     notice('Credential saved');

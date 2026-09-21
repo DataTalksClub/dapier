@@ -13,16 +13,17 @@ from pathlib import Path
 
 import boto3
 import yaml
-from botocore.exceptions import ClientError
+
+from .credentials import credential_status, get_credential, put_credential
 
 
 SESSION_COOKIE = "dapier_session"
 OAUTH_COOKIE = "dapier_oauth_state"
 AUTH_STATE_COOKIE = "dapier_auth_state"
 SESSION_TTL_SECONDS = 12 * 60 * 60
-SECRET_SPECS = {
-    "slack": {"name": "dapier/slack", "fields": ("token",)},
-    "mailchimp": {"name": "dataops-v1/mailchimp", "fields": ("api_key",)},
+CREDENTIAL_SPECS = {
+    "slack": {"credential_id": "slack", "fields": ("token",)},
+    "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
 }
 OAUTH_PROVIDERS = {
     "dropbox": {
@@ -295,12 +296,19 @@ def _workflows():
             "id": workflow["id"],
             "enabled": workflow.get("enabled", True),
             "trigger": workflow["trigger"],
+            "source": path.name,
             "actions": [
-                {"id": action.get("id", str(index)), "type": action["type"]}
+                {**action, "id": action.get("id", str(index)), "type": action["type"]}
                 for index, action in enumerate(workflow.get("actions", []))
             ],
         })
     return result
+
+
+def _workflows_edit_base():
+    return os.environ.get(
+        "WORKFLOWS_REPO_URL", "https://github.com/DataTalksClub/dapier"
+    ).rstrip("/") + "/edit/main/workflows"
 
 
 def _scan(table_name, limit=50):
@@ -308,19 +316,9 @@ def _scan(table_name, limit=50):
     return table.scan(Limit=limit).get("Items", [])
 
 
-def _secret_status(provider):
-    spec = SECRET_SPECS[provider]
-    try:
-        metadata = boto3.client("secretsmanager").describe_secret(SecretId=spec["name"])
-        return {
-            "provider": provider,
-            "configured": True,
-            "updated_at": metadata.get("LastChangedDate", datetime.now(timezone.utc)).isoformat(),
-        }
-    except ClientError as exc:
-        if exc.response.get("Error", {}).get("Code") == "ResourceNotFoundException":
-            return {"provider": provider, "configured": False, "updated_at": None}
-        raise
+def _credential_status(provider):
+    spec = CREDENTIAL_SPECS[provider]
+    return {"provider": provider, **credential_status(spec["credential_id"])}
 
 
 def overview():
@@ -334,14 +332,15 @@ def overview():
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),
         "workflows": _workflows(),
+        "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
-        "credentials": [_secret_status(provider) for provider in SECRET_SPECS],
+        "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
     })
 
 
-def save_secret(provider, event):
-    if provider not in SECRET_SPECS:
+def save_credential(provider, event):
+    if provider not in CREDENTIAL_SPECS:
         return _json_response(404, {"error": "Unknown credential provider"})
     try:
         body = _request_json(event)
@@ -360,15 +359,7 @@ def save_secret(provider, event):
             return _json_response(400, {"error": "Enter a valid Mailchimp API key"})
         secret_value = {"apiKey": api_key, "server": api_key.rsplit("-", 1)[1]}
 
-    client = boto3.client("secretsmanager")
-    name = SECRET_SPECS[provider]["name"]
-    value = json.dumps(secret_value, separators=(",", ":"))
-    try:
-        client.create_secret(Name=name, SecretString=value, Description=f"Managed by Dapier: {provider}")
-    except ClientError as exc:
-        if exc.response.get("Error", {}).get("Code") != "ResourceExistsException":
-            raise
-        client.put_secret_value(SecretId=name, SecretString=value)
+    put_credential(CREDENTIAL_SPECS[provider]["credential_id"], secret_value, provider=provider)
     return _json_response(200, {"provider": provider, "configured": True})
 
 
@@ -386,15 +377,8 @@ def save_connection(event):
     if provider not in OAUTH_PROVIDERS or not client_id or not client_secret:
         return _json_response(400, {"error": "Provider, client ID, and client secret are required"})
 
-    secret_name = f"dapier/oauth/{connection_id}"
-    secret_value = json.dumps({"client_secret": client_secret}, separators=(",", ":"))
-    secrets = boto3.client("secretsmanager")
-    try:
-        secrets.create_secret(Name=secret_name, SecretString=secret_value, Description=f"Dapier OAuth credentials for {connection_id}")
-    except ClientError as exc:
-        if exc.response.get("Error", {}).get("Code") != "ResourceExistsException":
-            raise
-        secrets.put_secret_value(SecretId=secret_name, SecretString=secret_value)
+    credential_id = f"oauth#{connection_id}"
+    put_credential(credential_id, {"client_secret": client_secret}, provider=provider)
 
     now = datetime.now(timezone.utc).isoformat()
     item = {
@@ -403,7 +387,7 @@ def save_connection(event):
         "display_name": str(body.get("display_name") or connection_id).strip()[:100],
         "client_id": client_id,
         "scopes": [scope for scope in body.get("scopes", []) if isinstance(scope, str)],
-        "credential_secret_id": secret_name,
+        "credential_id": credential_id,
         "status": "ready",
         "updated_at": now,
     }
@@ -457,8 +441,7 @@ def oauth_callback(event):
     if not connection or not query.get("code"):
         return _json_response(400, {"error": "OAuth connection or code is missing"})
 
-    secrets = boto3.client("secretsmanager")
-    secret = json.loads(secrets.get_secret_value(SecretId=connection["credential_secret_id"])["SecretString"])
+    secret = get_credential(connection["credential_id"])
     provider = OAUTH_PROVIDERS[connection["provider"]]
     request = urllib.request.Request(
         provider["token_url"],
@@ -475,10 +458,7 @@ def oauth_callback(event):
     with urllib.request.urlopen(request, timeout=15) as response:
         tokens = json.loads(response.read())
     secret["tokens"] = tokens
-    secrets.put_secret_value(
-        SecretId=connection["credential_secret_id"],
-        SecretString=json.dumps(secret, separators=(",", ":")),
-    )
+    put_credential(connection["credential_id"], secret, provider=connection["provider"])
     connection.update({"status": "connected", "connected_at": datetime.now(timezone.utc).isoformat()})
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=connection)
     return _redirect(
@@ -508,8 +488,8 @@ def route(event, method, path):
         return logout()
     if method == "GET" and path == "/api/admin/overview":
         return overview()
-    if method == "PUT" and path.startswith("/api/admin/secrets/"):
-        return save_secret(path.rsplit("/", 1)[1], event)
+    if method == "PUT" and path.startswith("/api/admin/credentials/"):
+        return save_credential(path.rsplit("/", 1)[1], event)
     if method == "PUT" and path == "/api/admin/connections":
         return save_connection(event)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)

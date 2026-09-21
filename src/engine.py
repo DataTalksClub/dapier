@@ -8,6 +8,8 @@ from pathlib import Path
 
 import yaml
 
+from .credentials import get_credential
+
 
 @lru_cache
 def workflows():
@@ -77,7 +79,7 @@ def _json_request(url, payload, headers=None, timeout=10):
 
 
 def run_slack(action, event):
-    secret = json.loads(secrets_value(action["token_secret_id"]))
+    secret = get_credential(action["credential_id"])
     token = secret.get("token") or secret.get("bot_token") or secret.get("SLACK_BOT_TOKEN")
     if not token:
         raise ValueError("Slack secret does not contain a bot token")
