@@ -53,6 +53,7 @@ Globals:
         AUTH_CLIENT_ID: !Ref AuthClientId
         AUTH_CALLBACK_URL: !Sub https://${DomainName}/auth/callback
         AUTH_LOGOUT_URL: !Sub https://${DomainName}/
+        OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback
         AUTH_ISSUER: !Ref AuthIssuer
         AUTH_JWKS_URL: !Ref AuthJwksUrl
 

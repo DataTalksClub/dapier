@@ -399,30 +399,66 @@ def _connection(connection_id):
     )
 
 
+def oauth_callback_url():
+    """The single registered provider redirect URI. Never derived from headers."""
+    url = os.environ.get("OAUTH_CALLBACK_URL", "").strip()
+    return url
+
+
+def _claim_oauth_state(jti):
+    """Consume an OAuth state ID exactly once. Returns False on replay."""
+    from botocore.exceptions import ClientError
+
+    table = boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"])
+    try:
+        table.put_item(
+            Item={
+                "execution_id": f"oauth-state:{jti}",
+                "status": "consumed",
+                "expires_at": int(time.time()) + 3600,
+            },
+            ConditionExpression="attribute_not_exists(execution_id)",
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return False
+        raise
+    return True
+
+
 def oauth_start(event, connection_id):
     connection = _connection(connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
-    provider = oauth_providers.get(connection["provider"])
-    host = _header(event, "x-forwarded-host") or _header(event, "host")
-    redirect_uri = f"https://{host}/oauth/callback"
+    redirect_uri = oauth_callback_url()
+    if not redirect_uri:
+        return _json_response(503, {"error": "OAuth callback URL is not configured"})
+    provider_name = connection["provider"]
+    try:
+        scopes = oauth_providers.normalize_scopes(provider_name, connection.get("scopes"))
+    except oauth_providers.ProviderError as exc:
+        return _json_response(400, {"error": str(exc)})
+    verifier = _b64encode(os.urandom(48))
+    challenge = _b64encode(hashlib.sha256(verifier.encode()).digest())
     state = _sign({
         "kind": "oauth",
         "connection_id": connection_id,
         "redirect_uri": redirect_uri,
+        "code_verifier": verifier,
+        "jti": _b64encode(os.urandom(16)),
+        "operator_subject": _session_subject(event),
         "exp": int(time.time()) + 600,
     })
-    params = {
-        "client_id": connection["client_id"],
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "state": state,
-        **provider["extra"],
-    }
-    if connection.get("scopes"):
-        params["scope"] = " ".join(connection["scopes"])
+    location = oauth_providers.authorization_url(
+        provider_name,
+        client_id=connection["client_id"],
+        redirect_uri=redirect_uri,
+        scopes=scopes,
+        state=state,
+        code_challenge=challenge,
+    )
     return _redirect(
-        f"{provider['authorization_url']}?{urllib.parse.urlencode(params)}",
+        location,
         cookies=[f"{OAUTH_COOKIE}={state}; Path=/oauth/callback; Max-Age=600; HttpOnly; Secure; SameSite=Lax"],
     )
 
@@ -435,30 +471,61 @@ def oauth_callback(event):
         return _json_response(400, {"error": "Invalid or expired OAuth state"})
     if query.get("error"):
         return _redirect(f"/?oauth={urllib.parse.quote(query['error'])}")
+    if not payload.get("jti") or not _claim_oauth_state(payload["jti"]):
+        return _json_response(400, {"error": "Invalid or expired OAuth state"})
+    session_subject = _session_subject(event)
+    if session_subject and payload.get("operator_subject") != session_subject:
+        return _json_response(400, {"error": "OAuth session does not match the connection request"})
     connection = _connection(payload["connection_id"])
     if not connection or not query.get("code"):
         return _json_response(400, {"error": "OAuth connection or code is missing"})
 
-    secret = get_credential(connection["credential_id"])
-    provider = oauth_providers.get(connection["provider"])
-    request = urllib.request.Request(
-        provider["token_url"],
-        data=urllib.parse.urlencode({
-            "code": query["code"],
-            "grant_type": "authorization_code",
-            "client_id": connection["client_id"],
-            "client_secret": secret["client_secret"],
-            "redirect_uri": payload["redirect_uri"],
-        }).encode(),
-        headers={"content-type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=15) as response:
-        tokens = json.loads(response.read())
-    secret["tokens"] = tokens
-    put_credential(connection["credential_id"], secret, provider=connection["provider"])
-    connection.update({"status": "connected", "connected_at": datetime.now(timezone.utc).isoformat()})
-    boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=connection)
+    try:
+        previous = get_credential(connection["credential_id"])
+    except KeyError:
+        return _json_response(400, {"error": "OAuth connection credentials are missing"})
+    try:
+        token_data = oauth_providers.exchange_code(
+            connection["provider"],
+            code=query["code"],
+            client_id=connection["client_id"],
+            client_secret=previous["client_secret"],
+            redirect_uri=payload["redirect_uri"],
+            code_verifier=payload.get("code_verifier"),
+        )
+    except (oauth_providers.ProviderError, KeyError) as exc:
+        message = str(exc) if isinstance(exc, oauth_providers.ProviderError) else "OAuth connection credentials are missing"
+        return _json_response(400, {"error": message})
+    requested = set(connection.get("scopes") or [])
+    granted_raw = token_data.get("scope")
+    if granted_raw:
+        granted = set(str(granted_raw).split())
+        missing = sorted(requested - granted)
+        if missing:
+            return _json_response(400, {
+                "error": "Provider did not grant the requested scopes",
+                "missing_scopes": missing,
+            })
+    else:
+        granted = requested
+    stored = {
+        "client_secret": previous.get("client_secret"),
+        **oauth_providers.normalize_token_data(
+            token_data, previous_refresh_token=previous.get("refresh_token"),
+        ),
+    }
+    put_credential(connection["credential_id"], stored, provider=connection["provider"])
+    try:
+        updated = connection_model.mark_connected(
+            connection,
+            verified_account_id=connection.get("verified_account_id"),
+            account_title=connection.get("account_title"),
+            granted_scopes=sorted(granted),
+            connected_by=payload.get("operator_subject") or session_subject,
+        )
+    except connection_model.BindingError as exc:
+        return _json_response(409, {"error": str(exc)})
+    boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     return _redirect(
         "/?oauth=connected",
         cookies=[f"{OAUTH_COOKIE}=; Path=/oauth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"],
