@@ -133,6 +133,9 @@ Resources:
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}
+        AgentApi:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: '/api/agent/{proxy+}', Method: ANY}
         OAuthCallback:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /oauth/callback, Method: GET}
