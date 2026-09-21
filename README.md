@@ -97,6 +97,55 @@ The `CredentialsTableName` and `CredentialsTableArn` stack outputs allow
 authorized consumers such as DataOps to receive exact-table, read-only IAM
 access without sharing Dapier's administration permissions.
 
+## OAuth token factory
+
+The full design lives in
+[docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md). One
+deliberate deviation: OAuth client secrets and tokens stay in the DynamoDB
+credentials table (with optimistic versioning) instead of Secrets Manager, so
+all application secrets share one storage boundary and IAM shape.
+
+Administration requires an explicit operator allowlist — a DTC sign-in alone
+is not enough. Configure it at deploy time (empty denies everyone):
+
+```bash
+sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatalks.club ...
+# or several: OperatorEmails="you@datatalks.club,teammate@datatalks.club"
+# stable Cognito subjects work too: OperatorSubjects="Google_123,..."
+```
+
+Install the operator CLI from this repo and sign in with the same DTC identity
+(the CLI client must be registered in the shared-auth stack with its localhost
+redirect URIs; the API publishes them at `/api/agent/config`):
+
+```bash
+pip install .
+dapier auth login
+dapier connections list
+dapier connections show youtube-personal
+dapier connections connect youtube-personal --agent buildcamp-uploader
+dapier token exec youtube-personal --agent buildcamp-uploader -- <command>
+dapier token write youtube-personal --agent buildcamp-uploader --output <private-file>
+```
+
+`token exec` puts a fresh access token only in the child's environment (as
+`DAPIER_ACCESS_TOKEN` plus `YOUTUBE_ACCESS_TOKEN`/`DROPBOX_ACCESS_TOKEN`) and
+never prints it. `token write` creates a `0600` file and refuses to overwrite
+without `--force`. Both commands verify the returned provider account ID
+against the connection's bound account before handing anything out.
+
+One-time migration of the existing DataTalksClub YouTube credential (bytes are
+transferred, never logged; refresh and channel ID are verified first; backups
+are untouched):
+
+```bash
+dapier connections import youtube-datatalksclub --provider youtube \
+  --client-id <id> --client-secret-file secret.txt \
+  --authorized-user-file token.json \
+  --expected-account UCDvErgK0j5ur3aLgn6U-LqQ \
+  --scopes https://www.googleapis.com/auth/youtube
+```
+
 ## Connector plan
 
 - **Dropbox:** webhook verification and notification ingress are scaffolded. The next
