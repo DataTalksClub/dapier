@@ -14,6 +14,8 @@ from pathlib import Path
 import boto3
 import yaml
 
+from . import connections as connection_model
+from . import oauth_providers
 from .credentials import credential_status, get_credential, put_credential
 
 
@@ -25,18 +27,7 @@ CREDENTIAL_SPECS = {
     "slack": {"credential_id": "slack", "fields": ("token",)},
     "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
 }
-OAUTH_PROVIDERS = {
-    "dropbox": {
-        "authorization_url": "https://www.dropbox.com/oauth2/authorize",
-        "token_url": "https://api.dropboxapi.com/oauth2/token",
-        "extra": {"token_access_type": "offline"},
-    },
-    "youtube": {
-        "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
-        "token_url": "https://oauth2.googleapis.com/token",
-        "extra": {"access_type": "offline", "prompt": "consent"},
-    },
-}
+OAUTH_PROVIDERS = oauth_providers.PROVIDERS
 
 _admin_secret = None
 
@@ -128,8 +119,18 @@ def _header(event, name):
     )
 
 
+def _session_payload(event):
+    return _verify(_cookie(event, SESSION_COOKIE)) or {}
+
+
 def authenticated(event):
     return _verify(_cookie(event, SESSION_COOKIE)) is not None
+
+
+def _session_subject(event):
+    payload = _session_payload(event)
+    subject = payload.get("subject") or payload.get("sub")
+    return str(subject) if subject else None
 
 
 def _auth_config():
@@ -372,44 +373,37 @@ def save_connection(event):
         body = _request_json(event)
     except (ValueError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    connection_id = str(body.get("connection_id", "")).strip().lower()
-    provider = str(body.get("provider", "")).strip().lower()
-    client_id = str(body.get("client_id", "")).strip()
-    client_secret = str(body.get("client_secret", "")).strip()
-    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,62}", connection_id):
-        return _json_response(400, {"error": "Connection ID must use lowercase letters, numbers, dashes, or underscores"})
-    if provider not in OAUTH_PROVIDERS or not client_id or not client_secret:
-        return _json_response(400, {"error": "Provider, client ID, and client secret are required"})
+    try:
+        fields = connection_model.validate_new_connection(body)
+    except connection_model.ConnectionError as exc:
+        return _json_response(400, {"error": str(exc)})
 
-    credential_id = f"oauth#{connection_id}"
-    put_credential(credential_id, {"client_secret": client_secret}, provider=provider)
+    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    previous = connection_model.get_connection(connections_table, fields["connection_id"])
+    try:
+        item = connection_model.build_item(
+            fields, owner_subject=_session_subject(event), previous=previous,
+        )
+    except connection_model.BindingError as exc:
+        return _json_response(409, {"error": str(exc)})
 
-    now = datetime.now(timezone.utc).isoformat()
-    item = {
-        "connection_id": connection_id,
-        "provider": provider,
-        "display_name": str(body.get("display_name") or connection_id).strip()[:100],
-        "client_id": client_id,
-        "scopes": [scope for scope in body.get("scopes", []) if isinstance(scope, str)],
-        "credential_id": credential_id,
-        "status": "ready",
-        "updated_at": now,
-    }
-    boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=item)
+    put_credential(item["credential_id"], {"client_secret": fields["client_secret"]}, provider=item["provider"])
+    connection_model.put_connection(connections_table, item)
     return _json_response(200, item)
 
 
 def _connection(connection_id):
-    return boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).get_item(
-        Key={"connection_id": connection_id}
-    ).get("Item")
+    return connection_model.get_connection(
+        boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]),
+        connection_id,
+    )
 
 
 def oauth_start(event, connection_id):
     connection = _connection(connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
-    provider = OAUTH_PROVIDERS[connection["provider"]]
+    provider = oauth_providers.get(connection["provider"])
     host = _header(event, "x-forwarded-host") or _header(event, "host")
     redirect_uri = f"https://{host}/oauth/callback"
     state = _sign({
@@ -446,7 +440,7 @@ def oauth_callback(event):
         return _json_response(400, {"error": "OAuth connection or code is missing"})
 
     secret = get_credential(connection["credential_id"])
-    provider = OAUTH_PROVIDERS[connection["provider"]]
+    provider = oauth_providers.get(connection["provider"])
     request = urllib.request.Request(
         provider["token_url"],
         data=urllib.parse.urlencode({

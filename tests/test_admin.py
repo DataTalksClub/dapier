@@ -125,6 +125,9 @@ def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
         def put_item(self, **kwargs):
             records.append(kwargs["Item"])
 
+        def get_item(self, **kwargs):
+            return {}
+
     class Dynamo:
         def Table(self, _name):
             return Table()
