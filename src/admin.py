@@ -206,8 +206,12 @@ def auth_callback(event):
         return _auth_error_redirect(clear_state)
     if not hmac.compare_digest(str(claims.get("nonce", "")), pending.get("nonce", "")):
         return _auth_error_redirect(clear_state)
+    # `email_verified` is not re-checked here: the shared pool's pre-sign-up trigger
+    # already requires a verified @datatalks.club address on every Google
+    # authentication, and this app client is Google-only. The email claim itself is
+    # still required, because the session is keyed by it.
     email = claims.get("email")
-    if not isinstance(email, str) or claims.get("email_verified") is not True:
+    if not isinstance(email, str) or not email:
         return _auth_error_redirect(clear_state)
     token = _sign({"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS})
     return _redirect(

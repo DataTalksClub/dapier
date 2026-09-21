@@ -35,7 +35,8 @@ def configure_oidc(monkeypatch):
     monkeypatch.setenv("AUTH_JWKS_URL", "https://issuer.example.test/pool/.well-known/jwks.json")
 
 
-def test_oidc_login_uses_pkce_and_verified_callback_creates_session(monkeypatch):
+def begin_oidc(monkeypatch, claims):
+    """Run login, then feed `claims` back through the callback as the ID token."""
     configure_oidc(monkeypatch)
     monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
     start = admin.auth_login(request("GET", "/auth/login"))
@@ -48,18 +49,32 @@ def test_oidc_login_uses_pkce_and_verified_callback_creates_session(monkeypatch)
     state_cookie = start["cookies"][0].split(";", 1)[0]
     pending = admin._verify(state_cookie.split("=", 1)[1], kind="oidc")
     monkeypatch.setattr(admin, "_exchange_auth_code", lambda code, verifier: {"id_token": "signed-token"})
-    monkeypatch.setattr(admin, "_verify_id_token", lambda token: {
-        "sub": "person-1", "email": "Person@DataTalks.Club",
-        "email_verified": True, "nonce": pending["nonce"],
-    })
+    monkeypatch.setattr(admin, "_verify_id_token", lambda token: {"nonce": pending["nonce"], **claims})
     event = request("GET", "/auth/callback", cookies=[state_cookie])
     event["queryStringParameters"] = {"code": "valid-code", "state": query["state"][0]}
-    callback = admin.auth_callback(event)
+    return admin.auth_callback(event)
+
+
+def test_oidc_login_uses_pkce_and_google_identity_creates_session(monkeypatch):
+    # Cognito emits the mapped Google attribute as the string "true", not a boolean.
+    callback = begin_oidc(monkeypatch, {
+        "sub": "Google_115538746644348324376", "email": "Person@DataTalks.Club",
+        "email_verified": "true",
+    })
+
     assert callback["statusCode"] == 302
     assert callback["headers"]["location"] == "/"
     session_cookie = next(value for value in callback["cookies"] if value.startswith("dapier_session="))
     session = admin._verify(session_cookie.split(";", 1)[0].split("=", 1)[1])
     assert session["sub"] == "person@datatalks.club"
+
+
+def test_oidc_callback_rejects_token_without_email(monkeypatch):
+    callback = begin_oidc(monkeypatch, {"sub": "Google_115538746644348324376"})
+
+    assert callback["statusCode"] == 303
+    assert callback["headers"]["location"] == "/auth/error"
+    assert not any(value.startswith("dapier_session=") for value in callback["cookies"])
 
 
 def test_oidc_callback_rejects_invalid_state(monkeypatch):
