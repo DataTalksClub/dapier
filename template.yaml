@@ -30,10 +30,22 @@ Parameters:
     Default: https://auth.dtcdev.click
   AuthClientId:
     Type: String
+  AuthCliClientId:
+    Type: String
+    Default: ''
+    Description: DTC shared-auth public client ID for the dapier CLI (empty disables CLI token issuance)
   AuthIssuer:
     Type: String
   AuthJwksUrl:
     Type: String
+  OperatorEmails:
+    Type: String
+    Default: ''
+    Description: Comma-separated DTC emails allowed to administer connections (empty denies all)
+  OperatorSubjects:
+    Type: String
+    Default: ''
+    Description: Comma-separated stable DTC subjects allowed to administer connections
 
 Globals:
   Function:
@@ -46,16 +58,21 @@ Globals:
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         CREDENTIALS_TABLE: !Ref CredentialsTable
         EXECUTIONS_TABLE: !Ref ExecutionsTable
+        GRANTS_TABLE: !Ref GrantsTable
+        AUDIT_TABLE: !Ref AuditTable
         RENDER_QUEUE_URL: !Ref RenderQueue
         RENDER_ARTIFACTS_BUCKET: !Ref RenderArtifactsBucket
         DATAOPS_INTAKE_URL: !Ref DataOpsIntakeUrl
         AUTH_BASE_URL: !Ref AuthBaseUrl
         AUTH_CLIENT_ID: !Ref AuthClientId
+        AUTH_CLI_CLIENT_ID: !Ref AuthCliClientId
         AUTH_CALLBACK_URL: !Sub https://${DomainName}/auth/callback
         AUTH_LOGOUT_URL: !Sub https://${DomainName}/
         OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback
         AUTH_ISSUER: !Ref AuthIssuer
         AUTH_JWKS_URL: !Ref AuthJwksUrl
+        OPERATOR_EMAILS: !Ref OperatorEmails
+        OPERATOR_SUBJECTS: !Ref OperatorSubjects
 
 Resources:
   Api:
@@ -93,8 +110,12 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]
             Resource: !GetAtt CredentialsTable.Arn
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref ExecutionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GrantsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AuditTable
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -388,6 +409,34 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  GrantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: connection_id, AttributeType: S}
+        - {AttributeName: grantee, AttributeType: S}
+      KeySchema:
+        - {AttributeName: connection_id, KeyType: HASH}
+        - {AttributeName: grantee, KeyType: RANGE}
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  AuditTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: audit_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: audit_id, KeyType: HASH}
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   MailBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -441,3 +490,7 @@ Outputs:
     Value: !Ref CredentialsTable
   CredentialsTableArn:
     Value: !GetAtt CredentialsTable.Arn
+  GrantsTableName:
+    Value: !Ref GrantsTable
+  AuditTableName:
+    Value: !Ref AuditTable

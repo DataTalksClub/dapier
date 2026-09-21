@@ -14,6 +14,8 @@ from pathlib import Path
 import boto3
 import yaml
 
+from . import audit as audit_log
+from . import authz
 from . import connections as connection_model
 from . import oauth_providers
 from .credentials import credential_status, get_credential, put_credential
@@ -125,6 +127,57 @@ def _session_payload(event):
 
 def authenticated(event):
     return _verify(_cookie(event, SESSION_COOKIE)) is not None
+
+
+def require_operator(event):
+    """Return ``(payload, None)`` for operators, ``(None, response)`` otherwise."""
+    payload = _session_payload(event)
+    if not payload:
+        return None, _json_response(401, {"error": "Authentication required"})
+    if not authz.is_operator(payload):
+        _audit_event(
+            "unknown", audit_log.CONNECT, subject_fallback(payload),
+            outcome="denied-not-operator",
+        )
+        return None, _json_response(403, {"error": "Operator authorization required"})
+    return payload, None
+
+
+def subject_fallback(payload):
+    subject = (payload or {}).get("subject") or (payload or {}).get("sub")
+    return str(subject) if subject else "unknown"
+
+
+def _audit_event(connection_id, action, actor, *, outcome, agent=None, error=None):
+    table_name = os.environ.get("AUDIT_TABLE", "")
+    if not table_name:
+        return None
+    try:
+        table = audit_log.audit_table()
+    except KeyError:
+        return None
+    return audit_log.record(
+        table, connection_id=connection_id, action=action,
+        actor_subject=actor, agent=agent, outcome=outcome, error=error,
+    )
+
+
+def _csrf_ok(event, method):
+    """Same-origin check for cookie-authenticated state-changing requests."""
+    if method in ("GET", "HEAD", "OPTIONS"):
+        return True
+    if not _cookie(event, SESSION_COOKIE):
+        return True
+    host = _header(event, "host").lower()
+    for header in (_header(event, "origin"), _header(event, "referer")):
+        if not header:
+            continue
+        try:
+            if urllib.parse.urlparse(header).hostname.lower() == host:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _session_subject(event):
@@ -380,16 +433,71 @@ def save_connection(event):
 
     connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
     previous = connection_model.get_connection(connections_table, fields["connection_id"])
+    operator = _session_subject(event)
     try:
         item = connection_model.build_item(
-            fields, owner_subject=_session_subject(event), previous=previous,
+            fields, owner_subject=operator, previous=previous,
         )
     except connection_model.BindingError as exc:
+        _audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                     outcome="error", error=str(exc))
         return _json_response(409, {"error": str(exc)})
 
     put_credential(item["credential_id"], {"client_secret": fields["client_secret"]}, provider=item["provider"])
     connection_model.put_connection(connections_table, item)
+    _audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
     return _json_response(200, item)
+
+
+def list_grants(event):
+    query = event.get("queryStringParameters") or {}
+    table = authz.grants_table()
+    items = authz.list_grants(table, connection_id=query.get("connection_id") or None)
+    return _json_response(200, {"grants": [
+        {key: item.get(key) for key in (
+            "connection_id", "grantee", "subject", "agent", "operations",
+            "granted_by", "granted_at", "updated_at", "expires_at",
+        )} for item in items
+    ]})
+
+
+def save_grant(event, operator):
+    try:
+        body = _request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    connection_id = str(body.get("connection_id", "")).strip().lower()
+    subject = str(body.get("subject", "")).strip()
+    if not connection_id or not subject:
+        return _json_response(400, {"error": "Connection ID and subject are required"})
+    if not _connection(connection_id):
+        return _json_response(404, {"error": "Connection not found"})
+    try:
+        item = authz.put_grant(
+            authz.grants_table(),
+            connection_id=connection_id,
+            subject=subject,
+            agent=body.get("agent", ""),
+            operations=body.get("operations", []),
+            granted_by=operator,
+            expires_at=body.get("expires_at"),
+        )
+    except ValueError as exc:
+        return _json_response(400, {"error": str(exc)})
+    _audit_event(connection_id, audit_log.GRANT, operator,
+                 agent=item["agent"], outcome="ok")
+    return _json_response(200, item)
+
+
+def delete_grant(event, operator):
+    query = event.get("queryStringParameters") or {}
+    connection_id = str(query.get("connection_id", "")).strip().lower()
+    grantee_id = str(query.get("grantee", "")).strip()
+    if not connection_id or not grantee_id:
+        return _json_response(400, {"error": "Connection ID and grantee are required"})
+    authz.delete_grant(authz.grants_table(), connection_id=connection_id, grantee_id=grantee_id)
+    _audit_event(connection_id, audit_log.GRANT, operator, outcome="revoked")
+    return _json_response(200, {"ok": True})
 
 
 def _connection(connection_id):
@@ -474,7 +582,10 @@ def oauth_callback(event):
     if not payload.get("jti") or not _claim_oauth_state(payload["jti"]):
         return _json_response(400, {"error": "Invalid or expired OAuth state"})
     session_subject = _session_subject(event)
+    operator = payload.get("operator_subject") or session_subject or "unknown"
     if session_subject and payload.get("operator_subject") != session_subject:
+        _audit_event(payload.get("connection_id", "unknown"), audit_log.CALLBACK,
+                     session_subject, outcome="denied-wrong-operator")
         return _json_response(400, {"error": "OAuth session does not match the connection request"})
     connection = _connection(payload["connection_id"])
     if not connection or not query.get("code"):
@@ -495,6 +606,8 @@ def oauth_callback(event):
         )
     except (oauth_providers.ProviderError, KeyError) as exc:
         message = str(exc) if isinstance(exc, oauth_providers.ProviderError) else "OAuth connection credentials are missing"
+        _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
+                     outcome="error", error=message)
         return _json_response(400, {"error": message})
     requested = set(connection.get("scopes") or [])
     granted_raw = token_data.get("scope")
@@ -502,6 +615,8 @@ def oauth_callback(event):
         granted = set(str(granted_raw).split())
         missing = sorted(requested - granted)
         if missing:
+            _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
+                         outcome="error", error="missing scopes")
             return _json_response(400, {
                 "error": "Provider did not grant the requested scopes",
                 "missing_scopes": missing,
@@ -521,11 +636,14 @@ def oauth_callback(event):
             verified_account_id=connection.get("verified_account_id"),
             account_title=connection.get("account_title"),
             granted_scopes=sorted(granted),
-            connected_by=payload.get("operator_subject") or session_subject,
+            connected_by=operator,
         )
     except connection_model.BindingError as exc:
+        _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
+                     outcome="error", error=str(exc))
         return _json_response(409, {"error": str(exc)})
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
+    _audit_event(connection["connection_id"], audit_log.CALLBACK, operator, outcome="ok")
     return _redirect(
         "/?oauth=connected",
         cookies=[f"{OAUTH_COOKIE}=; Path=/oauth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"],
@@ -548,15 +666,31 @@ def route(event, method, path):
     if not authenticated(event):
         return _json_response(401, {"error": "Authentication required"})
     if method == "GET" and path == "/api/admin/me":
-        return _json_response(200, {"username": _verify(_cookie(event, SESSION_COOKIE))["sub"]})
+        payload = _session_payload(event)
+        return _json_response(200, {
+            "username": payload.get("sub"),
+            "operator": authz.is_operator(payload),
+        })
     if method == "POST" and path == "/api/admin/logout":
         return logout()
+    if not _csrf_ok(event, method):
+        return _json_response(403, {"error": "Cross-site request rejected"})
+    operator_payload, operator_error = require_operator(event)
+    if operator_error:
+        return operator_error
+    operator_subject = subject_fallback(operator_payload)
     if method == "GET" and path == "/api/admin/overview":
         return overview()
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return save_credential(path.rsplit("/", 1)[1], event)
     if method == "PUT" and path == "/api/admin/connections":
         return save_connection(event)
+    if method == "GET" and path == "/api/admin/grants":
+        return list_grants(event)
+    if method == "PUT" and path == "/api/admin/grants":
+        return save_grant(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/grants":
+        return delete_grant(event, operator_subject)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))
