@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timezone
 
 from .engine import execute
 
@@ -65,6 +66,10 @@ def _execution_id(workflow_id, action_id, event):
     return f"{workflow_id}:{action_id}:{event['id']}"
 
 
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _is_pending(workflow_id, action_id, event):
     import boto3
     from botocore.exceptions import ClientError
@@ -75,7 +80,13 @@ def _is_pending(workflow_id, action_id, event):
         table.put_item(
             Item={
                 "execution_id": _execution_id(workflow_id, action_id, event),
+                "workflow_id": workflow_id,
+                "action_id": action_id,
+                "connector": event.get("connector"),
+                "event_type": event.get("event"),
+                "correlation_id": event.get("correlation_id") or event.get("id"),
                 "status": "processing",
+                "started_at": _now_iso(),
                 "lease_until": now + 300,
                 "expires_at": now + 90 * 86400,
             },
@@ -92,21 +103,37 @@ def _is_pending(workflow_id, action_id, event):
 def _mark_completed(workflow_id, action_id, event):
     import boto3
 
-    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(Item={
-        "execution_id": _execution_id(workflow_id, action_id, event),
-        "status": "completed",
-        "expires_at": int(time.time()) + 90 * 86400,
-    })
+    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).update_item(
+        Key={"execution_id": _execution_id(workflow_id, action_id, event)},
+        UpdateExpression="SET #status = :completed, finished_at = :finished, expires_at = :expires",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues={
+            ":completed": "completed",
+            ":finished": _now_iso(),
+            ":expires": int(time.time()) + 90 * 86400,
+        },
+    )
 
 
-def _release_action(workflow_id, action_id, event):
+def _release_action(workflow_id, action_id, event, exc=None):
     import boto3
 
-    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).delete_item(
+    now = int(time.time())
+    message = (str(exc) or exc.__class__.__name__) if exc is not None else "Action failed"
+    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).update_item(
         Key={"execution_id": _execution_id(workflow_id, action_id, event)},
-        ConditionExpression="#status = :processing",
-        ExpressionAttributeNames={"#status": "status"},
-        ExpressionAttributeValues={":processing": "processing"},
+        UpdateExpression=(
+            "SET #status = :failed, finished_at = :finished, #error = :error, "
+            "lease_until = :lease, expires_at = :expires"
+        ),
+        ExpressionAttributeNames={"#status": "status", "#error": "error"},
+        ExpressionAttributeValues={
+            ":failed": "failed",
+            ":finished": _now_iso(),
+            ":error": message[:500],
+            ":lease": now - 1,
+            ":expires": now + 90 * 86400,
+        },
     )
 
 

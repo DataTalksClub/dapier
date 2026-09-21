@@ -217,9 +217,9 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         run_render_job(action, event, workflow["id"])
                     else:
                         raise ValueError(f"unsupported action: {action['type']}")
-                except Exception:
+                except Exception as exc:
                     if on_action_error:
-                        on_action_error(workflow["id"], action_id, event)
+                        on_action_error(workflow["id"], action_id, event, exc)
                     raise
                 if after_action:
                     after_action(workflow["id"], action_id, event)

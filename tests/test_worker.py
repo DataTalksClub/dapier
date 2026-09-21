@@ -1,7 +1,90 @@
 import json
 import unittest
 
+import boto3
+from botocore.exceptions import ClientError
+
+from src import worker
 from src.worker import normalize_payload
+
+
+EVENT = {
+    "id": "evt-1",
+    "connector": "email",
+    "event": "message.received",
+    "correlation_id": "corr-1",
+}
+
+
+class _CapturingTable:
+    def __init__(self, calls, put_raises=None):
+        self._calls = calls
+        self._put_raises = put_raises
+
+    def put_item(self, **kwargs):
+        self._calls.append(("put_item", kwargs))
+        if self._put_raises:
+            raise self._put_raises
+
+    def update_item(self, **kwargs):
+        self._calls.append(("update_item", kwargs))
+
+
+def _patch_table(monkeypatch, calls, put_raises=None):
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+
+    class Dynamo:
+        def Table(self, _name):
+            return _CapturingTable(calls, put_raises)
+
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+
+
+def test_is_pending_records_identity_and_start(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    assert worker._is_pending("youtube-slack", "notify", EVENT) is True
+    item = calls[0][1]["Item"]
+    assert item["execution_id"] == "youtube-slack:notify:evt-1"
+    assert item["workflow_id"] == "youtube-slack"
+    assert item["action_id"] == "notify"
+    assert item["connector"] == "email"
+    assert item["event_type"] == "message.received"
+    assert item["correlation_id"] == "corr-1"
+    assert item["status"] == "processing"
+    assert item["started_at"]
+
+
+def test_is_pending_false_when_lease_held(monkeypatch):
+    calls = []
+    conflict = ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
+    _patch_table(monkeypatch, calls, put_raises=conflict)
+
+    assert worker._is_pending("youtube-slack", "notify", EVENT) is False
+
+
+def test_mark_completed_sets_finished(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    worker._mark_completed("youtube-slack", "notify", EVENT)
+    kwargs = calls[0][1]
+    assert calls[0][0] == "update_item"
+    assert kwargs["ExpressionAttributeValues"][":completed"] == "completed"
+    assert kwargs["ExpressionAttributeValues"][":finished"]
+
+
+def test_release_action_records_error_and_reopens_lease(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    worker._release_action("youtube-slack", "notify", EVENT, RuntimeError("boom"))
+    values = calls[0][1]["ExpressionAttributeValues"]
+    assert calls[0][0] == "update_item"
+    assert values[":failed"] == "failed"
+    assert values[":error"] == "boom"
+    assert values[":lease"] < int(__import__("time").time())
 
 
 class NormalizeTests(unittest.TestCase):
