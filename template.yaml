@@ -44,6 +44,7 @@ Globals:
       Variables:
         EVENT_QUEUE_URL: !Ref EventQueue
         CONNECTIONS_TABLE: !Ref ConnectionsTable
+        CREDENTIALS_TABLE: !Ref CredentialsTable
         EXECUTIONS_TABLE: !Ref ExecutionsTable
         RENDER_QUEUE_URL: !Ref RenderQueue
         RENDER_ARTIFACTS_BUCKET: !Ref RenderArtifactsBucket
@@ -87,19 +88,12 @@ Resources:
             SecretArn: !Ref DapierAdminSecret
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref ExecutionsTable
         - Statement:
             Effect: Allow
-            Action:
-              - secretsmanager:CreateSecret
-              - secretsmanager:DescribeSecret
-              - secretsmanager:GetSecretValue
-              - secretsmanager:PutSecretValue
-            Resource:
-              - !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/slack-*
-              - !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/oauth/*
-              - !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dataops-v1/mailchimp-*
+            Action: [dynamodb:GetItem, dynamodb:PutItem]
+            Resource: !GetAtt CredentialsTable.Arn
+        - DynamoDBReadPolicy:
+            TableName: !Ref ExecutionsTable
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -226,6 +220,10 @@ Resources:
       MemorySize: 512
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:GetItem]
+            Resource: !GetAtt CredentialsTable.Arn
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -364,6 +362,18 @@ Resources:
         - {AttributeName: connection_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  CredentialsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: credential_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: credential_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   ExecutionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -426,3 +436,7 @@ Outputs:
     Value: !Ref YouTubeSubscriptionFunction
   AdminSecretName:
     Value: !Ref DapierAdminSecret
+  CredentialsTableName:
+    Value: !Ref CredentialsTable
+  CredentialsTableArn:
+    Value: !GetAtt CredentialsTable.Arn
