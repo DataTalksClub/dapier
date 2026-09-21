@@ -120,7 +120,7 @@ def handler(event, _context):
         if static:
             return static
 
-    if path.startswith("/api/admin/") or path == "/oauth/callback" or path.startswith("/auth/"):
+    if path.startswith("/api/admin/") or path.startswith("/api/agent/") or path == "/oauth/callback" or path.startswith("/auth/"):
         return admin.route(event, method, path)
 
     if method == "GET" and path == "/health":

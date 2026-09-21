@@ -44,3 +44,19 @@ def test_publish_adds_version_and_correlation_id(monkeypatch):
     assert envelope["schema_version"] == "1.0"
     assert envelope["id"] == "event-1"
     assert envelope["correlation_id"] == "event-1"
+
+
+def test_agent_paths_reach_the_api_router(monkeypatch):
+    import json
+
+    monkeypatch.setenv("AUTH_CLI_CLIENT_ID", "")
+    response = ingress.handler(
+        {
+            "requestContext": {"http": {"method": "GET", "path": "/api/agent/config"}},
+            "headers": {"host": "dapier.example.test"},
+            "cookies": [],
+        },
+        None,
+    )
+    assert response["statusCode"] == 200
+    assert "cli_client_id" in json.loads(response["body"])
