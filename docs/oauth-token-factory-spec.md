@@ -67,9 +67,10 @@ The provider account ID is immutable after first verified consent unless an
 operator explicitly replaces the connection. In particular, binding
 `youtube-personal` to the DataTalksClub channel must fail.
 
-Secrets Manager stores the OAuth client credential, access token, refresh
-token, expiry, and provider-specific token metadata under one versioned secret
-per connection. DynamoDB does not contain bearer credentials. Preserve a valid
+Secrets Manager stores the OAuth client credential, refresh token, and
+provider-specific durable metadata under one versioned secret per connection.
+Short-lived access tokens are renewed as needed; they do not need separate
+durable backups. DynamoDB does not contain bearer credentials. Preserve a valid
 refresh token when a refresh response omits `refresh_token`. Make connection
 edits and token refreshes safe under concurrent use: do not overwrite a newer
 secret with stale state, and do not lose a rotated refresh token. Redact
@@ -153,6 +154,10 @@ Create `youtube-personal` through a fresh consent selecting `@stolzenable`.
 Do not copy the DataTalksClub token or assume that the Google account picker
 selected the intended channel. Nothing in the AI Shipping Labs production
 website needs this credential; the buildcamp migration is an operator job.
+There is an interim local upload-only cache in
+`youtube-manager-agent/.youtube/personal/token.json`; its channel identity has
+not been verified because `youtube.upload` cannot call `channels.list`. Treat
+it as untrusted input for migration, and complete verified consent in Dapier.
 
 Do not automate the 107-video upload as part of this work. Confirm the current
 YouTube API upload quota and the unaudited-project private-video restriction
