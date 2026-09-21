@@ -22,6 +22,9 @@ Connections, OAuth tokens, cursors, and idempotency records are stored in Dynamo
 Secrets belong in Secrets Manager. SQS provides retries and dead-letter queues;
 CloudWatch alarms track worker failures and visible DLQ messages.
 
+The proposed shared-auth OAuth token factory and agent CLI are specified in
+[docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md).
+
 ## Configure a workflow
 
 Add a file under `workflows/`:
