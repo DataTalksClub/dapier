@@ -59,3 +59,18 @@ def record(table, *, connection_id, action, actor_subject, outcome,
 
 def recent(table, limit=100):
     return table.scan(Limit=limit).get("Items", [])
+
+
+def emit(connection_id, action, actor_subject, *, outcome, agent=None, error=None):
+    """Best-effort audit write. No-ops when AUDIT_TABLE is not configured."""
+    table_name = os.environ.get("AUDIT_TABLE", "")
+    if not table_name:
+        return None
+    try:
+        table = audit_table()
+    except KeyError:
+        return None
+    return record(
+        table, connection_id=connection_id, action=action,
+        actor_subject=actor_subject, agent=agent, outcome=outcome, error=error,
+    )

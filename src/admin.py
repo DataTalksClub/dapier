@@ -14,11 +14,15 @@ from pathlib import Path
 import boto3
 import yaml
 
+from . import agent_api
 from . import audit as audit_log
 from . import authz
 from . import connections as connection_model
 from . import oauth_providers
 from .credentials import credential_status, get_credential, put_credential
+from .dtc_auth import auth_config as _auth_config
+from .dtc_auth import exchange_auth_code as _exchange_auth_code
+from .dtc_auth import verify_id_token as _verify_id_token
 
 
 SESSION_COOKIE = "dapier_session"
@@ -149,16 +153,8 @@ def subject_fallback(payload):
 
 
 def _audit_event(connection_id, action, actor, *, outcome, agent=None, error=None):
-    table_name = os.environ.get("AUDIT_TABLE", "")
-    if not table_name:
-        return None
-    try:
-        table = audit_log.audit_table()
-    except KeyError:
-        return None
-    return audit_log.record(
-        table, connection_id=connection_id, action=action,
-        actor_subject=actor, agent=agent, outcome=outcome, error=error,
+    return audit_log.emit(
+        connection_id, action, actor, outcome=outcome, agent=agent, error=error,
     )
 
 
@@ -186,18 +182,6 @@ def _session_subject(event):
     return str(subject) if subject else None
 
 
-def _auth_config():
-    issuer = os.environ.get("AUTH_ISSUER", "").rstrip("/")
-    return {
-        "base_url": os.environ.get("AUTH_BASE_URL", "").rstrip("/"),
-        "client_id": os.environ.get("AUTH_CLIENT_ID", ""),
-        "callback_url": os.environ.get("AUTH_CALLBACK_URL", ""),
-        "logout_url": os.environ.get("AUTH_LOGOUT_URL", ""),
-        "issuer": issuer,
-        "jwks_url": os.environ.get("AUTH_JWKS_URL", f"{issuer}/.well-known/jwks.json" if issuer else ""),
-    }
-
-
 def auth_login(event):
     config = _auth_config()
     if not all(config[key] for key in ("base_url", "client_id", "callback_url", "issuer", "jwks_url")):
@@ -219,31 +203,6 @@ def auth_login(event):
     return _redirect(
         f'{config["base_url"]}/oauth2/authorize?{query}',
         cookies=[f"{AUTH_STATE_COOKIE}={token}; Path=/auth/callback; Max-Age=600; HttpOnly; Secure; SameSite=Lax"],
-    )
-
-
-def _exchange_auth_code(code, verifier):
-    config = _auth_config()
-    body = urllib.parse.urlencode({
-        "grant_type": "authorization_code", "client_id": config["client_id"],
-        "code": code, "redirect_uri": config["callback_url"], "code_verifier": verifier,
-    }).encode()
-    request = urllib.request.Request(
-        f'{config["base_url"]}/oauth2/token', data=body,
-        headers={"content-type": "application/x-www-form-urlencoded"}, method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=15) as response:
-        return json.loads(response.read())
-
-
-def _verify_id_token(id_token):
-    import jwt
-
-    config = _auth_config()
-    key = jwt.PyJWKClient(config["jwks_url"]).get_signing_key_from_jwt(id_token)
-    return jwt.decode(
-        id_token, key.key, algorithms=["RS256"], audience=config["client_id"],
-        issuer=config["issuer"], options={"require": ["exp", "iat", "iss", "aud", "sub"]},
     )
 
 
@@ -507,6 +466,18 @@ def _connection(connection_id):
     )
 
 
+def revoke_connection_tokens(connection_id, operator):
+    from . import tokens as token_lifecycle
+
+    connection = _connection(connection_id)
+    if not connection:
+        return _json_response(404, {"error": "Connection not found"})
+    updated = token_lifecycle.revoke_connection(connection)
+    boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
+    _audit_event(connection_id, audit_log.REVOKE, operator, outcome="ok")
+    return _json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+
 def oauth_callback_url():
     """The single registered provider redirect URI. Never derived from headers."""
     url = os.environ.get("OAUTH_CALLBACK_URL", "").strip()
@@ -663,6 +634,8 @@ def route(event, method, path):
         return login(event)
     if method == "GET" and path == "/oauth/callback":
         return oauth_callback(event)
+    if path.startswith("/api/agent/"):
+        return agent_api.route(event, method, path)
     if not authenticated(event):
         return _json_response(401, {"error": "Authentication required"})
     if method == "GET" and path == "/api/admin/me":
@@ -694,4 +667,7 @@ def route(event, method, path):
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))
+    revoke_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/tokens", path)
+    if method == "DELETE" and revoke_match:
+        return revoke_connection_tokens(revoke_match.group(1), operator_subject)
     return _json_response(404, {"error": "Not found"})
