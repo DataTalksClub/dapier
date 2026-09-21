@@ -99,9 +99,35 @@
     </form>
   </dialog>
 
+  <dialog id="run-dialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">Execution</p><h2 id="run-title">Run</h2></div>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="run-detail" class="workflow-detail"></div>
+    <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Close</button></div>
+  </dialog>
+
+  <dialog id="workflow-dialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">Workflow</p><h2 id="workflow-title">Workflow</h2></div>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="workflow-detail" class="workflow-detail"></div>
+    <div class="dialog-actions">
+      <button class="button secondary dialog-close" type="button">Close</button>
+      <a id="workflow-edit" class="button primary" target="_blank" rel="noopener"><i data-lucide="pencil"></i><span>Edit on GitHub</span></a>
+    </div>
+  </dialog>
+
   <dialog id="connection-dialog">
     <form id="connection-form" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">OAuth 2.0</p><h2>Add connection</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="dialog-head"><div><p class="eyebrow">OAuth 2.0</p><h2 id="connection-heading">Add connection</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="callout">
+        <p class="callout-step"><strong>1.</strong> In the <a id="connection-console" href="#" target="_blank" rel="noopener">provider console</a>, register this redirect URI:</p>
+        <div class="copy-field"><code id="connection-redirect">https://…/oauth/callback</code><button id="connection-copy" class="icon-button" type="button" title="Copy" aria-label="Copy redirect URI"><i data-lucide="copy"></i></button></div>
+        <p class="callout-step"><strong>2.</strong> Paste the client ID and secret it gives you below.</p>
+      </div>
       <div class="form-grid">
         <label>Provider<select name="provider"><option value="dropbox">Dropbox</option><option value="youtube">YouTube</option></select></label>
         <label>Connection ID<input name="connection_id" placeholder="team-dropbox" pattern="[a-z0-9][a-z0-9_-]{1,62}" required></label>
@@ -109,7 +135,7 @@
       <label>Display name<input name="display_name" placeholder="Team Dropbox" required></label>
       <label>Client ID<input name="client_id" autocomplete="off" required></label>
       <label>Client secret<input name="client_secret" type="password" autocomplete="off" required></label>
-      <label>Scopes<input name="scopes" placeholder="files.metadata.read files.content.read"></label>
+      <label>Scopes<input name="scopes" placeholder="files.metadata.read files.content.read"><small id="connection-scope-hint" class="field-hint"></small></label>
       <p id="connection-error" class="form-error" role="alert"></p>
       <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Cancel</button><button class="button primary" type="submit"><i data-lucide="save"></i><span>Save connection</span></button></div>
     </form>

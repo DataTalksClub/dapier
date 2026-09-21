@@ -55,11 +55,90 @@ function triggerLabel(workflow) {
 }
 
 function workflowRow(workflow) {
-  return `<div class="workflow-row">
+  return `<div class="workflow-row workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
     <div class="workflow-name">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(workflow.id)}</span></div>
     <div class="workflow-trigger">${escapeHtml(triggerLabel(workflow))}</div>
     ${badge(workflow.enabled ? 'enabled' : 'disabled')}
   </div>`;
+}
+
+function configRows(config) {
+  const entries = Object.entries(config).filter(([key]) => key !== 'id' && key !== 'type');
+  if (!entries.length) return '<p class="detail-muted">No parameters.</p>';
+  return `<dl class="detail-list">${entries.map(([key, value]) => {
+    const text = typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value);
+    return `<div><dt>${escapeHtml(key)}</dt><dd><pre>${escapeHtml(text)}</pre></dd></div>`;
+  }).join('')}</dl>`;
+}
+
+function openWorkflow(id) {
+  const workflow = (state.data.workflows || []).find((item) => item.id === id);
+  if (!workflow) return;
+  const filters = workflow.trigger.filters || {};
+  $('#workflow-title').textContent = workflow.id;
+  $('#workflow-detail').innerHTML = `
+    <div class="detail-summary">
+      ${badge(workflow.enabled ? 'enabled' : 'disabled')}
+      ${workflow.source ? `<code>workflows/${escapeHtml(workflow.source)}</code>` : ''}
+    </div>
+    <section class="detail-block">
+      <h3>Trigger</h3>
+      <p class="detail-trigger">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(triggerLabel(workflow))}</span></p>
+      ${Object.keys(filters).length ? `<h4>Filters</h4>${configRows(filters)}` : ''}
+    </section>
+    <section class="detail-block">
+      <h3>Actions</h3>
+      ${(workflow.actions || []).map((action) => `<div class="detail-action">
+        <div class="detail-action-head">${connectorIcon(action.type)}<strong>${escapeHtml(action.id)}</strong><span class="badge neutral">${escapeHtml(action.type)}</span></div>
+        ${configRows(action)}
+      </div>`).join('')}
+    </section>`;
+  const edit = $('#workflow-edit');
+  if (workflow.source && state.data.workflows_edit_base) {
+    edit.href = `${state.data.workflows_edit_base}/${encodeURIComponent(workflow.source)}`;
+    edit.hidden = false;
+  } else {
+    edit.hidden = true;
+  }
+  $('#workflow-dialog').showModal();
+  icons();
+}
+
+function detailRows(rows) {
+  const entries = rows.filter(([, value]) => value !== undefined && value !== null && value !== '');
+  if (!entries.length) return '<p class="detail-muted">No details recorded.</p>';
+  return `<dl class="detail-list">${entries.map(([label, value]) =>
+    `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>`;
+}
+
+function formatTimestamp(value) {
+  if (value == null || value === '') return null;
+  const date = /^\d+$/.test(String(value)) ? new Date(Number(value) * 1000) : new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function openRun(executionId) {
+  const run = (state.data.executions || []).find((item) => item.execution_id === executionId);
+  if (!run) return;
+  const parts = String(executionId).split(':');
+  const workflowId = run.workflow_id || parts[0];
+  const actionId = run.action_id || parts[1];
+  $('#run-title').textContent = workflowId || 'Run';
+  $('#run-detail').innerHTML = `
+    <div class="detail-summary">${badge(run.status)}<code>${escapeHtml(executionId)}</code></div>
+    ${run.error ? `<div class="detail-error"><i data-lucide="alert-triangle"></i><span>${escapeHtml(run.error)}</span></div>` : ''}
+    <section class="detail-block">${detailRows([
+      ['Workflow', workflowId],
+      ['Action', actionId],
+      ['Connector', run.connector],
+      ['Event', run.event_type],
+      ['Correlation ID', run.correlation_id],
+      ['Started', formatTimestamp(run.started_at)],
+      ['Finished', formatTimestamp(run.finished_at)],
+      ['Retention until', formatTimestamp(run.expires_at)],
+    ])}</section>`;
+  $('#run-dialog').showModal();
+  icons();
 }
 
 function render() {
@@ -73,8 +152,8 @@ function render() {
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
   $('#overview-runs').innerHTML = data.executions.slice(0, 6).map((execution) =>
-    `<tr><td>${escapeHtml(execution.execution_id)}</td><td>${badge(execution.status)}</td></tr>`).join('') || emptyRow(2);
-  $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr>
+    `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0"><td>${escapeHtml(execution.execution_id)}</td><td>${badge(execution.status)}</td></tr>`).join('') || emptyRow(2);
+  $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
     <td><div class="workflow-name">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(workflow.id)}</span></div></td>
     <td>${escapeHtml(triggerLabel(workflow))}</td>
     <td>${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
@@ -82,7 +161,7 @@ function render() {
   </tr>`).join('');
   renderConnections(data.connections);
   renderCredentials(data.credentials);
-  $('#run-table').innerHTML = data.executions.map((execution) => `<tr>
+  $('#run-table').innerHTML = data.executions.map((execution) => `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0">
     <td>${escapeHtml(execution.execution_id)}</td><td>${badge(execution.status)}</td>
     <td>${execution.expires_at ? new Date(Number(execution.expires_at) * 1000).toLocaleDateString() : '—'}</td>
   </tr>`).join('') || emptyRow(3);
@@ -153,6 +232,42 @@ function notice(message, error = false) {
   setTimeout(() => { element.hidden = true; }, 4500);
 }
 
+const PROVIDER_SPECS = {
+  dropbox: {
+    connectionId: 'team-dropbox',
+    displayName: 'Team Dropbox',
+    scopes: 'files.metadata.read files.content.read',
+    console: 'https://www.dropbox.com/developers/apps',
+    consoleLabel: 'Dropbox App Console',
+    scopeHint: 'Space-separated Dropbox scopes. Leave as-is unless your app needs more.',
+  },
+  youtube: {
+    connectionId: 'channel-youtube',
+    displayName: 'Channel YouTube',
+    scopes: 'https://www.googleapis.com/auth/youtube.readonly',
+    console: 'https://console.cloud.google.com/apis/credentials',
+    consoleLabel: 'Google Cloud Console',
+    scopeHint: 'Google requires at least one scope — leave this filled in or YouTube sign-in fails.',
+  },
+};
+
+function applyProviderSpec(provider) {
+  const spec = PROVIDER_SPECS[provider] || PROVIDER_SPECS.dropbox;
+  const form = $('#connection-form');
+  form.connection_id.placeholder = spec.connectionId;
+  form.display_name.placeholder = spec.displayName;
+  form.scopes.placeholder = spec.scopes;
+  if (!form.scopes.value.trim() || form.scopes.dataset.autofill === '1') {
+    form.scopes.value = spec.scopes;
+    form.scopes.dataset.autofill = '1';
+  }
+  $('#connection-scope-hint').textContent = spec.scopeHint;
+  const link = $('#connection-console');
+  link.href = spec.console;
+  link.textContent = spec.consoleLabel;
+  $('#connection-redirect').textContent = `${window.location.origin}/oauth/callback`;
+}
+
 function openCredential(provider) {
   const form = $('#credential-form');
   form.reset();
@@ -206,10 +321,39 @@ $('#connection-form').addEventListener('submit', async (event) => {
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
 
+function handleRowActivate(event) {
+  const workflowRow = event.target.closest('.workflow-open');
+  if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
+  const runRow = event.target.closest('.run-open');
+  if (runRow) return openRun(runRow.dataset.run);
+}
+document.addEventListener('click', handleRowActivate);
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  if (!event.target.closest('.workflow-open, .run-open')) return;
+  event.preventDefault();
+  handleRowActivate(event);
+});
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
 $$('.nav-item').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
 $$('.view-link').forEach((button) => button.addEventListener('click', () => setView(button.dataset.target)));
-$('#add-connection').addEventListener('click', () => { $('#connection-form').reset(); $('#connection-error').textContent = ''; $('#connection-dialog').showModal(); icons(); });
+$('#add-connection').addEventListener('click', () => {
+  const form = $('#connection-form');
+  form.reset();
+  form.scopes.dataset.autofill = '1';
+  $('#connection-error').textContent = '';
+  applyProviderSpec(form.provider.value);
+  $('#connection-dialog').showModal();
+  icons();
+});
+$('#connection-form').provider.addEventListener('change', (event) => applyProviderSpec(event.target.value));
+$('#connection-form').scopes.addEventListener('input', (event) => { event.target.dataset.autofill = ''; });
+$('#connection-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#connection-redirect').textContent);
+    notice('Redirect URI copied');
+  } catch (_) { notice('Copy failed — select the URI manually', true); }
+});
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });
