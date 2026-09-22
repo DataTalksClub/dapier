@@ -46,6 +46,10 @@ Parameters:
     Type: String
     Default: ''
     Description: Comma-separated stable DTC subjects allowed to administer connections
+  DropboxRootPath:
+    Type: String
+    Default: ''
+    Description: Path the Dropbox resolver lists (empty lists everything the app can see)
 
 Globals:
   Function:
@@ -57,6 +61,7 @@ Globals:
         EVENT_QUEUE_URL: !Ref EventQueue
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         CREDENTIALS_TABLE: !Ref CredentialsTable
+        CURSORS_TABLE: !Ref CursorsTable
         EXECUTIONS_TABLE: !Ref ExecutionsTable
         GRANTS_TABLE: !Ref GrantsTable
         AUDIT_TABLE: !Ref AuditTable
@@ -100,6 +105,8 @@ Resources:
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DropboxQueue.QueueName
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref YouTubeWebhookSecret
         - AWSSecretsManagerGetSecretValuePolicy:
@@ -120,6 +127,7 @@ Resources:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
+          DROPBOX_QUEUE_URL: !Ref DropboxQueue
       Events:
         Root:
           Type: HttpApi
@@ -265,6 +273,37 @@ Resources:
             BatchSize: 10
             FunctionResponseTypes: [ReportBatchItemFailures]
 
+  DropboxResolverFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dropbox_resolver.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 120
+      MemorySize: 256
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt EventQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CursorsTable
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:GetItem, dynamodb:PutItem]
+            Resource: !GetAtt CredentialsTable.Arn
+      Environment:
+        Variables:
+          DROPBOX_ROOT_PATH: !Ref DropboxRootPath
+      Events:
+        Notifications:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DropboxQueue.Arn
+            BatchSize: 5
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -292,6 +331,17 @@ Resources:
   DeadLetterQueue:
     Type: AWS::SQS::Queue
 
+  DropboxQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DropboxDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  DropboxDeadLetterQueue:
+    Type: AWS::SQS::Queue
+
   RenderQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -312,6 +362,22 @@ Resources:
       Dimensions:
         - Name: QueueName
           Value: !GetAtt DeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  DropboxDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Dropbox notifications are waiting in the dead-letter queue
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DropboxDeadLetterQueue.QueueName
       Statistic: Maximum
       Period: 60
       EvaluationPeriods: 1
@@ -397,6 +463,19 @@ Resources:
         - {AttributeName: credential_id, AttributeType: S}
       KeySchema:
         - {AttributeName: credential_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  CursorsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: cursor_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: cursor_id, KeyType: HASH}
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   ExecutionsTable:
@@ -495,5 +574,7 @@ Outputs:
     Value: !GetAtt CredentialsTable.Arn
   GrantsTableName:
     Value: !Ref GrantsTable
+  CursorsTableName:
+    Value: !Ref CursorsTable
   AuditTableName:
     Value: !Ref AuditTable

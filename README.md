@@ -148,11 +148,17 @@ dapier connections import youtube-datatalksclub --provider youtube \
 
 ## Connector plan
 
-- **Dropbox:** webhook verification and notification ingress are scaffolded. The next
-  adapter resolves each notification with `files/list_folder_continue`, persists the
-  cursor, and emits `file.created`, `file.updated`, and `file.deleted` envelopes.
-- **YouTube:** WebSub verification and Atom notification ingress are scaffolded. This
-  does not need OAuth for public channel upload notifications.
+- **Dropbox:** complete. Ingress answers the verification challenge, checks
+  `X-Dropbox-Signature` (HMAC-SHA256 with the configured connections' app secrets,
+  failing closed when no Dropbox connection exists), and queues one notification per
+  notified account. A resolver Lambda walks each account with
+  `files/list_folder`/`files/list_folder/continue`, persists cursors and per-file
+  `rev` state in the cursors table, and emits `file.created`, `file.updated`, and
+  `file.deleted` envelopes onto the workflow queue. Deterministic event ids and
+  last-page cursor commits make replays and crashes harmless; a dedicated
+  dead-letter queue with a CloudWatch alarm catches accounts that keep failing.
+- **YouTube:** WebSub subscription renewal, callback verification, and Atom
+  notification ingress are live; public channel upload notifications need no OAuth.
 - **Email:** Datamailer owns SES receipt, MIME parsing, and private artifact storage;
   its normalized SNS events feed Dapier's event queue.
 - **OAuth:** authenticated start/callback endpoints and connection storage are
