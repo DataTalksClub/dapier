@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
+from boto3.dynamodb.conditions import Attr
 
 from . import admin
 
@@ -110,6 +111,67 @@ def _verify_youtube(event, body):
     return hmac.compare_digest(signature[5:], expected)
 
 
+def _dropbox_secrets():
+    """Distinct Dropbox app secrets of all configured connections.
+
+    Dropbox signs each webhook body with the app secret (X-Dropbox-Signature,
+    HMAC-SHA256); a connection's client_secret is that app secret. With no
+    configured Dropbox connection there is nothing to verify against and
+    nothing can be resolved either, so verification fails closed.
+    """
+    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    credentials_table = boto3.resource("dynamodb").Table(os.environ["CREDENTIALS_TABLE"])
+    response = connections_table.scan(
+        FilterExpression=Attr("provider").eq("dropbox"),
+        ProjectionExpression="connection_id",
+    )
+    secrets = []
+    for item in response.get("Items", []):
+        record = credentials_table.get_item(
+            Key={"credential_id": f"oauth#{item['connection_id']}"},
+        ).get("Item") or {}
+        value = record.get("value") or {}
+        secret = value.get("client_secret") if isinstance(value, dict) else None
+        if secret and secret not in secrets:
+            secrets.append(secret)
+    return secrets
+
+
+def _verify_dropbox(event, body):
+    signature = _header(event, "x-dropbox-signature")
+    if not signature:
+        return False
+    return any(
+        hmac.compare_digest(signature, hmac.new(secret.encode(), body, hashlib.sha256).hexdigest())
+        for secret in _dropbox_secrets()
+    )
+
+
+def _dropbox_accounts(payload):
+    """Notified account IDs from both webhook sections, deduplicated."""
+    accounts = []
+    for section in ("list_folder", "delta"):
+        for account_id in (payload.get(section) or {}).get("accounts") or []:
+            if account_id not in accounts:
+                accounts.append(account_id)
+    return accounts
+
+
+def _notify_dropbox(account_id, correlation_id):
+    event_id = str(uuid.uuid4())
+    envelope = {
+        "schema_version": "1.0",
+        "id": event_id,
+        "correlation_id": correlation_id,
+        "connector": "dropbox",
+        "event": "account.changed",
+        "source": account_id,
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "data": {"account_id": account_id},
+    }
+    queue.send_message(QueueUrl=os.environ["DROPBOX_QUEUE_URL"], MessageBody=json.dumps(envelope))
+
+
 def handler(event, _context):
     request = event.get("requestContext", {}).get("http", {})
     method, path = request.get("method"), request.get("path", "")
@@ -132,9 +194,13 @@ def handler(event, _context):
 
     body = _body(event)
     if path == "/hooks/dropbox":
+        if not _verify_dropbox(event, body):
+            return _response(401, {"error": "invalid signature"})
         payload = json.loads(body or b"{}")
-        # A resolver consumes these account IDs and emits individual file events.
-        _publish("dropbox", "account.changed", payload, event_id=str(uuid.uuid4()))
+        correlation_id = str(uuid.uuid4())
+        for account_id in _dropbox_accounts(payload):
+            # One message per account; the resolver turns it into file events.
+            _notify_dropbox(account_id, correlation_id)
     elif path == "/hooks/youtube":
         if not _verify_youtube(event, body):
             return _response(401, {"error": "invalid signature"})

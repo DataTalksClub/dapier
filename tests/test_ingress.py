@@ -60,3 +60,129 @@ def test_agent_paths_reach_the_api_router(monkeypatch):
     )
     assert response["statusCode"] == 200
     assert "cli_client_id" in json.loads(response["body"])
+
+
+def test_dropbox_challenge_is_answered():
+    response = ingress.handler(
+        {
+            "requestContext": {"http": {"method": "GET", "path": "/hooks/dropbox"}},
+            "queryStringParameters": {"challenge": "ping"},
+        },
+        None,
+    )
+    assert response["statusCode"] == 200
+    assert response["body"] == "ping"
+
+
+def test_dropbox_accounts_deduplicates_across_sections():
+    payload = {
+        "list_folder": {"accounts": ["dbid:a", "dbid:b"]},
+        "delta": {"accounts": ["dbid:b", "dbid:c"]},
+    }
+    assert ingress._dropbox_accounts(payload) == ["dbid:a", "dbid:b", "dbid:c"]
+
+
+def test_dropbox_secrets_reads_client_secrets_of_dropbox_connections(monkeypatch):
+    connections_items = [
+        {"connection_id": "team-dropbox", "provider": "dropbox"},
+        {"connection_id": "team-dropbox-2", "provider": "dropbox"},
+        {"connection_id": "youtube-personal", "provider": "youtube"},
+    ]
+
+    class ConnectionsTable:
+        def __init__(self):
+            self.items = connections_items
+
+        def scan(self, **kwargs):
+            expression = kwargs["FilterExpression"].get_expression()
+            attribute, expected = expression["values"]
+            return {"Items": [
+                item for item in self.items if item.get(attribute.name) == expected
+            ]}
+
+    class CredentialsTable:
+        def get_item(self, Key):
+            records = {
+                "oauth#team-dropbox": {"value": {"client_secret": "secret-1"}},
+                "oauth#team-dropbox-2": {"value": {"client_secret": "secret-1"}},
+                "oauth#youtube-personal": {"value": {"client_secret": "google-secret"}},
+            }
+            return {"Item": records.get(Key["credential_id"])}
+
+    class Dynamo:
+        def Table(self, name):
+            return CredentialsTable() if name == "credentials" else ConnectionsTable()
+
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setattr(ingress.boto3, "resource", lambda service: Dynamo())
+
+    assert ingress._dropbox_secrets() == ["secret-1"]
+
+
+def test_dropbox_webhook_queues_one_message_per_account(monkeypatch):
+    import json
+
+    body = json.dumps({
+        "list_folder": {"accounts": ["dbid:a"]},
+        "delta": {"accounts": ["dbid:a", "dbid:b"]},
+    }).encode()
+    signature = hmac.new(b"app-secret", body, hashlib.sha256).hexdigest()
+    monkeypatch.setattr(ingress, "_dropbox_secrets", lambda: ["app-secret"])
+    monkeypatch.setenv("DROPBOX_QUEUE_URL", "https://sqs.example.test/dropbox")
+    sent = []
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+
+    response = ingress.handler(
+        {
+            "requestContext": {"http": {"method": "POST", "path": "/hooks/dropbox"}},
+            "headers": {"X-Dropbox-Signature": signature},
+            "body": body.decode(),
+        },
+        None,
+    )
+
+    assert response["statusCode"] == 202
+    envelopes = [json.loads(message["MessageBody"]) for message in sent]
+    assert [envelope["data"]["account_id"] for envelope in envelopes] == ["dbid:a", "dbid:b"]
+    assert all(message["QueueUrl"] == "https://sqs.example.test/dropbox" for message in sent)
+    assert len({envelope["correlation_id"] for envelope in envelopes}) == 1
+    assert all(envelope["event"] == "account.changed" for envelope in envelopes)
+
+
+def test_dropbox_webhook_rejects_missing_or_invalid_signature(monkeypatch):
+    import json
+
+    body = json.dumps({"delta": {"accounts": ["dbid:a"]}}).encode()
+    bad_signature = hmac.new(b"other-secret", body, hashlib.sha256).hexdigest()
+    monkeypatch.setattr(ingress, "_dropbox_secrets", lambda: ["app-secret"])
+    monkeypatch.setenv("DROPBOX_QUEUE_URL", "https://sqs.example.test/dropbox")
+    sent = []
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+
+    def post(headers):
+        return ingress.handler(
+            {
+                "requestContext": {"http": {"method": "POST", "path": "/hooks/dropbox"}},
+                "headers": headers,
+                "body": body.decode(),
+            },
+            None,
+        )
+
+    assert post({"x-dropbox-signature": bad_signature})["statusCode"] == 401
+    assert post({})["statusCode"] == 401
+    assert sent == []
+
+
+def test_dropbox_webhook_fails_closed_without_configured_connections(monkeypatch):
+    monkeypatch.setattr(ingress, "_dropbox_secrets", lambda: [])
+    response = ingress.handler(
+        {
+            "requestContext": {"http": {"method": "POST", "path": "/hooks/dropbox"}},
+            "headers": {},
+            "body": "{}",
+        },
+        None,
+    )
+    assert response["statusCode"] == 401
