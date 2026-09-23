@@ -13,6 +13,10 @@ async function api(path, options = {}) {
     showLogin();
     throw new Error(body.error || 'Authentication required');
   }
+  if (response.status === 403) {
+    showForbidden(body.error || 'Your account is not an operator for this console.');
+    throw new Error(body.error || 'Not authorized');
+  }
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
 }
@@ -23,6 +27,12 @@ function icons() {
 
 function showLogin() {
   window.location.assign('/auth/login');
+}
+
+function showForbidden(message = 'Your account is not an operator for this console.') {
+  $('#login-view').hidden = true;
+  $('#forbidden-view').hidden = false;
+  $('#forbidden-message').textContent = message;
 }
 
 function showApp() {
@@ -360,5 +370,8 @@ $('#logout').addEventListener('click', () => { window.location.assign('/auth/log
 
 window.addEventListener('DOMContentLoaded', async () => {
   icons();
-  try { await api('/api/admin/me'); await refresh(); } catch (_) { showLogin(); }
+  let me;
+  try { me = await api('/api/admin/me'); } catch (_) { return; }
+  if (!me.operator) { showForbidden(); return; }
+  await refresh();
 });

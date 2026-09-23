@@ -15,6 +15,9 @@ auth_output() {
 AUTH_CLIENT_ID="${AUTH_CLIENT_ID:-$(auth_output DapierClientId)}"
 AUTH_ISSUER="${AUTH_ISSUER:-$(auth_output IssuerUrl)}"
 AUTH_JWKS_URL="${AUTH_JWKS_URL:-$(auth_output JwksUrl)}"
+# Empty allowlist denies everyone (fail closed), so default to the maintainer;
+# override with OPERATOR_EMAILS="a@x,b@y" for additional operators.
+OPERATOR_EMAILS="${OPERATOR_EMAILS:-alexey.s.grigoriev@gmail.com}"
 
 sam deploy --config-env sandbox --parameter-overrides \
   DomainName=dapier.dtcdev.click \
@@ -29,4 +32,5 @@ sam deploy --config-env sandbox --parameter-overrides \
   AuthClientId="$AUTH_CLIENT_ID" \
   AuthIssuer="$AUTH_ISSUER" \
   AuthJwksUrl="$AUTH_JWKS_URL" \
+  OperatorEmails="$OPERATOR_EMAILS" \
   "$@"
