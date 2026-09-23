@@ -138,6 +138,9 @@ Resources:
         AppJs:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /assets/app.js, Method: GET}
+        LucideJs:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /assets/lucide.min.js, Method: GET}
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}
