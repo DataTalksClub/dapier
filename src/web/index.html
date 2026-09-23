@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light">
   <title>Dapier</title>
   <link rel="stylesheet" href="/assets/app.css">
-  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="/assets/lucide.min.js"></script>
   <script defer src="/assets/app.js"></script>
 </head>
 <body>
@@ -22,6 +22,18 @@
       <p id="login-error" class="form-error" role="alert"></p>
       <button class="button primary" type="submit"><i data-lucide="log-in"></i><span>Sign in</span></button>
     </form>
+  </section>
+
+  <section id="forbidden-view" class="login-view" hidden>
+    <div class="login-brand" aria-hidden="true">D</div>
+    <div class="login-panel">
+      <div>
+        <p class="eyebrow">AWS automation</p>
+        <h1>Dapier</h1>
+      </div>
+      <p id="forbidden-message" class="form-error" role="alert"></p>
+      <a class="button secondary" href="/auth/logout">Sign out</a>
+    </div>
   </section>
 
   <div id="app" class="app-shell" hidden>

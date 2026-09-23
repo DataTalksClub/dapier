@@ -33,6 +33,7 @@ def _static(path):
         "/": ("index.html", "text/html; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
+        "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
     }
     if path not in assets:
         return None
@@ -45,7 +46,7 @@ def _static(path):
         headers={
             "cache-control": "no-store" if path == "/" else "public, max-age=300",
             "content-security-policy": (
-                "default-src 'self'; script-src 'self' https://unpkg.com; "
+                "default-src 'self'; script-src 'self'; "
                 "style-src 'self'; img-src 'self' data:; connect-src 'self'; "
                 "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
             ),
