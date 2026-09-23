@@ -29,12 +29,14 @@ DROPBOX_REVOKE_URL = "https://api.dropboxapi.com/2/auth/token/revoke"
 GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 YOUTUBE_CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 
 # Scopes sufficient for the account-identity check of each provider. A
 # connection whose granted scopes fall outside these sets cannot be verified
 # and must fail closed (see verify_account).
 IDENTITY_SCOPES = {
+    "google": ("https://www.googleapis.com/auth/userinfo.email",),
     "youtube": (
         "https://www.googleapis.com/auth/youtube",
         "https://www.googleapis.com/auth/youtube.readonly",
@@ -48,6 +50,13 @@ PROVIDERS = {
         "token_url": DROPBOX_TOKEN_URL,
         # Dropbox grants a long-lived refresh token only with offline access.
         "extra": {"token_access_type": "offline"},
+    },
+    "google": {
+        "authorization_url": GOOGLE_AUTHORIZATION_URL,
+        "token_url": GOOGLE_TOKEN_URL,
+        # Google re-issues a refresh token only with offline access plus an
+        # explicit consent prompt.
+        "extra": {"access_type": "offline", "prompt": "consent"},
     },
     "youtube": {
         "authorization_url": GOOGLE_AUTHORIZATION_URL,
@@ -80,8 +89,8 @@ def normalize_scopes(provider_name, scopes):
     """Return scopes as a sorted, deduplicated list of non-empty strings."""
     get(provider_name)
     cleaned = sorted({str(scope).strip() for scope in scopes or [] if str(scope).strip()})
-    if provider_name == "youtube" and not cleaned:
-        raise ProviderError("YouTube connections require at least one scope")
+    if provider_name in ("youtube", "google") and not cleaned:
+        raise ProviderError("Google connections require at least one scope")
     return cleaned
 
 
@@ -232,6 +241,15 @@ def verify_account(provider_name, access_token, *, transport=None):
     raises ProviderError instead of returning an unverified identity.
     """
     get(provider_name)
+    if provider_name == "google":
+        data = _get_json(GOOGLE_USERINFO_URL, access_token, transport=transport)
+        email = data.get("email")
+        if not email or data.get("email_verified") is False:
+            raise ProviderError(
+                "Google account verification returned no verified email; "
+                "grant the userinfo.email scope"
+            )
+        return email, data.get("name") or email
     if provider_name == "youtube":
         url = f"{YOUTUBE_CHANNELS_URL}?{urllib.parse.urlencode({'part': 'id,snippet', 'mine': 'true'})}"
         data = _get_json(url, access_token, transport=transport)
@@ -268,7 +286,7 @@ def revoke_token(provider_name, token, *, transport=None):
     get(provider_name)
     transport = transport or _default_transport
     try:
-        if provider_name == "youtube":
+        if provider_name in ("youtube", "google"):
             status, _ = transport(
                 "POST", GOOGLE_REVOKE_URL,
                 headers={"content-type": "application/x-www-form-urlencoded"},

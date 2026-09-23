@@ -183,3 +183,99 @@ def test_redact_removes_secrets():
     assert "shh-secret-value" not in str(redacted)
     assert "tok-value-123" not in str(redacted)
     assert "refresh-value-456" not in str(redacted)
+
+
+def test_google_requires_a_scope():
+    with pytest.raises(ProviderError):
+        normalize_scopes("google", [])
+
+
+def test_authorization_url_google_offline_consent():
+    url = authorization_url(
+        "google",
+        client_id="cid",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        scopes=["https://www.googleapis.com/auth/calendar.events.owned"],
+        state="state-token",
+    )
+    assert url.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
+    assert "access_type=offline" in url
+    assert "prompt=consent" in url
+    assert "calendar.events.owned" in url
+
+
+def test_verify_google_account_email():
+    calls = []
+    transport = fake_transport(calls, payload={
+        "email": "alexey@datatalks.club", "email_verified": True,
+        "name": "Alexey Grigorev"})
+    account_id, title = verify_account("google", "token", transport=transport)
+    assert account_id == "alexey@datatalks.club"
+    assert title == "Alexey Grigorev"
+    assert calls[0]["url"] == "https://www.googleapis.com/oauth2/v3/userinfo"
+
+
+def test_verify_google_unverified_email_fails_closed():
+    transport = fake_transport([], payload={"email": "a@b.c", "email_verified": False})
+    with pytest.raises(ProviderError):
+        verify_account("google", "token", transport=transport)
+
+
+def test_verify_google_missing_email_fails_closed():
+    transport = fake_transport([], payload={"name": "No Email"})
+    with pytest.raises(ProviderError):
+        verify_account("google", "token", transport=transport)
+
+
+def test_revoke_google_posts_to_google_revoke():
+    calls = []
+    assert revoke_token("google", "t", transport=fake_transport(calls, status=200)) is True
+    assert calls[0]["url"] == "https://oauth2.googleapis.com/revoke"
+
+
+def test_google_requires_a_scope():
+    with pytest.raises(ProviderError):
+        normalize_scopes("google", [])
+
+
+def test_authorization_url_google_offline_consent():
+    url = authorization_url(
+        "google",
+        client_id="cid",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        scopes=["https://www.googleapis.com/auth/calendar.events.owned"],
+        state="state-token",
+    )
+    assert url.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
+    assert "access_type=offline" in url
+    assert "prompt=consent" in url
+    assert "calendar.events.owned" in url
+
+
+def test_verify_google_account_email():
+    calls = []
+    transport = fake_transport(calls, payload={
+        "email": "alexey@datatalks.club", "email_verified": True,
+        "name": "Alexey Grigorev"})
+    account_id, title = verify_account("google", "token", transport=transport)
+    assert account_id == "alexey@datatalks.club"
+    assert title == "Alexey Grigorev"
+    assert calls[0]["url"] == "https://www.googleapis.com/oauth2/v3/userinfo"
+
+
+def test_verify_google_unverified_email_fails_closed():
+    transport = fake_transport([], payload={"email": "a@b.c", "email_verified": False})
+    with pytest.raises(ProviderError):
+        verify_account("google", "token", transport=transport)
+
+
+def test_verify_google_missing_email_fails_closed():
+    transport = fake_transport([], payload={"name": "No Email"})
+    with pytest.raises(ProviderError):
+        verify_account("google", "token", transport=transport)
+
+
+def test_revoke_google_posts_to_google_revoke():
+    calls = []
+    assert revoke_token("google", "t", transport=fake_transport(calls, status=200)) is True
+    assert calls[0]["url"] == "https://oauth2.googleapis.com/revoke"

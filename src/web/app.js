@@ -251,6 +251,14 @@ const PROVIDER_SPECS = {
     consoleLabel: 'Dropbox App Console',
     scopeHint: 'Space-separated Dropbox scopes. Leave as-is unless your app needs more.',
   },
+  google: {
+    connectionId: 'calendar-alexey',
+    displayName: 'Calendar — Alexey',
+    scopes: 'https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.email',
+    console: 'https://console.cloud.google.com/apis/credentials',
+    consoleLabel: 'Google Cloud Console',
+    scopeHint: 'Google requires at least one scope — the prefilled three cover free/busy, owned-event edits, and account verification.',
+  },
   youtube: {
     connectionId: 'channel-youtube',
     displayName: 'Channel YouTube',
