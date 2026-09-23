@@ -43,5 +43,16 @@ jobs:
           role-session-name: dapier-deploy
           aws-region: ${{ env.AWS_REGION }}
       - run: sam build --config-env sandbox
+      # A failed deploy whose rollback also failed leaves the stack in
+      # UPDATE_ROLLBACK_FAILED, where every further deploy is rejected.
+      - name: Resume an interrupted rollback
+        run: |
+          status=$(aws cloudformation describe-stacks --stack-name dapier \
+            --query 'Stacks[0].StackStatus' --output text)
+          echo "stack status: $status"
+          if [ "$status" = "UPDATE_ROLLBACK_FAILED" ]; then
+            aws cloudformation continue-update-rollback --stack-name dapier
+            aws cloudformation wait stack-update-complete --stack-name dapier
+          fi
       - run: scripts/deploy.sh
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
