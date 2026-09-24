@@ -76,10 +76,12 @@ def test_is_operator_matches_subject_or_email(monkeypatch):
     assert authz.is_operator(None) is False
 
 
-def test_is_operator_deny_by_default(monkeypatch):
+def test_is_operator_allows_any_authenticated_account_by_default(monkeypatch):
     monkeypatch.setenv("OPERATOR_EMAILS", "")
     monkeypatch.setenv("OPERATOR_SUBJECTS", "")
-    assert authz.is_operator({"sub": "op@example.test", "subject": "subject-1"}) is False
+    assert authz.is_operator({"sub": "op@datatalks.club", "subject": "subject-1"}) is True
+    assert authz.is_operator({}) is False
+    assert authz.is_operator(None) is False
 
 
 def test_overview_rejects_unauthenticated(monkeypatch):

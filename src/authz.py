@@ -2,10 +2,11 @@
 
 Two layers:
 
-1. Operators administer connections, credentials, and grants. A valid DTC
-   account alone is not enough: the session's stable subject (or email) must
-   appear in ``OPERATOR_SUBJECTS`` / ``OPERATOR_EMAILS``. Empty allowlists
-   deny everyone (fail closed).
+1. Operators administer connections, credentials, and grants. Sign-in goes
+   through the DTC identity provider, which only issues datatalks.club
+   accounts, so every authenticated account may administer the console.
+   ``OPERATOR_SUBJECTS`` / ``OPERATOR_EMAILS`` optionally restrict it to a
+   subset of accounts (matched by stable subject or email).
 2. Agents use connections only through explicit grants keyed by
    ``(connection_id, subject, agent)`` with an allowed operation
    (``use``, ``connect``, ``admin``). No grant means no access. Grants may
@@ -37,12 +38,16 @@ def operator_allowlists():
 
 
 def is_operator(session_payload):
-    """True when the session belongs to a configured operator."""
+    """True when the session may administer the console.
+
+    DTC sign-in is the operator gate, so any authenticated session qualifies
+    unless allowlists narrow it to specific subjects or emails.
+    """
     if not session_payload:
         return False
     subjects, emails = operator_allowlists()
     if not subjects and not emails:
-        return False
+        return True
     subject = session_payload.get("subject")
     if subject and str(subject) in subjects:
         return True

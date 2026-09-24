@@ -105,8 +105,9 @@ deliberate deviation: OAuth client secrets and tokens stay in the DynamoDB
 credentials table (with optimistic versioning) instead of Secrets Manager, so
 all application secrets share one storage boundary and IAM shape.
 
-Administration requires an explicit operator allowlist — a DTC sign-in alone
-is not enough. Configure it at deploy time (empty denies everyone):
+Administration is open to every account that completes DTC sign-in — the DTC
+identity provider only issues datatalks.club accounts. To restrict it to a
+subset, configure an allowlist at deploy time:
 
 ```bash
 sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatalks.club ...

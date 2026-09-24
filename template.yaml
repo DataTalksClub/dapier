@@ -41,7 +41,7 @@ Parameters:
   OperatorEmails:
     Type: String
     Default: ''
-    Description: Comma-separated DTC emails allowed to administer connections (empty denies all)
+    Description: Comma-separated DTC accounts allowed to administer connections (empty: any signed-in DTC account)
   OperatorSubjects:
     Type: String
     Default: ''

@@ -287,10 +287,9 @@ def start_connect(event, connection_id):
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
     claims = event.get("_dtc_claims") or {}
-    email = claims.get("email", "")
+    operator_payload = {"subject": subject, "sub": claims.get("email", "")}
     allowed = (
-        subject in _operator_subjects()
-        or (email and email.lower() in _operator_emails())
+        authz.is_operator(operator_payload)
         or authz.check_grant(grants_table, subject=subject, agent=agent,
                              connection_id=connection_id, operation="connect")
     )
@@ -329,14 +328,6 @@ def start_connect(event, connection_id):
         ),
         "expires_in": 600,
     })
-
-
-def _operator_subjects():
-    return {part.strip() for part in os.environ.get("OPERATOR_SUBJECTS", "").split(",") if part.strip()}
-
-
-def _operator_emails():
-    return {part.strip().lower() for part in os.environ.get("OPERATOR_EMAILS", "").split(",") if part.strip()}
 
 
 def import_core(body, *, operator_subject, connections_table):
@@ -408,8 +399,7 @@ def import_connection(event):
     if error:
         return error
     claims = event.get("_dtc_claims") or {}
-    email = str(claims.get("email", "")).lower()
-    if subject not in _operator_subjects() and email not in _operator_emails():
+    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
         audit.emit("unknown", audit.IMPORT, subject, outcome="denied-not-operator")
         return _json_response(403, {"error": "Operator authorization required"})
     try:
