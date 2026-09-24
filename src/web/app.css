@@ -190,6 +190,8 @@ nav { display: grid; align-content: start; gap: 2px; padding: 14px 0; }
 }
 .nav-item:hover { color: var(--rail-ink); background: rgba(236, 231, 218, .06); }
 .nav-item.active { color: var(--rail-ink); border-left-color: #48a878; background: rgba(236, 231, 218, .08); font-weight: 500; }
+.nav-item svg { width: 16px; height: 16px; opacity: .75; }
+.nav-item.active svg { opacity: 1; }
 .sidebar-foot {
   margin-top: auto;
   display: flex;

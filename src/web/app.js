@@ -30,13 +30,11 @@ function showLogin() {
 }
 
 function showForbidden(message = 'Your account is not an operator for this console.') {
-  $('#login-view').hidden = true;
   $('#forbidden-view').hidden = false;
   $('#forbidden-message').textContent = message;
 }
 
 function showApp() {
-  $('#login-view').hidden = true;
   $('#app').hidden = false;
   icons();
 }
@@ -341,18 +339,6 @@ function openCredential(provider) {
   $('#credential-dialog').showModal();
   form.value.focus();
 }
-
-$('#login-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const element = event.currentTarget;
-  const form = new FormData(element);
-  $('#login-error').textContent = '';
-  try {
-    await api('/api/admin/session', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) });
-    element.querySelector('[name="password"]').value = '';
-    await refresh();
-  } catch (error) { $('#login-error').textContent = error.message; }
-});
 
 $('#credential-form').addEventListener('submit', async (event) => {
   event.preventDefault();
