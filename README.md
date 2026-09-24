@@ -54,6 +54,23 @@ the worker reads a Secrets Manager secret containing either a plain signing secr
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
+## Workflow designer
+
+`designer/` is a local visual editor for `workflows/*.yaml` — draw the trigger
+and action chain on a node canvas, edit each node's fields in the inspector,
+and **Save to git** writes the YAML file and commits it; **Push** pushes the
+branch. The canvas is a hand-rolled SVG board (drag handles to connect,
+reattachable arrow endpoints, pan/zoom, undo/redo) adapted from the
+ai-system-design-studio project.
+
+```sh
+make designer          # install deps, start api on :8787 + vite on :5175
+```
+
+Then open http://localhost:5175. The API server talks to the git checkout it
+lives in (`DAPIER_ROOT` to override); it binds 127.0.0.1 only, and
+`DESIGNER_UNIX_SOCKET` switches it to a unix socket instead of TCP.
+
 ## Deploy
 
 Prerequisites: Python 3.12, AWS SAM CLI, and configured AWS credentials.

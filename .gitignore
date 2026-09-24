@@ -7,3 +7,11 @@ __pycache__/
 
 *.egg-info/
 uv.lock
+
+# workflow designer
+designer/node_modules/
+designer/dist/
+
+# workflow designer
+designer/node_modules/
+designer/dist/

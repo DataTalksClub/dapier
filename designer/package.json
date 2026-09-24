@@ -1,0 +1,27 @@
+{
+  "name": "dapier-designer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs & vite",
+    "dev:api": "node server.mjs",
+    "build": "tsc && vite build",
+    "start": "node server.mjs",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  }
+}
