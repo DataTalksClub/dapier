@@ -23,7 +23,7 @@ def workflows():
 
 
 def all_workflows():
-    """YAML workflows plus operator-created email and hook triggers (read per invocation)."""
+    """YAML workflows plus operator-created email, hook, and schedule triggers (read per invocation)."""
     extra = []
     if os.environ.get("EMAIL_TRIGGERS_TABLE"):
         from . import email_triggers
@@ -33,6 +33,10 @@ def all_workflows():
         from . import hook_triggers
 
         extra = extra + hook_triggers.load_workflows()
+    if os.environ.get("SCHEDULE_TRIGGERS_TABLE"):
+        from . import schedule_triggers
+
+        extra = extra + schedule_triggers.load_workflows()
     return workflows() + extra
 
 

@@ -25,6 +25,7 @@ from . import email_triggers
 from . import hook_triggers
 from . import oauth_clients
 from . import oauth_providers
+from . import schedule_triggers
 from . import slack_tokens
 from .credentials import CREDENTIAL_SPECS, credential_status, get_credential, put_credential
 from .dtc_auth import auth_config as _auth_config
@@ -587,6 +588,33 @@ def delete_hook_trigger(event, operator):
     return _json_response(status, payload)
 
 
+def list_schedule_triggers(event):
+    status, payload = schedule_triggers.api_list()
+    return _json_response(status, payload)
+
+
+def save_schedule_trigger(event, operator):
+    try:
+        body = _request_json(event)
+        status, payload = schedule_triggers.api_save(body, operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    _audit_event(payload.get("schedule_id", "unknown"), "schedule-trigger.save", operator,
+                 outcome="created" if payload.get("created") else "updated")
+    return _json_response(status, payload)
+
+
+def delete_schedule_trigger(event, operator):
+    try:
+        query = event.get("queryStringParameters") or {}
+        status, payload = schedule_triggers.api_delete(query.get("name", ""), operator)
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    _audit_event(payload.get("schedule_id", "unknown"), "schedule-trigger.delete",
+                 operator, outcome="deleted")
+    return _json_response(status, payload)
+
+
 def list_api_tokens(event):
     status, payload = api_tokens.api_list()
     return _json_response(status, payload)
@@ -890,6 +918,12 @@ def route(event, method, path):
         return save_hook_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/hook-triggers":
         return delete_hook_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/schedule-triggers":
+        return list_schedule_triggers(event)
+    if method == "PUT" and path == "/api/admin/schedule-triggers":
+        return save_schedule_trigger(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/schedule-triggers":
+        return delete_schedule_trigger(event, operator_subject)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))

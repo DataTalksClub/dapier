@@ -129,6 +129,13 @@ def build_parser():
     hook_del_p = hook_sub.add_parser("delete", help="Delete a hook trigger")
     hook_del_p.add_argument("name")
     hook_del_p.add_argument("--kind", default=None, choices=["webhook", "telegram"])
+    sched_p = sub.add_parser("schedules", help="Cron and rate schedule triggers (EventBridge rules)")
+    sched_sub = sched_p.add_subparsers(dest="command", required=True)
+    sched_sub.add_parser("list", help="List schedule triggers")
+    sched_save_p = sched_sub.add_parser("save", help="Create or update a schedule trigger from a JSON file")
+    sched_save_p.add_argument("file", help="Path to the schedule JSON, or - for stdin")
+    sched_del_p = sched_sub.add_parser("delete", help="Delete a schedule trigger and its rule")
+    sched_del_p.add_argument("name")
     return parser
 
 
@@ -157,6 +164,8 @@ def main(argv=None):
             return cmd_workflows(args, api_url, debug)
         if args.group == "hooks":
             return cmd_hooks(args, api_url, debug)
+        if args.group == "schedules":
+            return cmd_schedules(args, api_url, debug)
         if args.group == "credentials":
             return cmd_credentials(args, api_url, debug)
         if args.group == "grants":
@@ -260,6 +269,16 @@ def cmd_hooks(args, api_url, debug):
         return commands.hooks_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.hooks_delete(api_url, args.name, kind=args.kind, debug=debug)
+    return 2
+
+
+def cmd_schedules(args, api_url, debug):
+    if args.command == "list":
+        return commands.schedules_list(api_url, debug)
+    if args.command == "save":
+        return commands.schedules_save(api_url, args.file, debug)
+    if args.command == "delete":
+        return commands.schedules_delete(api_url, args.name, debug)
     return 2
 
 

@@ -247,6 +247,24 @@ domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already
 claimed by YAML workflows cannot be shadowed.
 
+### Webhook, Telegram, and schedule triggers
+
+Webhook and Telegram triggers work like email triggers but are invoked over
+HTTP. A webhook trigger reserves `https://dapier.dtcdev.click/hooks/webhook/{name}`
+and answers only calls carrying its bearer token; a Telegram trigger binds a
+Telegram bot connection to `/hooks/telegram/{name}` (one webhook per bot, so
+one connection drives at most one trigger). Both are created and listed with
+`dapier hooks save|list|show|delete`, fire the same action catalog as email
+triggers, and are live immediately — no deploy.
+
+Schedule triggers are cron jobs: `dapier schedules save` takes a name, a
+`cron(...)` or `rate(...)` expression, and actions, and programmatically
+creates (or reprograms) an EventBridge rule `dapier-schedule-{name}`
+targeted at the worker. `schedules delete` removes the rule; disabling a
+trigger disables it. The rules fire without any deploy, and the CLI, the
+console API (`/api/agent/schedule-triggers`, `/api/admin/schedule-triggers`),
+and the worker all see the same stored actions.
+
 One-time migration of the existing DataTalksClub YouTube credential (bytes are
 transferred, never logged; refresh and channel ID are verified first; backups
 are untouched). `--client-id`/`--client-secret-file` are optional — they are
@@ -273,10 +291,28 @@ dapier grants delete youtube-personal "subject-9#buildcamp-uploader"
 dapier connections revoke youtube-personal   # revoke stored tokens
 dapier oauth-clients list                    # shared OAuth clients (dropbox/google/youtube)
 dapier oauth-clients set google --client-id my-id --client-secret-file -   # or a file path
+dapier tokens list                           # operator-issued API tokens (no secrets)
+dapier tokens create --name personal-scheduler --agent personal-scheduler
+dapier tokens revoke personal-scheduler
+dapier hooks save webhook.json               # webhook/Telegram triggers (see below)
+dapier schedules save schedule.json          # {"name", "expression": "cron(0 8 * * ? *)", "actions"}
 ```
 
 Credential values travel only in the request body and are never echoed; like
 the console's write-only credential fields, they cannot be read back.
+
+### API tokens for headless consumers
+
+For machines that call the agent API unattended (the personal scheduler, CI
+jobs), an operator issues long-lived **API tokens** instead of enrolling a
+browser identity: `dapier tokens create --name <id> --agent <agent>` (or the
+console's API tokens view) returns a `dap_…` bearer value exactly once. The
+token authenticates as the subject `token:<id>`, is bound to one agent name,
+and its reach is governed by the ordinary grants table — grant
+`token:<id>` on specific connections with `dapier grants save`, and revoke it
+any time with `dapier tokens revoke` (or the console). Only the SHA-256 hash
+is stored; presented values stop authenticating the moment the token is
+revoked. API tokens never qualify for operator actions.
 
 ## Connector plan
 

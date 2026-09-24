@@ -110,6 +110,7 @@ Globals:
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
+        SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
@@ -170,11 +171,19 @@ Resources:
             TableName: !Ref HookTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ApiTokensTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ScheduleTriggersTable
+        - Statement:
+            Effect: Allow
+            Action: [events:PutRule, events:PutTargets, events:DeleteRule,
+                     events:RemoveTargets, events:DescribeRule]
+            Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
+          WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
           GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
           GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
@@ -378,6 +387,8 @@ Resources:
             TableName: !Ref EmailTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref HookTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScheduleTriggersTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -393,6 +404,17 @@ Resources:
             Queue: !GetAtt EventQueue.Arn
             BatchSize: 10
             FunctionResponseTypes: [ReportBatchItemFailures]
+
+  # Standalone (not inline) because schedule rules are created and deleted at
+  # runtime; the permission is provisioned once for the whole rule family so
+  # trigger saves only ever call the Events API.
+  ScheduleInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WorkerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
 
   DropboxResolverFunction:
     Type: AWS::Serverless::Function
@@ -659,6 +681,16 @@ Resources:
         - {AttributeName: hook_id, AttributeType: S}
       KeySchema:
         - {AttributeName: hook_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  ScheduleTriggersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: schedule_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: schedule_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   ApiTokensTable:

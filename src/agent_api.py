@@ -15,7 +15,7 @@ import os
 import re
 import time
 
-from . import api_tokens, audit, authz, connections, credentials, designer_store, email_triggers, hook_triggers, oauth_clients, oauth_providers, tokens
+from . import api_tokens, audit, authz, connections, credentials, designer_store, email_triggers, hook_triggers, oauth_clients, oauth_providers, schedule_triggers, tokens
 from .connections import BindingError
 from .dtc_auth import verify_id_token
 from .tokens import TokenError
@@ -283,6 +283,8 @@ def route(event, method, path):
         return email_triggers_api(event, method)
     if path == "/api/agent/hook-triggers" and method in ("GET", "PUT", "DELETE"):
         return hook_triggers_api(event, method)
+    if path == "/api/agent/schedule-triggers" and method in ("GET", "PUT", "DELETE"):
+        return schedule_triggers_api(event, method)
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
         return grants_api(event, method)
     if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):
@@ -397,6 +399,30 @@ def hook_triggers_api(event, method):
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(payload.get("hook_id", "unknown"), "hook-trigger", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def schedule_triggers_api(event, method):
+    """Operator-only cron/rate schedule trigger management over the CLI's bearer authentication."""
+    subject, error = require_operator(event, "schedule-trigger")
+    if error:
+        return error
+    table_ref = schedule_triggers.get_table()
+    try:
+        if method == "GET":
+            status, payload = schedule_triggers.api_list(table_ref)
+        elif method == "PUT":
+            body = json.loads(event.get("body") or "{}")
+            status, payload = schedule_triggers.api_save(body, subject, table_ref=table_ref)
+        else:
+            query = event.get("queryStringParameters") or {}
+            status, payload = schedule_triggers.api_delete(
+                query.get("name", ""), subject, table_ref=table_ref,
+            )
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(payload.get("schedule_id", "unknown"), "schedule-trigger", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
 

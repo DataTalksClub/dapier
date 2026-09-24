@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 
 from .engine import execute
@@ -137,7 +138,45 @@ def _release_action(workflow_id, action_id, event, exc=None):
     )
 
 
+def _schedule_event(payload):
+    """Normalize a schedule trigger fire into a dapier event.
+
+    The EventBridge target input replaces the whole event, so the payload
+    names the trigger and the fire's id and time are minted here.
+    """
+    schedule_id = payload["schedule_id"]
+    fired_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "schema_version": "1.0",
+        "id": f"{schedule_id}-{uuid.uuid4()}",
+        "correlation_id": f"{schedule_id}-{fired_at}",
+        "connector": "schedule",
+        "event": "schedule.triggered",
+        "source": schedule_id,
+        "occurred_at": fired_at,
+        "data": {
+            "schedule": schedule_id,
+            "utc_time": fired_at,
+        },
+    }
+
+
 def handler(event, _context):
+    if isinstance(event, dict) and event.get("trigger") == "schedule" and event.get("schedule_id"):
+        # EventBridge invokes the function directly: the target input names
+        # the trigger, and the envelope carries the fire's id and time.
+        try:
+            normalized = _schedule_event(event)
+            execute(
+                normalized,
+                before_action=_is_pending,
+                after_action=_mark_completed,
+                on_action_error=_release_action,
+            )
+        except Exception:
+            logger.exception("schedule trigger failed", extra={"schedule_id": event.get("schedule_id")})
+            raise
+        return {"executed": event["schedule_id"]}
     failures = []
     for record in event.get("Records", []):
         try:
