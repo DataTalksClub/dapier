@@ -15,7 +15,7 @@ import os
 import re
 import time
 
-from . import audit, authz, connections, email_triggers, oauth_clients, oauth_providers, tokens
+from . import audit, authz, connections, designer_store, email_triggers, oauth_clients, oauth_providers, tokens
 from .connections import BindingError
 from .dtc_auth import verify_id_token
 from .tokens import TokenError
@@ -241,7 +241,34 @@ def route(event, method, path):
         return import_connection(event)
     if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
         return email_triggers_api(event, method)
+    if path == "/api/agent/designer/workflows" and method in ("GET", "PUT"):
+        return designer_api(event, method)
+    designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
+    if designer_match and method == "GET":
+        return designer_api(event, method, source=designer_match.group(1))
     return _json_response(404, {"error": "Not found"})
+
+
+def designer_api(event, method, source=None):
+    """Operator-only workflow designer API over the CLI's bearer authentication."""
+    subject, error = authenticate(event)
+    if error:
+        return error
+    claims = event.get("_dtc_claims") or {}
+    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
+        audit.emit("unknown", "workflow.save", subject, outcome="denied-not-operator")
+        return _json_response(403, {"error": "Operator authorization required"})
+    if method == "GET":
+        status, payload = designer_store.api_get(source) if source else designer_store.api_list()
+        return _json_response(status, payload)
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_save(body)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", "unknown")), "workflow.save", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
 
 
 def email_triggers_api(event, method):

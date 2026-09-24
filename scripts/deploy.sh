@@ -45,6 +45,15 @@ for pair in \
   fi
 done
 
+# Optional: Secrets Manager secret name holding the GitHub token the console
+# designer uses to commit workflows/*.yaml (Contents: read/write on this
+# repo). Like the OAuth clients, omitted when unset so CloudFormation keeps
+# the previously deployed value.
+github_token_lines=""
+if [ -n "${GITHUB_WORKFLOWS_TOKEN_SECRET:-}" ]; then
+  github_token_lines="GithubWorkflowsTokenSecret: \"${GITHUB_WORKFLOWS_TOKEN_SECRET}\""$'\n'
+fi
+
 # Overrides go through a YAML file: SAM rejects empty values in the shorthand
 # key=value format and CloudFormation keeps a parameter's previous value when
 # an override is omitted — so this file passes every parameter explicitly
@@ -68,7 +77,6 @@ AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 DropboxRootPath: "${DROPBOX_ROOT_PATH:-}"
-${oauth_override_lines}
-EOF
+${oauth_override_lines}${github_token_lines}EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"

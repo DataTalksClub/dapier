@@ -18,6 +18,7 @@ from . import agent_api
 from . import audit as audit_log
 from . import authz
 from . import connections as connection_model
+from . import designer_store
 from . import email_triggers
 from . import oauth_clients
 from . import oauth_providers
@@ -549,6 +550,27 @@ def delete_email_trigger(event, operator):
     return _json_response(status, payload)
 
 
+def designer_list(event):
+    status, payload = designer_store.api_list()
+    return _json_response(status, payload)
+
+
+def designer_get(source):
+    status, payload = designer_store.api_get(source)
+    return _json_response(status, payload)
+
+
+def save_designer_workflow(event, operator):
+    try:
+        body = _request_json(event)
+        status, payload = designer_store.api_save(body)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    _audit_event(str(payload.get("file", "unknown")), "workflow.save", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
 def _connection(connection_id):
     return connection_model.get_connection(
         boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]),
@@ -807,6 +829,13 @@ def route(event, method, path):
         return save_email_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/email-triggers":
         return delete_email_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/designer/workflows":
+        return designer_list(event)
+    if method == "PUT" and path == "/api/admin/designer/workflows":
+        return save_designer_workflow(event, operator_subject)
+    designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
+    if method == "GET" and designer_match:
+        return designer_get(designer_match.group(1))
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))

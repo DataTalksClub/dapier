@@ -62,6 +62,16 @@ def build_parser():
     trig_save_p.add_argument("file", help="Path to the trigger JSON, or - for stdin")
     trig_del_p = trig_sub.add_parser("delete", help="Delete an email trigger")
     trig_del_p.add_argument("name")
+
+    wf_p = sub.add_parser("workflows", help="Workflow YAML committed by the console designer")
+    wf_sub = wf_p.add_subparsers(dest="command", required=True)
+    wf_sub.add_parser("list", help="List deployed workflows and the git sync target")
+    wf_show_p = wf_sub.add_parser("show", help="Show one workflow (JSON)")
+    wf_show_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo")
+    wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
+    wf_save_p.add_argument("--rename-from", default=None,
+                           help="Previous file name when the workflow was renamed")
     return parser
 
 
@@ -86,6 +96,10 @@ def main(argv=None):
             return cmd_token(args, api_url, debug, child)
         if args.group == "triggers":
             return cmd_triggers(args, api_url, debug)
+        if args.group == "workflows":
+            return cmd_workflows(args, api_url, debug)
+        if args.group == "workflows":
+            return cmd_workflows(args, api_url, debug)
     except ApiError as exc:
         print(f"Error: {exc}")
         if exc.status == 401:
@@ -154,6 +168,26 @@ def cmd_triggers(args, api_url, debug):
         return commands.triggers_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.triggers_delete(api_url, args.name, debug)
+    return 2
+
+
+def cmd_workflows(args, api_url, debug):
+    if args.command == "list":
+        return commands.workflows_list(api_url, debug)
+    if args.command == "show":
+        return commands.workflows_show(api_url, args.file, debug)
+    if args.command == "save":
+        return commands.workflows_save(api_url, args.file, args.rename_from, debug)
+    return 2
+
+
+def cmd_workflows(args, api_url, debug):
+    if args.command == "list":
+        return commands.workflows_list(api_url, debug)
+    if args.command == "show":
+        return commands.workflows_show(api_url, args.file, debug)
+    if args.command == "save":
+        return commands.workflows_save(api_url, args.file, args.rename_from, debug)
     return 2
 
 

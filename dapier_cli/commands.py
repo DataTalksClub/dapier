@@ -250,3 +250,85 @@ def triggers_delete(api_url, name, debug=False):
     data = api.call(api_url, "DELETE", f"/api/agent/email-triggers?name={name}", debug=debug)
     print(f"Deleted {data.get('address') or name}.")
     return 0
+
+
+def workflows_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
+    items = data.get("workflows", [])
+    if not items:
+        print("No workflows deployed yet. Draw one at /designer or run `dapier workflows save`.")
+    for item in items:
+        enabled = "yes" if item.get("enabled", True) else "no"
+        trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
+        print(f"{item.get('source', ''):36} {trigger:34} "
+              f"{item.get('actionCount', 0)} action(s) enabled={enabled}")
+    sync = data.get("git_sync") or {}
+    target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
+    if sync.get("configured"):
+        print(f"Designer saves commit straight to {target}.")
+    else:
+        print(f"Saves are disabled: git sync to {target} is not configured.")
+    return 0
+
+
+def workflows_show(api_url, file, debug=False):
+    data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
+    print(json.dumps(data.get("workflow", {}), indent=2))
+    return 0
+
+
+def workflows_save(api_url, path, rename_from, debug=False):
+    try:
+        with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
+            yaml_text = handle.read()
+    except OSError as exc:
+        print(f"Cannot read {path}: {exc}")
+        return 2
+    body = {"yaml": yaml_text}
+    if rename_from:
+        body["renameFrom"] = rename_from
+    data = api.call(api_url, "PUT", "/api/agent/designer/workflows", body, debug=debug)
+    print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
+          "The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def workflows_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
+    items = data.get("workflows", [])
+    if not items:
+        print("No workflows deployed yet. Draw one at /designer or run `dapier workflows save`.")
+    for item in items:
+        enabled = "yes" if item.get("enabled", True) else "no"
+        trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
+        print(f"{item.get('source', ''):36} {trigger:34} "
+              f"{item.get('actionCount', 0)} action(s) enabled={enabled}")
+    sync = data.get("git_sync") or {}
+    target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
+    if sync.get("configured"):
+        print(f"Designer saves commit straight to {target}.")
+    else:
+        print(f"Saves are disabled: git sync to {target} is not configured.")
+    return 0
+
+
+def workflows_show(api_url, file, debug=False):
+    data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
+    print(json.dumps(data.get("workflow", {}), indent=2))
+    return 0
+
+
+def workflows_save(api_url, path, rename_from, debug=False):
+    try:
+        with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
+            yaml_text = handle.read()
+    except OSError as exc:
+        print(f"Cannot read {path}: {exc}")
+        return 2
+    body = {"yaml": yaml_text}
+    if rename_from:
+        body["renameFrom"] = rename_from
+    data = api.call(api_url, "PUT", "/api/agent/designer/workflows", body, debug=debug)
+    print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
+          "The deploy pipeline publishes it in a few minutes.")
+    return 0
