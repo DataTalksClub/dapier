@@ -695,3 +695,25 @@ def test_cli_workflows_save_posts_yaml_with_rename(monkeypatch, tmp_path, capsys
     out, _ = capsys.readouterr()
     assert "Committed test-flow.yaml (abc1234)" in out
     assert cli_commands.workflows_save("https://api.example.test", str(tmp_path / "nope"), None) == 2
+
+
+def test_deploy_script_heredoc_terminators_are_literal_lines():
+    """bash matches heredoc terminators before expanding parameters, so a
+    terminator appended to a ${var} line is never seen: the params file
+    swallows the rest of deploy.sh and CI deploys nothing while staying
+    green (this shipped exactly that way once)."""
+    script = open("scripts/deploy.sh").read()
+    starts = len([line for line in script.splitlines() if "<<EOF" in line or "<<'EOF'" in line])
+    terminators = len([line for line in script.splitlines() if line.strip() == "EOF"])
+    assert starts > 0 and starts == terminators
+
+
+def test_deploy_script_heredoc_terminators_are_literal_lines():
+    """bash matches heredoc terminators before expanding parameters, so a
+    terminator appended to a ${var} line is never seen: the params file
+    swallows the rest of deploy.sh and CI deploys nothing while staying
+    green (this shipped exactly that way once)."""
+    script = open("scripts/deploy.sh").read()
+    starts = len([line for line in script.splitlines() if "<<EOF" in line or "<<'EOF'" in line])
+    terminators = len([line for line in script.splitlines() if line.strip() == "EOF"])
+    assert starts > 0 and starts == terminators

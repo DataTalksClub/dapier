@@ -77,6 +77,7 @@ AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 DropboxRootPath: "${DROPBOX_ROOT_PATH:-}"
-${oauth_override_lines}${github_token_lines}EOF
+${oauth_override_lines}${github_token_lines}
+EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"
