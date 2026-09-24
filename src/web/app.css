@@ -288,9 +288,9 @@ th:last-child, td:last-child { padding-right: 0; }
 .action-cell .button + .button { margin-left: 6px; }
 [data-page="connections"] th:first-child { width: 24%; }
 
-/* --- one-click connect cards -------------------------------------------------- */
-.connect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 4px 0 30px; }
-.connect-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 0 rgba(35, 31, 23, .04); }
+/* --- one-click connect grid: hairline-ruled plate, per the design contract ---- */
+.connect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 4px 0 30px; }
+.connect-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; background: var(--surface); }
 .connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .connect-name { font-weight: 600; letter-spacing: -0.01em; }
 .connect-blurb { margin: 0; flex: 1; color: var(--muted); font-size: .88rem; line-height: 1.45; }
