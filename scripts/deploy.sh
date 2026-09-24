@@ -20,18 +20,23 @@ AUTH_JWKS_URL="${AUTH_JWKS_URL:-$(auth_output JwksUrl)}"
 # OPERATOR_EMAILS="a@datatalks.club,b@datatalks.club" to restrict it.
 OPERATOR_EMAILS="${OPERATOR_EMAILS:-}"
 
-sam deploy --config-env sandbox --parameter-overrides \
-  DomainName=dapier.dtcdev.click \
-  DomainCertificateArn=arn:aws:acm:eu-west-1:817685572750:certificate/df237eb8-9d9a-4d48-8aa3-2fbe99018cd9 \
-  HostedZoneId=Z05963572WVWFHDQZH5NE \
-  HtmlRendererImageUri=817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer:20260712-lambda \
-  InboundEmailTopicArn=arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events \
-  DatamailerInboundBucketName=datamailer-sandbox-817685572750-inbound-mail \
-  YouTubeChannelIds=UCDvErgK0j5ur3aLgn6U-LqQ \
-  DataOpsIntakeUrl=https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents \
-  AuthBaseUrl=https://auth.dtcdev.click \
-  AuthClientId="$AUTH_CLIENT_ID" \
-  AuthIssuer="$AUTH_ISSUER" \
-  AuthJwksUrl="$AUTH_JWKS_URL" \
-  OperatorEmails="$OPERATOR_EMAILS" \
-  "$@"
+overrides=(
+  DomainName=dapier.dtcdev.click
+  DomainCertificateArn=arn:aws:acm:eu-west-1:817685572750:certificate/df237eb8-9d9a-4d48-8aa3-2fbe99018cd9
+  HostedZoneId=Z05963572WVWFHDQZH5NE
+  HtmlRendererImageUri=817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer:20260712-lambda
+  InboundEmailTopicArn=arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events
+  DatamailerInboundBucketName=datamailer-sandbox-817685572750-inbound-mail
+  YouTubeChannelIds=UCDvErgK0j5ur3aLgn6U-LqQ
+  DataOpsIntakeUrl=https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents
+  AuthBaseUrl=https://auth.dtcdev.click
+  AuthClientId="$AUTH_CLIENT_ID"
+  AuthIssuer="$AUTH_ISSUER"
+  AuthJwksUrl="$AUTH_JWKS_URL"
+)
+# SAM rejects empty values in --parameter-overrides and the template defaults
+# OperatorEmails to '', so pass it only when actually restricting access.
+if [ -n "$OPERATOR_EMAILS" ]; then
+  overrides+=(OperatorEmails="$OPERATOR_EMAILS")
+fi
+sam deploy --config-env sandbox --parameter-overrides "${overrides[@]}" "$@"
