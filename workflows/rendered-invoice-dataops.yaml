@@ -9,7 +9,7 @@ actions:
     type: dropbox_upload
     connection_id: dropbox
     source: output
-    folder: /Invoices
+    folder: _dtc_paperwork/income-invoices
     filename: invoice-email.pdf
   - id: create-rendered-invoice
     type: dataops
