@@ -82,42 +82,12 @@ def test_dropbox_accounts_deduplicates_across_sections():
     assert ingress._dropbox_accounts(payload) == ["dbid:a", "dbid:b", "dbid:c"]
 
 
-def test_dropbox_secrets_reads_client_secrets_of_dropbox_connections(monkeypatch):
-    connections_items = [
-        {"connection_id": "team-dropbox", "provider": "dropbox"},
-        {"connection_id": "team-dropbox-2", "provider": "dropbox"},
-        {"connection_id": "youtube-personal", "provider": "youtube"},
-    ]
+def test_dropbox_secrets_come_from_the_deploy_time_app_secret(monkeypatch):
+    monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "app-secret")
+    assert ingress._dropbox_secrets() == ["app-secret"]
 
-    class ConnectionsTable:
-        def __init__(self):
-            self.items = connections_items
-
-        def scan(self, **kwargs):
-            expression = kwargs["FilterExpression"].get_expression()
-            attribute, expected = expression["values"]
-            return {"Items": [
-                item for item in self.items if item.get(attribute.name) == expected
-            ]}
-
-    class CredentialsTable:
-        def get_item(self, Key):
-            records = {
-                "oauth#team-dropbox": {"value": {"client_secret": "secret-1"}},
-                "oauth#team-dropbox-2": {"value": {"client_secret": "secret-1"}},
-                "oauth#youtube-personal": {"value": {"client_secret": "google-secret"}},
-            }
-            return {"Item": records.get(Key["credential_id"])}
-
-    class Dynamo:
-        def Table(self, name):
-            return CredentialsTable() if name == "credentials" else ConnectionsTable()
-
-    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
-    monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
-    monkeypatch.setattr(ingress.boto3, "resource", lambda service: Dynamo())
-
-    assert ingress._dropbox_secrets() == ["secret-1"]
+    monkeypatch.delenv("DROPBOX_OAUTH_CLIENT_SECRET")
+    assert ingress._dropbox_secrets() == []
 
 
 def test_dropbox_webhook_queues_one_message_per_account(monkeypatch):

@@ -50,6 +50,15 @@ Parameters:
     Type: String
     Default: ''
     Description: Path the Dropbox resolver lists (empty lists everything the app can see)
+  DropboxOAuthClientId:
+    Type: String
+    Default: ''
+    Description: Dropbox app key shared by Dropbox connections
+  DropboxOAuthClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Dropbox app secret (also verifies webhook signatures)
 
 Globals:
   Function:
@@ -128,6 +137,8 @@ Resources:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
+          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
+          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
         Root:
           Type: HttpApi
