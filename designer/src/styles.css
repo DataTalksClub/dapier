@@ -128,6 +128,16 @@ button {
   gap: 8px;
 }
 
+/* Console mode renders the brand as the back link to the console. */
+a.brand {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.brand:hover span:last-child {
+  text-decoration: underline;
+}
+
 .brand-mark {
   align-items: center;
   background: var(--active-bg);

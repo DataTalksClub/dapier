@@ -549,6 +549,7 @@ document.addEventListener('keydown', (event) => {
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
 $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', (event) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  if (link.dataset.external) return; // full-page view with its own asset bundle
   event.preventDefault();
   setView(link.dataset.view || link.dataset.target);
 }));

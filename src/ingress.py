@@ -29,14 +29,23 @@ def _response(status, body, content_type="application/json", headers=None):
 
 
 CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/runs")
+DESIGNER_VIEW = "/designer"
+# Pages whose static cache policy matches the console views.
+HTML_VIEWS = CONSOLE_VIEWS + (DESIGNER_VIEW,)
 
 
 def _static(path):
+    # The designer canvas positions nodes with inline style attributes, which
+    # CSP only allows with an explicit style-src exception for that page.
+    style_src = "'self' 'unsafe-inline'" if path == DESIGNER_VIEW else "'self'"
     assets = {
         **{view: ("index.html", "text/html; charset=utf-8") for view in CONSOLE_VIEWS},
+        DESIGNER_VIEW: ("designer.html", "text/html; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
+        "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
+        "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
         "/assets/fonts/IBMPlexSans-VF.woff2": ("assets/fonts/IBMPlexSans-VF.woff2", "font/woff2"),
         "/assets/fonts/IBMPlexMono-Regular.woff2": ("assets/fonts/IBMPlexMono-Regular.woff2", "font/woff2"),
         "/assets/fonts/IBMPlexMono-Medium.woff2": ("assets/fonts/IBMPlexMono-Medium.woff2", "font/woff2"),
@@ -56,10 +65,10 @@ def _static(path):
         body,
         content_type,
         headers={
-            "cache-control": "no-store" if path in CONSOLE_VIEWS else "public, max-age=300",
+            "cache-control": "no-store" if path in HTML_VIEWS else "public, max-age=300",
             "content-security-policy": (
                 "default-src 'self'; script-src 'self'; "
-                "style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+                f"style-src {style_src}; img-src 'self' data:; connect-src 'self'; "
                 "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
             ),
             "x-content-type-options": "nosniff",

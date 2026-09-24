@@ -7,6 +7,7 @@
     "dev": "node server.mjs & vite",
     "dev:api": "node server.mjs",
     "build": "tsc && vite build",
+    "build:console": "vite build --config vite.console.config.ts",
     "start": "node server.mjs",
     "typecheck": "tsc"
   },

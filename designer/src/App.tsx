@@ -5,6 +5,7 @@ import { WorkflowBoard } from "./WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
+import { localConfig, type DesignerConfig } from "./config";
 import type { DiagramShape, FilterRule, GitStatus, NodeData, Workflow, WorkflowSummary } from "./types";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
@@ -15,11 +16,15 @@ function TriggerLogo({ connector }: { connector: string }) {
   return Logo ? <Logo size={12} /> : null;
 }
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+async function api<T>(config: DesignerConfig, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${config.apiBase}${path}`, {
     headers: init?.body ? { "content-type": "application/json" } : undefined,
     ...init
   });
+  if (response.status === 401 && config.onUnauthorized) {
+    config.onUnauthorized();
+    throw new Error("Sign-in required");
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${response.status}`);
   return body as T;
@@ -107,7 +112,7 @@ function RawJsonInput({ value, onChange }: {
   );
 }
 
-export function App() {
+export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [summaries, setSummaries] = useState<WorkflowSummary[]>([]);
   const [sourceName, setSourceName] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState("new-workflow");
@@ -121,13 +126,14 @@ export function App() {
   const dirty = useMemo(() => JSON.stringify(shapes) !== savedSnapshot, [shapes, savedSnapshot]);
 
   const refreshGit = useCallback(() => {
-    api<GitStatus>("/git/status").then(setGit).catch(() => setGit(null));
-  }, []);
+    if (config.mode !== "local") return;
+    api<GitStatus>(config, "/git/status").then(setGit).catch(() => setGit(null));
+  }, [config]);
 
   const refreshList = useCallback(async () => {
-    const data = await api<{ workflows: WorkflowSummary[] }>("/workflows");
+    const data = await api<{ workflows: WorkflowSummary[] }>(config, "/workflows");
     setSummaries(data.workflows);
-  }, []);
+  }, [config]);
 
   useEffect(() => {
     refreshList().catch((error) => setStatus({ kind: "error", message: String(error) }));
@@ -136,7 +142,7 @@ export function App() {
 
   async function openWorkflow(summary: WorkflowSummary) {
     try {
-      const data = await api<{ workflow: Workflow }>(`/workflows/${summary.source}`);
+      const data = await api<{ workflow: Workflow }>(config, `/workflows/${summary.source}`);
       const workflow = data.workflow;
       setSourceName(summary.source);
       setWorkflowId(workflow.id);
@@ -178,7 +184,7 @@ export function App() {
     }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
-      const result = await api<{ commit: string | null }>("/workflows", {
+      const result = await api<{ commit: string | null; html_url?: string }>(config, "/workflows", {
         method: "PUT",
         body: JSON.stringify({ yaml: workflowYaml(workflow), renameFrom: sourceName })
       });
@@ -191,7 +197,11 @@ export function App() {
       refreshGit();
       setStatus({
         kind: "ok",
-        message: result.commit ? `Saved and committed ${result.commit.slice(0, 7)}` : "Saved (no changes)"
+        message: !result.commit
+          ? "No changes to commit"
+          : config.mode === "console"
+            ? `Committed ${result.commit.slice(0, 7)} — the deploy pipeline publishes it in a few minutes`
+            : `Saved and committed ${result.commit.slice(0, 7)}`
       });
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
@@ -201,7 +211,7 @@ export function App() {
   async function push() {
     setStatus({ kind: "busy", message: "Pushing…" });
     try {
-      const result = await api<{ output: string }>("/git/push", { method: "POST" });
+      const result = await api<{ output: string }>(config, "/git/push", { method: "POST" });
       refreshGit();
       setStatus({ kind: "ok", message: result.output.trim() || "Pushed" });
     } catch (error) {
@@ -376,7 +386,11 @@ export function App() {
   return (
     <div className="designer-shell">
       <aside className="designer-sidebar">
-        <div className="brand"><span className="brand-mark">D</span><span>Workflow designer</span></div>
+        {config.mode === "console" ? (
+          <a className="brand brand-link" href="/"><span className="brand-mark">D</span><span>← Console · Designer</span></a>
+        ) : (
+          <div className="brand"><span className="brand-mark">D</span><span>Workflow designer</span></div>
+        )}
         <button className="button primary" type="button" onClick={newWorkflow}>
           <FilePlus2 size={15} /><span>New workflow</span>
         </button>
@@ -398,7 +412,7 @@ export function App() {
           ))}
           {summaries.length === 0 && <p className="inspector-hint">No workflows found.</p>}
         </nav>
-        {git && (
+        {config.mode === "local" && git && (
           <div className="git-foot">
             <GitBranch size={14} />
             <span>{git.branch}</span>
@@ -428,9 +442,11 @@ export function App() {
                 {status.message}
               </span>
             )}
-            <button className="button secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
-              <CloudUpload size={15} /><span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
-            </button>
+            {config.mode === "local" && (
+              <button className="button secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
+                <CloudUpload size={15} /><span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
+              </button>
+            )}
             <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy"}>
               <Save size={15} /><span>{dirty ? "Save to git" : "Saved"}</span>
             </button>

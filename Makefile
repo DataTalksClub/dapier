@@ -1,4 +1,4 @@
-.PHONY: build deploy test validate designer-install designer designer-build
+.PHONY: build deploy test validate designer-install designer designer-build designer-console
 
 build:
 	sam build --config-env sandbox
@@ -22,3 +22,8 @@ designer: designer-install
 
 designer-build:
 	cd designer && npm run build
+
+# Rebuild the bundle vendored into the console (src/web/designer.js/.css,
+# served at /designer). Run after changing designer sources.
+designer-console: designer-install
+	cd designer && npm run build:console

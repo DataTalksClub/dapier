@@ -72,6 +72,16 @@ Parameters:
     Type: String
     Default: dtcdev.click
     Description: Domain for operator-created email trigger addresses
+  GithubWorkflowsTokenSecret:
+    Type: String
+    Default: ''
+    Description: >
+      Secrets Manager secret name holding a GitHub token (Contents: read/write
+      on the workflows repo). Set to let the console designer commit
+      workflows/*.yaml straight to the repo; empty disables designer saves.
+
+Conditions:
+  HasGithubWorkflowsToken: !Not [!Equals [!Ref GithubWorkflowsTokenSecret, '']]
 
 Globals:
   Function:
@@ -153,6 +163,7 @@ Resources:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
+          GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
           GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
           GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
@@ -183,6 +194,15 @@ Resources:
         LucideJs:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /assets/lucide.min.js, Method: GET}
+        DesignerView:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /designer, Method: GET}
+        DesignerJs:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /assets/designer.js, Method: GET}
+        DesignerCss:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /assets/designer.css, Method: GET}
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}
@@ -225,6 +245,22 @@ Resources:
         YouTubePost:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /hooks/youtube, Method: POST}
+
+  # Standalone (not inline) because the grant exists only when the token
+  # secret is configured; AWS::NoValue inside the function's Policies list
+  # does not survive SAM's template transform.
+  DesignerGithubTokenPolicy:
+    Type: AWS::IAM::Policy
+    Condition: HasGithubWorkflowsToken
+    Properties:
+      PolicyName: dapier-designer-github-token-read
+      Roles: [!Ref IngressFunctionRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
 
   EmailIngressFunction:
     Type: AWS::Serverless::Function
