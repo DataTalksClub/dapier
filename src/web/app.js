@@ -202,11 +202,12 @@ function emptyRow(columns) {
 }
 
 function renderConnections(connections) {
+  renderConnectCards(connections);
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
     const action = connection.provider === 'slack'
-      ? '<span class="action-type">token</span>'
+      ? '<button class="button secondary connection-token" type="button">Replace token</button>'
       : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
@@ -216,6 +217,7 @@ function renderConnections(connections) {
     <td class="action-cell"${connection.provider === 'slack' ? ' data-label="Auth"' : ''}>${action}</td>
   </tr>`;
   }).join('');
+  $$('.connection-token').forEach((button) => button.addEventListener('click', openSlackDialog));
 }
 
 function renderCredentials(credentials) {
@@ -249,12 +251,25 @@ async function refresh() {
   }
 }
 
-function setView(view) {
+const VIEWS = ['overview', 'workflows', 'connections', 'credentials', 'runs'];
+
+function viewFromPath(path) {
+  const name = path.replace(/^\/+|\/+$/g, '');
+  return VIEWS.includes(name) ? name : 'overview';
+}
+
+function setView(view, push = true) {
   state.view = view;
-  $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === view));
+  $$('.nav-item').forEach((item) => {
+    item.classList.toggle('active', item.dataset.view === view);
+    if (item.dataset.view === view) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
+  });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
   $('#view-title').textContent = view[0].toUpperCase() + view.slice(1);
   $('.sidebar').classList.remove('open');
+  if (push) history.pushState(null, '', view === 'overview' ? '/' : `/${view}`);
+  window.scrollTo(0, 0);
 }
 
 function notice(message, error = false) {
@@ -265,68 +280,79 @@ function notice(message, error = false) {
   setTimeout(() => { element.hidden = true; }, 4500);
 }
 
-const PROVIDER_SPECS = {
-  dropbox: {
-    connectionId: 'team-dropbox',
-    displayName: 'Team Dropbox',
-    scopes: 'files.metadata.read files.content.read',
-    console: 'https://www.dropbox.com/developers/apps',
-    consoleLabel: 'Dropbox App Console',
-    scopeHint: 'Space-separated Dropbox scopes. Leave as-is unless your app needs more.',
-  },
+const CONNECT_PROVIDERS = {
   google: {
-    connectionId: 'calendar-alexey',
-    displayName: 'Calendar — Alexey',
-    scopes: 'https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.email',
-    console: 'https://console.cloud.google.com/apis/credentials',
-    consoleLabel: 'Google Cloud Console',
-    scopeHint: 'Google requires at least one scope — the prefilled three cover free/busy, owned-event edits, and account verification.',
+    label: 'Google Calendar',
+    blurb: 'Free/busy lookups and owned-event edits for the scheduling flows.',
+    connectionId: 'google-calendar',
+    displayName: 'Google Calendar',
+    scopes: ['https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.events.owned', 'https://www.googleapis.com/auth/userinfo.email'],
   },
   youtube: {
-    connectionId: 'channel-youtube',
-    displayName: 'Channel YouTube',
-    scopes: 'https://www.googleapis.com/auth/youtube.readonly',
-    console: 'https://console.cloud.google.com/apis/credentials',
-    consoleLabel: 'Google Cloud Console',
-    scopeHint: 'Google requires at least one scope — leave this filled in or YouTube sign-in fails.',
+    label: 'YouTube',
+    blurb: 'Published-video triggers for your channel.',
+    connectionId: 'youtube',
+    displayName: 'YouTube channel',
+    scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+  },
+  dropbox: {
+    label: 'Dropbox',
+    blurb: 'File watchers, uploads, and the invoice pipeline.',
+    connectionId: 'dropbox',
+    displayName: 'Dropbox',
+    scopes: ['files.metadata.read', 'files.content.read'],
   },
   slack: {
+    label: 'Slack',
+    blurb: 'Post notifications with a bot token — no browser consent.',
     connectionId: 'slack',
     displayName: 'DataTalks Slack',
-    scopes: '',
-    console: 'https://api.slack.com/apps',
-    consoleLabel: 'Slack App Directory',
-    scopeHint: 'Slack tokens carry their scopes from the app installation.',
+    scopes: [],
   },
 };
 
-function applyProviderSpec(provider) {
-  const spec = PROVIDER_SPECS[provider] || PROVIDER_SPECS.dropbox;
+function renderConnectCards(connections) {
+  $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => {
+    const existing = connections.find((connection) => connection.provider === provider);
+    const status = existing
+      ? statusLine(existing.status)
+      : '<span class="status off"><span class="status-dot" aria-hidden="true"></span>not connected</span>';
+    const action = provider === 'slack'
+      ? `<button class="button secondary connect-button" data-provider="slack" type="button">${existing ? 'Replace token' : 'Paste bot token'}</button>`
+      : `<button class="button primary connect-button" data-provider="${provider}" type="button">${existing ? (existing.status === 'connected' ? 'Reconnect' : 'Continue connecting') : 'Connect'}</button>`;
+    return `<div class="connect-card">
+      <div class="connect-card-head"><span class="connect-name">${meta.label}</span>${status}</div>
+      <p class="connect-blurb">${meta.blurb}</p>
+      ${action}
+    </div>`;
+  }).join('');
+  $$('.connect-button').forEach((button) => button.addEventListener('click', () => connectProvider(button.dataset.provider)));
+}
+
+async function connectProvider(provider) {
+  if (provider === 'slack') return openSlackDialog();
+  const meta = CONNECT_PROVIDERS[provider];
+  const existing = ((state.data || {}).connections || []).find((connection) => connection.provider === provider);
+  const id = existing ? existing.connection_id : meta.connectionId;
+  try {
+    if (!existing) {
+      // First connect: provision the record with the provider's standard
+      // scopes, then bounce straight to the consent screen.
+      await api('/api/admin/connections', {
+        method: 'PUT',
+        body: JSON.stringify({ connection_id: id, provider, display_name: meta.displayName, scopes: meta.scopes }),
+      });
+    }
+    window.location.assign(`/api/admin/oauth/${encodeURIComponent(id)}/start`);
+  } catch (error) { notice(error.message, true); }
+}
+
+function openSlackDialog() {
   const form = $('#connection-form');
-  const tokenProvider = provider === 'slack';
-  $('#connection-oauth-callout').hidden = tokenProvider;
-  $('#connection-client-id-field').hidden = tokenProvider;
-  $('#connection-client-secret-field').hidden = tokenProvider;
-  $('#connection-scopes-field').hidden = tokenProvider;
-  $('#connection-token-field').hidden = !tokenProvider;
-  form.client_id.required = !tokenProvider;
-  form.client_secret.required = !tokenProvider;
-  form.slack_token.required = tokenProvider;
-  form.connection_id.placeholder = spec.connectionId;
-  form.display_name.placeholder = spec.displayName;
-  form.scopes.placeholder = spec.scopes;
-  if (tokenProvider) {
-    form.scopes.value = '';
-    delete form.scopes.dataset.autofill;
-  } else if (!form.scopes.value.trim() || form.scopes.dataset.autofill === '1') {
-    form.scopes.value = spec.scopes;
-    form.scopes.dataset.autofill = '1';
-  }
-  $('#connection-scope-hint').textContent = spec.scopeHint;
-  const link = $('#connection-console');
-  link.href = spec.console;
-  link.textContent = spec.consoleLabel;
-  $('#connection-redirect').textContent = `${window.location.origin}/oauth/callback`;
+  form.reset();
+  $('#connection-error').textContent = '';
+  $('#connection-dialog').showModal();
+  form.slack_token.focus();
 }
 
 function openCredential(provider) {
@@ -358,19 +384,19 @@ $('#credential-form').addEventListener('submit', async (event) => {
 $('#connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
-  const values = Object.fromEntries(new FormData(form));
-  values.scopes = values.scopes.trim() ? values.scopes.trim().split(/\s+/) : [];
-  if (values.provider === 'slack') {
-    values.token = values.slack_token;
-    delete values.slack_token;
-  }
   $('#connection-error').textContent = '';
+  const existing = ((state.data || {}).connections || []).find((connection) => connection.provider === 'slack');
+  const body = {
+    connection_id: existing ? existing.connection_id : 'slack',
+    provider: 'slack',
+    display_name: existing ? existing.display_name : 'DataTalks Slack',
+    token: form.slack_token.value,
+  };
   try {
-    await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(values) });
-    form.client_secret.value = '';
+    await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
     form.slack_token.value = '';
     $('#connection-dialog').close();
-    notice('Connection saved');
+    notice('Slack connected');
     await refresh();
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
@@ -389,25 +415,12 @@ document.addEventListener('keydown', (event) => {
   handleRowActivate(event);
 });
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
-$$('.nav-item').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
-$$('.view-link').forEach((button) => button.addEventListener('click', () => setView(button.dataset.target)));
-$('#add-connection').addEventListener('click', () => {
-  const form = $('#connection-form');
-  form.reset();
-  form.scopes.dataset.autofill = '1';
-  $('#connection-error').textContent = '';
-  applyProviderSpec(form.provider.value);
-  $('#connection-dialog').showModal();
-  icons();
-});
-$('#connection-form').provider.addEventListener('change', (event) => applyProviderSpec(event.target.value));
-$('#connection-form').scopes.addEventListener('input', (event) => { event.target.dataset.autofill = ''; });
-$('#connection-copy').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText($('#connection-redirect').textContent);
-    notice('Redirect URI copied');
-  } catch (_) { notice('Copy failed — select the URI manually', true); }
-});
+$$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', (event) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  setView(link.dataset.view || link.dataset.target);
+}));
+window.addEventListener('popstate', () => setView(viewFromPath(window.location.pathname), false));
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });
@@ -417,5 +430,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   let me;
   try { me = await api('/api/admin/me'); } catch (_) { return; }
   if (!me.operator) { showForbidden(); return; }
+  setView(viewFromPath(window.location.pathname), false);
   await refresh();
 });

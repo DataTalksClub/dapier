@@ -120,14 +120,15 @@ The **Credentials** view accepts the Slack bot token used by Dapier and the
 Mailchimp API key used by DataOps. The values are write-only: the browser sends
 them over HTTPS to the administration API, which stores them in the dedicated
 DynamoDB credentials table and returns only presence and update metadata. The
-**Connections** view lists OAuth connections: pick a provider, keep the
-prefilled scopes, hit **Save & connect**, and approve access — that's the whole
-flow. OAuth client IDs and secrets are shared per provider and deploy with the
-stack (see below); provider tokens land in the same write-only DynamoDB
-credentials table.
+**Connections** view shows one card per service: click **Connect** on Google
+Calendar, YouTube, or Dropbox, approve access on the consent screen, and the
+token is stored — no client IDs, secrets, or scopes to enter. When a token
+expires, click the card again. OAuth client IDs and secrets are shared per
+provider and deploy with the stack (see below); provider tokens land in the
+same write-only DynamoDB credentials table.
 
-Slack connects as a regular connection without OAuth: pick the **Slack**
-provider, paste a bot (`xoxb-`) or user (`xoxp-`) token, and save — Dapier
+Slack connects without OAuth: click **Paste bot token** on the Slack card and
+save a bot (`xoxb-`) or user (`xoxp-`) token — Dapier
 verifies it with Slack's `auth.test`, stores it in the credentials table under
 the connection's ID, and marks the connection connected. Workflows reference it
 by `connection_id` (the `youtube-slack` workflow posts with `connection_id:

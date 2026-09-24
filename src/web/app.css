@@ -131,6 +131,7 @@ code { font-family: var(--mono); font-size: .92em; background: rgba(35, 31, 23, 
   color: var(--accent);
   font-size: 12.5px;
   font-weight: 500;
+  text-decoration: none;
 }
 .text-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -187,6 +188,7 @@ nav { display: grid; align-content: start; gap: 2px; padding: 14px 0; }
   font-size: 13px;
   font-weight: 400;
   text-align: left;
+  text-decoration: none;
 }
 .nav-item:hover { color: var(--rail-ink); background: rgba(236, 231, 218, .06); }
 .nav-item.active { color: var(--rail-ink); border-left-color: #48a878; background: rgba(236, 231, 218, .08); font-weight: 500; }
@@ -281,6 +283,15 @@ th:last-child, td:last-child { padding-right: 0; }
 .action-col { text-align: right; }
 .action-cell { text-align: right; white-space: nowrap; }
 [data-page="connections"] th:first-child { width: 24%; }
+
+/* --- one-click connect cards -------------------------------------------------- */
+.connect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 4px 0 30px; }
+.connect-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 0 rgba(35, 31, 23, .04); }
+.connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.connect-name { font-weight: 600; letter-spacing: -0.01em; }
+.connect-blurb { margin: 0; flex: 1; color: var(--muted); font-size: .88rem; line-height: 1.45; }
+.connect-card .button { align-self: flex-start; }
+.sub-head { font-size: 1.05rem; }
 td.mono, .mono-cell { font-family: var(--mono); font-size: 12.5px; }
 .muted-cell { color: var(--muted); }
 .cell-title { display: grid; gap: 2px; }

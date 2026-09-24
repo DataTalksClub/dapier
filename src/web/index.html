@@ -29,11 +29,11 @@
     <aside class="sidebar">
       <div class="brand"><span class="wordmark">Dapier</span></div>
       <nav aria-label="Main navigation">
-        <button class="nav-item active" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></button>
-        <button class="nav-item" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></button>
-        <button class="nav-item" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></button>
-        <button class="nav-item" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></button>
-        <button class="nav-item" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></button>
+        <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
+        <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
+        <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
+        <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
+        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
@@ -64,7 +64,7 @@
 
         <div class="section-head">
           <div class="section-head-text"><h2>Active automations</h2><p class="sub">Current YAML deployment</p></div>
-          <button class="text-link view-link" data-target="workflows">View all<i data-lucide="arrow-right"></i></button>
+          <a class="text-link view-link" href="/workflows" data-target="workflows">View all<i data-lucide="arrow-right"></i></a>
         </div>
         <div class="table-wrap">
           <table>
@@ -75,7 +75,7 @@
 
         <div class="section-head">
           <div class="section-head-text"><h2>Recent activity</h2><p class="sub">Idempotent workflow actions</p></div>
-          <button class="text-link view-link" data-target="runs">View all<i data-lucide="arrow-right"></i></button>
+          <a class="text-link view-link" href="/runs" data-target="runs">View all<i data-lucide="arrow-right"></i></a>
         </div>
         <div class="table-wrap">
           <table>
@@ -99,10 +99,13 @@
 
       <section class="view" data-page="connections">
         <div class="section-head">
-          <div class="section-head-text"><h2>OAuth connections</h2><p class="sub">Dropbox, Google, YouTube, and Slack accounts</p></div>
-          <button id="add-connection" class="button primary">Add connection</button>
+          <div class="section-head-text"><h2>OAuth connections</h2><p class="sub">Click a service, approve access, done — the token is stored for you. If it ever expires, click again.</p></div>
         </div>
-        <div id="connection-empty" class="empty-state" hidden><h3>No connections</h3><p>Add one to let workflows call external services.</p></div>
+        <div class="connect-grid" id="connect-grid"></div>
+        <div class="section-head">
+          <div class="section-head-text"><h2 class="sub-head">Connected accounts</h2></div>
+        </div>
+        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Connect a service above to let workflows call it.</p></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Name</th><th>Provider</th><th>Scopes</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
@@ -181,29 +184,17 @@
   <dialog id="connection-dialog">
     <form id="connection-form" method="dialog">
       <div class="dialog-head">
-        <h2 id="connection-heading">Add connection</h2>
+        <h2 id="connection-heading">Connect Slack</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
       <div class="dialog-body">
-        <div class="callout" id="connection-oauth-callout">
-          <p class="callout-step"><strong>1.</strong> In the <a id="connection-console" href="#" target="_blank" rel="noopener">provider console</a>, register this redirect URI:</p>
-          <div class="copy-field"><code id="connection-redirect" class="mono">https://…/oauth/callback</code><button id="connection-copy" class="icon-button" type="button" title="Copy" aria-label="Copy redirect URI"><i data-lucide="copy"></i></button></div>
-          <p class="callout-step"><strong>2.</strong> Paste the client ID and secret it gives you below.</p>
-        </div>
-        <div class="form-grid">
-          <label>Provider<select name="provider"><option value="dropbox">Dropbox</option><option value="google">Google Calendar</option><option value="youtube">YouTube</option><option value="slack">Slack</option></select></label>
-          <label>Connection ID<input name="connection_id" class="mono-input" placeholder="team-dropbox" pattern="[a-z0-9][a-z0-9_-]{1,62}" required></label>
-        </div>
-        <label>Display name<input name="display_name" placeholder="Team Dropbox" required></label>
-        <label id="connection-client-id-field">Client ID<input name="client_id" class="mono-input" autocomplete="off" required></label>
-        <label id="connection-client-secret-field">Client secret<input name="client_secret" class="mono-input" type="password" autocomplete="off" required></label>
-        <label id="connection-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="files.metadata.read files.content.read"><small id="connection-scope-hint" class="field-hint"></small></label>
-        <label id="connection-token-field" hidden>Slack token<input name="slack_token" class="mono-input" type="password" autocomplete="off" placeholder="xoxb-… or xoxp-…"><small class="field-hint">Paste a bot (xoxb-) or user (xoxp-) token from your Slack app — it is verified and stored as the connection's secret.</small></label>
+        <p class="sub">Slack is the one service that can't do browser consent here — paste a bot (<code>xoxb-…</code>) or user (<code>xoxp-…</code>) token from your Slack app settings. It is verified against Slack and stored as the connection's secret.</p>
+        <label>Slack token<input name="slack_token" class="mono-input" type="password" autocomplete="off" placeholder="xoxb-… or xoxp-…" required></label>
         <p id="connection-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
-        <button class="button primary" type="submit">Save connection</button>
+        <button class="button primary" type="submit">Save token</button>
       </div>
     </form>
   </dialog>
