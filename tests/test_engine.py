@@ -97,17 +97,28 @@ class DropboxUploadTests(unittest.TestCase):
         paths = [json.loads(c["headers"]["dropbox-api-arg"])["path"] for c in transport.calls]
         self.assertEqual(paths, ["/Invoices/a.pdf", "/Invoices/b.pdf"])
 
-    def test_uploads_rendered_output(self):
+    def test_names_rendered_output_after_the_artifact_key(self):
         transport = FakeTransport()
         action = {
             "type": "dropbox_upload", "connection_id": "dropbox",
-            "source": "output", "folder": "/Invoices", "filename": "invoice-email.pdf",
+            "source": "output", "folder": "/Invoices",
         }
         event = {"data": {"output": {"bucket": "artifacts", "key": "rendered/1.pdf"}}}
         self.run_action(transport, event=event, action=action)
 
         arg = json.loads(transport.calls[0]["headers"]["dropbox-api-arg"])
-        self.assertEqual(arg["path"], "/Invoices/invoice-email.pdf")
+        self.assertEqual(arg["path"], "/Invoices/1.pdf")
+
+    def test_makes_relative_folder_absolute(self):
+        transport = FakeTransport()
+        action = {
+            "type": "dropbox_upload", "connection_id": "dropbox",
+            "folder": "_dtc_paperwork/income-invoices",
+        }
+        self.run_action(transport, action=action)
+
+        arg = json.loads(transport.calls[0]["headers"]["dropbox-api-arg"])
+        self.assertEqual(arg["path"], "/_dtc_paperwork/income-invoices/invoice.pdf")
 
     def test_strips_path_traversal_from_filename(self):
         transport = FakeTransport()

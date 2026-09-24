@@ -198,7 +198,8 @@ def _upload_files(action, data):
         output = data.get("output") or {}
         if not (output.get("bucket") and output.get("key")):
             raise ValueError("render output does not reference a stored file")
-        return [{"s3": output, "filename": action.get("filename", "invoice-email.pdf")}]
+        name = action.get("filename") or str(output["key"]).split("/")[-1]
+        return [{"s3": output, "filename": name}]
     files = [
         {"s3": attachment["s3"], "filename": attachment.get("filename") or "attachment"}
         for attachment in data.get("attachments") or []
@@ -251,7 +252,8 @@ def run_dropbox_upload(action, event, transport=None):
 
     connection = _dropbox_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection, transport=transport)
-    folder = str(action.get("folder") or "/").rstrip("/") or ""
+    stripped = str(action.get("folder") or "").strip("/")
+    folder = f"/{stripped}" if stripped else ""
     for file in _upload_files(action, event.get("data", {})):
         path = f"{folder}/{_safe_filename(file['filename'])}"
         _dropbox_upload(access_token, path, _s3_body(file["s3"]), transport=transport)
