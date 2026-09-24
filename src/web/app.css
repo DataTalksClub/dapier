@@ -352,6 +352,18 @@ dialog form { display: contents; }
 .dialog-head .icon-button { border-color: transparent; }
 .dialog-head .icon-button:hover { border-color: var(--line-strong); }
 .dialog-body { padding: 20px 22px; display: grid; gap: 16px; max-height: min(62vh, 580px); overflow-y: auto; align-content: start; }
+.token-reveal { display: flex; gap: 10px; align-items: stretch; }
+.token-reveal code {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft, transparent);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

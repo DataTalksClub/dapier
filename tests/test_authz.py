@@ -109,6 +109,7 @@ def test_overview_allows_operator(monkeypatch, tmp_path):
         "executions": DictTable(("execution_id",)),
         "connections": DictTable(("connection_id",)),
         "credentials": DictTable(("credential_id",)),
+        "api-tokens": DictTable(("token_hash",)),
     })
     from src import credentials as credentials_module
 
@@ -116,6 +117,7 @@ def test_overview_allows_operator(monkeypatch, tmp_path):
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
     response = admin.route(cookie_event(token), "GET", "/api/admin/overview")
     assert response["statusCode"] == 200
 
