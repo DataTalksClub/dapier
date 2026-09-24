@@ -109,32 +109,29 @@ function filterRulesToYaml(rules: FilterRule[] | undefined): Record<string, Reco
 
 function actionToYaml(node: DiagramShape, index: number): Record<string, unknown> {
   const data = node.data ?? defaultNodeData("action");
+  const type = data.actionType ?? "webhook";
   const action: Record<string, unknown> = {
     id: (data.fields?.id ?? "").trim() || `action-${index + 1}`,
-    type: data.actionType ?? "webhook"
+    type
   };
-  const meta = actionMeta(data.actionType);
+  const meta = actionMeta(type);
   if (!meta) {
     // Unknown action type: write the original YAML back untouched.
     return { ...action, ...(data.raw ?? {}) };
   }
   for (const field of meta.fields) {
+    // Presence-based: keys the YAML omits stay omitted (engine defaults
+    // apply), keys it sets — or the inspector touches — are written back.
     if (field.type === "boolean") {
-      // Stay out of the YAML while the checkbox matches its default, so
-      // engine defaults keep minimal diffs and round-trips stay stable.
-      const on = (data.fields?.[field.key] ?? field.default ?? "false") === "true";
-      if (on !== ((field.default ?? "false") === "true")) fieldTarget(action, field)[field.key] = on;
+      const raw = data.fields?.[field.key];
+      if (raw === undefined) continue;
+      fieldTarget(action, field)[field.key] = raw === "true";
       continue;
     }
-    const value = (data.fields?.[field.key] ?? "").trim() || field.default || "";
+    const value = (data.fields?.[field.key] ?? "").trim();
     if (value === "") continue;
     const parsed = field.type === "number" ? Number(value) : value;
     fieldTarget(action, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
-  }
-  for (const field of meta.fields) {
-    if (field.group && Object.keys(action[field.group] as Record<string, unknown>).length === 0) {
-      delete action[field.group];
-    }
   }
   return action;
 }
@@ -192,7 +189,9 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
   for (const field of meta.fields) {
     const holder = field.group ? action[field.group] : action;
     const value = isRecord(holder) ? holder[field.key] : undefined;
-    fields[field.key] = value === undefined ? (field.default ?? "") : String(value);
+    // Keys the YAML omits stay unset: the inspector falls back to the
+    // field default, and saving omits them again.
+    if (value !== undefined) fields[field.key] = String(value);
   }
   return fields;
 }

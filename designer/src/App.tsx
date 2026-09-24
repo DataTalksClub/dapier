@@ -270,6 +270,7 @@ export function App() {
                   {filterOperators.map((op) => <option key={op} value={op}>{op}</option>)}
                 </select>
                 <input
+                  className="filter-value"
                   placeholder="value"
                   value={rule.value}
                   onChange={(event) => updateSelected((current) => ({
@@ -305,7 +306,8 @@ export function App() {
       );
     }
 
-    const meta = actionMeta(data.actionType);
+    const type = data.actionType ?? "webhook";
+    const meta = actionMeta(type);
     const setField = (key: string, value: string) => updateSelected((current) => ({
       ...current,
       fields: { ...current.fields, [key]: value }

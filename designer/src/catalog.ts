@@ -94,6 +94,8 @@ export const actionCatalog: ActionEntry[] = [
       { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
       { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
       { key: "url", label: "URL (overrides env)" },
+      { key: "connection_id", label: "Dropbox connection ID", placeholder: "dropbox — for file-event intakes" },
+      { key: "filename", label: "Filename override" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   },

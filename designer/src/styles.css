@@ -394,8 +394,19 @@ select:focus {
 }
 
 .inspector input,
-.inspector select {
+.inspector select,
+.inspector textarea {
   width: 100%;
+}
+
+.inspector textarea {
+  background: var(--surface);
+  border: 1px solid var(--section-border);
+  border-radius: 6px;
+  color: var(--text);
+  font: 11px/1.5 ui-monospace, monospace;
+  padding: 7px 9px;
+  resize: vertical;
 }
 
 .check-label {
@@ -654,5 +665,9 @@ select:focus {
 .filter-row {
   display: grid;
   gap: 4px;
-  grid-template-columns: 1fr 70px 1fr 28px;
+  grid-template-columns: 1fr 70px 28px;
+}
+
+.filter-row .filter-value {
+  grid-column: 1 / -1;
 }
