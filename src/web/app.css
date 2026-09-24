@@ -292,7 +292,10 @@ th:last-child, td:last-child { padding-right: 0; }
 .connect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 4px 0 30px; }
 .connect-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; background: var(--surface); }
 .connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.connect-title { display: inline-flex; align-items: center; gap: 9px; }
 .connect-name { font-weight: 600; letter-spacing: -0.01em; }
+.brand-mark { flex: none; }
+.provider-cell { display: inline-flex; align-items: center; gap: 8px; }
 .connect-blurb { margin: 0; flex: 1; color: var(--muted); font-size: .88rem; line-height: 1.45; }
 .connect-card .button { align-self: flex-start; }
 .sub-head { font-size: 1.05rem; }
