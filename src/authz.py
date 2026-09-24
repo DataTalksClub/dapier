@@ -141,3 +141,56 @@ def list_grants(table, connection_id=None, limit=100):
             Limit=limit,
         ).get("Items", [])
     return table.scan(Limit=limit).get("Items", [])
+
+
+GRANT_PUBLIC_FIELDS = (
+    "connection_id", "grantee", "subject", "agent", "operations",
+    "granted_by", "granted_at", "updated_at", "expires_at",
+)
+
+
+def public_grant(item):
+    return {key: item.get(key) for key in GRANT_PUBLIC_FIELDS}
+
+
+def api_list_grants(table, connection_id=None):
+    return 200, {"grants": [public_grant(item) for item in list_grants(table, connection_id=connection_id)]}
+
+
+def api_save_grant(table, body, *, operator, connections_table):
+    """Validate a grant request body and store one grant. Returns ``(status, payload)``.
+
+    Shared by the console (cookie) and CLI (bearer) API layers; audit stays
+    with the caller.
+    """
+    from . import connections as connection_model
+
+    connection_id = str(body.get("connection_id", "")).strip().lower()
+    subject = str(body.get("subject", "")).strip()
+    if not connection_id or not subject:
+        return 400, {"error": "Connection ID and subject are required"}
+    if not connection_model.get_connection(connections_table, connection_id):
+        return 404, {"error": "Connection not found"}
+    try:
+        item = put_grant(
+            table,
+            connection_id=connection_id,
+            subject=subject,
+            agent=body.get("agent", ""),
+            operations=body.get("operations", []),
+            granted_by=operator,
+            expires_at=body.get("expires_at"),
+        )
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    return 200, item
+
+
+def api_delete_grant(table, connection_id, grantee_id):
+    """Revoke one grant by ``(connection_id, grantee)``. Returns ``(status, payload)``."""
+    connection_id = str(connection_id or "").strip().lower()
+    grantee_id = str(grantee_id or "").strip()
+    if not connection_id or not grantee_id:
+        return 400, {"error": "Connection ID and grantee are required"}
+    delete_grant(table, connection_id=connection_id, grantee_id=grantee_id)
+    return 200, {"ok": True}

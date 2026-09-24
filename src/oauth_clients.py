@@ -84,6 +84,43 @@ def invalidate_cache():
     _cache.clear()
 
 
+def status(provider_name):
+    """Presence and source of a shared OAuth client — never its secret."""
+    provider = canonical_provider(str(provider_name or "").strip().lower())
+    stored = stored_client(provider) or {}
+    if stored.get("client_id") and stored.get("client_secret"):
+        return {"provider": provider, "client_id": stored["client_id"], "source": "config", "configured": True}
+    env_id, env_secret = env_vars(provider)
+    if os.environ.get(env_id, "").strip() and os.environ.get(env_secret, "").strip():
+        return {"provider": provider, "client_id": os.environ[env_id].strip(), "source": "deploy", "configured": True}
+    return {"provider": provider, "client_id": "", "source": "none", "configured": False}
+
+
+def api_save_client(provider_name, client_id, client_secret):
+    """Validate and store the shared OAuth client for a provider.
+
+    Shared by the console (cookie) and CLI (bearer) API layers. Returns
+    ``(status, payload)``; the secret is write-only — the payload reports
+    presence, not the value.
+    """
+    provider = canonical_provider(str(provider_name or "").strip().lower())
+    if provider not in CANONICAL_PROVIDERS:
+        return 404, {"error": "Unknown OAuth client provider"}
+    client_id = str(client_id or "").strip()
+    client_secret = str(client_secret or "").strip()
+    if not client_id or not client_secret:
+        return 400, {"error": "Both the client ID and the client secret are required"}
+    from .credentials import put_credential  # kept local: this module stays import-light
+
+    put_credential(
+        f"oauth-client#{provider}",
+        {"client_id": client_id, "client_secret": client_secret},
+        provider=provider,
+    )
+    invalidate_cache()
+    return 200, {"provider": provider, "client_id": client_id, "source": "config", "configured": True}
+
+
 def get(provider_name, *, client_id=None, client_secret=None):
     """Return ``(client_id, client_secret)`` for the provider.
 
@@ -104,8 +141,8 @@ def get(provider_name, *, client_id=None, client_secret=None):
         resolved_secret = resolved_secret or os.environ.get(env_secret, "").strip()
     if not resolved_id or not resolved_secret:
         raise ClientConfigError(
-            f"No OAuth client is configured for {provider_name}; save it in the "
-            f"console under Credentials → OAuth clients (or set {env_id} and "
-            f"{env_secret} at deploy time)"
+            f"No OAuth client is configured for {provider_name}; save it with "
+            f"`dapier oauth-clients set` or the console's Credentials → OAuth "
+            f"clients (or set {env_id} and {env_secret} at deploy time)"
         )
     return resolved_id, resolved_secret

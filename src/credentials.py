@@ -1,7 +1,13 @@
 import os
+import re
 from datetime import datetime, timezone
 
 import boto3
+
+CREDENTIAL_SPECS = {
+    "slack": {"credential_id": "slack", "fields": ("token",)},
+    "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
+}
 
 
 class VersionConflict(Exception):
@@ -87,3 +93,26 @@ def credential_status(credential_id):
         "configured": item is not None,
         "updated_at": item.get("updated_at") if item else None,
     }
+
+
+def api_save_credential(provider, body):
+    """Validate and store one provider credential. Returns ``(status, payload)``.
+
+    Shared by the console (cookie) and CLI (bearer) API layers; the value is
+    write-only — responses never echo it back.
+    """
+    spec = CREDENTIAL_SPECS.get(provider)
+    if not spec:
+        return 404, {"error": "Unknown credential provider"}
+    if provider == "slack":
+        token = str(body.get("token", "")).strip()
+        if not token.startswith(("xoxb-", "xapp-")) or len(token) < 20:
+            return 400, {"error": "Enter a valid Slack bot token"}
+        secret_value = {"token": token}
+    else:
+        api_key = str(body.get("api_key", "")).strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{20,}-us\d{1,3}", api_key):
+            return 400, {"error": "Enter a valid Mailchimp API key"}
+        secret_value = {"apiKey": api_key, "server": api_key.rsplit("-", 1)[1]}
+    put_credential(spec["credential_id"], secret_value, provider=provider)
+    return 200, {"provider": provider, "configured": True}

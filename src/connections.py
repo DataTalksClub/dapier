@@ -25,7 +25,7 @@ STATUS_CONNECTED = "connected"
 
 # Providers that authenticate with a directly supplied token instead of an
 # OAuth consent round-trip (see admin._save_token_connection).
-TOKEN_PROVIDERS = {"slack"}
+TOKEN_PROVIDERS = {"slack", "telegram"}
 
 
 class ConnectionError(ValueError):
@@ -80,6 +80,13 @@ def validate_new_connection(body):
     except oauth_providers.ProviderError as exc:
         raise ConnectionError(str(exc))
     expected_account_id = str(body.get("expected_account_id", "") or "").strip() or None
+    root_path = body.get("root_path")
+    root_path = "" if root_path is None else str(root_path).strip()
+    if root_path:
+        if provider != "dropbox":
+            raise ConnectionError("root_path applies only to Dropbox connections")
+        root_path = root_path.strip("/")
+        root_path = f"/{root_path}" if root_path else ""
     return {
         "connection_id": connection_id,
         "provider": provider,
@@ -88,6 +95,9 @@ def validate_new_connection(body):
         "client_secret": client_secret,
         "scopes": scopes,
         "expected_account_id": expected_account_id,
+        # None = the request didn't mention it (build_item keeps the previous
+        # value); "" = explicitly clear (list the whole Dropbox).
+        "root_path": root_path if "root_path" in body else None,
     }
 
 
@@ -119,6 +129,10 @@ def build_item(fields, *, owner_subject, previous=None):
         "scopes": fields["scopes"],
         "granted_scopes": list(previous.get("granted_scopes") or []),
         "expected_account_id": fields.get("expected_account_id"),
+        # None = the request didn't mention it; "" = explicitly clear (list
+        # the whole Dropbox).
+        "root_path": (previous.get("root_path") or "") if fields.get("root_path") is None
+        else fields["root_path"],
         "verified_account_id": verified,
         "account_title": previous.get("account_title"),
         "owner_subject": owner_subject or previous.get("owner_subject"),
@@ -181,6 +195,7 @@ def public_view(item):
         "scopes": item.get("scopes", []),
         "granted_scopes": item.get("granted_scopes", []),
         "expected_account_id": item.get("expected_account_id"),
+        "root_path": item.get("root_path") or "",
         "verified_account_id": item.get("verified_account_id"),
         "account_title": item.get("account_title"),
         "status": item.get("status"),
