@@ -54,6 +54,14 @@ the worker reads a Secrets Manager secret containing either a plain signing secr
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
+Each workflow item carries its own connector config — there is no global
+channel or folder list. A YouTube trigger names the channel(s) it watches in
+its trigger filters (`channel_id: {equals: UC...}` for one, `channel_id:
+{in: [UC..., UC...]}` for several), and the WebSub renewal job subscribes
+exactly those channels. A Dropbox connection carries its own listing root
+(`root_path`, editable in the console's connection dialog or set at
+`dapier connections import --root-path`); empty lists the whole Dropbox.
+
 ## Workflow designer
 
 `designer/` is a local visual editor for `workflows/*.yaml` — draw the trigger
@@ -146,8 +154,8 @@ slack`); actions may still use a raw `credential_id` for global credentials.
 OAuth clients are created once in each provider console (Google Cloud Console
 for Calendar/YouTube, Dropbox App Console for Dropbox) with the redirect URI
 `https://dapier.dtcdev.click/oauth/callback`. Set them in the console under
-**Credentials → OAuth clients** — the values are stored in the credentials
-table and take effect immediately, no redeploy. YouTube shares the Google
+**Credentials → OAuth clients** or with `dapier oauth-clients set` — the values
+are stored in the credentials table and take effect immediately, no redeploy. YouTube shares the Google
 client. Rotating a client there is also how you re-webhook Dropbox: the
 ingress accepts the configured secret and the deploy-time one during a
 rotation window. The deploy-time environment remains a fallback for a fresh
@@ -231,7 +239,11 @@ description, and one or more actions, e.g.:
 ```
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
-`dataops`, `dropbox_upload`, `dropbox_delete`, `render_html_to_pdf`). Some
+`telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
+`render_html_to_pdf`). Text fields accept `{field}` templates from the
+triggering event; `email_send` sends through SES from the configured sender
+(the `EmailSender` deployment parameter, default `no-reply@` the trigger
+domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already
 claimed by YAML workflows cannot be shadowed.
 
@@ -248,6 +260,24 @@ dapier connections import youtube-datatalksclub --provider youtube \
   --scopes https://www.googleapis.com/auth/youtube
 ```
 
+Everything else the administration console can do, an operator can do from
+the CLI — the commands drive the same operator-gated API as the console:
+
+```bash
+dapier overview                       # workflows, connections, credentials, recent executions
+dapier credentials set slack --file slack-token.txt   # or --file - for stdin
+dapier credentials set mailchimp --file mailchimp-key.txt
+dapier grants list [--connection youtube-personal]
+dapier grants save grant.json         # {"connection_id", "subject", "agent", "operations"}
+dapier grants delete youtube-personal "subject-9#buildcamp-uploader"
+dapier connections revoke youtube-personal   # revoke stored tokens
+dapier oauth-clients list                    # shared OAuth clients (dropbox/google/youtube)
+dapier oauth-clients set google --client-id my-id --client-secret-file -   # or a file path
+```
+
+Credential values travel only in the request body and are never echoed; like
+the console's write-only credential fields, they cannot be read back.
+
 ## Connector plan
 
 - **Dropbox:** complete. Ingress answers the verification challenge, checks
@@ -260,7 +290,9 @@ dapier connections import youtube-datatalksclub --provider youtube \
   last-page cursor commits make replays and crashes harmless; a dedicated
   dead-letter queue with a CloudWatch alarm catches accounts that keep failing.
 - **YouTube:** WebSub subscription renewal, callback verification, and Atom
-  notification ingress are live; public channel upload notifications need no OAuth.
+  notification ingress are live; public channel upload notifications need no
+  OAuth. The renewal Lambda subscribes the channels named by the workflow
+  items' `channel_id` filters (no separate channel list to keep in sync).
 - **Email:** Datamailer owns SES receipt, MIME parsing, and private artifact storage;
   its normalized SNS events feed Dapier's event queue.
 - **OAuth:** adding a connection is one click in the administration console:

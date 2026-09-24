@@ -58,6 +58,17 @@ class ActionValidationTests(unittest.TestCase):
             email_triggers.validate_actions([{"type": "dropbox_upload", "connection_id": "dropbox"}])
         self.assertIn("folder", str(ctx.exception))
 
+    def test_accepts_email_send_and_rejects_unknown_keys(self):
+        actions = [{"type": "email_send", "to": "ops@example.com",
+                    "subject": "s", "text": "t", "html": "<b>t</b>", "sender": "me@dtcdev.click"}]
+        self.assertEqual(email_triggers.validate_actions(actions), actions)
+        with self.assertRaises(email_triggers.TriggerError):
+            email_triggers.validate_actions([{"type": "email_send"}])
+        with self.assertRaises(email_triggers.TriggerError) as ctx:
+            email_triggers.validate_actions(
+                [{"type": "email_send", "to": "ops@example.com", "bcc": "x"}])
+        self.assertIn("bcc", str(ctx.exception))
+
 
 class TriggerItemTests(unittest.TestCase):
     def setUp(self):

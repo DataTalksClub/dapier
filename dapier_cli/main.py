@@ -37,9 +37,55 @@ def build_parser():
                           help="Optional; defaults to the shared deploy-time OAuth client")
     import_p.add_argument("--client-secret-file", default=None,
                           help="Optional; needed only for refresh tokens issued by another client")
-    import_p.add_argument("--authorized-user-file", required=True)
+    import_p.add_argument("--authorized-user-file", default=None,
+                          help="Refresh-token JSON for OAuth providers")
+    import_p.add_argument("--token-file", default=None,
+                          help="Pasted provider token for slack/telegram connections")
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])
+    import_p.add_argument("--root-path", default=None,
+                          help="Dropbox only: folder webhook resolution lists (empty lists everything)")
+    revoke_p = conn_sub.add_parser("revoke", help="Revoke a connection's stored tokens")
+    revoke_p.add_argument("connection_id")
+
+    cred_p = sub.add_parser("credentials", help="Provider credentials used by workflows")
+    cred_sub = cred_p.add_subparsers(dest="command", required=True)
+    cred_set_p = cred_sub.add_parser("set", help="Store a credential (Slack bot token or Mailchimp API key)")
+    cred_set_p.add_argument("provider")
+    cred_set_p.add_argument("--file", required=True,
+                            help="File with the secret value, or - for stdin")
+
+    grants_p = sub.add_parser("grants", help="Agent access grants per connection")
+    grants_sub = grants_p.add_subparsers(dest="command", required=True)
+    grants_list_p = grants_sub.add_parser("list", help="List grants")
+    grants_list_p.add_argument("--connection", default=None)
+    grants_save_p = grants_sub.add_parser("save", help="Create or update a grant from a JSON file")
+    grants_save_p.add_argument("file", help="Path to the grant JSON, or - for stdin")
+    grants_del_p = grants_sub.add_parser("delete", help="Revoke one grant")
+    grants_del_p.add_argument("connection_id")
+    grants_del_p.add_argument("grantee", help="The grant's grantee ID (subject#agent)")
+
+    tokens_p = sub.add_parser("tokens", help="Operator-issued API tokens for headless consumers")
+    tokens_sub = tokens_p.add_subparsers(dest="command", required=True)
+    tokens_sub.add_parser("list", help="List API tokens (no secrets)")
+    tokens_create_p = tokens_sub.add_parser("create", help="Issue an API token; the value prints once")
+    tokens_create_p.add_argument("--name", required=True,
+                                 help="Token ID; the machine subject becomes token:<name>")
+    tokens_create_p.add_argument("--agent", required=True,
+                                 help="The one agent name this token may act as")
+    tokens_del_p = tokens_sub.add_parser("revoke", help="Revoke an API token")
+    tokens_del_p.add_argument("name")
+
+    sub.add_parser("overview", help="Operator overview: workflows, connections, credentials")
+
+    oac_p = sub.add_parser("oauth-clients", help="Shared OAuth clients per provider (same as the console's Credentials view)")
+    oac_sub = oac_p.add_subparsers(dest="command", required=True)
+    oac_sub.add_parser("list", help="Show the configured shared OAuth clients (no secrets)")
+    oac_set_p = oac_sub.add_parser("set", help="Store the shared OAuth client for a provider")
+    oac_set_p.add_argument("provider", help="dropbox, google, or youtube")
+    oac_set_p.add_argument("--client-id", required=True)
+    oac_set_p.add_argument("--client-secret-file", required=True,
+                           help="File with the client secret, or - for stdin")
 
     token_p = sub.add_parser("token", help="Short-lived provider access tokens")
     token_sub = token_p.add_subparsers(dest="command", required=True)
@@ -72,6 +118,17 @@ def build_parser():
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
+    hook_p = sub.add_parser("hooks", help="Webhook and Telegram triggers")
+    hook_sub = hook_p.add_subparsers(dest="command", required=True)
+    hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
+    hook_list_p.add_argument("--kind", default=None, choices=["webhook", "telegram"])
+    hook_show_p = hook_sub.add_parser("show", help="Show one hook trigger, including its token")
+    hook_show_p.add_argument("name")
+    hook_save_p = hook_sub.add_parser("save", help="Create or update a hook trigger from a JSON file")
+    hook_save_p.add_argument("file", help="Path to the hook JSON, or - for stdin")
+    hook_del_p = hook_sub.add_parser("delete", help="Delete a hook trigger")
+    hook_del_p.add_argument("name")
+    hook_del_p.add_argument("--kind", default=None, choices=["webhook", "telegram"])
     return parser
 
 
@@ -98,8 +155,18 @@ def main(argv=None):
             return cmd_triggers(args, api_url, debug)
         if args.group == "workflows":
             return cmd_workflows(args, api_url, debug)
-        if args.group == "workflows":
-            return cmd_workflows(args, api_url, debug)
+        if args.group == "hooks":
+            return cmd_hooks(args, api_url, debug)
+        if args.group == "credentials":
+            return cmd_credentials(args, api_url, debug)
+        if args.group == "grants":
+            return cmd_grants(args, api_url, debug)
+        if args.group == "tokens":
+            return cmd_tokens(args, api_url, debug)
+        if args.group == "overview":
+            return commands.overview(api_url, debug)
+        if args.group == "oauth-clients":
+            return cmd_oauth_clients(args, api_url, debug)
     except ApiError as exc:
         print(f"Error: {exc}")
         if exc.status == 401:
@@ -145,7 +212,10 @@ def cmd_connections(args, api_url, debug):
             api_url, args.connection_id, args.provider, args.client_id,
             args.client_secret_file, args.authorized_user_file,
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
+            token_path=args.token_file, root_path=args.root_path,
         )
+    if args.command == "revoke":
+        return commands.connections_revoke(api_url, args.connection_id, debug)
     return 2
 
 
@@ -181,13 +251,50 @@ def cmd_workflows(args, api_url, debug):
     return 2
 
 
-def cmd_workflows(args, api_url, debug):
+def cmd_hooks(args, api_url, debug):
     if args.command == "list":
-        return commands.workflows_list(api_url, debug)
+        return commands.hooks_list(api_url, kind=args.kind, debug=debug)
     if args.command == "show":
-        return commands.workflows_show(api_url, args.file, debug)
+        return commands.hooks_show(api_url, args.name, debug)
     if args.command == "save":
-        return commands.workflows_save(api_url, args.file, args.rename_from, debug)
+        return commands.hooks_save(api_url, args.file, debug)
+    if args.command == "delete":
+        return commands.hooks_delete(api_url, args.name, kind=args.kind, debug=debug)
+    return 2
+
+
+def cmd_credentials(args, api_url, debug):
+    if args.command == "set":
+        return commands.credentials_set(api_url, args.provider, args.file, debug)
+    return 2
+
+
+def cmd_grants(args, api_url, debug):
+    if args.command == "list":
+        return commands.grants_list(api_url, args.connection, debug)
+    if args.command == "save":
+        return commands.grants_save(api_url, args.file, debug)
+    if args.command == "delete":
+        return commands.grants_delete(api_url, args.connection_id, args.grantee, debug)
+    return 2
+
+
+def cmd_tokens(args, api_url, debug):
+    if args.command == "list":
+        return commands.tokens_list(api_url, debug)
+    if args.command == "create":
+        return commands.tokens_create(api_url, args.name, args.agent, debug)
+    if args.command == "revoke":
+        return commands.tokens_revoke(api_url, args.name, debug)
+    return 2
+
+
+def cmd_oauth_clients(args, api_url, debug):
+    if args.command == "list":
+        return commands.oauth_clients_list(api_url, debug)
+    if args.command == "set":
+        return commands.oauth_clients_set(api_url, args.provider, args.client_id,
+                                          args.client_secret_file, debug)
     return 2
 
 

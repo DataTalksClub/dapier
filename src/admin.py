@@ -15,15 +15,18 @@ import boto3
 import yaml
 
 from . import agent_api
+from . import api_tokens
 from . import audit as audit_log
 from . import authz
 from . import connections as connection_model
+from . import credentials
 from . import designer_store
 from . import email_triggers
+from . import hook_triggers
 from . import oauth_clients
 from . import oauth_providers
 from . import slack_tokens
-from .credentials import credential_status, get_credential, put_credential
+from .credentials import CREDENTIAL_SPECS, credential_status, get_credential, put_credential
 from .dtc_auth import auth_config as _auth_config
 from .dtc_auth import exchange_auth_code as _exchange_auth_code
 from .dtc_auth import verify_id_token as _verify_id_token
@@ -33,10 +36,6 @@ SESSION_COOKIE = "dapier_session"
 OAUTH_COOKIE = "dapier_oauth_state"
 AUTH_STATE_COOKIE = "dapier_auth_state"
 SESSION_TTL_SECONDS = 12 * 60 * 60
-CREDENTIAL_SPECS = {
-    "slack": {"credential_id": "slack", "fields": ("token",)},
-    "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
-}
 OAUTH_PROVIDERS = oauth_providers.PROVIDERS
 
 _admin_secret = None
@@ -315,14 +314,7 @@ def _credential_status(provider):
 
 
 def _oauth_client_status(provider):
-    """Presence and source of a shared OAuth client — never its secret."""
-    stored = oauth_clients.stored_client(provider) or {}
-    if stored.get("client_id") and stored.get("client_secret"):
-        return {"provider": provider, "client_id": stored["client_id"], "source": "config", "configured": True}
-    env_id, env_secret = oauth_clients.env_vars(provider)
-    if os.environ.get(env_id, "").strip() and os.environ.get(env_secret, "").strip():
-        return {"provider": provider, "client_id": os.environ[env_id].strip(), "source": "deploy", "configured": True}
-    return {"provider": provider, "client_id": "", "source": "none", "configured": False}
+    return oauth_clients.status(provider)
 
 
 def oauth_clients_view():
@@ -337,25 +329,16 @@ def save_oauth_client(provider, event):
     Runtime-reconfigurable: no redeploy needed. The secret is write-only —
     the response reports presence, not the value.
     """
-    provider = oauth_clients.canonical_provider(str(provider or "").strip().lower())
-    if provider not in oauth_clients.CANONICAL_PROVIDERS:
-        return _json_response(404, {"error": "Unknown OAuth client provider"})
     try:
         body = _request_json(event)
     except (ValueError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    client_id = str(body.get("client_id", "")).strip()
-    client_secret = str(body.get("client_secret", "")).strip()
-    if not client_id or not client_secret:
-        return _json_response(400, {"error": "Both the client ID and the client secret are required"})
-    put_credential(
-        f"oauth-client#{provider}",
-        {"client_id": client_id, "client_secret": client_secret},
-        provider=provider,
-    )
-    oauth_clients.invalidate_cache()
-    _audit_event(f"oauth-client#{provider}", audit_log.CONFIG, _session_subject(event) or "unknown", outcome="ok")
-    return _json_response(200, {"provider": provider, "client_id": client_id, "source": "config", "configured": True})
+    status, payload = oauth_clients.api_save_client(
+        provider, body.get("client_id"), body.get("client_secret"))
+    if status == 200:
+        _audit_event(f"oauth-client#{payload['provider']}", audit_log.CONFIG,
+                     _session_subject(event) or "unknown", outcome="ok")
+    return _json_response(status, payload)
 
 
 def overview():
@@ -374,31 +357,17 @@ def overview():
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
         "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
+        "api_tokens": [api_tokens.public_view(item) for item in api_tokens.list_all()],
     })
 
 
 def save_credential(provider, event):
-    if provider not in CREDENTIAL_SPECS:
-        return _json_response(404, {"error": "Unknown credential provider"})
     try:
         body = _request_json(event)
     except (ValueError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-
-    if provider == "slack":
-        token = str(body.get("token", "")).strip()
-        if not token.startswith(("xoxb-", "xapp-")) or len(token) < 20:
-            return _json_response(400, {"error": "Enter a valid Slack bot token"})
-        secret_value = {"token": token}
-    else:
-        api_key = str(body.get("api_key", "")).strip()
-        match = re.fullmatch(r"[A-Za-z0-9_-]{20,}-us\d{1,3}", api_key)
-        if not match:
-            return _json_response(400, {"error": "Enter a valid Mailchimp API key"})
-        secret_value = {"apiKey": api_key, "server": api_key.rsplit("-", 1)[1]}
-
-    put_credential(CREDENTIAL_SPECS[provider]["credential_id"], secret_value, provider=provider)
-    return _json_response(200, {"provider": provider, "configured": True})
+    status, payload = credentials.api_save_credential(provider, body)
+    return _json_response(status, payload)
 
 
 def save_connection(event):
@@ -432,23 +401,43 @@ def save_connection(event):
     return _json_response(200, item)
 
 
+def _verify_token_provider(provider, token):
+    """Verify a pasted token against its provider. Returns ``(account_id, title)``.
+
+    Slack workspaces verify via ``auth.test``; Telegram bots via ``getMe``.
+    Both fail closed before anything is stored.
+    """
+    from . import telegram_api
+
+    if provider == "slack":
+        token = slack_tokens.validate_token(token)
+        return slack_tokens.verify_account(token)
+    token = telegram_api.validate_token(token)
+    return telegram_api.get_me(token)
+
+
 def _save_token_connection(fields, body, previous, operator, connections_table):
     """Create/update a connection that authenticates with a pasted token.
 
     The token is verified against the provider before anything is stored;
     an edit without a new token re-verifies and keeps the stored one.
     """
+    from . import telegram_api
+
     try:
-        token = slack_tokens.validate_token(body.get("token") or (
-            get_credential(connection_model.credential_id_for(fields["connection_id"])).get("token")
-        ))
+        token = body.get("token") or get_credential(
+            connection_model.credential_id_for(fields["connection_id"]),
+        ).get("token")
     except KeyError:
-        return _json_response(400, {"error": "A Slack bot (xoxb-) or user (xoxp-) token is required"})
-    except slack_tokens.SlackTokenError as exc:
-        return _json_response(400, {"error": str(exc)})
+        token = None
+    if not token:
+        hint = ("A Slack bot (xoxb-) or user (xoxp-) token is required"
+                if fields["provider"] == "slack"
+                else "A Telegram bot token from @BotFather is required")
+        return _json_response(400, {"error": hint})
     try:
-        account_id, account_title = slack_tokens.verify_account(token)
-    except slack_tokens.SlackTokenError as exc:
+        account_id, account_title = _verify_token_provider(fields["provider"], token)
+    except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError) as exc:
         _audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
                      outcome="error", error=str(exc))
         return _json_response(400, {"error": str(exc)})
@@ -475,14 +464,10 @@ def _save_token_connection(fields, body, previous, operator, connections_table):
 
 def list_grants(event):
     query = event.get("queryStringParameters") or {}
-    table = authz.grants_table()
-    items = authz.list_grants(table, connection_id=query.get("connection_id") or None)
-    return _json_response(200, {"grants": [
-        {key: item.get(key) for key in (
-            "connection_id", "grantee", "subject", "agent", "operations",
-            "granted_by", "granted_at", "updated_at", "expires_at",
-        )} for item in items
-    ]})
+    status, payload = authz.api_list_grants(
+        authz.grants_table(), connection_id=query.get("connection_id") or None,
+    )
+    return _json_response(status, payload)
 
 
 def save_grant(event, operator):
@@ -490,38 +475,25 @@ def save_grant(event, operator):
         body = _request_json(event)
     except (ValueError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    connection_id = str(body.get("connection_id", "")).strip().lower()
-    subject = str(body.get("subject", "")).strip()
-    if not connection_id or not subject:
-        return _json_response(400, {"error": "Connection ID and subject are required"})
-    if not _connection(connection_id):
-        return _json_response(404, {"error": "Connection not found"})
-    try:
-        item = authz.put_grant(
-            authz.grants_table(),
-            connection_id=connection_id,
-            subject=subject,
-            agent=body.get("agent", ""),
-            operations=body.get("operations", []),
-            granted_by=operator,
-            expires_at=body.get("expires_at"),
-        )
-    except ValueError as exc:
-        return _json_response(400, {"error": str(exc)})
-    _audit_event(connection_id, audit_log.GRANT, operator,
-                 agent=item["agent"], outcome="ok")
-    return _json_response(200, item)
+    status, payload = authz.api_save_grant(
+        authz.grants_table(), body, operator=operator,
+        connections_table=boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]),
+    )
+    if status == 200:
+        _audit_event(payload["connection_id"], audit_log.GRANT, operator,
+                     agent=payload["agent"], outcome="ok")
+    return _json_response(status, payload)
 
 
 def delete_grant(event, operator):
     query = event.get("queryStringParameters") or {}
-    connection_id = str(query.get("connection_id", "")).strip().lower()
-    grantee_id = str(query.get("grantee", "")).strip()
-    if not connection_id or not grantee_id:
-        return _json_response(400, {"error": "Connection ID and grantee are required"})
-    authz.delete_grant(authz.grants_table(), connection_id=connection_id, grantee_id=grantee_id)
-    _audit_event(connection_id, audit_log.GRANT, operator, outcome="revoked")
-    return _json_response(200, {"ok": True})
+    status, payload = authz.api_delete_grant(
+        authz.grants_table(), query.get("connection_id"), query.get("grantee"),
+    )
+    if status == 200:
+        _audit_event(str(query.get("connection_id", "")).strip().lower(),
+                     audit_log.GRANT, operator, outcome="revoked")
+    return _json_response(status, payload)
 
 
 def list_email_triggers(event):
@@ -568,6 +540,76 @@ def save_designer_workflow(event, operator):
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     _audit_event(str(payload.get("file", "unknown")), "workflow.save", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def _hook_kind(event, body=None):
+    """The hook trigger kind, from the query string or the request body."""
+    query = event.get("queryStringParameters") or {}
+    kind = (body or {}).get("kind") or query.get("kind") or "webhook"
+    kind = str(kind).strip().lower()
+    if kind not in hook_triggers.KINDS:
+        raise email_triggers.TriggerError(
+            f"hook kind must be one of: {', '.join(hook_triggers.KINDS)}")
+    return kind
+
+
+def list_hook_triggers(event):
+    try:
+        kind = _hook_kind(event)
+    except email_triggers.TriggerError as exc:
+        return _json_response(400, {"error": str(exc)})
+    status, payload = hook_triggers.api_list(kind=kind)
+    return _json_response(status, payload)
+
+
+def save_hook_trigger(event, operator):
+    try:
+        body = _request_json(event)
+        kind = _hook_kind(event, body)
+        status, payload = hook_triggers.api_save(body, operator, kind)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    _audit_event(payload.get("hook_id", "unknown"), "hook-trigger.save", operator,
+                 outcome="created" if payload.get("created") else "updated")
+    return _json_response(status, payload)
+
+
+def delete_hook_trigger(event, operator):
+    try:
+        kind = _hook_kind(event)
+        query = event.get("queryStringParameters") or {}
+        status, payload = hook_triggers.api_delete(
+            query.get("name", ""), operator, kind=kind)
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    _audit_event(payload.get("hook_id", "unknown"), "hook-trigger.delete", operator, outcome="deleted")
+    return _json_response(status, payload)
+
+
+def list_api_tokens(event):
+    status, payload = api_tokens.api_list()
+    return _json_response(status, payload)
+
+
+def create_api_token(event, operator):
+    try:
+        body = _request_json(event)
+        status, payload = api_tokens.api_create(body, operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    if status == 200:
+        _audit_event(f"api-token#{payload['token_id']}", audit_log.API_TOKEN,
+                     operator, agent=payload["agent"], outcome="created")
+    return _json_response(status, payload)
+
+
+def revoke_api_token(event, operator):
+    query = event.get("queryStringParameters") or {}
+    status, payload = api_tokens.api_revoke(query.get("token_id"))
+    if status == 200:
+        _audit_event(f"api-token#{payload.get('token_id', 'unknown')}",
+                     audit_log.API_TOKEN, operator, outcome="revoked")
     return _json_response(status, payload)
 
 
@@ -823,6 +865,12 @@ def route(event, method, path):
         return save_grant(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/grants":
         return delete_grant(event, operator_subject)
+    if method == "GET" and path == "/api/admin/tokens":
+        return list_api_tokens(event)
+    if method == "PUT" and path == "/api/admin/tokens":
+        return create_api_token(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/tokens":
+        return revoke_api_token(event, operator_subject)
     if method == "GET" and path == "/api/admin/email-triggers":
         return list_email_triggers(event)
     if method == "PUT" and path == "/api/admin/email-triggers":
@@ -836,6 +884,12 @@ def route(event, method, path):
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
         return designer_get(designer_match.group(1))
+    if method == "GET" and path == "/api/admin/hook-triggers":
+        return list_hook_triggers(event)
+    if method == "PUT" and path == "/api/admin/hook-triggers":
+        return save_hook_trigger(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/hook-triggers":
+        return delete_hook_trigger(event, operator_subject)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))

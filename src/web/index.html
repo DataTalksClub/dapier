@@ -34,6 +34,7 @@
         <a class="nav-item" href="/designer" data-external><i data-lucide="pen-tool"></i><span>Designer</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
+        <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
       </nav>
       <div class="sidebar-foot">
@@ -136,6 +137,20 @@
         </div>
       </section>
 
+      <section class="view" data-page="tokens">
+        <div class="section-head">
+          <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent — grant the subject access per connection with <code>dapier grants save</code>, and revoke it here any time. The value is shown once, at creation.</p></div>
+          <button id="new-token" class="button primary" type="button">New token</button>
+        </div>
+        <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Token</th><th>Agent</th><th>Created</th><th>Last used</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="token-table"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="view" data-page="runs">
         <div class="section-head">
           <div class="section-head-text"><h2>Action executions</h2><p class="sub">90-day idempotency ledger</p></div>
@@ -217,8 +232,8 @@
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
       <div class="dialog-body">
-        <p class="sub">Slack is the one service that can't do browser consent here — paste a bot (<code>xoxb-…</code>) or user (<code>xoxp-…</code>) token from your Slack app settings. It is verified against Slack and stored as the connection's secret.</p>
-        <label>Slack token<input name="slack_token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or xoxp-…" required></label>
+        <p id="connection-blurb" class="sub"></p>
+        <label id="connection-token-label">Token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-…" required></label>
         <p id="connection-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
@@ -226,6 +241,41 @@
         <button class="button primary" type="submit">Create connection</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="token-dialog">
+    <form id="token-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2>New API token</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <label>Token ID<input name="token_id" class="mono-input" placeholder="personal-scheduler" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">Lowercase letters, numbers, dashes; the subject becomes <code>token:&lt;id&gt;</code>.</small></label>
+        <label>Agent<input name="agent" class="mono-input" placeholder="personal-scheduler" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">The one agent name this token may act as.</small></label>
+        <p id="token-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Create token</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="token-reveal-dialog">
+    <div class="dialog-head">
+      <h2 id="token-reveal-title">Token created</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p class="sub">Copy it now — this value is never shown or stored again. Store it in the consumer's secret store.</p>
+      <div class="token-reveal">
+        <code id="token-reveal-value" class="mono"></code>
+        <button id="token-copy" class="button secondary" type="button">Copy</button>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button class="button primary dialog-close" type="button">Done</button>
+    </div>
   </dialog>
 
   <dialog id="edit-connection-dialog">
@@ -238,7 +288,8 @@
         <p id="edit-connection-meta" class="sub mono"></p>
         <label>Display name<input name="display_name" maxlength="100" required></label>
         <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Applied the next time you reconnect.</small></label>
-        <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or xoxp-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
+        <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">Dropbox only: the folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
+        <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">

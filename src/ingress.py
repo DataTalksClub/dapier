@@ -192,6 +192,96 @@ def _notify_dropbox(account_id, correlation_id):
     queue.send_message(QueueUrl=os.environ["DROPBOX_QUEUE_URL"], MessageBody=json.dumps(envelope))
 
 
+# Envelopes ride SQS (256 KB messages), so oversized webhook bodies are
+# rejected before they can wedge the pipeline.
+MAX_HOOK_BODY_BYTES = 200_000
+
+TELEGRAM_SECRET_HEADER = "x-telegram-bot-api-secret-token"
+
+
+def _hook_item(name):
+    """The enabled stored hook trigger for ``name``, or None when absent."""
+    if not os.environ.get("HOOK_TRIGGERS_TABLE"):
+        return None
+    from . import hook_triggers
+
+    try:
+        item = hook_triggers.get_item(name)
+    except hook_triggers.TriggerError:
+        return None
+    return item if item and item.get("enabled", True) else None
+
+
+def _bearer_token(event):
+    """Token from ``Authorization: Bearer <token>`` (bare values tolerated)."""
+    value = _header(event, "authorization").strip()
+    scheme, _, token = value.partition(" ")
+    return token.strip() if scheme.lower() == "bearer" else value
+
+
+def _webhook_payload(body, content_type):
+    """Parsed JSON when the body is JSON, otherwise ``{"raw": text}``."""
+    text = body.decode(errors="replace")
+    if "json" in content_type or text.lstrip().startswith(("{", "[")):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, (dict, list)):
+                return parsed
+        except ValueError:
+            pass
+    return {"raw": text}
+
+
+def _webhook_hook(event, name, body, query):
+    from . import hook_triggers
+
+    item = _hook_item(name)
+    if not item or item.get("kind") != "webhook":
+        return _response(404, {"error": "unknown hook"})
+    supplied = _bearer_token(event)
+    if not supplied or not hmac.compare_digest(supplied, item.get("token") or ""):
+        return _response(401, {"error": "invalid token"})
+    content_type = _header(event, "content-type").split(";")[0].strip().lower()
+    _publish("webhook", hook_triggers.WEBHOOK_EVENT, {
+        "hook": item["hook_id"],
+        "body": _webhook_payload(body, content_type),
+        "query": query,
+        "content_type": content_type,
+    }, source=item["hook_id"])
+    return _response(202, {"accepted": True})
+
+
+def _telegram_hook(event, name, body):
+    from . import hook_triggers
+
+    item = _hook_item(name)
+    if not item or item.get("kind") != "telegram":
+        return _response(404, {"error": "unknown hook"})
+    secret = _header(event, TELEGRAM_SECRET_HEADER)
+    if not secret or not hmac.compare_digest(secret, item.get("token") or ""):
+        return _response(401, {"error": "invalid secret"})
+    try:
+        update = json.loads(body.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return _response(400, {"error": "invalid json"})
+    if not isinstance(update, dict):
+        return _response(400, {"error": "invalid update"})
+    message = update.get("message") or update.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    sender = message.get("from") or {}
+    _publish("telegram", hook_triggers.TELEGRAM_EVENT, {
+        "hook": item["hook_id"],
+        "update_id": update.get("update_id"),
+        "message_id": message.get("message_id"),
+        "text": message.get("text") or message.get("caption") or "",
+        "chat_id": chat.get("id"),
+        "chat": chat,
+        "from": sender,
+        "update": update,
+    }, source=item["hook_id"])
+    return _response(200, {"accepted": True})
+
+
 def handler(event, _context):
     request = event.get("requestContext", {}).get("http", {})
     method, path = request.get("method"), request.get("path", "")
@@ -225,6 +315,16 @@ def handler(event, _context):
         if not _verify_youtube(event, body):
             return _response(401, {"error": "invalid signature"})
         _youtube(body)
+    elif path.startswith("/hooks/webhook/") or path.startswith("/hooks/telegram/"):
+        prefix = "/hooks/webhook/" if path.startswith("/hooks/webhook/") else "/hooks/telegram/"
+        name = (path.split(prefix, 1)[1] or "").strip("/").lower()
+        if not name or "/" in name:
+            return _response(404, {"error": "not found"})
+        if len(body) > MAX_HOOK_BODY_BYTES:
+            return _response(413, {"error": "body too large"})
+        if prefix == "/hooks/telegram/":
+            return _telegram_hook(event, name, body)
+        return _webhook_hook(event, name, body, query)
     elif path.startswith("/hooks/custom/"):
         source = (event.get("pathParameters") or {}).get("source", "custom")
         _publish("custom", "received", json.loads(body or b"{}"), source=source)

@@ -23,12 +23,16 @@ def workflows():
 
 
 def all_workflows():
-    """YAML workflows plus operator-created email triggers (read per invocation)."""
+    """YAML workflows plus operator-created email and hook triggers (read per invocation)."""
     extra = []
     if os.environ.get("EMAIL_TRIGGERS_TABLE"):
         from . import email_triggers
 
         extra = email_triggers.load_workflows()
+    if os.environ.get("HOOK_TRIGGERS_TABLE"):
+        from . import hook_triggers
+
+        extra = extra + hook_triggers.load_workflows()
     return workflows() + extra
 
 
@@ -38,6 +42,7 @@ def _matches_filter(value, rule):
         return value == rule
     return all({
         "equals": lambda expected: text == str(expected),
+        "in": lambda expected: isinstance(expected, list) and text in [str(item) for item in expected],
         "prefix": lambda expected: text.startswith(str(expected)),
         "suffix": lambda expected: text.endswith(str(expected)),
         "contains": lambda expected: str(expected) in text,
@@ -130,6 +135,86 @@ def run_slack(action, event):
 class _SafeFormat(dict):
     def __missing__(self, key):
         return ""
+
+
+def _connected_connection(connection_id):
+    """Load a connected connection record for use by an action."""
+    import boto3
+
+    from . import connections
+
+    table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    connection = connections.get_connection(table, connection_id)
+    if not connection:
+        raise ValueError(f"connection {connection_id} is not configured")
+    if connection.get("status") != connections.STATUS_CONNECTED:
+        raise ValueError(f"connection {connection_id} is not connected")
+    return connection
+
+
+def run_telegram_send(action, event, *, transport=None):
+    """Post a message through a Telegram bot connection.
+
+    The target chat defaults to the chat a telegram trigger fired from, so
+    a trigger can reply in place; other triggers name the chat explicitly.
+    """
+    from . import telegram_api
+
+    connection = _connected_connection(action["connection_id"])
+    secret = get_credential(connection["credential_id"])
+    token = secret.get("token")
+    if not token:
+        raise ValueError("Telegram connection has no stored bot token")
+    data = event.get("data", {})
+    chat_id = action.get("chat_id") or data.get("chat_id")
+    if chat_id is None or str(chat_id).strip() == "":
+        raise ValueError("telegram_send needs a chat_id in the action or the triggering message")
+    template = action.get("text", "{text}")
+    text = template.format_map(_SafeFormat(data if isinstance(data, dict) else {}))
+    result = telegram_api.send_message(
+        token, chat_id, text, transport=transport,
+        timeout=action.get("timeout_seconds", 10),
+    )
+    if not result:
+        raise RuntimeError("Telegram did not confirm the message")
+
+
+def run_email_send(action, event, *, ses=None):
+    """Send an email through SES, with {field} templates filled from the event.
+
+    The sender defaults to the configured workflow sender and then to the
+    trigger domain's no-reply address; a per-action sender only works when SES
+    verified that identity too.
+    """
+    if ses is None:
+        import boto3
+
+        ses = boto3.client("ses")
+    from .email_triggers import trigger_domain
+
+    data = event.get("data", {})
+    fields = data if isinstance(data, dict) else {}
+    to = str(action.get("to") or "").format_map(_SafeFormat(fields))
+    addresses = [address.strip() for address in to.split(",") if address.strip()]
+    if not addresses:
+        raise ValueError("email_send needs a to address (literal or a {field} template)")
+    text = str(action.get("text") or "").format_map(_SafeFormat(fields))
+    html = str(action.get("html") or "").format_map(_SafeFormat(fields))
+    if not text and not html:
+        raise ValueError("email_send needs text or html")
+    subject = str(action.get("subject") or "(no subject)").format_map(_SafeFormat(fields))
+    sender = (action.get("sender") or os.environ.get("DAPIER_EMAIL_SENDER")
+              or f"no-reply@{trigger_domain()}")
+    body = {}
+    if text:
+        body["Text"] = {"Data": text, "Charset": "utf-8"}
+    if html:
+        body["Html"] = {"Data": html, "Charset": "utf-8"}
+    ses.send_email(
+        Source=sender,
+        Destination={"ToAddresses": addresses},
+        Message={"Subject": {"Data": subject, "Charset": "utf-8"}, "Body": body},
+    )
 
 
 @lru_cache
@@ -250,17 +335,7 @@ def _safe_filename(name):
 
 
 def _dropbox_connection(connection_id):
-    import boto3
-
-    from . import connections
-
-    table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
-    connection = connections.get_connection(table, connection_id)
-    if not connection:
-        raise ValueError(f"connection {connection_id} is not configured")
-    if connection.get("status") != connections.STATUS_CONNECTED:
-        raise ValueError(f"connection {connection_id} is not connected")
-    return connection
+    return _connected_connection(connection_id)
 
 
 def _s3_body(ref):
@@ -441,6 +516,10 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         run_webhook(action, event)
                     elif action["type"] == "slack":
                         run_slack(action, event)
+                    elif action["type"] == "telegram_send":
+                        run_telegram_send(action, event)
+                    elif action["type"] == "email_send":
+                        run_email_send(action, event)
                     elif action["type"] == "dataops":
                         run_dataops(action, event)
                     elif action["type"] == "dropbox_upload":

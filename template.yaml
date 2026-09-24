@@ -22,9 +22,6 @@ Parameters:
   DataOpsIntakeUrl:
     Type: String
     Default: https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents
-  YouTubeChannelIds:
-    Type: String
-    Default: UCDvErgK0j5ur3aLgn6U-LqQ
   AuthBaseUrl:
     Type: String
     Default: https://auth.dtcdev.click
@@ -46,10 +43,6 @@ Parameters:
     Type: String
     Default: ''
     Description: Comma-separated stable DTC subjects allowed to administer connections
-  DropboxRootPath:
-    Type: String
-    Default: ''
-    Description: Path the Dropbox resolver lists (empty lists everything the app can see)
   GoogleOAuthClientId:
     Type: String
     Default: ''
@@ -72,6 +65,10 @@ Parameters:
     Type: String
     Default: dtcdev.click
     Description: Domain for operator-created email trigger addresses
+  EmailSender:
+    Type: String
+    Default: no-reply@dtcdev.click
+    Description: From address for email_send workflow actions (must be SES-verified)
   GithubWorkflowsTokenSecret:
     Type: String
     Default: ''
@@ -112,6 +109,9 @@ Globals:
         OPERATOR_SUBJECTS: !Ref OperatorSubjects
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
+        HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
+        API_TOKENS_TABLE: !Ref ApiTokensTable
+        HOOKS_BASE_URL: !Sub https://${DomainName}
 
 Resources:
   Api:
@@ -145,6 +145,13 @@ Resources:
             SecretArn: !Ref YouTubeWebhookSecret
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DapierAdminSecret
+        - !If
+          - HasGithubWorkflowsToken
+          - Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
+          - !Ref AWS::NoValue
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
         - Statement:
@@ -159,6 +166,10 @@ Resources:
             TableName: !Ref AuditTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EmailTriggersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HookTriggersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ApiTokensTable
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -245,6 +256,18 @@ Resources:
         YouTubePost:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /hooks/youtube, Method: POST}
+        WebhookTriggerHook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: '/hooks/webhook/{proxy+}'
+            Method: POST
+        TelegramTriggerHook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: '/hooks/telegram/{proxy+}'
+            Method: POST
 
   # Standalone (not inline) because the grant exists only when the token
   # secret is configured; AWS::NoValue inside the function's Policies list
@@ -284,13 +307,12 @@ Resources:
   YouTubeSubscriptionFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: youtube_subscriptions.handler
+      CodeUri: .
+      Handler: src.youtube_subscriptions.handler
       Runtime: python3.12
       Architectures: [arm64]
       Environment:
         Variables:
-          YOUTUBE_CHANNEL_IDS: !Ref YouTubeChannelIds
           YOUTUBE_CALLBACK_URL: !Sub https://${DomainName}/hooks/youtube
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
       Policies:
@@ -339,8 +361,13 @@ Resources:
           DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
           CONNECTIONS_TABLE: !Ref ConnectionsTable
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
+        - Statement:
+            Effect: Allow
+            Action: [ses:SendEmail]
+            Resource: '*'
         - Statement:
             Effect: Allow
             Action: [dynamodb:GetItem]
@@ -349,6 +376,8 @@ Resources:
             TableName: !Ref ConnectionsTable
         - DynamoDBReadPolicy:
             TableName: !Ref EmailTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref HookTriggersTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -387,7 +416,6 @@ Resources:
             Resource: !GetAtt CredentialsTable.Arn
       Environment:
         Variables:
-          DROPBOX_ROOT_PATH: !Ref DropboxRootPath
           DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
@@ -621,6 +649,28 @@ Resources:
         - {AttributeName: name, AttributeType: S}
       KeySchema:
         - {AttributeName: name, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  HookTriggersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: hook_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: hook_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  ApiTokensTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: token_hash, AttributeType: S}
+      KeySchema:
+        - {AttributeName: token_hash, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   MailBucket:

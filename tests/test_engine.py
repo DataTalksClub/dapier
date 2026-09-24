@@ -1,9 +1,18 @@
 import json
+import os
 import unittest
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 
-from src.engine import matches, run_dataops, run_dropbox_delete, run_dropbox_upload, run_slack
+from src.engine import (
+    execute,
+    matches,
+    run_dataops,
+    run_dropbox_delete,
+    run_dropbox_upload,
+    run_email_send,
+    run_slack,
+)
 
 
 class FakeTransport:
@@ -33,6 +42,24 @@ class MatchTests(unittest.TestCase):
     def test_rejects_wrong_event(self):
         workflow = {"enabled": True, "trigger": {"connector": "youtube", "event": "video.published"}}
         event = {"connector": "dropbox", "event": "video.published", "data": {}}
+        self.assertFalse(matches(workflow, event))
+
+    def test_matches_in_rule_list_membership(self):
+        workflow = {
+            "enabled": True,
+            "trigger": {
+                "connector": "youtube",
+                "event": "video.published",
+                "filters": {"channel_id": {"in": ["UCa", "UCb"]}},
+            },
+        }
+        event = {"connector": "youtube", "event": "video.published", "data": {"channel_id": "UCb"}}
+        self.assertTrue(matches(workflow, event))
+        event["data"]["channel_id"] = "UCc"
+        self.assertFalse(matches(workflow, event))
+        # A non-list "in" value is a config error and matches nothing.
+        workflow["trigger"]["filters"]["channel_id"] = {"in": "UCa"}
+        event["data"]["channel_id"] = "UCa"
         self.assertFalse(matches(workflow, event))
 
 
@@ -303,6 +330,94 @@ class DropboxIntakeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_dataops_action(event={"connector": "dropbox", "event": "file.created",
                                            "id": "x", "occurred_at": "now", "data": {}})
+
+
+class StubSes:
+    def __init__(self):
+        self.sent = []
+
+    def send_email(self, **kwargs):
+        self.sent.append(kwargs)
+        return {"MessageId": "mid-1"}
+
+
+class EmailSendTests(unittest.TestCase):
+    def setUp(self):
+        self.ses = StubSes()
+
+    def run_action(self, action, data):
+        run_email_send(action, {"id": "evt-1", "connector": "email", "data": data}, ses=self.ses)
+        return self.ses.sent[0]
+
+    def test_sends_templated_text_email(self):
+        call = self.run_action(
+            {"type": "email_send", "to": "ops@example.com",
+             "subject": "New mail: {subject}", "text": "route {route}"},
+            {"subject": "invoice", "route": "todo"},
+        )
+        self.assertEqual(call["Source"], "no-reply@dtcdev.click")
+        self.assertEqual(call["Destination"], {"ToAddresses": ["ops@example.com"]})
+        self.assertEqual(call["Message"]["Subject"]["Data"], "New mail: invoice")
+        self.assertEqual(call["Message"]["Body"]["Text"]["Data"], "route todo")
+        self.assertNotIn("Html", call["Message"]["Body"])
+
+    def test_to_address_comes_from_the_event_for_replies(self):
+        call = self.run_action(
+            {"type": "email_send", "to": "{sender}", "text": "got it"},
+            {"sender": "customer@example.org"},
+        )
+        self.assertEqual(call["Destination"], {"ToAddresses": ["customer@example.org"]})
+
+    def test_splits_comma_separated_recipients(self):
+        call = self.run_action(
+            {"type": "email_send", "to": "a@example.com, b@example.com", "text": "hi"},
+            {},
+        )
+        self.assertEqual(call["Destination"], {"ToAddresses": ["a@example.com", "b@example.com"]})
+
+    def test_html_body_is_sent_alongside_text(self):
+        call = self.run_action(
+            {"type": "email_send", "to": "a@example.com", "text": "plain", "html": "<b>{route}</b>"},
+            {"route": "todo"},
+        )
+        self.assertEqual(call["Message"]["Body"]["Text"]["Data"], "plain")
+        self.assertEqual(call["Message"]["Body"]["Html"]["Data"], "<b>todo</b>")
+
+    def test_sender_overrides_in_order(self):
+        self.run_action({"type": "email_send", "to": "a@x", "sender": "act@x", "text": "t"}, {})
+        self.assertEqual(self.ses.sent[0]["Source"], "act@x")
+        with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "env@x"}):
+            run_email_send({"type": "email_send", "to": "a@x", "text": "t"},
+                           {"data": {}}, ses=self.ses)
+        self.assertEqual(self.ses.sent[1]["Source"], "env@x")
+
+    def test_subject_defaults_when_omitted(self):
+        call = self.run_action({"type": "email_send", "to": "a@example.com", "text": "hi"}, {})
+        self.assertEqual(call["Message"]["Subject"]["Data"], "(no subject)")
+
+    def test_requires_a_to_address(self):
+        with self.assertRaises(ValueError):
+            run_email_send({"type": "email_send", "to": "{missing}", "text": "t"},
+                           {"data": {}}, ses=self.ses)
+
+    def test_requires_a_body(self):
+        with self.assertRaises(ValueError):
+            run_email_send({"type": "email_send", "to": "a@example.com", "subject": "s"},
+                           {"data": {}}, ses=self.ses)
+
+    def test_execute_dispatches_email_send(self):
+        workflow = {
+            "id": "wf-email", "enabled": True,
+            "trigger": {"connector": "email", "event": "message.received", "filters": {}},
+            "actions": [{"type": "email_send", "to": "ops@example.com", "text": "route {route}"}],
+        }
+        event = {"id": "evt-2", "connector": "email", "event": "message.received",
+                 "data": {"route": "todo"}}
+        with patch("src.engine.all_workflows", return_value=[workflow]), \
+             patch("boto3.client", return_value=self.ses), \
+             patch.dict(os.environ, {"TRIGGER_EMAIL_DOMAIN": "dtcdev.click"}):
+            execute(event)
+        self.assertEqual(self.ses.sent[0]["Message"]["Body"]["Text"]["Data"], "route todo")
 
 
 if __name__ == "__main__":

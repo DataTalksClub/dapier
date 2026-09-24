@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import stat
@@ -180,7 +181,7 @@ def test_import_posts_files_without_logging(monkeypatch, tmp_path, capsys):
         expected_account_id="UC1", scopes=["s1"],
     )
     assert code == 0
-    assert posted["path"] == "/api/admin/connections/import"
+    assert posted["path"] == "/api/agent/connections/import"
     assert posted["body"]["authorized_user"] == {"refresh_token": "refresh-value"}
     assert posted["body"]["client_secret"] == "client-secret-value"
     out, _ = capsys.readouterr()
@@ -251,3 +252,800 @@ def test_main_triggers_parsing(monkeypatch):
     monkeypatch.setattr(commands, "triggers_save", fake_save)
     assert main.main(["triggers", "save", "/tmp/trigger.json"]) == 0
     assert seen["file"] == "/tmp/trigger.json"
+
+
+def test_credentials_set_posts_value_without_echoing(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "slack", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    secret = tmp_path / "slack-token"
+    secret.write_text("xoxb-123456789012345678901234\n")
+    assert commands.credentials_set("https://api.example.test", "slack", str(secret)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/credentials/slack",
+                      "body": {"token": "xoxb-123456789012345678901234"}}
+    out, _ = capsys.readouterr()
+    assert "xoxb-" not in out
+
+
+def test_credentials_set_reads_stdin(monkeypatch, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(path=path, body=body)
+        return {"provider": "mailchimp", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("a" * 20 + "-us1\n"))
+    assert commands.credentials_set("https://api.example.test", "mailchimp", "-") == 0
+    assert posted == {"path": "/api/agent/credentials/mailchimp",
+                      "body": {"api_key": "a" * 20 + "-us1"}}
+
+
+def test_credentials_set_rejects_unknown_provider_and_empty_value(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(commands.api, "call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    assert commands.credentials_set("https://api.example.test", "youtube", "-") == 2
+    empty = tmp_path / "empty"
+    empty.write_text("  \n")
+    assert commands.credentials_set("https://api.example.test", "slack", str(empty)) == 2
+    assert commands.credentials_set("https://api.example.test", "slack",
+                                    str(tmp_path / "missing")) == 2
+
+
+GRANT_BODY = {
+    "connection_id": "youtube-personal",
+    "subject": "subject-9",
+    "agent": "buildcamp-uploader",
+    "operations": ["use"],
+}
+
+
+def test_grants_commands_hit_agent_endpoints(monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        if method == "GET":
+            return {"grants": [dict(GRANT_BODY, grantee="subject-9#buildcamp-uploader")]}
+        if method == "PUT":
+            return dict(GRANT_BODY, grantee="subject-9#buildcamp-uploader", granted_by="op-1")
+        return {"ok": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.grants_list("https://api.example.test") == 0
+    assert commands.grants_list("https://api.example.test", connection_id="youtube-personal") == 0
+    grant_file = tmp_path / "grant.json"
+    grant_file.write_text(json.dumps(GRANT_BODY))
+    assert commands.grants_save("https://api.example.test", str(grant_file)) == 0
+    assert commands.grants_delete("https://api.example.test", "youtube-personal",
+                                  "subject-9#buildcamp-uploader") == 0
+    assert calls == [
+        ("GET", "/api/agent/grants", None),
+        ("GET", "/api/agent/grants?connection_id=youtube-personal", None),
+        ("PUT", "/api/agent/grants", GRANT_BODY),
+        ("DELETE", "/api/agent/grants?connection_id=youtube-personal"
+                   "&grantee=subject-9%23buildcamp-uploader", None),
+    ]
+
+
+def test_connections_revoke(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("DELETE", "/api/agent/connections/youtube-personal/tokens")
+        return {"connection_id": "youtube-personal", "status": "revoked"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_revoke("https://api.example.test", "youtube-personal") == 0
+    out, _ = capsys.readouterr()
+    assert "revoked" in out
+
+
+def test_overview_prints_operator_summary(monkeypatch, capsys):
+    payload = {
+        "service": "dapier",
+        "region": "eu-west-1",
+        "workflows": [{"id": "demo", "enabled": True}, {"id": "retired", "enabled": False}],
+        "connections": [{"connection_id": "youtube-personal", "provider": "youtube",
+                         "status": "connected"}],
+        "credentials": [{"provider": "slack", "configured": True,
+                         "updated_at": "2026-09-24T00:00:00+00:00"},
+                        {"provider": "mailchimp", "configured": False, "updated_at": None}],
+        "executions": [{"workflow_id": "demo", "action_id": "upload", "status": "completed",
+                        "started_at": "2026-09-24T01:00:00+00:00"}],
+    }
+    monkeypatch.setattr(commands.api, "call",
+                        lambda api_url, method, path, body=None, **kwargs: (
+                            pytest.fail("wrong path") if path != "/api/agent/overview" else payload))
+    assert commands.overview("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "dapier in eu-west-1" in out
+    assert "demo" in out and "retired" in out
+    assert "youtube-personal" in out
+    assert "configured" in out and "not set" in out
+    assert "completed" in out
+
+
+def test_main_operator_command_parsing(monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(commands, "grants_delete",
+                        lambda api_url, connection_id, grantee, debug=False:
+                        seen.update(connection_id=connection_id, grantee=grantee) or 0)
+    assert main.main(["grants", "delete", "youtube-personal", "subject-9#uploader"]) == 0
+    assert seen == {"connection_id": "youtube-personal", "grantee": "subject-9#uploader"}
+
+    monkeypatch.setattr(commands, "credentials_set",
+                        lambda api_url, provider, path, debug=False:
+                        seen.update(provider=provider, path=path) or 0)
+    assert main.main(["credentials", "set", "mailchimp", "--file", "-"]) == 0
+    assert seen["provider"] == "mailchimp" and seen["path"] == "-"
+
+    monkeypatch.setattr(commands, "overview", lambda api_url, debug=False: 0)
+    assert main.main(["overview"]) == 0
+
+    monkeypatch.setattr(commands, "connections_revoke",
+                        lambda api_url, connection_id, debug=False:
+                        seen.update(revoked=connection_id) or 0)
+    assert main.main(["connections", "revoke", "youtube-personal"]) == 0
+    assert seen["revoked"] == "youtube-personal"
+
+
+def test_credentials_set_posts_value_without_echoing(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "slack", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    secret = tmp_path / "slack-token"
+    secret.write_text("xoxb-123456789012345678901234\n")
+    assert commands.credentials_set("https://api.example.test", "slack", str(secret)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/credentials/slack",
+                      "body": {"token": "xoxb-123456789012345678901234"}}
+    out, _ = capsys.readouterr()
+    assert "xoxb-" not in out
+
+
+def test_credentials_set_reads_stdin(monkeypatch, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(path=path, body=body)
+        return {"provider": "mailchimp", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("a" * 20 + "-us1\n"))
+    assert commands.credentials_set("https://api.example.test", "mailchimp", "-") == 0
+    assert posted == {"path": "/api/agent/credentials/mailchimp",
+                      "body": {"api_key": "a" * 20 + "-us1"}}
+
+
+def test_credentials_set_rejects_unknown_provider_and_empty_value(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(commands.api, "call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    assert commands.credentials_set("https://api.example.test", "youtube", "-") == 2
+    empty = tmp_path / "empty"
+    empty.write_text("  \n")
+    assert commands.credentials_set("https://api.example.test", "slack", str(empty)) == 2
+    assert commands.credentials_set("https://api.example.test", "slack",
+                                    str(tmp_path / "missing")) == 2
+
+
+GRANT_BODY = {
+    "connection_id": "youtube-personal",
+    "subject": "subject-9",
+    "agent": "buildcamp-uploader",
+    "operations": ["use"],
+}
+
+
+def test_grants_commands_hit_agent_endpoints(monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        if method == "GET":
+            return {"grants": [dict(GRANT_BODY, grantee="subject-9#buildcamp-uploader")]}
+        if method == "PUT":
+            return dict(GRANT_BODY, grantee="subject-9#buildcamp-uploader", granted_by="op-1")
+        return {"ok": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.grants_list("https://api.example.test") == 0
+    assert commands.grants_list("https://api.example.test", connection_id="youtube-personal") == 0
+    grant_file = tmp_path / "grant.json"
+    grant_file.write_text(json.dumps(GRANT_BODY))
+    assert commands.grants_save("https://api.example.test", str(grant_file)) == 0
+    assert commands.grants_delete("https://api.example.test", "youtube-personal",
+                                  "subject-9#buildcamp-uploader") == 0
+    assert calls == [
+        ("GET", "/api/agent/grants", None),
+        ("GET", "/api/agent/grants?connection_id=youtube-personal", None),
+        ("PUT", "/api/agent/grants", GRANT_BODY),
+        ("DELETE", "/api/agent/grants?connection_id=youtube-personal"
+                   "&grantee=subject-9%23buildcamp-uploader", None),
+    ]
+
+
+def test_connections_revoke(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("DELETE", "/api/agent/connections/youtube-personal/tokens")
+        return {"connection_id": "youtube-personal", "status": "revoked"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_revoke("https://api.example.test", "youtube-personal") == 0
+    out, _ = capsys.readouterr()
+    assert "revoked" in out
+
+
+def test_overview_prints_operator_summary(monkeypatch, capsys):
+    payload = {
+        "service": "dapier",
+        "region": "eu-west-1",
+        "workflows": [{"id": "demo", "enabled": True}, {"id": "retired", "enabled": False}],
+        "connections": [{"connection_id": "youtube-personal", "provider": "youtube",
+                         "status": "connected"}],
+        "credentials": [{"provider": "slack", "configured": True,
+                         "updated_at": "2026-09-24T00:00:00+00:00"},
+                        {"provider": "mailchimp", "configured": False, "updated_at": None}],
+        "executions": [{"workflow_id": "demo", "action_id": "upload", "status": "completed",
+                        "started_at": "2026-09-24T01:00:00+00:00"}],
+    }
+    monkeypatch.setattr(commands.api, "call",
+                        lambda api_url, method, path, body=None, **kwargs: (
+                            pytest.fail("wrong path") if path != "/api/agent/overview" else payload))
+    assert commands.overview("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "dapier in eu-west-1" in out
+    assert "demo" in out and "retired" in out
+    assert "youtube-personal" in out
+    assert "configured" in out and "not set" in out
+    assert "completed" in out
+
+
+def test_main_operator_command_parsing(monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(commands, "grants_delete",
+                        lambda api_url, connection_id, grantee, debug=False:
+                        seen.update(connection_id=connection_id, grantee=grantee) or 0)
+    assert main.main(["grants", "delete", "youtube-personal", "subject-9#uploader"]) == 0
+    assert seen == {"connection_id": "youtube-personal", "grantee": "subject-9#uploader"}
+
+    monkeypatch.setattr(commands, "credentials_set",
+                        lambda api_url, provider, path, debug=False:
+                        seen.update(provider=provider, path=path) or 0)
+    assert main.main(["credentials", "set", "mailchimp", "--file", "-"]) == 0
+    assert seen["provider"] == "mailchimp" and seen["path"] == "-"
+
+    monkeypatch.setattr(commands, "overview", lambda api_url, debug=False: 0)
+    assert main.main(["overview"]) == 0
+
+    monkeypatch.setattr(commands, "connections_revoke",
+                        lambda api_url, connection_id, debug=False:
+                        seen.update(revoked=connection_id) or 0)
+    assert main.main(["connections", "revoke", "youtube-personal"]) == 0
+    assert seen["revoked"] == "youtube-personal"
+
+
+HOOK = {
+    "hook_id": "orders",
+    "kind": "webhook",
+    "url": "https://dapier.example.test/hooks/webhook/orders",
+    "token": "hook-token-value",
+    "header": "authorization",
+    "enabled": True,
+    "actions": [{"type": "webhook", "url": "https://hooks.test/x"}],
+}
+
+
+def test_hooks_list_and_show(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/hook-triggers")
+        return {"base_url": "https://dapier.example.test", "hooks": [HOOK]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.hooks_list("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "/hooks/webhook/orders" in out
+    assert commands.hooks_show("https://api.example.test", "orders") == 0
+    out, _ = capsys.readouterr()
+    assert "Bearer hook-token-value" in out
+    assert commands.hooks_show("https://api.example.test", "missing") == 4
+
+
+def test_hooks_save_prints_caller_instructions(monkeypatch, tmp_path, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"created": True, "hook_id": "orders", "kind": "webhook",
+                "url": HOOK["url"], "token": "tok", "header": "authorization"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    hook_file = tmp_path / "hook.json"
+    hook_file.write_text(json.dumps({"kind": "webhook", "name": "orders", "actions": HOOK["actions"]}))
+    assert commands.hooks_save("https://api.example.test", str(hook_file)) == 0
+    assert (seen["method"], seen["path"]) == ("PUT", "/api/agent/hook-triggers")
+    out, _ = capsys.readouterr()
+    assert "Created webhook hook 'orders'" in out
+    assert "authorization: Bearer tok" in out
+    assert "curl" in out
+
+
+def test_hooks_delete(monkeypatch, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen["path"] = path
+        return {"ok": True, "hook_id": "orders", "kind": "telegram"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.hooks_delete("https://api.example.test", "orders", kind="telegram") == 0
+    assert seen["path"] == "/api/agent/hook-triggers?name=orders&kind=telegram"
+    out, _ = capsys.readouterr()
+    assert "Deleted telegram trigger 'orders'" in out
+
+
+def test_main_hooks_parsing(monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(commands, "hooks_save",
+                        lambda api_url, path, debug=False: seen.update(file=path) or 0)
+    assert main.main(["hooks", "save", "/tmp/hook.json"]) == 0
+    assert seen["file"] == "/tmp/hook.json"
+
+    monkeypatch.setattr(commands, "hooks_list",
+                        lambda api_url, kind=None, debug=False: seen.update(kind=kind) or 0)
+    assert main.main(["hooks", "list", "--kind", "telegram"]) == 0
+    assert seen["kind"] == "telegram"
+
+    monkeypatch.setattr(commands, "hooks_delete",
+                        lambda api_url, name, kind=None, debug=False:
+                        seen.update(deleted=name, delete_kind=kind) or 0)
+    assert main.main(["hooks", "delete", "orders"]) == 0
+    assert seen["deleted"] == "orders" and seen["delete_kind"] is None
+
+
+def test_connections_import_token_provider_uses_token_file(monkeypatch, tmp_path, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"connection_id": "tg-bot", "account_title": "@dapier_bot"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    token_file = tmp_path / "bot-token"
+    token_file.write_text("123456:AAAtokentokentokentokentoken\n")
+
+    code = commands.connections_import(
+        "https://api.example.test", "tg-bot", "telegram", None, None, None,
+        debug=False, token_path=str(token_file))
+    assert code == 0
+    assert seen["path"] == "/api/agent/connections/import"
+    assert seen["body"]["token"] == "123456:AAAtokentokentokentokentoken"
+    assert "authorized_user" not in seen["body"]
+    out, _ = capsys.readouterr()
+    assert "@dapier_bot" in out and "123456" not in out
+
+    # A token provider without --token-file is a usage error, not a request.
+    assert commands.connections_import(
+        "https://api.example.test", "tg-bot", "telegram", None, None, None) == 2
+
+
+HOOK = {
+    "hook_id": "orders",
+    "kind": "webhook",
+    "url": "https://dapier.example.test/hooks/webhook/orders",
+    "token": "hook-token-value",
+    "header": "authorization",
+    "enabled": True,
+    "actions": [{"type": "webhook", "url": "https://hooks.test/x"}],
+}
+
+
+def test_hooks_list_and_show(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/hook-triggers")
+        return {"base_url": "https://dapier.example.test", "hooks": [HOOK]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.hooks_list("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "/hooks/webhook/orders" in out
+    assert commands.hooks_show("https://api.example.test", "orders") == 0
+    out, _ = capsys.readouterr()
+    assert "Bearer hook-token-value" in out
+    assert commands.hooks_show("https://api.example.test", "missing") == 4
+
+
+def test_hooks_save_prints_caller_instructions(monkeypatch, tmp_path, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"created": True, "hook_id": "orders", "kind": "webhook",
+                "url": HOOK["url"], "token": "tok", "header": "authorization"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    hook_file = tmp_path / "hook.json"
+    hook_file.write_text(json.dumps({"kind": "webhook", "name": "orders", "actions": HOOK["actions"]}))
+    assert commands.hooks_save("https://api.example.test", str(hook_file)) == 0
+    assert (seen["method"], seen["path"]) == ("PUT", "/api/agent/hook-triggers")
+    out, _ = capsys.readouterr()
+    assert "Created webhook hook 'orders'" in out
+    assert "authorization: Bearer tok" in out
+    assert "curl" in out
+
+
+def test_hooks_delete(monkeypatch, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen["path"] = path
+        return {"ok": True, "hook_id": "orders", "kind": "telegram"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.hooks_delete("https://api.example.test", "orders", kind="telegram") == 0
+    assert seen["path"] == "/api/agent/hook-triggers?name=orders&kind=telegram"
+    out, _ = capsys.readouterr()
+    assert "Deleted telegram trigger 'orders'" in out
+
+
+def test_main_hooks_parsing(monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(commands, "hooks_save",
+                        lambda api_url, path, debug=False: seen.update(file=path) or 0)
+    assert main.main(["hooks", "save", "/tmp/hook.json"]) == 0
+    assert seen["file"] == "/tmp/hook.json"
+
+    monkeypatch.setattr(commands, "hooks_list",
+                        lambda api_url, kind=None, debug=False: seen.update(kind=kind) or 0)
+    assert main.main(["hooks", "list", "--kind", "telegram"]) == 0
+    assert seen["kind"] == "telegram"
+
+    monkeypatch.setattr(commands, "hooks_delete",
+                        lambda api_url, name, kind=None, debug=False:
+                        seen.update(deleted=name, delete_kind=kind) or 0)
+    assert main.main(["hooks", "delete", "orders"]) == 0
+    assert seen["deleted"] == "orders" and seen["delete_kind"] is None
+
+
+def test_connections_import_token_provider_uses_token_file(monkeypatch, tmp_path, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"connection_id": "tg-bot", "account_title": "@dapier_bot"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    token_file = tmp_path / "bot-token"
+    token_file.write_text("123456:AAAtokentokentokentokentoken\n")
+
+    code = commands.connections_import(
+        "https://api.example.test", "tg-bot", "telegram", None, None, None,
+        debug=False, token_path=str(token_file))
+    assert code == 0
+    assert seen["path"] == "/api/agent/connections/import"
+    assert seen["body"]["token"] == "123456:AAAtokentokentokentokentoken"
+    assert "authorized_user" not in seen["body"]
+    out, _ = capsys.readouterr()
+    assert "@dapier_bot" in out and "123456" not in out
+
+    # A token provider without --token-file is a usage error, not a request.
+    assert commands.connections_import(
+        "https://api.example.test", "tg-bot", "telegram", None, None, None) == 2
+
+
+def test_connections_import_passes_root_path(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(body=body)
+        return {"connection_id": "dbx-team", "account_title": "Team Dropbox"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    refresh_file = tmp_path / "refresh.json"
+    refresh_file.write_text('{"refresh_token": "r"}')
+
+    code = commands.connections_import(
+        "https://api.example.test", "dbx-team", "dropbox", None, None,
+        str(refresh_file), root_path="/incoming")
+
+    assert code == 0
+    assert seen["body"]["root_path"] == "/incoming"
+
+
+def test_oauth_clients_set_posts_secret_without_echoing(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "google", "client_id": "g-id", "source": "config", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    secret = tmp_path / "g-secret"
+    secret.write_text("g-secret-value\n")
+    assert commands.oauth_clients_set("https://api.example.test", "youtube", "g-id", str(secret)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/oauth-clients/youtube",
+                      "body": {"client_id": "g-id", "client_secret": "g-secret-value"}}
+    out, _ = capsys.readouterr()
+    assert "g-secret-value" not in out
+
+
+def test_oauth_clients_set_reads_stdin_and_rejects_empty_or_missing(monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append({"path": path, "body": body})
+        return {"provider": "google", "client_id": "g-id", "source": "config", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("s3cret\n"))
+    assert commands.oauth_clients_set("https://api.example.test", "google", "g-id", "-") == 0
+    assert calls == [{"path": "/api/agent/oauth-clients/google",
+                      "body": {"client_id": "g-id", "client_secret": "s3cret"}}]
+
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
+    assert commands.oauth_clients_set("https://api.example.test", "google", "  ", "-") == 2
+    assert commands.oauth_clients_set("https://api.example.test", "google", "g-id",
+                                      str(tmp_path / "missing")) == 2
+    assert len(calls) == 1
+    out, _ = capsys.readouterr()
+    assert "s3cret" not in out
+
+
+def test_oauth_clients_list_prints_clients_without_secrets(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert path == "/api/agent/oauth-clients"
+        return {"clients": [
+            {"provider": "dropbox", "client_id": "d-id", "source": "config", "configured": True},
+            {"provider": "google", "client_id": "", "source": "none", "configured": False},
+        ]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.oauth_clients_list("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "dropbox" in out and "d-id" in out
+    assert "google" in out and "none" in out
+
+
+def test_main_oauth_clients_parsing(monkeypatch):
+    seen = {}
+
+    def fake_set(api_url, provider, client_id, secret_path, debug=False):
+        seen.update(provider=provider, client_id=client_id, secret_path=secret_path)
+        return 0
+
+    monkeypatch.setattr(commands, "oauth_clients_set", fake_set)
+    assert main.main(["oauth-clients", "set", "google", "--client-id", "g-id",
+                      "--client-secret-file", "/tmp/s"]) == 0
+    assert seen == {"provider": "google", "client_id": "g-id", "secret_path": "/tmp/s"}
+
+    monkeypatch.setattr(commands, "oauth_clients_list", lambda api_url, debug=False: 0)
+    assert main.main(["oauth-clients", "list"]) == 0
+
+
+def test_oauth_clients_set_posts_secret_without_echoing(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "google", "client_id": "g-id", "source": "config", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    secret = tmp_path / "g-secret"
+    secret.write_text("g-secret-value\n")
+    assert commands.oauth_clients_set("https://api.example.test", "youtube", "g-id", str(secret)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/oauth-clients/youtube",
+                      "body": {"client_id": "g-id", "client_secret": "g-secret-value"}}
+    out, _ = capsys.readouterr()
+    assert "g-secret-value" not in out
+
+
+def test_oauth_clients_set_reads_stdin_and_rejects_empty_or_missing(monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append({"path": path, "body": body})
+        return {"provider": "google", "client_id": "g-id", "source": "config", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("s3cret\n"))
+    assert commands.oauth_clients_set("https://api.example.test", "google", "g-id", "-") == 0
+    assert calls == [{"path": "/api/agent/oauth-clients/google",
+                      "body": {"client_id": "g-id", "client_secret": "s3cret"}}]
+
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
+    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
+    assert commands.oauth_clients_set("https://api.example.test", "google", "  ", "-") == 2
+    assert commands.oauth_clients_set("https://api.example.test", "google", "g-id",
+                                      str(tmp_path / "missing")) == 2
+    assert len(calls) == 1
+    out, _ = capsys.readouterr()
+    assert "s3cret" not in out
+
+
+def test_oauth_clients_list_prints_clients_without_secrets(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert path == "/api/agent/oauth-clients"
+        return {"clients": [
+            {"provider": "dropbox", "client_id": "d-id", "source": "config", "configured": True},
+            {"provider": "google", "client_id": "", "source": "none", "configured": False},
+        ]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.oauth_clients_list("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "dropbox" in out and "d-id" in out
+    assert "google" in out and "none" in out
+
+
+def test_main_oauth_clients_parsing(monkeypatch):
+    seen = {}
+
+    def fake_set(api_url, provider, client_id, secret_path, debug=False):
+        seen.update(provider=provider, client_id=client_id, secret_path=secret_path)
+        return 0
+
+    monkeypatch.setattr(commands, "oauth_clients_set", fake_set)
+    assert main.main(["oauth-clients", "set", "google", "--client-id", "g-id",
+                      "--client-secret-file", "/tmp/s"]) == 0
+    assert seen == {"provider": "google", "client_id": "g-id", "secret_path": "/tmp/s"}
+
+    monkeypatch.setattr(commands, "oauth_clients_list", lambda api_url, debug=False: 0)
+    assert main.main(["oauth-clients", "list"]) == 0
+
+
+# --- dapier tokens: operator API-token management ---
+
+TOKEN_CREATED = {
+    "token_id": "personal-scheduler",
+    "token_prefix": "dap_abc12345678",
+    "agent": "personal-scheduler",
+    "subject": "token:personal-scheduler",
+    "created_by": "op-1",
+    "created_at": "2026-09-24T20:00:00+00:00",
+    "token": "dap_SECRET_VALUE",
+}
+
+
+def test_tokens_create_prints_value_once(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        return dict(TOKEN_CREATED)
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "create", "--name", "personal-scheduler",
+                    "--agent", "personal-scheduler"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert calls == [("PUT", "/api/agent/tokens",
+                      {"token_id": "personal-scheduler", "agent": "personal-scheduler"})]
+    assert "dap_SECRET_VALUE" in out
+    assert "token:personal-scheduler" in out
+
+
+def test_tokens_list_never_prints_secrets(isolated_home, monkeypatch, capsys):
+    listed = {key: value for key, value in TOKEN_CREATED.items() if key != "token"}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/tokens")
+        return {"tokens": [listed]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "list"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "personal-scheduler" in out
+    assert "SECRET" not in out
+
+
+def test_tokens_revoke(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"token_id": "personal-scheduler", "revoked_at": "2026-09-24T21:00:00+00:00"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "revoke", "personal-scheduler"])
+
+    assert rc == 0
+    assert calls == [("DELETE", "/api/agent/tokens?token_id=personal-scheduler")]
+
+
+def test_tokens_empty_list(isolated_home, monkeypatch, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda api_url, method, path, body=None, **kwargs: {"tokens": []})
+
+    rc = main.main(["tokens", "list"])
+
+    assert rc == 0
+    assert "No API tokens" in capsys.readouterr().out
+
+
+# --- dapier tokens: operator API-token management ---
+
+TOKEN_CREATED = {
+    "token_id": "personal-scheduler",
+    "token_prefix": "dap_abc12345678",
+    "agent": "personal-scheduler",
+    "subject": "token:personal-scheduler",
+    "created_by": "op-1",
+    "created_at": "2026-09-24T20:00:00+00:00",
+    "token": "dap_SECRET_VALUE",
+}
+
+
+def test_tokens_create_prints_value_once(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        return dict(TOKEN_CREATED)
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "create", "--name", "personal-scheduler",
+                    "--agent", "personal-scheduler"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert calls == [("PUT", "/api/agent/tokens",
+                      {"token_id": "personal-scheduler", "agent": "personal-scheduler"})]
+    assert "dap_SECRET_VALUE" in out
+    assert "token:personal-scheduler" in out
+
+
+def test_tokens_list_never_prints_secrets(isolated_home, monkeypatch, capsys):
+    listed = {key: value for key, value in TOKEN_CREATED.items() if key != "token"}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/tokens")
+        return {"tokens": [listed]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "list"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "personal-scheduler" in out
+    assert "SECRET" not in out
+
+
+def test_tokens_revoke(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"token_id": "personal-scheduler", "revoked_at": "2026-09-24T21:00:00+00:00"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "revoke", "personal-scheduler"])
+
+    assert rc == 0
+    assert calls == [("DELETE", "/api/agent/tokens?token_id=personal-scheduler")]
+
+
+def test_tokens_empty_list(isolated_home, monkeypatch, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda api_url, method, path, body=None, **kwargs: {"tokens": []})
+
+    rc = main.main(["tokens", "list"])
+
+    assert rc == 0
+    assert "No API tokens" in capsys.readouterr().out

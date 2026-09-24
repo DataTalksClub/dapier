@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from src import admin, oauth_clients, ingress
+from src import admin, credentials, oauth_clients, ingress
 from src.oauth_clients import ClientConfigError
 
 
@@ -108,7 +108,7 @@ def test_youtube_shares_the_google_record(monkeypatch, config_db):
 
 def test_save_oauth_client_stores_write_only_record(monkeypatch, config_db):
     stored = []
-    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
+    monkeypatch.setattr(credentials, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
     monkeypatch.setattr(admin, "_session_subject", lambda event: "op")
     monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: None)
 
@@ -124,7 +124,7 @@ def test_save_oauth_client_stores_write_only_record(monkeypatch, config_db):
 
 def test_save_oauth_client_folds_youtube_onto_google(monkeypatch, config_db):
     stored = []
-    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
+    monkeypatch.setattr(credentials, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
     monkeypatch.setattr(admin, "_session_subject", lambda event: "op")
     monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: None)
 

@@ -43,7 +43,7 @@ const pad2 = (value) => String(value).padStart(2, '0');
 
 function statusLine(status, labels) {
   const value = String(status || 'unknown');
-  const kind = ['completed', 'connected', 'configured', 'enabled'].includes(value) ? 'ok'
+  const kind = ['completed', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'ready'].includes(value) ? 'run'
     : ['failed', 'error', 'missing', 'expired'].includes(value) ? 'err'
     : 'off';
@@ -189,6 +189,7 @@ function render() {
   renderConnections(data.connections);
   renderCredentials(data.credentials);
   renderOAuthClients(data.oauth_clients || []);
+  renderTokens(data.api_tokens || []);
   $('#run-table').innerHTML = data.executions.map((execution) => `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${wrapTokens(execution.execution_id)}</span></td>
     <td data-label="Status">${statusLine(execution.status)}</td>
@@ -208,7 +209,7 @@ function renderConnections(connections) {
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
-    const reconnect = connection.provider === 'slack' ? ''
+    const reconnect = TOKEN_PROVIDERS.includes(connection.provider) ? ''
       : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${['connected', 'expired'].includes(connection.status) ? 'Reconnect' : 'Connect'}</a>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
@@ -238,6 +239,28 @@ function renderCredentials(credentials) {
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));
 }
 
+function renderTokens(tokens) {
+  $('#token-empty').hidden = tokens.length > 0;
+  $('.table-wrap', $('[data-page=tokens]')).hidden = tokens.length === 0;
+  $('#token-table').innerHTML = tokens.map((token) => `<tr>
+      <td class="cell-title"><span class="cell-name mono">${escapeHtml(token.token_id)}</span><span class="cell-sub">${wrapTokens(token.token_prefix || '')}…</span></td>
+      <td class="mono muted-cell" data-label="Agent">${escapeHtml(token.agent)}</td>
+      <td class="mono muted-cell" data-label="Created">${formatTimestamp(token.created_at) || '—'}</td>
+      <td class="mono muted-cell" data-label="Last used">${formatTimestamp(token.last_used_at) || 'never'}</td>
+      <td data-label="Status">${token.revoked_at
+        ? `<span class="status off"><span class="status-dot" aria-hidden="true"></span>revoked ${formatTimestamp(token.revoked_at) || ''}</span>`
+        : statusLine('active')}</td>
+      <td class="action-cell">${token.revoked_at ? '' : `<button class="button secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
+    </tr>`).join('');
+  $$('.token-revoke').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      await api(`/api/admin/tokens?token_id=${encodeURIComponent(button.dataset.token)}`, { method: 'DELETE' });
+      notice(`Token ${button.dataset.token} revoked — its grants remain but no longer authenticate`);
+      await refresh();
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
 async function refresh() {
   $('#loading').hidden = false;
   try {
@@ -251,7 +274,7 @@ async function refresh() {
   }
 }
 
-const VIEWS = ['overview', 'workflows', 'connections', 'credentials', 'runs'];
+const VIEWS = ['overview', 'workflows', 'connections', 'credentials', 'tokens', 'runs'];
 
 function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');
@@ -309,6 +332,33 @@ const CONNECT_PROVIDERS = {
     displayName: 'DataTalks Slack',
     scopes: [],
   },
+  telegram: {
+    label: 'Telegram',
+    blurb: 'Message triggers and bot posts — paste a bot token from @BotFather.',
+    connectionId: 'telegram-bot',
+    displayName: 'Telegram bot',
+    scopes: [],
+  },
+};
+
+/* Token providers paste a credential instead of browser consent. */
+const TOKEN_PROVIDERS = ['slack', 'telegram'];
+
+const TOKEN_PROVIDER_META = {
+  slack: {
+    heading: 'New Slack connection',
+    blurb: 'Slack is the one service that can\'t do browser consent here — paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. It is verified against Slack and stored as the connection\'s secret.',
+    label: 'Slack token',
+    placeholder: 'xoxb-… or xoxp-…',
+    displayName: 'DataTalks Slack',
+  },
+  telegram: {
+    heading: 'New Telegram connection',
+    blurb: 'Paste a bot token from @BotFather (the digits:secret string). It is verified against Telegram and stored as the connection\'s secret; bots drive Telegram triggers and sendMessage actions.',
+    label: 'Bot token',
+    placeholder: '123456:ABC-DEF…',
+    displayName: 'Telegram bot',
+  },
 };
 
 /* Canonical brand glyphs (same simple-icons paths the designer palette uses)
@@ -318,6 +368,7 @@ const PROVIDER_MARKS = {
   google: '<svg class="brand-mark" width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="Google"><path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"/></svg>',
   youtube: '<svg class="brand-mark" width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="YouTube"><path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
   dropbox: '<svg class="brand-mark" width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="Dropbox"><path fill="#0061FF" d="M6 1.807 0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z"/></svg>',
+  telegram: '<svg class="brand-mark" width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="Telegram"><path fill="#26A5E4" d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>',
 };
 
 function providerMark(provider) {
@@ -354,7 +405,7 @@ function nextConnectionId(base) {
 }
 
 async function connectProvider(provider) {
-  if (provider === 'slack') return openSlackDialog();
+  if (TOKEN_PROVIDERS.includes(provider)) return openTokenDialog(provider);
   const meta = CONNECT_PROVIDERS[provider];
   const { id, suffix } = nextConnectionId(meta.connectionId);
   try {
@@ -373,12 +424,18 @@ async function connectProvider(provider) {
   } catch (error) { notice(error.message, true); }
 }
 
-function openSlackDialog() {
+function openTokenDialog(provider) {
+  const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   const form = $('#connection-form');
+  form.dataset.provider = provider;
   form.reset();
+  $('#connection-heading').textContent = meta.heading;
+  $('#connection-blurb').textContent = meta.blurb;
+  $('#connection-token-label').firstChild.textContent = meta.label;
+  form.token.placeholder = meta.placeholder;
   $('#connection-error').textContent = '';
   $('#connection-dialog').showModal();
-  form.slack_token.focus();
+  form.token.focus();
 }
 
 function openEditConnection(connectionId) {
@@ -392,9 +449,11 @@ function openEditConnection(connectionId) {
   $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}`;
   form.display_name.value = connection.display_name || connection.connection_id;
   form.scopes.value = (connection.scopes || []).join(' ');
-  $('#edit-scopes-field').hidden = connection.provider === 'slack';
+  $('#edit-scopes-field').hidden = TOKEN_PROVIDERS.includes(connection.provider);
+  form.root_path.value = connection.root_path || '';
+  $('#edit-root-path-field').hidden = connection.provider !== 'dropbox';
   form.token.value = '';
-  $('#edit-token-field').hidden = connection.provider !== 'slack';
+  $('#edit-token-field').hidden = !TOKEN_PROVIDERS.includes(connection.provider);
   $('#edit-connection-error').textContent = '';
   $('#edit-connection-dialog').showModal();
   form.display_name.focus();
@@ -464,22 +523,66 @@ $('#oauth-client-form').addEventListener('submit', async (event) => {
   } catch (error) { $('#oauth-client-error').textContent = error.message; }
 });
 
+$('#token-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  $('#token-error').textContent = '';
+  try {
+    const created = await api('/api/admin/tokens', {
+      method: 'PUT',
+      body: JSON.stringify({ token_id: form.token_id.value.trim(), agent: form.agent.value.trim() }),
+    });
+    form.reset();
+    $('#token-dialog').close();
+    $('#token-reveal-title').textContent = `Token ${created.token_id} created`;
+    $('#token-reveal-value').textContent = created.token || '';
+    $('#token-reveal-dialog').showModal();
+    await refresh();
+  } catch (error) { $('#token-error').textContent = error.message; }
+});
+
+$('#token-copy').addEventListener('click', async () => {
+  const value = $('#token-reveal-value').textContent;
+  try {
+    await navigator.clipboard.writeText(value);
+    $('#token-copy').textContent = 'Copied';
+    setTimeout(() => { $('#token-copy').textContent = 'Copy'; }, 2000);
+  } catch (_) {
+    // Clipboard refused (insecure context): fall back to manual selection.
+    const range = document.createRange();
+    range.selectNodeContents($('#token-reveal-value'));
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+});
+
+$('#new-token').addEventListener('click', () => {
+  const form = $('#token-form');
+  form.reset();
+  $('#token-error').textContent = '';
+  $('#token-dialog').showModal();
+  form.token_id.focus();
+});
+
 $('#connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const provider = form.dataset.provider || 'slack';
+  const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   $('#connection-error').textContent = '';
-  const { id, suffix } = nextConnectionId('slack');
+  const { id, suffix } = nextConnectionId(meta === TOKEN_PROVIDER_META.slack ? 'slack' : 'telegram-bot');
   const body = {
     connection_id: id,
-    provider: 'slack',
-    display_name: suffix ? `DataTalks Slack ${suffix}` : 'DataTalks Slack',
-    token: form.slack_token.value,
+    provider,
+    display_name: suffix ? `${meta.displayName} ${suffix}` : meta.displayName,
+    token: form.token.value,
   };
   try {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
-    form.slack_token.value = '';
+    form.token.value = '';
     $('#connection-dialog').close();
-    notice('Slack connected');
+    notice(`${meta.displayName} connected`);
     await refresh();
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
@@ -495,12 +598,13 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     provider,
     display_name: form.display_name.value.trim() || connectionId,
   };
-  if (provider !== 'slack') {
+  if (!TOKEN_PROVIDERS.includes(provider)) {
     body.scopes = form.scopes.value.split(/\s+/).filter(Boolean);
   } else {
     const token = form.token.value.trim();
     if (token) body.token = token;
   }
+  if (provider === 'dropbox') body.root_path = form.root_path.value.trim();
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (connection && connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
   try {

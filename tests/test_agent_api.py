@@ -1,6 +1,32 @@
 import json
 
-from src import agent_api
+from src import agent_api, tokens
+
+
+import pytest
+
+from src import oauth_clients
+
+
+@pytest.fixture(autouse=True)
+def clean_oauth_client_cache():
+    """The module-level client cache outlives a test; drop it around each one."""
+    oauth_clients.invalidate_cache()
+    yield
+    oauth_clients.invalidate_cache()
+
+
+import pytest
+
+from src import oauth_clients
+
+
+@pytest.fixture(autouse=True)
+def clean_oauth_client_cache():
+    """The module-level client cache outlives a test; drop it around each one."""
+    oauth_clients.invalidate_cache()
+    yield
+    oauth_clients.invalidate_cache()
 
 
 class Table:
@@ -10,11 +36,34 @@ class Table:
     def _lookup(self, key):
         if "grantee" in key:
             return self.items.get((key.get("connection_id"), key.get("grantee")))
-        return self.items.get(key.get("connection_id"))
+        if "token_hash" in key:
+            return self.items.get(key.get("token_hash"))
+        return self.items.get(key.get("connection_id"), self.items.get(key.get("credential_id")))
 
     def get_item(self, **kwargs):
         item = self._lookup(kwargs["Key"])
         return {"Item": dict(item)} if item else {}
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        if "grantee" in item:
+            self.items[(item["connection_id"], item["grantee"])] = item
+        else:
+            self.items[item.get("credential_id") or item.get("connection_id")
+                       or item.get("token_hash")] = item
+
+    def update_item(self, **kwargs):
+        item = self._lookup(kwargs["Key"])
+        if item is not None:
+            item["last_used_at"] = kwargs["ExpressionAttributeValues"][":now"]
+
+    def delete_item(self, **kwargs):
+        self.items.pop((kwargs["Key"]["connection_id"], kwargs["Key"]["grantee"]), None)
+
+    def query(self, **kwargs):
+        value = kwargs["ExpressionAttributeValues"][":connection"]
+        return {"Items": [item for item in self.items.values()
+                          if item.get("connection_id") == value]}
 
     def scan(self, **kwargs):
         return {"Items": list(self.items.values())}
@@ -25,6 +74,8 @@ def configure(monkeypatch, *, claims=None, connections=None, grants=None):
     tables = {
         "connections": Table(connections or {}),
         "grants": Table(grants or {}),
+        "credentials": Table(),
+        "api-tokens": Table(),
     }
 
     class Dynamo:
@@ -35,6 +86,8 @@ def configure(monkeypatch, *, claims=None, connections=None, grants=None):
 
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("GRANTS_TABLE", "grants")
+    monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
     monkeypatch.setenv("AUTH_CLI_CLIENT_ID", "cli-client")
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
@@ -219,3 +272,327 @@ def test_list_and_show_require_grants(monkeypatch):
     assert agent_api.route(event(), "GET", "/api/agent/connections")["statusCode"] == 200
     assert json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])["connections"] == []
     assert agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["statusCode"] == 404
+
+
+def test_operator_endpoints_reject_non_operators(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    requests = (
+        (event(), "GET", "/api/agent/overview"),
+        (event(), "GET", "/api/agent/grants"),
+        (event({"token": "xoxb-" + "a" * 20}), "PUT", "/api/agent/credentials/slack"),
+        (event(), "DELETE", "/api/agent/connections/youtube-personal/tokens"),
+        (event(), "GET", "/api/agent/oauth-clients"),
+        (event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/google"),
+    )
+    for request, method, path in requests:
+        assert agent_api.route(request, method, path)["statusCode"] == 403
+
+
+def test_grants_roundtrip_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+
+    saved = agent_api.route(
+        event({"connection_id": "youtube-personal", "subject": "subject-9",
+               "agent": "buildcamp-uploader", "operations": ["use"]}),
+        "PUT", "/api/agent/grants",
+    )
+    assert saved["statusCode"] == 200
+    assert json.loads(saved["body"])["grantee"] == "subject-9#buildcamp-uploader"
+
+    listed = agent_api.route(event(), "GET", "/api/agent/grants")
+    assert listed["statusCode"] == 200
+    assert [g["grantee"] for g in json.loads(listed["body"])["grants"]] == [
+        "subject-9#buildcamp-uploader",
+    ]
+
+    filtered = agent_api.route(
+        event(query={"connection_id": "youtube-personal"}), "GET", "/api/agent/grants",
+    )
+    assert json.loads(filtered["body"])["grants"]
+
+    revoked = agent_api.route(
+        event(query={"connection_id": "youtube-personal",
+                     "grantee": "subject-9#buildcamp-uploader"}),
+        "DELETE", "/api/agent/grants",
+    )
+    assert revoked["statusCode"] == 200
+    assert json.loads(agent_api.route(event(), "GET", "/api/agent/grants")["body"])["grants"] == []
+
+
+def test_grants_put_validates_body_and_connection(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+    missing = agent_api.route(event({"connection_id": " ", "subject": ""}), "PUT", "/api/agent/grants")
+    assert missing["statusCode"] == 400
+    unknown = agent_api.route(
+        event({"connection_id": "nope", "subject": "s", "agent": "a"}), "PUT", "/api/agent/grants",
+    )
+    assert unknown["statusCode"] == 404
+    bad_delete = agent_api.route(event(query={"connection_id": "youtube-personal"}),
+                                 "DELETE", "/api/agent/grants")
+    assert bad_delete["statusCode"] == 400
+
+
+def test_credentials_set_is_write_only(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    token = "xoxb-123456789012345678901234"
+
+    saved = agent_api.route(event({"token": token}), "PUT", "/api/agent/credentials/slack")
+    assert saved["statusCode"] == 200
+    assert token not in saved["body"]
+
+    invalid = agent_api.route(event({"token": "nope"}), "PUT", "/api/agent/credentials/slack")
+    assert invalid["statusCode"] == 400
+
+    unknown = agent_api.route(
+        event({"api_key": "a" * 20 + "-us1"}), "PUT", "/api/agent/credentials/youtube",
+    )
+    assert unknown["statusCode"] == 404
+
+
+def test_overview_mirrors_console_payload(monkeypatch, tmp_path):
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+                       connections={"youtube-personal": CONNECTION})
+    tables["executions"] = Table()
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    (tmp_path / "demo.yaml").write_text(
+        "id: demo\n"
+        "trigger:\n"
+        "  type: webhook\n"
+    )
+
+    response = agent_api.route(event(), "GET", "/api/agent/overview")
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["service"] == "dapier"
+    assert [w["id"] for w in body["workflows"]] == ["demo"]
+    assert [c["connection_id"] for c in body["connections"]] == ["youtube-personal"]
+
+
+def test_revoke_tokens_marks_connection_revoked(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+    assert agent_api.route(event(), "DELETE", "/api/agent/connections/nope/tokens")["statusCode"] == 404
+
+    response = agent_api.route(event(), "DELETE", "/api/agent/connections/youtube-personal/tokens")
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["status"] == tokens.STATUS_REVOKED
+
+
+def test_oauth_clients_roundtrip_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.delenv("DAPIER_SKIP_CONFIG_DB", raising=False)
+
+    saved = agent_api.route(
+        event({"client_id": "dropbox-app-id", "client_secret": "dropbox-secret-value"}),
+        "PUT", "/api/agent/oauth-clients/dropbox",
+    )
+    assert saved["statusCode"] == 200
+    assert json.loads(saved["body"]) == {
+        "provider": "dropbox", "client_id": "dropbox-app-id",
+        "source": "config", "configured": True,
+    }
+    assert "dropbox-secret-value" not in saved["body"]
+
+    alias = agent_api.route(
+        event({"client_id": "g-id", "client_secret": "g-secret-value"}),
+        "PUT", "/api/agent/oauth-clients/youtube",
+    )
+    assert alias["statusCode"] == 200
+    assert json.loads(alias["body"])["provider"] == "google"
+
+    listed = agent_api.route(event(), "GET", "/api/agent/oauth-clients")
+    assert listed["statusCode"] == 200
+    clients = {item["provider"]: item for item in json.loads(listed["body"])["clients"]}
+    assert set(clients) == {"dropbox", "google"}
+    assert clients["dropbox"]["source"] == "config"
+    assert clients["google"]["client_id"] == "g-id"
+
+    missing = agent_api.route(event({"client_id": "only-id"}), "PUT", "/api/agent/oauth-clients/google")
+    assert missing["statusCode"] == 400
+    unknown = agent_api.route(
+        event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/slack",
+    )
+    assert unknown["statusCode"] == 404
+
+
+# --- API tokens: machine-principal bearer authentication ---
+
+TOKEN_GRANT = {
+    "connection_id": "youtube-personal",
+    "grantee": "token:buildcamp-token#buildcamp-uploader",
+    "subject": "token:buildcamp-token",
+    "agent": "buildcamp-uploader",
+    "operations": ["use"],
+}
+
+
+def _issue_token(tables, token_id="buildcamp-token", agent="buildcamp-uploader"):
+    _, payload = agent_api.api_tokens.api_create(
+        {"token_id": token_id, "agent": agent}, "operator-1",
+        table_ref=tables["api-tokens"],
+    )
+    assert "token" in payload, payload
+    return payload["token"]
+
+
+def test_api_token_bearer_issues_connection_token(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"},
+                       connections={"youtube-personal": CONNECTION},
+                       grants={("youtube-personal", TOKEN_GRANT["grantee"]): TOKEN_GRANT})
+    secret = _issue_token(tables)
+    monkeypatch.setattr(
+        agent_api.tokens, "get_access_token",
+        lambda connection: ("live-access", {
+            "expires_at": 123, "scope": "s", "provider_account_id": "UC1",
+            "account_title": "Ch", "refreshed": False,
+        }),
+    )
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "buildcamp-uploader"},
+              token=secret),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 200
+    assert response["headers"]["cache-control"] == "no-store"
+    body = json.loads(response["body"])
+    assert body["access_token"] == "live-access"
+    stored = tables["api-tokens"].items
+    assert all(item["token_hash"] != secret for item in stored.values())
+    assert any(item.get("last_used_at") for item in stored.values())
+
+
+def test_api_token_is_bound_to_its_agent(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"},
+                       connections={"youtube-personal": CONNECTION},
+                       grants={("youtube-personal", TOKEN_GRANT["grantee"]): TOKEN_GRANT})
+    secret = _issue_token(tables)
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "other-agent"}, token=secret),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 403
+    assert "buildcamp-uploader" in response["body"]
+
+
+def test_api_token_without_grant_is_denied(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"},
+                       connections={"youtube-personal": CONNECTION})
+    secret = _issue_token(tables)
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "buildcamp-uploader"},
+              token=secret),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 403
+
+
+def test_revoked_api_token_stops_authenticating(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"},
+                       connections={"youtube-personal": CONNECTION},
+                       grants={("youtube-personal", TOKEN_GRANT["grantee"]): TOKEN_GRANT})
+    secret = _issue_token(tables)
+    _, duplicate = agent_api.api_tokens.api_create(
+        {"token_id": "buildcamp-token", "agent": "buildcamp-uploader"}, "operator-1",
+        table_ref=tables["api-tokens"],
+    )
+    assert "already exists" in duplicate.get("error", "")
+    agent_api.api_tokens.api_revoke("buildcamp-token", table_ref=tables["api-tokens"])
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "buildcamp-uploader"},
+              token=secret),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 401
+
+
+def test_api_token_needs_no_cli_client_configuration(monkeypatch):
+    tables = configure(monkeypatch, claims=None,
+                       connections={"youtube-personal": CONNECTION},
+                       grants={("youtube-personal", TOKEN_GRANT["grantee"]): TOKEN_GRANT})
+    monkeypatch.delenv("AUTH_CLI_CLIENT_ID")
+    secret = _issue_token(tables)
+    monkeypatch.setattr(
+        agent_api.tokens, "get_access_token",
+        lambda connection: ("live-access", {
+            "expires_at": 123, "scope": "s", "provider_account_id": "UC1",
+            "account_title": "Ch", "refreshed": False,
+        }),
+    )
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "buildcamp-uploader"},
+              token=secret),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 200
+
+
+def test_unknown_api_token_is_401(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1"})
+
+    response = agent_api.route(
+        event({"connection_id": "youtube-personal", "agent": "buildcamp-uploader"},
+              token="dap_entirely-unknown-value"),
+        "POST", "/api/agent/token",
+    )
+
+    assert response["statusCode"] == 401
+
+
+def test_api_token_never_qualifies_as_operator(monkeypatch):
+    """An empty operator allowlist admits every DTC account; a machine
+    token must not inherit that, or it could mint tokens and grants."""
+    tables = configure(monkeypatch, claims={"sub": "subject-1"})
+    secret = _issue_token(tables)
+
+    listed = agent_api.route(event(token=secret), "GET", "/api/agent/tokens")
+    created = agent_api.route(
+        event({"token_id": "escalate", "agent": "escalate"}, token=secret),
+        "PUT", "/api/agent/tokens",
+    )
+    grants = agent_api.route(event(token=secret), "GET", "/api/agent/grants")
+
+    assert listed["statusCode"] == 403
+    assert created["statusCode"] == 403
+    assert grants["statusCode"] == 403
+
+
+def test_operator_token_lifecycle_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1"})
+
+    created = agent_api.route(
+        event({"token_id": "personal-scheduler", "agent": "personal-scheduler"}),
+        "PUT", "/api/agent/tokens",
+    )
+    assert created["statusCode"] == 200
+    body = json.loads(created["body"])
+    assert body["token"].startswith("dap_")
+    assert body["subject"] == "token:personal-scheduler"
+
+    listed = agent_api.route(event(), "GET", "/api/agent/tokens")
+    items = json.loads(listed["body"])["tokens"]
+    assert items == [{key: body[key] for key in (
+        "token_id", "token_prefix", "agent", "subject",
+        "created_by", "created_at", "last_used_at", "revoked_at")}]
+
+    revoked = agent_api.route(
+        event(query={"token_id": "personal-scheduler"}), "DELETE", "/api/agent/tokens")
+    assert revoked["statusCode"] == 200
+    assert json.loads(revoked["body"])["revoked_at"]
+
+    missing = agent_api.route(
+        event(query={"token_id": "never-existed"}), "DELETE", "/api/agent/tokens")
+    assert missing["statusCode"] == 404

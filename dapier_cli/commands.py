@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 import webbrowser
+from urllib.parse import urlencode
 
 from . import api
 
@@ -143,14 +144,46 @@ def token_write(api_url, connection_id, agent, output, force=False, debug=False)
     return 0
 
 
+TOKEN_PROVIDERS = ("slack", "telegram")
+
+
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
-                       authorized_user_path, expected_account_id=None, scopes=(), debug=False):
+                       authorized_user_path, expected_account_id=None, scopes=(), debug=False,
+                       token_path=None, root_path=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
-    try:
-        authorized_user = json.loads(open(authorized_user_path, encoding="utf-8").read())
-    except (OSError, ValueError) as exc:
-        print(f"Cannot read {authorized_user_path}: {exc}")
-        return 2
+    body = {
+        "connection_id": connection_id,
+        "provider": provider,
+    }
+    if provider in TOKEN_PROVIDERS:
+        # Token providers paste their credential directly; a refresh-token
+        # file makes no sense for them.
+        if not token_path:
+            print(f"{provider} connections import with --token-file (the pasted provider token).")
+            return 2
+        try:
+            with open(token_path, encoding="utf-8") as handle:
+                token = handle.read().strip()
+        except OSError as exc:
+            print(f"Cannot read {token_path}: {exc}")
+            return 2
+        if not token:
+            print("The token file is empty.")
+            return 2
+        body["token"] = token
+    else:
+        if not authorized_user_path:
+            print("OAuth providers import with --authorized-user-file (a refresh-token JSON).")
+            return 2
+        try:
+            authorized_user = json.loads(open(authorized_user_path, encoding="utf-8").read())
+        except (OSError, ValueError) as exc:
+            print(f"Cannot read {authorized_user_path}: {exc}")
+            return 2
+        if not isinstance(authorized_user, dict) or not authorized_user.get("refresh_token"):
+            print("The authorized-user file has no refresh token.")
+            return 2
+        body["authorized_user"] = {"refresh_token": authorized_user["refresh_token"]}
     client_secret = ""
     if client_secret_file:
         try:
@@ -162,14 +195,6 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
         if not client_secret:
             print("The client-secret file is empty.")
             return 2
-    if not isinstance(authorized_user, dict) or not authorized_user.get("refresh_token"):
-        print("The authorized-user file has no refresh token.")
-        return 2
-    body = {
-        "connection_id": connection_id,
-        "provider": provider,
-        "authorized_user": {"refresh_token": authorized_user["refresh_token"]},
-    }
     # Omitted client credentials fall back to the shared deploy-time OAuth
     # client on the server; explicit ones are for tokens issued by another client.
     if client_id:
@@ -180,9 +205,11 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
         body["expected_account_id"] = expected_account_id
     if scopes:
         body["scopes"] = list(scopes)
+    if root_path is not None:
+        body["root_path"] = root_path
     # Secrets travel only in the TLS request body to the operator endpoint;
     # they never appear in argv, logs, or output. The local files are only read.
-    data = api.call(api_url, "POST", "/api/admin/connections/import", body, debug=debug)
+    data = api.call(api_url, "POST", "/api/agent/connections/import", body, debug=debug)
     print(f"Imported {data.get('connection_id')} "
           f"({data.get('account_title') or data.get('verified_account_id')}).")
     return 0
@@ -223,7 +250,7 @@ def triggers_show(api_url, name, debug=False):
     return 0
 
 
-def _read_trigger_file(path):
+def _read_json_file(path):
     """Return the parsed JSON body, or ``(None, error_message)``."""
     try:
         with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
@@ -235,7 +262,7 @@ def _read_trigger_file(path):
 
 
 def triggers_save(api_url, path, debug=False):
-    body, error = _read_trigger_file(path)
+    body, error = _read_json_file(path)
     if error:
         print(error)
         return 2
@@ -293,42 +320,247 @@ def workflows_save(api_url, path, rename_from, debug=False):
     return 0
 
 
-def workflows_list(api_url, debug=False):
-    data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
-    items = data.get("workflows", [])
-    if not items:
-        print("No workflows deployed yet. Draw one at /designer or run `dapier workflows save`.")
-    for item in items:
-        enabled = "yes" if item.get("enabled", True) else "no"
-        trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
-        print(f"{item.get('source', ''):36} {trigger:34} "
-              f"{item.get('actionCount', 0)} action(s) enabled={enabled}")
-    sync = data.get("git_sync") or {}
-    target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
-    if sync.get("configured"):
-        print(f"Designer saves commit straight to {target}.")
+def print_hook(item):
+    for key in ("hook_id", "kind", "url", "connection_id", "description",
+                "enabled", "created_by", "created_at", "updated_at"):
+        if item.get(key) not in (None, ""):
+            print(f"{key}: {item[key]}")
+    if item.get("kind") == "telegram":
+        print("secret header: x-telegram-bot-api-secret-token (managed by Telegram)")
     else:
-        print(f"Saves are disabled: git sync to {target} is not configured.")
+        print(f"auth header: {item.get('header', 'authorization')}: Bearer {item.get('token', '')}")
+    for index, action in enumerate(item.get("actions") or [], 1):
+        print(f"action[{index}]: {json.dumps(action, sort_keys=True)}")
+
+
+def hooks_list(api_url, kind=None, debug=False):
+    query = f"?kind={kind}" if kind else ""
+    data = api.call(api_url, "GET", f"/api/agent/hook-triggers{query}", debug=debug)
+    items = data.get("hooks", [])
+    if not items:
+        print("No hook triggers yet. Create one with `dapier hooks save`.")
+    for item in items:
+        types = ",".join(action.get("type", "?") for action in item.get("actions") or [])
+        enabled = "yes" if item.get("enabled", True) else "no"
+        print(f"{item.get('hook_id', ''):20} {item.get('kind', ''):9} "
+              f"enabled={enabled:3} {item.get('url', '')} {types}")
     return 0
 
 
-def workflows_show(api_url, file, debug=False):
-    data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
-    print(json.dumps(data.get("workflow", {}), indent=2))
+def hooks_show(api_url, name, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/hook-triggers", debug=debug)
+    item = next((h for h in data.get("hooks", []) if h.get("hook_id") == name), None)
+    if item is None:
+        print(f"No hook trigger named '{name}'.")
+        return 4
+    print_hook(item)
     return 0
 
 
-def workflows_save(api_url, path, rename_from, debug=False):
+def hooks_save(api_url, path, debug=False):
+    body, error = _read_json_file(path)
+    if error:
+        print(error)
+        return 2
+    data = api.call(api_url, "PUT", "/api/agent/hook-triggers", body, debug=debug)
+    verb = "Created" if data.get("created") else "Updated"
+    print(f"{verb} {data.get('kind', 'webhook')} hook '{data.get('hook_id')}'. "
+          "It is live immediately; no deploy needed.")
+    if data.get("kind") == "telegram":
+        print(f"  Telegram delivery URL: {data.get('url')}")
+        if data.get("connection_id"):
+            print(f"  Bot connection: {data.get('connection_id')}")
+    else:
+        print(f"  URL: {data.get('url')}")
+        print(f"  Callers send: {data.get('header', 'authorization')}: Bearer {data.get('token', '')}")
+        url, token = data.get("url", ""), data.get("token", "")
+        print("  Try it: curl -X POST '" + url + "' "
+              "-H 'authorization: Bearer " + token + "' "
+              "-H 'content-type: application/json' -d '{\"hello\":\"world\"}'")
+    return 0
+
+
+def hooks_delete(api_url, name, kind=None, debug=False):
+    query = f"name={name}" + (f"&kind={kind}" if kind else "")
+    data = api.call(api_url, "DELETE", f"/api/agent/hook-triggers?{query}", debug=debug)
+    print(f"Deleted {data.get('kind') or 'hook'} trigger '{data.get('hook_id') or name}'.")
+    return 0
+
+
+CREDENTIAL_FIELDS = {"slack": "token", "mailchimp": "api_key"}
+
+
+def credentials_set(api_url, provider, path, debug=False):
+    """Store a provider credential; the value travels only in the request body."""
+    field = CREDENTIAL_FIELDS.get(provider)
+    if not field:
+        known = ", ".join(sorted(CREDENTIAL_FIELDS))
+        print(f"Unknown credential provider '{provider}'. Known providers: {known}.")
+        return 2
     try:
         with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
-            yaml_text = handle.read()
+            value = handle.read().strip()
     except OSError as exc:
         print(f"Cannot read {path}: {exc}")
         return 2
-    body = {"yaml": yaml_text}
-    if rename_from:
-        body["renameFrom"] = rename_from
-    data = api.call(api_url, "PUT", "/api/agent/designer/workflows", body, debug=debug)
-    print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
-          "The deploy pipeline publishes it in a few minutes.")
+    if not value:
+        print("The credential value is empty.")
+        return 2
+    data = api.call(api_url, "PUT", f"/api/agent/credentials/{provider}",
+                    {field: value}, debug=debug)
+    print(f"Stored the {data.get('provider', provider)} credential. "
+          "It is live immediately; the value is never shown again.")
+    return 0
+
+
+def print_grants(items):
+    print(f"{'CONNECTION':24} {'SUBJECT':34} {'AGENT':24} {'OPERATIONS':18} EXPIRES")
+    for item in items:
+        operations = ",".join(item.get("operations") or [])
+        expires = item.get("expires_at") or "-"
+        print(f"{item.get('connection_id', ''):24} {item.get('subject', ''):34} "
+              f"{item.get('agent', ''):24} {operations:18} {expires}")
+
+
+def grants_list(api_url, connection_id=None, debug=False):
+    query = f"?{urlencode({'connection_id': connection_id})}" if connection_id else ""
+    data = api.call(api_url, "GET", f"/api/agent/grants{query}", debug=debug)
+    items = data.get("grants", [])
+    if not items:
+        print("No grants. Create one with `dapier grants save`.")
+        return 0
+    print_grants(items)
+    return 0
+
+
+def grants_save(api_url, path, debug=False):
+    body, error = _read_json_file(path)
+    if error:
+        print(error)
+        return 2
+    data = api.call(api_url, "PUT", "/api/agent/grants", body, debug=debug)
+    print(f"Granted {data.get('subject')}#{data.get('agent')} on {data.get('connection_id')} "
+          f"({', '.join(data.get('operations') or [])}).")
+    return 0
+
+
+def grants_delete(api_url, connection_id, grantee, debug=False):
+    query = urlencode({"connection_id": connection_id, "grantee": grantee})
+    api.call(api_url, "DELETE", f"/api/agent/grants?{query}", debug=debug)
+    print(f"Revoked {grantee} on {connection_id}.")
+    return 0
+
+
+def print_tokens(items):
+    print(f"{'TOKEN':24} {'AGENT':24} {'STATUS':10} {'CREATED':20} LAST USED")
+    for item in items:
+        status = "revoked" if item.get("revoked_at") else "active"
+        created = (item.get("created_at") or "-")[:19]
+        last_used = (item.get("last_used_at") or "never")[:19]
+        print(f"{item.get('token_id', ''):24} {item.get('agent', ''):24} "
+              f"{status:10} {created:20} {last_used}")
+
+
+def tokens_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/tokens", debug=debug)
+    items = data.get("tokens", [])
+    if not items:
+        print("No API tokens. Issue one with `dapier tokens create`.")
+        return 0
+    print_tokens(items)
+    return 0
+
+
+def tokens_create(api_url, name, agent, debug=False):
+    data = api.call(api_url, "PUT", "/api/agent/tokens",
+                    {"token_id": name, "agent": agent}, debug=debug)
+    print(f"Created API token {data.get('token_id')} "
+          f"(subject {data.get('subject')}, agent {data.get('agent')}).")
+    print(f"Grant it access with `dapier grants save` using subject {data.get('subject')}.")
+    print("Store the value now; it is not retrievable again:")
+    print(data.get("token", ""))
+    return 0
+
+
+def tokens_revoke(api_url, name, debug=False):
+    query = urlencode({"token_id": name})
+    api.call(api_url, "DELETE", f"/api/agent/tokens?{query}", debug=debug)
+    print(f"Revoked API token {name}. Presented values stop authenticating immediately.")
+    return 0
+
+
+def connections_revoke(api_url, connection_id, debug=False):
+    data = api.call(api_url, "DELETE",
+                    f"/api/agent/connections/{connection_id}/tokens", debug=debug)
+    print(f"Revoked tokens for {data.get('connection_id', connection_id)}; "
+          f"status is now {data.get('status')}.")
+    return 0
+
+
+def print_overview(data):
+    print(f"{data.get('service', 'dapier')} in {data.get('region', '-')}")
+    workflows = data.get("workflows") or []
+    enabled = sum(1 for item in workflows if item.get("enabled", True))
+    print(f"\nWORKFLOWS ({enabled}/{len(workflows)} enabled)")
+    for item in workflows:
+        state = "" if item.get("enabled", True) else " (disabled)"
+        print(f"  {item.get('id', ''):32} {state}")
+    print("\nCONNECTIONS")
+    for item in data.get("connections") or []:
+        print(f"  {item.get('connection_id', ''):24} {item.get('provider', ''):10} "
+              f"{item.get('status', '')}")
+    print("\nCREDENTIALS")
+    for item in data.get("credentials") or []:
+        state = "configured" if item.get("configured") else "not set"
+        updated = f" (updated {item['updated_at']})" if item.get("updated_at") else ""
+        print(f"  {item.get('provider', '?'):12} {state}{updated}")
+    oauth_clients = data.get("oauth_clients") or []
+    if oauth_clients:
+        print("\nOAUTH CLIENTS")
+        for item in oauth_clients:
+            state = f"configured ({item.get('source')})" if item.get("configured") else "not set"
+            print(f"  {item.get('provider', '?'):12} {state}")
+    executions = (data.get("executions") or [])[:10]
+    if executions:
+        print(f"\nRECENT EXECUTIONS ({len(executions)} latest)")
+        for item in executions:
+            print(f"  {item.get('workflow_id', '?')}.{item.get('action_id', '?'):24} "
+                  f"{item.get('status', ''):12} {item.get('started_at', '')}")
+
+
+def overview(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/overview", debug=debug)
+    print_overview(data)
+    return 0
+
+
+def print_oauth_clients(items):
+    print(f"{'PROVIDER':12} {'CLIENT ID':46} {'SOURCE':8} CONFIGURED")
+    for item in items:
+        client_id = item.get("client_id") or "-"
+        print(f"{item.get('provider', ''):12} {client_id:46} "
+              f"{item.get('source', ''):8} {'yes' if item.get('configured') else 'no'}")
+
+
+def oauth_clients_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/oauth-clients", debug=debug)
+    print_oauth_clients(data.get("clients") or [])
+    return 0
+
+
+def oauth_clients_set(api_url, provider, client_id, secret_path, debug=False):
+    """Store the shared OAuth client; the secret travels only in the request body."""
+    try:
+        with (sys.stdin if secret_path == "-" else open(secret_path, encoding="utf-8")) as handle:
+            client_secret = handle.read().strip()
+    except OSError as exc:
+        print(f"Cannot read {secret_path}: {exc}")
+        return 2
+    if not client_id.strip() or not client_secret:
+        print("Both --client-id and the client secret (from --client-secret-file) are required.")
+        return 2
+    data = api.call(api_url, "PUT", f"/api/agent/oauth-clients/{provider}",
+                    {"client_id": client_id, "client_secret": client_secret}, debug=debug)
+    print(f"Stored the OAuth client for {data.get('provider', provider)}. "
+          "It is live immediately; the secret is never shown again.")
     return 0

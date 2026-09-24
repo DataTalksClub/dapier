@@ -27,6 +27,7 @@ REVOKE = "revoke"
 GRANT = "grant"
 IMPORT = "import"
 CONFIG = "config"
+API_TOKEN = "api-token"
 
 
 def audit_table():

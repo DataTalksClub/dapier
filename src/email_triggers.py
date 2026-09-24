@@ -33,6 +33,11 @@ ACTION_SPECS = {
         {"credential_id", "channel"},
         {"text", "unfurl_links", "unfurl_media", "timeout_seconds"},
     ),
+    "telegram_send": (
+        {"connection_id"},
+        {"chat_id", "text", "timeout_seconds"},
+    ),
+    "email_send": ({"to"}, {"subject", "text", "html", "sender"}),
     "dataops": ({"auth_secret_id"}, {"url", "url_env", "timeout_seconds", "connection_id"}),
     "dropbox_upload": ({"connection_id", "folder"}, {"source", "filename"}),
     "dropbox_delete": ({"connection_id"}, {"path"}),

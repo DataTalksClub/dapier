@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 
-from src import admin, ingress
+from src import admin, credentials, ingress
 
 
 def request(method, path, body=None, cookies=None):
@@ -94,7 +94,8 @@ def test_admin_api_rejects_unauthenticated_request(monkeypatch):
 
 def test_save_slack_credential_is_write_only(monkeypatch):
     writes = []
-    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
+    monkeypatch.setattr(credentials, "put_credential",
+                        lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
     token = "xoxb-123456789012345678901234"
 
     response = admin.save_credential("slack", request("PUT", "/api/admin/credentials/slack", {"token": token}))
@@ -243,3 +244,227 @@ def test_json_response_serializes_dynamodb_numbers():
     response = admin._json_response(200, {"expires_at": Decimal("1791655833")})
 
     assert json.loads(response["body"])["expires_at"] == 1791655833
+
+
+# --- API tokens: console cookie path ---
+
+import time
+
+from src import api_tokens
+
+
+class TokenTable:
+    def __init__(self):
+        self.items = {}
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        self.items[item["token_hash"]] = item
+
+    def get_item(self, **kwargs):
+        item = self.items.get(kwargs["Key"]["token_hash"])
+        return {"Item": dict(item)} if item else {}
+
+    def update_item(self, **kwargs):
+        item = self.items.get(kwargs["Key"]["token_hash"])
+        if item is not None:
+            item["last_used_at"] = kwargs["ExpressionAttributeValues"][":now"]
+
+    def scan(self, **kwargs):
+        return {"Items": list(self.items.values())}
+
+
+def operator_request(method, path, body=None, cookies=None, origin=True):
+    event = request(method, path, body, cookies)
+    if origin:
+        event["headers"]["origin"] = "https://dapier.example.test"
+    return event
+
+
+def configure_tokens(monkeypatch):
+    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    table = TokenTable()
+
+    class Dynamo:
+        def Table(self, _name):
+            return table
+
+    import boto3
+
+    monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    cookie = admin._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                          "exp": int(time.time()) + 600})
+    return table, [f"dapier_session={cookie}"]
+
+
+def test_admin_token_lifecycle_create_list_revoke(monkeypatch):
+    table, cookies = configure_tokens(monkeypatch)
+
+    created = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "personal-scheduler", "agent": "personal-scheduler"},
+                         cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+    assert created["statusCode"] == 200
+    body = json.loads(created["body"])
+    assert body["token"].startswith("dap_")
+    assert body["subject"] == "token:personal-scheduler"
+    assert body["token"] not in json.dumps(list(table.items.values()))
+    # The plaintext is never echoed by the list endpoint.
+    listed = admin.route(
+        operator_request("GET", "/api/admin/tokens", cookies=cookies),
+        "GET", "/api/admin/tokens",
+    )
+    assert listed["statusCode"] == 200
+    assert body["token"] not in listed["body"]
+    assert json.loads(listed["body"])["tokens"][0]["token_prefix"].startswith("dap_")
+
+    revoked = admin.route(
+        operator_request("DELETE", "/api/admin/tokens?token_id=personal-scheduler",
+                         cookies=cookies),
+        "DELETE", "/api/admin/tokens",
+    )
+    assert revoked["statusCode"] == 200
+    assert json.loads(revoked["body"])["revoked_at"]
+    assert api_tokens.verify(body["token"], table_ref=table) is None
+
+
+def test_admin_tokens_require_operator_session(monkeypatch):
+    configure_tokens(monkeypatch)
+
+    listed = admin.route(operator_request("GET", "/api/admin/tokens"),
+                         "GET", "/api/admin/tokens")
+
+    assert listed["statusCode"] == 401
+
+
+def test_admin_duplicate_token_is_conflict(monkeypatch):
+    table, cookies = configure_tokens(monkeypatch)
+
+    first = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "scheduler", "agent": "scheduler"}, cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+    second = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "scheduler", "agent": "scheduler"}, cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+
+    assert first["statusCode"] == 200
+    assert second["statusCode"] == 409
+
+
+# --- API tokens: console cookie path ---
+
+import time
+
+from src import api_tokens
+
+
+class TokenTable:
+    def __init__(self):
+        self.items = {}
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        self.items[item["token_hash"]] = item
+
+    def get_item(self, **kwargs):
+        item = self.items.get(kwargs["Key"]["token_hash"])
+        return {"Item": dict(item)} if item else {}
+
+    def update_item(self, **kwargs):
+        item = self.items.get(kwargs["Key"]["token_hash"])
+        if item is not None:
+            item["last_used_at"] = kwargs["ExpressionAttributeValues"][":now"]
+
+    def scan(self, **kwargs):
+        return {"Items": list(self.items.values())}
+
+
+def operator_request(method, path, body=None, cookies=None, origin=True):
+    event = request(method, path, body, cookies)
+    if origin:
+        event["headers"]["origin"] = "https://dapier.example.test"
+    return event
+
+
+def configure_tokens(monkeypatch):
+    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    table = TokenTable()
+
+    class Dynamo:
+        def Table(self, _name):
+            return table
+
+    import boto3
+
+    monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    cookie = admin._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                          "exp": int(time.time()) + 600})
+    return table, [f"dapier_session={cookie}"]
+
+
+def test_admin_token_lifecycle_create_list_revoke(monkeypatch):
+    table, cookies = configure_tokens(monkeypatch)
+
+    created = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "personal-scheduler", "agent": "personal-scheduler"},
+                         cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+    assert created["statusCode"] == 200
+    body = json.loads(created["body"])
+    assert body["token"].startswith("dap_")
+    assert body["subject"] == "token:personal-scheduler"
+    assert body["token"] not in json.dumps(list(table.items.values()))
+    # The plaintext is never echoed by the list endpoint.
+    listed = admin.route(
+        operator_request("GET", "/api/admin/tokens", cookies=cookies),
+        "GET", "/api/admin/tokens",
+    )
+    assert listed["statusCode"] == 200
+    assert body["token"] not in listed["body"]
+    assert json.loads(listed["body"])["tokens"][0]["token_prefix"].startswith("dap_")
+
+    revoked = admin.route(
+        operator_request("DELETE", "/api/admin/tokens?token_id=personal-scheduler",
+                         cookies=cookies),
+        "DELETE", "/api/admin/tokens",
+    )
+    assert revoked["statusCode"] == 200
+    assert json.loads(revoked["body"])["revoked_at"]
+    assert api_tokens.verify(body["token"], table_ref=table) is None
+
+
+def test_admin_tokens_require_operator_session(monkeypatch):
+    configure_tokens(monkeypatch)
+
+    listed = admin.route(operator_request("GET", "/api/admin/tokens"),
+                         "GET", "/api/admin/tokens")
+
+    assert listed["statusCode"] == 401
+
+
+def test_admin_duplicate_token_is_conflict(monkeypatch):
+    table, cookies = configure_tokens(monkeypatch)
+
+    first = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "scheduler", "agent": "scheduler"}, cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+    second = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "scheduler", "agent": "scheduler"}, cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+
+    assert first["statusCode"] == 200
+    assert second["statusCode"] == 409

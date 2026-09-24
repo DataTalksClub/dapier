@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 
 from src import ingress
 
@@ -175,3 +176,257 @@ def test_console_assets_are_self_hosted():
     index = ingress._static("/")
     assert "https://unpkg.com" not in index["body"]
     assert "forbidden-view" in index["body"]
+
+
+# --- Webhook and Telegram trigger hooks -------------------------------------
+
+def _hook_stub(hook_id="orders", kind="webhook", token="tok-123", enabled=True):
+    item = {"hook_id": hook_id, "kind": kind, "url": f"u-{hook_id}", "token": token,
+            "actions": [], "enabled": enabled}
+    return type("T", (), {
+        "scan": lambda self, Limit=200: {"Items": [dict(item)]},
+        "get_item": lambda self, Key: {"Item": dict(item)} if Key["hook_id"] == hook_id else {},
+        "put_item": lambda self, Item: None,
+        "delete_item": lambda self, Key: None,
+    })()
+
+
+def _post(path, body=b'{"hello":"world"}', headers=None, query=None):
+    return ingress.handler({
+        "requestContext": {"http": {"method": "POST", "path": path}},
+        "headers": headers or {},
+        "queryStringParameters": query,
+        "body": body.decode(),
+    }, None)
+
+
+def test_webhook_hook_accepts_bearer_token_and_publishes(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    response = _post("/hooks/webhook/orders",
+                     headers={"authorization": "Bearer tok-123",
+                              "content-type": "application/json"},
+                     query={"src": "ci"})
+
+    assert response["statusCode"] == 202
+    envelope = json.loads(sent[0]["MessageBody"])
+    assert envelope["connector"] == "webhook"
+    assert envelope["event"] == "request.received"
+    assert envelope["source"] == "orders"
+    assert envelope["data"]["hook"] == "orders"
+    assert envelope["data"]["body"] == {"hello": "world"}
+    assert envelope["data"]["query"] == {"src": "ci"}
+
+
+def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    assert _post("/hooks/webhook/orders")["statusCode"] == 401
+    assert _post("/hooks/webhook/orders",
+                 headers={"authorization": "Bearer wrong"})["statusCode"] == 401
+    assert sent == []
+
+
+def test_webhook_hook_unknown_or_disabled_is_404(monkeypatch):
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    assert _post("/hooks/webhook/stranger",
+                 headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
+    monkeypatch.setattr("src.hook_triggers.get_table",
+                        lambda *a, **k: _hook_stub(enabled=False))
+    assert _post("/hooks/webhook/orders",
+                 headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
+
+
+def test_webhook_hook_wraps_non_json_bodies(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    response = _post("/hooks/webhook/orders", body=b"plain text",
+                     headers={"authorization": "Bearer tok-123",
+                              "content-type": "text/plain"})
+    assert response["statusCode"] == 202
+    assert json.loads(sent[0]["MessageBody"])["data"]["body"] == {"raw": "plain text"}
+
+
+def test_telegram_hook_verifies_secret_header_and_extracts_fields(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "src.hook_triggers.get_table",
+        lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
+
+    update = {"update_id": 91, "message": {
+        "message_id": 7, "text": "hello dapier",
+        "chat": {"id": 555, "type": "private"},
+        "from": {"id": 9, "first_name": "Ada"},
+    }}
+    response = _post("/hooks/telegram/bot-inbox",
+                     body=json.dumps(update).encode(),
+                     headers={"x-telegram-bot-api-secret-token": "tg-secret"})
+
+    assert response["statusCode"] == 200
+    envelope = json.loads(sent[0]["MessageBody"])
+    assert envelope["connector"] == "telegram"
+    assert envelope["event"] == "message.received"
+    data = envelope["data"]
+    assert data["hook"] == "bot-inbox"
+    assert data["text"] == "hello dapier"
+    assert data["chat_id"] == 555
+    assert data["update_id"] == 91
+    assert data["update"]["message"]["from"]["first_name"] == "Ada"
+
+
+def test_telegram_hook_rejects_wrong_or_missing_secret(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "src.hook_triggers.get_table",
+        lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
+
+    assert _post("/hooks/telegram/bot-inbox")["statusCode"] == 401
+    assert _post("/hooks/telegram/bot-inbox",
+                 headers={"x-telegram-bot-api-secret-token": "nope"})["statusCode"] == 401
+    assert sent == []
+
+
+# --- Webhook and Telegram trigger hooks -------------------------------------
+
+def _hook_stub(hook_id="orders", kind="webhook", token="tok-123", enabled=True):
+    item = {"hook_id": hook_id, "kind": kind, "url": f"u-{hook_id}", "token": token,
+            "actions": [], "enabled": enabled}
+    return type("T", (), {
+        "scan": lambda self, Limit=200: {"Items": [dict(item)]},
+        "get_item": lambda self, Key: {"Item": dict(item)} if Key["hook_id"] == hook_id else {},
+        "put_item": lambda self, Item: None,
+        "delete_item": lambda self, Key: None,
+    })()
+
+
+def _post(path, body=b'{"hello":"world"}', headers=None, query=None):
+    return ingress.handler({
+        "requestContext": {"http": {"method": "POST", "path": path}},
+        "headers": headers or {},
+        "queryStringParameters": query,
+        "body": body.decode(),
+    }, None)
+
+
+def test_webhook_hook_accepts_bearer_token_and_publishes(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    response = _post("/hooks/webhook/orders",
+                     headers={"authorization": "Bearer tok-123",
+                              "content-type": "application/json"},
+                     query={"src": "ci"})
+
+    assert response["statusCode"] == 202
+    envelope = json.loads(sent[0]["MessageBody"])
+    assert envelope["connector"] == "webhook"
+    assert envelope["event"] == "request.received"
+    assert envelope["source"] == "orders"
+    assert envelope["data"]["hook"] == "orders"
+    assert envelope["data"]["body"] == {"hello": "world"}
+    assert envelope["data"]["query"] == {"src": "ci"}
+
+
+def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    assert _post("/hooks/webhook/orders")["statusCode"] == 401
+    assert _post("/hooks/webhook/orders",
+                 headers={"authorization": "Bearer wrong"})["statusCode"] == 401
+    assert sent == []
+
+
+def test_webhook_hook_unknown_or_disabled_is_404(monkeypatch):
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    assert _post("/hooks/webhook/stranger",
+                 headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
+    monkeypatch.setattr("src.hook_triggers.get_table",
+                        lambda *a, **k: _hook_stub(enabled=False))
+    assert _post("/hooks/webhook/orders",
+                 headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
+
+
+def test_webhook_hook_wraps_non_json_bodies(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+
+    response = _post("/hooks/webhook/orders", body=b"plain text",
+                     headers={"authorization": "Bearer tok-123",
+                              "content-type": "text/plain"})
+    assert response["statusCode"] == 202
+    assert json.loads(sent[0]["MessageBody"])["data"]["body"] == {"raw": "plain text"}
+
+
+def test_telegram_hook_verifies_secret_header_and_extracts_fields(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "src.hook_triggers.get_table",
+        lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
+
+    update = {"update_id": 91, "message": {
+        "message_id": 7, "text": "hello dapier",
+        "chat": {"id": 555, "type": "private"},
+        "from": {"id": 9, "first_name": "Ada"},
+    }}
+    response = _post("/hooks/telegram/bot-inbox",
+                     body=json.dumps(update).encode(),
+                     headers={"x-telegram-bot-api-secret-token": "tg-secret"})
+
+    assert response["statusCode"] == 200
+    envelope = json.loads(sent[0]["MessageBody"])
+    assert envelope["connector"] == "telegram"
+    assert envelope["event"] == "message.received"
+    data = envelope["data"]
+    assert data["hook"] == "bot-inbox"
+    assert data["text"] == "hello dapier"
+    assert data["chat_id"] == 555
+    assert data["update_id"] == 91
+    assert data["update"]["message"]["from"]["first_name"] == "Ada"
+
+
+def test_telegram_hook_rejects_wrong_or_missing_secret(monkeypatch):
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "src.hook_triggers.get_table",
+        lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
+
+    assert _post("/hooks/telegram/bot-inbox")["statusCode"] == 401
+    assert _post("/hooks/telegram/bot-inbox",
+                 headers={"x-telegram-bot-api-secret-token": "nope"})["statusCode"] == 401
+    assert sent == []

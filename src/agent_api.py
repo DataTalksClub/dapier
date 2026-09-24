@@ -15,7 +15,7 @@ import os
 import re
 import time
 
-from . import audit, authz, connections, designer_store, email_triggers, oauth_clients, oauth_providers, tokens
+from . import api_tokens, audit, authz, connections, credentials, designer_store, email_triggers, hook_triggers, oauth_clients, oauth_providers, tokens
 from .connections import BindingError
 from .dtc_auth import verify_id_token
 from .tokens import TokenError
@@ -73,15 +73,28 @@ def _bearer(event):
 
 
 def authenticate(event):
-    """Return ``(subject, None)`` or ``(None, error_response)``."""
+    """Return ``(subject, None)`` or ``(None, error_response)``.
+
+    Two bearer kinds: a Dapier-issued API token (``dap_…``) authenticates
+    as its machine subject, and any other value is verified as a DTC ID
+    token. API tokens work even where CLI token issuance is unconfigured.
+    """
+    token = _bearer(event)
+    if not token:
+        return None, _json_response(401, {"error": "DTC identity required"})
+    if token.startswith(api_tokens.PREFIX):
+        item = api_tokens.verify(token)
+        if not item:
+            return None, _json_response(401, {"error": "Invalid API token"})
+        event["_api_token"] = item
+        api_tokens.mark_used(item["token_hash"])
+        return item["subject"], None
+
     from .dtc_auth import auth_config
 
     cli_client_id = auth_config().get("cli_client_id", "")
     if not cli_client_id:
         return None, _json_response(503, {"error": "CLI token issuance is not configured"})
-    token = _bearer(event)
-    if not token:
-        return None, _json_response(401, {"error": "DTC identity required"})
     try:
         claims = verify_id_token(token, audience=cli_client_id)
     except Exception:
@@ -91,6 +104,29 @@ def authenticate(event):
         return None, _json_response(401, {"error": "Invalid DTC identity"})
     event["_dtc_claims"] = claims
     return str(subject), None
+
+
+def _is_operator(event, subject):
+    """Operator check that API tokens can never pass.
+
+    An empty operator allowlist means every DTC-authenticated account may
+    administer the console; a machine token must not inherit that, so the
+    check is DTC-claims-only by construction.
+    """
+    if event.get("_api_token"):
+        return False
+    claims = event.get("_dtc_claims") or {}
+    return authz.is_operator({"subject": subject, "sub": claims.get("email", "")})
+
+
+def _api_token(event):
+    return event.get("_api_token")
+
+
+def _check_agent_binding(event, agent):
+    """Refuse API-token callers acting as any agent other than their own."""
+    item = _api_token(event)
+    return bool(item) and agent != item.get("agent")
 
 
 def _tables():
@@ -118,6 +154,10 @@ def issue_token(event):
         agent = authz.validate_agent(body.get("agent", ""))
     except ValueError as exc:
         return _json_response(400, {"error": str(exc)})
+    if _check_agent_binding(event, agent):
+        bound = _api_token(event).get("agent")
+        audit.emit(connection_id, audit.TOKEN, subject, agent=agent, outcome="denied-agent-mismatch")
+        return _json_response(403, {"error": f"This API token is bound to agent '{bound}'"})
     if not connection_id:
         return _json_response(400, {"error": "Connection ID and agent are required"})
     if not _check_rate(subject, connection_id):
@@ -241,6 +281,25 @@ def route(event, method, path):
         return import_connection(event)
     if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
         return email_triggers_api(event, method)
+    if path == "/api/agent/hook-triggers" and method in ("GET", "PUT", "DELETE"):
+        return hook_triggers_api(event, method)
+    if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
+        return grants_api(event, method)
+    if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):
+        return tokens_api(event, method)
+    if path == "/api/agent/overview" and method == "GET":
+        return operator_overview(event)
+    if path == "/api/agent/oauth-clients" and method == "GET":
+        return oauth_clients_view(event)
+    oauth_client_match = re.fullmatch(r"/api/agent/oauth-clients/([a-z]+)", path)
+    if oauth_client_match and method == "PUT":
+        return oauth_clients_api(event, oauth_client_match.group(1))
+    credential_match = re.fullmatch(r"/api/agent/credentials/([a-z]+)", path)
+    if credential_match and method == "PUT":
+        return credentials_api(event, credential_match.group(1))
+    revoke_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/tokens", path)
+    if revoke_match and method == "DELETE":
+        return revoke_connection_tokens(event, revoke_match.group(1))
     if path == "/api/agent/designer/workflows" and method in ("GET", "PUT"):
         return designer_api(event, method)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
@@ -249,15 +308,26 @@ def route(event, method, path):
     return _json_response(404, {"error": "Not found"})
 
 
-def designer_api(event, method, source=None):
-    """Operator-only workflow designer API over the CLI's bearer authentication."""
+def require_operator(event, action):
+    """Authenticate the bearer identity and require the operator allowlist.
+
+    Returns ``(subject, None)`` or ``(None, error_response)``. ``action`` is
+    the audit action recorded on a denial. API tokens never qualify.
+    """
     subject, error = authenticate(event)
     if error:
+        return None, error
+    if not _is_operator(event, subject):
+        audit.emit("unknown", action, subject, outcome="denied-not-operator")
+        return None, _json_response(403, {"error": "Operator authorization required"})
+    return subject, None
+
+
+def designer_api(event, method, source=None):
+    """Operator-only workflow designer API over the CLI's bearer authentication."""
+    subject, error = require_operator(event, "workflow.save")
+    if error:
         return error
-    claims = event.get("_dtc_claims") or {}
-    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
-        audit.emit("unknown", "workflow.save", subject, outcome="denied-not-operator")
-        return _json_response(403, {"error": "Operator authorization required"})
     if method == "GET":
         status, payload = designer_store.api_get(source) if source else designer_store.api_list()
         return _json_response(status, payload)
@@ -273,13 +343,9 @@ def designer_api(event, method, source=None):
 
 def email_triggers_api(event, method):
     """Operator-only trigger management over the CLI's bearer authentication."""
-    subject, error = authenticate(event)
+    subject, error = require_operator(event, "email-trigger")
     if error:
         return error
-    claims = event.get("_dtc_claims") or {}
-    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
-        audit.emit("unknown", "email-trigger", subject, outcome="denied-not-operator")
-        return _json_response(403, {"error": "Operator authorization required"})
     table_ref = email_triggers.get_table()
     try:
         if method == "GET":
@@ -297,6 +363,186 @@ def email_triggers_api(event, method):
     audit.emit(payload.get("name", "unknown"), "email-trigger", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
+
+
+def hook_triggers_api(event, method):
+    """Operator-only webhook/Telegram trigger management over the CLI's bearer authentication."""
+    subject, error = require_operator(event, "hook-trigger")
+    if error:
+        return error
+    table_ref = hook_triggers.get_table()
+    try:
+        if method == "GET":
+            query = event.get("queryStringParameters") or {}
+            kind = str(query.get("kind", "") or "").strip().lower() or None
+            if kind and kind not in hook_triggers.KINDS:
+                raise ValueError(f"hook kind must be one of: {', '.join(hook_triggers.KINDS)}")
+            status, payload = hook_triggers.api_list(table_ref, kind=kind)
+        elif method == "PUT":
+            body = json.loads(event.get("body") or "{}")
+            kind = str((body or {}).get("kind") or "webhook").strip().lower()
+            if kind not in hook_triggers.KINDS:
+                raise ValueError(f"hook kind must be one of: {', '.join(hook_triggers.KINDS)}")
+            status, payload = hook_triggers.api_save(
+                body, subject, kind, table_ref=table_ref,
+                connections_table=_tables()[0],
+            )
+        else:
+            query = event.get("queryStringParameters") or {}
+            kind = str(query.get("kind", "") or "").strip().lower() or None
+            status, payload = hook_triggers.api_delete(
+                query.get("name", ""), subject, kind=kind, table_ref=table_ref,
+                connections_table=_tables()[0],
+            )
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(payload.get("hook_id", "unknown"), "hook-trigger", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def grants_api(event, method):
+    """Operator-only grant management over the CLI's bearer authentication.
+
+    Mirrors the console's /api/admin/grants endpoints on top of the shared
+    grant logic in authz.
+    """
+    subject, error = require_operator(event, audit.GRANT)
+    if error:
+        return error
+    if method == "GET":
+        query = event.get("queryStringParameters") or {}
+        status, payload = authz.api_list_grants(
+            authz.grants_table(), connection_id=query.get("connection_id") or None,
+        )
+        return _json_response(status, payload)
+    if method == "PUT":
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except (ValueError, AttributeError, json.JSONDecodeError):
+            return _json_response(400, {"error": "Invalid request"})
+        if not isinstance(body, dict):
+            return _json_response(400, {"error": "Invalid request"})
+        connections_table, _ = _tables()
+        status, payload = authz.api_save_grant(
+            authz.grants_table(), body, operator=subject,
+            connections_table=connections_table,
+        )
+        if status == 200:
+            audit.emit(payload["connection_id"], audit.GRANT, subject,
+                       agent=payload["agent"], outcome="ok")
+        return _json_response(status, payload)
+    query = event.get("queryStringParameters") or {}
+    status, payload = authz.api_delete_grant(
+        authz.grants_table(), query.get("connection_id"), query.get("grantee"),
+    )
+    if status == 200:
+        audit.emit(str(query.get("connection_id", "")).strip().lower(),
+                   audit.GRANT, subject, outcome="revoked")
+    return _json_response(status, payload)
+
+
+def tokens_api(event, method):
+    """Operator-only API-token management over the CLI's bearer authentication.
+
+    Mirrors the console's /api/admin/tokens endpoints on top of the shared
+    token logic in api_tokens. The create response carries the plaintext
+    token exactly once; revocation is the only later change.
+    """
+    subject, error = require_operator(event, audit.API_TOKEN)
+    if error:
+        return error
+    if method == "GET":
+        status, payload = api_tokens.api_list()
+        return _json_response(status, payload)
+    if method == "PUT":
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except (ValueError, AttributeError, json.JSONDecodeError):
+            return _json_response(400, {"error": "Invalid request"})
+        if not isinstance(body, dict):
+            return _json_response(400, {"error": "Invalid request"})
+        status, payload = api_tokens.api_create(body, operator=subject)
+        if status == 200:
+            audit.emit(f"api-token#{payload['token_id']}", audit.API_TOKEN, subject,
+                       agent=payload["agent"], outcome="created")
+        return _json_response(status, payload)
+    query = event.get("queryStringParameters") or {}
+    status, payload = api_tokens.api_revoke(query.get("token_id"))
+    if status == 200:
+        audit.emit(f"api-token#{payload.get('token_id', 'unknown')}", audit.API_TOKEN,
+                   subject, outcome="revoked")
+    return _json_response(status, payload)
+
+
+def operator_overview(event):
+    """Operator-only read view mirroring the console overview."""
+    _, error = require_operator(event, "overview")
+    if error:
+        return error
+    from . import admin as admin_module
+
+    return admin_module.overview()
+
+
+def oauth_clients_view(event):
+    """Operator-only view of the shared OAuth clients (no secrets)."""
+    _, error = require_operator(event, audit.CONFIG)
+    if error:
+        return error
+    return _json_response(200, {
+        "clients": [oauth_clients.status(p) for p in oauth_clients.CANONICAL_PROVIDERS],
+    })
+
+
+def oauth_clients_api(event, provider):
+    """Operator-only OAuth client storage over the CLI's bearer authentication."""
+    subject, error = require_operator(event, audit.CONFIG)
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    status, payload = oauth_clients.api_save_client(
+        provider, body.get("client_id"), body.get("client_secret"))
+    if status == 200:
+        audit.emit(f"oauth-client#{payload['provider']}", audit.CONFIG, subject, outcome="ok")
+    return _json_response(status, payload)
+
+
+def credentials_api(event, provider):
+    """Operator-only credential storage over the CLI's bearer authentication."""
+    subject, error = require_operator(event, "credential")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    status, payload = credentials.api_save_credential(provider, body)
+    audit.emit(provider, "credential", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def revoke_connection_tokens(event, connection_id):
+    """Operator-only token revoke over the CLI's bearer authentication."""
+    subject, error = require_operator(event, audit.REVOKE)
+    if error:
+        return error
+    connections_table, _ = _tables()
+    connection = connections.get_connection(connections_table, connection_id)
+    if not connection:
+        return _json_response(404, {"error": "Connection not found"})
+    updated = tokens.revoke_connection(connection)
+    connections.put_connection(connections_table, updated)
+    audit.emit(connection_id, audit.REVOKE, subject, outcome="ok")
+    return _json_response(200, {"connection_id": connection_id, "status": updated["status"]})
 
 
 def public_config():
@@ -336,6 +582,11 @@ def start_connect(event, connection_id):
         agent = authz.validate_agent(body.get("agent", ""))
     except ValueError as exc:
         return _json_response(400, {"error": str(exc)})
+    if _check_agent_binding(event, agent):
+        bound = _api_token(event).get("agent")
+        audit.emit(connection_id, audit.CALLBACK, subject, agent=agent,
+                   outcome="denied-agent-mismatch")
+        return _json_response(403, {"error": f"This API token is bound to agent '{bound}'"})
 
     from . import admin as admin_module
 
@@ -343,10 +594,8 @@ def start_connect(event, connection_id):
     connection = connections.get_connection(connections_table, connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
-    claims = event.get("_dtc_claims") or {}
-    operator_payload = {"subject": subject, "sub": claims.get("email", "")}
     allowed = (
-        authz.is_operator(operator_payload)
+        _is_operator(event, subject)
         or authz.check_grant(grants_table, subject=subject, agent=agent,
                              connection_id=connection_id, operation="connect")
     )
@@ -397,15 +646,63 @@ def start_connect(event, connection_id):
     })
 
 
+def _import_token_connection(body, *, operator_subject, connections_table):
+    """Operator import for pasted-token providers (Slack, Telegram).
+
+    Mirrors the console's token-connection path over the CLI's bearer
+    authentication: the token is verified against its provider before it is
+    stored, so an imported connection always carries a checked identity.
+    """
+    from . import slack_tokens, telegram_api
+    from .credentials import put_credential
+
+    try:
+        fields = connections.validate_new_connection(body)
+    except connections.ConnectionError as exc:
+        return 400, {"error": str(exc)}
+    token = str(body.get("token") or "").strip()
+    if not token:
+        return 400, {"error": "This provider imports with a token, not an authorized-user file"}
+    from . import admin as admin_module
+
+    try:
+        account_id, account_title = admin_module._verify_token_provider(fields["provider"], token)
+    except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError) as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="error", error=str(exc))
+        return 400, {"error": str(exc)}
+    previous = connections.get_connection(connections_table, fields["connection_id"])
+    try:
+        item = connections.build_item(fields, owner_subject=operator_subject, previous=previous)
+        connections.check_binding(item, account_id)
+        item = connections.mark_connected(
+            item, verified_account_id=account_id, account_title=account_title,
+            granted_scopes=fields["scopes"], connected_by=operator_subject,
+        )
+    except connections.ConnectionError as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="denied-account-mismatch", error=str(exc))
+        status = 409 if isinstance(exc, connections.BindingError) else 400
+        return status, {"error": str(exc)}
+    put_credential(item["credential_id"], {"token": token}, provider=item["provider"])
+    connections.put_connection(connections_table, item)
+    audit.emit(item["connection_id"], audit.IMPORT, operator_subject, outcome="ok")
+    return 200, connections.public_view(item)
+
+
 def import_core(body, *, operator_subject, connections_table):
     """Shared operator import. Returns ``(status_code, payload)``.
 
-    Transfers the supplied refresh credential without logging it, verifies
-    refresh + provider account before storing, and binds the connection.
-    Existing backups are never touched.
+    Token providers (Slack, Telegram) import a verified pasted token; OAuth
+    providers transfer the supplied refresh credential without logging it,
+    verify refresh + provider account before storing, and bind the
+    connection. Existing backups are never touched.
     """
     from .credentials import put_credential
 
+    if str(body.get("provider", "")).strip().lower() in connections.TOKEN_PROVIDERS:
+        return _import_token_connection(
+            body, operator_subject=operator_subject, connections_table=connections_table)
     if not isinstance(body.get("authorized_user"), dict):
         return 400, {"error": "An authorized-user credential object is required"}
     try:
@@ -477,8 +774,7 @@ def import_connection(event):
     subject, error = authenticate(event)
     if error:
         return error
-    claims = event.get("_dtc_claims") or {}
-    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
+    if not _is_operator(event, subject):
         audit.emit("unknown", audit.IMPORT, subject, outcome="denied-not-operator")
         return _json_response(403, {"error": "Operator authorization required"})
     try:
