@@ -41,13 +41,14 @@ function showApp() {
 
 const pad2 = (value) => String(value).padStart(2, '0');
 
-function statusLine(status) {
+function statusLine(status, labels) {
   const value = String(status || 'unknown');
   const kind = ['completed', 'connected', 'configured', 'enabled'].includes(value) ? 'ok'
     : ['processing', 'ready'].includes(value) ? 'run'
-    : ['failed', 'error', 'missing'].includes(value) ? 'err'
+    : ['failed', 'error', 'missing', 'expired'].includes(value) ? 'err'
     : 'off';
-  return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(value)}</span>`;
+  const text = (labels || {})[value] || value;
+  return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
 }
 
 /* Escape, then mark separator characters as safe wrap points so long machine
@@ -208,11 +209,11 @@ function renderConnections(connections) {
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
     const reconnect = connection.provider === 'slack' ? ''
-      : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a>`;
+      : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${['connected', 'expired'].includes(connection.status) ? 'Reconnect' : 'Connect'}</a>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
-    <td data-label="Status">${statusLine(connection.status)}</td>
+    <td data-label="Status">${statusLine(connection.status, CONNECTION_STATUS_LABELS)}</td>
     <td class="action-cell">${reconnect}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button></td>
   </tr>`;
   }).join('');
@@ -322,6 +323,13 @@ const PROVIDER_MARKS = {
 function providerMark(provider) {
   return PROVIDER_MARKS[provider] || '';
 }
+
+/* Each connection is individually connected, awaiting consent, or expired
+   (needs refreshing) — say so in plain words, not raw DynamoDB values. */
+const CONNECTION_STATUS_LABELS = {
+  ready: 'awaiting consent',
+  expired: 'expired — needs refresh',
+};
 
 function renderConnectCards() {
   // The grid is a "create new" picker — connection state lives in the
