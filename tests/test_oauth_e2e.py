@@ -18,7 +18,11 @@ import jwt
 from botocore.exceptions import ClientError
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from src import admin, agent_api, ingress
+from src.dapier.api import admin
+from src.dapier.api import agent as agent_api
+from src.dapier.api import router as ingress
+from src.dapier.auth import session
+from src.dapier.connections import credentials
 
 HOST = "dapier.example.test"
 AUTH_BASE = "https://auth.example.test"
@@ -163,15 +167,15 @@ def configure(monkeypatch, http):
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "shared-client-id")
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "shared-client-secret")
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
-    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
     monkeypatch.setattr(boto3, "resource", lambda service: dynamo)
     monkeypatch.setattr(urllib.request, "urlopen", http)
     monkeypatch.setattr(
-        admin, "get_credential",
+        credentials, "get_credential",
         lambda credential_id: dict(stored_credentials[credential_id]),
     )
     monkeypatch.setattr(
-        admin, "put_credential",
+        credentials, "put_credential",
         lambda credential_id, value, **kwargs: stored_credentials.__setitem__(
             credential_id, dict(value),
         ),
@@ -212,7 +216,7 @@ def sign_in(monkeypatch, http):
     assert login["headers"]["location"].startswith(f"{AUTH_BASE}/oauth2/authorize?")
     state_cookie = cookie_value(login, "dapier_auth_state=")
 
-    nonce = admin._verify(state_cookie, kind="oidc")["nonce"]
+    nonce = session._verify(state_cookie, kind="oidc")["nonce"]
     minted["id_token"] = mint_token(nonce=nonce, email=EMAIL)
 
     from urllib.parse import parse_qs, urlparse

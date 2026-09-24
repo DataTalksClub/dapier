@@ -1,6 +1,6 @@
 import json
 
-from src import dropbox_resolver
+from src.dapier.triggers.intake import dropbox_resolver
 
 
 class FakeDropbox:
@@ -88,12 +88,13 @@ class FakeConnectionsTable:
         return {"Items": matched}
 
 
-def connection(account="dbid:acct1", status="connected"):
+def connection(account="dbid:acct1", status="connected", **extra):
     return {
         "connection_id": "team-dropbox",
         "provider": "dropbox",
         "status": status,
         "verified_account_id": account,
+        **extra,
     }
 
 
@@ -147,6 +148,22 @@ def test_first_notification_starts_fresh_listing(monkeypatch):
     assert cursors.items["dropbox#dbid:acct1"]["cursor"] == "cursor-2"
     assert cursors.items["dropbox#dbid:acct1//incoming/invoice.pdf"]["rev"] == "r1"
     assert "dropbox#dbid:acct1//incoming/old.pdf" not in cursors.items
+
+
+def test_connection_root_path_scopes_the_fresh_listing(monkeypatch):
+    """The listing root is per-connection config: only that subtree resolves."""
+    transport, publish, cursors, connections_table, _seen = setup_resolver(monkeypatch, [
+        (200, {"entries": [file_entry("/incoming/invoice.pdf", "r1")],
+               "cursor": "cursor-1", "has_more": False}),
+    ], connections_items=[connection(root_path="/incoming")])
+
+    dropbox_resolver.resolve_account(
+        "dbid:acct1", correlation_id="corr-1", transport=transport,
+        connections_table=connections_table, cursor_table=cursors, publish=publish,
+    )
+
+    _method, _url, payload = transport.calls[0]
+    assert payload == {"path": "/incoming", "recursive": True}
 
 
 def test_known_rev_is_skipped_and_changed_rev_updates(monkeypatch):

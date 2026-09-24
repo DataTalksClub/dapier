@@ -1,11 +1,12 @@
 import json
 
-from src import agent_api, tokens
+from src.dapier.api import agent as agent_api
+from src.dapier.connections import tokens
 
 
 import pytest
 
-from src import oauth_clients
+from src.dapier.connections.providers import oauth_clients
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +19,7 @@ def clean_oauth_client_cache():
 
 import pytest
 
-from src import oauth_clients
+from src.dapier.connections.providers import oauth_clients
 
 
 @pytest.fixture(autouse=True)

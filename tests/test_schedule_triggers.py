@@ -5,8 +5,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from src import agent_api, schedule_triggers, worker
-from src.engine import all_workflows, matches
+from src.dapier.api import agent as agent_api
+from src.dapier.triggers import schedule_triggers
+from src.dapier.engine import worker
+from src.dapier.engine import all_workflows, matches
 
 
 class StubTable:
@@ -178,9 +180,9 @@ class AgentApiTests(unittest.TestCase):
     def test_operator_can_create_and_list_schedules(self):
         stub = StubTable()
         event = {"headers": {}, "body": json.dumps(dict(SCHEDULE_BODY))}
-        with patch("src.agent_api.require_operator", return_value=("sub-1", None)), \
-             patch("src.schedule_triggers.sync_rule") as sync_rule, \
-             patch("src.schedule_triggers.get_table", return_value=stub), \
+        with patch("src.dapier.api.agent.require_operator", return_value=("sub-1", None)), \
+             patch("src.dapier.triggers.schedule_triggers.sync_rule") as sync_rule, \
+             patch("src.dapier.triggers.schedule_triggers.get_table", return_value=stub), \
              patch.dict(os.environ, ENV):
             created = agent_api.schedule_triggers_api(event, "PUT")
             listed = agent_api.schedule_triggers_api({"headers": {}}, "GET")
@@ -192,7 +194,7 @@ class AgentApiTests(unittest.TestCase):
         sync_rule.assert_called_once()
 
     def test_non_operator_is_rejected(self):
-        with patch("src.agent_api.require_operator",
+        with patch("src.dapier.api.agent.require_operator",
                    return_value=(None, {"statusCode": 403})):
             response = agent_api.schedule_triggers_api({"headers": {}}, "GET")
         self.assertEqual(response["statusCode"], 403)
@@ -200,8 +202,8 @@ class AgentApiTests(unittest.TestCase):
     def test_bad_expression_is_400(self):
         stub = StubTable()
         body = dict(SCHEDULE_BODY, expression="whenever")
-        with patch("src.agent_api.require_operator", return_value=("sub-1", None)), \
-             patch("src.schedule_triggers.get_table", return_value=stub), \
+        with patch("src.dapier.api.agent.require_operator", return_value=("sub-1", None)), \
+             patch("src.dapier.triggers.schedule_triggers.get_table", return_value=stub), \
              patch.dict(os.environ, ENV):
             response = agent_api.schedule_triggers_api(
                 {"headers": {}, "body": json.dumps(body)}, "PUT")

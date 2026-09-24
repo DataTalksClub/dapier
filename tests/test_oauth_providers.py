@@ -1,7 +1,7 @@
 import pytest
 
-from src import oauth_providers
-from src.oauth_providers import (
+from src.dapier.connections.providers import oauth_providers
+from src.dapier.connections.providers.oauth_providers import (
     ProviderError,
     UnknownProviderError,
     authorization_url,

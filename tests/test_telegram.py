@@ -4,8 +4,8 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src import telegram_api
-from src.engine import execute, run_telegram_send
+from src.dapier.connections.providers import telegram_api
+from src.dapier.engine import execute, run_telegram_send
 
 
 def stub_transport(result, status=200, *, capture=None):
@@ -69,8 +69,8 @@ class SendMessageActionTests(unittest.TestCase):
     def run_action(self, event, action=None, token="bot-token"):
         calls = []
         transport = stub_transport({"message_id": 7}, capture=calls)
-        with patch("src.engine._connected_connection", return_value=dict(self.CONNECTION)), \
-             patch("src.engine.get_credential", return_value={"token": token}):
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": token}):
             run_telegram_send(action or {"type": "telegram_send", "connection_id": "tg-bot",
                                          "chat_id": "101"},
                               event, transport=transport)
@@ -97,8 +97,8 @@ class SendMessageActionTests(unittest.TestCase):
         self.assertEqual(calls[0]["body"]["text"], "hi")
 
     def test_missing_chat_id_is_an_error(self):
-        with patch("src.engine._connected_connection", return_value=dict(self.CONNECTION)), \
-             patch("src.engine.get_credential", return_value={"token": "t"}):
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "t"}):
             with self.assertRaises(ValueError):
                 run_telegram_send({"type": "telegram_send", "connection_id": "tg-bot"},
                                   {"data": {}},
@@ -123,10 +123,10 @@ class SendMessageActionTests(unittest.TestCase):
             "delete_item": lambda self, Key: None,
         })()
         with patch.dict("os.environ", {"HOOK_TRIGGERS_TABLE": "hooks"}), \
-             patch("src.hook_triggers.get_table", return_value=stub), \
-             patch("src.engine._connected_connection", return_value=dict(self.CONNECTION)), \
-             patch("src.engine.get_credential", return_value={"token": "bot-token"}), \
-             patch("src.telegram_api.send_message", side_effect=fake_send):
+             patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub), \
+             patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.send_message", side_effect=fake_send):
             execute(event)
         self.assertEqual(recorded, [{"token": "bot-token", "chat_id": 555, "text": "ping"}])
 

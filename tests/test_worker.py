@@ -4,8 +4,8 @@ import unittest
 import boto3
 from botocore.exceptions import ClientError
 
-from src import worker
-from src.worker import normalize_payload
+from src.dapier.engine import worker
+from src.dapier.engine.worker import normalize_payload
 
 
 EVENT = {

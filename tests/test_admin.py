@@ -1,7 +1,10 @@
 import json
+import boto3
 from decimal import Decimal
 
-from src import admin, credentials, ingress
+from src.dapier.api import admin
+from src.dapier.connections import credentials as credentials_module
+from src.dapier.api import router as ingress
 
 
 def request(method, path, body=None, cookies=None):
@@ -25,8 +28,8 @@ def configure_oidc(monkeypatch):
 def begin_oidc(monkeypatch, claims):
     """Run login, then feed `claims` back through the callback as the ID token."""
     configure_oidc(monkeypatch)
-    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
-    start = admin.auth_login(request("GET", "/auth/login"))
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    start = login.auth_login(request("GET", "/auth/login"))
     assert start["statusCode"] == 302
     from urllib.parse import parse_qs, urlparse
 
@@ -34,12 +37,12 @@ def begin_oidc(monkeypatch, claims):
     assert query["code_challenge_method"] == ["S256"]
     assert query["code_challenge"][0]
     state_cookie = start["cookies"][0].split(";", 1)[0]
-    pending = admin._verify(state_cookie.split("=", 1)[1], kind="oidc")
-    monkeypatch.setattr(admin, "_exchange_auth_code", lambda code, verifier: {"id_token": "signed-token"})
-    monkeypatch.setattr(admin, "_verify_id_token", lambda token: {"nonce": pending["nonce"], **claims})
+    pending = session._verify(state_cookie.split("=", 1)[1], kind="oidc")
+    monkeypatch.setattr(dtc_auth, "exchange_auth_code", lambda code, verifier: {"id_token": "signed-token"})
+    monkeypatch.setattr(dtc_auth, "verify_id_token", lambda token: {"nonce": pending["nonce"], **claims})
     event = request("GET", "/auth/callback", cookies=[state_cookie])
     event["queryStringParameters"] = {"code": "valid-code", "state": query["state"][0]}
-    return admin.auth_callback(event)
+    return login.auth_callback(event)
 
 
 def test_oidc_login_uses_pkce_and_google_identity_creates_session(monkeypatch):
@@ -52,8 +55,8 @@ def test_oidc_login_uses_pkce_and_google_identity_creates_session(monkeypatch):
     assert callback["statusCode"] == 302
     assert callback["headers"]["location"] == "/"
     session_cookie = next(value for value in callback["cookies"] if value.startswith("dapier_session="))
-    session = admin._verify(session_cookie.split(";", 1)[0].split("=", 1)[1])
-    assert session["sub"] == "person@datatalks.club"
+    decoded = session._verify(session_cookie.split(";", 1)[0].split("=", 1)[1])
+    assert decoded["sub"] == "person@datatalks.club"
 
 
 def test_oidc_callback_rejects_token_without_email(monkeypatch):
@@ -66,8 +69,8 @@ def test_oidc_callback_rejects_token_without_email(monkeypatch):
 
 def test_oidc_callback_rejects_invalid_state(monkeypatch):
     configure_oidc(monkeypatch)
-    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
-    response = admin.auth_callback(request("GET", "/auth/callback"))
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    response = login.auth_callback(request("GET", "/auth/callback"))
     assert response["statusCode"] == 303
     assert response["headers"]["location"] == "/auth/error"
     assert response["headers"]["cache-control"] == "no-store"
@@ -76,7 +79,7 @@ def test_oidc_callback_rejects_invalid_state(monkeypatch):
 
 
 def test_oidc_error_page_is_hardened():
-    response = admin.auth_error()
+    response = login.auth_error()
     assert response["statusCode"] == 403
     assert "Dapier" in response["body"]
     assert response["headers"]["cache-control"] == "no-store"
@@ -85,7 +88,7 @@ def test_oidc_error_page_is_hardened():
 
 
 def test_admin_api_rejects_unauthenticated_request(monkeypatch):
-    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "correct-password"})
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "correct-password"})
 
     response = admin.route(request("GET", "/api/admin/overview"), "GET", "/api/admin/overview")
 
@@ -94,7 +97,7 @@ def test_admin_api_rejects_unauthenticated_request(monkeypatch):
 
 def test_save_slack_credential_is_write_only(monkeypatch):
     writes = []
-    monkeypatch.setattr(credentials, "put_credential",
+    monkeypatch.setattr(credentials_module, "put_credential",
                         lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
     token = "xoxb-123456789012345678901234"
 
@@ -121,8 +124,8 @@ def test_save_connection_stores_no_client_credentials(monkeypatch):
             return Table()
 
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
-    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
-    monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
+    monkeypatch.setattr(credentials_module, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
     body = {
         "connection_id": "team-dropbox",
         "provider": "dropbox",
@@ -152,15 +155,15 @@ def _fake_connections_table(monkeypatch, records):
             return Table()
 
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
-    monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
 
 
 def test_save_slack_connection_verifies_and_stores_token(monkeypatch):
     records = []
     credentials = []
     _fake_connections_table(monkeypatch, records)
-    monkeypatch.setattr(admin.slack_tokens, "verify_account", lambda token: ("T012345", "DataTalks"))
-    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
+    monkeypatch.setattr(slack_tokens, "verify_account", lambda token: ("T012345", "DataTalks"))
+    monkeypatch.setattr(credentials_module, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
     token = "xoxb-" + "a" * 30
     body = {
         "connection_id": "slack",
@@ -186,7 +189,7 @@ def test_save_slack_connection_requires_token_without_stored_secret(monkeypatch)
     def missing(credential_id):
         raise KeyError(credential_id)
 
-    monkeypatch.setattr(admin, "get_credential", missing)
+    monkeypatch.setattr(credentials_module, "get_credential", missing)
 
     response = admin.save_connection(request("PUT", "/api/admin/connections", {
         "connection_id": "slack",
@@ -204,9 +207,9 @@ def test_save_slack_connection_rejects_token_slack_rejects(monkeypatch):
     _fake_connections_table(monkeypatch, records)
 
     def reject(token):
-        raise admin.slack_tokens.SlackTokenError("Slack rejected the token: invalid_auth")
+        raise slack_tokens.SlackTokenError("Slack rejected the token: invalid_auth")
 
-    monkeypatch.setattr(admin.slack_tokens, "verify_account", reject)
+    monkeypatch.setattr(slack_tokens, "verify_account", reject)
 
     response = admin.save_connection(request("PUT", "/api/admin/connections", {
         "connection_id": "slack",
@@ -221,11 +224,11 @@ def test_save_slack_connection_rejects_token_slack_rejects(monkeypatch):
 
 
 def test_oauth_start_rejects_token_provider(monkeypatch):
-    monkeypatch.setattr(admin, "_connection", lambda connection_id: {
+    monkeypatch.setattr(oauth_flow, "_connection", lambda connection_id: {
         "connection_id": "slack", "provider": "slack", "status": "connected",
     })
 
-    response = admin.oauth_start(request("GET", "/api/admin/oauth/slack/start"), "slack")
+    response = oauth_flow.oauth_start(request("GET", "/api/admin/oauth/slack/start"), "slack")
 
     assert response["statusCode"] == 400
     assert "directly provided token" in response["body"]
@@ -241,7 +244,7 @@ def test_root_serves_console_with_security_headers():
 
 
 def test_json_response_serializes_dynamodb_numbers():
-    response = admin._json_response(200, {"expires_at": Decimal("1791655833")})
+    response = http._json_response(200, {"expires_at": Decimal("1791655833")})
 
     assert json.loads(response["body"])["expires_at"] == 1791655833
 
@@ -250,7 +253,14 @@ def test_json_response_serializes_dynamodb_numbers():
 
 import time
 
-from src import api_tokens
+from src.dapier.auth import api_tokens
+from src.dapier import http
+from src.dapier.api.admin import login
+from src.dapier.connections import oauth_flow
+from src.dapier.auth import session
+from src.dapier.connections.providers import slack_tokens
+from src.dapier.auth import dtc_auth
+from src.dapier.api.admin import routes
 
 
 class TokenTable:
@@ -282,7 +292,7 @@ def operator_request(method, path, body=None, cookies=None, origin=True):
 
 
 def configure_tokens(monkeypatch):
-    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
     table = TokenTable()
 
     class Dynamo:
@@ -293,7 +303,7 @@ def configure_tokens(monkeypatch):
 
     monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
-    cookie = admin._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
                           "exp": int(time.time()) + 600})
     return table, [f"dapier_session={cookie}"]
 

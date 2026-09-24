@@ -1,7 +1,7 @@
 import pytest
 
-from src import connections
-from src.connections import (
+from src.dapier.connections import records as connections
+from src.dapier.connections.records import (
     BindingError,
     ConnectionError,
     build_item,
@@ -113,6 +113,50 @@ def test_build_item_rejects_expected_account_change_after_binding():
             validate_new_connection(body(expected_account_id="UC2")),
             owner_subject="s", previous=connected,
         )
+
+
+def test_root_path_normalizes_to_absolute_dropbox_path():
+    assert validate_new_connection(
+        body(provider="dropbox", root_path="incoming/"))["root_path"] == "/incoming"
+    assert validate_new_connection(
+        body(provider="dropbox", root_path="/"))["root_path"] == ""
+
+
+def test_root_path_is_dropbox_only():
+    with pytest.raises(ConnectionError):
+        validate_new_connection(body(provider="slack", root_path="/incoming"))
+
+
+def test_root_path_absent_is_none_until_built():
+    # Requests that don't mention root_path carry None so build_item keeps
+    # the stored value instead of resetting it.
+    assert validate_new_connection(body())["root_path"] is None
+
+
+def test_root_path_survives_edits_that_omit_it():
+    created = build_item(
+        validate_new_connection(body(provider="dropbox", root_path="/incoming")),
+        owner_subject="s",
+    )
+    edited = build_item(
+        validate_new_connection(body(provider="dropbox", display_name="Renamed")),
+        owner_subject="s", previous=created,
+    )
+    assert edited["root_path"] == "/incoming"
+    # An explicit empty value clears it (list the whole Dropbox again).
+    cleared = build_item(
+        validate_new_connection(body(provider="dropbox", root_path="")),
+        owner_subject="s", previous=created,
+    )
+    assert cleared["root_path"] == ""
+
+
+def test_public_view_includes_root_path():
+    item = build_item(
+        validate_new_connection(body(provider="dropbox", root_path="/incoming")),
+        owner_subject="s",
+    )
+    assert public_view(item)["root_path"] == "/incoming"
 
 
 def test_check_binding_rejects_wrong_account():

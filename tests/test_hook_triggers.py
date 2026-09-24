@@ -5,8 +5,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-from src import agent_api, hook_triggers
-from src.engine import all_workflows, matches
+from src.dapier.api import agent as agent_api
+from src.dapier.triggers import hook_triggers
+from src.dapier.engine import all_workflows, matches
 
 
 class StubTable:
@@ -106,7 +107,7 @@ class TelegramSaveTests(unittest.TestCase):
         self.env.start()
         self.addCleanup(self.env.stop)
         self.connections = StubConnections([telegram_connection()])
-        credential_patch = patch("src.credentials.get_credential",
+        credential_patch = patch("src.dapier.connections.credentials.get_credential",
                                  return_value={"token": "bot-token"})
         credential_patch.start()
         self.addCleanup(credential_patch.stop)
@@ -222,7 +223,7 @@ class WorkflowMergeTests(unittest.TestCase):
             "actions": [{"type": "webhook", "url": "https://hooks.test/x"}], "enabled": True,
         }])
         with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}), \
-             patch("src.hook_triggers.get_table", return_value=stub):
+             patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub):
             merged = all_workflows()
         self.assertEqual(merged[-1]["id"], "webhook-trigger-orders")
 
@@ -235,9 +236,9 @@ class AgentApiTests(unittest.TestCase):
     def test_operator_can_create_and_list_hooks_over_bearer_auth(self):
         stub = StubTable()
         event = {"headers": {}, "body": json.dumps(dict(WEBHOOK_BODY))}
-        with patch("src.agent_api.authenticate", return_value=("sub-1", None)), \
-             patch("src.agent_api.authz.is_operator", return_value=True), \
-             patch("src.hook_triggers.get_table", return_value=stub), \
+        with patch("src.dapier.api.agent.authenticate", return_value=("sub-1", None)), \
+             patch("src.dapier.api.agent.authz.is_operator", return_value=True), \
+             patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub), \
              patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks",
                                      "CONNECTIONS_TABLE": "connections",
                                      "GRANTS_TABLE": "grants"}):
@@ -249,13 +250,13 @@ class AgentApiTests(unittest.TestCase):
             [h["hook_id"] for h in json.loads(listed["body"])["hooks"]], ["orders"])
 
     def test_non_operator_is_rejected(self):
-        with patch("src.agent_api.require_operator",
+        with patch("src.dapier.api.agent.require_operator",
                    return_value=(None, {"statusCode": 403})):
             response = agent_api.hook_triggers_api({"headers": {}}, "GET")
         self.assertEqual(response["statusCode"], 403)
 
     def test_bad_kind_is_400(self):
-        with patch("src.agent_api.require_operator", return_value=("sub-1", None)), \
+        with patch("src.dapier.api.agent.require_operator", return_value=("sub-1", None)), \
              patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
             response = agent_api.hook_triggers_api(
                 {"headers": {}, "queryStringParameters": {"kind": "pigeon"}}, "GET")

@@ -134,7 +134,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: src.ingress.handler
+      Handler: src.dapier.api.router.handler
       Runtime: python3.12
       Architectures: [arm64]
       Policies:
@@ -298,7 +298,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: email_ingress.handler
+      Handler: dapier.triggers.intake.email_ingress.handler
       Runtime: python3.12
       Architectures: [arm64]
       Policies:
@@ -317,7 +317,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: src.youtube_subscriptions.handler
+      Handler: src.dapier.triggers.intake.youtube_subscriptions.handler
       Runtime: python3.12
       Architectures: [arm64]
       Environment:
@@ -358,7 +358,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: src.worker.handler
+      Handler: src.dapier.engine.worker.handler
       Runtime: python3.12
       Architectures: [arm64]
       Timeout: 60
@@ -420,7 +420,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: src.dropbox_resolver.handler
+      Handler: src.dapier.triggers.intake.dropbox_resolver.handler
       Runtime: python3.12
       Architectures: [arm64]
       Timeout: 120

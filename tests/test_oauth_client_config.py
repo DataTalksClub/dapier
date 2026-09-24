@@ -2,8 +2,13 @@ import json
 
 import pytest
 
-from src import admin, credentials, oauth_clients, ingress
-from src.oauth_clients import ClientConfigError
+from src.dapier.api import admin
+from src.dapier.connections import credentials
+from src.dapier.connections.providers import oauth_clients
+from src.dapier.api import router as ingress
+from src.dapier.connections.providers.oauth_clients import ClientConfigError
+from src.dapier.api import overview
+from src.dapier.auth import session
 
 
 def request(method, path, body=None, cookies=None):
@@ -109,8 +114,8 @@ def test_youtube_shares_the_google_record(monkeypatch, config_db):
 def test_save_oauth_client_stores_write_only_record(monkeypatch, config_db):
     stored = []
     monkeypatch.setattr(credentials, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
-    monkeypatch.setattr(admin, "_session_subject", lambda event: "op")
-    monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(session, "_session_subject", lambda event: "op")
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
 
     response = admin.save_oauth_client("google", request("PUT", "/api/admin/oauth-clients/google", {
         "client_id": "gid", "client_secret": "gsec",
@@ -125,8 +130,8 @@ def test_save_oauth_client_stores_write_only_record(monkeypatch, config_db):
 def test_save_oauth_client_folds_youtube_onto_google(monkeypatch, config_db):
     stored = []
     monkeypatch.setattr(credentials, "put_credential", lambda credential_id, value, **kwargs: stored.append((credential_id, value, kwargs)))
-    monkeypatch.setattr(admin, "_session_subject", lambda event: "op")
-    monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(session, "_session_subject", lambda event: "op")
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
 
     response = admin.save_oauth_client("youtube", request("PUT", "/api/admin/oauth-clients/youtube", {
         "client_id": "gid", "client_secret": "gsec",
@@ -149,17 +154,17 @@ def test_save_oauth_client_requires_both_values(monkeypatch, config_db):
 def test_status_reports_config_source_and_never_the_secret(monkeypatch, config_db):
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_ID", "env-id")
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "env-secret")
-    status = admin._oauth_client_status("dropbox")
+    status = overview._oauth_client_status("dropbox")
     assert status == {"provider": "dropbox", "client_id": "env-id", "source": "deploy", "configured": True}
 
     config_db["oauth-client#dropbox"] = {"value": {"client_id": "db-id", "client_secret": "db-secret"}}
     oauth_clients.invalidate_cache()
-    status = admin._oauth_client_status("dropbox")
+    status = overview._oauth_client_status("dropbox")
     assert status["source"] == "config"
     assert status["client_id"] == "db-id"
     assert "db-secret" not in json.dumps(status)
 
-    status = admin._oauth_client_status("google")
+    status = overview._oauth_client_status("google")
     assert status["configured"] is False and status["source"] == "none"
 
 

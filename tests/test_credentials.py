@@ -1,4 +1,4 @@
-from src import credentials
+from src.dapier.connections import credentials
 
 
 class Table:

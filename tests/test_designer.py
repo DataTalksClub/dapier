@@ -2,7 +2,7 @@ import base64
 
 import pytest
 
-from src import designer_store
+from src.dapier.api import designer_store
 
 WORKFLOW_YAML = """\
 id: test-flow
@@ -227,7 +227,9 @@ def test_fetch_workflow_maps_404_to_keyerror(monkeypatch):
 
 import json
 
-from src import admin, agent_api, ingress
+from src.dapier.api import admin
+from src.dapier.api import agent as agent_api
+from src.dapier.api import router as ingress
 
 
 def admin_request(method, path, body=None):
@@ -241,14 +243,14 @@ def admin_request(method, path, body=None):
 
 @pytest.fixture
 def operator_session(monkeypatch):
-    monkeypatch.setattr(admin, "authenticated", lambda event: True)
-    monkeypatch.setattr(admin, "_csrf_ok", lambda event, method: True)
-    monkeypatch.setattr(admin, "require_operator", lambda event: ({"sub": "op-1"}, None))
-    monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: {"emitted": (args, kwargs)})
+    monkeypatch.setattr(session, "authenticated", lambda event: True)
+    monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
+    monkeypatch.setattr(session, "require_operator", lambda event: ({"sub": "op-1"}, None))
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: {"emitted": (args, kwargs)})
 
 
 def test_designer_list_requires_session(monkeypatch):
-    monkeypatch.setattr(admin, "authenticated", lambda event: False)
+    monkeypatch.setattr(session, "authenticated", lambda event: False)
     response = admin.route(
         admin_request("GET", "/api/admin/designer/workflows"), "GET", "/api/admin/designer/workflows",
     )
@@ -296,7 +298,7 @@ def test_designer_save_commits_and_audits(monkeypatch, operator_session):
         saved.update(body) or (200, {"file": "test-flow.yaml", "commit": "abc123", "removed": None})
     ))
     audits = []
-    monkeypatch.setattr(admin, "_audit_event",
+    monkeypatch.setattr(session, "_audit_event",
                         lambda *args, **kwargs: audits.append((args, kwargs)) or None)
 
     response = admin.route(
@@ -411,7 +413,9 @@ def test_unknown_static_path_is_not_served():
 
 import json
 
-from src import admin, agent_api, ingress
+from src.dapier.api import admin
+from src.dapier.api import agent as agent_api
+from src.dapier.api import router as ingress
 
 
 def admin_request(method, path, body=None):
@@ -425,14 +429,14 @@ def admin_request(method, path, body=None):
 
 @pytest.fixture
 def operator_session(monkeypatch):
-    monkeypatch.setattr(admin, "authenticated", lambda event: True)
-    monkeypatch.setattr(admin, "_csrf_ok", lambda event, method: True)
-    monkeypatch.setattr(admin, "require_operator", lambda event: ({"sub": "op-1"}, None))
-    monkeypatch.setattr(admin, "_audit_event", lambda *args, **kwargs: {"emitted": (args, kwargs)})
+    monkeypatch.setattr(session, "authenticated", lambda event: True)
+    monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
+    monkeypatch.setattr(session, "require_operator", lambda event: ({"sub": "op-1"}, None))
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: {"emitted": (args, kwargs)})
 
 
 def test_designer_list_requires_session(monkeypatch):
-    monkeypatch.setattr(admin, "authenticated", lambda event: False)
+    monkeypatch.setattr(session, "authenticated", lambda event: False)
     response = admin.route(
         admin_request("GET", "/api/admin/designer/workflows"), "GET", "/api/admin/designer/workflows",
     )
@@ -480,7 +484,7 @@ def test_designer_save_commits_and_audits(monkeypatch, operator_session):
         saved.update(body) or (200, {"file": "test-flow.yaml", "commit": "abc123", "removed": None})
     ))
     audits = []
-    monkeypatch.setattr(admin, "_audit_event",
+    monkeypatch.setattr(session, "_audit_event",
                         lambda *args, **kwargs: audits.append((args, kwargs)) or None)
 
     response = admin.route(
@@ -647,6 +651,7 @@ def test_cli_workflows_save_posts_yaml_with_rename(monkeypatch, tmp_path, capsys
 # ---- CLI parity ----
 
 from dapier_cli import commands as cli_commands
+from src.dapier.auth import session
 
 
 def test_cli_workflows_list_and_show(monkeypatch, capsys):

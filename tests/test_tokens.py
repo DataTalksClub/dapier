@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from src import tokens
-from src.connections import BindingError
-from src.credentials import VersionConflict
-from src.tokens import TokenError, get_access_token, refresh_and_store, revoke_connection
+from src.dapier.connections import tokens
+from src.dapier.connections.records import BindingError
+from src.dapier.connections.credentials import VersionConflict
+from src.dapier.connections.tokens import TokenError, get_access_token, refresh_and_store, revoke_connection
 
 YOUTUBE = "youtube"
 
@@ -84,7 +84,7 @@ def transport_for(monkeypatch, *, token_response=None, verify_payload=None):
             return 200, json.dumps(verify_payload or {}).encode()
         raise AssertionError(f"unexpected url {url}")
 
-    import src.oauth_providers as providers
+    import src.dapier.connections.providers.oauth_providers as providers
 
     monkeypatch.setattr(providers, "_default_transport", fake)
     return calls

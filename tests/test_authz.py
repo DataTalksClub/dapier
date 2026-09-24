@@ -3,12 +3,16 @@ import time
 
 import pytest
 
-from src import admin, audit, authz
+from src.dapier.api import admin
+from src.dapier import audit
+from src.dapier.auth import authz
+import boto3
+from src.dapier.auth import session
 
 
 def session_token(monkeypatch, sub="op@example.test", subject="subject-1"):
-    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
-    return admin._sign({"sub": sub, "subject": subject, "exp": int(time.time()) + 3600})
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    return session._sign({"sub": sub, "subject": subject, "exp": int(time.time()) + 3600})
 
 
 def cookie_event(token, method="GET", path="/api/admin/overview", headers=None, body=None):
@@ -56,7 +60,7 @@ def dynamo(monkeypatch, tables):
         def Table(self, name):
             return tables[name]
 
-    monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
     return tables
 
 
@@ -85,7 +89,7 @@ def test_is_operator_allows_any_authenticated_account_by_default(monkeypatch):
 
 
 def test_overview_rejects_unauthenticated(monkeypatch):
-    monkeypatch.setattr(admin, "_credentials", lambda: {"password": "x"})
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "x"})
     event = cookie_event("bogus", headers={})
     event["cookies"] = []
     response = admin.route(event, "GET", "/api/admin/overview")
@@ -113,7 +117,7 @@ def test_overview_allows_operator(monkeypatch, tmp_path):
     })
     from src import credentials as credentials_module
 
-    monkeypatch.setattr(credentials_module.boto3, "resource", admin.boto3.resource)
+    monkeypatch.setattr(credentials_module.boto3, "resource", boto3.resource)
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")

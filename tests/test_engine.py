@@ -4,7 +4,7 @@ import unittest
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 
-from src.engine import (
+from src.dapier.engine import (
     execute,
     matches,
     run_dataops,
@@ -64,8 +64,8 @@ class MatchTests(unittest.TestCase):
 
 
 class SlackTests(unittest.TestCase):
-    @patch("src.engine._json_request")
-    @patch("src.engine.get_credential")
+    @patch("src.dapier.engine.actions.base._json_request")
+    @patch("src.dapier.connections.credentials.get_credential")
     def test_reads_bot_token_from_dynamodb_credential(self, get_credential, json_request):
         get_credential.return_value = {"token": "xoxb-private"}
         json_request.return_value = {"ok": True}
@@ -80,8 +80,8 @@ class SlackTests(unittest.TestCase):
         self.assertEqual(json_request.call_args.args[1]["text"], "Published: https://example.test/video")
         self.assertEqual(json_request.call_args.kwargs["headers"], {"authorization": "Bearer xoxb-private"})
 
-    @patch("src.engine._json_request")
-    @patch("src.engine.get_credential")
+    @patch("src.dapier.engine.actions.base._json_request")
+    @patch("src.dapier.connections.credentials.get_credential")
     def test_resolves_credential_through_connection_id(self, get_credential, json_request):
         get_credential.return_value = {"token": "xoxb-private"}
         json_request.return_value = {"ok": True}
@@ -130,9 +130,9 @@ class DropboxUploadTests(unittest.TestCase):
 
     def run_action(self, transport, event=None, action=None):
         action = action or {"type": "dropbox_upload", "connection_id": "dropbox", "folder": "/Invoices"}
-        with patch("src.engine._dropbox_connection", return_value=dict(self.connection)), \
-             patch("src.tokens.get_access_token", return_value=("token-123", {})), \
-             patch("src.engine._s3_body", return_value=b"pdf-bytes"):
+        with patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
+             patch("src.dapier.engine.actions.base._s3_body", return_value=b"pdf-bytes"):
             run_dropbox_upload(action, event or deepcopy(self.attachment_event), transport=transport)
 
     def test_uploads_attachment_to_folder(self):
@@ -198,7 +198,7 @@ class DropboxUploadTests(unittest.TestCase):
 
     def test_fails_when_connection_not_connected(self):
         with patch("boto3.resource") as resource, \
-             patch("src.connections.get_connection",
+             patch("src.dapier.connections.records.get_connection",
                    return_value={"connection_id": "dropbox", "provider": "dropbox", "status": "ready"}), \
              patch.dict("os.environ", {"CONNECTIONS_TABLE": "connections"}), \
              self.assertRaises(ValueError) as ctx:
@@ -233,8 +233,8 @@ class DropboxDeleteTests(unittest.TestCase):
 
     def run_action(self, transport, event=None, action=None):
         action = action or {"type": "dropbox_delete", "connection_id": "dropbox"}
-        with patch("src.engine._dropbox_connection", return_value=dict(self.connection)), \
-             patch("src.tokens.get_access_token", return_value=("token-123", {})):
+        with patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})):
             run_dropbox_delete(action, event or dict(self.event), transport=transport)
 
     def test_deletes_the_event_path(self):
@@ -295,11 +295,11 @@ class DropboxIntakeTests(unittest.TestCase):
         action = {"type": "dataops", "connection_id": "dropbox",
                   "url_env": "DATAOPS_INTAKE_URL", "auth_secret_id": "dapier/dataops"}
         s3 = MagicMock()
-        with patch("src.engine.secrets_value", return_value='{"token": "tok"}'), \
-             patch("src.engine._json_request") as json_request, \
-             patch("src.engine._dropbox_connection", return_value=dict(self.connection)), \
-             patch("src.tokens.get_access_token", return_value=("token-123", {})), \
-             patch("src.engine._dropbox_download", return_value=b"pdf-bytes"), \
+        with patch("src.dapier.engine.actions.base.secrets_value", return_value='{"token": "tok"}'), \
+             patch("src.dapier.engine.actions.base._json_request") as json_request, \
+             patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
+             patch("src.dapier.engine.actions.dropbox._dropbox_download", return_value=b"pdf-bytes"), \
              patch("boto3.client", return_value=s3), \
              patch.dict("os.environ", {"RENDER_ARTIFACTS_BUCKET": "artifacts",
                                        "DATAOPS_INTAKE_URL": "https://intake.test"}):
@@ -413,7 +413,7 @@ class EmailSendTests(unittest.TestCase):
         }
         event = {"id": "evt-2", "connector": "email", "event": "message.received",
                  "data": {"route": "todo"}}
-        with patch("src.engine.all_workflows", return_value=[workflow]), \
+        with patch("src.dapier.engine.all_workflows", return_value=[workflow]), \
              patch("boto3.client", return_value=self.ses), \
              patch.dict(os.environ, {"TRIGGER_EMAIL_DOMAIN": "dtcdev.click"}):
             execute(event)

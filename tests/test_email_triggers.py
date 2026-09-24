@@ -4,8 +4,9 @@ import unittest
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from src import agent_api, email_triggers
-from src.engine import all_workflows, execute, matches
+from src.dapier.api import agent as agent_api
+from src.dapier.triggers import email_triggers
+from src.dapier.engine import all_workflows, execute, matches
 
 
 class StubTable:
@@ -82,7 +83,7 @@ class TriggerItemTests(unittest.TestCase):
         self.assertTrue(item["enabled"])
 
     def test_rejects_names_claimed_by_yaml_workflows(self):
-        with patch("src.email_triggers.yaml_email_routes", return_value={"taken"}):
+        with patch("src.dapier.triggers.email_triggers.yaml_email_routes", return_value={"taken"}):
             with self.assertRaises(email_triggers.TriggerError) as ctx:
                 email_triggers.build_item({"name": "taken", "actions": self.body["actions"]}, "op")
         self.assertIn("YAML workflow", str(ctx.exception))
@@ -150,7 +151,7 @@ class WorkflowMergeTests(unittest.TestCase):
     def test_all_workflows_appends_triggers_to_yaml(self):
         stub = StubTable([dict(self.item)])
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-             patch("src.email_triggers.get_table", return_value=stub):
+             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub):
             merged = all_workflows()
         self.assertGreater(len(merged), 1)
         self.assertEqual(merged[-1]["id"], "email-trigger-income-2026-08")
@@ -185,7 +186,7 @@ class ExecuteEndToEndTests(unittest.TestCase):
             "data": {"route": "receipts", "subject": "hi"},
         }
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-             patch("src.email_triggers.get_table", return_value=stub), \
+             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub), \
              patch("urllib.request.urlopen", return_value=FakeResponse()) as urlopen:
             execute(event)
 
@@ -203,7 +204,7 @@ class ExecuteEndToEndTests(unittest.TestCase):
         }])
         event = {"connector": "email", "event": "message.received", "data": {"route": "stranger"}}
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-             patch("src.email_triggers.get_table", return_value=stub), \
+             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub), \
              patch("urllib.request.urlopen") as urlopen:
             execute(event)
 
@@ -220,9 +221,9 @@ class AgentApiTests(unittest.TestCase):
                 "actions": [{"type": "webhook", "url": "https://hooks.test/x"}],
             }),
         }
-        with patch("src.agent_api.authenticate", return_value=("sub-1", None)), \
-             patch("src.agent_api.authz.is_operator", return_value=True), \
-             patch("src.email_triggers.get_table", return_value=stub), \
+        with patch("src.dapier.api.agent.authenticate", return_value=("sub-1", None)), \
+             patch("src.dapier.api.agent.authz.is_operator", return_value=True), \
+             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub), \
              patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}):
             created = agent_api.email_triggers_api(event, "PUT")
             listed = agent_api.email_triggers_api({"headers": {}}, "GET")
@@ -235,8 +236,8 @@ class AgentApiTests(unittest.TestCase):
         )
 
     def test_non_operator_is_rejected(self):
-        with patch("src.agent_api.authenticate", return_value=("sub-2", None)), \
-             patch("src.agent_api.authz.is_operator", return_value=False):
+        with patch("src.dapier.api.agent.authenticate", return_value=("sub-2", None)), \
+             patch("src.dapier.api.agent.authz.is_operator", return_value=False):
             response = agent_api.email_triggers_api({"headers": {}}, "GET")
 
         self.assertEqual(response["statusCode"], 403)

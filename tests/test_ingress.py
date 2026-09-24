@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 
-from src import ingress
+from src.dapier.api import router as ingress
 
 
 def test_youtube_signature_header_is_case_insensitive(monkeypatch):
@@ -205,7 +205,7 @@ def test_webhook_hook_accepts_bearer_token_and_publishes(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     response = _post("/hooks/webhook/orders",
                      headers={"authorization": "Bearer tok-123",
@@ -227,7 +227,7 @@ def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     assert _post("/hooks/webhook/orders")["statusCode"] == 401
     assert _post("/hooks/webhook/orders",
@@ -237,10 +237,10 @@ def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
 
 def test_webhook_hook_unknown_or_disabled_is_404(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
     assert _post("/hooks/webhook/stranger",
                  headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
-    monkeypatch.setattr("src.hook_triggers.get_table",
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table",
                         lambda *a, **k: _hook_stub(enabled=False))
     assert _post("/hooks/webhook/orders",
                  headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
@@ -251,7 +251,7 @@ def test_webhook_hook_wraps_non_json_bodies(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     response = _post("/hooks/webhook/orders", body=b"plain text",
                      headers={"authorization": "Bearer tok-123",
@@ -266,7 +266,7 @@ def test_telegram_hook_verifies_secret_header_and_extracts_fields(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
     monkeypatch.setattr(
-        "src.hook_triggers.get_table",
+        "src.dapier.triggers.hook_triggers.get_table",
         lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
 
     update = {"update_id": 91, "message": {
@@ -296,7 +296,7 @@ def test_telegram_hook_rejects_wrong_or_missing_secret(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
     monkeypatch.setattr(
-        "src.hook_triggers.get_table",
+        "src.dapier.triggers.hook_triggers.get_table",
         lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
 
     assert _post("/hooks/telegram/bot-inbox")["statusCode"] == 401
@@ -332,7 +332,7 @@ def test_webhook_hook_accepts_bearer_token_and_publishes(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     response = _post("/hooks/webhook/orders",
                      headers={"authorization": "Bearer tok-123",
@@ -354,7 +354,7 @@ def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     assert _post("/hooks/webhook/orders")["statusCode"] == 401
     assert _post("/hooks/webhook/orders",
@@ -364,10 +364,10 @@ def test_webhook_hook_rejects_bad_or_missing_tokens(monkeypatch):
 
 def test_webhook_hook_unknown_or_disabled_is_404(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
     assert _post("/hooks/webhook/stranger",
                  headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
-    monkeypatch.setattr("src.hook_triggers.get_table",
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table",
                         lambda *a, **k: _hook_stub(enabled=False))
     assert _post("/hooks/webhook/orders",
                  headers={"authorization": "Bearer tok-123"})["statusCode"] == 404
@@ -378,7 +378,7 @@ def test_webhook_hook_wraps_non_json_bodies(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
-    monkeypatch.setattr("src.hook_triggers.get_table", lambda *a, **k: _hook_stub())
+    monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table", lambda *a, **k: _hook_stub())
 
     response = _post("/hooks/webhook/orders", body=b"plain text",
                      headers={"authorization": "Bearer tok-123",
@@ -393,7 +393,7 @@ def test_telegram_hook_verifies_secret_header_and_extracts_fields(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
     monkeypatch.setattr(
-        "src.hook_triggers.get_table",
+        "src.dapier.triggers.hook_triggers.get_table",
         lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
 
     update = {"update_id": 91, "message": {
@@ -423,7 +423,7 @@ def test_telegram_hook_rejects_wrong_or_missing_secret(monkeypatch):
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
     monkeypatch.setattr(
-        "src.hook_triggers.get_table",
+        "src.dapier.triggers.hook_triggers.get_table",
         lambda *a, **k: _hook_stub(hook_id="bot-inbox", kind="telegram", token="tg-secret"))
 
     assert _post("/hooks/telegram/bot-inbox")["statusCode"] == 401

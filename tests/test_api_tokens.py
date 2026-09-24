@@ -1,6 +1,6 @@
 """Unit tests for operator-issued API tokens (src/api_tokens.py)."""
 
-from src import api_tokens
+from src.dapier.auth import api_tokens
 
 
 class TokenTable:

@@ -1,6 +1,6 @@
 import pytest
 
-from src import slack_tokens
+from src.dapier.connections.providers import slack_tokens
 
 
 class FakeTransport:
