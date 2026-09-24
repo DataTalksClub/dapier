@@ -24,7 +24,7 @@ OPERATOR_EMAILS="${OPERATOR_EMAILS:-}"
 # empty values, and CloudFormation keeps a parameter's previous value when an
 # override is omitted — so OperatorEmails must be passed explicitly (possibly
 # as '') to actually clear a previously deployed allowlist.
-params_file="$(mktemp)"
+params_file="$(mktemp --suffix .json)"
 trap 'rm -f "$params_file"' EXIT
 cat > "$params_file" <<EOF
 [
