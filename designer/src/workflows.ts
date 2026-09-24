@@ -31,7 +31,7 @@ export function defaultNodeData(kind: "trigger" | "action"): NodeData {
 }
 
 export function actionNodeTitle(data: NodeData): string {
-  return actionMeta(data.actionType ?? "webhook")?.label ?? "Action";
+  return actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Action";
 }
 
 export function actionNodeSubtitle(data: NodeData): string {
