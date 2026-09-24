@@ -202,7 +202,7 @@ function emptyRow(columns) {
 }
 
 function renderConnections(connections) {
-  renderConnectCards(connections);
+  renderConnectCards();
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
@@ -314,38 +314,44 @@ const CONNECT_PROVIDERS = {
   },
 };
 
-function renderConnectCards(connections) {
-  $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => {
-    const existing = connections.find((connection) => connection.provider === provider);
-    const status = existing
-      ? statusLine(existing.status)
-      : '<span class="status off"><span class="status-dot" aria-hidden="true"></span>not connected</span>';
-    const action = provider === 'slack'
-      ? `<button class="button secondary connect-button" data-provider="slack" type="button">${existing ? 'Replace token' : 'Paste bot token'}</button>`
-      : `<button class="button primary connect-button" data-provider="${provider}" type="button">${existing ? (existing.status === 'connected' ? 'Reconnect' : 'Continue connecting') : 'Connect'}</button>`;
-    return `<div class="connect-card">
-      <div class="connect-card-head"><span class="connect-name">${meta.label}</span>${status}</div>
+function renderConnectCards() {
+  // The grid is a "create new" picker — connection state lives in the
+  // Connected accounts table below, so the cards stay uniform.
+  $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => `
+    <div class="connect-card">
+      <div class="connect-card-head"><span class="connect-name">${meta.label}</span></div>
       <p class="connect-blurb">${meta.blurb}</p>
-      ${action}
-    </div>`;
-  }).join('');
+      <button class="button secondary connect-button" data-provider="${provider}" type="button">Create new</button>
+    </div>`).join('');
   $$('.connect-button').forEach((button) => button.addEventListener('click', () => connectProvider(button.dataset.provider)));
+}
+
+/* New connections must not clobber existing records, so derive the first
+   free "<base>", "<base>-2", … ID and number the display name to match. */
+function nextConnectionId(base) {
+  const taken = new Set(((state.data || {}).connections || []).map((connection) => connection.connection_id));
+  if (!taken.has(base)) return { id: base, suffix: 0 };
+  let suffix = 2;
+  while (taken.has(`${base}-${suffix}`)) suffix += 1;
+  return { id: `${base}-${suffix}`, suffix };
 }
 
 async function connectProvider(provider) {
   if (provider === 'slack') return openSlackDialog();
   const meta = CONNECT_PROVIDERS[provider];
-  const existing = ((state.data || {}).connections || []).find((connection) => connection.provider === provider);
-  const id = existing ? existing.connection_id : meta.connectionId;
+  const { id, suffix } = nextConnectionId(meta.connectionId);
   try {
-    if (!existing) {
-      // First connect: provision the record with the provider's standard
-      // scopes, then bounce straight to the consent screen.
-      await api('/api/admin/connections', {
-        method: 'PUT',
-        body: JSON.stringify({ connection_id: id, provider, display_name: meta.displayName, scopes: meta.scopes }),
-      });
-    }
+    // Provision the new record with the provider's standard scopes, then
+    // bounce straight to the consent screen.
+    await api('/api/admin/connections', {
+      method: 'PUT',
+      body: JSON.stringify({
+        connection_id: id,
+        provider,
+        display_name: suffix ? `${meta.displayName} ${suffix}` : meta.displayName,
+        scopes: meta.scopes,
+      }),
+    });
     window.location.assign(`/api/admin/oauth/${encodeURIComponent(id)}/start`);
   } catch (error) { notice(error.message, true); }
 }
@@ -407,11 +413,11 @@ $('#connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   $('#connection-error').textContent = '';
-  const existing = ((state.data || {}).connections || []).find((connection) => connection.provider === 'slack');
+  const { id, suffix } = nextConnectionId('slack');
   const body = {
-    connection_id: existing ? existing.connection_id : 'slack',
+    connection_id: id,
     provider: 'slack',
-    display_name: existing ? existing.display_name : 'DataTalks Slack',
+    display_name: suffix ? `DataTalks Slack ${suffix}` : 'DataTalks Slack',
     token: form.slack_token.value,
   };
   try {
