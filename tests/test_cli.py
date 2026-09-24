@@ -186,3 +186,68 @@ def test_import_posts_files_without_logging(monkeypatch, tmp_path, capsys):
     out, _ = capsys.readouterr()
     assert "refresh-value" not in out
     assert "client-secret-value" not in out
+
+
+TRIGGER = {
+    "name": "consulting",
+    "address": "consulting@dtcdev.click",
+    "description": "consulting invoices",
+    "enabled": True,
+    "actions": [{"type": "dropbox_upload", "connection_id": "dropbox", "folder": "/x"}],
+}
+
+
+def test_triggers_list_and_show(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/email-triggers")
+        return {"domain": "dtcdev.click", "triggers": [TRIGGER], "yaml_routes": ["todo"]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.triggers_list("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "consulting@dtcdev.click" in out
+    assert "dropbox_upload" in out
+    assert "todo" in out
+    assert commands.triggers_show("https://api.example.test", "consulting") == 0
+    out, _ = capsys.readouterr()
+    assert '"type": "dropbox_upload"' in out
+    assert commands.triggers_show("https://api.example.test", "missing") == 4
+
+
+def test_triggers_save_and_delete(monkeypatch, tmp_path, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"created": method == "PUT", "name": "consulting",
+                "address": "consulting@dtcdev.click"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    trigger_file = tmp_path / "trigger.json"
+    trigger_file.write_text(json.dumps({"name": "consulting", "actions": TRIGGER["actions"]}))
+    assert commands.triggers_save("https://api.example.test", str(trigger_file)) == 0
+    assert (seen["method"], seen["path"]) == ("PUT", "/api/agent/email-triggers")
+    assert seen["body"] == {"name": "consulting", "actions": TRIGGER["actions"]}
+    out, _ = capsys.readouterr()
+    assert "Created consulting@dtcdev.click" in out
+    assert commands.triggers_save("https://api.example.test", str(tmp_path / "nope")) == 2
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("{not json")
+    assert commands.triggers_save("https://api.example.test", str(bad_file)) == 2
+    assert commands.triggers_delete("https://api.example.test", "consulting") == 0
+    assert seen["method"] == "DELETE"
+    assert seen["path"] == "/api/agent/email-triggers?name=consulting"
+    out, _ = capsys.readouterr()
+    assert "Deleted consulting@dtcdev.click" in out
+
+
+def test_main_triggers_parsing(monkeypatch):
+    seen = {}
+
+    def fake_save(api_url, path, debug=False):
+        seen["file"] = path
+        return 0
+
+    monkeypatch.setattr(commands, "triggers_save", fake_save)
+    assert main.main(["triggers", "save", "/tmp/trigger.json"]) == 0
+    assert seen["file"] == "/tmp/trigger.json"

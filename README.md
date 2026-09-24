@@ -189,6 +189,37 @@ never prints it. `token write` creates a `0600` file and refuses to overwrite
 without `--force`. Both commands verify the returned provider account ID
 against the connection's bound account before handing anything out.
 
+Email triggers reserve `name@dtcdev.click` and run actions for every message
+sent to that address. They are live immediately — no deploy. Operators manage
+them with:
+
+```bash
+dapier triggers list
+dapier triggers show consulting
+dapier triggers save trigger.json
+dapier triggers delete consulting
+```
+
+`save` takes a JSON file (or `-` for stdin) with a name, an optional
+description, and one or more actions, e.g.:
+
+```json
+{
+  "name": "consulting",
+  "description": "consulting invoices",
+  "actions": [
+    {"type": "dropbox_upload", "connection_id": "dropbox",
+     "folder": "_dtc_paperwork/income-invoices"},
+    {"type": "dataops", "auth_secret_id": "dataops/auth"}
+  ]
+}
+```
+
+Action types and their keys match the workflow catalog (`webhook`, `slack`,
+`dataops`, `dropbox_upload`, `dropbox_delete`, `render_html_to_pdf`). Some
+local parts are reserved (`invoice`, `no-reply`, ...), and routes already
+claimed by YAML workflows cannot be shadowed.
+
 One-time migration of the existing DataTalksClub YouTube credential (bytes are
 transferred, never logged; refresh and channel ID are verified first; backups
 are untouched). `--client-id`/`--client-secret-file` are optional — they are

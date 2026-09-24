@@ -52,6 +52,16 @@ def build_parser():
     write_p.add_argument("--agent", required=True)
     write_p.add_argument("--output", required=True)
     write_p.add_argument("--force", action="store_true")
+
+    trig_p = sub.add_parser("triggers", help="Email triggers (name@dtcdev.click)")
+    trig_sub = trig_p.add_subparsers(dest="command", required=True)
+    trig_sub.add_parser("list", help="List email triggers and YAML-claimed routes")
+    trig_show_p = trig_sub.add_parser("show", help="Show one email trigger")
+    trig_show_p.add_argument("name")
+    trig_save_p = trig_sub.add_parser("save", help="Create or update a trigger from a JSON file")
+    trig_save_p.add_argument("file", help="Path to the trigger JSON, or - for stdin")
+    trig_del_p = trig_sub.add_parser("delete", help="Delete an email trigger")
+    trig_del_p.add_argument("name")
     return parser
 
 
@@ -74,6 +84,8 @@ def main(argv=None):
             return cmd_connections(args, api_url, debug)
         if args.group == "token":
             return cmd_token(args, api_url, debug, child)
+        if args.group == "triggers":
+            return cmd_triggers(args, api_url, debug)
     except ApiError as exc:
         print(f"Error: {exc}")
         if exc.status == 401:
@@ -130,6 +142,18 @@ def cmd_token(args, api_url, debug, child=None):
     if args.command == "write":
         return commands.token_write(api_url, args.connection_id, args.agent,
                                     args.output, args.force, debug)
+    return 2
+
+
+def cmd_triggers(args, api_url, debug):
+    if args.command == "list":
+        return commands.triggers_list(api_url, debug)
+    if args.command == "show":
+        return commands.triggers_show(api_url, args.name, debug)
+    if args.command == "save":
+        return commands.triggers_save(api_url, args.file, debug)
+    if args.command == "delete":
+        return commands.triggers_delete(api_url, args.name, debug)
     return 2
 
 

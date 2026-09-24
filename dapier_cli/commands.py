@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import sys
 import time
 import webbrowser
 
@@ -184,4 +185,68 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
     data = api.call(api_url, "POST", "/api/admin/connections/import", body, debug=debug)
     print(f"Imported {data.get('connection_id')} "
           f"({data.get('account_title') or data.get('verified_account_id')}).")
+    return 0
+
+
+def print_trigger(item):
+    for key in ("name", "address", "description", "enabled", "created_by",
+                "created_at", "updated_at"):
+        if item.get(key) not in (None, ""):
+            print(f"{key}: {item[key]}")
+    for index, action in enumerate(item.get("actions") or [], 1):
+        print(f"action[{index}]: {json.dumps(action, sort_keys=True)}")
+
+
+def triggers_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/email-triggers", debug=debug)
+    items = data.get("triggers", [])
+    if not items:
+        print("No email triggers yet. Create one with `dapier triggers save`.")
+    for item in items:
+        types = ",".join(action.get("type", "?") for action in item.get("actions") or [])
+        enabled = "yes" if item.get("enabled", True) else "no"
+        print(f"{item.get('name', ''):20} {item.get('address', ''):34} "
+              f"enabled={enabled:3} {types}")
+    routes = data.get("yaml_routes") or []
+    if routes:
+        print(f"Routes handled by YAML workflows (not editable here): {', '.join(routes)}")
+    return 0
+
+
+def triggers_show(api_url, name, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/email-triggers", debug=debug)
+    item = next((t for t in data.get("triggers", []) if t.get("name") == name), None)
+    if item is None:
+        print(f"No trigger named '{name}'.")
+        return 4
+    print_trigger(item)
+    return 0
+
+
+def _read_trigger_file(path):
+    """Return the parsed JSON body, or ``(None, error_message)``."""
+    try:
+        with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
+            return json.loads(handle.read()), None
+    except OSError as exc:
+        return None, f"Cannot read {path}: {exc}"
+    except ValueError as exc:
+        return None, f"{path} is not valid JSON: {exc}"
+
+
+def triggers_save(api_url, path, debug=False):
+    body, error = _read_trigger_file(path)
+    if error:
+        print(error)
+        return 2
+    data = api.call(api_url, "PUT", "/api/agent/email-triggers", body, debug=debug)
+    verb = "Created" if data.get("created") else "Updated"
+    print(f"{verb} {data.get('address') or data.get('name')}. "
+          "It is live immediately; no deploy needed.")
+    return 0
+
+
+def triggers_delete(api_url, name, debug=False):
+    data = api.call(api_url, "DELETE", f"/api/agent/email-triggers?name={name}", debug=debug)
+    print(f"Deleted {data.get('address') or name}.")
     return 0
