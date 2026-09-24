@@ -238,7 +238,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       Name: !Sub ${AWS::StackName}/admin
-      Description: Administrator credentials for the Dapier console
+      Description: Signing key for Dapier console session cookies
       GenerateSecretString:
         SecretStringTemplate: '{"username":"admin"}'
         GenerateStringKey: password

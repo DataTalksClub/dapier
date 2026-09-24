@@ -77,6 +77,7 @@ def _b64decode(value):
 
 
 def _credentials():
+    # The generated "password" is the HMAC key for signed session cookies.
     global _admin_secret
     if _admin_secret is None:
         value = boto3.client("secretsmanager").get_secret_value(
@@ -273,35 +274,6 @@ def _request_json(event):
     if not isinstance(value, dict):
         raise ValueError("request body must be an object")
     return value
-
-
-def login(event):
-    try:
-        body = _request_json(event)
-    except (ValueError, json.JSONDecodeError):
-        return _json_response(400, {"error": "Invalid request"})
-    credentials = _credentials()
-    username = str(body.get("username", ""))
-    password = str(body.get("password", ""))
-    if not (
-        hmac.compare_digest(username, credentials.get("username", "admin"))
-        and hmac.compare_digest(password, credentials["password"])
-    ):
-        return _json_response(401, {"error": "Invalid username or password"})
-    token = _sign({"sub": username, "exp": int(time.time()) + SESSION_TTL_SECONDS})
-    return _json_response(
-        200,
-        {"username": username},
-        cookies=[f"{SESSION_COOKIE}={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Strict"],
-    )
-
-
-def logout():
-    return _json_response(
-        200,
-        {"ok": True},
-        cookies=[f"{SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict"],
-    )
 
 
 def _workflows():
@@ -664,8 +636,6 @@ def route(event, method, path):
         return auth_error()
     if method == "GET" and path == "/auth/logout":
         return auth_logout()
-    if method == "POST" and path == "/api/admin/session" and os.environ.get("LEGACY_ADMIN_LOGIN_ENABLED", "").lower() in ("1", "true", "yes"):
-        return login(event)
     if method == "GET" and path == "/oauth/callback":
         return oauth_callback(event)
     if path.startswith("/api/agent/"):
@@ -678,8 +648,6 @@ def route(event, method, path):
             "username": payload.get("sub"),
             "operator": authz.is_operator(payload),
         })
-    if method == "POST" and path == "/api/admin/logout":
-        return logout()
     if not _csrf_ok(event, method):
         return _json_response(403, {"error": "Cross-site request rejected"})
     operator_payload, operator_error = require_operator(event)

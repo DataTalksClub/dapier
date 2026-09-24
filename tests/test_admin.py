@@ -13,19 +13,6 @@ def request(method, path, body=None, cookies=None):
     }
 
 
-def test_login_creates_signed_http_only_session(monkeypatch):
-    monkeypatch.setenv("LEGACY_ADMIN_LOGIN_ENABLED", "true")
-    monkeypatch.setattr(admin, "_credentials", lambda: {"username": "admin", "password": "correct-password"})
-
-    response = admin.login(request("POST", "/api/admin/session", {"username": "admin", "password": "correct-password"}))
-
-    assert response["statusCode"] == 200
-    assert "correct-password" not in response["body"]
-    assert response["cookies"][0].startswith("dapier_session=")
-    assert "HttpOnly" in response["cookies"][0]
-    assert "Secure" in response["cookies"][0]
-
-
 def configure_oidc(monkeypatch):
     monkeypatch.setenv("AUTH_BASE_URL", "https://auth.example.test")
     monkeypatch.setenv("AUTH_CLIENT_ID", "dapier-client")
