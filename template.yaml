@@ -41,7 +41,7 @@ Parameters:
   OperatorEmails:
     Type: String
     Default: ''
-    Description: Comma-separated DTC accounts allowed to administer connections (empty: any signed-in DTC account)
+    Description: Comma-separated DTC accounts allowed to administer connections (empty means any signed-in DTC account)
   OperatorSubjects:
     Type: String
     Default: ''
@@ -260,6 +260,8 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem]
             Resource: !GetAtt CredentialsTable.Arn
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConnectionsTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
