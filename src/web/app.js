@@ -206,9 +206,11 @@ function renderConnections(connections) {
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
-    const action = connection.provider === 'slack'
+    const primary = connection.provider === 'slack'
       ? '<button class="button secondary connection-token" type="button">Replace token</button>'
       : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a>`;
+    const action = `${primary}
+      <button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
     <td class="mono muted-cell" data-label="Provider">${escapeHtml(connection.provider)}</td>
@@ -218,6 +220,7 @@ function renderConnections(connections) {
   </tr>`;
   }).join('');
   $$('.connection-token').forEach((button) => button.addEventListener('click', openSlackDialog));
+  $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
 }
 
 function renderCredentials(credentials) {
@@ -355,6 +358,25 @@ function openSlackDialog() {
   form.slack_token.focus();
 }
 
+function openEditConnection(connectionId) {
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  if (!connection) return;
+  const form = $('#edit-connection-form');
+  form.reset();
+  form.dataset.connectionId = connection.connection_id;
+  form.dataset.provider = connection.provider;
+  $('#edit-connection-title').textContent = `Edit ${connection.display_name || connection.connection_id}`;
+  $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}`;
+  form.display_name.value = connection.display_name || connection.connection_id;
+  form.scopes.value = (connection.scopes || []).join(' ');
+  $('#edit-scopes-field').hidden = connection.provider === 'slack';
+  form.token.value = '';
+  $('#edit-token-field').hidden = connection.provider !== 'slack';
+  $('#edit-connection-error').textContent = '';
+  $('#edit-connection-dialog').showModal();
+  form.display_name.focus();
+}
+
 function openCredential(provider) {
   const form = $('#credential-form');
   form.reset();
@@ -401,6 +423,55 @@ $('#connection-form').addEventListener('submit', async (event) => {
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
 
+$('#edit-connection-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const connectionId = form.dataset.connectionId;
+  const provider = form.dataset.provider;
+  $('#edit-connection-error').textContent = '';
+  const body = {
+    connection_id: connectionId,
+    provider,
+    display_name: form.display_name.value.trim() || connectionId,
+  };
+  if (provider !== 'slack') {
+    body.scopes = form.scopes.value.split(/\s+/).filter(Boolean);
+  } else {
+    const token = form.token.value.trim();
+    if (token) body.token = token;
+  }
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  if (connection && connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
+  try {
+    await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
+    form.token.value = '';
+    $('#edit-connection-dialog').close();
+    notice('Connection updated');
+    await refresh();
+  } catch (error) { $('#edit-connection-error').textContent = error.message; }
+});
+
+/* Secret fields render masked bullets without being real password inputs where
+   the engine can draw them itself (-webkit-text-security): the browser's
+   password manager never sees a password field, so it neither autofills saved
+   credentials nor offers to save the pasted token. Copy, cut, and drag out of
+   a secret field are blocked so a pasted token can't leave it. */
+function hardenSecretInputs(root = document) {
+  $$('.secret-input', root).forEach((input) => {
+    if (input.type === 'password' && CSS.supports('-webkit-text-security', 'disc')) {
+      input.type = 'text';
+      input.classList.add('masked-input');
+      input.setAttribute('autocomplete', 'off');
+    } else {
+      input.setAttribute('autocomplete', 'new-password');
+    }
+  });
+}
+
+['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
+  if (event.target instanceof Element && event.target.closest('.secret-input')) event.preventDefault();
+}));
+
 function handleRowActivate(event) {
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
@@ -427,6 +498,7 @@ $('#logout').addEventListener('click', () => { window.location.assign('/auth/log
 
 window.addEventListener('DOMContentLoaded', async () => {
   icons();
+  hardenSecretInputs();
   let me;
   try { me = await api('/api/admin/me'); } catch (_) { return; }
   if (!me.operator) { showForbidden(); return; }

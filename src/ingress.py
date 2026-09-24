@@ -27,9 +27,12 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/runs")
+
+
 def _static(path):
     assets = {
-        "/": ("index.html", "text/html; charset=utf-8"),
+        **{view: ("index.html", "text/html; charset=utf-8") for view in CONSOLE_VIEWS},
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
@@ -52,7 +55,7 @@ def _static(path):
         body,
         content_type,
         headers={
-            "cache-control": "no-store" if path == "/" else "public, max-age=300",
+            "cache-control": "no-store" if path in CONSOLE_VIEWS else "public, max-age=300",
             "content-security-policy": (
                 "default-src 'self'; script-src 'self'; "
                 "style-src 'self'; img-src 'self' data:; connect-src 'self'; "

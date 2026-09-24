@@ -157,15 +157,13 @@ def test_dropbox_webhook_fails_closed_without_configured_connections(monkeypatch
     )
     assert response["statusCode"] == 401
 
-def test_console_assets_are_self_hosted():
-    lucide = ingress._static("/assets/lucide.min.js")
-    assert lucide["statusCode"] == 200
-    assert "unpkg.com" not in lucide["headers"]["content-security-policy"]
-    assert "sourceMappingURL" not in lucide["body"]
 
-    index = ingress._static("/")
-    assert "https://unpkg.com" not in index["body"]
-    assert "forbidden-view" in index["body"]
+def test_console_views_serve_index_html():
+    for path in ("/", "/workflows", "/connections", "/credentials", "/runs"):
+        response = ingress._static(path)
+        assert response["statusCode"] == 200, path
+        assert "forbidden-view" in response["body"], path
+        assert response["headers"]["cache-control"] == "no-store", path
 
 
 def test_console_assets_are_self_hosted():

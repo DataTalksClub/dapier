@@ -162,6 +162,18 @@ Resources:
         Root:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /, Method: GET}
+        ConsoleWorkflows:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /workflows, Method: GET}
+        ConsoleConnections:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /connections, Method: GET}
+        ConsoleCredentials:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /credentials, Method: GET}
+        ConsoleRuns:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}
         AppCss:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /assets/app.css, Method: GET}
