@@ -17522,6 +17522,108 @@
     safeLoadAll,
     safeDump
   } = yaml;
+  const nodeColor = "var(--diagram-component)";
+  const triggerColor = "var(--diagram-trigger)";
+  const noteColor = "var(--diagram-note)";
+  const handleColor = "var(--diagram-handle)";
+  const shapeLabelSize = 16;
+  const minZoom = 0.5;
+  const maxZoom = 2;
+  function shapeColor(shape) {
+    if (shape.type === "note") return noteColor;
+    if (shape.data?.nodeKind === "trigger") return triggerColor;
+    return nodeColor;
+  }
+  function centerOf(shape) {
+    return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+  }
+  function shapeContains(shape, point) {
+    return point.x >= shape.x - 10 && point.x <= shape.x + shape.width + 10 && point.y >= shape.y - 10 && point.y <= shape.y + shape.height + 10;
+  }
+  function findNodeAt(shapes, point) {
+    return [...shapes].reverse().find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
+  }
+  function isNodeShape(shape) {
+    return Boolean(shape && shape.type === "node");
+  }
+  function distanceToSegment(point, start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+    const projection = { x: start.x + t * dx, y: start.y + t * dy };
+    return Math.hypot(point.x - projection.x, point.y - projection.y);
+  }
+  function displayLabel(label) {
+    return label.length > 26 ? `${label.slice(0, 23)}...` : label;
+  }
+  function connectionHandles(shape) {
+    return [
+      { id: "top", x: shape.x + shape.width / 2, y: shape.y },
+      { id: "right", x: shape.x + shape.width, y: shape.y + shape.height / 2 },
+      { id: "bottom", x: shape.x + shape.width / 2, y: shape.y + shape.height },
+      { id: "left", x: shape.x, y: shape.y + shape.height / 2 }
+    ];
+  }
+  function nearestConnectionHandle(shape, point) {
+    return connectionHandles(shape).reduce((nearest, handle) => Math.hypot(point.x - handle.x, point.y - handle.y) < Math.hypot(point.x - nearest.x, point.y - nearest.y) ? handle : nearest);
+  }
+  function connectionHandleById(shape, handleId) {
+    return connectionHandles(shape).find((handle) => handle.id === handleId);
+  }
+  function inferConnectionHandles(source, target) {
+    const sourceHandles = connectionHandles(source);
+    const targetHandles = connectionHandles(target);
+    let best = { source: sourceHandles[0], target: targetHandles[0], distance: Number.POSITIVE_INFINITY };
+    for (const sourceHandle of sourceHandles) {
+      for (const targetHandle of targetHandles) {
+        const distance = Math.hypot(sourceHandle.x - targetHandle.x, sourceHandle.y - targetHandle.y);
+        if (distance < best.distance) best = { source: sourceHandle, target: targetHandle, distance };
+      }
+    }
+    return best;
+  }
+  function connectorEndpoints(shape, shapes) {
+    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+    const target = shapes.find((candidate) => candidate.id === shape.targetId);
+    if (source && target) {
+      const inferred = inferConnectionHandles(source, target);
+      const sourceHandle = connectionHandleById(source, shape.sourceHandleId) ?? inferred.source;
+      const targetHandle = connectionHandleById(target, shape.targetHandleId) ?? inferred.target;
+      return { start: sourceHandle, end: targetHandle };
+    }
+    return {
+      start: { x: shape.x, y: shape.y },
+      end: { x: shape.x + shape.width, y: shape.y + shape.height }
+    };
+  }
+  function refreshConnectedArrow(shape, shapes) {
+    if (shape.type !== "arrow") return shape;
+    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+    const target = shapes.find((candidate) => candidate.id === shape.targetId);
+    if (!source || !target) return shape;
+    const handles = inferConnectionHandles(source, target);
+    return {
+      ...shape,
+      sourceHandleId: handles.source.id,
+      targetHandleId: handles.target.id,
+      x: handles.source.x,
+      y: handles.source.y,
+      width: handles.target.x - handles.source.x,
+      height: handles.target.y - handles.source.y
+    };
+  }
+  function refreshArrowsForMovedShape(shapes, movedShapeId) {
+    return shapes.map((shape) => shape.sourceId === movedShapeId || shape.targetId === movedShapeId ? refreshConnectedArrow(shape, shapes) : shape);
+  }
+  function findConnectorAt(shapes, point) {
+    return [...shapes].reverse().find((shape) => {
+      if (shape.type !== "arrow") return false;
+      const endpoints = connectorEndpoints(shape, shapes);
+      return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
+    });
+  }
   function brandMark(title, paths) {
     return function BrandMark({ size = 16, className, x, y }) {
       return /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -17917,13 +18019,6 @@
       actionCount: Array.isArray(workflow.actions) ? workflow.actions.length : 0
     };
   }
-  const nodeColor = "var(--diagram-component)";
-  const triggerColor = "var(--diagram-trigger)";
-  const noteColor = "var(--diagram-note)";
-  const handleColor = "var(--diagram-handle)";
-  const shapeLabelSize = 16;
-  const minZoom = 0.5;
-  const maxZoom = 2;
   function actionIcon(type2) {
     return actionMeta(type2)?.icon ?? FileText;
   }
@@ -17945,101 +18040,6 @@
   const allPaletteEntries = [...triggerPalette, ...actionPalette, ...notePalette];
   function paletteLabel(kind) {
     return allPaletteEntries.find((entry) => entry.kind === kind)?.label ?? "Node";
-  }
-  function shapeColor(shape) {
-    if (shape.type === "note") return noteColor;
-    if (shape.data?.nodeKind === "trigger") return triggerColor;
-    return nodeColor;
-  }
-  function centerOf(shape) {
-    return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
-  }
-  function shapeContains(shape, point) {
-    return point.x >= shape.x - 10 && point.x <= shape.x + shape.width + 10 && point.y >= shape.y - 10 && point.y <= shape.y + shape.height + 10;
-  }
-  function findNodeAt(shapes, point) {
-    return [...shapes].reverse().find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
-  }
-  function isNodeShape(shape) {
-    return Boolean(shape && shape.type === "node");
-  }
-  function distanceToSegment(point, start, end) {
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const lengthSquared = dx * dx + dy * dy;
-    if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
-    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
-    const projection = { x: start.x + t * dx, y: start.y + t * dy };
-    return Math.hypot(point.x - projection.x, point.y - projection.y);
-  }
-  function displayLabel(label) {
-    return label.length > 26 ? `${label.slice(0, 23)}...` : label;
-  }
-  function connectionHandles(shape) {
-    return [
-      { id: "top", x: shape.x + shape.width / 2, y: shape.y },
-      { id: "right", x: shape.x + shape.width, y: shape.y + shape.height / 2 },
-      { id: "bottom", x: shape.x + shape.width / 2, y: shape.y + shape.height },
-      { id: "left", x: shape.x, y: shape.y + shape.height / 2 }
-    ];
-  }
-  function nearestConnectionHandle(shape, point) {
-    return connectionHandles(shape).reduce((nearest, handle) => Math.hypot(point.x - handle.x, point.y - handle.y) < Math.hypot(point.x - nearest.x, point.y - nearest.y) ? handle : nearest);
-  }
-  function connectionHandleById(shape, handleId) {
-    return connectionHandles(shape).find((handle) => handle.id === handleId);
-  }
-  function inferConnectionHandles(source, target) {
-    const sourceHandles = connectionHandles(source);
-    const targetHandles = connectionHandles(target);
-    let best = { source: sourceHandles[0], target: targetHandles[0], distance: Number.POSITIVE_INFINITY };
-    for (const sourceHandle of sourceHandles) {
-      for (const targetHandle of targetHandles) {
-        const distance = Math.hypot(sourceHandle.x - targetHandle.x, sourceHandle.y - targetHandle.y);
-        if (distance < best.distance) best = { source: sourceHandle, target: targetHandle, distance };
-      }
-    }
-    return best;
-  }
-  function connectorEndpoints(shape, shapes) {
-    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
-    const target = shapes.find((candidate) => candidate.id === shape.targetId);
-    if (source && target) {
-      const inferred = inferConnectionHandles(source, target);
-      const sourceHandle = connectionHandleById(source, shape.sourceHandleId) ?? inferred.source;
-      const targetHandle = connectionHandleById(target, shape.targetHandleId) ?? inferred.target;
-      return { start: sourceHandle, end: targetHandle };
-    }
-    return {
-      start: { x: shape.x, y: shape.y },
-      end: { x: shape.x + shape.width, y: shape.y + shape.height }
-    };
-  }
-  function refreshConnectedArrow(shape, shapes) {
-    if (shape.type !== "arrow") return shape;
-    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
-    const target = shapes.find((candidate) => candidate.id === shape.targetId);
-    if (!source || !target) return shape;
-    const handles = inferConnectionHandles(source, target);
-    return {
-      ...shape,
-      sourceHandleId: handles.source.id,
-      targetHandleId: handles.target.id,
-      x: handles.source.x,
-      y: handles.source.y,
-      width: handles.target.x - handles.source.x,
-      height: handles.target.y - handles.source.y
-    };
-  }
-  function refreshArrowsForMovedShape(shapes, movedShapeId) {
-    return shapes.map((shape) => shape.sourceId === movedShapeId || shape.targetId === movedShapeId ? refreshConnectedArrow(shape, shapes) : shape);
-  }
-  function findConnectorAt(shapes, point) {
-    return [...shapes].reverse().find((shape) => {
-      if (shape.type !== "arrow") return false;
-      const endpoints = connectorEndpoints(shape, shapes);
-      return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
-    });
   }
   function nodeDataForKind(kind) {
     if (kind === "note") return { nodeKind: "note" };

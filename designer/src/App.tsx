@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CloudUpload, FilePlus2, GitBranch, Loader2, Save, TriangleAlert } from "lucide-react";
 import { dump } from "js-yaml";
-import { WorkflowBoard } from "./WorkflowBoard";
+import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";

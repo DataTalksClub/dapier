@@ -1,20 +1,17 @@
 import {
-  FileText,
   Minus,
   MousePointer2,
   Plus,
   StickyNote,
   Trash2,
-  Zap,
   ListRestart
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "./workflows";
-import type { IconComponent } from "./catalog";
-import type { ActionType, DiagramShape, NodeData, Point, Tool } from "./types";
-
-export type PaletteKind = `trigger:${string}` | ActionType | "note";
+import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt } from "./geometry";
+import { PaletteKind, actionIcon, nodeIcon, PaletteEntry, paletteLabel, nodeDataForKind, nodeTitle, nodeSubtitle, triggerPalette, actionPalette, notePalette } from "./nodes";
+import { actionCatalog, actionMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "../workflows";
+import type { ActionType, DiagramShape, Point, Tool } from "../types";
 
 interface WorkflowBoardProps {
   shapes: DiagramShape[];
@@ -29,202 +26,6 @@ interface WorkflowBoardProps {
     undo: () => void;
   }) => ReactNode;
 }
-
-type ConnectionHandle = { id: string; x: number; y: number };
-
-const nodeColor = "var(--diagram-component)";
-const triggerColor = "var(--diagram-trigger)";
-const noteColor = "var(--diagram-note)";
-const handleColor = "var(--diagram-handle)";
-const shapeLabelSize = 16;
-const minZoom = 0.5;
-const maxZoom = 2;
-
-export function actionIcon(type: ActionType) {
-  return actionMeta(type)?.icon ?? FileText;
-}
-
-/** Icon for a canvas node: the trigger connector's logo, or the action's. */
-export function nodeIcon(data: NodeData | undefined): IconComponent {
-  if (data?.nodeKind === "trigger") return connectorMeta(data.connector ?? "custom")?.logo ?? Zap;
-  return actionIcon(data?.actionType ?? "webhook");
-}
-
-interface PaletteEntry {
-  kind: PaletteKind;
-  label: string;
-  icon: IconComponent;
-}
-
-/** One trigger chip per connector — the palette's Triggers group. */
-const triggerPalette: PaletteEntry[] = connectorCatalog.map((entry) => ({
-  kind: `trigger:${entry.name}`,
-  label: entry.label,
-  icon: entry.logo
-}));
-
-const actionPalette: PaletteEntry[] = actionCatalog.map((entry) => ({
-  kind: entry.type,
-  label: entry.label,
-  icon: entry.icon ?? FileText
-}));
-
-const notePalette: PaletteEntry[] = [{ kind: "note", label: "Note", icon: StickyNote }];
-
-const allPaletteEntries = [...triggerPalette, ...actionPalette, ...notePalette];
-
-function paletteLabel(kind: PaletteKind) {
-  return allPaletteEntries.find((entry) => entry.kind === kind)?.label ?? "Node";
-}
-
-function shapeColor(shape: DiagramShape) {
-  if (shape.type === "note") return noteColor;
-  if (shape.data?.nodeKind === "trigger") return triggerColor;
-  return nodeColor;
-}
-
-function centerOf(shape: DiagramShape): Point {
-  return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
-}
-
-function shapeContains(shape: DiagramShape, point: Point) {
-  return point.x >= shape.x - 10
-    && point.x <= shape.x + shape.width + 10
-    && point.y >= shape.y - 10
-    && point.y <= shape.y + shape.height + 10;
-}
-
-function findNodeAt(shapes: DiagramShape[], point: Point) {
-  return [...shapes].reverse().find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
-}
-
-function isNodeShape(shape: DiagramShape | null | undefined): shape is DiagramShape {
-  return Boolean(shape && shape.type === "node");
-}
-
-function distanceToSegment(point: Point, start: Point, end: Point) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
-  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
-  const projection = { x: start.x + t * dx, y: start.y + t * dy };
-  return Math.hypot(point.x - projection.x, point.y - projection.y);
-}
-
-function displayLabel(label: string) {
-  return label.length > 26 ? `${label.slice(0, 23)}...` : label;
-}
-
-function connectionHandles(shape: DiagramShape): ConnectionHandle[] {
-  return [
-    { id: "top", x: shape.x + shape.width / 2, y: shape.y },
-    { id: "right", x: shape.x + shape.width, y: shape.y + shape.height / 2 },
-    { id: "bottom", x: shape.x + shape.width / 2, y: shape.y + shape.height },
-    { id: "left", x: shape.x, y: shape.y + shape.height / 2 }
-  ];
-}
-
-function nearestConnectionHandle(shape: DiagramShape, point: Point) {
-  return connectionHandles(shape).reduce((nearest, handle) => (
-    Math.hypot(point.x - handle.x, point.y - handle.y) < Math.hypot(point.x - nearest.x, point.y - nearest.y)
-      ? handle
-      : nearest
-  ));
-}
-
-function connectionHandleById(shape: DiagramShape, handleId: string | undefined) {
-  return connectionHandles(shape).find((handle) => handle.id === handleId);
-}
-
-function inferConnectionHandles(source: DiagramShape, target: DiagramShape) {
-  const sourceHandles = connectionHandles(source);
-  const targetHandles = connectionHandles(target);
-  let best = { source: sourceHandles[0], target: targetHandles[0], distance: Number.POSITIVE_INFINITY };
-  for (const sourceHandle of sourceHandles) {
-    for (const targetHandle of targetHandles) {
-      const distance = Math.hypot(sourceHandle.x - targetHandle.x, sourceHandle.y - targetHandle.y);
-      if (distance < best.distance) best = { source: sourceHandle, target: targetHandle, distance };
-    }
-  }
-  return best;
-}
-
-function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
-  const source = shapes.find((candidate) => candidate.id === shape.sourceId);
-  const target = shapes.find((candidate) => candidate.id === shape.targetId);
-  if (source && target) {
-    const inferred = inferConnectionHandles(source, target);
-    const sourceHandle = connectionHandleById(source, shape.sourceHandleId) ?? inferred.source;
-    const targetHandle = connectionHandleById(target, shape.targetHandleId) ?? inferred.target;
-    return { start: sourceHandle, end: targetHandle };
-  }
-  return {
-    start: { x: shape.x, y: shape.y },
-    end: { x: shape.x + shape.width, y: shape.y + shape.height }
-  };
-}
-
-function refreshConnectedArrow(shape: DiagramShape, shapes: DiagramShape[]) {
-  if (shape.type !== "arrow") return shape;
-  const source = shapes.find((candidate) => candidate.id === shape.sourceId);
-  const target = shapes.find((candidate) => candidate.id === shape.targetId);
-  if (!source || !target) return shape;
-  const handles = inferConnectionHandles(source, target);
-  return {
-    ...shape,
-    sourceHandleId: handles.source.id,
-    targetHandleId: handles.target.id,
-    x: handles.source.x,
-    y: handles.source.y,
-    width: handles.target.x - handles.source.x,
-    height: handles.target.y - handles.source.y
-  };
-}
-
-function refreshArrowsForMovedShape(shapes: DiagramShape[], movedShapeId: string) {
-  return shapes.map((shape) => (
-    shape.sourceId === movedShapeId || shape.targetId === movedShapeId
-      ? refreshConnectedArrow(shape, shapes)
-      : shape
-  ));
-}
-
-function findConnectorAt(shapes: DiagramShape[], point: Point) {
-  return [...shapes].reverse().find((shape) => {
-    if (shape.type !== "arrow") return false;
-    const endpoints = connectorEndpoints(shape, shapes);
-    return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
-  });
-}
-
-function nodeDataForKind(kind: PaletteKind): NodeData {
-  if (kind === "note") return { nodeKind: "note" };
-  if (kind.startsWith("trigger:")) {
-    const connector = kind.slice("trigger:".length);
-    return {
-      nodeKind: "trigger",
-      connector,
-      event: connectorMeta(connector)?.events[0] ?? "received",
-      filters: []
-    };
-  }
-  return defaultNodeData("action");
-}
-
-function nodeTitle(shape: DiagramShape): string {
-  if (shape.type === "note") return shape.label ?? "Note";
-  if (shape.data?.nodeKind === "trigger") {
-    return `${connectorLabel(shape.data.connector ?? "custom")} · ${shape.data.event}`;
-  }
-  return actionNodeTitle(shape.data ?? { nodeKind: "action" });
-}
-
-function nodeSubtitle(shape: DiagramShape): string {
-  if (shape.type === "note" || shape.data?.nodeKind === "trigger") return "";
-  return actionNodeSubtitle(shape.data ?? { nodeKind: "action" });
-}
-
 export function WorkflowBoard({
   shapes,
   setShapes,
