@@ -76,13 +76,22 @@ lives in (`DAPIER_ROOT` to override); it binds 127.0.0.1 only, and
 Everything the palette and inspector know about action types lives in one
 declarative file, `designer/src/catalog.ts`. When `src/engine.py` grows a new
 action, append one object to `actionCatalog` — `type` (the YAML `type` value),
-`label`, optional lucide `icon`, and one `fields` entry per YAML key the engine
+`label`, optional `icon` (a lucide icon or a product logo from `logos.tsx`),
+and one `fields` entry per YAML key the engine
 reads. `type: "number" | "boolean" | "select" | "textarea"` picks the inspector
 widget and YAML coercion, and `group` nests keys under an object (e.g.
 `group: "pdf"` → `action.pdf.page_format`). Nothing else needs changing:
 palette, inspector, defaults, and YAML round-trip all derive from the catalog.
 Action types missing from the catalog are not lost either — the designer keeps
 them as opaque nodes and rewrites their YAML untouched on save.
+
+Connectors — the products workflows hook into — are first-class too, in
+`connectorCatalog` in the same file: one entry per product with `name` (the
+YAML `connector` value), `label`, `logo` from `logos.tsx`, and the `events` it
+emits. Each entry renders as a trigger chip in the palette's Triggers group
+(separate from Actions), supplies the trigger's event suggestions, and brands
+the trigger node and sidebar rows — so a trigger is always a connector's
+trigger, never a bare node.
 
 ## Deploy
 

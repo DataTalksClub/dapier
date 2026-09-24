@@ -175,8 +175,11 @@ button {
 }
 
 .workflow-meta {
+  align-items: center;
   color: var(--text-soft);
+  display: flex;
   font-size: 11px;
+  gap: 5px;
 }
 
 .workflow-disabled {
@@ -448,8 +451,27 @@ select:focus {
 
 .component-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   padding-left: 4px;
+}
+
+.chip-group-label {
+  align-self: center;
+  color: var(--text-soft);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  padding-left: 4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chip-divider {
+  align-self: center;
+  background: var(--soft-border);
+  height: 18px;
+  width: 1px;
 }
 
 .component-chip {

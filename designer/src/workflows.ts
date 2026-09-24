@@ -14,6 +14,15 @@ export function actionMeta(type: ActionType) {
   return actionCatalog.find((entry) => entry.type === type);
 }
 
+export function connectorMeta(name: string) {
+  return connectorCatalog.find((entry) => entry.name === name);
+}
+
+/** Product name for a connector ("youtube" → "YouTube"); falls back to the raw name. */
+export function connectorLabel(name: string) {
+  return connectorMeta(name)?.label ?? name;
+}
+
 /** Inspector starting values for a new node of this action type. */
 export function defaultFields(type: ActionType): Record<string, string> {
   const fields: Record<string, string> = {};
@@ -212,7 +221,7 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
     y: rowY(0),
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
-    label: `${workflow.trigger.connector} · ${workflow.trigger.event}`,
+    label: `${connectorLabel(workflow.trigger.connector)} · ${workflow.trigger.event}`,
     data: {
       nodeKind: "trigger",
       connector: connectorCatalog.some((entry) => entry.name === workflow.trigger.connector)

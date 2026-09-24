@@ -1,12 +1,6 @@
-import {
-  DatabaseZap,
-  FileText,
-  MessageSquare,
-  Trash2,
-  Upload,
-  Webhook,
-  type LucideIcon
-} from "lucide-react";
+import { DatabaseZap, FileText, Webhook } from "lucide-react";
+import type { ReactNode } from "react";
+import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
@@ -15,7 +9,8 @@ import {
  * Adding an action is one object in `actionCatalog`:
  *   1. type   — the exact string written to the action's `type` YAML key;
  *   2. label  — shown in the palette, canvas nodes and inspector;
- *   3. icon   — any lucide-react icon (optional, falls back to FileText);
+ *   3. icon   — a lucide-react icon or a product logo from logos.tsx
+ *      (optional, falls back to FileText);
  *   4. fields — one entry per YAML key the engine reads. `group` nests the key
  *      under an object (e.g. group: "pdf" → action.pdf.page_format), `type`
  *      picks the inspector widget and YAML coercion ("number" writes numbers,
@@ -23,10 +18,26 @@ import {
  *      its default, "select" offers fixed choices), `default` prefills new
  *      nodes and fills in values read from YAML that omit the key.
  *
+ * Connectors are the products workflows hook into; each entry in
+ * `connectorCatalog` renders as one trigger chip in the palette's Triggers
+ * group (logo + label) and contributes the events its trigger suggests.
+ *
  * Action types that are not in the catalog are still safe: the designer keeps
  * them as opaque nodes and round-trips their YAML untouched, so hand-written
  * workflows are never mangled on save.
  */
+
+/** Props every icon (lucide or logo) accepts; logos ignore color/strokeWidth. */
+export interface IconProps {
+  size?: number | string;
+  className?: string;
+  color?: string;
+  strokeWidth?: number | string;
+  x?: number | string;
+  y?: number | string;
+}
+
+export type IconComponent = (props: IconProps) => ReactNode;
 
 export interface CatalogField {
   key: string;
@@ -48,7 +59,8 @@ export interface ActionEntry {
   type: string;
   label: string;
   description?: string;
-  icon?: LucideIcon;
+  /** Lucide icon or product logo, shown on palette chips and canvas nodes. */
+  icon?: IconComponent;
   /** Order is the order the inspector renders and the YAML is written. */
   fields: CatalogField[];
 }
@@ -56,6 +68,10 @@ export interface ActionEntry {
 export interface ConnectorEntry {
   /** Value of the trigger's `connector` key in the workflow YAML. */
   name: string;
+  /** Product name shown on the trigger chip, node title and inspector. */
+  label: string;
+  /** Product logo from logos.tsx. */
+  logo: IconComponent;
   /** Events offered as suggestions for this connector's trigger. */
   events: string[];
 }
@@ -75,7 +91,7 @@ export const actionCatalog: ActionEntry[] = [
   {
     type: "slack",
     label: "Slack",
-    icon: MessageSquare,
+    icon: SlackLogo,
     fields: [
       { key: "credential_id", label: "Credential ID" },
       { key: "connection_id", label: "Connection ID", placeholder: "resolves the credential" },
@@ -102,7 +118,7 @@ export const actionCatalog: ActionEntry[] = [
   {
     type: "dropbox_upload",
     label: "Dropbox upload",
-    icon: Upload,
+    icon: DropboxLogo,
     fields: [
       { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
       { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
@@ -113,7 +129,7 @@ export const actionCatalog: ActionEntry[] = [
   {
     type: "dropbox_delete",
     label: "Dropbox delete",
-    icon: Trash2,
+    icon: DropboxLogo,
     fields: [
       { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
       { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
@@ -135,11 +151,11 @@ export const actionCatalog: ActionEntry[] = [
 ];
 
 export const connectorCatalog: ConnectorEntry[] = [
-  { name: "email", events: ["message.received"] },
-  { name: "youtube", events: ["video.published"] },
-  { name: "dropbox", events: ["file.created"] },
-  { name: "renderer", events: ["job.completed"] },
-  { name: "custom", events: [] }
+  { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
+  { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
+  { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
+  { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
+  { name: "custom", label: "Custom", logo: Webhook, events: [] }
 ];
 
 export const filterOperators = ["equals", "prefix", "suffix", "contains"] as const;

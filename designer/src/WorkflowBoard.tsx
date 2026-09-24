@@ -10,10 +10,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "./workflows";
+import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "./workflows";
+import type { IconComponent } from "./catalog";
 import type { ActionType, DiagramShape, NodeData, Point, Tool } from "./types";
 
-export type PaletteKind = "trigger" | ActionType | "note";
+export type PaletteKind = `trigger:${string}` | ActionType | "note";
 
 interface WorkflowBoardProps {
   shapes: DiagramShape[];
@@ -43,18 +44,37 @@ export function actionIcon(type: ActionType) {
   return actionMeta(type)?.icon ?? FileText;
 }
 
-const paletteEntries: Array<{ kind: PaletteKind; label: string; icon: typeof Zap }> = [
-  { kind: "trigger", label: "Trigger", icon: Zap },
-  ...actionCatalog.map((entry) => ({ kind: entry.type as PaletteKind, label: entry.label, icon: actionIcon(entry.type) })),
-  { kind: "note", label: "Note", icon: StickyNote }
-];
-
-function paletteIcon(kind: PaletteKind) {
-  return paletteEntries.find((entry) => entry.kind === kind)?.icon ?? Zap;
+/** Icon for a canvas node: the trigger connector's logo, or the action's. */
+export function nodeIcon(data: NodeData | undefined): IconComponent {
+  if (data?.nodeKind === "trigger") return connectorMeta(data.connector ?? "custom")?.logo ?? Zap;
+  return actionIcon(data?.actionType ?? "webhook");
 }
 
+interface PaletteEntry {
+  kind: PaletteKind;
+  label: string;
+  icon: IconComponent;
+}
+
+/** One trigger chip per connector — the palette's Triggers group. */
+const triggerPalette: PaletteEntry[] = connectorCatalog.map((entry) => ({
+  kind: `trigger:${entry.name}`,
+  label: entry.label,
+  icon: entry.logo
+}));
+
+const actionPalette: PaletteEntry[] = actionCatalog.map((entry) => ({
+  kind: entry.type,
+  label: entry.label,
+  icon: entry.icon ?? FileText
+}));
+
+const notePalette: PaletteEntry[] = [{ kind: "note", label: "Note", icon: StickyNote }];
+
+const allPaletteEntries = [...triggerPalette, ...actionPalette, ...notePalette];
+
 function paletteLabel(kind: PaletteKind) {
-  return paletteEntries.find((entry) => entry.kind === kind)?.label ?? "Node";
+  return allPaletteEntries.find((entry) => entry.kind === kind)?.label ?? "Node";
 }
 
 function shapeColor(shape: DiagramShape) {
@@ -180,13 +200,23 @@ function findConnectorAt(shapes: DiagramShape[], point: Point) {
 
 function nodeDataForKind(kind: PaletteKind): NodeData {
   if (kind === "note") return { nodeKind: "note" };
-  if (kind === "trigger") return defaultNodeData("trigger");
+  if (kind.startsWith("trigger:")) {
+    const connector = kind.slice("trigger:".length);
+    return {
+      nodeKind: "trigger",
+      connector,
+      event: connectorMeta(connector)?.events[0] ?? "received",
+      filters: []
+    };
+  }
   return defaultNodeData("action");
 }
 
 function nodeTitle(shape: DiagramShape): string {
   if (shape.type === "note") return shape.label ?? "Note";
-  if (shape.data?.nodeKind === "trigger") return `${shape.data.connector} · ${shape.data.event}`;
+  if (shape.data?.nodeKind === "trigger") {
+    return `${connectorLabel(shape.data.connector ?? "custom")} · ${shape.data.event}`;
+  }
   return actionNodeTitle(shape.data ?? { nodeKind: "action" });
 }
 
@@ -660,6 +690,22 @@ export function WorkflowBoard({
   const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
+  const renderChip = ({ kind, label, icon: Icon }: PaletteEntry) => (
+    <button
+      key={kind}
+      aria-grabbed={draggingKind === kind}
+      className={tool === "component" && paletteKind === kind ? "component-chip active" : "component-chip"}
+      draggable
+      onClick={() => { setPaletteKind(kind); selectTool("component"); }}
+      onDragEnd={() => setDraggingKind(null)}
+      onDragStart={(event) => startChipDrag(event, kind)}
+      title={kind.startsWith("trigger:") ? `${label} trigger` : label}
+      type="button"
+    >
+      <Icon size={15} />
+    </button>
+  );
+
   return (
     <section className="board-panel" aria-label="Workflow board">
       <div className="board-toolbar">
@@ -669,21 +715,13 @@ export function WorkflowBoard({
           </button>
         </div>
         <div className="component-toolbar" aria-label="Node types">
-          {paletteEntries.map(({ kind, label, icon: Icon }) => (
-            <button
-              key={kind}
-              aria-grabbed={draggingKind === kind}
-              className={tool === "component" && paletteKind === kind ? "component-chip active" : "component-chip"}
-              draggable
-              onClick={() => { setPaletteKind(kind); selectTool("component"); }}
-              onDragEnd={() => setDraggingKind(null)}
-              onDragStart={(event) => startChipDrag(event, kind)}
-              title={label}
-              type="button"
-            >
-              <Icon size={15} />
-            </button>
-          ))}
+          <span className="chip-group-label">Triggers</span>
+          {triggerPalette.map(renderChip)}
+          <span className="chip-divider" aria-hidden="true" />
+          <span className="chip-group-label">Actions</span>
+          {actionPalette.map(renderChip)}
+          <span className="chip-divider" aria-hidden="true" />
+          {notePalette.map(renderChip)}
         </div>
         {sessionControls && (
           <div className="canvas-session-controls">
@@ -762,7 +800,7 @@ export function WorkflowBoard({
           const color = shapeColor(shape);
 
           if (shape.type === "node") {
-            const Icon = paletteIcon(shape.data?.nodeKind === "trigger" ? "trigger" : shape.data?.actionType ?? "webhook");
+            const Icon = nodeIcon(shape.data);
             const title = nodeTitle(shape);
             const subtitle = nodeSubtitle(shape);
             return (

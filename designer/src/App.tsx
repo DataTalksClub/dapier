@@ -3,11 +3,17 @@ import { CloudUpload, FilePlus2, GitBranch, Loader2, Save, TriangleAlert } from 
 import { dump } from "js-yaml";
 import { WorkflowBoard } from "./WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
-import { actionMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import type { DiagramShape, FilterRule, GitStatus, NodeData, Workflow, WorkflowSummary } from "./types";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
+
+/** Product logo for a workflow's trigger connector, used in list rows. */
+function TriggerLogo({ connector }: { connector: string }) {
+  const Logo = connectorMeta(connector)?.logo;
+  return Logo ? <Logo size={12} /> : null;
+}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -209,7 +215,7 @@ export function App() {
       if (shape.id !== selectedId || !shape.data) return shape;
       const data = mutate(shape.data);
       const label = data.nodeKind === "trigger"
-        ? `${data.connector} · ${data.event}`
+        ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}`
         : shape.label;
       return { ...shape, data, label };
     }));
@@ -233,7 +239,7 @@ export function App() {
               value={data.connector ?? "custom"}
               onChange={(event) => updateSelected((current) => ({ ...current, connector: event.target.value as NodeData["connector"] }))}
             >
-              {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
+              {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.label}</option>)}
             </select>
           </label>
           <label>Event
@@ -383,7 +389,10 @@ export function App() {
               type="button"
             >
               <span className="workflow-name">{summary.id}</span>
-              <span className="workflow-meta">{summary.connector}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}</span>
+              <span className="workflow-meta">
+                <TriggerLogo connector={summary.connector} />
+                {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
+              </span>
               {!summary.enabled && <span className="workflow-disabled">disabled</span>}
             </button>
           ))}
