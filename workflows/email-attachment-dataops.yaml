@@ -7,6 +7,11 @@ trigger:
     route:
       equals: invoice-attachment
 actions:
+  - id: file-invoice-to-dropbox
+    type: dropbox_upload
+    connection_id: dropbox
+    source: attachment
+    folder: /Invoices
   - id: create-invoice-intake
     type: dataops
     url_env: DATAOPS_INTAKE_URL

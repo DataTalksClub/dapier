@@ -5,6 +5,12 @@ trigger:
   event: job.completed
   filters: {}
 actions:
+  - id: file-rendered-pdf-to-dropbox
+    type: dropbox_upload
+    connection_id: dropbox
+    source: output
+    folder: /Invoices
+    filename: invoice-email.pdf
   - id: create-rendered-invoice
     type: dataops
     url_env: DATAOPS_INTAKE_URL

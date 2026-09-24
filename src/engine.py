@@ -10,6 +10,8 @@ import yaml
 
 from .credentials import get_credential
 
+DROPBOX_UPLOAD_URL = "https://content.dropboxapi.com/2/files/upload"
+
 
 @lru_cache
 def workflows():
@@ -165,6 +167,96 @@ def run_dataops(action, event):
     )
 
 
+def _safe_filename(name):
+    name = str(name or "").replace("\\", "/").split("/")[-1].strip()
+    return (name or "file")[:255]
+
+
+def _dropbox_connection(connection_id):
+    import boto3
+
+    from . import connections
+
+    table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    connection = connections.get_connection(table, connection_id)
+    if not connection:
+        raise ValueError(f"connection {connection_id} is not configured")
+    if connection.get("status") != connections.STATUS_CONNECTED:
+        raise ValueError(f"connection {connection_id} is not connected")
+    return connection
+
+
+def _s3_body(ref):
+    import boto3
+
+    return boto3.client("s3").get_object(Bucket=ref["bucket"], Key=ref["key"])["Body"].read()
+
+
+def _upload_files(action, data):
+    """Return the ``{s3, filename}`` files the action should upload."""
+    if action.get("source") == "output":
+        output = data.get("output") or {}
+        if not (output.get("bucket") and output.get("key")):
+            raise ValueError("render output does not reference a stored file")
+        return [{"s3": output, "filename": action.get("filename", "invoice-email.pdf")}]
+    files = [
+        {"s3": attachment["s3"], "filename": attachment.get("filename") or "attachment"}
+        for attachment in data.get("attachments") or []
+        if isinstance(attachment.get("s3"), dict)
+        and attachment["s3"].get("bucket") and attachment["s3"].get("key")
+    ]
+    if not files:
+        raise ValueError("email has no stored attachments to upload")
+    return files
+
+
+def _default_transport(method, url, *, headers, body, timeout=15):
+    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status, response.read()
+
+
+def _dropbox_upload(access_token, path, payload, *, transport=None):
+    transport = transport or _default_transport
+    headers = {
+        "authorization": f"Bearer {access_token}",
+        "dropbox-api-arg": json.dumps(
+            {"path": path, "mode": "add", "autorename": True, "mute": False},
+            separators=(",", ":"),
+        ),
+        "content-type": "application/octet-stream",
+    }
+    try:
+        status, raw = transport(
+            "POST", DROPBOX_UPLOAD_URL, headers=headers, body=payload, timeout=15,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"dropbox upload unreachable: {type(exc).__name__}")
+    if status >= 300:
+        tag = ""
+        try:
+            error = json.loads(raw.decode() or "{}").get("error")
+            if isinstance(error, dict):
+                tag = error.get(".tag") or ""
+                nested = error.get(tag)
+                if isinstance(nested, dict) and nested.get(".tag"):
+                    tag = f"{tag}/{nested['.tag']}"
+        except (ValueError, UnicodeDecodeError):
+            pass
+        raise RuntimeError(f"dropbox upload returned HTTP {status}{f' ({tag})' if tag else ''}")
+
+
+def run_dropbox_upload(action, event, transport=None):
+    from . import tokens
+
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    folder = str(action.get("folder") or "/").rstrip("/") or ""
+    for file in _upload_files(action, event.get("data", {})):
+        path = f"{folder}/{_safe_filename(file['filename'])}"
+        _dropbox_upload(access_token, path, _s3_body(file["s3"]), transport=transport)
+
+
 def run_render_job(action, event, workflow_id):
     import boto3
 
@@ -213,6 +305,8 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         run_slack(action, event)
                     elif action["type"] == "dataops":
                         run_dataops(action, event)
+                    elif action["type"] == "dropbox_upload":
+                        run_dropbox_upload(action, event)
                     elif action["type"] == "render_html_to_pdf":
                         run_render_job(action, event, workflow["id"])
                     else:
