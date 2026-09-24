@@ -207,20 +207,15 @@ function renderConnections(connections) {
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
-    const primary = connection.provider === 'slack'
-      ? '<button class="button secondary connection-token" type="button">Replace token</button>'
+    const reconnect = connection.provider === 'slack' ? ''
       : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a>`;
-    const action = `${primary}
-      <button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
     <td class="mono muted-cell" data-label="Provider">${escapeHtml(connection.provider)}</td>
-    <td class="mono muted-cell" data-label="Scopes">${wrapTokens((connection.scopes || []).join(', ') || 'Default')}</td>
     <td data-label="Status">${statusLine(connection.status)}</td>
-    <td class="action-cell"${connection.provider === 'slack' ? ' data-label="Auth"' : ''}>${action}</td>
+    <td class="action-cell">${reconnect}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button></td>
   </tr>`;
   }).join('');
-  $$('.connection-token').forEach((button) => button.addEventListener('click', openSlackDialog));
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
 }
 
