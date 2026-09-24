@@ -1,9 +1,9 @@
 import json
 import unittest
 from copy import deepcopy
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from src.engine import matches, run_dropbox_upload, run_slack
+from src.engine import matches, run_dataops, run_dropbox_delete, run_dropbox_upload, run_slack
 
 
 class FakeTransport:
@@ -161,6 +161,113 @@ class DropboxUploadTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             self.run_action(transport)
         self.assertIn("unreachable", str(ctx.exception))
+
+
+class DropboxDeleteTests(unittest.TestCase):
+    def setUp(self):
+        self.connection = {"connection_id": "dropbox", "provider": "dropbox", "status": "connected"}
+        self.event = {"connector": "dropbox", "event": "file.created",
+                      "data": {"path": "/_dtc_paperwork/income-invoices/1.pdf"}}
+
+    def run_action(self, transport, event=None, action=None):
+        action = action or {"type": "dropbox_delete", "connection_id": "dropbox"}
+        with patch("src.engine._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.tokens.get_access_token", return_value=("token-123", {})):
+            run_dropbox_delete(action, event or dict(self.event), transport=transport)
+
+    def test_deletes_the_event_path(self):
+        transport = FakeTransport()
+
+        self.run_action(transport)
+
+        call = transport.calls[0]
+        self.assertEqual(call["method"], "POST")
+        self.assertEqual(call["url"], "https://api.dropboxapi.com/2/files/delete_v2")
+        self.assertEqual(call["headers"]["authorization"], "Bearer token-123")
+        self.assertEqual(json.loads(call["body"]), {"path": "/_dtc_paperwork/income-invoices/1.pdf"})
+
+    def test_prefers_explicit_path_over_event(self):
+        transport = FakeTransport()
+        action = {"type": "dropbox_delete", "connection_id": "dropbox", "path": "/other.pdf"}
+
+        self.run_action(transport, action=action)
+
+        self.assertEqual(json.loads(transport.calls[0]["body"]), {"path": "/other.pdf"})
+
+    def test_fails_without_a_path(self):
+        with self.assertRaises(ValueError):
+            self.run_action(FakeTransport(), event={"data": {}})
+
+    def test_raises_on_dropbox_error(self):
+        transport = FakeTransport(status=409, body=b'{"error": {".tag": "path_lookup", "path_lookup": {".tag": "not_found"}}}')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            self.run_action(transport)
+        self.assertIn("409", str(ctx.exception))
+        self.assertIn("path_lookup/not_found", str(ctx.exception))
+
+    def test_raises_when_unreachable(self):
+        def transport(method, url, *, headers, body, timeout=15):
+            raise OSError("no network")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            self.run_action(transport)
+        self.assertIn("unreachable", str(ctx.exception))
+
+
+class DropboxIntakeTests(unittest.TestCase):
+    def setUp(self):
+        self.connection = {"connection_id": "dropbox", "provider": "dropbox", "status": "connected"}
+        self.event = {
+            "connector": "dropbox",
+            "event": "file.created",
+            "id": "dropbox:acct1:fid:rev1",
+            "occurred_at": "2026-09-24T15:00:00+00:00",
+            "data": {
+                "path": "/_dtc_paperwork/income-invoices/1.pdf",
+                "content_hash": "abc123",
+            },
+        }
+
+    def run_dataops_action(self, event=None):
+        action = {"type": "dataops", "connection_id": "dropbox",
+                  "url_env": "DATAOPS_INTAKE_URL", "auth_secret_id": "dapier/dataops"}
+        s3 = MagicMock()
+        with patch("src.engine.secrets_value", return_value='{"token": "tok"}'), \
+             patch("src.engine._json_request") as json_request, \
+             patch("src.engine._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.tokens.get_access_token", return_value=("token-123", {})), \
+             patch("src.engine._dropbox_download", return_value=b"pdf-bytes"), \
+             patch("boto3.client", return_value=s3), \
+             patch.dict("os.environ", {"RENDER_ARTIFACTS_BUCKET": "artifacts",
+                                       "DATAOPS_INTAKE_URL": "https://intake.test"}):
+            run_dataops(action, event or deepcopy(self.event))
+        return json_request.call_args.args[1], s3
+
+    def test_intakes_a_copy_of_the_file(self):
+        body, s3 = self.run_dataops_action()
+
+        key = s3.put_object.call_args.kwargs["Key"]
+        self.assertEqual(key, "dropbox/dropbox:acct1:fid:rev1/1.pdf")
+        self.assertTrue(key.startswith("dropbox/"))
+        doc = body["documents"][0]
+        self.assertEqual(doc["storageUri"], f"s3://artifacts/{key}")
+        self.assertEqual(doc["filename"], "1.pdf")
+        self.assertEqual(doc["contentType"], "application/pdf")
+        self.assertEqual(doc["sizeBytes"], len(b"pdf-bytes"))
+        self.assertEqual(doc["checksum"], "sha256:abc123")
+
+    def test_uses_deterministic_event_id_as_message_id(self):
+        body, _s3 = self.run_dataops_action()
+
+        self.assertEqual(body["messageId"], "dropbox:acct1:fid:rev1")
+        self.assertEqual(body["subject"], "1.pdf")
+        self.assertEqual(body["receivedAt"], "2026-09-24T15:00:00+00:00")
+
+    def test_fails_without_a_path(self):
+        with self.assertRaises(ValueError):
+            self.run_dataops_action(event={"connector": "dropbox", "event": "file.created",
+                                           "id": "x", "occurred_at": "now", "data": {}})
 
 
 if __name__ == "__main__":

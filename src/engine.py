@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import mimetypes
 import os
 import urllib.request
 from functools import lru_cache
@@ -11,6 +12,8 @@ import yaml
 from .credentials import get_credential
 
 DROPBOX_UPLOAD_URL = "https://content.dropboxapi.com/2/files/upload"
+DROPBOX_DOWNLOAD_URL = "https://content.dropboxapi.com/2/files/download"
+DROPBOX_DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 
 
 @lru_cache
@@ -124,6 +127,65 @@ def run_dataops(action, event):
         token = value
     if not token:
         raise ValueError("DataOps secret does not contain a token")
+    _json_request(
+        action.get("url") or os.environ[action.get("url_env", "DATAOPS_INTAKE_URL")],
+        _intake_body(action, event),
+        headers={"x-dataops-intake-secret": token},
+        timeout=action.get("timeout_seconds", 15),
+    )
+
+
+def _intake_body(action, event):
+    if event.get("connector") == "dropbox":
+        return _dropbox_intake_body(action, event)
+    return _email_intake_body(action, event)
+
+
+def _dropbox_intake_body(action, event):
+    """Build a DataOps intake for a Dropbox file event.
+
+    The intake contract references documents by S3 URI, so the file is
+    copied into the artifacts bucket (which the intake can already read
+    from the rendered-invoice flow) before the request is built.
+    """
+    import boto3
+
+    from . import tokens
+
+    data = event.get("data", {})
+    path = data.get("path")
+    if not path:
+        raise ValueError("dropbox intake requires a file path")
+    filename = _safe_filename(path.split("/")[-1])
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection)
+    body = _dropbox_download(access_token, path)
+    bucket = os.environ["RENDER_ARTIFACTS_BUCKET"]
+    key = f"dropbox/{str(event['id']).replace('/', '_')}/{filename}"
+    boto3.client("s3").put_object(
+        Bucket=bucket, Key=key, Body=body, ContentType=content_type,
+        ServerSideEncryption="AES256",
+    )
+    return {
+        "version": "2026-07-01",
+        "messageId": event["id"],
+        "recipientRoute": "dropbox-upload",
+        "from": "dropbox",
+        "subject": filename,
+        "receivedAt": event["occurred_at"],
+        "documents": [{
+            "kind": "dropbox-file",
+            "storageUri": f"s3://{bucket}/{key}",
+            "filename": filename,
+            "contentType": content_type,
+            "sizeBytes": len(body),
+            "checksum": f"sha256:{data.get('content_hash') or ''}",
+        }],
+    }
+
+
+def _email_intake_body(action, event):
     data = event.get("data", {})
     documents = []
     for attachment in data.get("attachments", []):
@@ -150,7 +212,7 @@ def run_dataops(action, event):
     source_data = data.get("source_event", {}).get("data", data)
     sender = source_data.get("sender", {})
     sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
-    request_body = {
+    return {
         "version": "2026-07-01",
         "messageId": data.get("message_id") or source_data["message_id"],
         "recipientRoute": data.get("route") or source_data["route"],
@@ -159,12 +221,6 @@ def run_dataops(action, event):
         "receivedAt": source_data.get("date") or event["occurred_at"],
         "documents": documents,
     }
-    _json_request(
-        action.get("url") or os.environ[action.get("url_env", "DATAOPS_INTAKE_URL")],
-        request_body,
-        headers={"x-dataops-intake-secret": token},
-        timeout=action.get("timeout_seconds", 15),
-    )
 
 
 def _safe_filename(name):
@@ -259,6 +315,65 @@ def run_dropbox_upload(action, event, transport=None):
         _dropbox_upload(access_token, path, _s3_body(file["s3"]), transport=transport)
 
 
+def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dropbox call unreachable"):
+    transport = transport or _default_transport
+    headers = {
+        "authorization": f"Bearer {access_token}",
+        "content-type": "application/json",
+    }
+    try:
+        status, raw = transport(
+            "POST", url, headers=headers, body=json.dumps(payload).encode(), timeout=15,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"{unreachable}: {type(exc).__name__}")
+    if status >= 300:
+        tag = ""
+        try:
+            error = json.loads(raw.decode() or "{}").get("error")
+            if isinstance(error, dict):
+                tag = error.get(".tag") or ""
+                nested = error.get(tag)
+                if isinstance(nested, dict) and nested.get(".tag"):
+                    tag = f"{tag}/{nested['.tag']}"
+        except (ValueError, UnicodeDecodeError):
+            pass
+        raise RuntimeError(f"dropbox call returned HTTP {status}{f' ({tag})' if tag else ''}")
+    return raw
+
+
+def _dropbox_download(access_token, path, *, transport=None):
+    transport = transport or _default_transport
+    headers = {
+        "authorization": f"Bearer {access_token}",
+        "dropbox-api-arg": json.dumps({"path": path}, separators=(",", ":")),
+    }
+    try:
+        status, raw = transport(
+            "POST", DROPBOX_DOWNLOAD_URL, headers=headers, body=b"", timeout=15,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"dropbox download unreachable: {type(exc).__name__}")
+    if status >= 300:
+        raise RuntimeError(f"dropbox download returned HTTP {status}")
+    return raw
+
+
+def run_dropbox_delete(action, event, transport=None):
+    """Delete the processed file from Dropbox; run only after intake succeeds."""
+    from . import tokens
+
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    path = action.get("path") or event.get("data", {}).get("path")
+    if not path:
+        raise ValueError("dropbox_delete requires a file path")
+    _dropbox_rpc(
+        DROPBOX_DELETE_URL, access_token, {"path": path},
+        transport=transport, unreachable="dropbox delete unreachable",
+    )
+
+
 def run_render_job(action, event, workflow_id):
     import boto3
 
@@ -309,6 +424,8 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         run_dataops(action, event)
                     elif action["type"] == "dropbox_upload":
                         run_dropbox_upload(action, event)
+                    elif action["type"] == "dropbox_delete":
+                        run_dropbox_delete(action, event)
                     elif action["type"] == "render_html_to_pdf":
                         run_render_job(action, event, workflow["id"])
                     else:

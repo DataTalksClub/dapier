@@ -10,7 +10,3 @@ actions:
     connection_id: dropbox
     source: output
     folder: _dtc_paperwork/income-invoices
-  - id: create-rendered-invoice
-    type: dataops
-    url_env: DATAOPS_INTAKE_URL
-    auth_secret_id: dapier/dataops
