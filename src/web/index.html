@@ -10,25 +10,10 @@
   <script defer src="/assets/app.js"></script>
 </head>
 <body>
-  <section id="login-view" class="login-view" hidden>
-    <div class="login-brand" aria-hidden="true">D</div>
-    <form id="login-form" class="login-panel">
-      <div>
-        <p class="eyebrow">AWS automation</p>
-        <h1>Dapier</h1>
-      </div>
-      <label>Username<input name="username" autocomplete="username" value="admin" required></label>
-      <label>Password<input name="password" type="password" autocomplete="current-password" required autofocus></label>
-      <p id="login-error" class="form-error" role="alert"></p>
-      <button class="button primary" type="submit"><i data-lucide="log-in"></i><span>Sign in</span></button>
-    </form>
-  </section>
-
   <section id="forbidden-view" class="login-view" hidden>
     <div class="login-brand" aria-hidden="true">D</div>
     <div class="login-panel">
       <div>
-        <p class="eyebrow">AWS automation</p>
         <h1>Dapier</h1>
       </div>
       <p id="forbidden-message" class="form-error" role="alert"></p>
@@ -55,7 +40,7 @@
     <main>
       <header class="topbar">
         <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu"><i data-lucide="menu"></i></button>
-        <div><p class="eyebrow">Automation control plane</p><h1 id="view-title">Overview</h1></div>
+        <h1 id="view-title">Overview</h1>
         <div class="top-actions">
           <span id="last-updated" class="last-updated"></span>
           <button id="refresh" class="icon-button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
@@ -72,9 +57,9 @@
           <div><span>Completed actions</span><strong id="metric-runs">-</strong></div>
           <div><span>Credentials</span><strong id="metric-credentials">-</strong></div>
         </div>
-        <div class="section-heading"><div><h2>Active automations</h2><p>Current YAML deployment</p></div><button class="button quiet view-link" data-target="workflows">View all<i data-lucide="arrow-right"></i></button></div>
+        <div class="section-heading"><div><h2>Active automations</h2></div><button class="button quiet view-link" data-target="workflows">View all</button></div>
         <div id="overview-workflows" class="workflow-list"></div>
-        <div class="section-heading"><div><h2>Recent activity</h2><p>Idempotent workflow actions</p></div><button class="button quiet view-link" data-target="runs">View all<i data-lucide="arrow-right"></i></button></div>
+        <div class="section-heading"><div><h2>Recent activity</h2></div><button class="button quiet view-link" data-target="runs">View all</button></div>
         <div class="table-wrap"><table><thead><tr><th>Execution</th><th>Status</th></tr></thead><tbody id="overview-runs"></tbody></table></div>
       </section>
 
@@ -84,13 +69,13 @@
       </section>
 
       <section class="view" data-page="connections">
-        <div class="section-heading"><div><h2>OAuth connections</h2><p>Dropbox and YouTube accounts</p></div><button id="add-connection" class="button primary"><i data-lucide="plus"></i><span>Add connection</span></button></div>
+        <div class="section-heading"><div><h2>OAuth connections</h2></div><button id="add-connection" class="button primary"><span>Add connection</span></button></div>
         <div id="connection-empty" class="empty-state" hidden><i data-lucide="plug"></i><h3>No connections</h3></div>
         <div class="table-wrap"><table><thead><tr><th>Name</th><th>Provider</th><th>Scopes</th><th>Status</th><th class="action-cell"></th></tr></thead><tbody id="connection-table"></tbody></table></div>
       </section>
 
       <section class="view" data-page="credentials">
-        <div class="section-heading"><div><h2>Service credentials</h2><p>Protected by DynamoDB encryption at rest</p></div></div>
+        <div class="section-heading"><div><h2>Service credentials</h2></div></div>
         <div id="credential-list" class="credential-list"></div>
       </section>
 
@@ -103,17 +88,17 @@
 
   <dialog id="credential-dialog">
     <form id="credential-form" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">Credentials table</p><h2 id="credential-title">Add credential</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="dialog-head"><div><h2 id="credential-title">Add credential</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
       <input type="hidden" name="provider">
       <label id="credential-field-label">Token<input name="value" type="password" autocomplete="off" required></label>
       <p id="credential-error" class="form-error" role="alert"></p>
-      <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Cancel</button><button class="button primary" type="submit"><i data-lucide="save"></i><span>Save credential</span></button></div>
+      <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Cancel</button><button class="button primary" type="submit"><span>Save credential</span></button></div>
     </form>
   </dialog>
 
   <dialog id="run-dialog">
     <div class="dialog-head">
-      <div><p class="eyebrow">Execution</p><h2 id="run-title">Run</h2></div>
+      <div><h2 id="run-title">Run</h2></div>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
     <div id="run-detail" class="workflow-detail"></div>
@@ -122,34 +107,28 @@
 
   <dialog id="workflow-dialog">
     <div class="dialog-head">
-      <div><p class="eyebrow">Workflow</p><h2 id="workflow-title">Workflow</h2></div>
+      <div><h2 id="workflow-title">Workflow</h2></div>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
     <div id="workflow-detail" class="workflow-detail"></div>
     <div class="dialog-actions">
       <button class="button secondary dialog-close" type="button">Close</button>
-      <a id="workflow-edit" class="button primary" target="_blank" rel="noopener"><i data-lucide="pencil"></i><span>Edit on GitHub</span></a>
+      <a id="workflow-edit" class="button primary" target="_blank" rel="noopener"><span>Edit on GitHub</span></a>
     </div>
   </dialog>
 
   <dialog id="connection-dialog">
     <form id="connection-form" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">OAuth 2.0</p><h2 id="connection-heading">Add connection</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
-      <div class="callout">
-        <p class="callout-step"><strong>1.</strong> In the <a id="connection-console" href="#" target="_blank" rel="noopener">provider console</a>, register this redirect URI:</p>
-        <div class="copy-field"><code id="connection-redirect">https://…/oauth/callback</code><button id="connection-copy" class="icon-button" type="button" title="Copy" aria-label="Copy redirect URI"><i data-lucide="copy"></i></button></div>
-        <p class="callout-step"><strong>2.</strong> Paste the client ID and secret it gives you below.</p>
-      </div>
+      <div class="dialog-head"><div><h2 id="connection-heading">Add connection</h2></div><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <p class="field-hint">Saving starts the provider consent flow — approve access once and the connection is live. OAuth clients are configured at deploy time, so nothing to paste here.</p>
       <div class="form-grid">
         <label>Provider<select name="provider"><option value="dropbox">Dropbox</option><option value="google">Google Calendar</option><option value="youtube">YouTube</option></select></label>
         <label>Connection ID<input name="connection_id" placeholder="team-dropbox" pattern="[a-z0-9][a-z0-9_-]{1,62}" required></label>
       </div>
       <label>Display name<input name="display_name" placeholder="Team Dropbox" required></label>
-      <label>Client ID<input name="client_id" autocomplete="off" required></label>
-      <label>Client secret<input name="client_secret" type="password" autocomplete="off" required></label>
       <label>Scopes<input name="scopes" placeholder="files.metadata.read files.content.read"><small id="connection-scope-hint" class="field-hint"></small></label>
       <p id="connection-error" class="form-error" role="alert"></p>
-      <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Cancel</button><button class="button primary" type="submit"><i data-lucide="save"></i><span>Save connection</span></button></div>
+      <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Cancel</button><button class="button primary" type="submit"><span>Save &amp; connect</span></button></div>
     </form>
   </dialog>
 </body>

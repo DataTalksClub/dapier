@@ -30,13 +30,11 @@ function showLogin() {
 }
 
 function showForbidden(message = 'Your account is not an operator for this console.') {
-  $('#login-view').hidden = true;
   $('#forbidden-view').hidden = false;
   $('#forbidden-message').textContent = message;
 }
 
 function showApp() {
-  $('#login-view').hidden = true;
   $('#app').hidden = false;
   icons();
 }
@@ -44,7 +42,8 @@ function showApp() {
 function badge(status) {
   const value = String(status || 'unknown');
   const kind = value === 'completed' || value === 'connected' || value === 'configured' || value === 'enabled'
-    ? 'success' : value === 'ready' || value === 'processing' ? 'warning' : value === 'missing' ? 'error' : 'neutral';
+    ? 'success' : value === 'ready' || value === 'processing' ? 'warning'
+    : value === 'failed' || value === 'error' || value === 'missing' ? 'error' : 'neutral';
   return `<span class="badge ${kind}">${escapeHtml(value)}</span>`;
 }
 
@@ -206,7 +205,7 @@ function renderCredentials(credentials) {
     return `<div class="credential-row">
       <div class="credential-provider"><span class="connector-icon"><i data-lucide="${item.icon}"></i></span><div><strong>${item.name}</strong><span>${item.secret}</span></div></div>
       <div>${badge(status)}${credential.updated_at ? `<br><small>${new Date(credential.updated_at).toLocaleString()}</small>` : ''}</div>
-      <button class="button secondary credential-edit" data-provider="${credential.provider}"><i data-lucide="${credential.configured ? 'rotate-cw' : 'plus'}"></i><span>${credential.configured ? 'Replace' : 'Add'}</span></button>
+      <button class="button secondary credential-edit" data-provider="${credential.provider}"><span>${credential.configured ? 'Replace' : 'Add'}</span></button>
     </div>`;
   }).join('');
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));
@@ -236,8 +235,7 @@ function setView(view) {
 function notice(message, error = false) {
   const element = $('#notice');
   element.textContent = message;
-  element.style.borderColor = error ? 'var(--coral)' : 'var(--green)';
-  element.style.background = error ? 'var(--coral-soft)' : 'var(--green-soft)';
+  element.classList.toggle('error', error);
   element.hidden = false;
   setTimeout(() => { element.hidden = true; }, 4500);
 }
@@ -247,24 +245,18 @@ const PROVIDER_SPECS = {
     connectionId: 'team-dropbox',
     displayName: 'Team Dropbox',
     scopes: 'files.metadata.read files.content.read',
-    console: 'https://www.dropbox.com/developers/apps',
-    consoleLabel: 'Dropbox App Console',
     scopeHint: 'Space-separated Dropbox scopes. Leave as-is unless your app needs more.',
   },
   google: {
     connectionId: 'calendar-alexey',
     displayName: 'Calendar — Alexey',
     scopes: 'https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.email',
-    console: 'https://console.cloud.google.com/apis/credentials',
-    consoleLabel: 'Google Cloud Console',
     scopeHint: 'Google requires at least one scope — the prefilled three cover free/busy, owned-event edits, and account verification.',
   },
   youtube: {
     connectionId: 'channel-youtube',
     displayName: 'Channel YouTube',
     scopes: 'https://www.googleapis.com/auth/youtube.readonly',
-    console: 'https://console.cloud.google.com/apis/credentials',
-    consoleLabel: 'Google Cloud Console',
     scopeHint: 'Google requires at least one scope — leave this filled in or YouTube sign-in fails.',
   },
 };
@@ -280,10 +272,6 @@ function applyProviderSpec(provider) {
     form.scopes.dataset.autofill = '1';
   }
   $('#connection-scope-hint').textContent = spec.scopeHint;
-  const link = $('#connection-console');
-  link.href = spec.console;
-  link.textContent = spec.consoleLabel;
-  $('#connection-redirect').textContent = `${window.location.origin}/oauth/callback`;
 }
 
 function openCredential(provider) {
@@ -296,18 +284,6 @@ function openCredential(provider) {
   $('#credential-dialog').showModal();
   form.value.focus();
 }
-
-$('#login-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const element = event.currentTarget;
-  const form = new FormData(element);
-  $('#login-error').textContent = '';
-  try {
-    await api('/api/admin/session', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) });
-    element.querySelector('[name="password"]').value = '';
-    await refresh();
-  } catch (error) { $('#login-error').textContent = error.message; }
-});
 
 $('#credential-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -332,10 +308,9 @@ $('#connection-form').addEventListener('submit', async (event) => {
   $('#connection-error').textContent = '';
   try {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(values) });
-    form.client_secret.value = '';
-    $('#connection-dialog').close();
-    notice('Connection saved');
-    await refresh();
+    // Saving immediately continues into the provider consent flow; the
+    // callback returns to the console with the connection marked connected.
+    window.location.assign(`/api/admin/oauth/${encodeURIComponent(values.connection_id.trim().toLowerCase())}/start`);
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
 
@@ -366,12 +341,6 @@ $('#add-connection').addEventListener('click', () => {
 });
 $('#connection-form').provider.addEventListener('change', (event) => applyProviderSpec(event.target.value));
 $('#connection-form').scopes.addEventListener('input', (event) => { event.target.dataset.autofill = ''; });
-$('#connection-copy').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText($('#connection-redirect').textContent);
-    notice('Redirect URI copied');
-  } catch (_) { notice('Copy failed — select the URI manually', true); }
-});
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });

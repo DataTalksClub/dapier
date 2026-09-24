@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
-from boto3.dynamodb.conditions import Attr
 
 from . import admin
 
@@ -34,12 +33,21 @@ def _static(path):
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
+        "/assets/fonts/IBMPlexSans-VF.woff2": ("assets/fonts/IBMPlexSans-VF.woff2", "font/woff2"),
+        "/assets/fonts/IBMPlexMono-Regular.woff2": ("assets/fonts/IBMPlexMono-Regular.woff2", "font/woff2"),
+        "/assets/fonts/IBMPlexMono-Medium.woff2": ("assets/fonts/IBMPlexMono-Medium.woff2", "font/woff2"),
     }
     if path not in assets:
         return None
     filename, content_type = assets[path]
-    body = (Path(__file__).parent / "web" / filename).read_text()
-    return _response(
+    asset_path = Path(__file__).parent / "web" / filename
+    if filename.endswith(".woff2"):
+        body = base64.b64encode(asset_path.read_bytes()).decode()
+        extra = {"isBase64Encoded": True}
+    else:
+        body = asset_path.read_text()
+        extra = {}
+    response = _response(
         200,
         body,
         content_type,
@@ -54,6 +62,8 @@ def _static(path):
             "referrer-policy": "same-origin",
         },
     )
+    response.update(extra)
+    return response
 
 
 def _body(event):
@@ -113,29 +123,16 @@ def _verify_youtube(event, body):
 
 
 def _dropbox_secrets():
-    """Distinct Dropbox app secrets of all configured connections.
+    """The deploy-time Dropbox app secrets that may sign webhook deliveries.
 
     Dropbox signs each webhook body with the app secret (X-Dropbox-Signature,
-    HMAC-SHA256); a connection's client_secret is that app secret. With no
-    configured Dropbox connection there is nothing to verify against and
-    nothing can be resolved either, so verification fails closed.
+    HMAC-SHA256) of the OAuth client configured at deploy time
+    (DROPBOX_OAUTH_CLIENT_SECRET). With no secret configured there is nothing
+    to verify against and nothing can be resolved either, so verification
+    fails closed.
     """
-    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
-    credentials_table = boto3.resource("dynamodb").Table(os.environ["CREDENTIALS_TABLE"])
-    response = connections_table.scan(
-        FilterExpression=Attr("provider").eq("dropbox"),
-        ProjectionExpression="connection_id",
-    )
-    secrets = []
-    for item in response.get("Items", []):
-        record = credentials_table.get_item(
-            Key={"credential_id": f"oauth#{item['connection_id']}"},
-        ).get("Item") or {}
-        value = record.get("value") or {}
-        secret = value.get("client_secret") if isinstance(value, dict) else None
-        if secret and secret not in secrets:
-            secrets.append(secret)
-    return secrets
+    secret = os.environ.get("DROPBOX_OAUTH_CLIENT_SECRET", "").strip()
+    return [secret] if secret else []
 
 
 def _verify_dropbox(event, body):
