@@ -1,8 +1,9 @@
 export type Tool = "select" | "component";
 export type NodeKind = "trigger" | "action" | "note";
 export type ShapeType = "node" | "note" | "arrow";
-export type ActionType = "webhook" | "slack" | "dataops" | "dropbox_upload" | "render_html_to_pdf";
-export type ConnectorName = "email" | "youtube" | "renderer" | "dropbox" | "custom";
+/** Open set — the known actions and their fields live in catalog.ts. */
+export type ActionType = string;
+export type ConnectorName = string;
 export type FilterOperator = "equals" | "prefix" | "suffix" | "contains";
 
 export interface Point {
@@ -23,10 +24,13 @@ export interface NodeData {
   event?: string;
   filters?: FilterRule[];
   actionType?: ActionType;
-  /** Flat action fields, e.g. channel, url, folder; pdf.* is nested on save. */
+  /** Flat action fields as entered in the inspector; grouping/coercion happens on save. */
   fields?: Record<string, string>;
-  pdfPageFormat?: string;
-  pdfPrintBackground?: boolean;
+  /**
+   * Full YAML of an action whose type is not in the catalog, verbatim
+   * (minus id/type) so hand-written workflows survive a round-trip.
+   */
+  raw?: Record<string, unknown>;
 }
 
 export interface DiagramShape {

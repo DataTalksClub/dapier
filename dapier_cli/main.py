@@ -33,8 +33,10 @@ def build_parser():
     import_p = conn_sub.add_parser("import", help="One-time operator import of an existing credential")
     import_p.add_argument("connection_id")
     import_p.add_argument("--provider", required=True)
-    import_p.add_argument("--client-id", required=True)
-    import_p.add_argument("--client-secret-file", required=True)
+    import_p.add_argument("--client-id", default=None,
+                          help="Optional; defaults to the shared deploy-time OAuth client")
+    import_p.add_argument("--client-secret-file", default=None,
+                          help="Optional; needed only for refresh tokens issued by another client")
     import_p.add_argument("--authorized-user-file", required=True)
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])

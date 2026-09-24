@@ -18,7 +18,10 @@ from . import agent_api
 from . import audit as audit_log
 from . import authz
 from . import connections as connection_model
+from . import email_triggers
+from . import oauth_clients
 from . import oauth_providers
+from . import slack_tokens
 from .credentials import credential_status, get_credential, put_credential
 from .dtc_auth import auth_config as _auth_config
 from .dtc_auth import exchange_auth_code as _exchange_auth_code
@@ -253,7 +256,7 @@ def auth_error():
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
         },
-        "body": """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign-in error · Dapier</title><style>body{margin:0;font:16px system-ui;background:#f5f7fa;color:#172033}main{max-width:32rem;margin:10vh auto;padding:2rem;background:white;border:1px solid #dce2ea;border-radius:.75rem}a{color:#1769aa;font-weight:600}</style></head><body><main><h1>Sign-in error</h1><p>Authentication could not be completed. No account changes were made.</p><p><a href="/auth/login">Try again</a></p></main></body></html>""",
+        "body": """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign-in error · Dapier</title><style>:root{color-scheme:light}body{margin:0;min-height:100vh;display:grid;align-items:center;justify-items:center;background:#f4f1e9;color:#231f17;font:14px/1.5 "IBM Plex Sans",ui-sans-serif,system-ui,"Segoe UI",sans-serif}main{width:min(400px,calc(100% - 48px))}.wordmark{margin:0 0 6px;font-size:34px;font-weight:600;letter-spacing:-.01em}.sub{margin:0 0 26px;color:#6e6656;font-size:13px}.card{border-top:1px solid #c9c0aa;padding-top:24px;display:grid;gap:14px}h1{margin:0;font-size:16px;font-weight:600}p{margin:0;color:#514b3e;font-size:13.5px}a{color:#166a44;font-weight:500;text-underline-offset:3px}.foot{margin-top:26px;color:#6e6656;font-size:11.5px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}</style></head><body><main><p class="wordmark">Dapier</p><p class="sub">Operator console for AWS automation</p><div class="card"><h1>Sign-in error</h1><p>Authentication could not be completed. No account changes were made.</p><p><a href="/auth/login">Try again</a></p></div><p class="foot">eu-west-1 · single-operator control plane</p></main></body></html>""",
     }
 
 
@@ -365,6 +368,10 @@ def save_connection(event):
     connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
     previous = connection_model.get_connection(connections_table, fields["connection_id"])
     operator = _session_subject(event)
+
+    if fields["provider"] in connection_model.TOKEN_PROVIDERS:
+        return _save_token_connection(fields, body, previous, operator, connections_table)
+
     try:
         item = connection_model.build_item(
             fields, owner_subject=operator, previous=previous,
@@ -374,10 +381,50 @@ def save_connection(event):
                      outcome="error", error=str(exc))
         return _json_response(409, {"error": str(exc)})
 
-    put_credential(item["credential_id"], {"client_secret": fields["client_secret"]}, provider=item["provider"])
     connection_model.put_connection(connections_table, item)
     _audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
     return _json_response(200, item)
+
+
+def _save_token_connection(fields, body, previous, operator, connections_table):
+    """Create/update a connection that authenticates with a pasted token.
+
+    The token is verified against the provider before anything is stored;
+    an edit without a new token re-verifies and keeps the stored one.
+    """
+    try:
+        token = slack_tokens.validate_token(body.get("token") or (
+            get_credential(connection_model.credential_id_for(fields["connection_id"])).get("token")
+        ))
+    except KeyError:
+        return _json_response(400, {"error": "A Slack bot (xoxb-) or user (xoxp-) token is required"})
+    except slack_tokens.SlackTokenError as exc:
+        return _json_response(400, {"error": str(exc)})
+    try:
+        account_id, account_title = slack_tokens.verify_account(token)
+    except slack_tokens.SlackTokenError as exc:
+        _audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                     outcome="error", error=str(exc))
+        return _json_response(400, {"error": str(exc)})
+    try:
+        item = connection_model.build_item(fields, owner_subject=operator, previous=previous)
+        connection_model.check_binding(item, account_id)
+        item = connection_model.mark_connected(
+            item, verified_account_id=account_id, account_title=account_title,
+            granted_scopes=fields["scopes"], connected_by=operator,
+        )
+    except connection_model.BindingError as exc:
+        _audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                     outcome="denied-account-mismatch", error=str(exc))
+        return _json_response(409, {"error": str(exc)})
+    except connection_model.ConnectionError as exc:
+        _audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                     outcome="error", error=str(exc))
+        return _json_response(400, {"error": str(exc)})
+    put_credential(item["credential_id"], {"token": token}, provider=fields["provider"])
+    connection_model.put_connection(connections_table, item)
+    _audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
+    return _json_response(200, connection_model.public_view(item))
 
 
 def list_grants(event):
@@ -429,6 +476,32 @@ def delete_grant(event, operator):
     authz.delete_grant(authz.grants_table(), connection_id=connection_id, grantee_id=grantee_id)
     _audit_event(connection_id, audit_log.GRANT, operator, outcome="revoked")
     return _json_response(200, {"ok": True})
+
+
+def list_email_triggers(event):
+    status, payload = email_triggers.api_list()
+    return _json_response(status, payload)
+
+
+def save_email_trigger(event, operator):
+    try:
+        body = _request_json(event)
+        status, payload = email_triggers.api_save(body, operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    _audit_event(payload.get("name", "unknown"), "email-trigger.save", operator,
+                 outcome="created" if payload.get("created") else "updated")
+    return _json_response(status, payload)
+
+
+def delete_email_trigger(event, operator):
+    query = event.get("queryStringParameters") or {}
+    try:
+        status, payload = email_triggers.api_delete(query.get("name", ""), operator)
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    _audit_event(payload.get("name", "unknown"), "email-trigger.delete", operator, outcome="deleted")
+    return _json_response(status, payload)
 
 
 def _connection(connection_id):
@@ -492,6 +565,12 @@ def oauth_start(event, connection_id):
     connection = _connection(connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
+    if connection["provider"] in connection_model.TOKEN_PROVIDERS:
+        return _json_response(
+            400,
+            {"error": "This provider connects with a directly provided token; "
+                      "paste a new token in the connection form instead"},
+        )
     redirect_uri = oauth_callback_url()
     if not redirect_uri:
         return _json_response(503, {"error": "OAuth callback URL is not configured"})
@@ -500,6 +579,10 @@ def oauth_start(event, connection_id):
         scopes = oauth_providers.normalize_scopes(provider_name, connection.get("scopes"))
     except oauth_providers.ProviderError as exc:
         return _json_response(400, {"error": str(exc)})
+    try:
+        client_id, _ = oauth_clients.get(provider_name)
+    except oauth_clients.ClientConfigError as exc:
+        return _json_response(503, {"error": str(exc)})
     verifier = _b64encode(os.urandom(48))
     challenge = _b64encode(hashlib.sha256(verifier.encode()).digest())
     state = _sign({
@@ -513,7 +596,7 @@ def oauth_start(event, connection_id):
     })
     location = oauth_providers.authorization_url(
         provider_name,
-        client_id=connection["client_id"],
+        client_id=client_id,
         redirect_uri=redirect_uri,
         scopes=scopes,
         state=state,
@@ -555,23 +638,27 @@ def oauth_callback(event):
         return _json_response(400, {"error": "OAuth connection or code is missing"})
 
     try:
+        client_id, client_secret = oauth_clients.get(connection["provider"])
+    except oauth_clients.ClientConfigError as exc:
+        return _json_response(503, {"error": str(exc)})
+    try:
         previous = get_credential(connection["credential_id"])
     except KeyError:
-        return _json_response(400, {"error": "OAuth connection credentials are missing"})
+        # No credential record yet: the first consent creates it.
+        previous = {}
     try:
         token_data = oauth_providers.exchange_code(
             connection["provider"],
             code=query["code"],
-            client_id=connection["client_id"],
-            client_secret=previous["client_secret"],
+            client_id=client_id,
+            client_secret=client_secret,
             redirect_uri=payload["redirect_uri"],
             code_verifier=payload.get("code_verifier"),
         )
-    except (oauth_providers.ProviderError, KeyError) as exc:
-        message = str(exc) if isinstance(exc, oauth_providers.ProviderError) else "OAuth connection credentials are missing"
+    except oauth_providers.ProviderError as exc:
         _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
-                     outcome="error", error=message)
-        return _json_response(400, {"error": message})
+                     outcome="error", error=str(exc))
+        return _json_response(400, {"error": str(exc)})
     requested = set(connection.get("scopes") or [])
     granted_raw = token_data.get("scope")
     if granted_raw:
@@ -600,12 +687,9 @@ def oauth_callback(event):
         _audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="denied-account-mismatch", error=str(exc))
         return _json_response(409, {"error": str(exc)})
-    stored = {
-        "client_secret": previous.get("client_secret"),
-        **oauth_providers.normalize_token_data(
-            token_data, previous_refresh_token=previous.get("refresh_token"),
-        ),
-    }
+    stored = oauth_providers.normalize_token_data(
+        token_data, previous_refresh_token=previous.get("refresh_token"),
+    )
     put_credential(connection["credential_id"], stored, provider=connection["provider"])
     try:
         updated = connection_model.mark_connected(
@@ -668,6 +752,12 @@ def route(event, method, path):
         return save_grant(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/grants":
         return delete_grant(event, operator_subject)
+    if method == "GET" and path == "/api/admin/email-triggers":
+        return list_email_triggers(event)
+    if method == "PUT" and path == "/api/admin/email-triggers":
+        return save_email_trigger(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/email-triggers":
+        return delete_email_trigger(event, operator_subject)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))

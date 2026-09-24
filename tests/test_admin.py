@@ -104,7 +104,7 @@ def test_save_slack_credential_is_write_only(monkeypatch):
     assert writes[0] == ("slack", {"token": token}, {"provider": "slack"})
 
 
-def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
+def test_save_connection_stores_no_client_credentials(monkeypatch):
     credentials = []
     records = []
 
@@ -126,18 +126,108 @@ def test_save_connection_keeps_client_secret_out_of_metadata(monkeypatch):
         "connection_id": "team-dropbox",
         "provider": "dropbox",
         "display_name": "Team Dropbox",
-        "client_id": "client-id",
-        "client_secret": "client-secret",
         "scopes": ["files.metadata.read"],
     }
 
     response = admin.save_connection(request("PUT", "/api/admin/connections", body))
 
     assert response["statusCode"] == 200
-    assert "client-secret" not in response["body"]
+    assert credentials == []
+    assert "client_id" not in records[0]
     assert "client_secret" not in records[0]
     assert records[0]["credential_id"] == "oauth#team-dropbox"
-    assert credentials[0] == ("oauth#team-dropbox", {"client_secret": "client-secret"}, {"provider": "dropbox"})
+
+
+def _fake_connections_table(monkeypatch, records):
+    class Table:
+        def put_item(self, **kwargs):
+            records.append(kwargs["Item"])
+
+        def get_item(self, **kwargs):
+            return {}
+
+    class Dynamo:
+        def Table(self, _name):
+            return Table()
+
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
+
+
+def test_save_slack_connection_verifies_and_stores_token(monkeypatch):
+    records = []
+    credentials = []
+    _fake_connections_table(monkeypatch, records)
+    monkeypatch.setattr(admin.slack_tokens, "verify_account", lambda token: ("T012345", "DataTalks"))
+    monkeypatch.setattr(admin, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
+    token = "xoxb-" + "a" * 30
+    body = {
+        "connection_id": "slack",
+        "provider": "slack",
+        "display_name": "DataTalks Slack",
+        "token": token,
+    }
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", body))
+
+    assert response["statusCode"] == 200
+    assert records[0]["status"] == "connected"
+    assert records[0]["verified_account_id"] == "T012345"
+    assert records[0]["account_title"] == "DataTalks"
+    assert credentials == [("oauth#slack", {"token": token}, {"provider": "slack"})]
+    assert token not in response["body"]
+
+
+def test_save_slack_connection_requires_token_without_stored_secret(monkeypatch):
+    records = []
+    _fake_connections_table(monkeypatch, records)
+
+    def missing(credential_id):
+        raise KeyError(credential_id)
+
+    monkeypatch.setattr(admin, "get_credential", missing)
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "slack",
+        "provider": "slack",
+        "display_name": "DataTalks Slack",
+    }))
+
+    assert response["statusCode"] == 400
+    assert "token is required" in response["body"]
+    assert records == []
+
+
+def test_save_slack_connection_rejects_token_slack_rejects(monkeypatch):
+    records = []
+    _fake_connections_table(monkeypatch, records)
+
+    def reject(token):
+        raise admin.slack_tokens.SlackTokenError("Slack rejected the token: invalid_auth")
+
+    monkeypatch.setattr(admin.slack_tokens, "verify_account", reject)
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "slack",
+        "provider": "slack",
+        "display_name": "DataTalks Slack",
+        "token": "xoxp-" + "b" * 30,
+    }))
+
+    assert response["statusCode"] == 400
+    assert "invalid_auth" in response["body"]
+    assert records == []
+
+
+def test_oauth_start_rejects_token_provider(monkeypatch):
+    monkeypatch.setattr(admin, "_connection", lambda connection_id: {
+        "connection_id": "slack", "provider": "slack", "status": "connected",
+    })
+
+    response = admin.oauth_start(request("GET", "/api/admin/oauth/slack/start"), "slack")
+
+    assert response["statusCode"] == 400
+    assert "directly provided token" in response["body"]
 
 
 def test_root_serves_console_with_security_headers():

@@ -83,6 +83,25 @@ fixed registered redirect URIs, bounded state lifetime, and single-use
 callbacks. Validate the callback's connection ID and operator identity.
 Never derive a redirect URI from an untrusted forwarded-host header.
 
+Implemented deviation: the OAuth client ID/secret pair is shared per provider
+and deploys with the stack (CloudFormation parameters on the dapier stack,
+rendered into function environment variables), so operators never paste
+client credentials per connection; a connection may still carry explicit
+client credentials in its secret record when an imported refresh token was
+issued by a different client.
+
+Token providers (Slack): a provider may skip OAuth entirely and authenticate
+with a directly supplied token. Slack connections accept a bot (`xoxb-`),
+user (`xoxp-`), or app-level (`xapp-`) token in the create/edit request; the
+token is verified against Slack `auth.test` (workspace ID and name become the
+verified account binding) and stored in the credentials table under the
+connection's `credential_id`. Scopes are not requested — they ride on the
+token. Editing the connection without a new token re-verifies and keeps the
+stored one; `oauth/start` and the agent connect flow reject token providers
+with a clear message. Workflow slack actions resolve `connection_id` through
+the connections table, falling back to a raw `credential_id` for global
+credentials.
+
 For YouTube, verify the authenticated channel ID with `channels.list(mine=true)`
 before marking a connection ready or returning a token. If the upload-only
 scope cannot make that check, fail closed and document the minimum extra scope

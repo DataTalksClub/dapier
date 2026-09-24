@@ -50,6 +50,15 @@ Parameters:
     Type: String
     Default: ''
     Description: Path the Dropbox resolver lists (empty lists everything the app can see)
+  GoogleOAuthClientId:
+    Type: String
+    Default: ''
+    Description: Google OAuth client ID shared by Calendar and YouTube connections
+  GoogleOAuthClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Secret of the shared Google OAuth client
   DropboxOAuthClientId:
     Type: String
     Default: ''
@@ -59,6 +68,10 @@ Parameters:
     NoEcho: true
     Default: ''
     Description: Dropbox app secret (also verifies webhook signatures)
+  TriggerEmailDomain:
+    Type: String
+    Default: dtcdev.click
+    Description: Domain for operator-created email trigger addresses
 
 Globals:
   Function:
@@ -87,6 +100,8 @@ Globals:
         AUTH_JWKS_URL: !Ref AuthJwksUrl
         OPERATOR_EMAILS: !Ref OperatorEmails
         OPERATOR_SUBJECTS: !Ref OperatorSubjects
+        TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
+        EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
 
 Resources:
   Api:
@@ -132,11 +147,15 @@ Resources:
             TableName: !Ref GrantsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AuditTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EmailTriggersTable
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
+          GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
+          GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
           DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
@@ -265,6 +284,13 @@ Resources:
       Architectures: [arm64]
       Timeout: 60
       MemorySize: 512
+      Environment:
+        Variables:
+          GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
+          GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
+          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
+          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
@@ -273,6 +299,8 @@ Resources:
             Resource: !GetAtt CredentialsTable.Arn
         - DynamoDBReadPolicy:
             TableName: !Ref ConnectionsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EmailTriggersTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -312,6 +340,8 @@ Resources:
       Environment:
         Variables:
           DROPBOX_ROOT_PATH: !Ref DropboxRootPath
+          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
+          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
         Notifications:
           Type: SQS
@@ -533,6 +563,16 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  EmailTriggersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: name, AttributeType: S}
+      KeySchema:
+        - {AttributeName: name, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   MailBucket:

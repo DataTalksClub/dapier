@@ -26,6 +26,25 @@ if [ "$AUTH_CLI_CLIENT_ID" = "None" ]; then AUTH_CLI_CLIENT_ID=""; fi
 # OPERATOR_EMAILS="a@datatalks.club,b@datatalks.club" to restrict it.
 OPERATOR_EMAILS="${OPERATOR_EMAILS:-}"
 
+# Shared OAuth clients (Google for Calendar/YouTube, Dropbox), created once in
+# each provider console with the redirect URI https://dapier.dtcdev.click/oauth/
+# callback. Export GOOGLE_OAUTH_CLIENT_ID/SECRET and DROPBOX_OAUTH_CLIENT_ID/
+# SECRET to (re)set them; a variable left unset is omitted from the overrides
+# file so CloudFormation keeps the previously deployed value instead of
+# clearing it — do not "fix" that by passing empty strings.
+oauth_override_lines=""
+for pair in \
+  "GoogleOAuthClientId:GOOGLE_OAUTH_CLIENT_ID" \
+  "GoogleOAuthClientSecret:GOOGLE_OAUTH_CLIENT_SECRET" \
+  "DropboxOAuthClientId:DROPBOX_OAUTH_CLIENT_ID" \
+  "DropboxOAuthClientSecret:DROPBOX_OAUTH_CLIENT_SECRET"; do
+  param="${pair%%:*}" env_var="${pair##*:}"
+  value="${!env_var:-}"
+  if [ -n "$value" ]; then
+    oauth_override_lines+="${param}: \"${value}\""$'\n'
+  fi
+done
+
 # Overrides go through a YAML file: SAM rejects empty values in the shorthand
 # key=value format and CloudFormation keeps a parameter's previous value when
 # an override is omitted — so this file passes every parameter explicitly
@@ -49,6 +68,7 @@ AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 DropboxRootPath: "${DROPBOX_ROOT_PATH:-}"
+${oauth_override_lines}
 EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"

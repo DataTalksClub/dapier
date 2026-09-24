@@ -4,7 +4,7 @@ A connection binds one provider account to one ``connection_id``. Bearer
 credentials always live in the credentials store; this module owns the
 DynamoDB metadata item only:
 
-- ``connection_id`` (HASH key), ``provider``, ``display_name``, ``client_id``
+- ``connection_id`` (HASH key), ``provider``, ``display_name``
 - ``scopes`` (requested), ``granted_scopes``
 - ``expected_account_id`` / ``verified_account_id`` / ``account_title``
 - ``owner_subject`` (stable DTC subject that connected it)
@@ -22,6 +22,10 @@ CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
 
 STATUS_READY = "ready"
 STATUS_CONNECTED = "connected"
+
+# Providers that authenticate with a directly supplied token instead of an
+# OAuth consent round-trip (see admin._save_token_connection).
+TOKEN_PROVIDERS = {"slack"}
 
 
 class ConnectionError(ValueError):
@@ -49,22 +53,30 @@ def validate_new_connection(body):
     """Validate a create/edit request body. Returns cleaned fields.
 
     Raises ConnectionError with a user-facing message. Never returns secrets.
+    OAuth client credentials are not required: they deploy with the stack
+    (see ``oauth_clients``). Explicit values are still accepted here — the
+    CLI import path uses them for refresh tokens issued by another client.
     """
     body = body or {}
     connection_id = validate_connection_id(body.get("connection_id"))
     provider = str(body.get("provider", "")).strip().lower()
-    if provider not in oauth_providers.PROVIDERS:
-        raise ConnectionError("Provider, client ID, and client secret are required")
-    client_id = str(body.get("client_id", "")).strip()
-    client_secret = str(body.get("client_secret", "")).strip()
-    if not client_id or not client_secret:
-        raise ConnectionError("Provider, client ID, and client secret are required")
+    if provider not in oauth_providers.PROVIDERS and provider not in TOKEN_PROVIDERS:
+        raise ConnectionError(
+            f"Provider must be one of: "
+            f"{', '.join(sorted(set(oauth_providers.PROVIDERS) | TOKEN_PROVIDERS))}"
+        )
+    client_id = str(body.get("client_id", "")).strip() or None
+    client_secret = str(body.get("client_secret", "")).strip() or None
     raw_scopes = body.get("scopes", [])
     if isinstance(raw_scopes, str):
         raw_scopes = raw_scopes.split()
     scopes = [scope for scope in raw_scopes if isinstance(scope, str) and scope.strip()]
     try:
-        scopes = oauth_providers.normalize_scopes(provider, scopes)
+        if provider in oauth_providers.PROVIDERS:
+            scopes = oauth_providers.normalize_scopes(provider, scopes)
+        else:
+            # Token providers carry their scopes in the token itself.
+            scopes = sorted({scope for scope in scopes if scope})
     except oauth_providers.ProviderError as exc:
         raise ConnectionError(str(exc))
     expected_account_id = str(body.get("expected_account_id", "") or "").strip() or None
@@ -104,7 +116,6 @@ def build_item(fields, *, owner_subject, previous=None):
         "connection_id": fields["connection_id"],
         "provider": fields["provider"],
         "display_name": fields["display_name"],
-        "client_id": fields["client_id"],
         "scopes": fields["scopes"],
         "granted_scopes": list(previous.get("granted_scopes") or []),
         "expected_account_id": fields.get("expected_account_id"),

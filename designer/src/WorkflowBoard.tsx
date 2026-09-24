@@ -1,20 +1,16 @@
 import {
-  DatabaseZap,
   FileText,
   Minus,
   MousePointer2,
   Plus,
   StickyNote,
   Trash2,
-  Upload,
-  Webhook,
   Zap,
-  MessageSquare,
   ListRestart
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { actionCatalog, actionNodeSubtitle, actionNodeTitle, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "./workflows";
+import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "./workflows";
 import type { ActionType, DiagramShape, NodeData, Point, Tool } from "./types";
 
 export type PaletteKind = "trigger" | ActionType | "note";
@@ -44,11 +40,7 @@ const minZoom = 0.5;
 const maxZoom = 2;
 
 export function actionIcon(type: ActionType) {
-  if (type === "webhook") return Webhook;
-  if (type === "slack") return MessageSquare;
-  if (type === "dataops") return DatabaseZap;
-  if (type === "dropbox_upload") return Upload;
-  return FileText;
+  return actionMeta(type)?.icon ?? FileText;
 }
 
 const paletteEntries: Array<{ kind: PaletteKind; label: string; icon: typeof Zap }> = [
@@ -590,8 +582,8 @@ export function WorkflowBoard({
       if (shape.id !== shapeId || shape.type !== "node" || shape.data?.nodeKind !== "action") return shape;
       return {
         ...shape,
-        label: actionCatalog.find((entry) => entry.type === actionType)?.label ?? shape.label,
-        data: { ...defaultNodeData("action"), actionType }
+        label: actionMeta(actionType)?.label ?? actionType,
+        data: { ...defaultNodeData("action"), actionType, fields: defaultFields(actionType) }
       };
     }));
     setContextMenu(null);

@@ -2,14 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CloudUpload, FilePlus2, GitBranch, Loader2, Save, TriangleAlert } from "lucide-react";
 import { dump } from "js-yaml";
 import { WorkflowBoard } from "./WorkflowBoard";
-import {
-  actionCatalog,
-  connectorCatalog,
-  filterOperators,
-  shapesFromWorkflow,
-  summarize,
-  workflowFromShapes
-} from "./workflows";
+import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
+import { actionMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import type { CatalogField } from "./catalog";
 import type { DiagramShape, FilterRule, GitStatus, NodeData, Workflow, WorkflowSummary } from "./types";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
@@ -26,6 +21,84 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 function workflowYaml(workflow: Workflow): string {
   return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
+}
+
+/** One catalog field, rendered per its declared type. */
+function FieldInput({ field, value, onChange }: {
+  field: CatalogField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (field.type === "boolean") {
+    return (
+      <label className="check-label">
+        <input
+          type="checkbox"
+          checked={(value || field.default || "false") === "true"}
+          onChange={(event) => onChange(event.target.checked ? "true" : "false")}
+        />
+        {field.label}
+      </label>
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <label>{field.label}{field.required ? " *" : ""}
+        <select value={value} onChange={(event) => onChange(event.target.value)}>
+          {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </label>
+    );
+  }
+  if (field.type === "textarea") {
+    return (
+      <label>{field.label}{field.required ? " *" : ""}
+        <textarea value={value} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />
+      </label>
+    );
+  }
+  return (
+    <label>{field.label}{field.required ? " *" : ""}
+      <input
+        type={field.type === "number" ? "number" : "text"}
+        step={field.type === "number" ? "any" : undefined}
+        value={value}
+        placeholder={field.placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+/** Escape hatch for action types the catalog does not model: raw JSON editing. */
+function RawJsonInput({ value, onChange }: {
+  value: Record<string, unknown>;
+  onChange: (next: Record<string, unknown>) => void;
+}) {
+  const [text, setText] = useState(() => JSON.stringify(value, null, 2));
+  const [invalid, setInvalid] = useState(false);
+  return (
+    <>
+      <textarea
+        className="raw-json"
+        value={text}
+        rows={8}
+        onChange={(event) => {
+          setText(event.target.value);
+          try {
+            const parsed: unknown = JSON.parse(event.target.value);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              setInvalid(false);
+              onChange(parsed as Record<string, unknown>);
+              return;
+            }
+          } catch { /* not JSON yet */ }
+          setInvalid(true);
+        }}
+      />
+      {invalid && <span className="save-problems">Invalid JSON — fixes apply once it parses.</span>}
+    </>
+  );
 }
 
 export function App() {
@@ -151,6 +224,8 @@ export function App() {
     }
     const data = selected.data;
     if (data.nodeKind === "trigger") {
+      const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom"))
+        ?? { name: "custom", events: [] as string[] };
       return (
         <>
           <label>Connector
@@ -158,11 +233,18 @@ export function App() {
               value={data.connector ?? "custom"}
               onChange={(event) => updateSelected((current) => ({ ...current, connector: event.target.value as NodeData["connector"] }))}
             >
-              {connectorCatalog.map((name) => <option key={name} value={name}>{name}</option>)}
+              {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
             </select>
           </label>
           <label>Event
-            <input value={data.event ?? ""} onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))} />
+            <input
+              value={data.event ?? ""}
+              list="trigger-events"
+              onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
+            />
+            <datalist id="trigger-events">
+              {connectorEntry.events.map((event) => <option key={event} value={event} />)}
+            </datalist>
           </label>
           <div className="field-block">
             <span className="field-label">Filters</span>
@@ -223,54 +305,61 @@ export function App() {
       );
     }
 
-    const meta = actionCatalog.find((entry) => entry.type === data.actionType) ?? actionCatalog[0];
+    const meta = actionMeta(data.actionType);
+    const setField = (key: string, value: string) => updateSelected((current) => ({
+      ...current,
+      fields: { ...current.fields, [key]: value }
+    }));
     return (
       <>
         <label>Action type
-          <select
-            value={data.actionType ?? "webhook"}
-            onChange={(event) => updateSelected((current) => ({
-              ...current,
-              actionType: event.target.value as NodeData["actionType"],
-              fields: {}
-            }))}
-          >
-            {actionCatalog.map((entry) => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
-          </select>
+          {meta ? (
+            <select
+              value={data.actionType}
+              onChange={(event) => updateSelected((current) => ({
+                ...current,
+                actionType: event.target.value,
+                fields: defaultFields(event.target.value),
+                raw: undefined
+              }))}
+            >
+              {actionCatalog.map((entry) => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
+            </select>
+          ) : (
+            <input
+              value={data.actionType ?? ""}
+              onChange={(event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))}
+            />
+          )}
         </label>
         <label>Action ID
           <input
             value={data.fields?.id ?? ""}
-            placeholder={meta.fields[0].label}
-            onChange={(event) => updateSelected((current) => ({ ...current, fields: { ...current.fields, id: event.target.value } }))}
+            placeholder="action-1"
+            onChange={(event) => setField("id", event.target.value)}
           />
         </label>
-        {meta.fields.filter((field) => field.key !== "id").map((field) => (
-          <label key={field.key}>{field.label}{field.required ? " *" : ""}
-            <input
+        {meta ? (
+          meta.fields.map((field) => (
+            <FieldInput
+              key={field.key}
+              field={field}
               value={data.fields?.[field.key] ?? ""}
-              placeholder={field.placeholder}
-              onChange={(event) => updateSelected((current) => ({ ...current, fields: { ...current.fields, [field.key]: event.target.value } }))}
+              onChange={(value) => setField(field.key, value)}
             />
-          </label>
-        ))}
-        {(data.actionType === "render_html_to_pdf") && (
-          <>
-            <label>PDF page format
-              <input
-                value={data.pdfPageFormat ?? "A4"}
-                onChange={(event) => updateSelected((current) => ({ ...current, pdfPageFormat: event.target.value }))}
-              />
-            </label>
-            <label className="check-label">
-              <input
-                type="checkbox"
-                checked={data.pdfPrintBackground ?? true}
-                onChange={(event) => updateSelected((current) => ({ ...current, pdfPrintBackground: event.target.checked }))}
-              />
-              Print background
-            </label>
-          </>
+          ))
+        ) : (
+          <div className="field-block">
+            <span className="field-label">Unknown action</span>
+            <p className="inspector-hint">
+              Not in the catalog — the YAML is kept as-is on save. Edit it as JSON:
+            </p>
+            <RawJsonInput
+              key={selected.id}
+              value={data.raw ?? {}}
+              onChange={(raw) => updateSelected((current) => ({ ...current, raw }))}
+            />
+          </div>
         )}
       </>
     );

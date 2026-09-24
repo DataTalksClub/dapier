@@ -19,8 +19,6 @@ def body(**overrides):
         "connection_id": "youtube-personal",
         "provider": "youtube",
         "display_name": "Personal YouTube",
-        "client_id": "client-id",
-        "client_secret": "client-secret",
         "scopes": ["https://www.googleapis.com/auth/youtube.upload"],
     }
     base.update(overrides)
@@ -44,11 +42,24 @@ def test_validate_new_connection_keeps_current_error_messages():
 
     with pytest.raises(ConnectionError) as exc:
         validate_new_connection(body(provider="myspace"))
-    assert "client ID, and client secret are required" in str(exc.value)
+    assert "provider must be one of" in str(exc.value).lower()
 
-    with pytest.raises(ConnectionError) as exc:
-        validate_new_connection(body(client_secret=""))
-    assert "client ID, and client secret are required" in str(exc.value)
+
+def test_validate_new_connection_allows_slack_without_scopes():
+    fields = validate_new_connection(body(connection_id="slack", provider="slack", scopes=[]))
+    assert fields["provider"] == "slack"
+    assert fields["scopes"] == []
+    assert build_item(fields, owner_subject="op")["credential_id"] == "oauth#slack"
+
+
+def test_validate_new_connection_needs_no_client_credentials():
+    fields = validate_new_connection(body())
+    assert fields["client_id"] is None
+    assert fields["client_secret"] is None
+
+    explicit = validate_new_connection(body(client_id="cid", client_secret="csec"))
+    assert explicit["client_id"] == "cid"
+    assert explicit["client_secret"] == "csec"
 
 
 def test_validate_new_connection_accepts_space_separated_scopes():
@@ -70,6 +81,7 @@ def test_build_item_create_defaults():
     assert item["owner_subject"] == "subject-1"
     assert item["verified_account_id"] is None
     assert item["expected_account_id"] is None
+    assert "client_id" not in item
     assert "client_secret" not in item
 
 

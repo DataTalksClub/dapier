@@ -30,21 +30,32 @@ function showLogin() {
 }
 
 function showForbidden(message = 'Your account is not an operator for this console.') {
+  $('#login-view').hidden = true;
   $('#forbidden-view').hidden = false;
   $('#forbidden-message').textContent = message;
 }
 
 function showApp() {
+  $('#login-view').hidden = true;
   $('#app').hidden = false;
   icons();
 }
 
-function badge(status) {
+const pad2 = (value) => String(value).padStart(2, '0');
+
+function statusLine(status) {
   const value = String(status || 'unknown');
-  const kind = value === 'completed' || value === 'connected' || value === 'configured' || value === 'enabled'
-    ? 'success' : value === 'ready' || value === 'processing' ? 'warning'
-    : value === 'failed' || value === 'error' || value === 'missing' ? 'error' : 'neutral';
-  return `<span class="badge ${kind}">${escapeHtml(value)}</span>`;
+  const kind = ['completed', 'connected', 'configured', 'enabled'].includes(value) ? 'ok'
+    : ['processing', 'ready'].includes(value) ? 'run'
+    : ['failed', 'error', 'missing'].includes(value) ? 'err'
+    : 'off';
+  return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(value)}</span>`;
+}
+
+/* Escape, then mark separator characters as safe wrap points so long machine
+   values (execution IDs, scope URLs) break at ":", ".", "/", "_" — never mid-token. */
+function wrapTokens(value) {
+  return escapeHtml(value).replace(/([:._/])/g, '$1<wbr>');
 }
 
 function escapeHtml(value) {
@@ -53,22 +64,36 @@ function escapeHtml(value) {
   return element.innerHTML;
 }
 
-function connectorIcon(connector) {
-  const names = { email: 'mail', youtube: 'youtube', renderer: 'file-output', custom: 'webhook', dropbox: 'package-open' };
-  return `<span class="connector-icon"><i data-lucide="${names[connector] || 'workflow'}"></i></span>`;
-}
-
 function triggerLabel(workflow) {
   const trigger = workflow.trigger;
   return `${trigger.connector} · ${trigger.event}`;
 }
 
+/* One timestamp family everywhere: YYYY-MM-DD HH:MM (24h, local). */
+function toDate(value) {
+  return /^\d+$/.test(String(value)) ? new Date(Number(value) * 1000) : new Date(value);
+}
+
+function formatTimestamp(value) {
+  if (value == null || value === '') return null;
+  const date = toDate(value);
+  return Number.isNaN(date.getTime()) ? String(value)
+    : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function formatDay(value) {
+  if (value == null || value === '') return null;
+  const date = toDate(value);
+  return Number.isNaN(date.getTime()) ? String(value)
+    : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
 function workflowRow(workflow) {
-  return `<div class="workflow-row workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
-    <div class="workflow-name">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(workflow.id)}</span></div>
-    <div class="workflow-trigger">${escapeHtml(triggerLabel(workflow))}</div>
-    ${badge(workflow.enabled ? 'enabled' : 'disabled')}
-  </div>`;
+  return `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
+    <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
+    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
+    <td data-label="Status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}</td>
+  </tr>`;
 }
 
 function configRows(config) {
@@ -87,18 +112,18 @@ function openWorkflow(id) {
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `
     <div class="detail-summary">
-      ${badge(workflow.enabled ? 'enabled' : 'disabled')}
+      ${statusLine(workflow.enabled ? 'enabled' : 'disabled')}
       ${workflow.source ? `<code>workflows/${escapeHtml(workflow.source)}</code>` : ''}
     </div>
     <section class="detail-block">
       <h3>Trigger</h3>
-      <p class="detail-trigger">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(triggerLabel(workflow))}</span></p>
+      <p class="detail-trigger">${escapeHtml(triggerLabel(workflow))}</p>
       ${Object.keys(filters).length ? `<h4>Filters</h4>${configRows(filters)}` : ''}
     </section>
     <section class="detail-block">
       <h3>Actions</h3>
       ${(workflow.actions || []).map((action) => `<div class="detail-action">
-        <div class="detail-action-head">${connectorIcon(action.type)}<strong>${escapeHtml(action.id)}</strong><span class="badge neutral">${escapeHtml(action.type)}</span></div>
+        <div class="detail-action-head"><span class="action-id">${escapeHtml(action.id)}</span><span class="action-type">${escapeHtml(action.type)}</span></div>
         ${configRows(action)}
       </div>`).join('')}
     </section>`;
@@ -120,12 +145,6 @@ function detailRows(rows) {
     `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>`;
 }
 
-function formatTimestamp(value) {
-  if (value == null || value === '') return null;
-  const date = /^\d+$/.test(String(value)) ? new Date(Number(value) * 1000) : new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
 function openRun(executionId) {
   const run = (state.data.executions || []).find((item) => item.execution_id === executionId);
   if (!run) return;
@@ -134,7 +153,7 @@ function openRun(executionId) {
   const actionId = run.action_id || parts[1];
   $('#run-title').textContent = workflowId || 'Run';
   $('#run-detail').innerHTML = `
-    <div class="detail-summary">${badge(run.status)}<code>${escapeHtml(executionId)}</code></div>
+    <div class="detail-summary">${statusLine(run.status)}<code>${wrapTokens(executionId)}</code></div>
     ${run.error ? `<div class="detail-error"><i data-lucide="alert-triangle"></i><span>${escapeHtml(run.error)}</span></div>` : ''}
     <section class="detail-block">${detailRows([
       ['Workflow', workflowId],
@@ -161,20 +180,22 @@ function render() {
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
   $('#overview-runs').innerHTML = data.executions.slice(0, 6).map((execution) =>
-    `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0"><td>${escapeHtml(execution.execution_id)}</td><td>${badge(execution.status)}</td></tr>`).join('') || emptyRow(2);
+    `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0"><td class="mono">${wrapTokens(execution.execution_id)}</td><td data-label="Status">${statusLine(execution.status)}</td></tr>`).join('') || emptyRow(2);
   $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
-    <td><div class="workflow-name">${connectorIcon(workflow.trigger.connector)}<span>${escapeHtml(workflow.id)}</span></div></td>
-    <td>${escapeHtml(triggerLabel(workflow))}</td>
-    <td>${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
-    <td>${badge(workflow.enabled ? 'enabled' : 'disabled')}</td>
+    <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
+    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
+    <td class="mono muted-cell" data-label="Actions">${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
+    <td data-label="Status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}</td>
   </tr>`).join('');
   renderConnections(data.connections);
   renderCredentials(data.credentials);
   $('#run-table').innerHTML = data.executions.map((execution) => `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0">
-    <td>${escapeHtml(execution.execution_id)}</td><td>${badge(execution.status)}</td>
-    <td>${execution.expires_at ? new Date(Number(execution.expires_at) * 1000).toLocaleDateString() : '—'}</td>
+    <td class="cell-title mono"><span class="cell-name">${wrapTokens(execution.execution_id)}</span></td>
+    <td data-label="Status">${statusLine(execution.status)}</td>
+    <td class="mono muted-cell" data-label="Retention">${execution.expires_at ? wrapTokens(formatDay(execution.expires_at)) : '—'}</td>
   </tr>`).join('') || emptyRow(3);
-  $('#last-updated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const now = new Date();
+  $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();
 }
 
@@ -185,28 +206,34 @@ function emptyRow(columns) {
 function renderConnections(connections) {
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
-  $('#connection-table').innerHTML = connections.map((connection) => `<tr>
-    <td><strong>${escapeHtml(connection.display_name)}</strong><br><code>${escapeHtml(connection.connection_id)}</code></td>
-    <td>${escapeHtml(connection.provider)}</td>
-    <td>${escapeHtml((connection.scopes || []).join(', ') || 'Default')}</td>
-    <td>${badge(connection.status)}</td>
-    <td class="action-cell"><a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a></td>
-  </tr>`).join('');
+  $('#connection-table').innerHTML = connections.map((connection) => {
+    const action = connection.provider === 'slack'
+      ? '<span class="action-type">token</span>'
+      : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${connection.status === 'connected' ? 'Reconnect' : 'Connect'}</a>`;
+    return `<tr>
+    <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
+    <td class="mono muted-cell" data-label="Provider">${escapeHtml(connection.provider)}</td>
+    <td class="mono muted-cell" data-label="Scopes">${wrapTokens((connection.scopes || []).join(', ') || 'Default')}</td>
+    <td data-label="Status">${statusLine(connection.status)}</td>
+    <td class="action-cell"${connection.provider === 'slack' ? ' data-label="Auth"' : ''}>${action}</td>
+  </tr>`;
+  }).join('');
 }
 
 function renderCredentials(credentials) {
   const labels = {
-    slack: { name: 'Slack bot', secret: 'credential: slack', icon: 'message-square' },
-    mailchimp: { name: 'Mailchimp', secret: 'credential: mailchimp', icon: 'send' },
+    slack: { name: 'Slack bot', secret: 'credential: slack' },
+    mailchimp: { name: 'Mailchimp', secret: 'credential: mailchimp' },
   };
   $('#credential-list').innerHTML = credentials.map((credential) => {
     const item = labels[credential.provider];
     const status = credential.configured ? 'configured' : 'missing';
-    return `<div class="credential-row">
-      <div class="credential-provider"><span class="connector-icon"><i data-lucide="${item.icon}"></i></span><div><strong>${item.name}</strong><span>${item.secret}</span></div></div>
-      <div>${badge(status)}${credential.updated_at ? `<br><small>${new Date(credential.updated_at).toLocaleString()}</small>` : ''}</div>
-      <button class="button secondary credential-edit" data-provider="${credential.provider}"><span>${credential.configured ? 'Replace' : 'Add'}</span></button>
-    </div>`;
+    return `<tr>
+      <td class="cell-title"><span class="cell-name">${item.name}</span><span class="cell-sub">${item.secret}</span></td>
+      <td class="mono muted-cell" data-label="Updated">${credential.updated_at ? formatTimestamp(credential.updated_at) : '—'}</td>
+      <td data-label="Status">${statusLine(status)}</td>
+      <td class="action-cell"><button class="button secondary credential-edit" data-provider="${credential.provider}">${credential.configured ? 'Replace' : 'Add'}</button></td>
+    </tr>`;
   }).join('');
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));
 }
@@ -245,33 +272,63 @@ const PROVIDER_SPECS = {
     connectionId: 'team-dropbox',
     displayName: 'Team Dropbox',
     scopes: 'files.metadata.read files.content.read',
+    console: 'https://www.dropbox.com/developers/apps',
+    consoleLabel: 'Dropbox App Console',
     scopeHint: 'Space-separated Dropbox scopes. Leave as-is unless your app needs more.',
   },
   google: {
     connectionId: 'calendar-alexey',
     displayName: 'Calendar — Alexey',
     scopes: 'https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.email',
+    console: 'https://console.cloud.google.com/apis/credentials',
+    consoleLabel: 'Google Cloud Console',
     scopeHint: 'Google requires at least one scope — the prefilled three cover free/busy, owned-event edits, and account verification.',
   },
   youtube: {
     connectionId: 'channel-youtube',
     displayName: 'Channel YouTube',
     scopes: 'https://www.googleapis.com/auth/youtube.readonly',
+    console: 'https://console.cloud.google.com/apis/credentials',
+    consoleLabel: 'Google Cloud Console',
     scopeHint: 'Google requires at least one scope — leave this filled in or YouTube sign-in fails.',
+  },
+  slack: {
+    connectionId: 'slack',
+    displayName: 'DataTalks Slack',
+    scopes: '',
+    console: 'https://api.slack.com/apps',
+    consoleLabel: 'Slack App Directory',
+    scopeHint: 'Slack tokens carry their scopes from the app installation.',
   },
 };
 
 function applyProviderSpec(provider) {
   const spec = PROVIDER_SPECS[provider] || PROVIDER_SPECS.dropbox;
   const form = $('#connection-form');
+  const tokenProvider = provider === 'slack';
+  $('#connection-oauth-callout').hidden = tokenProvider;
+  $('#connection-client-id-field').hidden = tokenProvider;
+  $('#connection-client-secret-field').hidden = tokenProvider;
+  $('#connection-scopes-field').hidden = tokenProvider;
+  $('#connection-token-field').hidden = !tokenProvider;
+  form.client_id.required = !tokenProvider;
+  form.client_secret.required = !tokenProvider;
+  form.slack_token.required = tokenProvider;
   form.connection_id.placeholder = spec.connectionId;
   form.display_name.placeholder = spec.displayName;
   form.scopes.placeholder = spec.scopes;
-  if (!form.scopes.value.trim() || form.scopes.dataset.autofill === '1') {
+  if (tokenProvider) {
+    form.scopes.value = '';
+    delete form.scopes.dataset.autofill;
+  } else if (!form.scopes.value.trim() || form.scopes.dataset.autofill === '1') {
     form.scopes.value = spec.scopes;
     form.scopes.dataset.autofill = '1';
   }
   $('#connection-scope-hint').textContent = spec.scopeHint;
+  const link = $('#connection-console');
+  link.href = spec.console;
+  link.textContent = spec.consoleLabel;
+  $('#connection-redirect').textContent = `${window.location.origin}/oauth/callback`;
 }
 
 function openCredential(provider) {
@@ -284,6 +341,18 @@ function openCredential(provider) {
   $('#credential-dialog').showModal();
   form.value.focus();
 }
+
+$('#login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const element = event.currentTarget;
+  const form = new FormData(element);
+  $('#login-error').textContent = '';
+  try {
+    await api('/api/admin/session', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) });
+    element.querySelector('[name="password"]').value = '';
+    await refresh();
+  } catch (error) { $('#login-error').textContent = error.message; }
+});
 
 $('#credential-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -305,12 +374,18 @@ $('#connection-form').addEventListener('submit', async (event) => {
   const form = event.currentTarget;
   const values = Object.fromEntries(new FormData(form));
   values.scopes = values.scopes.trim() ? values.scopes.trim().split(/\s+/) : [];
+  if (values.provider === 'slack') {
+    values.token = values.slack_token;
+    delete values.slack_token;
+  }
   $('#connection-error').textContent = '';
   try {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(values) });
-    // Saving immediately continues into the provider consent flow; the
-    // callback returns to the console with the connection marked connected.
-    window.location.assign(`/api/admin/oauth/${encodeURIComponent(values.connection_id.trim().toLowerCase())}/start`);
+    form.client_secret.value = '';
+    form.slack_token.value = '';
+    $('#connection-dialog').close();
+    notice('Connection saved');
+    await refresh();
   } catch (error) { $('#connection-error').textContent = error.message; }
 });
 
@@ -341,6 +416,12 @@ $('#add-connection').addEventListener('click', () => {
 });
 $('#connection-form').provider.addEventListener('change', (event) => applyProviderSpec(event.target.value));
 $('#connection-form').scopes.addEventListener('input', (event) => { event.target.dataset.autofill = ''; });
+$('#connection-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#connection-redirect').textContent);
+    notice('Redirect URI copied');
+  } catch (_) { notice('Copy failed — select the URI manually', true); }
+});
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });

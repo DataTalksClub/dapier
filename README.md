@@ -107,8 +107,30 @@ The **Credentials** view accepts the Slack bot token used by Dapier and the
 Mailchimp API key used by DataOps. The values are write-only: the browser sends
 them over HTTPS to the administration API, which stores them in the dedicated
 DynamoDB credentials table and returns only presence and update metadata. The
-**Connections** view configures OAuth clients for Dropbox and YouTube; OAuth
-client secrets and tokens use the same write-only storage boundary.
+**Connections** view lists OAuth connections: pick a provider, keep the
+prefilled scopes, hit **Save & connect**, and approve access — that's the whole
+flow. OAuth client IDs and secrets are shared per provider and deploy with the
+stack (see below); provider tokens land in the same write-only DynamoDB
+credentials table.
+
+Slack connects as a regular connection without OAuth: pick the **Slack**
+provider, paste a bot (`xoxb-`) or user (`xoxp-`) token, and save — Dapier
+verifies it with Slack's `auth.test`, stores it in the credentials table under
+the connection's ID, and marks the connection connected. Workflows reference it
+by `connection_id` (the `youtube-slack` workflow posts with `connection_id:
+slack`); actions may still use a raw `credential_id` for global credentials.
+
+OAuth clients are created once in each provider console (Google Cloud Console
+for Calendar/YouTube, Dropbox App Console for Dropbox) with the redirect URI
+`https://dapier.dtcdev.click/oauth/callback`, and reach the functions through
+CloudFormation parameters. Export them before a deploy that should set or
+rotate them; omit them and CloudFormation keeps the previous values:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \
+DROPBOX_OAUTH_CLIENT_ID=... DROPBOX_OAUTH_CLIENT_SECRET=... \
+  make deploy
+```
 
 The `CredentialsTableName` and `CredentialsTableArn` stack outputs allow
 authorized consumers such as DataOps to receive exact-table, read-only IAM
@@ -118,9 +140,11 @@ access without sharing Dapier's administration permissions.
 
 The full design lives in
 [docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md). One
-deliberate deviation: OAuth client secrets and tokens stay in the DynamoDB
-credentials table (with optimistic versioning) instead of Secrets Manager, so
-all application secrets share one storage boundary and IAM shape.
+deliberate deviation: OAuth tokens stay in the DynamoDB credentials table
+(with optimistic versioning) instead of Secrets Manager, so all application
+secrets share one storage boundary and IAM shape. The OAuth client ID/secret
+pair is shared per provider and comes from deploy-time configuration rather
+than per-connection entry.
 
 Administration is open to every account that completes DTC sign-in — the DTC
 identity provider only issues datatalks.club accounts. To restrict it to a
@@ -154,11 +178,12 @@ against the connection's bound account before handing anything out.
 
 One-time migration of the existing DataTalksClub YouTube credential (bytes are
 transferred, never logged; refresh and channel ID are verified first; backups
-are untouched):
+are untouched). `--client-id`/`--client-secret-file` are optional — they are
+needed only when the refresh token was issued by a client other than the
+shared deploy-time one, and are then stored with the connection:
 
 ```bash
 dapier connections import youtube-datatalksclub --provider youtube \
-  --client-id <id> --client-secret-file secret.txt \
   --authorized-user-file token.json \
   --expected-account UCDvErgK0j5ur3aLgn6U-LqQ \
   --scopes https://www.googleapis.com/auth/youtube
@@ -167,8 +192,8 @@ dapier connections import youtube-datatalksclub --provider youtube \
 ## Connector plan
 
 - **Dropbox:** complete. Ingress answers the verification challenge, checks
-  `X-Dropbox-Signature` (HMAC-SHA256 with the configured connections' app secrets,
-  failing closed when no Dropbox connection exists), and queues one notification per
+  `X-Dropbox-Signature` (HMAC-SHA256 with the deploy-time Dropbox app secret,
+  failing closed when none is configured), and queues one notification per
   notified account. A resolver Lambda walks each account with
   `files/list_folder`/`files/list_folder/continue`, persists cursors and per-file
   `rev` state in the cursors table, and emits `file.created`, `file.updated`, and
@@ -179,10 +204,11 @@ dapier connections import youtube-datatalksclub --provider youtube \
   notification ingress are live; public channel upload notifications need no OAuth.
 - **Email:** Datamailer owns SES receipt, MIME parsing, and private artifact storage;
   its normalized SNS events feed Dapier's event queue.
-- **OAuth:** authenticated start/callback endpoints and connection storage are
-  available from the administration console. OAuth credentials and tokens are stored
-  in the dedicated credentials table; the general connections table contains
-  non-secret connection metadata only.
+- **OAuth:** adding a connection is one click in the administration console:
+  save it and the browser continues straight into the provider consent flow.
+  OAuth clients are shared per provider and configured at deploy time; provider
+  tokens are stored in the dedicated credentials table, and the general
+  connections table contains non-secret connection metadata only.
 
 Workflow files are packaged at deployment time. A deployment is therefore the audit
 trail and rollback mechanism for configuration changes.

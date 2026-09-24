@@ -150,25 +150,31 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
     except (OSError, ValueError) as exc:
         print(f"Cannot read {authorized_user_path}: {exc}")
         return 2
-    try:
-        with open(client_secret_file, encoding="utf-8") as handle:
-            client_secret = handle.read().strip()
-    except OSError as exc:
-        print(f"Cannot read {client_secret_file}: {exc}")
-        return 2
+    client_secret = ""
+    if client_secret_file:
+        try:
+            with open(client_secret_file, encoding="utf-8") as handle:
+                client_secret = handle.read().strip()
+        except OSError as exc:
+            print(f"Cannot read {client_secret_file}: {exc}")
+            return 2
+        if not client_secret:
+            print("The client-secret file is empty.")
+            return 2
     if not isinstance(authorized_user, dict) or not authorized_user.get("refresh_token"):
         print("The authorized-user file has no refresh token.")
-        return 2
-    if not client_secret:
-        print("The client-secret file is empty.")
         return 2
     body = {
         "connection_id": connection_id,
         "provider": provider,
-        "client_id": client_id,
-        "client_secret": client_secret,
         "authorized_user": {"refresh_token": authorized_user["refresh_token"]},
     }
+    # Omitted client credentials fall back to the shared deploy-time OAuth
+    # client on the server; explicit ones are for tokens issued by another client.
+    if client_id:
+        body["client_id"] = client_id
+    if client_secret:
+        body["client_secret"] = client_secret
     if expected_account_id:
         body["expected_account_id"] = expected_account_id
     if scopes:

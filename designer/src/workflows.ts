@@ -1,61 +1,8 @@
+import type { CatalogField } from "./catalog";
+import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import type { ActionType, DiagramShape, FilterRule, NodeData, Workflow, WorkflowSummary } from "./types";
 
-export const actionCatalog: Array<{
-  type: ActionType;
-  label: string;
-  /** Order follows the fields the engine reads in src/engine.py. */
-  fields: Array<{ key: string; label: string; placeholder?: string; required?: boolean }>;
-}> = [
-  {
-    type: "webhook",
-    label: "Webhook",
-    fields: [
-      { key: "url", label: "URL", required: true },
-      { key: "secret_id", label: "Signing secret ID", placeholder: "dapier/webhook" },
-      { key: "timeout_seconds", label: "Timeout (s)" }
-    ]
-  },
-  {
-    type: "slack",
-    label: "Slack",
-    fields: [
-      { key: "credential_id", label: "Credential ID", required: true },
-      { key: "channel", label: "Channel", placeholder: "#alerts", required: true },
-      { key: "text", label: "Text template", placeholder: "{title}\n{url}" }
-    ]
-  },
-  {
-    type: "dataops",
-    label: "DataOps intake",
-    fields: [
-      { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
-      { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
-      { key: "url", label: "URL (overrides env)" }
-    ]
-  },
-  {
-    type: "dropbox_upload",
-    label: "Dropbox upload",
-    fields: [
-      { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
-      { key: "source", label: "Source", placeholder: "attachment | output" },
-      { key: "folder", label: "Folder", placeholder: "/Invoices" },
-      { key: "filename", label: "Filename override" }
-    ]
-  },
-  {
-    type: "render_html_to_pdf",
-    label: "Render PDF",
-    fields: [
-      { key: "input_field", label: "Input field", placeholder: "html" },
-      { key: "output_key", label: "Output key", placeholder: "rendered/{event_id}.pdf" },
-      { key: "output_bucket_env", label: "Output bucket env" }
-    ]
-  }
-];
-
-export const connectorCatalog = ["email", "youtube", "renderer", "dropbox", "custom"] as const;
-export const filterOperators = ["equals", "prefix", "suffix", "contains"] as const;
+export { actionCatalog, connectorCatalog, filterOperators };
 
 export const NODE_WIDTH = 264;
 export const NODE_HEIGHT = 96;
@@ -67,11 +14,20 @@ export function actionMeta(type: ActionType) {
   return actionCatalog.find((entry) => entry.type === type);
 }
 
+/** Inspector starting values for a new node of this action type. */
+export function defaultFields(type: ActionType): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const field of actionMeta(type)?.fields ?? []) {
+    if (field.default !== undefined) fields[field.key] = field.default;
+  }
+  return fields;
+}
+
 export function defaultNodeData(kind: "trigger" | "action"): NodeData {
   if (kind === "trigger") {
     return { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] };
   }
-  return { nodeKind: "action", actionType: "webhook", fields: {} };
+  return { nodeKind: "action", actionType: "webhook", fields: defaultFields("webhook") };
 }
 
 export function actionNodeTitle(data: NodeData): string {
@@ -83,6 +39,20 @@ export function actionNodeSubtitle(data: NodeData): string {
   const meta = actionMeta(data.actionType ?? "webhook");
   const first = meta?.fields.find((field) => fields[field.key]);
   return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The object a field writes to: the action itself or its `group` object. */
+function fieldTarget(action: Record<string, unknown>, field: CatalogField): Record<string, unknown> {
+  if (!field.group) return action;
+  const group = action[field.group];
+  if (isRecord(group)) return group;
+  const created: Record<string, unknown> = {};
+  action[field.group] = created;
+  return created;
 }
 
 /** Chain actions in connector order starting at the trigger node. */
@@ -143,17 +113,28 @@ function actionToYaml(node: DiagramShape, index: number): Record<string, unknown
     id: (data.fields?.id ?? "").trim() || `action-${index + 1}`,
     type: data.actionType ?? "webhook"
   };
-  for (const field of actionMeta(data.actionType ?? "webhook")?.fields ?? []) {
-    const value = (data.fields?.[field.key] ?? "").trim();
-    if (value === "") continue;
-    const parsed = Number(value);
-    action[field.key] = field.key === "timeout_seconds" && Number.isFinite(parsed) ? parsed : value;
+  const meta = actionMeta(data.actionType);
+  if (!meta) {
+    // Unknown action type: write the original YAML back untouched.
+    return { ...action, ...(data.raw ?? {}) };
   }
-  if (data.actionType === "render_html_to_pdf") {
-    action.pdf = {
-      page_format: data.pdfPageFormat?.trim() || "A4",
-      print_background: data.pdfPrintBackground ?? true
-    };
+  for (const field of meta.fields) {
+    if (field.type === "boolean") {
+      // Stay out of the YAML while the checkbox matches its default, so
+      // engine defaults keep minimal diffs and round-trips stay stable.
+      const on = (data.fields?.[field.key] ?? field.default ?? "false") === "true";
+      if (on !== ((field.default ?? "false") === "true")) fieldTarget(action, field)[field.key] = on;
+      continue;
+    }
+    const value = (data.fields?.[field.key] ?? "").trim() || field.default || "";
+    if (value === "") continue;
+    const parsed = field.type === "number" ? Number(value) : value;
+    fieldTarget(action, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
+  }
+  for (const field of meta.fields) {
+    if (field.group && Object.keys(action[field.group] as Record<string, unknown>).length === 0) {
+      delete action[field.group];
+    }
   }
   return action;
 }
@@ -203,15 +184,22 @@ function yamlFiltersToRules(filters: Record<string, Record<string, unknown>> | u
   });
 }
 
-/** Strip keys the inspector owns so round-trips do not accumulate unknowns. */
+/** Catalog-owned keys of an action; anything else only survives via `raw`. */
 function actionFields(type: ActionType, action: Record<string, unknown>): Record<string, string> {
-  const known = new Set(actionMeta(type)?.fields.map((field) => field.key) ?? []);
   const fields: Record<string, string> = { id: String(action.id ?? "") };
-  for (const [key, value] of Object.entries(action)) {
-    if (key === "id" || key === "type" || key === "pdf") continue;
-    if (known.has(key)) fields[key] = String(value ?? "");
+  const meta = actionMeta(type);
+  if (!meta) return fields;
+  for (const field of meta.fields) {
+    const holder = field.group ? action[field.group] : action;
+    const value = isRecord(holder) ? holder[field.key] : undefined;
+    fields[field.key] = value === undefined ? (field.default ?? "") : String(value);
   }
   return fields;
+}
+
+/** Everything but id/type, for actions the catalog does not model. */
+function rawAction(action: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(action).filter(([key]) => key !== "id" && key !== "type"));
 }
 
 export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
@@ -228,8 +216,8 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
     label: `${workflow.trigger.connector} · ${workflow.trigger.event}`,
     data: {
       nodeKind: "trigger",
-      connector: (connectorCatalog as readonly string[]).includes(workflow.trigger.connector)
-        ? workflow.trigger.connector as NodeData["connector"]
+      connector: connectorCatalog.some((entry) => entry.name === workflow.trigger.connector)
+        ? workflow.trigger.connector
         : "custom",
       event: workflow.trigger.event,
       filters: yamlFiltersToRules(workflow.trigger.filters)
@@ -239,7 +227,8 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
 
   let previous = trigger;
   workflow.actions.forEach((action, index) => {
-    const type = (actionCatalog.find((entry) => entry.type === action.type)?.type ?? "webhook") as ActionType;
+    const type = String(action.type ?? "webhook");
+    const known = actionMeta(type) !== undefined;
     const node: DiagramShape = {
       id: `action-${index}`,
       type: "node",
@@ -247,13 +236,12 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
       y: rowY(index + 1),
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      label: actionMeta(type)?.label ?? "Action",
+      label: actionMeta(type)?.label ?? String(type),
       data: {
         nodeKind: "action",
         actionType: type,
         fields: actionFields(type, action),
-        pdfPageFormat: String((action.pdf as Record<string, unknown> | undefined)?.page_format ?? "A4"),
-        pdfPrintBackground: Boolean((action.pdf as Record<string, unknown> | undefined)?.print_background ?? true)
+        ...(known ? {} : { raw: rawAction(action) })
       }
     };
     shapes.push(node);

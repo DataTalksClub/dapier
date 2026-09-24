@@ -10,7 +10,7 @@
   subsequent requests fail.
 """
 
-from . import connections, oauth_providers
+from . import connections, oauth_clients, oauth_providers
 from .connections import BindingError
 from .credentials import (
     VersionConflict,
@@ -36,6 +36,25 @@ def _stored_tokens(record):
     return value
 
 
+def _client_override(stored):
+    """Explicit client credentials stored with the record, if any.
+
+    Legacy items and imported refresh tokens may be bound to a client other
+    than the shared deploy-time one; their client credentials travel with
+    the record and win over the shared configuration.
+    """
+    return {
+        key: stored[key] for key in ("client_id", "client_secret") if stored.get(key)
+    }
+
+
+def _client_credentials(connection, stored):
+    try:
+        return oauth_clients.get(connection["provider"], **_client_override(stored))
+    except oauth_clients.ClientConfigError as exc:
+        raise TokenError(str(exc))
+
+
 def refresh_and_store(connection, record, *, transport=None):
     """Refresh, verify, bind-check, then store. Returns ``(stored, refreshed)``.
 
@@ -46,12 +65,13 @@ def refresh_and_store(connection, record, *, transport=None):
     refresh_token = stored.get("refresh_token")
     if not refresh_token:
         raise TokenError(f"Connection {connection['connection_id']} has no refresh token")
+    client_id, client_secret = _client_credentials(connection, stored)
     try:
         response = oauth_providers.refresh_access_token(
             connection["provider"],
             refresh_token=refresh_token,
-            client_id=connection["client_id"],
-            client_secret=stored.get("client_secret") or "",
+            client_id=client_id,
+            client_secret=client_secret,
             transport=transport,
         )
     except oauth_providers.ProviderError as exc:
@@ -66,10 +86,7 @@ def refresh_and_store(connection, record, *, transport=None):
     except oauth_providers.ProviderError as exc:
         raise TokenError(str(exc))
     connections.check_binding(connection, account_id)
-    new_value = {
-        "client_secret": stored.get("client_secret"),
-        **normalized,
-    }
+    new_value = {**_client_override(stored), **normalized}
     expected = record.get("version", 0)
     try:
         put_credential_if_version(
@@ -140,7 +157,7 @@ def revoke_connection(connection, *, transport=None):
     for token in (stored.get("access_token"), stored.get("refresh_token")):
         if token:
             oauth_providers.revoke_token(connection["provider"], token, transport=transport)
-    cleared = {"client_secret": stored.get("client_secret")}
+    cleared = _client_override(stored)
     try:
         put_credential_if_version(
             f"oauth#{connection['connection_id']}", cleared,
@@ -151,7 +168,7 @@ def revoke_connection(connection, *, transport=None):
         fresh_stored = _stored_tokens(fresh)
         put_credential_if_version(
             f"oauth#{connection['connection_id']}",
-            {"client_secret": fresh_stored.get("client_secret")},
+            _client_override(fresh_stored),
             provider=connection["provider"], expected_version=fresh.get("version", 0),
         )
     updated = dict(connection)

@@ -15,7 +15,7 @@ import os
 import re
 import time
 
-from . import audit, authz, connections, oauth_providers, tokens
+from . import audit, authz, connections, email_triggers, oauth_clients, oauth_providers, tokens
 from .connections import BindingError
 from .dtc_auth import verify_id_token
 from .tokens import TokenError
@@ -239,7 +239,37 @@ def route(event, method, path):
         return start_connect(event, connect_match.group(1))
     if method == "POST" and path == "/api/agent/connections/import":
         return import_connection(event)
+    if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
+        return email_triggers_api(event, method)
     return _json_response(404, {"error": "Not found"})
+
+
+def email_triggers_api(event, method):
+    """Operator-only trigger management over the CLI's bearer authentication."""
+    subject, error = authenticate(event)
+    if error:
+        return error
+    claims = event.get("_dtc_claims") or {}
+    if not authz.is_operator({"subject": subject, "sub": claims.get("email", "")}):
+        audit.emit("unknown", "email-trigger", subject, outcome="denied-not-operator")
+        return _json_response(403, {"error": "Operator authorization required"})
+    table_ref = email_triggers.get_table()
+    try:
+        if method == "GET":
+            status, payload = email_triggers.api_list(table_ref)
+        elif method == "PUT":
+            body = json.loads(event.get("body") or "{}")
+            status, payload = email_triggers.api_save(body, subject, table_ref=table_ref)
+        else:
+            query = event.get("queryStringParameters") or {}
+            status, payload = email_triggers.api_delete(
+                query.get("name", ""), subject, table_ref=table_ref,
+            )
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(payload.get("name", "unknown"), "email-trigger", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
 
 
 def public_config():
@@ -298,6 +328,12 @@ def start_connect(event, connection_id):
                    outcome="denied-not-authorized")
         return _json_response(403, {"error": "Not authorized to connect this connection"})
     redirect_uri = admin_module.oauth_callback_url()
+    if connection["provider"] in connections.TOKEN_PROVIDERS:
+        return _json_response(
+            400,
+            {"error": "This provider connects with a directly provided token; "
+                      "an operator can paste a new one in the operator console"},
+        )
     if not redirect_uri:
         return _json_response(503, {"error": "OAuth callback URL is not configured"})
     try:
@@ -315,12 +351,16 @@ def start_connect(event, connection_id):
         "operator_subject": subject,
         "exp": int(time.time()) + 600,
     })
+    try:
+        client_id, _ = oauth_clients.get(connection["provider"])
+    except oauth_clients.ClientConfigError as exc:
+        return _json_response(503, {"error": str(exc)})
     audit.emit(connection_id, audit.CALLBACK, subject, agent=agent, outcome="connect-started")
     return _json_response(200, {
         "connection_id": connection_id,
         "authorize_url": oauth_providers.authorization_url(
             connection["provider"],
-            client_id=connection["client_id"],
+            client_id=client_id,
             redirect_uri=redirect_uri,
             scopes=scopes,
             state=state,
@@ -350,11 +390,20 @@ def import_core(body, *, operator_subject, connections_table):
         return 400, {"error": "The authorized-user object has no refresh token"}
 
     try:
+        client_id, client_secret = oauth_clients.get(
+            fields["provider"],
+            client_id=fields.get("client_id"),
+            client_secret=fields.get("client_secret"),
+        )
+    except oauth_clients.ClientConfigError as exc:
+        return 400, {"error": str(exc)}
+
+    try:
         token_data = oauth_providers.refresh_access_token(
             fields["provider"],
             refresh_token=refresh_token,
-            client_id=fields["client_id"],
-            client_secret=fields["client_secret"],
+            client_id=client_id,
+            client_secret=client_secret,
         )
     except oauth_providers.ProviderError as exc:
         audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
@@ -382,12 +431,15 @@ def import_core(body, *, operator_subject, connections_table):
                    outcome="denied-account-mismatch", error=str(exc))
         status = 409 if isinstance(exc, connections.BindingError) else 400
         return status, {"error": str(exc)}
+    # Refresh tokens issued by a client other than the shared one stay bound
+    # to it: keep the explicit client credentials with the record so refresh
+    # continues to work (tokens._client_override).
     stored = {
-        "client_secret": fields["client_secret"],
-        **oauth_providers.normalize_token_data(
-            token_data, previous_refresh_token=refresh_token,
-        ),
+        key: fields[key] for key in ("client_id", "client_secret") if fields.get(key)
     }
+    stored.update(oauth_providers.normalize_token_data(
+        token_data, previous_refresh_token=refresh_token,
+    ))
     put_credential(item["credential_id"], stored, provider=item["provider"])
     connections.put_connection(connections_table, item)
     audit.emit(item["connection_id"], audit.IMPORT, operator_subject, outcome="ok")

@@ -69,6 +69,8 @@ def configure(monkeypatch, token_payload=None, token_status=200,
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("OAUTH_CALLBACK_URL", CALLBACK_URL)
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "shared-client-id")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "shared-client-secret")
     monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
     monkeypatch.setattr(admin.boto3, "resource", lambda service: Dynamo())
     monkeypatch.setattr(
@@ -89,7 +91,6 @@ def seed_connection(connections, **overrides):
         "connection_id": "youtube-personal",
         "provider": "youtube",
         "display_name": "Personal YouTube",
-        "client_id": "client-id",
         "scopes": [YOUTUBE_SCOPE],
         "granted_scopes": [],
         "expected_account_id": None,
@@ -126,7 +127,6 @@ def start_flow(monkeypatch, connection_id="youtube-personal", **kwargs):
                        "expires_in": 3600, "scope": YOUTUBE_SCOPE},
     )
     seed_connection(connections)
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
     response = admin.oauth_start(start_event(**kwargs), connection_id)
     assert response["statusCode"] == 302
     return connections, executions, stored, requests, response
@@ -175,11 +175,13 @@ def test_callback_success_is_single_use(monkeypatch):
     sent = token_request.data.decode()
     assert "code_verifier=" in sent
     assert f"redirect_uri={urllib.parse.quote(CALLBACK_URL, safe='')}" in sent
+    assert "client_id=shared-client-id" in sent
+    assert "client_secret=shared-client-secret" in sent
 
     credential = stored["oauth#youtube-personal"]
     assert credential["access_token"] == "at"
     assert credential["refresh_token"] == "rt"
-    assert credential["client_secret"] == "client-secret"
+    assert "client_secret" not in credential
     assert "tokens" not in credential
 
     updated = connections.items["youtube-personal"]
@@ -215,11 +217,10 @@ def test_callback_ignores_request_host(monkeypatch):
 def test_callback_provider_error_stores_nothing(monkeypatch):
     connections, _, stored, _ = configure(monkeypatch, token_payload={"error": "invalid_grant"}, token_status=400)
     seed_connection(connections)
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
     response = admin.oauth_start(start_event(), "youtube-personal")
     result = admin.oauth_callback(callback_event(response))
     assert result["statusCode"] == 400
-    assert stored["oauth#youtube-personal"] == {"client_secret": "client-secret"}
+    assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
 
 
@@ -230,10 +231,6 @@ def test_callback_rejects_missing_scopes(monkeypatch):
                        "expires_in": 3600, "scope": "https://www.googleapis.com/auth/youtube.upload"},
     )
     seed_connection(connections)
-    import copy
-
-    stored = {"oauth#youtube-personal": {"client_secret": "client-secret"}}
-    monkeypatch.setattr(admin, "get_credential", lambda credential_id: copy.deepcopy(stored[credential_id]))
     writes = []
     monkeypatch.setattr(
         admin, "put_credential",
@@ -269,11 +266,10 @@ def test_callback_rejects_wrong_provider_account(monkeypatch):
         channel_payload={"items": [{"id": "UCDvErgK0j5ur3aLgn6U-LqQ", "snippet": {"title": "DTC"}}]},
     )
     seed_connection(connections, expected_account_id="UC-personal")
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
     response = admin.oauth_start(start_event(), "youtube-personal")
     result = admin.oauth_callback(callback_event(response))
     assert result["statusCode"] == 409
-    assert stored["oauth#youtube-personal"] == {"client_secret": "client-secret"}
+    assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
     assert connections.items["youtube-personal"]["verified_account_id"] is None
 
@@ -287,12 +283,11 @@ def test_callback_fails_closed_when_verification_fails(monkeypatch):
         channel_status=403,
     )
     seed_connection(connections)
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
     response = admin.oauth_start(start_event(), "youtube-personal")
     result = admin.oauth_callback(callback_event(response))
     assert result["statusCode"] == 400
     assert "verify" in json.loads(result["body"])["error"].lower()
-    assert stored["oauth#youtube-personal"] == {"client_secret": "client-secret"}
+    assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
 
 
@@ -305,7 +300,6 @@ def test_cookieless_cli_callback_succeeds(monkeypatch):
                        "expires_in": 3600, "scope": YOUTUBE_SCOPE},
     )
     seed_connection(connections)
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
     state = admin._sign({
         "kind": "oauth", "connection_id": "youtube-personal",
         "redirect_uri": CALLBACK_URL, "code_verifier": "verifier",

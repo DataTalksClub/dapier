@@ -160,6 +160,8 @@ def configure(monkeypatch, http):
     monkeypatch.setenv("OPERATOR_EMAILS", EMAIL)
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "shared-client-id")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "shared-client-secret")
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
     monkeypatch.setattr(admin, "_credentials", lambda: {"password": "session-secret"})
     monkeypatch.setattr(boto3, "resource", lambda service: dynamo)
@@ -183,7 +185,6 @@ def seed_youtube_connection(table, **overrides):
         "connection_id": "youtube-personal",
         "provider": "youtube",
         "display_name": "Personal YouTube",
-        "client_id": "client-id",
         "scopes": [YOUTUBE_SCOPE],
         "granted_scopes": [],
         "expected_account_id": None,
@@ -240,7 +241,6 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
     assert json.loads(me["body"]) == {"username": EMAIL, "operator": True}
 
     seed_youtube_connection(dynamo.tables["connections"])
-    stored["oauth#youtube-personal"] = {"client_secret": "client-secret"}
 
     anonymous = invoke(
         http_event("GET", "/api/admin/oauth/youtube-personal/start"))
@@ -279,7 +279,7 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
     credential = stored["oauth#youtube-personal"]
     assert credential["access_token"] == "at"
     assert credential["refresh_token"] == "rt"
-    assert credential["client_secret"] == "client-secret"
+    assert "client_secret" not in credential
     connected = dynamo.tables["connections"].items[("youtube-personal",)]
     assert connected["status"] == "connected"
     assert connected["verified_account_id"] == "UC1"

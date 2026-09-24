@@ -22,6 +22,16 @@ def workflows():
     return [yaml.safe_load(path.read_text()) for path in sorted(root.glob("*.yaml"))]
 
 
+def all_workflows():
+    """YAML workflows plus operator-created email triggers (read per invocation)."""
+    extra = []
+    if os.environ.get("EMAIL_TRIGGERS_TABLE"):
+        from . import email_triggers
+
+        extra = email_triggers.load_workflows()
+    return workflows() + extra
+
+
 def _matches_filter(value, rule):
     text = "" if value is None else str(value)
     if not isinstance(rule, dict):
@@ -84,8 +94,19 @@ def _json_request(url, payload, headers=None, timeout=10):
 
 
 def run_slack(action, event):
-    secret = get_credential(action["credential_id"])
-    token = secret.get("token") or secret.get("bot_token") or secret.get("SLACK_BOT_TOKEN")
+    credential_id = action.get("credential_id")
+    if action.get("connection_id"):
+        import boto3
+
+        item = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).get_item(
+            Key={"connection_id": action["connection_id"]},
+        ).get("Item") or {}
+        credential_id = item.get("credential_id") or credential_id
+    if not credential_id:
+        raise ValueError("Slack action needs a connection_id or credential_id")
+    secret = get_credential(credential_id)
+    token = (secret.get("token") or secret.get("bot_token")
+             or secret.get("user_token") or secret.get("SLACK_BOT_TOKEN"))
     if not token:
         raise ValueError("Slack secret does not contain a bot token")
     data = event.get("data", {})
@@ -409,7 +430,7 @@ def run_render_job(action, event, workflow_id):
 
 
 def execute(event, before_action=None, after_action=None, on_action_error=None):
-    for workflow in workflows():
+    for workflow in all_workflows():
         if matches(workflow, event):
             for index, action in enumerate(workflow.get("actions", [])):
                 action_id = action.get("id", str(index))

@@ -10,11 +10,22 @@ from src.tokens import TokenError, get_access_token, refresh_and_store, revoke_c
 YOUTUBE = "youtube"
 
 
+def configure_client(monkeypatch, **overrides):
+    values = {
+        "GOOGLE_OAUTH_CLIENT_ID": "shared-client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "shared-client-secret",
+        "DROPBOX_OAUTH_CLIENT_ID": "shared-dropbox-id",
+        "DROPBOX_OAUTH_CLIENT_SECRET": "shared-dropbox-secret",
+    }
+    values.update(overrides)
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+
+
 def connection(**overrides):
     item = {
         "connection_id": "youtube-personal",
         "provider": YOUTUBE,
-        "client_id": "client-id",
         "scopes": ["https://www.googleapis.com/auth/youtube.readonly"],
         "granted_scopes": [],
         "expected_account_id": None,
@@ -28,7 +39,6 @@ def connection(**overrides):
 
 def stored_token(**overrides):
     value = {
-        "client_secret": "client-secret",
         "access_token": "fresh-access",
         "refresh_token": "refresh-1",
         "expires_at": 9_000_000_000,
@@ -67,7 +77,7 @@ def transport_for(monkeypatch, *, token_response=None, verify_payload=None):
     calls = []
 
     def fake(method, url, *, headers=None, body=None, timeout=15):
-        calls.append({"method": method, "url": url, "headers": headers})
+        calls.append({"method": method, "url": url, "headers": headers, "body": body})
         if "oauth2.googleapis.com/token" in url or "api.dropboxapi.com/oauth2/token" in url:
             return 200, json.dumps(token_response or {}).encode()
         if "googleapis.com/youtube" in url:
@@ -78,6 +88,12 @@ def transport_for(monkeypatch, *, token_response=None, verify_payload=None):
 
     monkeypatch.setattr(providers, "_default_transport", fake)
     return calls
+
+
+def sent_fields(call):
+    import urllib.parse
+
+    return urllib.parse.parse_qs(call["body"].decode())
 
 
 def test_cached_token_verifies_binding(monkeypatch):
@@ -103,6 +119,7 @@ def test_cached_token_wrong_account_fails_closed(monkeypatch):
 
 def test_expired_token_refreshes_and_preserves_refresh(monkeypatch):
     writes = []
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(expires_at=100), writes=writes)
     transport_for(
         monkeypatch,
@@ -116,8 +133,55 @@ def test_expired_token_refreshes_and_preserves_refresh(monkeypatch):
     assert writes[0]["access_token"] == "new-access"
 
 
+def test_refresh_uses_shared_client_credentials(monkeypatch):
+    configure_client(monkeypatch)
+    configure_store(monkeypatch, stored_token(expires_at=100))
+    calls = transport_for(
+        monkeypatch,
+        token_response={"access_token": "a2", "expires_in": 3600},
+        verify_payload={"items": [{"id": "UC1", "snippet": {}}]},
+    )
+    get_access_token(connection())
+    fields = sent_fields(calls[0])
+    assert fields["client_id"] == ["shared-client-id"]
+    assert fields["client_secret"] == ["shared-client-secret"]
+
+
+def test_refresh_prefers_record_client_override(monkeypatch):
+    configure_client(monkeypatch)
+    writes = []
+    configure_store(monkeypatch, stored_token(
+        expires_at=100, client_id="legacy-id", client_secret="legacy-secret",
+    ), writes=writes)
+    calls = transport_for(
+        monkeypatch,
+        token_response={"access_token": "a2", "expires_in": 3600},
+        verify_payload={"items": [{"id": "UC1", "snippet": {}}]},
+    )
+    get_access_token(connection())
+    fields = sent_fields(calls[0])
+    assert fields["client_id"] == ["legacy-id"]
+    assert fields["client_secret"] == ["legacy-secret"]
+    # The override travels with the record so the next refresh still works.
+    assert writes[0]["client_id"] == "legacy-id"
+    assert writes[0]["client_secret"] == "legacy-secret"
+
+
+def test_missing_shared_client_fails_closed(monkeypatch):
+    configure_store(monkeypatch, stored_token(expires_at=100))
+    transport_for(
+        monkeypatch,
+        token_response={"access_token": "a2", "expires_in": 3600},
+        verify_payload={"items": [{"id": "UC1", "snippet": {}}]},
+    )
+    with pytest.raises(TokenError) as exc:
+        get_access_token(connection())
+    assert "GOOGLE_OAUTH_CLIENT_ID" in str(exc.value)
+
+
 def test_refresh_rotation_adopts_new_refresh_token(monkeypatch):
     writes = []
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(expires_at=100), writes=writes)
     transport_for(
         monkeypatch,
@@ -131,6 +195,7 @@ def test_refresh_rotation_adopts_new_refresh_token(monkeypatch):
 
 def test_refresh_binding_mismatch_stores_nothing(monkeypatch):
     writes = []
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(expires_at=100), writes=writes)
     transport_for(
         monkeypatch,
@@ -145,6 +210,7 @@ def test_refresh_binding_mismatch_stores_nothing(monkeypatch):
 
 
 def test_version_conflict_retries_with_fresh_read(monkeypatch):
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(expires_at=100), conflicts=1)
     transport_for(
         monkeypatch,
@@ -159,6 +225,7 @@ def test_version_conflict_retries_with_fresh_read(monkeypatch):
 
 
 def test_persistent_conflict_raises_token_error(monkeypatch):
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(expires_at=100), conflicts=99)
     transport_for(
         monkeypatch,
@@ -185,11 +252,21 @@ def test_revoked_connection_never_issues(monkeypatch):
 
 def test_revoke_clears_tokens_and_marks_revoked(monkeypatch):
     writes = []
+    configure_client(monkeypatch)
     configure_store(monkeypatch, stored_token(), writes=writes)
     calls = transport_for(monkeypatch)
     updated = revoke_connection(connection())
     assert updated["status"] == "revoked"
-    assert writes[0] == {"client_secret": "client-secret"}
+    assert writes[0] == {}
     assert any("revoke" in call["url"] for call in calls)
     with pytest.raises(TokenError):
         get_access_token(updated)
+
+
+def test_revoke_preserves_record_client_override(monkeypatch):
+    writes = []
+    configure_client(monkeypatch)
+    configure_store(monkeypatch, stored_token(client_id="legacy-id", client_secret="legacy-secret"), writes=writes)
+    transport_for(monkeypatch)
+    revoke_connection(connection())
+    assert writes[0] == {"client_id": "legacy-id", "client_secret": "legacy-secret"}

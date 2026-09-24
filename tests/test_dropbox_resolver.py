@@ -94,7 +94,6 @@ def connection(account="dbid:acct1", status="connected"):
         "provider": "dropbox",
         "status": status,
         "verified_account_id": account,
-        "client_id": "client-1",
     }
 
 

@@ -53,6 +53,41 @@ class SlackTests(unittest.TestCase):
         self.assertEqual(json_request.call_args.args[1]["text"], "Published: https://example.test/video")
         self.assertEqual(json_request.call_args.kwargs["headers"], {"authorization": "Bearer xoxb-private"})
 
+    @patch("src.engine._json_request")
+    @patch("src.engine.get_credential")
+    def test_resolves_credential_through_connection_id(self, get_credential, json_request):
+        get_credential.return_value = {"token": "xoxb-private"}
+        json_request.return_value = {"ok": True}
+
+        class Table:
+            def get_item(self, **kwargs):
+                self.key = kwargs["Key"]
+                return {"Item": {"connection_id": "slack", "credential_id": "oauth#slack"}}
+
+        class Dynamo:
+            def __init__(self):
+                self.table = Table()
+
+            def Table(self, name):
+                assert name == "connections"
+                return self.table
+
+        dynamo = Dynamo()
+        with patch("boto3.resource", return_value=dynamo), \
+             patch.dict("os.environ", {"CONNECTIONS_TABLE": "connections"}):
+            run_slack(
+                {"connection_id": "slack", "channel": "C123", "text": "hello"},
+                {"data": {}},
+            )
+
+        self.assertEqual(dynamo.table.key, {"connection_id": "slack"})
+        get_credential.assert_called_once_with("oauth#slack")
+        self.assertEqual(json_request.call_args.kwargs["headers"], {"authorization": "Bearer xoxb-private"})
+
+    def test_slack_action_without_credential_reference_fails(self):
+        with self.assertRaises(ValueError):
+            run_slack({"channel": "C123", "text": "hello"}, {"data": {}})
+
 
 class DropboxUploadTests(unittest.TestCase):
     def setUp(self):
