@@ -11,6 +11,7 @@ from pathlib import Path
 import boto3
 
 from . import admin
+from . import oauth_clients
 
 
 queue = boto3.client("sqs")
@@ -126,16 +127,25 @@ def _verify_youtube(event, body):
 
 
 def _dropbox_secrets():
-    """The deploy-time Dropbox app secrets that may sign webhook deliveries.
+    """Dropbox app secrets that may sign webhook deliveries.
 
     Dropbox signs each webhook body with the app secret (X-Dropbox-Signature,
-    HMAC-SHA256) of the OAuth client configured at deploy time
-    (DROPBOX_OAUTH_CLIENT_SECRET). With no secret configured there is nothing
-    to verify against and nothing can be resolved either, so verification
-    fails closed.
+    HMAC-SHA256) of the OAuth client. The runtime-configured client (config
+    DB, set from the console) and the deploy-time environment variable are
+    both accepted so a rotation window doesn't drop deliveries. With no
+    secret configured anywhere there is nothing to verify against and
+    verification fails closed.
     """
-    secret = os.environ.get("DROPBOX_OAUTH_CLIENT_SECRET", "").strip()
-    return [secret] if secret else []
+    secrets = []
+    try:
+        _, configured_secret = oauth_clients.get("dropbox")
+        secrets.append(configured_secret)
+    except oauth_clients.ClientConfigError:
+        pass
+    env_secret = os.environ.get("DROPBOX_OAUTH_CLIENT_SECRET", "").strip()
+    if env_secret and env_secret not in secrets:
+        secrets.append(env_secret)
+    return secrets
 
 
 def _verify_dropbox(event, body):

@@ -12,7 +12,7 @@ validate:
 test:
 	uv run --with boto3 --with pytest --with pyyaml --with "pyjwt[crypto]" env \
 		PYTHONPATH=. AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
-		AWS_DEFAULT_REGION=eu-west-1 pytest -q
+		AWS_DEFAULT_REGION=eu-west-1 DAPIER_SKIP_CONFIG_DB=1 pytest -q
 
 designer-install:
 	cd designer && npm install

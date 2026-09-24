@@ -116,7 +116,16 @@
 
       <section class="view" data-page="credentials">
         <div class="section-head">
-          <div class="section-head-text"><h2>Service credentials</h2><p class="sub">Protected by DynamoDB encryption at rest</p></div>
+          <div class="section-head-text"><h2>OAuth clients</h2><p class="sub">Shared per provider — set once and the Connect buttons work. Saved live, no redeploy needed.</p></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Client</th><th>Client ID</th><th>Source</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="oauth-client-list"></tbody>
+          </table>
+        </div>
+        <div class="section-head">
+          <div class="section-head-text"><h2 class="sub-head">Service credentials</h2><p class="sub">Protected by DynamoDB encryption at rest</p></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -154,6 +163,25 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Save credential</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="oauth-client-dialog">
+    <form id="oauth-client-form" method="dialog">
+      <div class="dialog-head">
+        <h2 id="oauth-client-title">OAuth client</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="sub">From the provider's app console (Google Cloud Console → Credentials, or Dropbox App Console). The redirect URI is <code>https://dapier.dtcdev.click/oauth/callback</code>.</p>
+        <label>Client ID<input name="client_id" class="mono-input" autocomplete="off" required></label>
+        <label>Client secret<input name="client_secret" class="secret-input" type="password" autocomplete="new-password" required></label>
+        <p id="oauth-client-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Save client</button>
       </div>
     </form>
   </dialog>

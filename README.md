@@ -145,9 +145,14 @@ slack`); actions may still use a raw `credential_id` for global credentials.
 
 OAuth clients are created once in each provider console (Google Cloud Console
 for Calendar/YouTube, Dropbox App Console for Dropbox) with the redirect URI
-`https://dapier.dtcdev.click/oauth/callback`, and reach the functions through
-CloudFormation parameters. Export them before a deploy that should set or
-rotate them; omit them and CloudFormation keeps the previous values:
+`https://dapier.dtcdev.click/oauth/callback`. Set them in the console under
+**Credentials → OAuth clients** — the values are stored in the credentials
+table and take effect immediately, no redeploy. YouTube shares the Google
+client. Rotating a client there is also how you re-webhook Dropbox: the
+ingress accepts the configured secret and the deploy-time one during a
+rotation window. The deploy-time environment remains a fallback for a fresh
+stack — export the variables before a deploy that should seed or rotate them;
+omit them and CloudFormation keeps the previous values:
 
 ```bash
 GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \

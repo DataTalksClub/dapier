@@ -313,6 +313,50 @@ def _credential_status(provider):
     return {"provider": provider, **credential_status(spec["credential_id"])}
 
 
+def _oauth_client_status(provider):
+    """Presence and source of a shared OAuth client — never its secret."""
+    stored = oauth_clients.stored_client(provider) or {}
+    if stored.get("client_id") and stored.get("client_secret"):
+        return {"provider": provider, "client_id": stored["client_id"], "source": "config", "configured": True}
+    env_id, env_secret = oauth_clients.env_vars(provider)
+    if os.environ.get(env_id, "").strip() and os.environ.get(env_secret, "").strip():
+        return {"provider": provider, "client_id": os.environ[env_id].strip(), "source": "deploy", "configured": True}
+    return {"provider": provider, "client_id": "", "source": "none", "configured": False}
+
+
+def oauth_clients_view():
+    return _json_response(200, {
+        "clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
+    })
+
+
+def save_oauth_client(provider, event):
+    """Store the shared OAuth client for a provider in the config DB.
+
+    Runtime-reconfigurable: no redeploy needed. The secret is write-only —
+    the response reports presence, not the value.
+    """
+    provider = oauth_clients.canonical_provider(str(provider or "").strip().lower())
+    if provider not in oauth_clients.CANONICAL_PROVIDERS:
+        return _json_response(404, {"error": "Unknown OAuth client provider"})
+    try:
+        body = _request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    client_id = str(body.get("client_id", "")).strip()
+    client_secret = str(body.get("client_secret", "")).strip()
+    if not client_id or not client_secret:
+        return _json_response(400, {"error": "Both the client ID and the client secret are required"})
+    put_credential(
+        f"oauth-client#{provider}",
+        {"client_id": client_id, "client_secret": client_secret},
+        provider=provider,
+    )
+    oauth_clients.invalidate_cache()
+    _audit_event(f"oauth-client#{provider}", audit_log.CONFIG, _session_subject(event) or "unknown", outcome="ok")
+    return _json_response(200, {"provider": provider, "client_id": client_id, "source": "config", "configured": True})
+
+
 def overview():
     executions = sorted(
         _scan(os.environ["EXECUTIONS_TABLE"]),
@@ -328,6 +372,7 @@ def overview():
         "executions": executions[:25],
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
+        "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
     })
 
 
@@ -742,6 +787,10 @@ def route(event, method, path):
         return overview()
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return save_credential(path.rsplit("/", 1)[1], event)
+    if method == "GET" and path == "/api/admin/oauth-clients":
+        return oauth_clients_view()
+    if method == "PUT" and path.startswith("/api/admin/oauth-clients/"):
+        return save_oauth_client(path.rsplit("/", 1)[1], event)
     if method == "PUT" and path == "/api/admin/connections":
         return save_connection(event)
     if method == "POST" and path == "/api/admin/connections/import":

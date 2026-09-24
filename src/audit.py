@@ -26,6 +26,7 @@ ROTATE = "rotate"
 REVOKE = "revoke"
 GRANT = "grant"
 IMPORT = "import"
+CONFIG = "config"
 
 
 def audit_table():
