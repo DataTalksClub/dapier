@@ -301,9 +301,14 @@ th:last-child, td:last-child { padding-right: 0; }
 .sub-head { font-size: 1.05rem; }
 td.mono, .mono-cell { font-family: var(--mono); font-size: 12.5px; }
 .muted-cell { color: var(--muted); }
-.cell-title { display: grid; gap: 2px; }
+/* .cell-title stays a real table-cell — display:grid here would strip the td of
+   its cell role, so its border paints at content height and rows split apart
+   whenever another cell (e.g. a wrapped date) is taller. Stack spans instead. */
+.cell-title > .cell-name, .cell-title > .cell-sub { display: block; }
+.cell-title > .cell-sub { margin-top: 2px; }
 .cell-name { font-weight: 500; color: var(--ink); }
 .cell-sub { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+td[data-label="Retention"] { white-space: nowrap; }
 
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }
