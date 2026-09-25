@@ -50,7 +50,7 @@ def run_chain(steps, *, data=None, run_action=None, hooks=None):
     event = {**EVENT, "data": EVENT["data"] if data is None else data}
     stop = logic.run_chain(
         "wf-1", steps, event,
-        run_action or (lambda action, event, workflow_id: {"ok": True}),
+        run_action or (lambda action, event, workflow_id, steps=None: {"ok": True}),
         before_action=hooks.before, after_action=hooks.after,
         on_action_error=hooks.error,
     )
@@ -65,7 +65,7 @@ class FilterTests(unittest.TestCase):
                 {"id": "gate", "type": "filter", "field": "route", "operator": "equals", "value": "invoice"},
                 {"id": "post", "type": "webhook", "url": "https://example.test"},
             ],
-            run_action=lambda action, event, workflow_id: runner_calls.append(action["id"]) or {},
+            run_action=lambda action, event, workflow_id, steps=None: runner_calls.append(action["id"]) or {},
         )
 
         assert stop is None
@@ -80,7 +80,7 @@ class FilterTests(unittest.TestCase):
                 {"id": "gate", "type": "filter", "field": "subject", "operator": "prefix", "value": "Receipt"},
                 {"id": "post", "type": "webhook", "url": "https://example.test"},
             ],
-            run_action=lambda action, event, workflow_id: runner_calls.append(action["id"]),
+            run_action=lambda action, event, workflow_id, steps=None: runner_calls.append(action["id"]),
         )
 
         assert stop == "filtered"
@@ -138,7 +138,7 @@ class ConditionTests(unittest.TestCase):
                  "then": [{"id": "notify", "type": "slack", "channel": "#inv"}],
                  "else": [{"id": "log", "type": "webhook", "url": "https://example.test"}]},
             ],
-            run_action=lambda action, event, workflow_id: runner_calls.append(action["id"]) or {},
+            run_action=lambda action, event, workflow_id, steps=None: runner_calls.append(action["id"]) or {},
         )
 
         assert stop is None
@@ -154,7 +154,7 @@ class ConditionTests(unittest.TestCase):
                  "then": [{"id": "notify", "type": "slack", "channel": "#inv"}],
                  "else": [{"id": "log", "type": "webhook", "url": "https://example.test"}]},
             ],
-            run_action=lambda action, event, workflow_id: runner_calls.append(action["id"]) or {},
+            run_action=lambda action, event, workflow_id, steps=None: runner_calls.append(action["id"]) or {},
         )
 
         assert stop is None
@@ -226,7 +226,7 @@ class ForEachTests(unittest.TestCase):
         stop, hooks = run_chain(
             [step],
             data={"attachments": EVENT["data"]["attachments"]} if data is None else data,
-            run_action=lambda action, event, workflow_id:
+            run_action=lambda action, event, workflow_id, steps=None:
                 runner_calls.append(dict(action)) or {"ok": True},
         )
         return stop, hooks, runner_calls
