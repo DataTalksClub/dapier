@@ -83,9 +83,20 @@ def test_mark_completed_sets_finished(monkeypatch):
     worker._mark_completed("youtube-slack", "notify", EVENT)
     kwargs = calls[0][1]
     assert calls[0][0] == "update_item"
-    assert kwargs["ExpressionAttributeValues"][":completed"] == "completed"
+    assert kwargs["ExpressionAttributeValues"][":status"] == "completed"
     assert kwargs["ExpressionAttributeValues"][":finished"]
     assert ":output" not in kwargs["ExpressionAttributeValues"]
+
+
+def test_mark_completed_records_filtered_status(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    worker._mark_completed("wf", "gate", EVENT, output={"filter": "stopped"},
+                           status="filtered")
+    kwargs = calls[0][1]
+    assert kwargs["ExpressionAttributeValues"][":status"] == "filtered"
+    assert kwargs["ExpressionAttributeValues"][":output"] == {"filter": "stopped"}
 
 
 def test_mark_completed_records_output_and_duration(monkeypatch):

@@ -103,6 +103,23 @@ def test_run_summary_failed_wins_over_processing(monkeypatch):
     assert run["failed_step"] == "post"
 
 
+def test_run_summary_filtered_is_finished_not_processing(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "gate", "evt-1", status="filtered", action_type="filter",
+              run_id="wf-1:evt-1", started="2026-09-25T10:00:00+00:00",
+              finished="2026-09-25T10:00:01+00:00"),
+        _step("wf-1", "post", "evt-1", status="completed",
+              run_id="wf-1:evt-1", started="2026-09-25T10:00:01+00:00",
+              finished="2026-09-25T10:00:02+00:00"),
+    ])
+
+    status, payload = runs.api_list()
+    run = payload["runs"][0]
+    assert run["status"] == "filtered"
+    assert run["failed_step"] is None
+    assert run["error"] is None
+
+
 def test_api_get_returns_steps_in_execution_order(monkeypatch):
     steps = [
         _step("wf-1", "post", "evt-1", started="2026-09-25T10:00:00+00:00",

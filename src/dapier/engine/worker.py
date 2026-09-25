@@ -127,13 +127,16 @@ def _is_pending(workflow_id, action_id, event, action_type=None):
     return True
 
 
-def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None):
+def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None,
+                    status="completed"):
+    """Close out a step; ``status`` is ``completed`` or ``filtered`` (a filter
+    stopped the chain — quiet, but visible in run history)."""
     import boto3
 
-    sets = ["#status = :completed", "finished_at = :finished", "expires_at = :expires"]
+    sets = ["#status = :status", "finished_at = :finished", "expires_at = :expires"]
     names = {"#status": "status"}
     values = {
-        ":completed": "completed",
+        ":status": status,
         ":finished": _now_iso(),
         ":expires": int(time.time()) + 90 * 86400,
     }

@@ -118,6 +118,98 @@ def test_parse_workflow_rejects_unknown_flow_reference(tmp_path, monkeypatch):
             "id: x\ntrigger: {connector: email, event: e}\nflow: nope\n")
 
 
+LOGIC_YAML = """\
+id: logic-flow
+enabled: true
+trigger:
+  connector: email
+  event: message.received
+actions:
+  - id: gate
+    type: filter
+    field: route
+    operator: equals
+    value: invoice
+  - id: route
+    type: condition
+    when:
+      subject: {contains: urgent}
+    then:
+      - {id: notify, type: slack, channel: '#alerts', text: '{subject}'}
+    else:
+      - {id: pause, type: delay, seconds: 30}
+  - id: each
+    type: for_each
+    list: attachments
+    item: item
+    actions:
+      - id: upload
+        type: dropbox_upload
+        connection_id: dropbox
+        folder: "/Invoices/{item.filename}"
+"""
+
+
+def test_parse_workflow_accepts_logic_steps():
+    workflow = designer_store.parse_workflow(LOGIC_YAML)
+    kinds = [action["type"] for action in workflow["actions"]]
+    assert kinds == ["filter", "condition", "for_each"]
+    assert workflow["actions"][2]["actions"][0]["folder"] == "/Invoices/{item.filename}"
+
+
+@pytest.mark.parametrize("yaml_text,fragment", [
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: pause, type: delay, seconds: 61}]\n",
+     "between 1 and 60"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: pause, type: delay, seconds: 0}]\n",
+     "between 1 and 60"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: pause, type: delay, seconds: '30'}]\n",
+     "between 1 and 60"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: pause, type: delay}]\n",
+     "between 1 and 60"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: gate, type: filter, operator: equals, value: invoice}]\n",
+     "needs a when mapping or a field"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: gate, type: filter, field: route, operator: regex, value: '.'}]\n",
+     "operator must be one of"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: gate, type: filter, when: [route]}]\n",
+     "must be a mapping"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: route, type: condition, field: route, then: {id: a}}]\n",
+     "must be a list of steps"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: route, type: condition, field: route,\n"
+     "  then: [{id: pause, type: delay, seconds: 999}]}]\n",
+     "between 1 and 60"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: each, type: for_each, actions: [{id: a, type: webhook, url: 'https://x'}]}]\n",
+     "needs a list field"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: each, type: for_each, list: attachments}]\n",
+     "at least one step"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: each, type: for_each, list: attachments, item: '9bad',\n"
+     "  actions: [{id: a, type: webhook, url: 'https://x'}]}]\n",
+     "template variable name"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: each, type: for_each, list: attachments, max_iterations: 101,\n"
+     "  actions: [{id: a, type: webhook, url: 'https://x'}]}]\n",
+     "between 1 and 100"),
+    ("id: x\ntrigger: {connector: email, event: e}\n"
+     "actions: [{id: each, type: for_each, list: attachments,\n"
+     "  actions: [{type: ''}]}]\n",
+     "needs a type"),
+])
+def test_parse_workflow_rejects_invalid_logic_steps(yaml_text, fragment):
+    with pytest.raises(designer_store.WorkflowError, match=fragment):
+        designer_store.parse_workflow(yaml_text)
+
+
 def test_filename_for_derives_yaml_name():
     assert designer_store.filename_for("render-invoice") == "render-invoice.yaml"
 

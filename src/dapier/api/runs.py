@@ -41,12 +41,18 @@ def run_id_of(item):
 
 
 def run_summary(run_id, items):
-    """Roll a run's steps up to one list row: worst status wins."""
+    """Roll a run's steps up to one list row: worst status wins.
+
+    A ``filtered`` step finished the run on purpose (a filter stopped the
+    chain), so it ranks as its own outcome between processing and completed.
+    """
     statuses = [item.get("status", "") for item in items]
     if any(status == "failed" for status in statuses):
         status = "failed"
-    elif any(status != "completed" for status in statuses):
+    elif any(status == "processing" for status in statuses):
         status = "processing"
+    elif any(status == "filtered" for status in statuses):
+        status = "filtered"
     else:
         status = "completed"
     started = min(str(item.get("started_at") or "") for item in items)
