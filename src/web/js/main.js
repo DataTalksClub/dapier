@@ -54,4 +54,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   setView(initialView, false);
   if (initialView === 'designer') designerFromLocation();
   await refresh();
+  /* The deep-link header sync above ran before the overview data arrived;
+     now the workflow name and GitHub link can be filled in. */
+  if (initialView === 'designer') designerFromLocation();
 });

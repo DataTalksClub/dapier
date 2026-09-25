@@ -424,11 +424,11 @@ dialog form { display: contents; }
 /* --- embedded designer -------------------------------------------------------- */
 .designer-embed iframe {
   width: 100%;
-  height: calc(100dvh - 240px);
+  height: calc(100dvh - 248px);
   min-height: 520px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: var(--surface);
+  border-radius: 4px;
+  background: var(--paper);
 }
 
 /* --- drawer behaviour (≤860) --------------------------------------------------- */

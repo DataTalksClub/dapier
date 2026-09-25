@@ -1,35 +1,61 @@
+/* Dapier "Operator's Ledger" tokens — same paper, ink, hairlines and single
+   green accent as the console (src/web/app.css). Font files live on the
+   console origin (/assets/fonts); outside it the Plex stacks fall back. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/IBMPlexSans-VF.woff2") format("woff2");
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/IBMPlexMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --active-bg: #eef0ff;
-  --active-border: #5b6ee1;
-  --active-text: #3546b6;
-  --app-bg: #f7f8fb;
-  --canvas-bg: #ffffff;
-  --danger-text: #b91c1c;
-  --diagram-component: #2563eb;
-  --diagram-trigger: #d97706;
-  --diagram-grid: #d7dde7;
-  --diagram-handle: #0f766e;
-  --diagram-node-accent: #eef4ff;
-  --diagram-node-bg: #ffffff;
-  --diagram-note: #d97706;
-  --field-bg: #ffffff;
-  --field-border: #d8dee8;
-  --focus-ring: rgba(91, 110, 225, 0.12);
-  --menu-shadow: rgba(15, 23, 42, 0.16);
-  --muted-bg: #f8f9fc;
-  --muted-bg-hover: #f1f4fa;
-  --note-bg: #fff7d6;
-  --ok-text: #047857;
-  --panel-border: #dde3ed;
-  --section-border: #e3e7ef;
-  --soft-border: #dce2ec;
-  --surface: #ffffff;
-  --text: #263245;
-  --text-muted: #657285;
-  --text-soft: #8a94a6;
-  --text-strong: #1f2937;
+  font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --active-bg: #e7ede0;
+  --active-border: #166a44;
+  --active-text: #0f5233;
+  --app-bg: #f4f1e9;
+  --canvas-bg: #f7f5ec;
+  --danger-text: #9a3b24;
+  --diagram-component: #166a44;
+  --diagram-trigger: #a5730f;
+  --diagram-grid: #e7e1cf;
+  --diagram-handle: #166a44;
+  --diagram-node-accent: #e7ede0;
+  --diagram-node-bg: #fdfcf7;
+  --diagram-note: #a5730f;
+  --field-bg: #fdfcf7;
+  --field-border: #c9c0aa;
+  --focus-ring: rgba(22, 106, 68, 0.12);
+  --menu-shadow: rgba(33, 28, 20, 0.22);
+  --muted-bg: #efece1;
+  --muted-bg-hover: #e8e3d3;
+  --note-bg: #f6efda;
+  --ok-text: #1d7a4f;
+  --panel-border: #c9c0aa;
+  --section-border: #ddd5c4;
+  --soft-border: #ddd5c4;
+  --surface: #fdfcf7;
+  --text: #514b3e;
+  --text-muted: #6e6656;
+  --text-soft: #8a8171;
+  --text-strong: #231f17;
   background: var(--app-bg);
   color: var(--text-strong);
 }
@@ -84,6 +110,12 @@ body {
   margin: 0;
   min-width: 320px;
   overflow: hidden;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+::selection {
+  background: #dbe5d4;
 }
 
 button,
@@ -148,7 +180,7 @@ a.brand:hover span:last-child {
 .brand-mark {
   align-items: center;
   background: var(--active-bg);
-  border-radius: 8px;
+  border-radius: 4px;
   color: var(--active-text);
   display: inline-flex;
   font-size: 14px;
@@ -166,7 +198,7 @@ a.brand:hover span:last-child {
 .workflow-item {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 4px;
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -188,13 +220,14 @@ a.brand:hover span:last-child {
 
 .workflow-name {
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .workflow-meta {
   align-items: center;
-  color: var(--text-soft);
+  color: var(--text-muted);
   display: flex;
+  font-family: var(--mono);
   font-size: 11px;
   gap: 5px;
 }
@@ -252,20 +285,11 @@ a.brand:hover span:last-child {
   gap: 14px;
 }
 
-.topbar-title label {
-  color: var(--text-soft);
-  display: flex;
-  flex-direction: column;
-  font-size: 10px;
-  font-weight: 650;
-  gap: 3px;
-  text-transform: uppercase;
-}
-
 .id-input {
+  font-family: var(--mono);
   font-size: 13px;
-  font-weight: 600;
-  width: 200px;
+  font-weight: 500;
+  width: 240px;
 }
 
 .save-problems {
@@ -283,10 +307,10 @@ a.brand:hover span:last-child {
 
 .status-message {
   align-items: center;
-  border-radius: 6px;
+  border-radius: 4px;
   display: inline-flex;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   gap: 6px;
   padding: 6px 10px;
 }
@@ -317,34 +341,36 @@ a.brand:hover span:last-child {
 
 .button {
   align-items: center;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid transparent;
   display: inline-flex;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
   gap: 7px;
   justify-content: center;
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 40px;
+  padding: 0 18px;
+  white-space: nowrap;
 }
 
 .button.primary {
   background: var(--active-border);
-  color: #ffffff;
+  color: #f7f4ea;
 }
 
-.button.primary:hover {
-  filter: brightness(1.06);
+.button.primary:hover:not(:disabled) {
+  background: var(--active-text);
 }
 
 .button.secondary {
-  background: var(--muted-bg);
-  border-color: var(--soft-border);
-  color: var(--text);
+  background: transparent;
+  border-color: var(--panel-border);
+  color: var(--text-strong);
 }
 
 .button.secondary:hover:not(:disabled) {
-  background: var(--muted-bg-hover);
+  background: rgba(35, 31, 23, .04);
+  border-color: #a89d83;
 }
 
 .button.quiet {
@@ -363,9 +389,9 @@ a.brand:hover span:last-child {
 
 .icon-button {
   align-items: center;
-  background: var(--muted-bg);
-  border: 1px solid var(--soft-border);
-  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
   color: var(--text);
   cursor: pointer;
   display: inline-flex;
@@ -390,27 +416,28 @@ input,
 select {
   background: var(--field-bg);
   border: 1px solid var(--field-border);
-  border-radius: 7px;
+  border-radius: 4px;
   color: var(--text-strong);
-  min-height: 30px;
-  padding: 5px 9px;
+  min-height: 34px;
+  padding: 5px 10px;
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--active-border);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-  outline: none;
+  outline: 2px solid var(--active-border);
+  outline-offset: 0;
 }
 
 .inspector label,
 .topbar-title label {
-  color: var(--text-soft);
+  color: var(--text-muted);
   display: flex;
   flex-direction: column;
-  font-size: 11px;
-  font-weight: 650;
-  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  gap: 5px;
 }
 
 .inspector input,
@@ -420,11 +447,11 @@ select:focus {
 }
 
 .inspector textarea {
-  background: var(--surface);
-  border: 1px solid var(--section-border);
-  border-radius: 6px;
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
   color: var(--text);
-  font: 11px/1.5 ui-monospace, monospace;
+  font: 12px/1.5 var(--mono);
   padding: 7px 9px;
   resize: vertical;
 }
@@ -475,10 +502,10 @@ select:focus {
 
 .chip-group-label {
   align-self: center;
-  color: var(--text-soft);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   padding-left: 4px;
   text-transform: uppercase;
   white-space: nowrap;
@@ -492,9 +519,9 @@ select:focus {
 }
 
 .component-chip {
-  background: var(--muted-bg);
-  border: 1px solid var(--soft-border);
-  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
@@ -533,6 +560,11 @@ select:focus {
   user-select: none;
 }
 
+/* Node subtitles carry connector/event machine truth — mono, like the console. */
+.drawing-surface text.node-subtitle {
+  font-family: var(--mono);
+}
+
 .drawing-surface.selecting {
   cursor: grab;
 }
@@ -556,10 +588,10 @@ select:focus {
 .canvas-zoom-controls {
   align-items: center;
   background: color-mix(in srgb, var(--surface) 68%, transparent);
-  border: 1px solid color-mix(in srgb, var(--soft-border) 72%, transparent);
-  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--panel-border) 72%, transparent);
+  border-radius: 4px;
   bottom: 14px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 6px 16px rgba(33, 28, 20, 0.05);
   display: flex;
   gap: 3px;
   padding: 3px;
@@ -609,7 +641,7 @@ select:focus {
 .canvas-context-menu {
   background: var(--surface);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 12px 32px var(--menu-shadow);
   max-height: min(520px, calc(100vh - 32px));
   overflow: auto;
@@ -622,11 +654,11 @@ select:focus {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   cursor: pointer;
   display: flex;
-  font-weight: 600;
+  font-weight: 500;
   gap: 8px;
   min-height: 34px;
   min-width: 130px;
@@ -659,10 +691,10 @@ select:focus {
 
 .context-menu-label {
   align-items: center;
-  color: var(--text-soft);
+  color: var(--text-muted);
   display: flex;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 500;
   gap: 6px;
   padding: 7px 8px 5px;
 }
@@ -696,9 +728,9 @@ select:focus {
 }
 
 .field-label {
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 650;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .filter-row {

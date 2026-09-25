@@ -3,6 +3,7 @@ import { state } from '../state.js';
 import { $, icons, showApp, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, triggerLabel, wrapTokens, formatTimestamp, formatDay, emptyRow, configRows, detailRows, pad2 } from '../format.js';
+import { openDesigner } from './designer.js';
 import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
@@ -19,6 +20,9 @@ function workflowRow(workflow) {
 function openWorkflow(id) {
   const workflow = (state.data.workflows || []).find((item) => item.id === id);
   if (!workflow) return;
+  /* The designer canvas is the workflow view; the plain-steps dialog below
+     remains only for workflows without a source file in workflows/*.yaml. */
+  if (workflow.source) return openDesigner(workflow.source);
   const filters = workflow.trigger.filters || {};
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `

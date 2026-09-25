@@ -1,9 +1,6 @@
 /* BUILD ARTIFACT - do not edit by hand.
  *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
  *  Rebuild into src/web/ with: make designer-console */
-/* BUILD ARTIFACT - do not edit by hand.
- *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
- *  Rebuild into src/web/ with: make designer-console */
 (function() {
   "use strict";
   var jsxRuntime = { exports: {} };
@@ -18598,13 +18595,13 @@
                       y: shape.y,
                       width: shape.width,
                       height: shape.height,
-                      rx: "10",
+                      rx: "6",
                       fill: "var(--diagram-node-bg)",
                       stroke: color,
                       strokeWidth
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "9", fill: "var(--diagram-node-accent)" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--diagram-node-accent)" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     Icon2,
                     {
@@ -18615,11 +18612,11 @@
                       strokeWidth: 1.8
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--text-strong)", fontSize: subtitle ? 15 : 13, fontWeight: "600", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--text-strong)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
                     /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     displayLabel(title)
                   ] }),
-                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: shape.x + 62, y: shape.y + 62, fill: "var(--text-muted)", fontSize: "12", children: displayLabel(subtitle) })
+                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--text-muted)", fontSize: "12", children: displayLabel(subtitle) })
                 ] }, shape.id);
               }
               if (shape.type === "note") {
@@ -18627,7 +18624,7 @@
                   event.stopPropagation();
                   openEditor(shape);
                 }, children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "6", fill: "var(--note-bg)", stroke: noteColor, strokeWidth }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--note-bg)", stroke: noteColor, strokeWidth }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--text-strong)", fontSize: shapeLabelSize, fontWeight: "500", children: [
                     shape.label && /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     shape.label ? displayLabel(shape.label) : ""
