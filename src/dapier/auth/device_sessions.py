@@ -110,9 +110,11 @@ def approve(user_code, subject, email, table_ref=None):
     try:
         store.update_item(
             Key={"pk": pairing["pk"]},
-            UpdateExpression="SET #st = :approved, session = :session",
-            ConditionExpression="attribute_exists(pk) AND #st = :pending",
-            ExpressionAttributeNames={"#st": "status"},
+            # SESSION and STATUS are DynamoDB reserved words: bare names in
+            # expressions raise ValidationException, so map every attribute.
+            UpdateExpression="SET #st = :approved, #s = :session",
+            ConditionExpression="attribute_exists(#pk) AND #st = :pending",
+            ExpressionAttributeNames={"#pk": "pk", "#st": "status", "#s": "session"},
             ExpressionAttributeValues={
                 ":approved": "approved",
                 ":pending": "pending",
@@ -201,8 +203,9 @@ def refresh(bearer, table_ref=None):
     try:
         store.update_item(
             Key=key,
-            UpdateExpression="SET ttl = :grace, rotated_at = :now",
-            ConditionExpression="attribute_exists(pk) AND attribute_not_exists(rotated_at)",
+            UpdateExpression="SET #t = :grace, #r = :now",
+            ConditionExpression="attribute_exists(#pk) AND attribute_not_exists(#r)",
+            ExpressionAttributeNames={"#pk": "pk", "#t": "ttl", "#r": "rotated_at"},
             ExpressionAttributeValues={
                 ":grace": int(time.time()) + ROTATION_GRACE_SECONDS,
                 ":now": _now_iso(),
