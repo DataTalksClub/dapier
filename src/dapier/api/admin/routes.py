@@ -220,6 +220,17 @@ def toggle_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
+def test_designer_workflow(event, operator, source=None):
+    """Dry-run (or, on execute, really run) one workflow on a sample event."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_test_run(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.test", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
 def _hook_kind(event, body=None):
     """The hook trigger kind, from the query string or the request body."""
     query = event.get("queryStringParameters") or {}

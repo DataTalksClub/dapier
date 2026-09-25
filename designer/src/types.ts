@@ -75,3 +75,25 @@ export interface GitStatus {
   behind: number;
   lastCommit?: string;
 }
+
+/** One action of a test run: what it would receive, or what went wrong. */
+export interface TestStepResult {
+  action_id: string;
+  action_type?: string;
+  rendered_input?: Record<string, unknown> | null;
+  ok?: boolean;
+  output?: Record<string, unknown>;
+  error?: string;
+}
+
+/** Payload of POST /designer/workflows/{file}/test (dry-run or execute). */
+export interface TestRunResult {
+  file?: string;
+  mode: "dry-run" | "execute";
+  matched: boolean;
+  enabled?: boolean;
+  ok?: boolean;
+  event?: Record<string, unknown>;
+  steps: TestStepResult[];
+  error?: string;
+}

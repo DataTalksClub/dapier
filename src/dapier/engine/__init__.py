@@ -44,8 +44,11 @@ def _run_connector(action, event, workflow_id, steps=None):
     raise ValueError(f"unsupported action: {action['type']}")
 
 
-def execute(event, before_action=None, after_action=None, on_action_error=None):
+def execute(event, before_action=None, after_action=None, on_action_error=None, workflows=None):
     """Run every matching workflow's actions.
+
+    ``workflows`` restricts the run to those definitions (the test-run path
+    passes exactly the workflow under test); default is the full catalog.
 
     The chain may mix connector actions with logic steps (filter, condition,
     delay, for_each — see engine.logic). The hooks carry the step telemetry:
@@ -60,8 +63,9 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
     like the run history (``{action_id: {"status": ..., "output": ...}}``);
     the templating runners receive it so later steps can reference earlier
     ones: ``{steps.<action_id>.output.<path>}``, ``{steps.<action_id>.status}``.
+
     """
-    for workflow in all_workflows():
+    for workflow in (all_workflows() if workflows is None else workflows):
         if matches(workflow, event):
             run_chain(
                 workflow["id"], workflow.get("actions", []), event,

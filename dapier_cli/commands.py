@@ -353,6 +353,62 @@ def workflows_set_enabled(api_url, file, enabled, debug=False):
     return 0
 
 
+def workflows_test(api_url, path, event_spec, execute=False, debug=False):
+    """Test-run a workflow YAML against a sample event, via the agent API.
+
+    Default is a dry-run: per-step rendered inputs with no side effects.
+    --execute really runs the actions. Exits 0 when every step is ok and a
+    trigger actually matched; 1 when the run found problems (a failed step,
+    an unsupported action, or no trigger match), so it can gate scripts.
+    """
+    try:
+        with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
+            yaml_text = handle.read()
+    except OSError as exc:
+        print(f"Cannot read {path}: {exc}")
+        return 2
+    try:
+        if event_spec.startswith("@"):
+            with open(event_spec[1:], encoding="utf-8") as handle:
+                sample = json.load(handle)
+        else:
+            sample = json.loads(event_spec)
+    except OSError as exc:
+        print(f"Cannot read {event_spec[1:]}: {exc}")
+        return 2
+    except ValueError as exc:
+        print(f"Invalid sample event JSON: {exc}")
+        return 2
+    if not isinstance(sample, dict):
+        print("The sample event must be a JSON object.")
+        return 2
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test",
+                    {"yaml": yaml_text, "event": sample, "execute": execute}, debug=debug)
+    label = data.get("file") or path
+    matched = bool(data.get("matched"))
+    enabled = bool(data.get("enabled", True))
+    print(f"{'Executed' if data.get('mode') == 'execute' else 'Dry run'}: {label} — "
+          f"{'a trigger matches' if matched else 'NO trigger matches'} the sample event"
+          + ("" if enabled else " (the workflow is disabled)"))
+    for index, step in enumerate(data.get("steps") or [], 1):
+        head = f"  {index}. {step.get('action_id', '?')} ({step.get('action_type', '?')})"
+        if step.get("ok"):
+            print(f"{head}: ok")
+        else:
+            print(f"{head}: {step.get('error') or 'failed'}")
+        if step.get("rendered_input") is not None:
+            print(f"     input: {json.dumps(step['rendered_input'], sort_keys=True)}")
+        if step.get("output") is not None:
+            print(f"     output: {json.dumps(step['output'], sort_keys=True)}")
+    if data.get("error"):
+        print(f"Run error: {data['error']}")
+    if not data.get("ok") or not matched:
+        if data.get("ok") and not matched:
+            print("Nothing would run: no trigger matches this event.")
+        return 1
+    return 0
+
+
 def print_hook(item):
     for key in ("hook_id", "kind", "url", "connection_id", "description", "flow",
                 "enabled", "created_by", "created_at", "updated_at"):
