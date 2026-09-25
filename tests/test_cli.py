@@ -45,12 +45,25 @@ def test_pkce_challenge_is_s256():
 
 
 def test_authorize_url_params():
+    import urllib.parse
+
     url = auth.authorize_url("https://auth.example.test", "cli-id",
-                             "http://127.0.0.1:9/callback", "st", "nn", "ch")
+                             auth.REDIRECT_URI, "st", "nn", "ch")
     assert "code_challenge=ch" in url
     assert "code_challenge_method=S256" in url
-    assert "offline_access" in url
+    assert f"redirect_uri={urllib.parse.quote(auth.REDIRECT_URI, safe='')}" in url
     assert "nonce=nn" in url
+
+
+def test_redirect_uri_satisfies_cognito_loopback_rules():
+    # Cognito whitelists cleartext loopback redirects only as http://localhost
+    # on a fixed port; the shared-auth stack registers exactly this URL.
+    import urllib.parse
+
+    parts = urllib.parse.urlparse(auth.REDIRECT_URI)
+    assert parts.scheme == "http"
+    assert parts.hostname == "localhost"
+    assert parts.port == auth.LOOPBACK_PORT and parts.path == "/callback"
 
 
 VIEW = {

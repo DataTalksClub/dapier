@@ -15,10 +15,10 @@ auth_output() {
 AUTH_CLIENT_ID="${AUTH_CLIENT_ID:-$(auth_output DapierClientId)}"
 AUTH_ISSUER="${AUTH_ISSUER:-$(auth_output IssuerUrl)}"
 AUTH_JWKS_URL="${AUTH_JWKS_URL:-$(auth_output JwksUrl)}"
-# The headless machine client behind the agent API; an auth stack that
-# predates the SchedulerMachineClientId output yields "None", which leaves
-# CLI token issuance disabled and agent requests failing closed (401/503).
-AUTH_CLI_CLIENT_ID="${AUTH_CLI_CLIENT_ID:-$(auth_output SchedulerMachineClientId)}"
+# The public CLI client behind `dapier auth login`; an auth stack that
+# predates the DapierCliClientId output yields "None", which leaves CLI
+# token issuance disabled and agent requests failing closed (401/503).
+AUTH_CLI_CLIENT_ID="${AUTH_CLI_CLIENT_ID:-$(auth_output DapierCliClientId)}"
 AUTH_CLI_CLIENT_ID="$(printf '%s' "$AUTH_CLI_CLIENT_ID" | head -n 1)"
 if [ "$AUTH_CLI_CLIENT_ID" = "None" ]; then AUTH_CLI_CLIENT_ID=""; fi
 # Unset means every account that completes DTC sign-in may administer the

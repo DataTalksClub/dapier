@@ -3,7 +3,7 @@
 The CLI registers no password anywhere: the operator signs in through the
 browser against the same DTC issuer the web console uses, and only DTC-issued
 tokens are stored locally. A dedicated public/native CLI client and its
-localhost redirect must be registered in the shared-auth stack.
+fixed-port localhost redirect must be registered in the shared-auth stack.
 """
 
 import base64
@@ -20,7 +20,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from . import config
 
 LOOPBACK_HOST = "127.0.0.1"
-SCOPES = "openid email profile offline_access"
+# Cognito accepts cleartext loopback redirects only as http://localhost —
+# never 127.0.0.1, never an ephemeral port — so the callback server binds
+# this exact port to match the URL registered in the shared-auth stack.
+LOOPBACK_PORT = 8471
+REDIRECT_URI = f"http://localhost:{LOOPBACK_PORT}/callback"
+SCOPES = "openid email profile"
 
 
 def _random(bytes_count):
@@ -99,17 +104,6 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass
 
 
-def wait_for_code(timeout=180):
-    server = HTTPServer((LOOPBACK_HOST, 0), _CallbackHandler)
-    port = server.server_address[1]
-    _CallbackHandler.result = None
-    thread = threading.Thread(target=server.handle_request, daemon=True)
-    thread.start()
-    thread.join(timeout)
-    server.server_close()
-    return port, _CallbackHandler.result
-
-
 def verify_session_token(id_token, *, jwks_url, issuer, audience, nonce=None):
     import jwt
 
@@ -129,10 +123,13 @@ def login(api_url, *, timeout=180, opener=None):
     state, nonce = _random(32), _random(32)
     verifier, challenge = build_pkce()
 
-    server = HTTPServer((LOOPBACK_HOST, 0), _CallbackHandler)
-    port = server.server_address[1]
-    redirect_uri = f"http://{LOOPBACK_HOST}:{port}/callback"
-    url = authorize_url(conf["auth_base_url"], conf["cli_client_id"], redirect_uri, state, nonce, challenge)
+    try:
+        server = HTTPServer((LOOPBACK_HOST, LOOPBACK_PORT), _CallbackHandler)
+    except OSError:
+        raise LoginError(
+            f"Callback port {LOOPBACK_PORT} is busy; free it and run `dapier auth login` again"
+        ) from None
+    url = authorize_url(conf["auth_base_url"], conf["cli_client_id"], REDIRECT_URI, state, nonce, challenge)
     (opener or webbrowser.open)(url)
     print("Opened the browser for sign-in. Waiting for the callback ...")
 
@@ -148,7 +145,7 @@ def login(api_url, *, timeout=180, opener=None):
         "grant_type": "authorization_code",
         "client_id": conf["cli_client_id"],
         "code": result["code"],
-        "redirect_uri": redirect_uri,
+        "redirect_uri": REDIRECT_URI,
         "code_verifier": verifier,
     })
     if status >= 300:

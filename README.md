@@ -193,8 +193,9 @@ sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatal
 ```
 
 Install the operator CLI from this repo and sign in with the same DTC identity
-(the CLI client must be registered in the shared-auth stack with its localhost
-redirect URIs; the API publishes them at `/api/agent/config`):
+(the CLI opens a browser and receives the callback at `http://localhost:8471/
+callback`, which the shared-auth stack registers for its `dapier-cli` client;
+the API publishes the client ID at `/api/agent/config`):
 
 ```bash
 pip install .
