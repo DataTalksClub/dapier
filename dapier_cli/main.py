@@ -130,6 +130,12 @@ def build_parser():
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
+    wf_draft_p = wf_sub.add_parser("draft",
+                                   help="Generate a draft workflow YAML from a natural-language prompt")
+    wf_draft_p.add_argument("prompt",
+                            help='What the workflow should do, e.g. "when someone emails todo@, push it to slack"')
+    wf_draft_p.add_argument("--save", action="store_true",
+                            help="Also save the draft through the `workflows save` path (only when it validates)")
     wf_enable_p = wf_sub.add_parser("enable", help="Publish a workflow as enabled (live immediately)")
     wf_enable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_disable_p = wf_sub.add_parser("disable", help="Publish a workflow as disabled (live immediately)")
@@ -290,6 +296,8 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_show(api_url, args.file, debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
+    if args.command == "draft":
+        return commands.workflows_draft(api_url, args.prompt, save=args.save, debug=debug)
     if args.command in ("enable", "disable"):
         return commands.workflows_set_enabled(api_url, args.file, args.command == "enable", debug)
     if args.command == "test":

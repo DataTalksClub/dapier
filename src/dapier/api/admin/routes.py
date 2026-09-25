@@ -7,6 +7,7 @@ import boto3
 from ... import audit as audit_log
 from ... import http
 from ...auth import api_tokens, authz, session
+from ... import copilot
 from ...connections import credentials, importing
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
@@ -209,6 +210,24 @@ def save_designer_workflow(event, operator):
     session._audit_event(str(payload.get("file", "unknown")), "workflow.save", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
+
+def copilot_draft(event, operator):
+    """Console mirror of the agent copilot: a DRAFT workflow for a prompt.
+
+    Delegates to the same copilot.draft_workflow handler as the CLI-facing
+    /api/agent/copilot/draft; never saves or publishes.
+    """
+    try:
+        body = http._request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return http._json_response(400, {"error": "Invalid request"})
+    status, payload = copilot.draft_workflow(body.get("prompt"))
+    session._audit_event("copilot", "workflow.draft", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
 
 def toggle_designer_workflow(event, operator, source):
     try:

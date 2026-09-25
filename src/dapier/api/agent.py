@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit
+from .. import audit, copilot
 from . import designer_store, runs
 from ..auth import api_tokens, authz, device_sessions, session
 from ..auth.dtc_auth import verify_id_token
@@ -343,6 +343,8 @@ def route(event, method, path):
         return designer_api(event, method)
     if path == "/api/agent/designer/workflows/test" and method == "POST":
         return designer_test_api(event, None)
+    if path == "/api/agent/copilot/draft" and method == "POST":
+        return copilot_draft_api(event)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))
@@ -385,6 +387,29 @@ def designer_api(event, method, source=None):
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(str(payload.get("file", "unknown")), "workflow.save", subject,
                outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def copilot_draft_api(event):
+    """Operator-gated copilot: a DRAFT workflow for a natural-language prompt.
+
+    Never saves or publishes; the caller reviews the YAML and commits it via
+    the designer save endpoint. Validation problems come back in ``errors[]``
+    with HTTP 200 so a coding agent can iterate on the draft. Mirrored at
+    /api/admin/copilot/draft for a future console view.
+    """
+    subject, error = require_operator(event, "workflow.draft")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    status, payload = copilot.draft_workflow(body.get("prompt"))
+    audit.emit("copilot", "workflow.draft", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
 
 

@@ -80,6 +80,8 @@ def route(event, method, path):
         return routes.save_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test":
         return routes.test_designer_workflow(event, operator_subject)
+    if method == "POST" and path == "/api/admin/copilot/draft":
+        return routes.copilot_draft(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1))
@@ -113,6 +115,7 @@ def route(event, method, path):
 # admin.save_credential / admin.list_grants directly.
 from .login import auth_callback, auth_error, auth_login, auth_logout  # noqa: F401
 from .routes import (  # noqa: F401
+    copilot_draft,
     create_api_token,
     delete_email_trigger,
     delete_grant,
