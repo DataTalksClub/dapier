@@ -55,13 +55,67 @@
   --red-soft: #f6e6de;
   --red-line: #e6c9bb;
   --off-dot: #b5ac99;
+  /* tints & effects — the washes that light ink casts on paper */
+  --code-bg: rgba(35, 31, 23, .055);
+  --wash: rgba(35, 31, 23, .04);
+  --wash-soft: rgba(35, 31, 23, .035);
+  --wash-faint: rgba(35, 31, 23, .015);
+  --hover-border: #a89d83;
+  --selection: #dbe5d4;
+  --backdrop: rgba(33, 28, 20, .45);
+  --dialog-shadow: 0 24px 64px rgba(33, 28, 20, .22);
   /* type */
   --topbar-h: 88px;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
   color: var(--ink);
   background: var(--paper);
   font-family: var(--sans);
+}
+
+/* Dark: the same ledger by lamplight — cool slate paper, the same hairlines,
+   the same single green. The toggle stores the choice under "dapier-theme";
+   with no stored choice the OS preference decides (see the head boot script). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* paper & ink */
+  --paper: #0f1218;
+  --surface: #141922;
+  --ink: #f2f5f9;
+  --ink-soft: #d9dee8;
+  --muted: #9ba6b8;
+  /* rules */
+  --line: #293241;
+  --line-strong: #303949;
+  /* rail */
+  --rail: #0a0d12;
+  --rail-ink: #e8ecf2;
+  --rail-muted: #8b94a6;
+  --rail-line: rgba(232, 236, 242, .12);
+  /* one accent */
+  --accent: #2f9e68;
+  --accent-deep: #288a5b;
+  --accent-soft: #14231b;
+  --accent-line: #2c4737;
+  /* status hues (status only) */
+  --ok-dot: #3fce8f;
+  --run-text: #e8b95e;
+  --run-dot: #d9a13f;
+  --red: #f0837a;
+  --red-deep: #f6a9a1;
+  --red-soft: #2a1a1a;
+  --red-line: #58302e;
+  --off-dot: #4d586b;
+  /* tints & effects */
+  --code-bg: rgba(242, 245, 249, .08);
+  --wash: rgba(242, 245, 249, .05);
+  --wash-soft: rgba(242, 245, 249, .045);
+  --wash-faint: rgba(242, 245, 249, .03);
+  --hover-border: #48566b;
+  --selection: #1e3a2b;
+  --backdrop: rgba(4, 6, 10, .6);
+  --dialog-shadow: 0 24px 64px rgba(0, 0, 0, .5);
 }
 
 * { box-sizing: border-box; }
@@ -79,8 +133,8 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 a { color: var(--accent); }
 h1, h2, h3, p { margin: 0; }
 strong { font-weight: 600; }
-code { font-family: var(--mono); font-size: .92em; background: rgba(35, 31, 23, .055); padding: 1px 5px; border-radius: 3px; }
-::selection { background: #dbe5d4; }
+code { font-family: var(--mono); font-size: .92em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+::selection { background: var(--selection); }
 [hidden] { display: none !important; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -108,7 +162,7 @@ code { font-family: var(--mono); font-size: .92em; background: rgba(35, 31, 23, 
 .button.primary { background: var(--accent); color: #f7f4ea; }
 .button.primary:hover { background: var(--accent-deep); }
 .button.secondary { border-color: var(--line-strong); background: transparent; color: var(--ink); }
-.button.secondary:hover { border-color: #a89d83; background: rgba(35, 31, 23, .04); }
+.button.secondary:hover { border-color: var(--hover-border); background: var(--wash); }
 
 /* Per-row enable/disable in the Workflows table; publishes live. */
 .workflow-status { display: inline-flex; align-items: center; }
@@ -124,7 +178,7 @@ code { font-family: var(--mono); font-size: .92em; background: rgba(35, 31, 23, 
   color: var(--ink);
   cursor: pointer;
 }
-.workflow-toggle:hover { border-color: #a89d83; background: rgba(35, 31, 23, .04); }
+.workflow-toggle:hover { border-color: var(--hover-border); background: var(--wash); }
 .workflow-toggle:disabled { opacity: .5; cursor: default; }
 
 .icon-button {
@@ -138,7 +192,7 @@ code { font-family: var(--mono); font-size: .92em; background: rgba(35, 31, 23, 
   background: transparent;
   color: var(--ink-soft);
 }
-.icon-button:hover { border-color: #a89d83; background: rgba(35, 31, 23, .04); color: var(--ink); }
+.icon-button:hover { border-color: var(--hover-border); background: var(--wash); color: var(--ink); }
 .icon-button svg { width: 16px; height: 16px; }
 
 .text-link {
@@ -226,8 +280,14 @@ nav { display: grid; align-content: start; gap: 2px; padding: 14px 0; }
 }
 .environment { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; color: var(--rail-muted); }
 .env-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #48a878; }
+.sidebar-foot-actions { display: inline-flex; align-items: center; gap: 6px; }
 .sidebar .icon-button { border-color: var(--rail-line); color: var(--rail-muted); }
 .sidebar .icon-button:hover { border-color: #5c5546; background: rgba(236, 231, 218, .08); color: var(--rail-ink); }
+
+/* theme toggle: moon invites dark, sun invites light */
+#theme-toggle .theme-icon-sun { display: none; }
+[data-theme="dark"] #theme-toggle .theme-icon-moon { display: none; }
+[data-theme="dark"] #theme-toggle .theme-icon-sun { display: block; }
 
 /* --- topbar / loading / notice -------------------------------------------- */
 main { min-width: 0; padding: 0 32px 64px; }
@@ -330,7 +390,7 @@ td[data-label="Retention"] { white-space: nowrap; }
 
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }
-tr.workflow-open:hover td, tr.run-open:hover td { background: rgba(35, 31, 23, .035); }
+tr.workflow-open:hover td, tr.run-open:hover td { background: var(--wash-soft); }
 tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* --- status (dot + word, one language everywhere) ----------------------------- */
@@ -355,10 +415,10 @@ dialog {
   padding: 0;
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 24px 64px rgba(33, 28, 20, .22);
+  box-shadow: var(--dialog-shadow);
   overscroll-behavior: contain;
 }
-dialog::backdrop { background: rgba(33, 28, 20, .45); }
+dialog::backdrop { background: var(--backdrop); }
 dialog form { display: contents; }
 #run-dialog { width: min(640px, calc(100vw - 32px)); }
 #workflow-dialog { width: min(680px, calc(100vw - 32px)); }
@@ -393,7 +453,7 @@ dialog form { display: contents; }
   gap: 10px;
   padding: 14px 22px;
   border-top: 1px solid var(--line);
-  background: rgba(35, 31, 23, .015);
+  background: var(--wash-faint);
 }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
