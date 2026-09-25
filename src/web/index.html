@@ -90,13 +90,23 @@
       <section class="view" data-page="workflows">
         <div class="section-head">
           <div class="section-head-text"><h2>Deployed workflows</h2><p class="sub">Edit in the visual designer; saving commits to <code>workflows/*.yaml</code> and deploys.</p></div>
-          <a class="button primary" href="/designer">New workflow</a>
+          <a id="new-workflow" class="button primary" href="/designer">New workflow</a>
         </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Workflow</th><th>Trigger</th><th>Actions</th><th>Status</th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="view" data-page="designer">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Workflow designer</h2><p class="sub">Saving commits to <code>workflows/*.yaml</code> and deploys.</p></div>
+          <a class="text-link view-link" href="/workflows" data-target="workflows"><i data-lucide="arrow-left"></i>Back to workflows</a>
+        </div>
+        <div class="designer-embed">
+          <iframe id="designer-frame" title="Workflow designer"></iframe>
         </div>
       </section>
 

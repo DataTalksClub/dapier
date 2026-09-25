@@ -111,6 +111,12 @@ button {
   height: 100%;
 }
 
+/* Embedded mode: the console provides the navigation, so the canvas gets the
+   whole frame instead of the sidebar column. */
+.designer-shell.embedded {
+  grid-template-columns: 1fr;
+}
+
 .designer-sidebar {
   background: var(--surface);
   border-right: 1px solid var(--panel-border);

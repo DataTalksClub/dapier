@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'workflows', 'connections', 'credentials', 'tokens', 'runs'];
+const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'credentials', 'tokens', 'runs'];
 
 export function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');

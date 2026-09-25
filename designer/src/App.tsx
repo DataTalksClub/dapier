@@ -143,6 +143,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         const requested = new URLSearchParams(window.location.search).get("workflow");
         const match = requested ? workflows.find((summary) => summary.source === requested) : null;
         if (match) return openWorkflow(match);
+        // The embedded view has no sidebar, so a blank console canvas starts
+        // with the same seeded trigger the sidebar's New-workflow used to add.
+        if (config.mode === "console") newWorkflow();
       })
       .catch((error) => setStatus({ kind: "error", message: String(error) }));
     refreshGit();
@@ -159,8 +162,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSavedSnapshot(JSON.stringify(shapesFromWorkflow(workflow)));
       setSelectedId(null);
       setStatus({ kind: "idle", message: "" });
-      if (config.mode === "console") {
-        history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(summary.source)}`);
+      if (config.mode === "console" && !config.embedded) {
+        history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
       }
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
@@ -201,8 +204,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       });
       setSavedSnapshot(JSON.stringify(shapes));
       setSourceName(`${workflow.id}.yaml`);
-      if (config.mode === "console") {
-        history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
+      if (config.mode === "console" && !config.embedded) {
+        history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
       }
       setSummaries((current) => {
         const others = current.filter((entry) => entry.source !== sourceName && entry.source !== `${workflow.id}.yaml`);
@@ -398,8 +401,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   };
 
   return (
-    <div className="designer-shell">
-      <aside className="designer-sidebar">
+    <div className={config.embedded ? "designer-shell embedded" : "designer-shell"}>
+      {!config.embedded && (
+        <aside className="designer-sidebar">
         {config.mode === "console" ? (
           <a className="brand brand-link" href="/"><span className="brand-mark">D</span><span>← Console · Designer</span></a>
         ) : (
@@ -434,7 +438,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             {(git.ahead > 0 || git.behind > 0) && <span>{git.ahead}↑ {git.behind}↓</span>}
           </div>
         )}
-      </aside>
+        </aside>
+      )}
 
       <main className="designer-main">
         <header className="designer-topbar">

@@ -3,6 +3,7 @@ import { $, $$, icons, notice, hardenSecretInputs, showForbidden } from './ui.js
 import { api } from './api.js';
 import { setView, viewFromPath } from './router.js';
 import { refresh, openRowFor } from './views/overview.js';
+import { openDesigner, designerFromLocation } from './views/designer.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
   if (event.target instanceof Element && event.target.closest('.secret-input')) event.preventDefault();
@@ -22,7 +23,23 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', (ev
   event.preventDefault();
   setView(link.dataset.view || link.dataset.target);
 }));
-window.addEventListener('popstate', () => setView(viewFromPath(window.location.pathname), false));
+window.addEventListener('popstate', () => {
+  const view = viewFromPath(window.location.pathname);
+  setView(view, false);
+  if (view === 'designer') designerFromLocation();
+});
+
+/* Edit-in-designer and New workflow open the designer inside the console;
+   the plain hrefs stay as the fallback for full-page loads. */
+function designerClick(event) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  const target = event.target.closest('#workflow-edit, #new-workflow');
+  if (!target) return;
+  event.preventDefault();
+  if (target.id === 'workflow-edit') $('#workflow-dialog').close();
+  openDesigner(target.id === 'workflow-edit' ? target.dataset.source : null);
+}
+document.addEventListener('click', designerClick);
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });
@@ -33,6 +50,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   let me;
   try { me = await api('/api/admin/me'); } catch (_) { return; }
   if (!me.operator) { showForbidden(); return; }
-  setView(viewFromPath(window.location.pathname), false);
+  const initialView = viewFromPath(window.location.pathname);
+  setView(initialView, false);
+  if (initialView === 'designer') designerFromLocation();
   await refresh();
 });

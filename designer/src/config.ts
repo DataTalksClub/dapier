@@ -4,6 +4,8 @@ export interface DesignerConfig {
   apiBase: string;
   /** "local" renders local-git chrome (push button, branch status); "console" commits via the deployed API. */
   mode: "local" | "console";
+  /** Sidebar-less rendering for the console's embedded designer view (src/web/js/views/designer.js). */
+  embedded?: boolean;
   /** Called when the API answers 401, e.g. to redirect to the console sign-in. */
   onUnauthorized?: () => void;
 }

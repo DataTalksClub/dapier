@@ -29,17 +29,22 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/tokens", "/runs")
-DESIGNER_VIEW = "/designer"
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/tokens", "/runs", "/designer")
+# The designer app shell, framed by the console's /designer view.
+DESIGNER_APP_VIEW = "/designer/app"
 
 
 def _static(path):
     # The designer canvas positions nodes with inline style attributes, which
-    # CSP only allows with an explicit style-src exception for that page.
-    style_src = "'self' 'unsafe-inline'" if path == DESIGNER_VIEW else "'self'"
+    # CSP only allows with an explicit style-src exception on its page, and
+    # the console's /designer view embeds it, so it opts into frame-ancestors
+    # 'self' while every other page refuses all framing.
+    embed = path == DESIGNER_APP_VIEW
+    style_src = "'self' 'unsafe-inline'" if embed else "'self'"
+    frame_ancestors = "'self'" if embed else "'none'"
     assets = {
         **{view: ("index.html", "text/html; charset=utf-8") for view in CONSOLE_VIEWS},
-        DESIGNER_VIEW: ("designer.html", "text/html; charset=utf-8"),
+        DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
@@ -53,6 +58,7 @@ def _static(path):
         "/assets/js/views/credentials.js": ("js/views/credentials.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/oauth-clients.js": ("js/views/oauth-clients.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/overview.js": ("js/views/overview.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/designer.js": ("js/views/designer.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
@@ -83,7 +89,7 @@ def _static(path):
             "content-security-policy": (
                 "default-src 'self'; script-src 'self'; "
                 f"style-src {style_src}; img-src 'self' data:; connect-src 'self'; "
-                "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+                f"frame-ancestors {frame_ancestors}; base-uri 'self'; form-action 'self'"
             ),
             "x-content-type-options": "nosniff",
             "referrer-policy": "same-origin",

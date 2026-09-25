@@ -546,7 +546,7 @@ def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_id
 # ---- Static serving ----
 
 def test_designer_page_is_served_with_inline_style_csp():
-    response = ingress._static("/designer")
+    response = ingress._static("/designer/app")
     assert response["statusCode"] == 200
     assert response["headers"]["content-type"].startswith("text/html")
     assert "style-src 'self' 'unsafe-inline'" in response["headers"]["content-security-policy"]

@@ -1,6 +1,9 @@
 /* BUILD ARTIFACT - do not edit by hand.
  *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
  *  Rebuild into src/web/ with: make designer-console */
+/* BUILD ARTIFACT - do not edit by hand.
+ *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
+ *  Rebuild into src/web/ with: make designer-console */
 (function() {
   "use strict";
   var jsxRuntime = { exports: {} };
@@ -18871,6 +18874,7 @@
         const requested = new URLSearchParams(window.location.search).get("workflow");
         const match = requested ? workflows.find((summary) => summary.source === requested) : null;
         if (match) return openWorkflow(match);
+        if (config.mode === "console") newWorkflow();
       }).catch((error) => setStatus({ kind: "error", message: String(error) }));
       refreshGit();
     }, [refreshGit, refreshList]);
@@ -18885,8 +18889,8 @@
         setSavedSnapshot(JSON.stringify(shapesFromWorkflow(workflow)));
         setSelectedId(null);
         setStatus({ kind: "idle", message: "" });
-        if (config.mode === "console") {
-          history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(summary.source)}`);
+        if (config.mode === "console" && !config.embedded) {
+          history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
         }
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
@@ -18925,8 +18929,8 @@
         });
         setSavedSnapshot(JSON.stringify(shapes));
         setSourceName(`${workflow.id}.yaml`);
-        if (config.mode === "console") {
-          history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
+        if (config.mode === "console" && !config.embedded) {
+          history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
         }
         setSummaries((current) => {
           const others = current.filter((entry) => entry.source !== sourceName && entry.source !== `${workflow.id}.yaml`);
@@ -19121,8 +19125,8 @@
         ] })
       ] });
     };
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-shell", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "designer-sidebar", children: [
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: config.embedded ? "designer-shell embedded" : "designer-shell", children: [
+      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "designer-sidebar", children: [
         config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "brand-mark", children: "D" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
@@ -19230,8 +19234,21 @@
   }
   const root = document.getElementById("designer-root");
   if (root) {
+    const embedded = new URLSearchParams(window.location.search).get("embed") === "1";
     clientExports.createRoot(root).render(
-      /* @__PURE__ */ jsxRuntimeExports.jsx(App, { config: { apiBase: "/api/admin/designer", mode: "console", onUnauthorized: () => window.location.assign("/auth/login") } })
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        App,
+        {
+          config: {
+            apiBase: "/api/admin/designer",
+            mode: "console",
+            embedded,
+            onUnauthorized: () => {
+              (embedded && window.top ? window.top : window).location.assign("/auth/login");
+            }
+          }
+        }
+      )
     );
   }
 })();

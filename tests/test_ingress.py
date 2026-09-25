@@ -180,13 +180,37 @@ def test_every_nav_link_resolves_to_a_served_page():
 def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
     index = ingress._static("/")["body"]
     workflows_view = re.search(r'data-page="workflows".*?</section>', index, re.S).group(0)
-    new_link = re.search(r'<a class="button primary" href="([^"]+)">New workflow</a>', workflows_view)
+    new_link = re.search(r'<a id="new-workflow" class="button primary" href="([^"]+)">New workflow</a>', workflows_view)
     assert new_link and new_link.group(1) == "/designer"
     assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
 
     # The workflow dialog deep-links the designer with the workflow source.
     assert 'id="workflow-edit"' in index
     assert ingress._static("/designer")["statusCode"] == 200
+
+
+def test_designer_serves_the_console_with_the_embedded_canvas():
+    # /designer is a console view: the workflows dialog's Edit-in-designer and
+    # the New-workflow button open the canvas inside the console, not on a
+    # standalone page with a second sidebar.
+    body = ingress._static("/designer")["body"]
+    assert "forbidden-view" in body
+    designer_view = re.search(r'data-page="designer".*?</section>', body, re.S).group(0)
+    frame = re.search(r'<iframe id="designer-frame"', designer_view)
+    assert frame, "the designer view must host the designer iframe"
+    # The console page itself still refuses to be framed by anyone else.
+    assert "frame-ancestors 'none'" in ingress._static("/designer")["headers"]["content-security-policy"]
+
+
+def test_designer_app_shell_is_framable_by_the_console():
+    response = ingress._static("/designer/app")
+    assert response["statusCode"] == 200
+    assert "designer-root" in response["body"]
+    csp = response["headers"]["content-security-policy"]
+    # The console's /designer view embeds this page (frame-ancestors), and the
+    # canvas positions nodes with inline style attributes (unsafe-inline).
+    assert "frame-ancestors 'self'" in csp
+    assert "style-src 'self' 'unsafe-inline'" in csp
 
 
 def test_assets_are_served_without_caching():
@@ -224,10 +248,13 @@ def test_every_nav_link_has_an_api_gateway_route():
 
     assets = set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', index["body"]))
     assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer")["body"]))
-    assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/fonts/IBMPlexSans-VF.woff2"}
+    assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer/app")["body"]))
+    assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/js/views/designer.js", "/assets/fonts/IBMPlexSans-VF.woff2"}
     assert len(assets) >= 8, assets
     for path in assets:
         assert covered(path), f"API Gateway has no route for {path}"
+    # The embedded designer shell itself rides the /designer/{proxy+} route.
+    assert covered("/designer/app"), "API Gateway has no route for /designer/app"
 
 
 def test_console_assets_are_self_hosted():

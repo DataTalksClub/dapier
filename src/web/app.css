@@ -421,6 +421,16 @@ dialog form { display: contents; }
 }
 .detail-error svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
 
+/* --- embedded designer -------------------------------------------------------- */
+.designer-embed iframe {
+  width: 100%;
+  height: calc(100dvh - 240px);
+  min-height: 520px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
 /* --- drawer behaviour (≤860) --------------------------------------------------- */
 @media (max-width: 860px) {
   .app-shell { grid-template-columns: 1fr; }

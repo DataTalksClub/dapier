@@ -41,6 +41,7 @@ function openWorkflow(id) {
   const designer = $('#workflow-edit');
   if (workflow.source) {
     designer.href = `/designer?workflow=${encodeURIComponent(workflow.source)}`;
+    designer.dataset.source = workflow.source;
     designer.hidden = false;
   } else {
     designer.hidden = true;

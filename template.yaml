@@ -216,6 +216,11 @@ Resources:
         DesignerView:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /designer, Method: GET}
+        # The designer app shell under /designer/app, framed by the console's
+        # /designer view; the router._static allowlist decides what is served.
+        DesignerEmbed:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: '/designer/{proxy+}', Method: GET}
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}
@@ -621,8 +626,14 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - {AttributeName: execution_id, AttributeType: S}
+        - {AttributeName: run_id, AttributeType: S}
       KeySchema:
         - {AttributeName: execution_id, KeyType: HASH}
+      GlobalSecondaryIndexes:
+        - IndexName: runs-by-run-id
+          KeySchema:
+            - {AttributeName: run_id, KeyType: HASH}
+          Projection: {ProjectionType: ALL}
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
