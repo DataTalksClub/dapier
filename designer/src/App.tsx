@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlaskConical, GitBranch, Loader2, Play, TriangleAlert, X } from "lucide-react";
-import { dump } from "js-yaml";
+import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
@@ -141,7 +141,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [testBusy, setTestBusy] = useState(false);
   const [testResult, setTestResult] = useState<TestRunResult | null>(null);
 
-  const dirty = useMemo(() => JSON.stringify(shapes) !== savedSnapshot, [shapes, savedSnapshot]);
+  const dirty = useMemo(
+    () => (view === "yaml" ? yamlText !== savedYaml : JSON.stringify(shapes) !== savedSnapshot),
+    [view, yamlText, savedYaml, shapes, savedSnapshot]
+  );
 
   const refreshGit = useCallback(() => {
     if (config.mode !== "local") return;
@@ -173,11 +176,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     try {
       const data = await api<{ workflow: Workflow }>(config, `/workflows/${summary.source}`);
       const workflow = data.workflow;
+      const shapes = shapesFromWorkflow(workflow);
+      const yaml = workflowYaml(workflow);
       setSourceName(summary.source);
       setWorkflowId(workflow.id);
       setEnabled(workflow.enabled !== false);
-      setShapes(shapesFromWorkflow(workflow));
-      setSavedSnapshot(JSON.stringify(shapesFromWorkflow(workflow)));
+      setShapes(shapes);
+      setSavedSnapshot(JSON.stringify(shapes));
+      setBase(workflow);
+      setYamlText(yaml);
+      setSavedYaml(yaml);
       setSelectedId(null);
       setStatus({ kind: "idle", message: "" });
       if (config.mode === "console" && !config.embedded) {
@@ -204,23 +212,93 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setEnabled(true);
     setShapes([trigger]);
     setSavedSnapshot("[]");
+    setBase(null);
+    setYamlText("");
+    setSavedYaml("");
     setSelectedId(null);
     setStatus({ kind: "idle", message: "" });
   }
 
+  /** Parses editor YAML; on failure shows the problem and returns null. */
+  function parseYamlText(text: string): Workflow | null {
+    try {
+      const parsed: unknown = load(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        setStatus({ kind: "error", message: "The YAML must be one object mapping." });
+        return null;
+      }
+      return parsed as Workflow;
+    } catch (error) {
+      const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+      setStatus({ kind: "error", message: `Invalid YAML: ${message}` });
+      return null;
+    }
+  }
+
+  /** Switches editor view, materializing edits so nothing is silently dropped. */
+  function switchView(next: "canvas" | "yaml") {
+    if (next === view) return;
+    if (next === "yaml") {
+      const built = workflowFromShapes(shapes, workflowId, enabled, base);
+      if (built.lost.length) {
+        const noun = built.lost.length === 1 ? "node is" : "nodes are";
+        setStatus({
+          kind: "error",
+          message: `${built.lost.length} ${noun} not connected to a trigger and would be lost in YAML — connect or delete them first.`
+        });
+        return;
+      }
+      setYamlText(workflowYaml(built.workflow));
+    } else {
+      const parsed = parseYamlText(yamlText);
+      if (!parsed) return;
+      const shapes = shapesFromWorkflow(parsed);
+      setShapes(shapes);
+      setSavedSnapshot(JSON.stringify(shapes));
+      setBase(parsed);
+      if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
+      setEnabled(parsed.enabled !== false);
+      setSelectedId(null);
+    }
+    setView(next);
+  }
+
   async function save() {
-    const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
-    if (problems.length) {
-      setStatus({ kind: "error", message: problems.join(" ") });
-      return;
+    let yamlOut: string;
+    let workflow: Workflow;
+    let nextShapes: DiagramShape[];
+    if (view === "yaml") {
+      const parsed = parseYamlText(yamlText);
+      if (!parsed) return;
+      workflow = parsed;
+      yamlOut = yamlText;
+      nextShapes = shapesFromWorkflow(parsed);
+    } else {
+      const built = workflowFromShapes(shapes, workflowId, enabled, base);
+      if (built.problems.length) {
+        setStatus({ kind: "error", message: built.problems.join(" ") });
+        return;
+      }
+      workflow = built.workflow;
+      yamlOut = workflowYaml(workflow);
+      nextShapes = shapes;
     }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
       const result = await api<{ commit: string | null; html_url?: string }>(config, "/workflows", {
         method: "PUT",
-        body: JSON.stringify({ yaml: workflowYaml(workflow), renameFrom: sourceName })
+        body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
       });
-      setSavedSnapshot(JSON.stringify(shapes));
+      setBase(workflow);
+      setSavedYaml(yamlOut);
+      if (view === "yaml") {
+        setShapes(nextShapes);
+        setSavedSnapshot(JSON.stringify(nextShapes));
+        setWorkflowId(workflow.id);
+        setEnabled(workflow.enabled !== false);
+      } else {
+        setSavedSnapshot(JSON.stringify(shapes));
+      }
       setSourceName(`${workflow.id}.yaml`);
       if (config.mode === "console" && !config.embedded) {
         history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
@@ -303,7 +381,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
 
-  const triggerNode = shapes.find((shape) => shape.data?.nodeKind === "trigger") ?? null;
+  const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
   const selectedInspector = () => {
     if (!selected || selected.type !== "node" || !selected.data) {
       return (
@@ -515,18 +593,45 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       <main className="designer-main">
         <header className="designer-topbar">
           <div className="topbar-title">
+            <div className="view-switch" role="group" aria-label="Editor view">
+              <button
+                type="button"
+                className={view === "canvas" ? "view-option active" : "view-option"}
+                aria-pressed={view === "canvas"}
+                onClick={() => switchView("canvas")}
+              >
+                Canvas
+              </button>
+              <button
+                type="button"
+                className={view === "yaml" ? "view-option active" : "view-option"}
+                aria-pressed={view === "yaml"}
+                onClick={() => switchView("yaml")}
+              >
+                YAML
+              </button>
+            </div>
             <input
               className="id-input"
               value={workflowId}
               aria-label="Workflow ID"
               placeholder="workflow-id"
+              disabled={view === "yaml"}
+              title={view === "yaml" ? "Edit the id in the YAML view" : undefined}
               onChange={(event) => setWorkflowId(event.target.value)}
             />
-            <label className="check-label">
-              <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+            <label className="check-label" title={view === "yaml" ? "Edit enabled in the YAML view" : undefined}>
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={view === "yaml"}
+                onChange={(event) => setEnabled(event.target.checked)}
+              />
               Enabled
             </label>
-            {triggerNode === null && <span className="save-problems">Add a trigger node to save.</span>}
+            {view === "canvas" && triggerNodes.length === 0 && (
+              <span className="save-problems">Add a trigger node to save.</span>
+            )}
           </div>
           <div className="topbar-actions">
             {status.message && (
@@ -557,6 +662,21 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           </div>
         </header>
 
+        {view === "yaml" ? (
+          <div className="yaml-editor">
+            <div className="yaml-editor-bar">
+              <span className="mono-file">workflows/{sourceName ?? `${workflowId}.yaml`}</span>
+              <span className="yaml-hint">comments are not preserved on save</span>
+            </div>
+            <textarea
+              className="yaml-text"
+              value={yamlText}
+              spellCheck={false}
+              aria-label="Workflow YAML"
+              onChange={(event) => setYamlText(event.target.value)}
+            />
+          </div>
+        ) : (
         <div className="designer-body">
           <WorkflowBoard
             shapes={shapes}
@@ -650,6 +770,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
           </aside>
         </div>
+        )}
       </main>
     </div>
   );

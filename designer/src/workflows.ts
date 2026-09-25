@@ -1,7 +1,7 @@
 import { dump, load } from "js-yaml";
 import type { CatalogField } from "./catalog";
 import { actionCatalog, connectorCatalog, filterOperators, logicOperators } from "./catalog";
-import type { ActionType, DiagramShape, FilterRule, NodeData, Workflow, WorkflowSummary } from "./types";
+import type { ActionType, DiagramShape, FilterRule, NodeData, TriggerSpec, Workflow, WorkflowSummary } from "./types";
 
 export { actionCatalog, connectorCatalog, filterOperators, logicOperators };
 
@@ -55,6 +55,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Every entry point of a workflow: its `triggers` list or single `trigger`. */
+export function workflowTriggers(workflow: Workflow): TriggerSpec[] {
+  if (Array.isArray(workflow.triggers) && workflow.triggers.length) return workflow.triggers;
+  return workflow.trigger ? [workflow.trigger] : [];
+}
+
+/** The chain a workflow runs: inline `actions`, or the bound flow's. */
+export function workflowActions(workflow: Workflow): Array<Record<string, unknown>> {
+  if (workflow.flow && isRecord(workflow.flows)) {
+    const bound = workflow.flows[workflow.flow];
+    if (isRecord(bound) && Array.isArray(bound.actions)) return bound.actions;
+  }
+  return Array.isArray(workflow.actions) ? workflow.actions : [];
+}
+
 /** The object a field writes to: the action itself or its `group` object. */
 function fieldTarget(action: Record<string, unknown>, field: CatalogField): Record<string, unknown> {
   if (!field.group) return action;
@@ -65,8 +80,8 @@ function fieldTarget(action: Record<string, unknown>, field: CatalogField): Reco
   return created;
 }
 
-/** Chain actions in connector order starting at the trigger node. */
-function orderedActions(shapes: DiagramShape[], trigger: DiagramShape): { actions: DiagramShape[]; problems: string[] } {
+/** Chain actions in traversal order starting at the trigger nodes. */
+function orderedActions(shapes: DiagramShape[], roots: DiagramShape[]): { actions: DiagramShape[]; lost: DiagramShape[]; problems: string[] } {
   const outgoing = new Map<string, string[]>();
   for (const shape of shapes) {
     if (shape.type !== "arrow" || !shape.sourceId || !shape.targetId) continue;
@@ -74,9 +89,9 @@ function orderedActions(shapes: DiagramShape[], trigger: DiagramShape): { action
   }
 
   const actions: DiagramShape[] = [];
-  const visited = new Set<string>([trigger.id]);
+  const visited = new Set<string>(roots.map((root) => root.id));
   const problems: string[] = [];
-  let frontier = (outgoing.get(trigger.id) ?? []).filter((id) => id !== trigger.id);
+  let frontier = roots.flatMap((root) => (outgoing.get(root.id) ?? []).filter((id) => !visited.has(id)));
 
   while (frontier.length) {
     const nextFrontier: string[] = [];
@@ -89,7 +104,7 @@ function orderedActions(shapes: DiagramShape[], trigger: DiagramShape): { action
       const node = shapes.find((shape) => shape.id === id);
       if (!node || node.type !== "node") continue;
       if (node.data?.nodeKind === "trigger") {
-        problems.push("Only one trigger per workflow; the extra trigger was ignored.");
+        problems.push("A trigger can only start a workflow; the mid-chain trigger was ignored.");
         continue;
       }
       actions.push(node);
@@ -98,12 +113,13 @@ function orderedActions(shapes: DiagramShape[], trigger: DiagramShape): { action
     frontier = nextFrontier;
   }
 
-  for (const shape of shapes) {
-    if (shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)) {
-      problems.push(`"${shape.label}" is not connected to the trigger and was not saved.`);
-    }
+  const lost = shapes.filter(
+    (shape) => shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)
+  );
+  for (const shape of lost) {
+    problems.push(`"${shape.label}" is not connected to a trigger and was not saved.`);
   }
-  return { actions, problems };
+  return { actions, lost, problems };
 }
 
 function filterRulesToYaml(rules: FilterRule[] | undefined): Record<string, Record<string, unknown>> {
@@ -171,39 +187,52 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
   return merged;
 }
 
+function triggerToYaml(data: NodeData): TriggerSpec {
+  return {
+    connector: data.connector ?? "custom",
+    event: data.event?.trim() || "received",
+    filters: filterRulesToYaml(data.filters)
+  };
+}
+
 export function workflowFromShapes(
   shapes: DiagramShape[],
   workflowId: string,
-  enabled: boolean
-): { workflow: Workflow; problems: string[] } {
+  enabled: boolean,
+  base?: Workflow | null
+): { workflow: Workflow; problems: string[]; lost: DiagramShape[] } {
   const problems: string[] = [];
-  const triggers = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
-  if (triggers.length === 0) problems.push("Add a trigger node before saving.");
-  if (triggers.length > 1) problems.push("Only one trigger per workflow; the extra triggers were ignored.");
+  const triggerNodes = shapes
+    .filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger")
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  if (triggerNodes.length === 0) problems.push("Add a trigger node before saving.");
 
-  const trigger = triggers[0];
-  const triggerData = trigger?.data ?? defaultNodeData("trigger");
-  const { actions, problems: chainProblems } = trigger
-    ? orderedActions(shapes, trigger)
-    : { actions: [], problems: [] };
-  if (trigger && actions.length === 0) problems.push("Connect at least one action to the trigger.");
+  const { actions, lost, problems: chainProblems } = triggerNodes.length
+    ? orderedActions(shapes, triggerNodes)
+    : { actions: [], lost: [], problems: [] };
+  if (triggerNodes.length && actions.length === 0) problems.push("Connect at least one action to the trigger.");
 
-  const yaml: Array<Record<string, unknown>> = [];
-  actions.forEach((node, index) => yaml.push(actionToYaml(node, index, problems)));
-
-  return {
-    workflow: {
-      id: workflowId.trim() || "untitled-workflow",
-      enabled,
-      trigger: {
-        connector: triggerData.connector ?? "custom",
-        event: triggerData.event?.trim() || "received",
-        filters: filterRulesToYaml(triggerData.filters)
-      },
-      actions: yaml
-    },
-    problems: [...problems, ...chainProblems]
+  const workflow: Workflow = {
+    id: workflowId.trim() || "untitled-workflow",
+    enabled
   };
+  if (base?.flow) {
+    // The chain lives in the shared `flows:` block; write it back there and
+    // keep every other flow (and the binding) exactly as they were. Never
+    // emit inline actions next to a flow binding — the engine rejects that.
+    const flows = isRecord(base.flows) ? base.flows : {};
+    const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
+    workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map(actionToYaml) } };
+    workflow.flow = base.flow;
+  } else {
+    workflow.actions = actions.map(actionToYaml);
+  }
+  if (triggerNodes.length === 1) {
+    workflow.trigger = triggerToYaml(triggerNodes[0].data!);
+  } else if (triggerNodes.length > 1) {
+    workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data!));
+  }
+  return { workflow, problems: [...problems, ...chainProblems], lost };
 }
 
 function yamlFiltersToRules(filters: Record<string, Record<string, unknown>> | undefined): FilterRule[] {
@@ -271,28 +300,39 @@ function rawExtras(action: Record<string, unknown>): Record<string, unknown> | u
 export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
   const shapes: DiagramShape[] = [];
   const rowY = (index: number) => ORIGIN_Y + index * (NODE_HEIGHT + NODE_GAP_Y);
+  const triggers = workflowTriggers(workflow);
+  const actions = workflowActions(workflow);
 
-  const trigger: DiagramShape = {
-    id: "trigger",
-    type: "node",
-    x: ORIGIN_X,
-    y: rowY(0),
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-    label: `${connectorLabel(workflow.trigger.connector)} · ${workflow.trigger.event}`,
-    data: {
-      nodeKind: "trigger",
-      connector: connectorCatalog.some((entry) => entry.name === workflow.trigger.connector)
-        ? workflow.trigger.connector
-        : "custom",
-      event: workflow.trigger.event,
-      filters: yamlFiltersToRules(workflow.trigger.filters)
-    }
-  };
-  shapes.push(trigger);
+  // Entry points sit in one row, centered over the action chain; a lone
+  // trigger keeps the chain's column.
+  const TRIGGER_GAP_X = 72;
+  const rowWidth = triggers.length * NODE_WIDTH + (triggers.length - 1) * TRIGGER_GAP_X;
+  const rowStartX = ORIGIN_X + NODE_WIDTH / 2 - rowWidth / 2;
 
-  let previous = trigger;
-  workflow.actions.forEach((action, index) => {
+  const triggerNodes = triggers.map((spec, index) => {
+    const node: DiagramShape = {
+      id: triggers.length === 1 ? "trigger" : `trigger-${index}`,
+      type: "node",
+      x: rowStartX + index * (NODE_WIDTH + TRIGGER_GAP_X),
+      y: rowY(0),
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+      label: `${connectorLabel(spec.connector)} · ${spec.event}`,
+      data: {
+        nodeKind: "trigger",
+        connector: connectorCatalog.some((entry) => entry.name === spec.connector)
+          ? spec.connector
+          : "custom",
+        event: spec.event,
+        filters: yamlFiltersToRules(spec.filters)
+      }
+    };
+    shapes.push(node);
+    return node;
+  });
+
+  let previous: DiagramShape | null = triggerNodes[triggerNodes.length - 1] ?? null;
+  actions.forEach((action, index) => {
     const type = String(action.type ?? "webhook");
     const extras = rawExtras(action);
     const node: DiagramShape = {
@@ -311,18 +351,20 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
       }
     };
     shapes.push(node);
-    shapes.push({
-      id: `link-${index}`,
-      type: "arrow",
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      sourceId: previous.id,
-      targetId: node.id,
-      sourceHandleId: "bottom",
-      targetHandleId: "top"
-    });
+    for (const source of index === 0 ? triggerNodes : [previous!]) {
+      shapes.push({
+        id: `link-${source.id}-${node.id}`,
+        type: "arrow",
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        sourceId: source.id,
+        targetId: node.id,
+        sourceHandleId: "bottom",
+        targetHandleId: "top"
+      });
+    }
     previous = node;
   });
 
@@ -330,12 +372,13 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
 }
 
 export function summarize(source: string, workflow: Workflow): WorkflowSummary {
+  const primary = workflowTriggers(workflow)[0];
   return {
     id: workflow.id,
     enabled: workflow.enabled !== false,
     source,
-    connector: workflow.trigger?.connector ?? "?",
-    event: workflow.trigger?.event ?? "?",
-    actionCount: Array.isArray(workflow.actions) ? workflow.actions.length : 0
+    connector: primary?.connector ?? "?",
+    event: primary?.event ?? "?",
+    actionCount: workflowActions(workflow).length
   };
 }

@@ -17901,9 +17901,6 @@
     return fields;
   }
   function defaultNodeData(kind) {
-    if (kind === "trigger") {
-      return { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] };
-    }
     return { nodeKind: "action", actionType: "webhook", fields: defaultFields("webhook") };
   }
   function actionNodeTitle(data) {
@@ -17918,6 +17915,17 @@
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
+  function workflowTriggers(workflow) {
+    if (Array.isArray(workflow.triggers) && workflow.triggers.length) return workflow.triggers;
+    return workflow.trigger ? [workflow.trigger] : [];
+  }
+  function workflowActions(workflow) {
+    if (workflow.flow && isRecord(workflow.flows)) {
+      const bound = workflow.flows[workflow.flow];
+      if (isRecord(bound) && Array.isArray(bound.actions)) return bound.actions;
+    }
+    return Array.isArray(workflow.actions) ? workflow.actions : [];
+  }
   function fieldTarget(action, field) {
     if (!field.group) return action;
     const group = action[field.group];
@@ -17926,16 +17934,16 @@
     action[field.group] = created;
     return created;
   }
-  function orderedActions(shapes, trigger) {
+  function orderedActions(shapes, roots) {
     const outgoing = /* @__PURE__ */ new Map();
     for (const shape of shapes) {
       if (shape.type !== "arrow" || !shape.sourceId || !shape.targetId) continue;
       outgoing.set(shape.sourceId, [...outgoing.get(shape.sourceId) ?? [], shape.targetId]);
     }
     const actions = [];
-    const visited = /* @__PURE__ */ new Set([trigger.id]);
+    const visited = new Set(roots.map((root2) => root2.id));
     const problems = [];
-    let frontier = (outgoing.get(trigger.id) ?? []).filter((id) => id !== trigger.id);
+    let frontier = roots.flatMap((root2) => (outgoing.get(root2.id) ?? []).filter((id) => !visited.has(id)));
     while (frontier.length) {
       const nextFrontier = [];
       for (const id of frontier) {
@@ -17947,7 +17955,7 @@
         const node = shapes.find((shape) => shape.id === id);
         if (!node || node.type !== "node") continue;
         if (node.data?.nodeKind === "trigger") {
-          problems.push("Only one trigger per workflow; the extra trigger was ignored.");
+          problems.push("A trigger can only start a workflow; the mid-chain trigger was ignored.");
           continue;
         }
         actions.push(node);
@@ -17955,12 +17963,13 @@
       }
       frontier = nextFrontier;
     }
-    for (const shape of shapes) {
-      if (shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)) {
-        problems.push(`"${shape.label}" is not connected to the trigger and was not saved.`);
-      }
+    const lost = shapes.filter(
+      (shape) => shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)
+    );
+    for (const shape of lost) {
+      problems.push(`"${shape.label}" is not connected to a trigger and was not saved.`);
     }
-    return { actions, problems };
+    return { actions, lost, problems };
   }
   function filterRulesToYaml(rules) {
     const filters = {};
@@ -17971,7 +17980,7 @@
     return filters;
   }
   function actionToYaml(node, index, problems) {
-    const data = node.data ?? defaultNodeData("action");
+    const data = node.data ?? defaultNodeData();
     const type2 = data.actionType ?? "webhook";
     const action = {
       id: (data.fields?.id ?? "").trim() || `action-${index + 1}`,
@@ -18017,30 +18026,37 @@
     }
     return merged;
   }
-  function workflowFromShapes(shapes, workflowId, enabled) {
-    const problems = [];
-    const triggers = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
-    if (triggers.length === 0) problems.push("Add a trigger node before saving.");
-    if (triggers.length > 1) problems.push("Only one trigger per workflow; the extra triggers were ignored.");
-    const trigger = triggers[0];
-    const triggerData = trigger?.data ?? defaultNodeData("trigger");
-    const { actions, problems: chainProblems } = trigger ? orderedActions(shapes, trigger) : { actions: [], problems: [] };
-    if (trigger && actions.length === 0) problems.push("Connect at least one action to the trigger.");
-    const yaml2 = [];
-    actions.forEach((node, index) => yaml2.push(actionToYaml(node, index, problems)));
+  function triggerToYaml(data) {
     return {
-      workflow: {
-        id: workflowId.trim() || "untitled-workflow",
-        enabled,
-        trigger: {
-          connector: triggerData.connector ?? "custom",
-          event: triggerData.event?.trim() || "received",
-          filters: filterRulesToYaml(triggerData.filters)
-        },
-        actions: yaml2
-      },
-      problems: [...problems, ...chainProblems]
+      connector: data.connector ?? "custom",
+      event: data.event?.trim() || "received",
+      filters: filterRulesToYaml(data.filters)
     };
+  }
+  function workflowFromShapes(shapes, workflowId, enabled, base2) {
+    const problems = [];
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
+    if (triggerNodes.length === 0) problems.push("Add a trigger node before saving.");
+    const { actions, lost, problems: chainProblems } = triggerNodes.length ? orderedActions(shapes, triggerNodes) : { actions: [], lost: [], problems: [] };
+    if (triggerNodes.length && actions.length === 0) problems.push("Connect at least one action to the trigger.");
+    const workflow = {
+      id: workflowId.trim() || "untitled-workflow",
+      enabled
+    };
+    if (base2?.flow) {
+      const flows = isRecord(base2.flows) ? base2.flows : {};
+      const bound = isRecord(flows[base2.flow]) ? flows[base2.flow] : {};
+      workflow.flows = { ...flows, [base2.flow]: { ...bound, actions: actions.map(actionToYaml) } };
+      workflow.flow = base2.flow;
+    } else {
+      workflow.actions = actions.map(actionToYaml);
+    }
+    if (triggerNodes.length === 1) {
+      workflow.trigger = triggerToYaml(triggerNodes[0].data);
+    } else if (triggerNodes.length > 1) {
+      workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data));
+    }
+    return { workflow, problems: [...problems, ...chainProblems], lost };
   }
   function yamlFiltersToRules(filters) {
     return Object.entries(filters ?? {}).flatMap(([field, rule]) => {
@@ -18091,24 +18107,32 @@
   function shapesFromWorkflow(workflow) {
     const shapes = [];
     const rowY = (index) => ORIGIN_Y + index * (NODE_HEIGHT + NODE_GAP_Y);
-    const trigger = {
-      id: "trigger",
-      type: "node",
-      x: ORIGIN_X,
-      y: rowY(0),
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      label: `${connectorLabel(workflow.trigger.connector)} · ${workflow.trigger.event}`,
-      data: {
-        nodeKind: "trigger",
-        connector: connectorCatalog.some((entry) => entry.name === workflow.trigger.connector) ? workflow.trigger.connector : "custom",
-        event: workflow.trigger.event,
-        filters: yamlFiltersToRules(workflow.trigger.filters)
-      }
-    };
-    shapes.push(trigger);
-    let previous = trigger;
-    workflow.actions.forEach((action, index) => {
+    const triggers = workflowTriggers(workflow);
+    const actions = workflowActions(workflow);
+    const TRIGGER_GAP_X = 72;
+    const rowWidth = triggers.length * NODE_WIDTH + (triggers.length - 1) * TRIGGER_GAP_X;
+    const rowStartX = ORIGIN_X + NODE_WIDTH / 2 - rowWidth / 2;
+    const triggerNodes = triggers.map((spec, index) => {
+      const node = {
+        id: triggers.length === 1 ? "trigger" : `trigger-${index}`,
+        type: "node",
+        x: rowStartX + index * (NODE_WIDTH + TRIGGER_GAP_X),
+        y: rowY(0),
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        label: `${connectorLabel(spec.connector)} · ${spec.event}`,
+        data: {
+          nodeKind: "trigger",
+          connector: connectorCatalog.some((entry) => entry.name === spec.connector) ? spec.connector : "custom",
+          event: spec.event,
+          filters: yamlFiltersToRules(spec.filters)
+        }
+      };
+      shapes.push(node);
+      return node;
+    });
+    let previous = triggerNodes[triggerNodes.length - 1] ?? null;
+    actions.forEach((action, index) => {
       const type2 = String(action.type ?? "webhook");
       const extras = rawExtras(action);
       const node = {
@@ -18127,30 +18151,33 @@
         }
       };
       shapes.push(node);
-      shapes.push({
-        id: `link-${index}`,
-        type: "arrow",
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        sourceId: previous.id,
-        targetId: node.id,
-        sourceHandleId: "bottom",
-        targetHandleId: "top"
-      });
+      for (const source of index === 0 ? triggerNodes : [previous]) {
+        shapes.push({
+          id: `link-${source.id}-${node.id}`,
+          type: "arrow",
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          sourceId: source.id,
+          targetId: node.id,
+          sourceHandleId: "bottom",
+          targetHandleId: "top"
+        });
+      }
       previous = node;
     });
     return shapes;
   }
   function summarize(source, workflow) {
+    const primary = workflowTriggers(workflow)[0];
     return {
       id: workflow.id,
       enabled: workflow.enabled !== false,
       source,
-      connector: workflow.trigger?.connector ?? "?",
-      event: workflow.trigger?.event ?? "?",
-      actionCount: Array.isArray(workflow.actions) ? workflow.actions.length : 0
+      connector: primary?.connector ?? "?",
+      event: primary?.event ?? "?",
+      actionCount: workflowActions(workflow).length
     };
   }
   function actionIcon(type2) {
@@ -18196,7 +18223,11 @@
     return actionNodeTitle(shape.data ?? {});
   }
   function nodeSubtitle(shape) {
-    if (shape.type === "note" || shape.data?.nodeKind === "trigger") return "";
+    if (shape.type === "note") return "";
+    if (shape.data?.nodeKind === "trigger") {
+      const rule = (shape.data.filters ?? []).find((entry) => entry.field.trim());
+      return rule ? `${rule.field.trim()} ${rule.operator} ${rule.value}`.trim() : "";
+    }
     return actionNodeSubtitle(shape.data ?? {});
   }
   function WorkflowBoard({
@@ -18549,7 +18580,7 @@
         return {
           ...shape,
           label: actionMeta(actionType)?.label ?? actionType,
-          data: { ...defaultNodeData("action"), actionType, fields: defaultFields(actionType) }
+          data: { ...defaultNodeData(), actionType, fields: defaultFields(actionType) }
         };
       }));
       setContextMenu(null);
@@ -19011,7 +19042,10 @@
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
     const [testResult, setTestResult] = reactExports.useState(null);
-    const dirty = reactExports.useMemo(() => JSON.stringify(shapes) !== savedSnapshot, [shapes, savedSnapshot]);
+    const dirty = reactExports.useMemo(
+      () => view === "yaml" ? yamlText !== savedYaml : JSON.stringify(shapes) !== savedSnapshot,
+      [view, yamlText, savedYaml, shapes, savedSnapshot]
+    );
     const refreshGit = reactExports.useCallback(() => {
       if (config.mode !== "local") return;
       api(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -19034,11 +19068,16 @@
       try {
         const data = await api(config, `/workflows/${summary.source}`);
         const workflow = data.workflow;
+        const shapes2 = shapesFromWorkflow(workflow);
+        const yaml2 = workflowYaml(workflow);
         setSourceName(summary.source);
         setWorkflowId(workflow.id);
         setEnabled(workflow.enabled !== false);
-        setShapes(shapesFromWorkflow(workflow));
-        setSavedSnapshot(JSON.stringify(shapesFromWorkflow(workflow)));
+        setShapes(shapes2);
+        setSavedSnapshot(JSON.stringify(shapes2));
+        setBase(workflow);
+        setYamlText(yaml2);
+        setSavedYaml(yaml2);
         setSelectedId(null);
         setStatus({ kind: "idle", message: "" });
         if (config.mode === "console" && !config.embedded) {
@@ -19064,22 +19103,88 @@
       setEnabled(true);
       setShapes([trigger]);
       setSavedSnapshot("[]");
+      setBase(null);
+      setYamlText("");
+      setSavedYaml("");
       setSelectedId(null);
       setStatus({ kind: "idle", message: "" });
     }
+    function parseYamlText(text) {
+      try {
+        const parsed = load(text);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          setStatus({ kind: "error", message: "The YAML must be one object mapping." });
+          return null;
+        }
+        return parsed;
+      } catch (error) {
+        const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+        setStatus({ kind: "error", message: `Invalid YAML: ${message}` });
+        return null;
+      }
+    }
+    function switchView(next) {
+      if (next === view) return;
+      if (next === "yaml") {
+        const built = workflowFromShapes(shapes, workflowId, enabled, base);
+        if (built.lost.length) {
+          const noun = built.lost.length === 1 ? "node is" : "nodes are";
+          setStatus({
+            kind: "error",
+            message: `${built.lost.length} ${noun} not connected to a trigger and would be lost in YAML — connect or delete them first.`
+          });
+          return;
+        }
+        setYamlText(workflowYaml(built.workflow));
+      } else {
+        const parsed = parseYamlText(yamlText);
+        if (!parsed) return;
+        const shapes2 = shapesFromWorkflow(parsed);
+        setShapes(shapes2);
+        setSavedSnapshot(JSON.stringify(shapes2));
+        setBase(parsed);
+        if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
+        setEnabled(parsed.enabled !== false);
+        setSelectedId(null);
+      }
+      setView(next);
+    }
     async function save() {
-      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
-      if (problems.length) {
-        setStatus({ kind: "error", message: problems.join(" ") });
-        return;
+      let yamlOut;
+      let workflow;
+      let nextShapes;
+      if (view === "yaml") {
+        const parsed = parseYamlText(yamlText);
+        if (!parsed) return;
+        workflow = parsed;
+        yamlOut = yamlText;
+        nextShapes = shapesFromWorkflow(parsed);
+      } else {
+        const built = workflowFromShapes(shapes, workflowId, enabled, base);
+        if (built.problems.length) {
+          setStatus({ kind: "error", message: built.problems.join(" ") });
+          return;
+        }
+        workflow = built.workflow;
+        yamlOut = workflowYaml(workflow);
+        nextShapes = shapes;
       }
       setStatus({ kind: "busy", message: "Saving…" });
       try {
         const result = await api(config, "/workflows", {
           method: "PUT",
-          body: JSON.stringify({ yaml: workflowYaml(workflow), renameFrom: sourceName })
+          body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
         });
-        setSavedSnapshot(JSON.stringify(shapes));
+        setBase(workflow);
+        setSavedYaml(yamlOut);
+        if (view === "yaml") {
+          setShapes(nextShapes);
+          setSavedSnapshot(JSON.stringify(nextShapes));
+          setWorkflowId(workflow.id);
+          setEnabled(workflow.enabled !== false);
+        } else {
+          setSavedSnapshot(JSON.stringify(shapes));
+        }
         setSourceName(`${workflow.id}.yaml`);
         if (config.mode === "console" && !config.embedded) {
           history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
@@ -19149,7 +19254,7 @@
       }));
     }
     const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
-    const triggerNode = shapes.find((shape) => shape.data?.nodeKind === "trigger") ?? null;
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
     const selectedInspector = () => {
       if (!selected || selected.type !== "node" || !selected.data) {
         return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-empty", children: [
@@ -19376,6 +19481,28 @@
       /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "view-switch", role: "group", "aria-label": "Editor view", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: view === "canvas" ? "view-option active" : "view-option",
+                  "aria-pressed": view === "canvas",
+                  onClick: () => switchView("canvas"),
+                  children: "Canvas"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: view === "yaml" ? "view-option active" : "view-option",
+                  "aria-pressed": view === "yaml",
+                  onClick: () => switchView("yaml"),
+                  children: "YAML"
+                }
+              )
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -19383,14 +19510,24 @@
                 value: workflowId,
                 "aria-label": "Workflow ID",
                 placeholder: "workflow-id",
+                disabled: view === "yaml",
+                title: view === "yaml" ? "Edit the id in the YAML view" : void 0,
                 onChange: (event) => setWorkflowId(event.target.value)
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "checkbox", checked: enabled, onChange: (event) => setEnabled(event.target.checked) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", title: view === "yaml" ? "Edit enabled in the YAML view" : void 0, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  type: "checkbox",
+                  checked: enabled,
+                  disabled: view === "yaml",
+                  onChange: (event) => setEnabled(event.target.checked)
+                }
+              ),
               "Enabled"
             ] }),
-            triggerNode === null && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Add a trigger node to save." })
+            view === "canvas" && triggerNodes.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Add a trigger node to save." })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-actions", children: [
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
@@ -19415,7 +19552,25 @@
             /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: dirty ? "Save to git" : "Saved" }) })
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", children: [
+        view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor-bar", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "mono-file", children: [
+              "workflows/",
+              sourceName ?? `${workflowId}.yaml`
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "yaml-hint", children: "comments are not preserved on save" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "textarea",
+            {
+              className: "yaml-text",
+              value: yamlText,
+              spellCheck: false,
+              "aria-label": "Workflow YAML",
+              onChange: (event) => setYamlText(event.target.value)
+            }
+          )
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             WorkflowBoard,
             {
@@ -19502,6 +19657,22 @@
       ] })
     ] });
   }
+  function applyStoredTheme() {
+    let theme = null;
+    try {
+      theme = localStorage.getItem("dapier-theme");
+    } catch {
+    }
+    if (theme !== "dark" && theme !== "light") {
+      const applied = document.documentElement.dataset.theme;
+      theme = applied === "dark" || applied === "light" ? applied : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.dataset.theme = theme;
+  }
+  applyStoredTheme();
+  window.addEventListener("storage", (event) => {
+    if (event.key === "dapier-theme" || event.key === null) applyStoredTheme();
+  });
   const root = document.getElementById("designer-root");
   if (root) {
     const embedded = new URLSearchParams(window.location.search).get("embed") === "1";

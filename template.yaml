@@ -245,6 +245,10 @@ Resources:
         DesignerEmbed:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/designer/{proxy+}', Method: GET}
+        # The CLI device-pairing page (dapier auth login).
+        DevicePairing:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /device, Method: GET}
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}

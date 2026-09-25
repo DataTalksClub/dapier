@@ -4,8 +4,8 @@ import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
- * new engine action (see run_* dispatch in src/engine.py), an in-workflow
- * logic step (filter, condition, delay, for_each — executed by
+ * new engine action (see run_* dispatch in src/dapier/engine/__init__.py), an
+ * in-workflow logic step (filter, condition, delay, for_each — executed by
  * src/dapier/engine/logic.py), or trigger connector.
  *
  * Adding an action is one object in `actionCatalog`:
@@ -84,7 +84,7 @@ export interface ConnectorEntry {
  */
 export const logicOperators = ["equals", "in", "prefix", "suffix", "contains"] as const;
 
-/** Mirrors the run_* dispatch in src/engine.py. */
+/** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
   {
     type: "webhook",
