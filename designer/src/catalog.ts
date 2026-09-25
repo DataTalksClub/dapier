@@ -1,4 +1,4 @@
-import { DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Webhook } from "lucide-react";
+import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
@@ -199,6 +199,22 @@ export const actionCatalog: ActionEntry[] = [
       { key: "item", label: "Item variable", default: "item" },
       { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
       { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: "- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: \"/Invoices/{item.filename}\"" }
+    ]
+  },
+  {
+    type: "code",
+    label: "Code (Python)",
+    icon: Code2,
+    description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+    fields: [
+      {
+        key: "code",
+        label: "Python source",
+        type: "textarea",
+        required: true,
+        placeholder: "# event data is `input`; last expression is the result\n{\"route\": input[\"route\"], \"score\": len(input.get(\"body\",\ \"\"))}"
+      },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   }
 ];

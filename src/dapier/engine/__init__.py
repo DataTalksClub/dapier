@@ -16,6 +16,7 @@ from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401
 from .actions.dropbox import run_dropbox_delete, run_dropbox_upload  # noqa: F401
 from .actions.render import run_render_job  # noqa: F401
+from .actions.code import run_code  # noqa: F401
 from .logic import run_chain
 
 
@@ -38,6 +39,8 @@ def _run_connector(action, event, workflow_id, steps=None):
         return run_dropbox_delete(action, event)
     if action["type"] == "render_html_to_pdf":
         return run_render_job(action, event, workflow_id)
+    if action["type"] == "code":
+        return run_code(action, event)
     raise ValueError(f"unsupported action: {action['type']}")
 
 

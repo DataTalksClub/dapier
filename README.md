@@ -246,7 +246,7 @@ description, and one or more actions, e.g.:
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
 `telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
-`render_html_to_pdf`). Text fields accept `{field}` templates from the
+`render_html_to_pdf`, `code`). Text fields accept `{field}` templates from the
 triggering event; `{trigger.field}` reaches the same data (plus envelope
 scalars like `trigger.connector` and `trigger.occurred_at`), and
 `{steps.<action_id>.output.<path>}` / `{steps.<action_id>.status}` reference an
