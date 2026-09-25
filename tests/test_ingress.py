@@ -195,6 +195,21 @@ def test_every_nav_link_has_an_api_gateway_route():
     index = ingress._static("/")
     for path in re.findall(r'class="nav-item[^"]*" href="([^"]+)"', index["body"]):
         assert (path, "GET") in routes, f"API Gateway has no route for {path}"
+    proxy_prefixes = [
+        path[: -len("{proxy+}")]
+        for (path, _method) in routes
+        if path.endswith("{proxy+}")
+    ]
+
+    def covered(path):
+        return (path, "GET") in routes or any(path.startswith(prefix) for prefix in proxy_prefixes)
+
+    assets = set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', index["body"]))
+    assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer")["body"]))
+    assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/fonts/IBMPlexSans-VF.woff2"}
+    assert len(assets) >= 8, assets
+    for path in assets:
+        assert covered(path), f"API Gateway has no route for {path}"
 
 
 def test_console_assets_are_self_hosted():

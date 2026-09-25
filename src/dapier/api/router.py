@@ -58,6 +58,7 @@ def _static(path):
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
+        "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),
         "/assets/fonts/IBMPlexSans-VF.woff2": ("assets/fonts/IBMPlexSans-VF.woff2", "font/woff2"),
         "/assets/fonts/IBMPlexMono-Regular.woff2": ("assets/fonts/IBMPlexMono-Regular.woff2", "font/woff2"),
         "/assets/fonts/IBMPlexMono-Medium.woff2": ("assets/fonts/IBMPlexMono-Medium.woff2", "font/woff2"),
