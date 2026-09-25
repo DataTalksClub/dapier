@@ -204,8 +204,8 @@ def test_token_success_returns_no_secrets(monkeypatch):
 
 
 def test_token_binding_conflict_is_409_and_refresh_failure_502(monkeypatch):
-    from src.connections import BindingError
-    from src.tokens import TokenError
+    from src.dapier.connections.records import BindingError
+    from src.dapier.connections.tokens import TokenError
 
     configure(monkeypatch, claims={"sub": "subject-1"},
               connections={"youtube-personal": CONNECTION},

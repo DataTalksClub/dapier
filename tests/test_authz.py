@@ -115,7 +115,7 @@ def test_overview_allows_operator(monkeypatch, tmp_path):
         "credentials": DictTable(("credential_id",)),
         "api-tokens": DictTable(("token_hash",)),
     })
-    from src import credentials as credentials_module
+    from src.dapier.connections import credentials as credentials_module
 
     monkeypatch.setattr(credentials_module.boto3, "resource", boto3.resource)
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
