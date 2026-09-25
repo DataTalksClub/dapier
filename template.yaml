@@ -208,24 +208,14 @@ Resources:
         ConsoleRuns:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}
-        AppCss:
+        # One greedy route for every static asset; the console Lambda's
+        # allowlist (router._static) decides what is actually served.
+        ConsoleAssets:
           Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /assets/app.css, Method: GET}
-        AppJs:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /assets/app.js, Method: GET}
-        LucideJs:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /assets/lucide.min.js, Method: GET}
+          Properties: {ApiId: !Ref Api, Path: '/assets/{proxy+}', Method: GET}
         DesignerView:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /designer, Method: GET}
-        DesignerJs:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /assets/designer.js, Method: GET}
-        DesignerCss:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /assets/designer.css, Method: GET}
         AdminApi:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/api/admin/{proxy+}', Method: ANY}
