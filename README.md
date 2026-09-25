@@ -242,7 +242,16 @@ description, and one or more actions, e.g.:
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
 `telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
 `render_html_to_pdf`). Text fields accept `{field}` templates from the
-triggering event; `email_send` sends through SES from the configured sender
+triggering event; `{trigger.field}` reaches the same data (plus envelope
+scalars like `trigger.connector` and `trigger.occurred_at`), and
+`{steps.<action_id>.output.<path>}` / `{steps.<action_id>.status}` reference an
+earlier step in the same run. A `|` pipes the value through formatters —
+`trim`, `lower`, `upper`, `slice:start:end`, `replace:old:new`,
+`regex_extract:pattern`, `round:digits`, `format:spec` (number),
+`date_format:strftime`, `date_offset:1d|-2h` — e.g.
+`{trigger.subject | trim | upper}`. Missing values render as empty; unknown
+formatters are rejected when the workflow or trigger is saved.
+`email_send` sends through SES from the configured sender
 (the `EmailSender` deployment parameter, default `no-reply@` the trigger
 domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already

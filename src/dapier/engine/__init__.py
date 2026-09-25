@@ -32,25 +32,32 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
     step duration, and ``on_action_error`` gets the duration of the failed
     attempt. Runners return a small JSON-safe dict describing what happened
     (message ids, paths, HTTP statuses) — it lands on the run record.
+
+    Step outputs accumulate per workflow run in a ``steps`` mapping shaped
+    like the run history (``{action_id: {"status": ..., "output": ...}}``);
+    the templating runners receive it so later steps can reference earlier
+    ones: ``{steps.<action_id>.output.<path>}``, ``{steps.<action_id>.status}``.
     """
     for workflow in all_workflows():
         if matches(workflow, event):
+            steps = {}
             for index, action in enumerate(workflow.get("actions", [])):
                 action_id = action.get("id", str(index))
                 if before_action and not before_action(
                     workflow["id"], action_id, event, action.get("type"),
                 ):
+                    steps[action_id] = {"status": "skipped"}
                     continue
                 started = time.monotonic()
                 try:
                     if action["type"] == "webhook":
                         output = run_webhook(action, event)
                     elif action["type"] == "slack":
-                        output = run_slack(action, event)
+                        output = run_slack(action, event, steps=steps)
                     elif action["type"] == "telegram_send":
-                        output = run_telegram_send(action, event)
+                        output = run_telegram_send(action, event, steps=steps)
                     elif action["type"] == "email_send":
-                        output = run_email_send(action, event)
+                        output = run_email_send(action, event, steps=steps)
                     elif action["type"] == "dataops":
                         output = run_dataops(action, event)
                     elif action["type"] == "dropbox_upload":
@@ -66,6 +73,7 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         on_action_error(workflow["id"], action_id, event, exc,
                                         duration_ms=_elapsed(started))
                     raise
+                steps[action_id] = {"status": "completed", "output": output or {}}
                 if after_action:
                     after_action(workflow["id"], action_id, event,
                                  output=output or {}, duration_ms=_elapsed(started))

@@ -2,10 +2,12 @@
 import os
 
 from . import base
+from .templating import render
 
 
-def run_email_send(action, event, *, ses=None):
-    """Send an email through SES, with {field} templates filled from the event.
+def run_email_send(action, event, *, ses=None, steps=None):
+    """Send an email through SES, with {field} templates filled from the event
+    (plus {trigger.*} and {steps.*} — see templating).
 
     The sender defaults to the configured workflow sender and then to the
     trigger domain's no-reply address; a per-action sender only works when SES
@@ -17,17 +19,15 @@ def run_email_send(action, event, *, ses=None):
         ses = boto3.client("ses")
     from ...triggers.email_triggers import trigger_domain
 
-    data = event.get("data", {})
-    fields = data if isinstance(data, dict) else {}
-    to = str(action.get("to") or "").format_map(base._SafeFormat(fields))
+    to = render(action.get("to") or "", event, steps)
     addresses = [address.strip() for address in to.split(",") if address.strip()]
     if not addresses:
         raise ValueError("email_send needs a to address (literal or a {field} template)")
-    text = str(action.get("text") or "").format_map(base._SafeFormat(fields))
-    html = str(action.get("html") or "").format_map(base._SafeFormat(fields))
+    text = render(action.get("text") or "", event, steps)
+    html = render(action.get("html") or "", event, steps)
     if not text and not html:
         raise ValueError("email_send needs text or html")
-    subject = str(action.get("subject") or "(no subject)").format_map(base._SafeFormat(fields))
+    subject = render(action.get("subject") or "(no subject)", event, steps)
     sender = (action.get("sender") or os.environ.get("DAPIER_EMAIL_SENDER")
               or f"no-reply@{trigger_domain()}")
     body = {}
