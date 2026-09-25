@@ -2,8 +2,10 @@ import json
 import unittest
 
 import boto3
+import pytest
 from botocore.exceptions import ClientError
 
+from src.dapier.engine import notify
 from src.dapier.engine import worker
 from src.dapier.engine.worker import normalize_payload
 
@@ -185,6 +187,129 @@ class NormalizeTests(unittest.TestCase):
     def test_rejects_unsupported_inbound_email_contract_version(self):
         with self.assertRaisesRegex(ValueError, "unsupported inbound-email contract version"):
             normalize_payload({"contract": "inbound-email", "version": 2})
+
+
+class FakeSes:
+    def __init__(self):
+        self.calls = []
+
+    def send_email(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"MessageId": "ses-1"}
+
+
+def test_notify_failure_emails_the_workflow_notify_list(monkeypatch):
+    import src.dapier.engine.matching as matching
+
+    calls = []
+    _patch_table(monkeypatch, calls)
+    monkeypatch.setattr(matching, "all_workflows",
+                        lambda: [{"id": "wf-1", "notify": ["ops@example.test", "  ", "lead@example.test"]}])
+    ses = FakeSes()
+    exc = ValueError("Slack rejected message")
+    exc.dapier_workflow = "wf-1"
+    event = {"id": "evt-1", "connector": "email", "event": "message.received"}
+
+    result = notify.notify_failure(exc, event, ses=ses)
+
+    assert result["run_id"] == "wf-1:evt-1"
+    sent = ses.calls[0]
+    assert sent["Destination"]["ToAddresses"] == ["ops@example.test", "lead@example.test"]
+    assert sent["Source"]
+    assert "Run failed" in sent["Message"]["Subject"]["Data"]
+    body = sent["Message"]["Body"]["Text"]["Data"]
+    assert "workflow: wf-1" in body
+    assert "run: wf-1:evt-1" in body
+    assert "failing step error: Slack rejected message" in body
+    item = calls[0][1]["Item"]
+    assert item["execution_id"] == "wf-1:failure-notice:evt-1"
+    assert item["run_id"] == "wf-1:evt-1#notice"
+    assert item["kind"] == "failure-notice"
+    assert item["status"] == "notified"
+
+
+def test_notify_failure_skips_workflows_without_notify(monkeypatch):
+    import src.dapier.engine.matching as matching
+
+    calls = []
+    _patch_table(monkeypatch, calls)
+    monkeypatch.setattr(matching, "all_workflows", lambda: [{"id": "wf-1"}])
+    ses = FakeSes()
+    exc = ValueError("boom")
+    exc.dapier_workflow = "wf-1"
+
+    assert notify.notify_failure(exc, {"id": "evt-1"}, ses=ses) is None
+    assert ses.calls == []
+    assert calls == []
+
+
+def test_notify_failure_sends_at_most_once_per_run(monkeypatch):
+    import src.dapier.engine.matching as matching
+
+    calls = []
+    conflict = ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
+    _patch_table(monkeypatch, calls, put_raises=conflict)
+    monkeypatch.setattr(matching, "all_workflows",
+                        lambda: [{"id": "wf-1", "notify": ["ops@example.test"]}])
+    ses = FakeSes()
+    exc = ValueError("boom")
+    exc.dapier_workflow = "wf-1"
+
+    assert notify.notify_failure(exc, {"id": "evt-1"}, ses=ses) is None
+    assert ses.calls == []
+
+
+def test_notify_failure_ignores_untagged_errors_and_missing_payloads(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    assert notify.notify_failure(ValueError("boom"), {"id": "evt-1"}, ses=FakeSes()) is None
+    tagged = ValueError("boom")
+    tagged.dapier_workflow = "wf-1"
+    assert notify.notify_failure(tagged, None, ses=FakeSes()) is None
+
+
+def test_handler_notifies_on_failed_queue_records(monkeypatch):
+    notified = []
+    monkeypatch.setattr(worker, "notify_failure", lambda exc, event: notified.append(event))
+
+    def boom(payload, **hooks):
+        exc = ValueError("boom")
+        exc.dapier_workflow = "wf-1"
+        raise exc
+
+    monkeypatch.setattr(worker, "execute", boom)
+    event = {"Records": [{"messageId": "m1",
+                          "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
+
+    result = worker.handler(event, None)
+
+    assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
+    assert notified == [{"id": "evt-1", "connector": "email"}]
+
+
+def test_handler_skips_notifications_when_the_payload_never_parses(monkeypatch):
+    notified = []
+    monkeypatch.setattr(worker, "notify_failure", lambda exc, event: notified.append(event))
+    monkeypatch.setattr(worker, "execute", lambda payload, **hooks: None)
+    event = {"Records": [{"messageId": "m1", "body": "not json"}]}
+
+    result = worker.handler(event, None)
+
+    assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
+    assert notified == [None]
+
+
+def test_handler_notifies_and_reraises_for_failed_schedule_triggers(monkeypatch):
+    notified = []
+    monkeypatch.setattr(worker, "notify_failure", lambda exc, event: notified.append(event))
+    monkeypatch.setattr(worker, "execute", lambda payload, **hooks: (_ for _ in ()).throw(ValueError("boom")))
+
+    with pytest.raises(ValueError):
+        worker.handler({"trigger": "schedule", "schedule_id": "nightly"}, None)
+
+    assert len(notified) == 1
+    assert notified[0]["data"]["schedule"] == "nightly"
+
 
 
 if __name__ == "__main__":

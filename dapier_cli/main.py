@@ -87,6 +87,8 @@ def build_parser():
     runs_list_p.add_argument("--limit", type=int, default=25)
     runs_show_p = runs_sub.add_parser("show", help="Show one run's step-by-step flow")
     runs_show_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+    runs_replay_p = runs_sub.add_parser("replay", help="Re-run a past run by re-injecting its original trigger event")
+    runs_replay_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
 
     oac_p = sub.add_parser("oauth-clients", help="Shared OAuth clients per provider (same as the console's Credentials view)")
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
@@ -349,6 +351,8 @@ def cmd_runs(args, api_url, debug):
         return commands.runs_list(api_url, args.limit, debug)
     if args.command == "show":
         return commands.runs_show(api_url, args.run_id, debug)
+    if args.command == "replay":
+        return commands.runs_replay(api_url, args.run_id, debug)
     return 2
 
 

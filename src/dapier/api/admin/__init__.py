@@ -40,6 +40,9 @@ def route(event, method, path):
         return overview.overview()
     if method == "GET" and path == "/api/admin/runs":
         return routes.list_runs(event)
+    run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
+    if method == "POST" and run_replay_match:
+        return routes.replay_run(unquote(run_replay_match.group(1)), operator_subject)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)))
@@ -121,6 +124,7 @@ from .routes import (  # noqa: F401
     list_schedule_triggers,
     oauth_clients_view,
     revoke_api_token,
+    replay_run,
     revoke_connection_tokens,
     save_connection,
     save_credential,

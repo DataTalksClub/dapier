@@ -1,6 +1,15 @@
 """Run history: one run per workflow handling of a trigger event, with the
-per-step flow (status, input, output, duration, error) between elements."""
+per-step flow (status, input, output, duration, error) between elements.
+
+Replay re-injects a past run's original trigger event onto the event queue —
+the same dispatch path every hook and custom event takes — so the rerun
+lands in run history exactly like a normal run, for failed runs (retry) and
+successful ones (replay) alike.
+"""
+import json
 import os
+import uuid
+from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -91,11 +100,15 @@ def recent(limit=25):
     """The most recent runs, newest first.
 
     A single bounded scan groups into runs; runs older than the scan window
-    age out of the list but stay reachable through api_get.
+    age out of the list but stay reachable through api_get. Failure-notice
+    bookkeeping items (written by the worker's notification path) never
+    group into the list.
     """
     items = _table().scan(Limit=max(limit * 6, 150)).get("Items", [])
     grouped = {}
     for item in items:
+        if item.get("kind") == "failure-notice":
+            continue
         grouped.setdefault(run_id_of(item), []).append(item)
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     runs.sort(key=lambda run: run.get("started_at") or "", reverse=True)
@@ -131,4 +144,75 @@ def api_get(run_id):
     return 200, {
         "run": run_summary(run_id, items),
         "steps": [_step_view(item) for item in items],
+    }
+
+
+def replay_event(run_id, steps):
+    """Rebuild the original trigger envelope from a run's stored steps.
+
+    Every step of a run records the same event data as its input, so the
+    first step with data carries the trigger. The replay gets a fresh event
+    id (a fresh run in history) while ``correlation_id`` keeps the original
+    event id, tying the rerun to the run it came from.
+
+    Returns ``(event, None)``, or ``(None, error)`` when the stored steps
+    cannot be replayed.
+    """
+    original_event_id = run_id.split(":", 1)[1] if ":" in run_id else run_id
+    first = next(
+        (step for step in steps if step.get("input") not in (None, "", {}, [])),
+        None,
+    )
+    if first is None:
+        return None, "This run's event data was not recorded; it cannot be replayed"
+    data = first.get("input")
+    if isinstance(data, dict) and data.get("truncated"):
+        return None, "The original event data was too large to store; it cannot be replayed"
+    event_id = f"replay-{uuid.uuid4()}"
+    return {
+        "schema_version": "1.0",
+        "id": event_id,
+        "correlation_id": original_event_id,
+        "connector": first.get("connector"),
+        "event": first.get("event_type"),
+        "source": first.get("connector"),
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "data": data if isinstance(data, dict) else {},
+    }, None
+
+
+def _queue():
+    import boto3
+
+    return boto3.client("sqs")
+
+
+def api_replay(run_id, *, queue=None):
+    """Re-execute a past run by re-injecting its original trigger event.
+
+    The rebuilt envelope is published to the event queue, so the worker
+    picks it up through the normal path: workflows are matched afresh and
+    the rerun is recorded in run history like any other run. Asynchronous,
+    hence 202; the response projects the replayed run's id from the
+    original run's workflow.
+    """
+    run_id = str(run_id or "").strip()
+    if not run_id:
+        return 400, {"error": "run_id is required"}
+    status, payload = api_get(run_id)
+    if status != 200:
+        return status, payload
+    event, error = replay_event(run_id, payload.get("steps") or [])
+    if error:
+        return 409, {"error": error}
+    (queue or _queue()).send_message(
+        QueueUrl=os.environ["EVENT_QUEUE_URL"],
+        MessageBody=json.dumps(event),
+    )
+    workflow_id = (payload.get("run") or {}).get("workflow_id") or run_id.split(":", 1)[0]
+    return 202, {
+        "accepted": True,
+        "replayed_from": run_id,
+        "event_id": event["id"],
+        "run_id": f"{workflow_id}:{event['id']}",
     }

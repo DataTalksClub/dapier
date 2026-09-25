@@ -641,6 +641,14 @@ def runs_show(api_url, run_id, debug=False):
     return 0
 
 
+def runs_replay(api_url, run_id, debug=False):
+    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/replay", body={}, debug=debug)
+    print(f"Replay accepted for {data.get('replayed_from') or run_id}.")
+    print(f"The re-injected run ({data.get('run_id') or 'pending'}) appears in `dapier runs list` "
+          "once the worker picks it up.")
+    return 0
+
+
 def print_oauth_clients(items):
     print(f"{'PROVIDER':12} {'CLIENT ID':46} {'SOURCE':8} CONFIGURED")
     for item in items:

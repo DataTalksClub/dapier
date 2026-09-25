@@ -325,6 +325,9 @@ def route(event, method, path):
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
     if runs_match and method == "GET":
         return runs_api(event, run_id=unquote(runs_match.group(1)))
+    runs_replay_match = re.fullmatch(r"/api/agent/runs/([^/]+)/replay", path)
+    if runs_replay_match and method == "POST":
+        return runs_replay_api(event, unquote(runs_replay_match.group(1)))
     if path == "/api/agent/oauth-clients" and method == "GET":
         return oauth_clients_view(event)
     oauth_client_match = re.fullmatch(r"/api/agent/oauth-clients/([a-z]+)", path)
@@ -575,6 +578,22 @@ def runs_api(event, run_id=None):
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(query.get("limit", 25))
+    return _no_store(_json_response(status, payload))
+
+
+def runs_replay_api(event, run_id):
+    """Operator-only run replay, mirroring the console's replay button.
+
+    Re-injects the run's original trigger event onto the event queue; the
+    worker re-executes it and the rerun lands in run history like a normal
+    run.
+    """
+    subject, error = require_operator(event, "runs")
+    if error:
+        return error
+    status, payload = runs.api_replay(run_id)
+    if status == 202:
+        audit.emit(run_id, "runs.replay", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 

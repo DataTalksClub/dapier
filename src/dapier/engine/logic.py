@@ -185,6 +185,9 @@ def _run_step(workflow_id, step, index, event, run_action, *,
             step_outputs=step_outputs,
         )
     except Exception as exc:
+        # Tag the failing workflow for the worker's failure
+        # notifications (see engine.notify).
+        exc.dapier_workflow = workflow_id
         if on_action_error:
             on_action_error(workflow_id, action_id, event, exc, duration_ms=_elapsed(started))
         raise

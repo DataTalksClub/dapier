@@ -101,6 +101,8 @@ export async function openRun(runId) {
       ${statusLine(run.status)}
       <code>${wrapTokens(run.run_id || runId)}</code>
       ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
+      <button class="button secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+        title="Re-inject this run's original trigger event">Replay</button>
     </div>
     ${flow(data)}`;
   icons();

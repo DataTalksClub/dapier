@@ -898,3 +898,41 @@ def test_runs_show_prints_the_step_flow(isolated_home, monkeypatch, capsys):
     assert "step[2]: notify (slack)  failed  340ms" in out
     assert "error: Slack rejected message" in out
     assert '{"status": 200}' in out
+
+
+def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"accepted": True, "replayed_from": "wf-1:evt-1",
+                "event_id": "replay-abc", "run_id": "wf-1:replay-abc"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "replay", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out
+    assert "wf-1:replay-abc" in out
+
+
+def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"accepted": True, "replayed_from": "wf-1:evt-1",
+                "event_id": "replay-abc", "run_id": "wf-1:replay-abc"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "replay", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out
+    assert "wf-1:replay-abc" in out
