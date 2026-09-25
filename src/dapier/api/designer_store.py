@@ -325,6 +325,12 @@ def parse_workflow(yaml_text):
             templating.validate_action(action)
         except templating.TemplateError as exc:
             raise WorkflowError(f"action '{action.get('type')}': {exc}") from exc
+        from ..engine.actions import templating
+
+        try:
+            templating.validate_action(action)
+        except templating.TemplateError as exc:
+            raise WorkflowError(f"action '{action.get('type')}': {exc}") from exc
     _validate_steps(actions)
     return workflow
 

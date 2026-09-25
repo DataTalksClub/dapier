@@ -138,17 +138,21 @@ def _rendered(context, path):
 
 def run_chain(workflow_id, steps, event, run_action, *,
               before_action=None, after_action=None, on_action_error=None,
-              prefix="", scope=None):
+              prefix="", scope=None, step_outputs=None):
     """Run a chain of steps in order.
 
     ``run_action`` dispatches connector actions as ``run_action(step, event,
-    workflow_id)``; logic steps are handled here.
+    workflow_id, steps=...)`` — ``steps`` is the run's accumulated step
+    outputs (``{action_id: {"status": ..., "output": ...}}``), so templating
+    runners can reference earlier ones; logic steps are handled here.
     Sub-chains (condition branches, loop bodies) recurse into run_chain, so
     every nested step gets the same telemetry hooks and ids. ``scope`` is the
     data predicates evaluate against (loop bodies bind ``{item}`` into it);
     it defaults to the event data. Returns why the chain stopped early
     (``"filtered"``) or None when it ran to the end.
     """
+    if step_outputs is None:
+        step_outputs = {}
     for index, step in enumerate(steps):
         if not isinstance(step, dict) or not str(step.get("type") or "").strip():
             raise ValueError(f"step {index} needs a type")
@@ -156,6 +160,7 @@ def run_chain(workflow_id, steps, event, run_action, *,
             workflow_id, step, index, event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, prefix=prefix, scope=scope,
+            step_outputs=step_outputs,
         )
         if stop:
             return stop
@@ -163,9 +168,13 @@ def run_chain(workflow_id, steps, event, run_action, *,
 
 
 def _run_step(workflow_id, step, index, event, run_action, *,
-              before_action, after_action, on_action_error, prefix, scope=None):
+              before_action, after_action, on_action_error, prefix, scope=None,
+              step_outputs=None):
+    if step_outputs is None:
+        step_outputs = {}
     action_id = _step_id(prefix, step, index)
     if before_action and not before_action(workflow_id, action_id, event, step.get("type")):
+        step_outputs[action_id] = {"status": "skipped"}
         return None
     started = time.monotonic()
     try:
@@ -173,11 +182,13 @@ def _run_step(workflow_id, step, index, event, run_action, *,
             workflow_id, action_id, step, event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, scope=scope,
+            step_outputs=step_outputs,
         )
     except Exception as exc:
         if on_action_error:
             on_action_error(workflow_id, action_id, event, exc, duration_ms=_elapsed(started))
         raise
+    step_outputs[action_id] = {"status": status, "output": output or {}}
     if after_action:
         after_action(workflow_id, action_id, event, output=output or {},
                      duration_ms=_elapsed(started), status=status)
@@ -185,7 +196,8 @@ def _run_step(workflow_id, step, index, event, run_action, *,
 
 
 def _execute_step(workflow_id, action_id, step, event, run_action, *,
-                  before_action, after_action, on_action_error, scope=None):
+                  before_action, after_action, on_action_error, scope=None,
+                  step_outputs=None):
     """One step: returns (stop reason, output summary, run-history status)."""
     step_type = str(step.get("type"))
     if step_type == "filter":
@@ -195,6 +207,7 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
             workflow_id, action_id, step, event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, scope=scope,
+            step_outputs=step_outputs,
         )
     if step_type == "delay":
         return _run_delay(step)
@@ -203,8 +216,9 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
             workflow_id, action_id, step, event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, scope=scope,
+            step_outputs=step_outputs,
         )
-    return None, run_action(step, event, workflow_id) or {}, "completed"
+    return None, run_action(step, event, workflow_id, steps=step_outputs) or {}, "completed"
 
 
 def _predicate_scope(event, scope):
@@ -224,7 +238,8 @@ def _run_filter(step, data):
 
 
 def _run_condition(workflow_id, action_id, step, event, run_action, *,
-                   before_action, after_action, on_action_error, scope=None):
+                   before_action, after_action, on_action_error, scope=None,
+                   step_outputs=None):
     rules = predicate_rules(step)
     if rules is None:
         raise ValueError(f"condition '{step.get('id', '')}' needs a when mapping or a field")
@@ -237,7 +252,7 @@ def _run_condition(workflow_id, action_id, step, event, run_action, *,
         workflow_id, steps, event, run_action,
         before_action=before_action, after_action=after_action,
         on_action_error=on_action_error, prefix=f"{action_id}.{branch}",
-        scope=scope,
+        scope=scope, step_outputs=step_outputs,
     )
     return stop, {"condition": "passed" if passed else "failed",
                   "branch": branch, "steps": len(steps)}, "completed"
@@ -255,10 +270,11 @@ def _run_delay(step):
 
 
 def _run_for_each(workflow_id, action_id, step, event, run_action, *,
-                  before_action, after_action, on_action_error, scope=None):
+                  before_action, after_action, on_action_error, scope=None,
+                  step_outputs=None):
     label = step.get("id", "")
-    steps = step.get("actions")
-    if not isinstance(steps, list) or not steps:
+    body = step.get("actions")
+    if not isinstance(body, list) or not body:
         raise ValueError(f"for_each '{label}' needs at least one step in actions")
     path = str(step.get("list") or "").strip().strip("{}").strip()
     if not path:
@@ -277,10 +293,10 @@ def _run_for_each(workflow_id, action_id, step, event, run_action, *,
     for position, item in enumerate(items[:cap]):
         child_scope = {**base, item_var: item, f"{item_var}_index": position}
         stop = run_chain(
-            workflow_id, render_value(steps, child_scope), event, run_action,
+            workflow_id, render_value(body, child_scope), event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, prefix=f"{action_id}[{position}]",
-            scope=child_scope,
+            scope=child_scope, step_outputs=step_outputs,
         )
         iterated += 1
         # A filter inside the body skips just this iteration; the loop goes on.
