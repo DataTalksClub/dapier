@@ -119,7 +119,7 @@ def test_execute_runs_the_chain_through_the_real_engine(monkeypatch):
         calls.append(("dataops", action["id"]))
         return {"accepted": True}
 
-    def fake_slack(action, event):
+    def fake_slack(action, event, steps=None):
         calls.append(("slack", action["channel"], event["data"]["title"]))
         return {"ok": True, "ts": "1"}
 
@@ -312,7 +312,7 @@ def test_agent_test_dry_run_and_execute_over_bearer(operator_bearer, monkeypatch
     assert payload["ok"] is True
 
     monkeypatch.setattr(engine, "run_dataops", lambda action, event: {"accepted": True})
-    monkeypatch.setattr(engine, "run_slack", lambda action, event: {"ok": True, "ts": "9"})
+    monkeypatch.setattr(engine, "run_slack", lambda action, event, steps=None: {"ok": True, "ts": "9"})
     live = agent_api.route(
         agent_request({"event": SAMPLE, "workflow": draft, "execute": True}),
         "POST", "/api/agent/designer/workflows/test",
