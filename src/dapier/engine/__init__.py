@@ -18,6 +18,7 @@ from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401
 from .actions.dropbox import run_dropbox_delete, run_dropbox_upload  # noqa: F401
 from .actions.render import run_render_job  # noqa: F401
+from .actions.code import run_code  # noqa: F401
 
 
 def _elapsed(started):
@@ -59,6 +60,8 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                         output = run_dropbox_delete(action, event)
                     elif action["type"] == "render_html_to_pdf":
                         output = run_render_job(action, event, workflow["id"])
+                    elif action["type"] == "code":
+                        output = run_code(action, event)
                     else:
                         raise ValueError(f"unsupported action: {action['type']}")
                 except Exception as exc:

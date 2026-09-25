@@ -314,6 +314,8 @@ def parse_workflow(yaml_text):
     for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():
             raise WorkflowError("every action needs a type")
+        if action.get("type") == "code" and not str(action.get("code") or "").strip():
+            raise WorkflowError("every code action needs non-empty code")
     return workflow
 
 

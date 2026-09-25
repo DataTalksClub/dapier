@@ -1,4 +1,4 @@
-import { DatabaseZap, FileText, Webhook } from "lucide-react";
+import { Code2, DatabaseZap, FileText, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
@@ -146,6 +146,22 @@ export const actionCatalog: ActionEntry[] = [
       { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
       { key: "page_format", label: "PDF page format", group: "pdf", default: "A4" },
       { key: "print_background", label: "Print background", group: "pdf", type: "boolean", default: "true" }
+    ]
+  },
+  {
+    type: "code",
+    label: "Code (Python)",
+    icon: Code2,
+    description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+    fields: [
+      {
+        key: "code",
+        label: "Python source",
+        type: "textarea",
+        required: true,
+        placeholder: "# event data is `input`; last expression is the result\n{\"route\": input[\"route\"], \"score\": len(input.get(\"body\", \"\"))}"
+      },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   }
 ];

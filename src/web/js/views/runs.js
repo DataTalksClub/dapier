@@ -14,6 +14,7 @@ const STEP_ICONS = {
   dropbox_upload: 'cloud-upload',
   dropbox_delete: 'trash-2',
   render_html_to_pdf: 'file-text',
+  code: 'code-2',
 };
 
 function triggerLabel(run) {

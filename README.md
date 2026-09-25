@@ -241,12 +241,19 @@ description, and one or more actions, e.g.:
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
 `telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
-`render_html_to_pdf`). Text fields accept `{field}` templates from the
+`render_html_to_pdf`, `code`). Text fields accept `{field}` templates from the
 triggering event; `email_send` sends through SES from the configured sender
 (the `EmailSender` deployment parameter, default `no-reply@` the trigger
 domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already
-claimed by YAML workflows cannot be shadowed.
+claimed by YAML workflows cannot be shadowed. The `code` action runs a
+sandboxed Python snippet over the event's data (bound to `input` in the
+snippet); its last expression (or an `output` variable) becomes the step
+result and anything it prints is captured. Imports are limited to a safe
+allowlist (`base64`, `collections`, `datetime`, `decimal`, `hashlib`,
+`itertools`, `json`, `math`, `random`, `re`, `statistics`, `string`, `time`,
+`uuid`), the snippet fails after `timeout_seconds` (default 5), and its
+result/stdout are size-capped for run history.
 
 ### Webhook, Telegram, and schedule triggers
 

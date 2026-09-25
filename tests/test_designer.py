@@ -71,6 +71,9 @@ def test_parse_workflow_accepts_known_and_unknown_actions():
     ("id: x\ntrigger: {connector: email, event: e}\n", "at least one action"),
     ("id: x\ntrigger: {connector: email, event: e}\nactions: [just-a-string]\n", "needs a type"),
     ("id: x\ntrigger: {connector: email, event: e}\nactions: [{type: ''}]\n", "needs a type"),
+    ("id: x\ntrigger: {connector: email, event: e}\nactions: [{type: code}]\n", "non-empty code"),
+    ("id: x\ntrigger: {connector: email, event: e}\nactions: [{type: code, code: ''}]\n", "non-empty code"),
+    ("id: x\ntrigger: {connector: email, event: e}\nactions: [{type: code, code: '   '}]\n", "non-empty code"),
     ("id: x\ntrigger: {connector: [nope, event: e}\nactions: []\n", "invalid YAML"),
 ])
 def test_parse_workflow_rejects_invalid_definitions(yaml_text, fragment):
@@ -81,6 +84,20 @@ def test_parse_workflow_rejects_invalid_definitions(yaml_text, fragment):
 def test_parse_workflow_rejects_oversized_yaml():
     with pytest.raises(designer_store.WorkflowError, match="too large"):
         designer_store.parse_workflow("id: x\n# " + "x" * (designer_store.MAX_YAML_BYTES + 10))
+
+
+def test_parse_workflow_accepts_a_code_action_with_source():
+    workflow = designer_store.parse_workflow(
+        "id: coder\n"
+        "trigger: {connector: email, event: message.received}\n"
+        "actions:\n"
+        "  - id: shape\n"
+        "    type: code\n"
+        "    code: |\n"
+        "      {'route': input['route']}\n")
+    action = workflow["actions"][0]
+    assert action["type"] == "code"
+    assert "route" in action["code"]
 
 
 def test_parse_workflow_accepts_triggers_list_and_flow_reference(tmp_path, monkeypatch):
