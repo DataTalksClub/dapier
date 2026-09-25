@@ -41,11 +41,15 @@ modules inside Dapier are welcome so `src/admin.py` does not grow indefinitely.
 1. Human operators use DTC shared auth. Keep the existing web OIDC flow. Add
    an explicit operator authorization check after authentication; a valid DTC
    account alone does not grant credential administration.
-2. The CLI uses the same DTC issuer with an authorization-code + PKCE flow and
-   a loopback callback. Register a dedicated public/native CLI client and its
-   allowed localhost redirect URIs in the shared-auth stack. Do not copy a web
-   session cookie or store a DTC password in the CLI. Verify issuer, audience,
-   nonce/state, expiry, and the operator's subject on the Dapier API.
+2. The CLI uses the same DTC issuer. Default: device pairing — the CLI shows
+   a code, the operator approves it on the dapier `/device` page after DTC
+   sign-in, and the API issues a revocable, rotating device session that
+   authenticates as the operator's stable subject (Cognito has no native
+   RFC 8628 grant). Alternative: authorization-code + PKCE with a loopback
+   callback and a dedicated public/native CLI client registered in the
+   shared-auth stack. Neither flow copies a web session cookie or stores a
+   DTC password in the CLI. The API verifies the operator's subject and
+   expiry on every call.
 3. Store connection grants keyed by stable DTC subject and agent identity, with
    explicit connection ID and allowed operation (`use`, `connect`, `admin`).
    Deny by default. A caller cannot name an arbitrary agent to gain its grants.

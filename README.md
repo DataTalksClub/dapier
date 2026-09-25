@@ -192,10 +192,15 @@ sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatal
 # stable Cognito subjects work too: OperatorSubjects="Google_123,..."
 ```
 
-Install the operator CLI from this repo and sign in with the same DTC identity
-(the CLI opens a browser and receives the callback at `http://localhost:8471/
-callback`, which the shared-auth stack registers for its `dapier-cli` client;
-the API publishes the client ID at `/api/agent/config`):
+Install the operator CLI from this repo and sign in with the same DTC identity.
+`dapier auth login` pairs the device: it prints a short code and opens
+`https://dapier.dtcdev.click/device`, where you enter the code after signing in
+through DTC (GitHub-style device flow — no localhost listener). Approving
+issues the CLI a dapier-issued device session that acts as your DTC subject;
+it rotates on every refresh and `dapier auth logout` revokes it server-side.
+`dapier auth login --browser` uses the classic loopback flow instead (the
+shared-auth stack registers `http://localhost:8471/callback` for its
+`dapier-cli` client; the API publishes the client ID at `/api/agent/config`):
 
 ```bash
 pip install .

@@ -11,10 +11,19 @@ from ... import http
 from ...auth.session import SESSION_COOKIE, AUTH_STATE_COOKIE, SESSION_TTL_SECONDS
 
 
+def _safe_next(raw):
+    """Where to land after sign-in: any in-app path, never off-site."""
+    value = str(raw or "")
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
+        return value
+    return "/"
+
+
 def auth_login(event):
     config = dtc_auth.auth_config()
     if not all(config[key] for key in ("base_url", "client_id", "callback_url", "issuer", "jwks_url")):
         return http._json_response(503, {"error": "Shared authentication is not configured"})
+    next_path = _safe_next((event.get("queryStringParameters") or {}).get("next"))
     state = session._b64encode(os.urandom(32))
     verifier = session._b64encode(os.urandom(48))
     nonce = session._b64encode(os.urandom(32))
@@ -27,7 +36,7 @@ def auth_login(event):
     })
     token = session._sign({
         "kind": "oidc", "state": state, "verifier": verifier, "nonce": nonce,
-        "exp": int(time.time()) + 600,
+        "next": next_path, "exp": int(time.time()) + 600,
     })
     return http._redirect(
         f'{config["base_url"]}/oauth2/authorize?{query}',
@@ -56,7 +65,7 @@ def auth_callback(event):
         return _auth_error_redirect(clear_state)
     token = session._sign({"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS})
     return http._redirect(
-        "/",
+        _safe_next(pending.get("next")),
         cookies=[clear_state, f"{SESSION_COOKIE}={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax"],
     )
 

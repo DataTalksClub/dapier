@@ -1,9 +1,11 @@
-"""DTC shared-auth login for the CLI (authorization-code + PKCE, loopback).
+"""DTC shared-auth login for the CLI.
 
-The CLI registers no password anywhere: the operator signs in through the
-browser against the same DTC issuer the web console uses, and only DTC-issued
-tokens are stored locally. A dedicated public/native CLI client and its
-fixed-port localhost redirect must be registered in the shared-auth stack.
+Default flow: device pairing (`login_device`) — the CLI shows a short code,
+the operator approves it on the console's /device page after signing in
+with the DTC identity, and the CLI polls for a dapier-issued device
+session. No localhost listener is needed. The classic browser loopback
+flow (`login`, used by `dapier auth login --browser`) signs in directly
+against the shared DTC issuer and stores DTC-issued tokens instead.
 """
 
 import base64
@@ -12,6 +14,7 @@ import json
 import os
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -80,6 +83,77 @@ def server_config(api_url):
 
 class LoginError(Exception):
     pass
+
+
+class DeviceFlowUnavailable(Exception):
+    """The API predates device pairing; fall back to the browser flow."""
+
+
+def _post_json(url, body, bearer=None, timeout=20):
+    """POST JSON, returning ``(status, parsed_body)`` without leaking tokens."""
+    headers = {"content-type": "application/json"}
+    if bearer:
+        headers["authorization"] = f"Bearer {bearer}"
+    request = urllib.request.Request(
+        url, data=json.dumps(body).encode(), headers=headers, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        try:
+            data = json.loads(exc.read() or b"{}")
+        except ValueError:
+            data = {}
+        if exc.code in (404, 503) and url.endswith("/device/start"):
+            raise DeviceFlowUnavailable from None
+        return exc.code, data
+
+
+def login_device(api_url, *, timeout=600, sleeper=time.sleep, poster=None):
+    """Pair this CLI with the operator identity; returns the device session."""
+    poster = poster or _post_json
+    base = api_url.rstrip("/")
+    status, pairing = poster(f"{base}/api/agent/device/start", {})
+    if status != 200 or not pairing.get("device_code") or not pairing.get("user_code"):
+        raise LoginError("This Dapier API did not offer device pairing")
+    interval = max(int(pairing.get("interval") or 2), 1)
+    print(f"Open:  {base}/device")
+    print(f"Code:  {pairing['user_code']}")
+    print("Waiting for approval (the code expires in 15 minutes) ...", flush=True)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        status, result = poster(f"{base}/api/agent/device/token", {"device_code": pairing["device_code"]})
+        if status == 200 and result.get("status") == "approved":
+            if not result.get("token"):
+                raise LoginError("The API returned an empty device session")
+            session = {
+                "token": result["token"],
+                "kind": "device",
+                "subject": result.get("subject", ""),
+                "email": result.get("email", ""),
+                "expires_at": int(result.get("expires_at") or 0),
+                "obtained_at": int(time.time()),
+            }
+            config.save_session(session)
+            return session
+        if status == 200 and result.get("status") == "expired":
+            raise LoginError("The pairing code expired; run `dapier auth login` again")
+        if result.get("slow_down"):
+            interval += 2
+        sleeper(interval)
+    raise LoginError("Timed out waiting for approval; run `dapier auth login` again")
+
+
+def revoke_session(api_url, session):
+    """Best-effort server-side revocation of a device session."""
+    if not session or session.get("kind") != "device":
+        return
+    try:
+        _post_json(f"{api_url.rstrip('/')}/api/agent/device/revoke", {},
+                   bearer=session.get("token"), timeout=10)
+    except Exception:
+        pass
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
@@ -170,8 +244,24 @@ def login(api_url, *, timeout=180, opener=None):
 
 
 def refresh_session(api_url, session):
-    """Refresh the DTC session in place. Returns the session or None."""
-    if not session or not session.get("refresh_token"):
+    """Refresh the session in place. Returns the session or None."""
+    if not session:
+        return None
+    if session.get("kind") == "device":
+        status, data = _post_json(
+            f"{api_url.rstrip('/')}/api/agent/device/refresh", {},
+            bearer=session.get("token"),
+        )
+        if status != 200 or not data.get("token"):
+            return None
+        session.update({
+            "token": data["token"],
+            "expires_at": int(data.get("expires_at") or 0),
+            "obtained_at": int(time.time()),
+        })
+        config.save_session(session)
+        return session
+    if not session.get("refresh_token"):
         return None
     try:
         conf = server_config(api_url)

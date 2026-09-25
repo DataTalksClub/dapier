@@ -66,6 +66,177 @@ def test_redirect_uri_satisfies_cognito_loopback_rules():
     assert parts.port == auth.LOOPBACK_PORT and parts.path == "/callback"
 
 
+def device_poster(script):
+    """Scripted _post_json stand-in keyed by endpoint suffix."""
+    calls = []
+
+    def poster(url, body, bearer=None, timeout=20):
+        calls.append({"url": url, "body": body, "bearer": bearer})
+        for suffix, response in script.items():
+            if url.endswith(suffix):
+                return response() if callable(response) else response
+        raise AssertionError(f"unexpected POST {url}")
+
+    return poster, calls
+
+
+def test_login_device_happy_path(isolated_home, monkeypatch):
+    poster, calls = device_poster({
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH", "interval": 2}),
+        "/device/token": (200, {"status": "approved", "token": "dapd_tok",
+                                "subject": "Google_1", "email": "op@datatalks.club",
+                                "expires_at": 4102444800}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+
+    session = auth.login_device("https://api.example.test/", sleeper=lambda seconds: None)
+
+    assert session == {"token": "dapd_tok", "kind": "device", "subject": "Google_1",
+                       "email": "op@datatalks.club", "expires_at": 4102444800,
+                       "obtained_at": session["obtained_at"]}
+    assert config.load_session() == session
+    assert calls[0]["url"] == "https://api.example.test/api/agent/device/start"
+    assert calls[1]["body"] == {"device_code": "dapd_secret"}
+
+
+def test_login_device_polls_until_approved(isolated_home, monkeypatch):
+    polls = []
+
+    def poster(url, body, bearer=None, timeout=20):
+        if url.endswith("/device/start"):
+            return 200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}
+        if url.endswith("/device/token"):
+            polls.append(body)
+            if len(polls) >= 3:
+                return (200, {"status": "approved", "token": "dapd_tok",
+                              "subject": "Google_1", "email": "op@x", "expires_at": 4102444800})
+            return (200, {"status": "pending"})
+        raise AssertionError(url)
+
+    monkeypatch.setattr(auth, "_post_json", poster)
+    sleeps = []
+    session = auth.login_device("https://api.example.test", sleeper=sleeps.append, timeout=30)
+    assert session["token"] == "dapd_tok"
+    assert len(polls) == 3 and len(sleeps) == 2
+
+
+def test_login_device_expired_and_timeout(isolated_home, monkeypatch):
+    poster, _ = device_poster({
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}),
+        "/device/token": (200, {"status": "expired"}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+    with pytest.raises(auth.LoginError, match="expired"):
+        auth.login_device("https://api.example.test", sleeper=lambda s: None)
+
+    def pending_forever(url, body, bearer=None, timeout=20):
+        if url.endswith("/device/start"):
+            return 200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}
+        return (200, {"status": "pending"})
+
+    monkeypatch.setattr(auth, "_post_json", pending_forever)
+    with pytest.raises(auth.LoginError, match="Timed out"):
+        auth.login_device("https://api.example.test", sleeper=lambda s: None, timeout=0)
+
+
+def test_login_device_honors_slow_down(isolated_home, monkeypatch):
+    poster, _ = device_poster({
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}),
+        "/device/token": (200, {"status": "pending", "slow_down": True}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+    sleeps = []
+
+    def sleeper(seconds):
+        sleeps.append(seconds)
+        if len(sleeps) >= 2:
+            raise KeyboardInterrupt  # stop the wait loop after two intervals
+
+    with pytest.raises(KeyboardInterrupt):
+        auth.login_device("https://api.example.test", sleeper=sleeper, timeout=60)
+    assert sleeps == [4, 6]
+
+
+def test_refresh_device_session_rotates(isolated_home, monkeypatch):
+    config.save_session({"token": "dapd_old", "kind": "device", "subject": "s",
+                         "email": "e", "expires_at": 1, "obtained_at": 1})
+    poster, calls = device_poster({
+        "/device/refresh": (200, {"token": "dapd_new", "expires_at": 4102444800}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+
+    refreshed = auth.refresh_session("https://api.example.test", config.load_session())
+
+    assert refreshed["token"] == "dapd_new"
+    assert calls[0]["bearer"] == "dapd_old"
+    assert config.load_session()["token"] == "dapd_new"
+
+
+def test_refresh_dt_session_still_uses_cognito(isolated_home, monkeypatch):
+    config.save_session({"id_token": "idt", "refresh_token": "rt", "kind": "dtc",
+                         "subject": "s", "expires_at": 1, "obtained_at": 1})
+    monkeypatch.setattr(auth, "server_config", lambda api_url: {
+        "auth_base_url": "https://auth.example.test", "cli_client_id": "cid",
+        "issuer": "iss", "jwks_url": "jwks"})
+    monkeypatch.setattr(auth, "_post_form", lambda url, fields, timeout=20: (
+        200, b'{"id_token": "idt2"}'))
+    monkeypatch.setattr(auth, "verify_session_token", lambda *a, **k: {"sub": "s"})
+
+    refreshed = auth.refresh_session("https://api.example.test", config.load_session())
+
+    assert refreshed["id_token"] == "idt2"
+    assert config.load_session()["id_token"] == "idt2"
+
+
+def test_api_call_sends_device_bearer(isolated_home, monkeypatch):
+    config.save_session({"token": "dapd_b", "kind": "device", "subject": "s", "expires_at": 9})
+    seen = {}
+
+    def fake_request(api_url, method, path, session, body=None, timeout=20, debug=False):
+        from dapier_cli import api
+        seen["bearer"] = api.session_bearer(session)
+        return 200, {}
+
+    monkeypatch.setattr(commands.api, "_request", fake_request)
+    commands.api.call("https://api.example.test", "GET", "/api/agent/connections")
+    assert seen["bearer"] == "dapd_b"
+
+    config.save_session({"id_token": "idt"})  # legacy loopback session
+    monkeypatch.setattr(commands.api, "_request", fake_request)
+    commands.api.call("https://api.example.test", "GET", "/api/agent/connections")
+    assert seen["bearer"] == "idt"
+
+
+def test_login_falls_back_when_device_flow_unavailable(isolated_home, monkeypatch, capsys):
+    def unavailable(url, body, bearer=None, timeout=20):
+        raise auth.DeviceFlowUnavailable
+
+    monkeypatch.setattr(auth, "_post_json", unavailable)
+    monkeypatch.setattr(auth, "login", lambda api_url, timeout=180: {"email": "op@x"})
+
+    import argparse
+    code = main.cmd_auth(argparse.Namespace(command="login", timeout=10, browser=False),
+                         "https://api.example.test")
+
+    assert code == 0
+    assert "falling back" in capsys.readouterr().out
+
+
+def test_logout_revokes_device_session(isolated_home, monkeypatch):
+    config.save_session({"token": "dapd_bye", "kind": "device", "subject": "s",
+                         "email": "e", "expires_at": 9, "obtained_at": 1})
+    revoked = []
+    monkeypatch.setattr(auth, "revoke_session",
+                        lambda api_url, session: revoked.append(session["token"]))
+
+    import argparse
+    code = main.cmd_auth(argparse.Namespace(command="logout"), "https://api.example.test")
+
+    assert code == 0
+    assert revoked == ["dapd_bye"]
+    assert config.load_session() is None
+
+
 VIEW = {
     "connection_id": "youtube-personal",
     "provider": "youtube",

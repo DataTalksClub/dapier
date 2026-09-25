@@ -1,0 +1,61 @@
+/* Standalone device-pairing page; app.css supplies the design tokens. */
+body {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.device-card {
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 2rem;
+  border: 1px solid var(--border, #d8d8dc);
+  border-radius: 12px;
+  background: var(--bg-card, #fff);
+  color: var(--text, #17171c);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.device-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.device-lede { margin: 0 0 1.25rem; color: var(--text-muted, #5a5a66); }
+code { font-family: var(--font-mono, ui-monospace, monospace); }
+
+#pair-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#pair-code {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid var(--border, #d8d8dc);
+  border-radius: 8px;
+}
+
+#pair-button {
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+#pair-button:disabled { opacity: 0.6; cursor: default; }
+
+.device-status { min-height: 1.4em; margin: 1rem 0 0; }
+.device-status.ok { color: var(--ok, #15803d); font-weight: 500; }
+.device-status.err { color: var(--err, #b91c1c); }
+.device-status a { color: inherit; }
+
+.device-fineprint {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #5a5a66);
+}

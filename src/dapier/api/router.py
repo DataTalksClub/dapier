@@ -45,6 +45,10 @@ def _static(path):
     assets = {
         **{view: ("index.html", "text/html; charset=utf-8") for view in CONSOLE_VIEWS},
         DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
+        # The CLI device-pairing page (dapier auth login).
+        "/device": ("device.html", "text/html; charset=utf-8"),
+        "/assets/device.css": ("device.css", "text/css; charset=utf-8"),
+        "/assets/js/device.js": ("js/device.js", "text/javascript; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
@@ -61,6 +65,7 @@ def _static(path):
         "/assets/js/views/runs.js": ("js/views/runs.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/designer.js": ("js/views/designer.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
+        "/assets/js/theme.js": ("js/theme.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approve device — dapier</title>
+<link rel="icon" href="/assets/favicon.svg">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/device.css">
+</head>
+<body>
+<main class="device-card">
+  <h1>Approve device</h1>
+  <p class="device-lede">A <code>dapier</code> CLI asked to sign in as you.
+  Enter the code it shows, or follow the link it printed.</p>
+  <form id="pair-form">
+    <input id="pair-code" name="code" inputmode="text" autocomplete="off"
+           spellcheck="false" maxlength="9" placeholder="XXXX-XXXX"
+           aria-label="Pairing code" required>
+    <button type="submit" id="pair-button">Approve</button>
+  </form>
+  <p id="pair-status" class="device-status" role="status"></p>
+  <p class="device-fineprint">Approving signs the CLI in as your DTC identity.
+  It can only act where your grants allow it, and you can undo it with
+  <code>dapier auth logout</code>.</p>
+</main>
+<script src="/assets/js/device.js"></script>
+</body>
+</html>

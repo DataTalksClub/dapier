@@ -28,6 +28,7 @@ GRANT = "grant"
 IMPORT = "import"
 CONFIG = "config"
 API_TOKEN = "api-token"
+DEVICE_LOGIN = "device-login"
 
 
 def audit_table():

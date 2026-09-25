@@ -113,6 +113,7 @@ Globals:
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
         PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
+        DEVICE_SESSIONS_TABLE: !Ref DeviceSessionsTable
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
 Resources:
@@ -172,6 +173,8 @@ Resources:
             TableName: !Ref HookTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ApiTokensTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DeviceSessionsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBCrudPolicy:
@@ -722,6 +725,19 @@ Resources:
         - {AttributeName: token_hash, AttributeType: S}
       KeySchema:
         - {AttributeName: token_hash, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  # Pending CLI device pairings and issued CLI device sessions
+  # (src/dapier/auth/device_sessions.py). Everything carries a TTL.
+  DeviceSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   MailBucket:

@@ -19,11 +19,12 @@ class ApiError(Exception):
 
 def _request(api_url, method, path, session, body=None, timeout=20, debug=False):
     payload = json.dumps(body).encode() if body is not None else None
+    bearer = session_bearer(session)
     request = urllib.request.Request(
         f"{api_url}{path}", data=payload, method=method,
         headers={
             "content-type": "application/json",
-            "authorization": f"Bearer {session['id_token']}",
+            "authorization": f"Bearer {bearer}",
         },
     )
     if debug:
@@ -44,10 +45,15 @@ def _request(api_url, method, path, session, body=None, timeout=20, debug=False)
     return status, (data if isinstance(data, dict) else {})
 
 
+def session_bearer(session):
+    """The bearer value for a stored session, whichever kind it is."""
+    return (session.get("token") or session.get("id_token") or "").strip()
+
+
 def call(api_url, method, path, body=None, timeout=20, debug=False):
-    """Call the agent API, refreshing the DTC session once on 401."""
+    """Call the agent API, refreshing the session once on 401."""
     session = config.load_session()
-    if not session or not session.get("id_token"):
+    if not session or not session_bearer(session):
         raise ApiError("Not signed in; run `dapier auth login`", status=401)
     status, data = _request(api_url, method, path, session, body, timeout, debug)
     if status == 401 and auth.refresh_session(api_url, session):
