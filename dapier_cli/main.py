@@ -129,6 +129,12 @@ def build_parser():
     wf_enable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_disable_p = wf_sub.add_parser("disable", help="Publish a workflow as disabled (live immediately)")
     wf_disable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_test_p = wf_sub.add_parser("test", help="Test-run a workflow YAML against a sample event (dry-run)")
+    wf_test_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
+    wf_test_p.add_argument("--event", required=True,
+                           help="Sample event JSON, inline or @file (e.g. --event @event.json)")
+    wf_test_p.add_argument("--execute", action="store_true",
+                           help="Actually run the actions (real side effects); default is a dry-run")
     hook_p = sub.add_parser("hooks", help="Webhook and Telegram triggers")
     hook_sub = hook_p.add_subparsers(dest="command", required=True)
     hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
@@ -272,6 +278,8 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
     if args.command in ("enable", "disable"):
         return commands.workflows_set_enabled(api_url, args.file, args.command == "enable", debug)
+    if args.command == "test":
+        return commands.workflows_test(api_url, args.file, args.event, args.execute, debug)
     return 2
 
 

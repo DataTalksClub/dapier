@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { GitBranch, Loader2, TriangleAlert } from "lucide-react";
+import { FlaskConical, GitBranch, Loader2, Play, TriangleAlert, X } from "lucide-react";
 import { dump } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
-import type { DiagramShape, FilterRule, GitStatus, NodeData, Workflow, WorkflowSummary } from "./types";
+import type { DiagramShape, FilterRule, GitStatus, NodeData, TestRunResult, Workflow, WorkflowSummary } from "./types";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
 
@@ -123,6 +123,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [savedSnapshot, setSavedSnapshot] = useState("[]");
   const [status, setStatus] = useState<{ kind: "idle" | "busy" | "error" | "ok"; message: string }>({ kind: "idle", message: "" });
   const [git, setGit] = useState<GitStatus | null>(null);
+  const [testOpen, setTestOpen] = useState(false);
+  const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
+  const [testBusy, setTestBusy] = useState(false);
+  const [testResult, setTestResult] = useState<TestRunResult | null>(null);
 
   const dirty = useMemo(() => JSON.stringify(shapes) !== savedSnapshot, [shapes, savedSnapshot]);
 
@@ -234,6 +238,41 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setStatus({ kind: "ok", message: result.output.trim() || "Pushed" });
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
+    }
+  }
+
+  /** Test the unsaved canvas against a sample event (dry-run unless execute). */
+  async function runTest(execute: boolean) {
+    const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+    if (problems.length) {
+      setStatus({ kind: "error", message: problems.join(" ") });
+      return;
+    }
+    let sample: unknown;
+    const mode = execute ? "execute" : "dry-run";
+    try {
+      sample = JSON.parse(testEvent);
+    } catch {
+      setTestResult({ mode, matched: false, steps: [], error: "The sample event is not valid JSON." });
+      return;
+    }
+    if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+      setTestResult({ mode, matched: false, steps: [], error: "The sample event must be a JSON object." });
+      return;
+    }
+    if (execute && !window.confirm("Run the actions for real? Live messages will be sent.")) return;
+    setTestBusy(true);
+    setTestResult(null);
+    try {
+      // The draft goes inline: the server tests exactly what would be saved.
+      setTestResult(await api<TestRunResult>(config, "/workflows/test", {
+        method: "POST",
+        body: JSON.stringify({ event: sample, workflow, execute })
+      }));
+    } catch (error) {
+      setTestResult({ mode, matched: false, steps: [], error: String(error) });
+    } finally {
+      setTestBusy(false);
     }
   }
 
@@ -489,6 +528,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
               </button>
             )}
+            {config.mode === "console" && (
+              <button
+                className={testOpen ? "button secondary active" : "button secondary"}
+                type="button"
+                onClick={() => setTestOpen(!testOpen)}
+                disabled={status.kind === "busy"}
+              >
+                <span>Test run</span>
+              </button>
+            )}
             <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy"}>
               <span>{dirty ? "Save to git" : "Saved"}</span>
             </button>
@@ -509,6 +558,66 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               </>
             )}
           />
+          {testOpen && (
+            <section className="test-panel" aria-label="Test run">
+              <header className="test-panel-head">
+                <h2>Test run</h2>
+                <button className="icon-button" type="button" title="Close" onClick={() => setTestOpen(false)}>
+                  <X size={15} />
+                </button>
+              </header>
+              <p className="test-hint">
+                Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent.
+                &ldquo;Run for real&rdquo; executes the actions with live side effects.
+              </p>
+              <label>Sample event (JSON)
+                <textarea
+                  className="test-event"
+                  rows={6}
+                  spellCheck={false}
+                  value={testEvent}
+                  onChange={(event) => setTestEvent(event.target.value)}
+                />
+              </label>
+              <div className="test-actions">
+                <button className="button primary" type="button" disabled={testBusy} onClick={() => runTest(false)}>
+                  {testBusy ? <Loader2 size={15} className="spin" /> : <FlaskConical size={15} />}
+                  <span>Dry run</span>
+                </button>
+                <button className="button danger" type="button" disabled={testBusy} onClick={() => runTest(true)}>
+                  <Play size={15} /><span>Run for real</span>
+                </button>
+              </div>
+              {testResult && (
+                <div className={`test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`}>
+                  <p className="test-summary">
+                    {testResult.error && testResult.steps.length === 0
+                      ? testResult.error
+                      : <>
+                          <strong>{testResult.mode === "execute" ? "Executed" : "Dry run"}</strong>
+                          {" — "}
+                          {testResult.matched
+                            ? "a trigger matches the sample event."
+                            : "NO trigger matches the sample event."}
+                          {testResult.enabled === false && <span> The workflow is disabled.</span>}
+                          {testResult.error && <span> Run stopped: {testResult.error}</span>}
+                        </>}
+                  </p>
+                  {testResult.steps.map((step, index) => (
+                    <div key={`${step.action_id}-${index}`} className={step.ok ? "test-step ok" : "test-step failed"}>
+                      <span className="test-step-title">
+                        {index + 1}. {step.action_id} <em>({step.action_type || "?"})</em>
+                        {!step.ok && <span className="test-step-error"> — {step.error}</span>}
+                      </span>
+                      {(step.rendered_input ?? step.output) !== undefined && (step.rendered_input ?? step.output) !== null && (
+                        <pre className="test-io">{JSON.stringify(step.rendered_input ?? step.output, null, 2)}</pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
           <aside className="inspector">
             {selected?.type === "node" && selected.data ? (
               <header className={`inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`}>

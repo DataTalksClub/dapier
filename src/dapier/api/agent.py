@@ -312,11 +312,17 @@ def route(event, method, path):
         return revoke_connection_tokens(event, revoke_match.group(1))
     if path == "/api/agent/designer/workflows" and method in ("GET", "PUT"):
         return designer_api(event, method)
+    if path == "/api/agent/designer/workflows/test" and method == "POST":
+        return designer_test_api(event, None)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))
     if designer_match and method == "PUT":
         return designer_toggle_api(event, designer_match.group(1))
+    designer_test_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+    if designer_test_match and method == "POST":
+        return designer_test_api(event, designer_test_match.group(1))
     return _json_response(404, {"error": "Not found"})
 
 
@@ -365,6 +371,22 @@ def designer_toggle_api(event, source):
     status, payload = designer_store.api_toggle(source, body, operator=subject)
     audit.emit(str(source), "workflow.toggle", subject,
                outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def designer_test_api(event, source):
+    """Operator-only test run: dry-run a workflow on a sample event, or run
+    it for real with execute. Mirrors the console's test endpoint."""
+    subject, error = require_operator(event, "workflow.test")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_test_run(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.test", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
 
 

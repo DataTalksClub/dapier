@@ -1,4 +1,5 @@
-"""Designer save path: validate workflow YAML, commit it to GitHub, publish it live.
+"""Designer save and test-run paths: validate workflow YAML, commit it to
+GitHub, publish it live, and dry-run it against a sample event.
 
 The console designer at /designer edits workflows/<id>.yaml in the dapier
 repo. Saves are validated server-side (structure only — action types beyond
@@ -263,6 +264,60 @@ def api_toggle(source, body, operator=None):
 
 def filename_for(workflow_id):
     return f"{workflow_id}.yaml"
+
+
+def api_test_run(source, body, operator=None):
+    """Test-run one workflow against a sample event: dry-run by default,
+    real execution with ``execute: true``.
+
+    The workflow under test is, in order: the inline draft definition in the
+    body (``workflow`` object or ``yaml`` text — the point of the feature is
+    testing what is about to be saved), else the current file (published
+    overlay / bundled YAML / committed git state). ``event`` is the sample
+    event payload. Read-only unless ``execute`` is set.
+    """
+    del operator  # recorded by the calling route; the run itself is read-only
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    sample = body.get("event")
+    if not isinstance(sample, dict):
+        return 400, {"error": 'body must include "event": the sample event object'}
+    if not isinstance(body.get("execute", False), bool):
+        return 400, {"error": "execute must be a boolean"}
+    inline = body.get("workflow")
+    yaml_text = body.get("yaml")
+    if inline is not None and not isinstance(inline, dict):
+        return 400, {"error": "workflow must be an object"}
+    if inline is None and yaml_text is not None and not isinstance(yaml_text, str):
+        return 400, {"error": "yaml must be a string"}
+    try:
+        if inline is not None:
+            # Round-trip through the same validation the save path applies.
+            workflow = parse_workflow(yaml.safe_dump(inline))
+            label = filename_for(str(workflow["id"]))
+        elif isinstance(yaml_text, str):
+            workflow = parse_workflow(yaml_text)
+            label = filename_for(str(workflow["id"]))
+        else:
+            if not source:
+                return 400, {"error": "pass the workflow inline (workflow or yaml) "
+                                      "or test a saved file: /workflows/{file}/test"}
+            status, payload = api_get(source)
+            if status != 200:
+                return status, payload
+            workflow = payload["workflow"]
+            label = source
+    except WorkflowError as exc:
+        return 400, {"error": str(exc)}
+
+    from ..engine import dryrun
+
+    try:
+        payload = dryrun.test_run(workflow, sample, execute=bool(body.get("execute", False)))
+    except dryrun.TestRunError as exc:
+        return 400, {"error": str(exc)}
+    payload["file"] = label
+    return 200, payload
 
 
 def parse_workflow(yaml_text):

@@ -24,8 +24,11 @@ def _elapsed(started):
     return int((time.monotonic() - started) * 1000)
 
 
-def execute(event, before_action=None, after_action=None, on_action_error=None):
+def execute(event, before_action=None, after_action=None, on_action_error=None, workflows=None):
     """Run every matching workflow's actions.
+
+    ``workflows`` restricts the run to those definitions (the test-run path
+    passes exactly the workflow under test); default is the full catalog.
 
     The hooks carry the step telemetry: ``before_action`` also gets the
     action type, ``after_action`` gets the runner's output summary and the
@@ -33,7 +36,7 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
     attempt. Runners return a small JSON-safe dict describing what happened
     (message ids, paths, HTTP statuses) — it lands on the run record.
     """
-    for workflow in all_workflows():
+    for workflow in (all_workflows() if workflows is None else workflows):
         if matches(workflow, event):
             for index, action in enumerate(workflow.get("actions", [])):
                 action_id = action.get("id", str(index))

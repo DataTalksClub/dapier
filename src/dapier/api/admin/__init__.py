@@ -75,11 +75,17 @@ def route(event, method, path):
         return routes.designer_list(event)
     if method == "PUT" and path == "/api/admin/designer/workflows":
         return routes.save_designer_workflow(event, operator_subject)
+    if method == "POST" and path == "/api/admin/designer/workflows/test":
+        return routes.test_designer_workflow(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1))
     if method == "PUT" and designer_match:
         return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1))
+    designer_test_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+    if method == "POST" and designer_test_match:
+        return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1))
     if method == "GET" and path == "/api/admin/hook-triggers":
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":
@@ -125,6 +131,7 @@ from .routes import (  # noqa: F401
     save_connection,
     save_credential,
     save_designer_workflow,
+    test_designer_workflow,
     toggle_designer_workflow,
     save_email_trigger,
     save_grant,
