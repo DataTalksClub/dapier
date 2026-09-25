@@ -14312,15 +14312,21 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$c = [
+  const __iconNode$j = [
+    ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
+    ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
+    ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
+  ];
+  const CodeXml = createLucideIcon("code-xml", __iconNode$j);
+  const __iconNode$i = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$c);
-  const __iconNode$b = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$i);
+  const __iconNode$h = [
     [
       "path",
       {
@@ -14333,15 +14339,37 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$b);
-  const __iconNode$a = [
+  const FileText = createLucideIcon("file-text", __iconNode$h);
+  const __iconNode$g = [
+    [
+      "path",
+      {
+        d: "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2",
+        key: "18mbvz"
+      }
+    ],
+    ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
+    ["path", { d: "M8.5 2h7", key: "csnxdl" }]
+  ];
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$g);
+  const __iconNode$f = [
+    [
+      "path",
+      {
+        d: "M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z",
+        key: "sc7q7i"
+      }
+    ]
+  ];
+  const Funnel = createLucideIcon("funnel", __iconNode$f);
+  const __iconNode$e = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$a);
-  const __iconNode$9 = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14354,12 +14382,20 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$9);
-  const __iconNode$8 = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$8);
-  const __iconNode$7 = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$7);
-  const __iconNode$6 = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$d);
+  const __iconNode$c = [
+    ["path", { d: "M8 5h13", key: "1pao27" }],
+    ["path", { d: "M13 12h8", key: "h98zly" }],
+    ["path", { d: "M13 19h8", key: "c3s6r1" }],
+    ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
+    ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
+  ];
+  const ListTree = createLucideIcon("list-tree", __iconNode$c);
+  const __iconNode$b = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$b);
+  const __iconNode$a = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$a);
+  const __iconNode$9 = [
     [
       "path",
       {
@@ -14368,13 +14404,23 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$6);
-  const __iconNode$5 = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$9);
+  const __iconNode$8 = [
+    [
+      "path",
+      {
+        d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
+        key: "10ikf1"
+      }
+    ]
+  ];
+  const Play = createLucideIcon("play", __iconNode$8);
+  const __iconNode$7 = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$5);
-  const __iconNode$4 = [
+  const Plus = createLucideIcon("plus", __iconNode$7);
+  const __iconNode$6 = [
     [
       "path",
       {
@@ -14384,16 +14430,22 @@
     ],
     ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
   ];
-  const StickyNote = createLucideIcon("sticky-note", __iconNode$4);
-  const __iconNode$3 = [
+  const StickyNote = createLucideIcon("sticky-note", __iconNode$6);
+  const __iconNode$5 = [
+    ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
+    ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
+    ["circle", { cx: "12", cy: "14", r: "8", key: "1e1u0o" }]
+  ];
+  const Timer = createLucideIcon("timer", __iconNode$5);
+  const __iconNode$4 = [
     ["path", { d: "M10 11v6", key: "nco0om" }],
     ["path", { d: "M14 11v6", key: "outv1u" }],
     ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
     ["path", { d: "M3 6h18", key: "d0wm0j" }],
     ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
   ];
-  const Trash2 = createLucideIcon("trash-2", __iconNode$3);
-  const __iconNode$2 = [
+  const Trash2 = createLucideIcon("trash-2", __iconNode$4);
+  const __iconNode$3 = [
     [
       "path",
       {
@@ -14404,8 +14456,8 @@
     ["path", { d: "M12 9v4", key: "juzpu7" }],
     ["path", { d: "M12 17h.01", key: "p32p05" }]
   ];
-  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$2);
-  const __iconNode$1 = [
+  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$3);
+  const __iconNode$2 = [
     [
       "path",
       {
@@ -14416,7 +14468,12 @@
     ["path", { d: "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", key: "1go1hn" }],
     ["path", { d: "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8", key: "qlwsc0" }]
   ];
-  const Webhook = createLucideIcon("webhook", __iconNode$1);
+  const Webhook = createLucideIcon("webhook", __iconNode$2);
+  const __iconNode$1 = [
+    ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
+    ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
+  ];
+  const X = createLucideIcon("x", __iconNode$1);
   const __iconNode = [
     [
       "path",
@@ -17680,6 +17737,7 @@
       }
     );
   }
+  const logicOperators = ["equals", "in", "prefix", "suffix", "contains"];
   const actionCatalog = [
     {
       type: "webhook",
@@ -17749,6 +17807,67 @@
         { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
         { key: "page_format", label: "PDF page format", group: "pdf", default: "A4" },
         { key: "print_background", label: "Print background", group: "pdf", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "filter",
+      label: "Filter",
+      icon: Funnel,
+      description: "Stop the chain quietly unless the condition holds",
+      fields: [
+        { key: "field", label: "Field", placeholder: "subject", required: true },
+        { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+        { key: "value", label: "Value", placeholder: "invoice" }
+      ]
+    },
+    {
+      type: "condition",
+      label: "Condition",
+      icon: GitBranch,
+      description: "Run the then steps, or the else steps",
+      fields: [
+        { key: "field", label: "Field", placeholder: "route", required: true },
+        { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+        { key: "value", label: "Value" },
+        { key: "then", label: "Then steps (YAML)", type: "yaml", placeholder: '- id: notify\n  type: slack\n  channel: "#alerts"\n  text: "{subject}"' },
+        { key: "else", label: "Else steps (YAML)", type: "yaml" }
+      ]
+    },
+    {
+      type: "delay",
+      label: "Delay",
+      icon: Timer,
+      description: "Pause the chain before the next step (max 60s)",
+      fields: [
+        { key: "seconds", label: "Seconds (max 60)", type: "number", required: true, placeholder: "30" }
+      ]
+    },
+    {
+      type: "for_each",
+      label: "For each",
+      icon: ListTree,
+      description: "Run steps once per item of a list (max 100 items)",
+      fields: [
+        { key: "list", label: "List field", placeholder: "attachments", required: true },
+        { key: "item", label: "Item variable", default: "item" },
+        { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
+        { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: '- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: "/Invoices/{item.filename}"' }
+      ]
+    },
+    {
+      type: "code",
+      label: "Code (Python)",
+      icon: CodeXml,
+      description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+      fields: [
+        {
+          key: "code",
+          label: "Python source",
+          type: "textarea",
+          required: true,
+          placeholder: '# event data is `input`; last expression is the result\n{"route": input["route"], "score": len(input.get("body", ""))}'
+        },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
     }
   ];
@@ -17851,7 +17970,7 @@
     }
     return filters;
   }
-  function actionToYaml(node, index) {
+  function actionToYaml(node, index, problems) {
     const data = node.data ?? defaultNodeData("action");
     const type2 = data.actionType ?? "webhook";
     const action = {
@@ -17862,19 +17981,41 @@
     if (!meta) {
       return { ...action, ...data.raw ?? {} };
     }
+    const written = {};
     for (const field of meta.fields) {
       if (field.type === "boolean") {
         const raw = data.fields?.[field.key];
         if (raw === void 0) continue;
-        fieldTarget(action, field)[field.key] = raw === "true";
+        fieldTarget(written, field)[field.key] = raw === "true";
+        continue;
+      }
+      if (field.type === "yaml") {
+        const text = (data.fields?.[field.key] ?? "").trim();
+        if (text === "") continue;
+        try {
+          const parsed2 = load(text);
+          if (!Array.isArray(parsed2)) {
+            problems.push(`"${node.label ?? type2}": ${field.label} must be a YAML list of steps.`);
+            continue;
+          }
+          fieldTarget(written, field)[field.key] = parsed2;
+        } catch {
+          problems.push(`"${node.label ?? type2}": ${field.label} is not valid YAML.`);
+        }
         continue;
       }
       const value = (data.fields?.[field.key] ?? "").trim();
       if (value === "") continue;
       const parsed = field.type === "number" ? Number(value) : value;
-      fieldTarget(action, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
+      fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
     }
-    return action;
+    const merged = { ...action, ...data.raw ?? {}, ...written };
+    for (const field of meta.fields) {
+      if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
+        delete merged[field.key];
+      }
+    }
+    return merged;
   }
   function workflowFromShapes(shapes, workflowId, enabled) {
     const problems = [];
@@ -17885,6 +18026,8 @@
     const triggerData = trigger?.data ?? defaultNodeData("trigger");
     const { actions, problems: chainProblems } = trigger ? orderedActions(shapes, trigger) : { actions: [], problems: [] };
     if (trigger && actions.length === 0) problems.push("Connect at least one action to the trigger.");
+    const yaml2 = [];
+    actions.forEach((node, index) => yaml2.push(actionToYaml(node, index, problems)));
     return {
       workflow: {
         id: workflowId.trim() || "untitled-workflow",
@@ -17894,7 +18037,7 @@
           event: triggerData.event?.trim() || "received",
           filters: filterRulesToYaml(triggerData.filters)
         },
-        actions: actions.map(actionToYaml)
+        actions: yaml2
       },
       problems: [...problems, ...chainProblems]
     };
@@ -17916,12 +18059,34 @@
     for (const field of meta.fields) {
       const holder = field.group ? action[field.group] : action;
       const value = isRecord(holder) ? holder[field.key] : void 0;
+      if (field.type === "yaml") {
+        if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();
+        continue;
+      }
       if (value !== void 0) fields[field.key] = String(value);
     }
     return fields;
   }
   function rawAction(action) {
     return Object.fromEntries(Object.entries(action).filter(([key]) => key !== "id" && key !== "type"));
+  }
+  function rawExtras(action) {
+    const extras = rawAction(action);
+    const meta = actionMeta(String(action.type ?? "webhook"));
+    for (const field of meta?.fields ?? []) {
+      if (!field.group) {
+        delete extras[field.key];
+        continue;
+      }
+      const group = extras[field.group];
+      if (isRecord(group)) {
+        const rest = { ...group };
+        delete rest[field.key];
+        if (Object.keys(rest).length) extras[field.group] = rest;
+        else delete extras[field.group];
+      }
+    }
+    return Object.keys(extras).length ? extras : void 0;
   }
   function shapesFromWorkflow(workflow) {
     const shapes = [];
@@ -17945,7 +18110,7 @@
     let previous = trigger;
     workflow.actions.forEach((action, index) => {
       const type2 = String(action.type ?? "webhook");
-      const known = actionMeta(type2) !== void 0;
+      const extras = rawExtras(action);
       const node = {
         id: `action-${index}`,
         type: "node",
@@ -17958,7 +18123,7 @@
           nodeKind: "action",
           actionType: type2,
           fields: actionFields(type2, action),
-          ...known ? {} : { raw: rawAction(action) }
+          ...extras ? { raw: extras } : {}
         }
       };
       shapes.push(node);
@@ -18021,7 +18186,7 @@
         filters: []
       };
     }
-    return defaultNodeData("action");
+    return { nodeKind: "action", actionType: kind, fields: defaultFields(kind) };
   }
   function nodeTitle(shape) {
     if (shape.type === "note") return shape.label ?? "Note";
@@ -18762,7 +18927,23 @@
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
         field.label,
         field.required ? " *" : "",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("select", { value, onChange: (event) => onChange(event.target.value), children: field.options?.map((option) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: option, children: option }, option)) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("select", { value: value || field.default || "", onChange: (event) => onChange(event.target.value), children: field.options?.map((option) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: option, children: option }, option)) })
+      ] });
+    }
+    if (field.type === "yaml") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "textarea",
+          {
+            className: "raw-yaml",
+            rows: 6,
+            value,
+            placeholder: field.placeholder,
+            onChange: (event) => onChange(event.target.value)
+          }
+        )
       ] });
     }
     if (field.type === "textarea") {
@@ -18826,6 +19007,10 @@
     const [savedSnapshot, setSavedSnapshot] = reactExports.useState("[]");
     const [status, setStatus] = reactExports.useState({ kind: "idle", message: "" });
     const [git, setGit] = reactExports.useState(null);
+    const [testOpen, setTestOpen] = reactExports.useState(false);
+    const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
+    const [testBusy, setTestBusy] = reactExports.useState(false);
+    const [testResult, setTestResult] = reactExports.useState(null);
     const dirty = reactExports.useMemo(() => JSON.stringify(shapes) !== savedSnapshot, [shapes, savedSnapshot]);
     const refreshGit = reactExports.useCallback(() => {
       if (config.mode !== "local") return;
@@ -18920,6 +19105,38 @@
         setStatus({ kind: "ok", message: result.output.trim() || "Pushed" });
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function runTest(execute) {
+      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+      if (problems.length) {
+        setStatus({ kind: "error", message: problems.join(" ") });
+        return;
+      }
+      let sample;
+      const mode = execute ? "execute" : "dry-run";
+      try {
+        sample = JSON.parse(testEvent);
+      } catch {
+        setTestResult({ mode, matched: false, steps: [], error: "The sample event is not valid JSON." });
+        return;
+      }
+      if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+        setTestResult({ mode, matched: false, steps: [], error: "The sample event must be a JSON object." });
+        return;
+      }
+      if (execute && !window.confirm("Run the actions for real? Live messages will be sent.")) return;
+      setTestBusy(true);
+      setTestResult(null);
+      try {
+        setTestResult(await api(config, "/workflows/test", {
+          method: "POST",
+          body: JSON.stringify({ event: sample, workflow, execute })
+        }));
+      } catch (error) {
+        setTestResult({ mode, matched: false, steps: [], error: String(error) });
+      } finally {
+        setTestBusy(false);
       }
     }
     function updateSelected(mutate) {
@@ -19185,6 +19402,16 @@
               "Push ",
               git && git.ahead > 0 ? `(${git.ahead})` : ""
             ] }) }),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: testOpen ? "button secondary active" : "button secondary",
+                type: "button",
+                onClick: () => setTestOpen(!testOpen),
+                disabled: status.kind === "busy",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
+              }
+            ),
             /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: dirty ? "Save to git" : "Saved" }) })
           ] })
         ] }),
@@ -19203,6 +19430,66 @@
               ] })
             }
           ),
+          testOpen && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "test-panel", "aria-label": "Test run", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "test-panel-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Test run" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 15 }) })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run for real” executes the actions with live side effects." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Sample event (JSON)",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "textarea",
+                {
+                  className: "test-event",
+                  rows: 6,
+                  spellCheck: false,
+                  value: testEvent,
+                  onChange: (event) => setTestEvent(event.target.value)
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: testBusy, onClick: () => runTest(false), children: [
+                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", disabled: testBusy, onClick: () => runTest(true), children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
+              ] })
+            ] }),
+            testResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: testResult.error && testResult.steps.length === 0 ? testResult.error : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: testResult.mode === "execute" ? "Executed" : "Dry run" }),
+                " — ",
+                testResult.matched ? "a trigger matches the sample event." : "NO trigger matches the sample event.",
+                testResult.enabled === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: " The workflow is disabled." }),
+                testResult.error && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                  " Run stopped: ",
+                  testResult.error
+                ] })
+              ] }) }),
+              testResult.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: step.ok ? "test-step ok" : "test-step failed", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-title", children: [
+                  index + 1,
+                  ". ",
+                  step.action_id,
+                  " ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("em", { children: [
+                    "(",
+                    step.action_type || "?",
+                    ")"
+                  ] }),
+                  !step.ok && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                    " — ",
+                    step.error
+                  ] })
+                ] }),
+                (step.rendered_input ?? step.output) !== void 0 && (step.rendered_input ?? step.output) !== null && /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "test-io", children: JSON.stringify(step.rendered_input ?? step.output, null, 2) })
+              ] }, `${step.action_id}-${index}`))
+            ] })
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "inspector", children: [
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
