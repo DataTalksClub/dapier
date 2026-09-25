@@ -175,7 +175,8 @@ def execute_once(workflow, sample):
                     if isinstance(action, dict)}
     steps = []
 
-    def after_action(workflow_id, action_id, event, output=None, duration_ms=None):
+    def after_action(workflow_id, action_id, event, output=None, duration_ms=None,
+                     status="completed"):
         steps.append({"action_id": str(action_id), "action_type": action_types.get(str(action_id), ""),
                       "ok": True, "output": output or {}})
 
