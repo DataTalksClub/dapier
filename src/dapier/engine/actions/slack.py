@@ -3,9 +3,10 @@ import os
 
 from ...connections import credentials
 from . import base
+from .templating import render
 
 
-def run_slack(action, event):
+def run_slack(action, event, *, steps=None):
     credential_id = action.get("credential_id")
     if action.get("connection_id"):
         import boto3
@@ -22,8 +23,7 @@ def run_slack(action, event):
     if not token:
         raise ValueError("Slack secret does not contain a bot token")
     data = event.get("data", {})
-    template = action.get("text", "{title}\n{url}")
-    text = template.format_map(base._SafeFormat(data))
+    text = render(action.get("text", "{title}\n{url}"), event, steps)
     result = base._json_request(
         "https://slack.com/api/chat.postMessage",
         {

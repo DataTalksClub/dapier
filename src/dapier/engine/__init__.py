@@ -1,6 +1,4 @@
 """Workflow engine: match events to workflows and run their actions."""
-import time
-
 from .matching import (  # noqa: F401
     all_workflows,
     flow_actions,
@@ -18,54 +16,61 @@ from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401
 from .actions.dropbox import run_dropbox_delete, run_dropbox_upload  # noqa: F401
 from .actions.render import run_render_job  # noqa: F401
+from .actions.code import run_code  # noqa: F401
+from .logic import run_chain
 
 
-def _elapsed(started):
-    return int((time.monotonic() - started) * 1000)
+def _run_connector(action, event, workflow_id, steps=None):
+    """Run one connector action; the engine's dispatch table. ``steps`` is
+    the run's accumulated step outputs, for the templating runners."""
+    if action["type"] == "webhook":
+        return run_webhook(action, event)
+    if action["type"] == "slack":
+        return run_slack(action, event, steps=steps)
+    if action["type"] == "telegram_send":
+        return run_telegram_send(action, event, steps=steps)
+    if action["type"] == "email_send":
+        return run_email_send(action, event, steps=steps)
+    if action["type"] == "dataops":
+        return run_dataops(action, event)
+    if action["type"] == "dropbox_upload":
+        return run_dropbox_upload(action, event)
+    if action["type"] == "dropbox_delete":
+        return run_dropbox_delete(action, event)
+    if action["type"] == "render_html_to_pdf":
+        return run_render_job(action, event, workflow_id)
+    if action["type"] == "code":
+        return run_code(action, event)
+    raise ValueError(f"unsupported action: {action['type']}")
 
 
-def execute(event, before_action=None, after_action=None, on_action_error=None):
+def execute(event, before_action=None, after_action=None, on_action_error=None, workflows=None):
     """Run every matching workflow's actions.
 
-    The hooks carry the step telemetry: ``before_action`` also gets the
-    action type, ``after_action`` gets the runner's output summary and the
-    step duration, and ``on_action_error`` gets the duration of the failed
-    attempt. Runners return a small JSON-safe dict describing what happened
-    (message ids, paths, HTTP statuses) — it lands on the run record.
+    ``workflows`` restricts the run to those definitions (the test-run path
+    passes exactly the workflow under test); default is the full catalog.
+
+    The chain may mix connector actions with logic steps (filter, condition,
+    delay, for_each — see engine.logic). The hooks carry the step telemetry:
+    ``before_action`` also gets the action type, ``after_action`` gets the
+    runner's output summary, the step duration, and the terminal status
+    (``completed`` or ``filtered``), and ``on_action_error`` gets the duration
+    of the failed attempt. Runners return a small JSON-safe dict describing
+    what happened (message ids, paths, HTTP statuses) — it lands on the run
+    record.
+
+    Step outputs accumulate per workflow run in a ``steps`` mapping shaped
+    like the run history (``{action_id: {"status": ..., "output": ...}}``);
+    the templating runners receive it so later steps can reference earlier
+    ones: ``{steps.<action_id>.output.<path>}``, ``{steps.<action_id>.status}``.
+
     """
-    for workflow in all_workflows():
+    for workflow in (all_workflows() if workflows is None else workflows):
         if matches(workflow, event):
-            for index, action in enumerate(workflow.get("actions", [])):
-                action_id = action.get("id", str(index))
-                if before_action and not before_action(
-                    workflow["id"], action_id, event, action.get("type"),
-                ):
-                    continue
-                started = time.monotonic()
-                try:
-                    if action["type"] == "webhook":
-                        output = run_webhook(action, event)
-                    elif action["type"] == "slack":
-                        output = run_slack(action, event)
-                    elif action["type"] == "telegram_send":
-                        output = run_telegram_send(action, event)
-                    elif action["type"] == "email_send":
-                        output = run_email_send(action, event)
-                    elif action["type"] == "dataops":
-                        output = run_dataops(action, event)
-                    elif action["type"] == "dropbox_upload":
-                        output = run_dropbox_upload(action, event)
-                    elif action["type"] == "dropbox_delete":
-                        output = run_dropbox_delete(action, event)
-                    elif action["type"] == "render_html_to_pdf":
-                        output = run_render_job(action, event, workflow["id"])
-                    else:
-                        raise ValueError(f"unsupported action: {action['type']}")
-                except Exception as exc:
-                    if on_action_error:
-                        on_action_error(workflow["id"], action_id, event, exc,
-                                        duration_ms=_elapsed(started))
-                    raise
-                if after_action:
-                    after_action(workflow["id"], action_id, event,
-                                 output=output or {}, duration_ms=_elapsed(started))
+            run_chain(
+                workflow["id"], workflow.get("actions", []), event,
+                _run_connector,
+                before_action=before_action,
+                after_action=after_action,
+                on_action_error=on_action_error,
+            )

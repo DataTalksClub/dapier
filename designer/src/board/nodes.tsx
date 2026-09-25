@@ -1,5 +1,5 @@
 import { FileText, StickyNote, Zap } from "lucide-react";
-import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultNodeData } from "../workflows";
+import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultFields } from "../workflows";
 import type { IconComponent } from "../catalog";
 import type { ActionType, DiagramShape, NodeData } from "../types";
 
@@ -51,7 +51,8 @@ export function nodeDataForKind(kind: PaletteKind): NodeData {
       filters: []
     };
   }
-  return defaultNodeData("action");
+  // An action chip seeds the node with its own type and default fields.
+  return { nodeKind: "action", actionType: kind, fields: defaultFields(kind) };
 }
 
 export function nodeTitle(shape: DiagramShape): string {

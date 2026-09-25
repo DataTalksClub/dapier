@@ -54,6 +54,20 @@ the worker reads a Secrets Manager secret containing either a plain signing secr
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
+A workflow can opt into failure notifications with a top-level `notify` list of
+email addresses. When a run of that workflow fails, the worker sends one SES
+email per failed run (workflow id, run id, failing step's error); SQS
+redeliveries of the same record never re-notify:
+
+```yaml
+notify: [ops@example.com, lead@example.com]
+```
+
+Every run is recorded in run history (console → Runs, or `dapier runs list`),
+and any run — failed or successful — can be re-executed with its original
+trigger event via the Replay button in the run dialog or
+`dapier runs replay <run-id>`.
+
 Each workflow item carries its own connector config — there is no global
 channel or folder list. A YouTube trigger names the channel(s) it watches in
 its trigger filters (`channel_id: {equals: UC...}` for one, `channel_id:
@@ -246,8 +260,17 @@ description, and one or more actions, e.g.:
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
 `telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
-`render_html_to_pdf`). Text fields accept `{field}` templates from the
-triggering event; `email_send` sends through SES from the configured sender
+`render_html_to_pdf`, `code`). Text fields accept `{field}` templates from the
+triggering event; `{trigger.field}` reaches the same data (plus envelope
+scalars like `trigger.connector` and `trigger.occurred_at`), and
+`{steps.<action_id>.output.<path>}` / `{steps.<action_id>.status}` reference an
+earlier step in the same run. A `|` pipes the value through formatters —
+`trim`, `lower`, `upper`, `slice:start:end`, `replace:old:new`,
+`regex_extract:pattern`, `round:digits`, `format:spec` (number),
+`date_format:strftime`, `date_offset:1d|-2h` — e.g.
+`{trigger.subject | trim | upper}`. Missing values render as empty; unknown
+formatters are rejected when the workflow or trigger is saved.
+`email_send` sends through SES from the configured sender
 (the `EmailSender` deployment parameter, default `no-reply@` the trigger
 domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already

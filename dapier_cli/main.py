@@ -17,7 +17,8 @@ def build_parser():
     auth_sub = auth_p.add_subparsers(dest="command", required=True)
     login_p = auth_sub.add_parser(
         "login", help="Sign in by pairing this device (or --browser for the localhost flow)")
-    login_p.add_argument("--timeout", type=int, default=600)
+    login_p.add_argument("--timeout", type=int, default=900,
+                         help="Seconds to wait for approval (default: the code's 15-minute life)")
     login_p.add_argument("--browser", action="store_true",
                          help="Use the browser loopback flow instead of device pairing")
     auth_sub.add_parser("status", help="Show the stored session (no secrets)")
@@ -87,6 +88,8 @@ def build_parser():
     runs_list_p.add_argument("--limit", type=int, default=25)
     runs_show_p = runs_sub.add_parser("show", help="Show one run's step-by-step flow")
     runs_show_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+    runs_replay_p = runs_sub.add_parser("replay", help="Re-run a past run by re-injecting its original trigger event")
+    runs_replay_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
 
     oac_p = sub.add_parser("oauth-clients", help="Shared OAuth clients per provider (same as the console's Credentials view)")
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
@@ -128,10 +131,22 @@ def build_parser():
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
+    wf_draft_p = wf_sub.add_parser("draft",
+                                   help="Generate a draft workflow YAML from a natural-language prompt")
+    wf_draft_p.add_argument("prompt",
+                            help='What the workflow should do, e.g. "when someone emails todo@, push it to slack"')
+    wf_draft_p.add_argument("--save", action="store_true",
+                            help="Also save the draft through the `workflows save` path (only when it validates)")
     wf_enable_p = wf_sub.add_parser("enable", help="Publish a workflow as enabled (live immediately)")
     wf_enable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_disable_p = wf_sub.add_parser("disable", help="Publish a workflow as disabled (live immediately)")
     wf_disable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_test_p = wf_sub.add_parser("test", help="Test-run a workflow YAML against a sample event (dry-run)")
+    wf_test_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
+    wf_test_p.add_argument("--event", required=True,
+                           help="Sample event JSON, inline or @file (e.g. --event @event.json)")
+    wf_test_p.add_argument("--execute", action="store_true",
+                           help="Actually run the actions (real side effects); default is a dry-run")
     hook_p = sub.add_parser("hooks", help="Webhook and Telegram triggers")
     hook_sub = hook_p.add_subparsers(dest="command", required=True)
     hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
@@ -282,8 +297,12 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_show(api_url, args.file, debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
+    if args.command == "draft":
+        return commands.workflows_draft(api_url, args.prompt, save=args.save, debug=debug)
     if args.command in ("enable", "disable"):
         return commands.workflows_set_enabled(api_url, args.file, args.command == "enable", debug)
+    if args.command == "test":
+        return commands.workflows_test(api_url, args.file, args.event, args.execute, debug)
     return 2
 
 
@@ -349,6 +368,8 @@ def cmd_runs(args, api_url, debug):
         return commands.runs_list(api_url, args.limit, debug)
     if args.command == "show":
         return commands.runs_show(api_url, args.run_id, debug)
+    if args.command == "replay":
+        return commands.runs_replay(api_url, args.run_id, debug)
     return 2
 
 

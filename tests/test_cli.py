@@ -80,9 +80,10 @@ def device_poster(script):
     return poster, calls
 
 
-def test_login_device_happy_path(isolated_home, monkeypatch):
+def test_login_device_happy_path(isolated_home, monkeypatch, capsys):
     poster, calls = device_poster({
-        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH", "interval": 2}),
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH",
+                                "expires_in": 900, "interval": 2}),
         "/device/token": (200, {"status": "approved", "token": "dapd_tok",
                                 "subject": "Google_1", "email": "op@datatalks.club",
                                 "expires_at": 4102444800}),
@@ -97,6 +98,24 @@ def test_login_device_happy_path(isolated_home, monkeypatch):
     assert config.load_session() == session
     assert calls[0]["url"] == "https://api.example.test/api/agent/device/start"
     assert calls[1]["body"] == {"device_code": "dapd_secret"}
+    output = capsys.readouterr().out
+    assert "https://api.example.test/device" in output
+    assert "valid for 15 minutes" in output
+
+
+def test_login_device_waits_out_the_code_life():
+    # The CLI must never give up before the code does: a 15-minute pairing is
+    # waited out in full even if --timeout were still at the old 10-minute
+    # default; without a server-reported expiry, --timeout rules as before.
+    assert auth._wait_seconds(600, 900) == 915
+    assert auth._wait_seconds(900, 900) == 915
+    assert auth._wait_seconds(30, None) == 30
+    assert auth._wait_seconds(0, 0) == 0
+
+
+def test_login_timeout_default_matches_the_code_life():
+    args = main.build_parser().parse_args(["auth", "login"])
+    assert args.timeout == 900
 
 
 def test_login_device_polls_until_approved(isolated_home, monkeypatch):
@@ -898,3 +917,41 @@ def test_runs_show_prints_the_step_flow(isolated_home, monkeypatch, capsys):
     assert "step[2]: notify (slack)  failed  340ms" in out
     assert "error: Slack rejected message" in out
     assert '{"status": 200}' in out
+
+
+def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"accepted": True, "replayed_from": "wf-1:evt-1",
+                "event_id": "replay-abc", "run_id": "wf-1:replay-abc"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "replay", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out
+    assert "wf-1:replay-abc" in out
+
+
+def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"accepted": True, "replayed_from": "wf-1:evt-1",
+                "event_id": "replay-abc", "run_id": "wf-1:replay-abc"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "replay", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out
+    assert "wf-1:replay-abc" in out

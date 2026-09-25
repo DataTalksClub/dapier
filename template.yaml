@@ -76,6 +76,21 @@ Parameters:
       Secrets Manager secret name holding a GitHub token (Contents: read/write
       on the workflows repo). Set to let the console designer commit
       workflows/*.yaml straight to the repo; empty disables designer saves.
+  CopilotLlmBaseUrl:
+    Type: String
+    Default: https://api.openai.com/v1
+    Description: OpenAI-compatible chat-completions base URL for the workflow copilot
+  CopilotLlmApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: >
+      API key for the copilot's OpenAI-compatible endpoint; empty disables
+      draft generation (the endpoint answers 503 with setup instructions)
+  CopilotLlmModel:
+    Type: String
+    Default: gpt-4o-mini
+    Description: Model name the copilot requests from the LLM endpoint
 
 Conditions:
   HasGithubWorkflowsToken: !Not [!Equals [!Ref GithubWorkflowsTokenSecret, '']]
@@ -189,6 +204,9 @@ Resources:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
+          COPILOT_LLM_BASE_URL: !Ref CopilotLlmBaseUrl
+          COPILOT_LLM_API_KEY: !Ref CopilotLlmApiKey
+          COPILOT_LLM_MODEL: !Ref CopilotLlmModel
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
           GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId

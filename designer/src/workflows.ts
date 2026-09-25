@@ -1,8 +1,9 @@
+import { dump, load } from "js-yaml";
 import type { CatalogField } from "./catalog";
-import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
+import { actionCatalog, connectorCatalog, filterOperators, logicOperators } from "./catalog";
 import type { ActionType, DiagramShape, FilterRule, NodeData, TriggerSpec, Workflow, WorkflowSummary } from "./types";
 
-export { actionCatalog, connectorCatalog, filterOperators };
+export { actionCatalog, connectorCatalog, filterOperators, logicOperators };
 
 export const NODE_WIDTH = 264;
 export const NODE_HEIGHT = 96;
@@ -132,7 +133,7 @@ function filterRulesToYaml(rules: FilterRule[] | undefined): Record<string, Reco
   return filters;
 }
 
-function actionToYaml(node: DiagramShape, index: number): Record<string, unknown> {
+function actionToYaml(node: DiagramShape, index: number, problems: string[]): Record<string, unknown> {
   const data = node.data ?? defaultNodeData("action");
   const type = data.actionType ?? "webhook";
   const action: Record<string, unknown> = {
@@ -144,21 +145,46 @@ function actionToYaml(node: DiagramShape, index: number): Record<string, unknown
     // Unknown action type: write the original YAML back untouched.
     return { ...action, ...(data.raw ?? {}) };
   }
+  const written: Record<string, unknown> = {};
   for (const field of meta.fields) {
     // Presence-based: keys the YAML omits stay omitted (engine defaults
     // apply), keys it sets — or the inspector touches — are written back.
     if (field.type === "boolean") {
       const raw = data.fields?.[field.key];
       if (raw === undefined) continue;
-      fieldTarget(action, field)[field.key] = raw === "true";
+      fieldTarget(written, field)[field.key] = raw === "true";
+      continue;
+    }
+    if (field.type === "yaml") {
+      const text = (data.fields?.[field.key] ?? "").trim();
+      if (text === "") continue;
+      try {
+        const parsed: unknown = load(text);
+        if (!Array.isArray(parsed)) {
+          problems.push(`"${node.label ?? type}": ${field.label} must be a YAML list of steps.`);
+          continue;
+        }
+        fieldTarget(written, field)[field.key] = parsed;
+      } catch {
+        problems.push(`"${node.label ?? type}": ${field.label} is not valid YAML.`);
+      }
       continue;
     }
     const value = (data.fields?.[field.key] ?? "").trim();
     if (value === "") continue;
     const parsed = field.type === "number" ? Number(value) : value;
-    fieldTarget(action, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
+    fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
   }
-  return action;
+  // Extras the catalog does not model (nested branch/loop steps, hand-written
+  // keys) round-trip untouched; the form's values win where both exist.
+  const merged: Record<string, unknown> = { ...action, ...(data.raw ?? {}), ...written };
+  for (const field of meta.fields) {
+    // A cleared yaml field removes the key (and any stale extra under it).
+    if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
+      delete merged[field.key];
+    }
+  }
+  return merged;
 }
 
 function triggerToYaml(data: NodeData): TriggerSpec {
@@ -230,6 +256,11 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
   for (const field of meta.fields) {
     const holder = field.group ? action[field.group] : action;
     const value = isRecord(holder) ? holder[field.key] : undefined;
+    if (field.type === "yaml") {
+      // Sub-step lists (condition branches, loop bodies) edit as YAML text.
+      if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();
+      continue;
+    }
     // Keys the YAML omits stay unset: the inspector falls back to the
     // field default, and saving omits them again.
     if (value !== undefined) fields[field.key] = String(value);
@@ -240,6 +271,30 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
 /** Everything but id/type, for actions the catalog does not model. */
 function rawAction(action: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(action).filter(([key]) => key !== "id" && key !== "type"));
+}
+
+/**
+ * Keys of a catalog-modeled action the inspector form does not own — nested
+ * branch/loop steps, hand-written extras. They ride along in `raw` so a save
+ * never drops them; the form's own fields win where both exist.
+ */
+function rawExtras(action: Record<string, unknown>): Record<string, unknown> | undefined {
+  const extras = rawAction(action);
+  const meta = actionMeta(String(action.type ?? "webhook"));
+  for (const field of meta?.fields ?? []) {
+    if (!field.group) {
+      delete extras[field.key];
+      continue;
+    }
+    const group = extras[field.group];
+    if (isRecord(group)) {
+      const rest = { ...group };
+      delete rest[field.key];
+      if (Object.keys(rest).length) extras[field.group] = rest;
+      else delete extras[field.group];
+    }
+  }
+  return Object.keys(extras).length ? extras : undefined;
 }
 
 export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
@@ -279,7 +334,7 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
   let previous: DiagramShape | null = triggerNodes[triggerNodes.length - 1] ?? null;
   actions.forEach((action, index) => {
     const type = String(action.type ?? "webhook");
-    const known = actionMeta(type) !== undefined;
+    const extras = rawExtras(action);
     const node: DiagramShape = {
       id: `action-${index}`,
       type: "node",
@@ -292,7 +347,7 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
         nodeKind: "action",
         actionType: type,
         fields: actionFields(type, action),
-        ...(known ? {} : { raw: rawAction(action) })
+        ...(extras ? { raw: extras } : {})
       }
     };
     shapes.push(node);

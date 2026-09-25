@@ -604,5 +604,37 @@ class SharedFlowTests(unittest.TestCase):
         self.assertEqual(run_webhook.call_count, 2)
 
 
+class ExecuteFailureTests(unittest.TestCase):
+    def test_execute_tags_exceptions_with_the_failing_workflow(self):
+        workflow = {
+            "id": "wf-1", "enabled": True,
+            "trigger": {"connector": "email", "event": "message.received"},
+            "actions": [{"id": "post", "type": "webhook", "url": "https://x.test/hook"}],
+        }
+        runner = MagicMock(side_effect=ValueError("webhook exploded"))
+        event = {"id": "e1", "connector": "email", "event": "message.received", "data": {}}
+        with patch("src.dapier.engine.all_workflows", lambda: [workflow]):
+            with patch("src.dapier.engine.run_webhook", runner):
+                with self.assertRaises(ValueError) as caught:
+                    execute(event)
+        self.assertEqual(caught.exception.dapier_workflow, "wf-1")
+
+
+class ExecuteFailureTests(unittest.TestCase):
+    def test_execute_tags_exceptions_with_the_failing_workflow(self):
+        workflow = {
+            "id": "wf-1", "enabled": True,
+            "trigger": {"connector": "email", "event": "message.received"},
+            "actions": [{"id": "post", "type": "webhook", "url": "https://x.test/hook"}],
+        }
+        runner = MagicMock(side_effect=ValueError("webhook exploded"))
+        event = {"id": "e1", "connector": "email", "event": "message.received", "data": {}}
+        with patch("src.dapier.engine.all_workflows", lambda: [workflow]):
+            with patch("src.dapier.engine.run_webhook", runner):
+                with self.assertRaises(ValueError) as caught:
+                    execute(event)
+        self.assertEqual(caught.exception.dapier_workflow, "wf-1")
+
+
 if __name__ == "__main__":
     unittest.main()

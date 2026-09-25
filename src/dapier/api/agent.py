@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit
+from .. import audit, copilot
 from . import designer_store, runs
 from ..auth import api_tokens, authz, device_sessions, session
 from ..auth.dtc_auth import verify_id_token
@@ -325,6 +325,9 @@ def route(event, method, path):
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
     if runs_match and method == "GET":
         return runs_api(event, run_id=unquote(runs_match.group(1)))
+    runs_replay_match = re.fullmatch(r"/api/agent/runs/([^/]+)/replay", path)
+    if runs_replay_match and method == "POST":
+        return runs_replay_api(event, unquote(runs_replay_match.group(1)))
     if path == "/api/agent/oauth-clients" and method == "GET":
         return oauth_clients_view(event)
     oauth_client_match = re.fullmatch(r"/api/agent/oauth-clients/([a-z]+)", path)
@@ -338,11 +341,19 @@ def route(event, method, path):
         return revoke_connection_tokens(event, revoke_match.group(1))
     if path == "/api/agent/designer/workflows" and method in ("GET", "PUT"):
         return designer_api(event, method)
+    if path == "/api/agent/designer/workflows/test" and method == "POST":
+        return designer_test_api(event, None)
+    if path == "/api/agent/copilot/draft" and method == "POST":
+        return copilot_draft_api(event)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))
     if designer_match and method == "PUT":
         return designer_toggle_api(event, designer_match.group(1))
+    designer_test_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+    if designer_test_match and method == "POST":
+        return designer_test_api(event, designer_test_match.group(1))
     return _json_response(404, {"error": "Not found"})
 
 
@@ -379,6 +390,29 @@ def designer_api(event, method, source=None):
     return _json_response(status, payload)
 
 
+def copilot_draft_api(event):
+    """Operator-gated copilot: a DRAFT workflow for a natural-language prompt.
+
+    Never saves or publishes; the caller reviews the YAML and commits it via
+    the designer save endpoint. Validation problems come back in ``errors[]``
+    with HTTP 200 so a coding agent can iterate on the draft. Mirrored at
+    /api/admin/copilot/draft for a future console view.
+    """
+    subject, error = require_operator(event, "workflow.draft")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    status, payload = copilot.draft_workflow(body.get("prompt"))
+    audit.emit("copilot", "workflow.draft", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
 def designer_toggle_api(event, source):
     """Operator-only live enable/disable; mirrors the console's toggle."""
     subject, error = require_operator(event, "workflow.toggle")
@@ -391,6 +425,22 @@ def designer_toggle_api(event, source):
     status, payload = designer_store.api_toggle(source, body, operator=subject)
     audit.emit(str(source), "workflow.toggle", subject,
                outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def designer_test_api(event, source):
+    """Operator-only test run: dry-run a workflow on a sample event, or run
+    it for real with execute. Mirrors the console's test endpoint."""
+    subject, error = require_operator(event, "workflow.test")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_test_run(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.test", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
 
 
@@ -575,6 +625,22 @@ def runs_api(event, run_id=None):
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(query.get("limit", 25))
+    return _no_store(_json_response(status, payload))
+
+
+def runs_replay_api(event, run_id):
+    """Operator-only run replay, mirroring the console's replay button.
+
+    Re-injects the run's original trigger event onto the event queue; the
+    worker re-executes it and the rerun lands in run history like a normal
+    run.
+    """
+    subject, error = require_operator(event, "runs")
+    if error:
+        return error
+    status, payload = runs.api_replay(run_id)
+    if status == 202:
+        audit.emit(run_id, "runs.replay", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 

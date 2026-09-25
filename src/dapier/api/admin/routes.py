@@ -7,6 +7,7 @@ import boto3
 from ... import audit as audit_log
 from ... import http
 from ...auth import api_tokens, authz, session
+from ... import copilot
 from ...connections import credentials, importing
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
@@ -24,6 +25,14 @@ def list_runs(event):
 def get_run(run_id):
     """One run's step-by-step flow: status, input, output, duration, error."""
     status, payload = runs.api_get(run_id)
+    return http._json_response(status, payload)
+
+
+def replay_run(run_id, operator):
+    """Re-execute a run: its original trigger event goes back on the queue."""
+    status, payload = runs.api_replay(run_id)
+    if status == 202:
+        session._audit_event(run_id, "runs.replay", operator or "unknown", outcome="ok")
     return http._json_response(status, payload)
 
 
@@ -202,6 +211,24 @@ def save_designer_workflow(event, operator):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
+def copilot_draft(event, operator):
+    """Console mirror of the agent copilot: a DRAFT workflow for a prompt.
+
+    Delegates to the same copilot.draft_workflow handler as the CLI-facing
+    /api/agent/copilot/draft; never saves or publishes.
+    """
+    try:
+        body = http._request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return http._json_response(400, {"error": "Invalid request"})
+    status, payload = copilot.draft_workflow(body.get("prompt"))
+    session._audit_event("copilot", "workflow.draft", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+
 def toggle_designer_workflow(event, operator, source):
     try:
         body = http._request_json(event)
@@ -209,6 +236,17 @@ def toggle_designer_workflow(event, operator, source):
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     session._audit_event(str(source), "workflow.toggle", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def test_designer_workflow(event, operator, source=None):
+    """Dry-run (or, on execute, really run) one workflow on a sample event."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_test_run(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.test", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 

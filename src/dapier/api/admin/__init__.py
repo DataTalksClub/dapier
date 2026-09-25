@@ -40,6 +40,9 @@ def route(event, method, path):
         return overview.overview()
     if method == "GET" and path == "/api/admin/runs":
         return routes.list_runs(event)
+    run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
+    if method == "POST" and run_replay_match:
+        return routes.replay_run(unquote(run_replay_match.group(1)), operator_subject)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)))
@@ -75,11 +78,19 @@ def route(event, method, path):
         return routes.designer_list(event)
     if method == "PUT" and path == "/api/admin/designer/workflows":
         return routes.save_designer_workflow(event, operator_subject)
+    if method == "POST" and path == "/api/admin/designer/workflows/test":
+        return routes.test_designer_workflow(event, operator_subject)
+    if method == "POST" and path == "/api/admin/copilot/draft":
+        return routes.copilot_draft(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1))
     if method == "PUT" and designer_match:
         return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1))
+    designer_test_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+    if method == "POST" and designer_test_match:
+        return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1))
     if method == "GET" and path == "/api/admin/hook-triggers":
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":
@@ -104,6 +115,7 @@ def route(event, method, path):
 # admin.save_credential / admin.list_grants directly.
 from .login import auth_callback, auth_error, auth_login, auth_logout  # noqa: F401
 from .routes import (  # noqa: F401
+    copilot_draft,
     create_api_token,
     delete_email_trigger,
     delete_grant,
@@ -121,10 +133,12 @@ from .routes import (  # noqa: F401
     list_schedule_triggers,
     oauth_clients_view,
     revoke_api_token,
+    replay_run,
     revoke_connection_tokens,
     save_connection,
     save_credential,
     save_designer_workflow,
+    test_designer_workflow,
     toggle_designer_workflow,
     save_email_trigger,
     save_grant,

@@ -1,4 +1,5 @@
-"""Designer save path: validate workflow YAML, commit it to GitHub, publish it live.
+"""Designer save and test-run paths: validate workflow YAML, commit it to
+GitHub, publish it live, and dry-run it against a sample event.
 
 The console designer at /designer edits workflows/<id>.yaml in the dapier
 repo. Saves are validated server-side (structure only — action types beyond
@@ -33,6 +34,11 @@ MAX_YAML_BYTES = 100_000
 
 FILE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.yaml$", re.IGNORECASE)
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
+# Logic-step bounds the engine enforces at runtime; rejected here at save time.
+DELAY_MAX_SECONDS = 60
+LOOP_MAX_ITERATIONS = 100
+FILTER_OPERATORS = ("equals", "in", "prefix", "suffix", "contains")
 
 
 class WorkflowError(ValueError):
@@ -265,6 +271,60 @@ def filename_for(workflow_id):
     return f"{workflow_id}.yaml"
 
 
+def api_test_run(source, body, operator=None):
+    """Test-run one workflow against a sample event: dry-run by default,
+    real execution with ``execute: true``.
+
+    The workflow under test is, in order: the inline draft definition in the
+    body (``workflow`` object or ``yaml`` text — the point of the feature is
+    testing what is about to be saved), else the current file (published
+    overlay / bundled YAML / committed git state). ``event`` is the sample
+    event payload. Read-only unless ``execute`` is set.
+    """
+    del operator  # recorded by the calling route; the run itself is read-only
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    sample = body.get("event")
+    if not isinstance(sample, dict):
+        return 400, {"error": 'body must include "event": the sample event object'}
+    if not isinstance(body.get("execute", False), bool):
+        return 400, {"error": "execute must be a boolean"}
+    inline = body.get("workflow")
+    yaml_text = body.get("yaml")
+    if inline is not None and not isinstance(inline, dict):
+        return 400, {"error": "workflow must be an object"}
+    if inline is None and yaml_text is not None and not isinstance(yaml_text, str):
+        return 400, {"error": "yaml must be a string"}
+    try:
+        if inline is not None:
+            # Round-trip through the same validation the save path applies.
+            workflow = parse_workflow(yaml.safe_dump(inline))
+            label = filename_for(str(workflow["id"]))
+        elif isinstance(yaml_text, str):
+            workflow = parse_workflow(yaml_text)
+            label = filename_for(str(workflow["id"]))
+        else:
+            if not source:
+                return 400, {"error": "pass the workflow inline (workflow or yaml) "
+                                      "or test a saved file: /workflows/{file}/test"}
+            status, payload = api_get(source)
+            if status != 200:
+                return status, payload
+            workflow = payload["workflow"]
+            label = source
+    except WorkflowError as exc:
+        return 400, {"error": str(exc)}
+
+    from ..engine import dryrun
+
+    try:
+        payload = dryrun.test_run(workflow, sample, execute=bool(body.get("execute", False)))
+    except dryrun.TestRunError as exc:
+        return 400, {"error": str(exc)}
+    payload["file"] = label
+    return 200, payload
+
+
 def parse_workflow(yaml_text):
     """Structural validation mirroring what engine.py reads at runtime.
 
@@ -314,7 +374,81 @@ def parse_workflow(yaml_text):
     for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():
             raise WorkflowError("every action needs a type")
+        if action.get("type") == "code" and not str(action.get("code") or "").strip():
+            raise WorkflowError("every code action needs non-empty code")
+        from ..engine.actions import templating
+
+        try:
+            templating.validate_action(action)
+        except templating.TemplateError as exc:
+            raise WorkflowError(f"action '{action.get('type')}': {exc}") from exc
+        from ..engine.actions import templating
+
+        try:
+            templating.validate_action(action)
+        except templating.TemplateError as exc:
+            raise WorkflowError(f"action '{action.get('type')}': {exc}") from exc
+    _validate_steps(actions)
     return workflow
+
+
+def _validate_steps(steps, where="actions"):
+    """Structural validation of a step chain, recursing into logic steps.
+
+    Connector action internals stay permissive (the engine owns them); the
+    logic step kinds — filter, condition, delay, for_each — are checked here
+    so a bad delay bound or an empty loop body fails the save with a clear
+    error instead of failing at run time.
+    """
+    from ..engine import logic
+
+    for index, step in enumerate(steps or []):
+        if not isinstance(step, dict) or not str(step.get("type") or "").strip():
+            raise WorkflowError(f"{where}[{index}]: every step needs a type")
+        kind = str(step["type"])
+        label = str(step.get("id") or f"{where}[{index}]")
+        if kind in ("filter", "condition"):
+            when = step.get("when")
+            if when is not None and not isinstance(when, dict):
+                raise WorkflowError(f"step '{label}': when must be a mapping of field rules")
+            if logic.predicate_rules(step) is None:
+                raise WorkflowError(f"step '{label}': {kind} needs a when mapping or a field")
+            operator = str(step.get("operator") or "").strip()
+            if operator and operator not in FILTER_OPERATORS:
+                raise WorkflowError(
+                    f"step '{label}': operator must be one of {', '.join(FILTER_OPERATORS)}")
+        if kind == "condition":
+            for branch in ("then", "else"):
+                value = step.get(branch)
+                if value is None:
+                    continue
+                if not isinstance(value, list):
+                    raise WorkflowError(f"step '{label}': condition {branch} must be a list of steps")
+                _validate_steps(value, where=f"{label}.{branch}")
+        if kind == "delay":
+            seconds = step.get("seconds")
+            if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
+                    or seconds <= 0 or seconds > DELAY_MAX_SECONDS:
+                raise WorkflowError(
+                    f"step '{label}': delay seconds must be a number between 1 and "
+                    f"{DELAY_MAX_SECONDS} (Lambda invocation limit)")
+        if kind == "for_each":
+            if not str(step.get("list") or "").strip().strip("{}").strip():
+                raise WorkflowError(f"step '{label}': for_each needs a list field")
+            item = str(step.get("item") or "item").strip() or "item"
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item):
+                raise WorkflowError(f"step '{label}': for_each item must be a template variable name")
+            body = step.get("actions")
+            if not isinstance(body, list) or not body:
+                raise WorkflowError(f"step '{label}': for_each needs at least one step in actions")
+            _validate_steps(body, where=label)
+            iterations = step.get("max_iterations")
+            if iterations is not None and (
+                    isinstance(iterations, bool) or not isinstance(iterations, int)
+                    or iterations < 1 or iterations > LOOP_MAX_ITERATIONS):
+                raise WorkflowError(
+                    f"step '{label}': for_each max_iterations must be between 1 and "
+                    f"{LOOP_MAX_ITERATIONS}")
 
 
 def get_token():

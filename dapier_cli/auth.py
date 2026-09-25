@@ -110,7 +110,14 @@ def _post_json(url, body, bearer=None, timeout=20):
         return exc.code, data
 
 
-def login_device(api_url, *, timeout=600, sleeper=time.sleep, poster=None):
+def _wait_seconds(timeout, expires_in):
+    """Never give up before the code does: wait out the pairing's full life."""
+    if expires_in:
+        return max(timeout, int(expires_in) + 15)
+    return timeout
+
+
+def login_device(api_url, *, timeout=900, sleeper=time.sleep, poster=None):
     """Pair this CLI with the operator identity; returns the device session."""
     poster = poster or _post_json
     base = api_url.rstrip("/")
@@ -118,10 +125,11 @@ def login_device(api_url, *, timeout=600, sleeper=time.sleep, poster=None):
     if status != 200 or not pairing.get("device_code") or not pairing.get("user_code"):
         raise LoginError("This Dapier API did not offer device pairing")
     interval = max(int(pairing.get("interval") or 2), 1)
+    expires_in = int(pairing.get("expires_in") or 0)
+    deadline = time.time() + _wait_seconds(timeout, expires_in)
     print(f"Open:  {base}/device")
     print(f"Code:  {pairing['user_code']}")
-    print("Waiting for approval (the code expires in 15 minutes) ...", flush=True)
-    deadline = time.time() + timeout
+    print(f"Waiting for approval (the code is valid for {max(expires_in // 60, 1)} minutes) ...", flush=True)
     while time.time() < deadline:
         status, result = poster(f"{base}/api/agent/device/token", {"device_code": pairing["device_code"]})
         if status == 200 and result.get("status") == "approved":

@@ -14,6 +14,7 @@ const STEP_ICONS = {
   dropbox_upload: 'cloud-upload',
   dropbox_delete: 'trash-2',
   render_html_to_pdf: 'file-text',
+  code: 'code-2',
 };
 
 function triggerLabel(run) {
@@ -100,6 +101,8 @@ export async function openRun(runId) {
       ${statusLine(run.status)}
       <code>${wrapTokens(run.run_id || runId)}</code>
       ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
+      <button class="button secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+        title="Re-inject this run's original trigger event">Replay</button>
     </div>
     ${flow(data)}`;
   icons();

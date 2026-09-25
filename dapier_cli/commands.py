@@ -328,6 +328,11 @@ def workflows_save(api_url, path, rename_from, debug=False):
     except OSError as exc:
         print(f"Cannot read {path}: {exc}")
         return 2
+    return _save_workflow_yaml(api_url, yaml_text, rename_from, debug=debug)
+
+
+def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
+    """The `workflows save` wire call; also the --save tail of `workflows draft`."""
     body = {"yaml": yaml_text}
     if rename_from:
         body["renameFrom"] = rename_from
@@ -340,6 +345,27 @@ def workflows_save(api_url, path, rename_from, debug=False):
     return 0
 
 
+def workflows_draft(api_url, prompt, save=False, debug=False):
+    """Copilot draft: print the model's YAML; --save pipes it through the
+    existing save path (the API validates again there). The draft itself is
+    never saved implicitly."""
+    data = api.call(api_url, "POST", "/api/agent/copilot/draft", {"prompt": prompt},
+                    timeout=120, debug=debug)
+    yaml_text = data.get("yaml") or ""
+    print(yaml_text)
+    errors = data.get("errors") or []
+    if errors:
+        print("\nValidation errors (a save would reject this draft):")
+        for error in errors:
+            print(f"  - {error}")
+    if not save:
+        return 0
+    if errors or not yaml_text:
+        print("Not saving: fix the errors above, then run `dapier workflows save <file>`.")
+        return 5
+    return _save_workflow_yaml(api_url, yaml_text, None, debug=debug)
+
+
 def workflows_set_enabled(api_url, file, enabled, debug=False):
     data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}",
                     {"enabled": enabled}, debug=debug)
@@ -350,6 +376,62 @@ def workflows_set_enabled(api_url, file, enabled, debug=False):
     if data.get("git_sync_error"):
         print(f"Warning: the git commit failed ({data['git_sync_error']}); "
               "the next deploy may revert this toggle.")
+    return 0
+
+
+def workflows_test(api_url, path, event_spec, execute=False, debug=False):
+    """Test-run a workflow YAML against a sample event, via the agent API.
+
+    Default is a dry-run: per-step rendered inputs with no side effects.
+    --execute really runs the actions. Exits 0 when every step is ok and a
+    trigger actually matched; 1 when the run found problems (a failed step,
+    an unsupported action, or no trigger match), so it can gate scripts.
+    """
+    try:
+        with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
+            yaml_text = handle.read()
+    except OSError as exc:
+        print(f"Cannot read {path}: {exc}")
+        return 2
+    try:
+        if event_spec.startswith("@"):
+            with open(event_spec[1:], encoding="utf-8") as handle:
+                sample = json.load(handle)
+        else:
+            sample = json.loads(event_spec)
+    except OSError as exc:
+        print(f"Cannot read {event_spec[1:]}: {exc}")
+        return 2
+    except ValueError as exc:
+        print(f"Invalid sample event JSON: {exc}")
+        return 2
+    if not isinstance(sample, dict):
+        print("The sample event must be a JSON object.")
+        return 2
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test",
+                    {"yaml": yaml_text, "event": sample, "execute": execute}, debug=debug)
+    label = data.get("file") or path
+    matched = bool(data.get("matched"))
+    enabled = bool(data.get("enabled", True))
+    print(f"{'Executed' if data.get('mode') == 'execute' else 'Dry run'}: {label} — "
+          f"{'a trigger matches' if matched else 'NO trigger matches'} the sample event"
+          + ("" if enabled else " (the workflow is disabled)"))
+    for index, step in enumerate(data.get("steps") or [], 1):
+        head = f"  {index}. {step.get('action_id', '?')} ({step.get('action_type', '?')})"
+        if step.get("ok"):
+            print(f"{head}: ok")
+        else:
+            print(f"{head}: {step.get('error') or 'failed'}")
+        if step.get("rendered_input") is not None:
+            print(f"     input: {json.dumps(step['rendered_input'], sort_keys=True)}")
+        if step.get("output") is not None:
+            print(f"     output: {json.dumps(step['output'], sort_keys=True)}")
+    if data.get("error"):
+        print(f"Run error: {data['error']}")
+    if not data.get("ok") or not matched:
+        if data.get("ok") and not matched:
+            print("Nothing would run: no trigger matches this event.")
+        return 1
     return 0
 
 
@@ -638,6 +720,14 @@ def runs_show(api_url, run_id, debug=False):
             value = step.get(field)
             if value not in (None, "", [], {}):
                 print(f"  {field}: {json.dumps(value, sort_keys=True, default=str)}")
+    return 0
+
+
+def runs_replay(api_url, run_id, debug=False):
+    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/replay", body={}, debug=debug)
+    print(f"Replay accepted for {data.get('replayed_from') or run_id}.")
+    print(f"The re-injected run ({data.get('run_id') or 'pending'}) appears in `dapier runs list` "
+          "once the worker picks it up.")
     return 0
 
 

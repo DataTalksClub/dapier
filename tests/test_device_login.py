@@ -1,6 +1,7 @@
 """Device pairing: storage logic and the /api/agent/device/* endpoints."""
 
 import json
+import re
 import time
 
 import pytest
@@ -10,10 +11,36 @@ from src.dapier.auth import device_sessions
 
 
 class FakeTable:
-    """pk-keyed table honoring the conditions device_sessions relies on."""
+    """pk-keyed table honoring the conditions device_sessions relies on.
+
+    Unlike real DynamoDB, moto accepts bare attribute names in expressions
+    even reserved ones (session, ttl, status …) — the bug that made every
+    live approval fail with "Unknown or expired code". So this fake enforces
+    what the real service does not: every attribute in an expression must be
+    a #placeholder.
+    """
+
+    _EXPRESSION_WORDS = {
+        "SET", "REMOVE", "ADD", "DELETE", "AND", "OR", "NOT", "BETWEEN", "IN",
+        "attribute_exists", "attribute_not_exists", "attribute_type",
+        "begins_with", "contains", "size",
+    }
 
     def __init__(self):
         self.items = {}
+
+    @staticmethod
+    def _check_expression(expression, names):
+        for word in re.findall(r"[#:]?[A-Za-z_][A-Za-z0-9_]*", expression or ""):
+            if word.startswith(("#", ":")) or word in FakeTable._EXPRESSION_WORDS:
+                continue
+            if word not in set((names or {}).values()):
+                raise ValueError(f"bare attribute in expression: {word}")
+
+    def _resolve(self, kwargs, expression):
+        for placeholder, attribute in (kwargs.get("ExpressionAttributeNames") or {}).items():
+            expression = expression.replace(placeholder, attribute)
+        return expression
 
     def put_item(self, **kwargs):
         item = kwargs["Item"]
@@ -24,8 +51,11 @@ class FakeTable:
         return {"Item": dict(item)} if item else {}
 
     def update_item(self, **kwargs):
+        names = kwargs.get("ExpressionAttributeNames")
+        self._check_expression(kwargs.get("UpdateExpression"), names)
+        self._check_expression(kwargs.get("ConditionExpression"), names)
         item = self.items.get(kwargs["Key"]["pk"])
-        condition = kwargs.get("ConditionExpression") or ""
+        condition = self._resolve(kwargs, kwargs.get("ConditionExpression") or "")
         if "attribute_exists(pk)" in condition and item is None:
             raise KeyError(kwargs["Key"]["pk"])
         if ":pending" in condition and (item is None or item.get("status") != "pending"):

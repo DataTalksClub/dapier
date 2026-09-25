@@ -1,10 +1,12 @@
-import { DatabaseZap, FileText, Webhook } from "lucide-react";
+import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
- * new engine action (see run_* dispatch in src/dapier/engine/__init__.py) or trigger connector.
+ * new engine action (see run_* dispatch in src/dapier/engine/__init__.py), an
+ * in-workflow logic step (filter, condition, delay, for_each — executed by
+ * src/dapier/engine/logic.py), or trigger connector.
  *
  * Adding an action is one object in `actionCatalog`:
  *   1. type   — the exact string written to the action's `type` YAML key;
@@ -44,13 +46,13 @@ export interface CatalogField {
   label: string;
   placeholder?: string;
   required?: boolean;
-  /** Inspector widget and YAML coercion; default "text". */
-  type?: "text" | "number" | "textarea" | "boolean" | "select";
+  /** Inspector widget and YAML coercion; default "text". "yaml" edits a list/object as YAML text. */
+  type?: "text" | "number" | "textarea" | "boolean" | "select" | "yaml";
   /** Choices for type: "select". */
   options?: string[];
   /** Value assumed when absent; prefills new nodes and YAML round-trips. */
   default?: string;
-  /** Nest under this object in the action YAML, e.g. "pdf" → action.pdf.page_format. */
+  /** Nest under this object in the action YAML, e.g. group: "pdf" → action.pdf.page_format. */
   group?: string;
 }
 
@@ -75,6 +77,12 @@ export interface ConnectorEntry {
   /** Events offered as suggestions for this connector's trigger. */
   events: string[];
 }
+
+/**
+ * Operators the in-workflow logic steps (filter, condition) accept — the same
+ * matching engine as trigger filters, plus "in".
+ */
+export const logicOperators = ["equals", "in", "prefix", "suffix", "contains"] as const;
 
 /** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
@@ -146,6 +154,67 @@ export const actionCatalog: ActionEntry[] = [
       { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
       { key: "page_format", label: "PDF page format", group: "pdf", default: "A4" },
       { key: "print_background", label: "Print background", group: "pdf", type: "boolean", default: "true" }
+    ]
+  },
+  {
+    type: "filter",
+    label: "Filter",
+    icon: Filter,
+    description: "Stop the chain quietly unless the condition holds",
+    fields: [
+      { key: "field", label: "Field", placeholder: "subject", required: true },
+      { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+      { key: "value", label: "Value", placeholder: "invoice" }
+    ]
+  },
+  {
+    type: "condition",
+    label: "Condition",
+    icon: GitBranch,
+    description: "Run the then steps, or the else steps",
+    fields: [
+      { key: "field", label: "Field", placeholder: "route", required: true },
+      { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+      { key: "value", label: "Value" },
+      { key: "then", label: "Then steps (YAML)", type: "yaml", placeholder: "- id: notify\n  type: slack\n  channel: \"#alerts\"\n  text: \"{subject}\"" },
+      { key: "else", label: "Else steps (YAML)", type: "yaml" }
+    ]
+  },
+  {
+    type: "delay",
+    label: "Delay",
+    icon: Timer,
+    description: "Pause the chain before the next step (max 60s)",
+    fields: [
+      { key: "seconds", label: "Seconds (max 60)", type: "number", required: true, placeholder: "30" }
+    ]
+  },
+  {
+    type: "for_each",
+    label: "For each",
+    icon: ListTree,
+    description: "Run steps once per item of a list (max 100 items)",
+    fields: [
+      { key: "list", label: "List field", placeholder: "attachments", required: true },
+      { key: "item", label: "Item variable", default: "item" },
+      { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
+      { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: "- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: \"/Invoices/{item.filename}\"" }
+    ]
+  },
+  {
+    type: "code",
+    label: "Code (Python)",
+    icon: Code2,
+    description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+    fields: [
+      {
+        key: "code",
+        label: "Python source",
+        type: "textarea",
+        required: true,
+        placeholder: "# event data is `input`; last expression is the result\n{\"route\": input[\"route\"], \"score\": len(input.get(\"body\",\ \"\"))}"
+      },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   }
 ];

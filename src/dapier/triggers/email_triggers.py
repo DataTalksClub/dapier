@@ -75,6 +75,8 @@ def validate_name(name):
 def validate_actions(actions):
     if not isinstance(actions, list) or not actions:
         raise TriggerError("at least one action is required")
+    from ..engine.actions import templating
+
     for action in actions:
         if not isinstance(action, dict):
             raise TriggerError("each action must be an object")
@@ -88,6 +90,10 @@ def validate_actions(actions):
         unknown = sorted(set(action) - required - optional - {"type", "id"})
         if unknown:
             raise TriggerError(f"{action_type} action has unknown keys: {', '.join(unknown)}")
+        try:
+            templating.validate_action(action)
+        except templating.TemplateError as exc:
+            raise TriggerError(f"{action_type}: {exc}") from exc
     return actions
 
 

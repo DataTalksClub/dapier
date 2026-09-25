@@ -711,3 +711,105 @@ def test_runs_list_and_detail_over_bearer(monkeypatch):
 
     missing = agent_api.route(event(), "GET", "/api/agent/runs/wf-1:missing")
     assert missing["statusCode"] == 404
+
+
+def _configure_replay_queue(monkeypatch):
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    calls = []
+
+    class Queue:
+        def send_message(self, **kwargs):
+            calls.append(kwargs)
+            return {"MessageId": "sqsm-1"}
+
+    monkeypatch.setattr(agent_api.runs, "_queue", lambda: Queue())
+    return calls
+
+
+def test_runs_replay_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_runs_table(monkeypatch, [])
+
+    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/replay")
+
+    assert replayed["statusCode"] == 403
+
+
+def test_runs_replay_over_bearer_reinjects_the_original_event(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_runs_table(monkeypatch, [
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "post", "connector": "email", "event_type": "message.received",
+         "status": "failed", "started_at": "2026-09-25T10:00:00+00:00",
+         "finished_at": "2026-09-25T10:00:01+00:00", "input": {"route": "invoice"}},
+    ])
+    calls = _configure_replay_queue(monkeypatch)
+
+    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1%3Aevt-1/replay")
+
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["replayed_from"] == "wf-1:evt-1"
+    assert body["run_id"].startswith("wf-1:replay-")
+    envelope = json.loads(calls[0]["MessageBody"])
+    assert envelope["id"].startswith("replay-")
+    assert envelope["correlation_id"] == "evt-1"
+    assert envelope["connector"] == "email"
+    assert envelope["data"] == {"route": "invoice"}
+
+    missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/replay")
+    assert missing["statusCode"] == 404
+
+
+def _configure_replay_queue(monkeypatch):
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    calls = []
+
+    class Queue:
+        def send_message(self, **kwargs):
+            calls.append(kwargs)
+            return {"MessageId": "sqsm-1"}
+
+    monkeypatch.setattr(agent_api.runs, "_queue", lambda: Queue())
+    return calls
+
+
+def test_runs_replay_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_runs_table(monkeypatch, [])
+
+    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/replay")
+
+    assert replayed["statusCode"] == 403
+
+
+def test_runs_replay_over_bearer_reinjects_the_original_event(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_runs_table(monkeypatch, [
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "post", "connector": "email", "event_type": "message.received",
+         "status": "failed", "started_at": "2026-09-25T10:00:00+00:00",
+         "finished_at": "2026-09-25T10:00:01+00:00", "input": {"route": "invoice"}},
+    ])
+    calls = _configure_replay_queue(monkeypatch)
+
+    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1%3Aevt-1/replay")
+
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["replayed_from"] == "wf-1:evt-1"
+    assert body["run_id"].startswith("wf-1:replay-")
+    envelope = json.loads(calls[0]["MessageBody"])
+    assert envelope["id"].startswith("replay-")
+    assert envelope["correlation_id"] == "evt-1"
+    assert envelope["connector"] == "email"
+    assert envelope["data"] == {"route": "invoice"}
+
+    missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/replay")
+    assert missing["statusCode"] == 404
