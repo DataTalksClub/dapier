@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { setView, viewFromPath } from './router.js';
 import { refresh, openRowFor } from './views/overview.js';
 import { openDesigner, designerFromLocation } from './views/designer.js';
+import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
   if (event.target instanceof Element && event.target.closest('.secret-input')) event.preventDefault();
@@ -81,6 +82,7 @@ document.addEventListener('click', designerClick);
 $('#refresh').addEventListener('click', refresh);
 $('#menu-toggle').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
 $('#logout').addEventListener('click', () => { window.location.assign('/auth/logout'); });
+$('#theme-toggle').addEventListener('click', toggleTheme);
 
 window.addEventListener('DOMContentLoaded', async () => {
   icons();
