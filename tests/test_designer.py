@@ -383,32 +383,6 @@ def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_id
     )["statusCode"] == 401
 
 
-# ---- Static serving ----
-
-def test_designer_page_is_served_with_inline_style_csp():
-    response = ingress._static("/designer")
-    assert response["statusCode"] == 200
-    assert response["headers"]["content-type"].startswith("text/html")
-    assert "style-src 'self' 'unsafe-inline'" in response["headers"]["content-security-policy"]
-    assert response["headers"]["cache-control"] == "no-store"
-    assert 'id="designer-root"' in response["body"]
-
-
-def test_designer_assets_are_served_cacheable():
-    js = ingress._static("/assets/designer.js")
-    assert js["statusCode"] == 200
-    assert js["headers"]["content-type"].startswith("text/javascript")
-    assert js["headers"]["cache-control"] == "public, max-age=300"
-    css = ingress._static("/assets/designer.css")
-    assert css["statusCode"] == 200
-    assert css["headers"]["content-type"].startswith("text/css")
-
-
-def test_unknown_static_path_is_not_served():
-    assert ingress._static("/assets/nope.js") is None
-    assert ingress._static("/designer/extra") is None
-
-
 # ---- Admin + agent API surface ----
 
 import json
@@ -580,14 +554,17 @@ def test_designer_page_is_served_with_inline_style_csp():
     assert 'id="designer-root"' in response["body"]
 
 
-def test_designer_assets_are_served_cacheable():
+def test_designer_assets_are_served_uncached():
+    # Deploys swap the bundles in place, so a cached copy would drive stale
+    # markup/JS against fresh pages; everything is no-store.
     js = ingress._static("/assets/designer.js")
     assert js["statusCode"] == 200
     assert js["headers"]["content-type"].startswith("text/javascript")
-    assert js["headers"]["cache-control"] == "public, max-age=300"
+    assert js["headers"]["cache-control"] == "no-store"
     css = ingress._static("/assets/designer.css")
     assert css["statusCode"] == 200
     assert css["headers"]["content-type"].startswith("text/css")
+    assert css["headers"]["cache-control"] == "no-store"
 
 
 def test_unknown_static_path_is_not_served():

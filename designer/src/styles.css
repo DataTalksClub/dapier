@@ -73,7 +73,8 @@
 
 html,
 body,
-#root {
+#root,
+#designer-root {
   height: 100%;
 }
 

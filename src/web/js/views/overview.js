@@ -38,7 +38,14 @@ function openWorkflow(id) {
         ${configRows(action)}
       </div>`).join('')}
     </section>`;
-  const edit = $('#workflow-edit');
+  const designer = $('#workflow-edit');
+  if (workflow.source) {
+    designer.href = `/designer?workflow=${encodeURIComponent(workflow.source)}`;
+    designer.hidden = false;
+  } else {
+    designer.hidden = true;
+  }
+  const edit = $('#workflow-edit-github');
   if (workflow.source && state.data.workflows_edit_base) {
     edit.href = `${state.data.workflows_edit_base}/${encodeURIComponent(workflow.source)}`;
     edit.hidden = false;

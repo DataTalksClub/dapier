@@ -31,8 +31,6 @@ def _response(status, body, content_type="application/json", headers=None):
 
 CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/tokens", "/runs")
 DESIGNER_VIEW = "/designer"
-# Pages whose static cache policy matches the console views.
-HTML_VIEWS = CONSOLE_VIEWS + (DESIGNER_VIEW,)
 
 
 def _static(path):
@@ -78,7 +76,10 @@ def _static(path):
         body,
         content_type,
         headers={
-            "cache-control": "no-store" if path in HTML_VIEWS else "public, max-age=300",
+            # Deploys swap bundles in place at the same URLs; caching any
+            # tier lets a stale app.js drive fresh markup (the "designer
+            # lands on /workflows empty" bug), so everything is no-store.
+            "cache-control": "no-store",
             "content-security-policy": (
                 "default-src 'self'; script-src 'self'; "
                 f"style-src {style_src}; img-src 'self' data:; connect-src 'self'; "

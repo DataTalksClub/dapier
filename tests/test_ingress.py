@@ -171,10 +171,28 @@ def test_console_views_serve_index_html():
 def test_every_nav_link_resolves_to_a_served_page():
     index = ingress._static("/")
     nav_links = re.findall(r'class="nav-item[^"]*" href="([^"]+)"', index["body"])
-    assert len(nav_links) >= 7, nav_links
+    assert len(nav_links) >= 6, nav_links
     for path in nav_links:
         response = ingress._static(path)
         assert response is not None and response["statusCode"] == 200, path
+
+
+def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
+    index = ingress._static("/")["body"]
+    workflows_view = re.search(r'data-page="workflows".*?</section>', index, re.S).group(0)
+    new_link = re.search(r'<a class="button primary" href="([^"]+)">New workflow</a>', workflows_view)
+    assert new_link and new_link.group(1) == "/designer"
+    assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
+
+    # The workflow dialog deep-links the designer with the workflow source.
+    assert 'id="workflow-edit"' in index
+    assert ingress._static("/designer")["statusCode"] == 200
+
+
+def test_assets_are_served_without_caching():
+    for path in ("/", "/assets/app.js", "/assets/designer.js", "/assets/app.css"):
+        response = ingress._static(path)
+        assert response["headers"]["cache-control"] == "no-store", path
 
 
 def test_every_nav_link_has_an_api_gateway_route():

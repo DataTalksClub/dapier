@@ -133,10 +133,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const refreshList = useCallback(async () => {
     const data = await api<{ workflows: WorkflowSummary[] }>(config, "/workflows");
     setSummaries(data.workflows);
+    return data.workflows;
   }, [config]);
 
   useEffect(() => {
-    refreshList().catch((error) => setStatus({ kind: "error", message: String(error) }));
+    refreshList()
+      .then((workflows) => {
+        // Console deep link: /designer?workflow=<source> opens that workflow.
+        const requested = new URLSearchParams(window.location.search).get("workflow");
+        const match = requested ? workflows.find((summary) => summary.source === requested) : null;
+        if (match) return openWorkflow(match);
+      })
+      .catch((error) => setStatus({ kind: "error", message: String(error) }));
     refreshGit();
   }, [refreshGit, refreshList]);
 
@@ -151,6 +159,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSavedSnapshot(JSON.stringify(shapesFromWorkflow(workflow)));
       setSelectedId(null);
       setStatus({ kind: "idle", message: "" });
+      if (config.mode === "console") {
+        history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(summary.source)}`);
+      }
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
     }
@@ -190,6 +201,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       });
       setSavedSnapshot(JSON.stringify(shapes));
       setSourceName(`${workflow.id}.yaml`);
+      if (config.mode === "console") {
+        history.replaceState(null, "", `/designer?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
+      }
       setSummaries((current) => {
         const others = current.filter((entry) => entry.source !== sourceName && entry.source !== `${workflow.id}.yaml`);
         return [...others, summarize(`${workflow.id}.yaml`, workflow)].sort((a, b) => a.source.localeCompare(b.source));
