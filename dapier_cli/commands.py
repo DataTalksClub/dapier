@@ -328,6 +328,11 @@ def workflows_save(api_url, path, rename_from, debug=False):
     except OSError as exc:
         print(f"Cannot read {path}: {exc}")
         return 2
+    return _save_workflow_yaml(api_url, yaml_text, rename_from, debug=debug)
+
+
+def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
+    """The `workflows save` wire call; also the --save tail of `workflows draft`."""
     body = {"yaml": yaml_text}
     if rename_from:
         body["renameFrom"] = rename_from
@@ -338,6 +343,27 @@ def workflows_save(api_url, path, rename_from, debug=False):
         print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
               "The deploy pipeline publishes it in a few minutes.")
     return 0
+
+
+def workflows_draft(api_url, prompt, save=False, debug=False):
+    """Copilot draft: print the model's YAML; --save pipes it through the
+    existing save path (the API validates again there). The draft itself is
+    never saved implicitly."""
+    data = api.call(api_url, "POST", "/api/agent/copilot/draft", {"prompt": prompt},
+                    timeout=120, debug=debug)
+    yaml_text = data.get("yaml") or ""
+    print(yaml_text)
+    errors = data.get("errors") or []
+    if errors:
+        print("\nValidation errors (a save would reject this draft):")
+        for error in errors:
+            print(f"  - {error}")
+    if not save:
+        return 0
+    if errors or not yaml_text:
+        print("Not saving: fix the errors above, then run `dapier workflows save <file>`.")
+        return 5
+    return _save_workflow_yaml(api_url, yaml_text, None, debug=debug)
 
 
 def workflows_set_enabled(api_url, file, enabled, debug=False):
