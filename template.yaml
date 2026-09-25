@@ -202,6 +202,9 @@ Resources:
         ConsoleCredentials:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /credentials, Method: GET}
+        ConsoleTokens:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /tokens, Method: GET}
         ConsoleRuns:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}

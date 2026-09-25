@@ -177,6 +177,26 @@ def test_every_nav_link_resolves_to_a_served_page():
         assert response is not None and response["statusCode"] == 200, path
 
 
+def test_every_nav_link_has_an_api_gateway_route():
+    import yaml
+
+    class CloudFormationLoader(yaml.SafeLoader):
+        pass
+
+    CloudFormationLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+    with open("template.yaml") as handle:
+        template = yaml.load(handle, Loader=CloudFormationLoader)
+    events = template["Resources"]["IngressFunction"]["Properties"]["Events"]
+    routes = {
+        (event["Properties"]["Path"], event["Properties"]["Method"])
+        for event in events.values()
+        if event.get("Type") == "HttpApi"
+    }
+    index = ingress._static("/")
+    for path in re.findall(r'class="nav-item[^"]*" href="([^"]+)"', index["body"]):
+        assert (path, "GET") in routes, f"API Gateway has no route for {path}"
+
+
 def test_console_assets_are_self_hosted():
     lucide = ingress._static("/assets/lucide.min.js")
     assert lucide["statusCode"] == 200
