@@ -34,6 +34,11 @@ MAX_YAML_BYTES = 100_000
 FILE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.yaml$", re.IGNORECASE)
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
+# Logic-step bounds the engine enforces at runtime; rejected here at save time.
+DELAY_MAX_SECONDS = 60
+LOOP_MAX_ITERATIONS = 100
+FILTER_OPERATORS = ("equals", "in", "prefix", "suffix", "contains")
+
 
 class WorkflowError(ValueError):
     """Invalid workflow definition."""
@@ -314,7 +319,67 @@ def parse_workflow(yaml_text):
     for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():
             raise WorkflowError("every action needs a type")
+    _validate_steps(actions)
     return workflow
+
+
+def _validate_steps(steps, where="actions"):
+    """Structural validation of a step chain, recursing into logic steps.
+
+    Connector action internals stay permissive (the engine owns them); the
+    logic step kinds — filter, condition, delay, for_each — are checked here
+    so a bad delay bound or an empty loop body fails the save with a clear
+    error instead of failing at run time.
+    """
+    from ..engine import logic
+
+    for index, step in enumerate(steps or []):
+        if not isinstance(step, dict) or not str(step.get("type") or "").strip():
+            raise WorkflowError(f"{where}[{index}]: every step needs a type")
+        kind = str(step["type"])
+        label = str(step.get("id") or f"{where}[{index}]")
+        if kind in ("filter", "condition"):
+            when = step.get("when")
+            if when is not None and not isinstance(when, dict):
+                raise WorkflowError(f"step '{label}': when must be a mapping of field rules")
+            if logic.predicate_rules(step) is None:
+                raise WorkflowError(f"step '{label}': {kind} needs a when mapping or a field")
+            operator = str(step.get("operator") or "").strip()
+            if operator and operator not in FILTER_OPERATORS:
+                raise WorkflowError(
+                    f"step '{label}': operator must be one of {', '.join(FILTER_OPERATORS)}")
+        if kind == "condition":
+            for branch in ("then", "else"):
+                value = step.get(branch)
+                if value is None:
+                    continue
+                if not isinstance(value, list):
+                    raise WorkflowError(f"step '{label}': condition {branch} must be a list of steps")
+                _validate_steps(value, where=f"{label}.{branch}")
+        if kind == "delay":
+            seconds = step.get("seconds")
+            if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
+                    or seconds <= 0 or seconds > DELAY_MAX_SECONDS:
+                raise WorkflowError(
+                    f"step '{label}': delay seconds must be a number between 1 and "
+                    f"{DELAY_MAX_SECONDS} (Lambda invocation limit)")
+        if kind == "for_each":
+            if not str(step.get("list") or "").strip().strip("{}").strip():
+                raise WorkflowError(f"step '{label}': for_each needs a list field")
+            item = str(step.get("item") or "item").strip() or "item"
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item):
+                raise WorkflowError(f"step '{label}': for_each item must be a template variable name")
+            body = step.get("actions")
+            if not isinstance(body, list) or not body:
+                raise WorkflowError(f"step '{label}': for_each needs at least one step in actions")
+            _validate_steps(body, where=label)
+            iterations = step.get("max_iterations")
+            if iterations is not None and (
+                    isinstance(iterations, bool) or not isinstance(iterations, int)
+                    or iterations < 1 or iterations > LOOP_MAX_ITERATIONS):
+                raise WorkflowError(
+                    f"step '{label}': for_each max_iterations must be between 1 and "
+                    f"{LOOP_MAX_ITERATIONS}")
 
 
 def get_token():

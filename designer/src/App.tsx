@@ -55,9 +55,22 @@ function FieldInput({ field, value, onChange }: {
   if (field.type === "select") {
     return (
       <label>{field.label}{field.required ? " *" : ""}
-        <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <select value={value || field.default || ""} onChange={(event) => onChange(event.target.value)}>
           {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
+      </label>
+    );
+  }
+  if (field.type === "yaml") {
+    return (
+      <label>{field.label}{field.required ? " *" : ""}
+        <textarea
+          className="raw-yaml"
+          rows={6}
+          value={value}
+          placeholder={field.placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
       </label>
     );
   }
