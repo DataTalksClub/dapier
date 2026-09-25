@@ -134,6 +134,40 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     [view, yamlText, savedYaml, shapes, savedSnapshot]
   );
 
+  /** Tells the framing console what the title bar should show and edit.
+     The console owns the h1 rename affordance; it answers with set-id. */
+  useEffect(() => {
+    if (!config.embedded || window.parent === window) return;
+    window.parent.postMessage(
+      {
+        type: "designer:meta",
+        id: workflowId,
+        enabled,
+        source: sourceName,
+        editable: view === "canvas"
+      },
+      window.location.origin
+    );
+  }, [config.embedded, workflowId, enabled, sourceName, view]);
+
+  useEffect(() => {
+    if (!config.embedded) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; id?: unknown };
+      if (data?.type !== "designer:set-id" || typeof data.id !== "string") return;
+      const id = data.id.trim();
+      if (!id) return;
+      if (view !== "canvas") {
+        setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit id: in the YAML." });
+        return;
+      }
+      setWorkflowId(id);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [config.embedded, view]);
+
   const refreshGit = useCallback(() => {
     if (config.mode !== "local") return;
     api<GitStatus>(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -564,16 +598,28 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 YAML
               </button>
             </div>
-            <input
-              className="id-input"
-              value={workflowId}
-              aria-label="Workflow ID"
-              placeholder="workflow-id"
-              disabled={view === "yaml"}
-              title={view === "yaml" ? "Edit the id in the YAML view" : undefined}
-              onChange={(event) => setWorkflowId(event.target.value)}
-            />
-            <label className="check-label" title={view === "yaml" ? "Edit enabled in the YAML view" : undefined}>
+            {/* Embedded in the console, the console's own h1 renames the
+               workflow (see views/designer.js); standalone keeps an input. */}
+            {!config.embedded && (
+              <input
+                className="id-input"
+                value={workflowId}
+                aria-label="Workflow ID"
+                placeholder="workflow-id"
+                disabled={view === "yaml"}
+                title={view === "yaml" ? "Edit the id in the YAML view" : undefined}
+                onChange={(event) => setWorkflowId(event.target.value)}
+              />
+            )}
+            {view === "canvas" && triggerNodes.length === 0 && (
+              <span className="save-problems">Add a trigger node to save.</span>
+            )}
+          </div>
+          <div className="topbar-actions">
+            <label
+              className="check-label enabled-toggle"
+              title={view === "yaml" ? "Edit enabled in the YAML view" : undefined}
+            >
               <input
                 type="checkbox"
                 checked={enabled}
@@ -582,11 +628,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               />
               Enabled
             </label>
-            {view === "canvas" && triggerNodes.length === 0 && (
-              <span className="save-problems">Add a trigger node to save.</span>
-            )}
-          </div>
-          <div className="topbar-actions">
             {status.message && (
               <span className={`status-message ${status.kind}`}>
                 {status.kind === "busy" && <Loader2 size={14} className="spin" />}

@@ -563,6 +563,26 @@ body[data-view="designer"] .topbar h1 {
   font-size: 19px;
   letter-spacing: 0;
 }
+/* The h1 doubles as the workflow rename affordance; the edit commits with
+   the designer's "Save to git", so it stays a draft until then. */
+body[data-view="designer"] .topbar h1.renamable { cursor: text; }
+body[data-view="designer"] .topbar h1.renamable:hover {
+  text-decoration: underline dashed var(--muted);
+  text-underline-offset: 5px;
+}
+.topbar h1 .title-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  max-width: 38vw;
+  outline: none;
+  padding: 0;
+  width: 320px;
+}
 .top-actions #designer-github { display: none; }
 body[data-view="designer"] .top-actions #designer-github { display: inline-flex; }
 .designer-embed {

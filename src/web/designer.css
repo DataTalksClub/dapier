@@ -393,6 +393,20 @@ a.brand:hover span:last-child {
   gap: 8px;
 }
 
+/* Enabled sits with the save action: the workflow's on/off switch belongs
+   next to the button that publishes it. */
+.topbar-actions .check-label {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: row;
+  font-size: 12.5px;
+  font-weight: 500;
+  gap: 6px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
 .status-message {
   align-items: center;
   border-radius: 4px;

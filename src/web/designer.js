@@ -18867,6 +18867,36 @@
       () => view === "yaml" ? yamlText !== savedYaml : JSON.stringify(shapes) !== savedSnapshot,
       [view, yamlText, savedYaml, shapes, savedSnapshot]
     );
+    reactExports.useEffect(() => {
+      if (!config.embedded || window.parent === window) return;
+      window.parent.postMessage(
+        {
+          type: "designer:meta",
+          id: workflowId,
+          enabled,
+          source: sourceName,
+          editable: view === "canvas"
+        },
+        window.location.origin
+      );
+    }, [config.embedded, workflowId, enabled, sourceName, view]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data;
+        if (data?.type !== "designer:set-id" || typeof data.id !== "string") return;
+        const id = data.id.trim();
+        if (!id) return;
+        if (view !== "canvas") {
+          setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit id: in the YAML." });
+          return;
+        }
+        setWorkflowId(id);
+      };
+      window.addEventListener("message", onMessage);
+      return () => window.removeEventListener("message", onMessage);
+    }, [config.embedded, view]);
     const refreshGit = reactExports.useCallback(() => {
       if (config.mode !== "local") return;
       api(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -19292,7 +19322,7 @@
                 }
               )
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
+            !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
                 className: "id-input",
@@ -19304,21 +19334,28 @@
                 onChange: (event) => setWorkflowId(event.target.value)
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", title: view === "yaml" ? "Edit enabled in the YAML view" : void 0, children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "input",
-                {
-                  type: "checkbox",
-                  checked: enabled,
-                  disabled: view === "yaml",
-                  onChange: (event) => setEnabled(event.target.checked)
-                }
-              ),
-              "Enabled"
-            ] }),
             view === "canvas" && triggerNodes.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Add a trigger node to save." })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "label",
+              {
+                className: "check-label enabled-toggle",
+                title: view === "yaml" ? "Edit enabled in the YAML view" : void 0,
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "checkbox",
+                      checked: enabled,
+                      disabled: view === "yaml",
+                      onChange: (event) => setEnabled(event.target.checked)
+                    }
+                  ),
+                  "Enabled"
+                ]
+              }
+            ),
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
               status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 14, className: "spin" }),
               status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 14 }),
