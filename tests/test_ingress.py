@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import re
 
 from src.dapier.api import router as ingress
 
@@ -160,11 +161,20 @@ def test_dropbox_webhook_fails_closed_without_configured_connections(monkeypatch
 
 
 def test_console_views_serve_index_html():
-    for path in ("/", "/workflows", "/connections", "/credentials", "/runs"):
+    for path in ingress.CONSOLE_VIEWS:
         response = ingress._static(path)
         assert response["statusCode"] == 200, path
         assert "forbidden-view" in response["body"], path
         assert response["headers"]["cache-control"] == "no-store", path
+
+
+def test_every_nav_link_resolves_to_a_served_page():
+    index = ingress._static("/")
+    nav_links = re.findall(r'class="nav-item[^"]*" href="([^"]+)"', index["body"])
+    assert len(nav_links) >= 7, nav_links
+    for path in nav_links:
+        response = ingress._static(path)
+        assert response is not None and response["statusCode"] == 200, path
 
 
 def test_console_assets_are_self_hosted():

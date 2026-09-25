@@ -29,7 +29,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/runs")
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/credentials", "/tokens", "/runs")
 DESIGNER_VIEW = "/designer"
 # Pages whose static cache policy matches the console views.
 HTML_VIEWS = CONSOLE_VIEWS + (DESIGNER_VIEW,)
@@ -45,17 +45,6 @@ def _static(path):
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
-        "/assets/js/api.js": ("js/api.js", "text/javascript; charset=utf-8"),
-        "/assets/js/format.js": ("js/format.js", "text/javascript; charset=utf-8"),
-        "/assets/js/main.js": ("js/main.js", "text/javascript; charset=utf-8"),
-        "/assets/js/router.js": ("js/router.js", "text/javascript; charset=utf-8"),
-        "/assets/js/state.js": ("js/state.js", "text/javascript; charset=utf-8"),
-        "/assets/js/ui.js": ("js/ui.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/connections.js": ("js/views/connections.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/credentials.js": ("js/views/credentials.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/oauth-clients.js": ("js/views/oauth-clients.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/overview.js": ("js/views/overview.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
         "/assets/js/api.js": ("js/api.js", "text/javascript; charset=utf-8"),
         "/assets/js/format.js": ("js/format.js", "text/javascript; charset=utf-8"),
         "/assets/js/main.js": ("js/main.js", "text/javascript; charset=utf-8"),
