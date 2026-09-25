@@ -35,3 +35,4 @@ def run_render_job(action, event, workflow_id):
         "context": {"source_event": event},
     }
     boto3.client("sqs").send_message(QueueUrl=os.environ["RENDER_QUEUE_URL"], MessageBody=json.dumps(job))
+    return {"job_id": job_id, "output": {"bucket": output_bucket, "key": key}}

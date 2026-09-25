@@ -76,12 +76,12 @@
         </div>
 
         <div class="section-head">
-          <div class="section-head-text"><h2>Recent activity</h2><p class="sub">Idempotent workflow actions</p></div>
+          <div class="section-head-text"><h2>Recent activity</h2><p class="sub">Latest runs — open one to see the step flow</p></div>
           <a class="text-link view-link" href="/runs" data-target="runs">View all<i data-lucide="arrow-right"></i></a>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Execution</th><th>Status</th></tr></thead>
+            <thead><tr><th>Run</th><th>Status</th></tr></thead>
             <tbody id="overview-runs"></tbody>
           </table>
         </div>
@@ -89,7 +89,7 @@
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Deployed workflows</h2><p class="sub">Edit in the visual designer; saving commits to <code>workflows/*.yaml</code> and deploys.</p></div>
+          <div class="section-head-text"><h2>Workflows</h2><p class="sub">Edit in the visual designer; saving publishes live and commits to <code>workflows/*.yaml</code>.</p></div>
           <a id="new-workflow" class="button primary" href="/designer">New workflow</a>
         </div>
         <div class="table-wrap">
@@ -102,7 +102,7 @@
 
       <section class="view" data-page="designer">
         <div class="section-head">
-          <div class="section-head-text"><h2 id="designer-title">Workflow designer</h2><p class="sub">Saving commits to <code>workflows/*.yaml</code> and deploys.</p></div>
+          <div class="section-head-text"><h2 id="designer-title">Workflow designer</h2><p class="sub">Saving publishes live and commits to <code>workflows/*.yaml</code>.</p></div>
           <a id="designer-github" class="text-link view-link" target="_blank" rel="noopener" hidden><i data-lucide="arrow-up-right"></i>Edit on GitHub</a>
           <a class="text-link view-link" href="/workflows" data-target="workflows"><i data-lucide="arrow-left"></i>Back to workflows</a>
         </div>
@@ -165,11 +165,11 @@
 
       <section class="view" data-page="runs">
         <div class="section-head">
-          <div class="section-head-text"><h2>Action executions</h2><p class="sub">90-day idempotency ledger</p></div>
+          <div class="section-head-text"><h2>Runs</h2><p class="sub">One run per trigger event — open one to see the flow of data between the steps. Records are kept for 90 days.</p></div>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Execution</th><th>Status</th><th>Retention</th></tr></thead>
+            <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
             <tbody id="run-table"></tbody>
           </table>
         </div>

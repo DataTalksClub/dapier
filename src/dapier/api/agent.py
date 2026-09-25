@@ -6,9 +6,10 @@ import json
 import os
 import re
 import time
+from urllib.parse import unquote
 
 from .. import audit
-from . import designer_store
+from . import designer_store, runs
 from ..auth import api_tokens, authz, session
 from ..auth.dtc_auth import verify_id_token
 from ..connections import credentials, importing
@@ -293,6 +294,11 @@ def route(event, method, path):
         return tokens_api(event, method)
     if path == "/api/agent/overview" and method == "GET":
         return operator_overview(event)
+    if path == "/api/agent/runs" and method == "GET":
+        return runs_api(event)
+    runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
+    if runs_match and method == "GET":
+        return runs_api(event, run_id=unquote(runs_match.group(1)))
     if path == "/api/agent/oauth-clients" and method == "GET":
         return oauth_clients_view(event)
     oauth_client_match = re.fullmatch(r"/api/agent/oauth-clients/([a-z]+)", path)
@@ -309,6 +315,8 @@ def route(event, method, path):
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))
+    if designer_match and method == "PUT":
+        return designer_toggle_api(event, designer_match.group(1))
     return _json_response(404, {"error": "Not found"})
 
 
@@ -337,10 +345,25 @@ def designer_api(event, method, source=None):
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
-        status, payload = designer_store.api_save(body)
+        status, payload = designer_store.api_save(body, operator=subject)
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(str(payload.get("file", "unknown")), "workflow.save", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def designer_toggle_api(event, source):
+    """Operator-only live enable/disable; mirrors the console's toggle."""
+    subject, error = require_operator(event, "workflow.toggle")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    status, payload = designer_store.api_toggle(source, body, operator=subject)
+    audit.emit(str(source), "workflow.toggle", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
 
@@ -509,6 +532,24 @@ def operator_overview(event):
     if error:
         return error
     return overview.overview()
+
+
+def runs_api(event, run_id=None):
+    """Operator-only run history mirroring the console Runs view.
+
+    Without a run id: the recent-run list, one row per workflow handling of a
+    trigger event. With one: the run's step-by-step flow (status, input,
+    output, duration, error per step).
+    """
+    _, error = require_operator(event, "runs")
+    if error:
+        return error
+    if run_id:
+        status, payload = runs.api_get(run_id)
+        return _no_store(_json_response(status, payload))
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_list(query.get("limit", 25))
+    return _no_store(_json_response(status, payload))
 
 
 def oauth_clients_view(event):

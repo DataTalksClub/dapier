@@ -11,8 +11,20 @@ from ...connections import credentials, importing
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
 from ...triggers import email_triggers, hook_triggers, schedule_triggers
-from .. import designer_store, overview
-from .. import designer_store, overview
+from .. import designer_store, overview, runs
+
+
+def list_runs(event):
+    """Recent runs, one row per workflow handling of a trigger event."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_list(query.get("limit", 25))
+    return http._json_response(status, payload)
+
+
+def get_run(run_id):
+    """One run's step-by-step flow: status, input, output, duration, error."""
+    status, payload = runs.api_get(run_id)
+    return http._json_response(status, payload)
 
 
 def oauth_clients_view():
@@ -183,10 +195,20 @@ def designer_get(source):
 def save_designer_workflow(event, operator):
     try:
         body = http._request_json(event)
-        status, payload = designer_store.api_save(body)
+        status, payload = designer_store.api_save(body, operator=operator)
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     session._audit_event(str(payload.get("file", "unknown")), "workflow.save", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def toggle_designer_workflow(event, operator, source):
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_toggle(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(source), "workflow.toggle", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 

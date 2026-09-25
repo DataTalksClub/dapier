@@ -9,10 +9,13 @@ invocation, so a created trigger is live without a deploy. Only reserved
 names run actions; anything else at the domain matches no workflow.
 """
 
+import logging
 import os
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 TABLE_ENV = "EMAIL_TRIGGERS_TABLE"
 DOMAIN_ENV = "TRIGGER_EMAIL_DOMAIN"
@@ -88,24 +91,51 @@ def validate_actions(actions):
     return actions
 
 
+def resolve_actions_flow(body):
+    """Inline actions or a named shared flow — exactly one of the two.
+
+    A flow must exist in the bundled YAML at save time. The reference is
+    stored by name, so a later deploy that removes the flow fails the
+    trigger closed (it stops matching) instead of running an empty chain.
+    """
+    flow = str(body.get("flow") or "").strip()
+    actions = body.get("actions")
+    if flow and actions:
+        raise TriggerError("bind either inline actions or a flow, not both")
+    if flow:
+        from ..engine import matching
+
+        if matching.flow_actions(flow) is None:
+            raise TriggerError(f"no shared flow named '{flow}'")
+        return None, flow
+    return validate_actions(actions), ""
+
+
+def flow_catalog():
+    """The shared flows a trigger can bind to (from the bundled YAML)."""
+    from ..engine import matching
+
+    return matching.flow_catalog()
+
+
 def yaml_email_routes():
     """Routes already claimed by YAML workflows, so triggers cannot shadow them."""
     from .. import engine
 
     routes = set()
     for workflow in engine.workflows():
-        trigger = workflow.get("trigger") or {}
-        if trigger.get("connector") != "email":
-            continue
-        rule = (trigger.get("filters") or {}).get("route") or {}
-        if isinstance(rule, dict) and rule.get("equals"):
-            routes.add(str(rule["equals"]).lower())
+        for trigger in engine.workflow_triggers(workflow):
+            if trigger.get("connector") != "email":
+                continue
+            rule = (trigger.get("filters") or {}).get("route") or {}
+            if isinstance(rule, dict) and rule.get("equals"):
+                routes.add(str(rule["equals"]).lower())
     return routes
 
 
 def build_item(body, operator):
     name = validate_name(body.get("name"))
-    actions = validate_actions(body.get("actions"))
+    actions, flow = resolve_actions_flow(body)
     if name in yaml_email_routes():
         raise TriggerError(f"the route '{name}' is already handled by a YAML workflow")
     now = datetime.now(timezone.utc).isoformat()
@@ -113,7 +143,8 @@ def build_item(body, operator):
         "name": name,
         "address": address_for(name),
         "description": str(body.get("description") or "")[:200],
-        "actions": actions,
+        "actions": actions or [],
+        "flow": flow,
         "enabled": bool(body.get("enabled", True)),
         "created_by": str(operator or ""),
         "created_at": now,
@@ -152,6 +183,17 @@ def load_items(table_ref=None):
 
 
 def workflow_for(item):
+    """The engine workflow for a stored trigger, or None when its flow is gone."""
+    actions = item.get("actions") or []
+    flow = str(item.get("flow") or "").strip()
+    if flow:
+        from ..engine import matching
+
+        actions = matching.flow_actions(flow)
+        if actions is None:
+            logger.warning("email trigger '%s' binds undefined flow '%s'; skipped",
+                           item["name"], flow)
+            return None
     return {
         "id": f"email-trigger-{item['name']}",
         "enabled": True,
@@ -160,19 +202,21 @@ def workflow_for(item):
             "event": "message.received",
             "filters": {"route": {"equals": item["name"]}},
         },
-        "actions": item.get("actions") or [],
+        "actions": actions,
     }
 
 
 def load_workflows(table_ref=None):
     return [
-        workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True)
+        workflow for workflow in
+        (workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True))
+        if workflow is not None
     ]
 
 
 def public_view(item):
     return {key: item.get(key) for key in (
-        "name", "address", "description", "actions", "enabled",
+        "name", "address", "description", "actions", "flow", "enabled",
         "created_by", "created_at", "updated_at",
     )}
 
@@ -183,6 +227,7 @@ def api_list(table_ref=None):
         "domain": trigger_domain(),
         "triggers": triggers,
         "yaml_routes": sorted(yaml_email_routes()),
+        "flows": flow_catalog(),
     }
 
 

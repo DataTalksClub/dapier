@@ -15,12 +15,17 @@ ever call the Events API.
 """
 
 import json
+import logging
 import os
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from .email_triggers import NAME_PATTERN, TriggerError, validate_actions
+from .email_triggers import (
+    NAME_PATTERN, TriggerError, flow_catalog, resolve_actions_flow,
+)
+
+logger = logging.getLogger(__name__)
 
 TABLE_ENV = "SCHEDULE_TRIGGERS_TABLE"
 WORKER_ARN_ENV = "WORKER_FUNCTION_ARN"
@@ -61,11 +66,13 @@ def build_item(body, operator, previous=None):
     previous = previous or {}
     if previous and previous.get("schedule_id") != name:
         raise TriggerError(f"schedule id mismatch: stored as '{previous.get('schedule_id')}'")
+    actions, flow = resolve_actions_flow(body)
     return {
         "schedule_id": name,
         "expression": validate_expression(body.get("expression")),
         "description": str(body.get("description") or "")[:200],
-        "actions": validate_actions(body.get("actions")),
+        "actions": actions or [],
+        "flow": flow,
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -165,6 +172,17 @@ def remove_rule(schedule_id, *, events_client=None):
 
 
 def workflow_for(item):
+    """The engine workflow for a stored schedule, or None when its flow is gone."""
+    actions = item.get("actions") or []
+    flow = str(item.get("flow") or "").strip()
+    if flow:
+        from ..engine import matching
+
+        actions = matching.flow_actions(flow)
+        if actions is None:
+            logger.warning("schedule trigger '%s' binds undefined flow '%s'; skipped",
+                           item.get("schedule_id"), flow)
+            return None
     return {
         "id": workflow_id_for(item),
         "enabled": True,
@@ -173,14 +191,15 @@ def workflow_for(item):
             "event": SCHEDULE_EVENT,
             "filters": {"schedule": {"equals": item["schedule_id"]}},
         },
-        "actions": item.get("actions") or [],
+        "actions": actions,
     }
 
 
 def load_workflows(table_ref=None):
     return [
-        workflow_for(item) for item in load_items(table_ref=table_ref)
-        if item.get("enabled", True)
+        workflow for workflow in
+        (workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True))
+        if workflow is not None
     ]
 
 
@@ -191,6 +210,7 @@ def public_view(item):
         "rule": rule_name(item.get("schedule_id", "")),
         "description": item.get("description"),
         "actions": item.get("actions"),
+        "flow": item.get("flow"),
         "enabled": item.get("enabled", True),
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),
@@ -199,7 +219,10 @@ def public_view(item):
 
 
 def api_list(table_ref=None):
-    return 200, {"schedules": [public_view(item) for item in load_items(table_ref=table_ref)]}
+    return 200, {
+        "schedules": [public_view(item) for item in load_items(table_ref=table_ref)],
+        "flows": flow_catalog(),
+    }
 
 
 def api_save(body, operator, *, table_ref=None, events_client=None, target_arn=None):

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 import webbrowser
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from . import api
 
@@ -215,8 +215,21 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
     return 0
 
 
+def _entry_label(item):
+    """What a trigger runs: its flow binding or its inline action types."""
+    if item.get("flow"):
+        return f"flow={item['flow']}"
+    return ",".join(action.get("type", "?") for action in item.get("actions") or []) or "-"
+
+
+def print_flows(flows):
+    if flows:
+        print("Shared flows (bind with \"flow\": \"<name>\"): "
+              + ", ".join(f"{flow['name']} ({flow.get('actions', 0)} action(s))" for flow in flows))
+
+
 def print_trigger(item):
-    for key in ("name", "address", "description", "enabled", "created_by",
+    for key in ("name", "address", "description", "flow", "enabled", "created_by",
                 "created_at", "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
@@ -230,13 +243,13 @@ def triggers_list(api_url, debug=False):
     if not items:
         print("No email triggers yet. Create one with `dapier triggers save`.")
     for item in items:
-        types = ",".join(action.get("type", "?") for action in item.get("actions") or [])
         enabled = "yes" if item.get("enabled", True) else "no"
         print(f"{item.get('name', ''):20} {item.get('address', ''):34} "
-              f"enabled={enabled:3} {types}")
+              f"enabled={enabled:3} {_entry_label(item)}")
     routes = data.get("yaml_routes") or []
     if routes:
         print(f"Routes handled by YAML workflows (not editable here): {', '.join(routes)}")
+    print_flows(data.get("flows") or [])
     return 0
 
 
@@ -286,9 +299,13 @@ def workflows_list(api_url, debug=False):
         print("No workflows deployed yet. Draw one at /designer or run `dapier workflows save`.")
     for item in items:
         enabled = "yes" if item.get("enabled", True) else "no"
+        live = "live" if item.get("published") else "pending-deploy"
         trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
+        extra = (item.get("triggerCount") or 1) - 1
+        if extra > 0:
+            trigger = f"{trigger} +{extra}"
         print(f"{item.get('source', ''):36} {trigger:34} "
-              f"{item.get('actionCount', 0)} action(s) enabled={enabled}")
+              f"{item.get('actionCount', 0)} action(s) enabled={enabled} {live}")
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
@@ -315,13 +332,29 @@ def workflows_save(api_url, path, rename_from, debug=False):
     if rename_from:
         body["renameFrom"] = rename_from
     data = api.call(api_url, "PUT", "/api/agent/designer/workflows", body, debug=debug)
-    print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
-          "The deploy pipeline publishes it in a few minutes.")
+    if data.get("published"):
+        print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}) and published it live.")
+    else:
+        print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
+              "The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def workflows_set_enabled(api_url, file, enabled, debug=False):
+    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}",
+                    {"enabled": enabled}, debug=debug)
+    state = "Enabled" if enabled else "Disabled"
+    print(f"{state} {data.get('file') or file} — live now.")
+    if data.get("commit"):
+        print(f"Committed {str(data['commit'])[:7]}.")
+    if data.get("git_sync_error"):
+        print(f"Warning: the git commit failed ({data['git_sync_error']}); "
+              "the next deploy may revert this toggle.")
     return 0
 
 
 def print_hook(item):
-    for key in ("hook_id", "kind", "url", "connection_id", "description",
+    for key in ("hook_id", "kind", "url", "connection_id", "description", "flow",
                 "enabled", "created_by", "created_at", "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
@@ -340,10 +373,10 @@ def hooks_list(api_url, kind=None, debug=False):
     if not items:
         print("No hook triggers yet. Create one with `dapier hooks save`.")
     for item in items:
-        types = ",".join(action.get("type", "?") for action in item.get("actions") or [])
         enabled = "yes" if item.get("enabled", True) else "no"
         print(f"{item.get('hook_id', ''):20} {item.get('kind', ''):9} "
-              f"enabled={enabled:3} {item.get('url', '')} {types}")
+              f"enabled={enabled:3} {item.get('url', '')} {_entry_label(item)}")
+    print_flows(data.get("flows") or [])
     return 0
 
 
@@ -393,10 +426,10 @@ def schedules_list(api_url, debug=False):
     if not items:
         print("No schedule triggers yet. Create one with `dapier schedules save`.")
     for item in items:
-        types = ",".join(action.get("type", "?") for action in item.get("actions") or [])
         state = "enabled" if item.get("enabled", True) else "disabled"
         print(f"{item.get('schedule_id', ''):20} {item.get('expression', ''):40} "
-              f"{state:9} {types}")
+              f"{state:9} {_entry_label(item)}")
+    print_flows(data.get("flows") or [])
     return 0
 
 
@@ -564,6 +597,47 @@ def print_overview(data):
 def overview(api_url, debug=False):
     data = api.call(api_url, "GET", "/api/agent/overview", debug=debug)
     print_overview(data)
+    return 0
+
+
+def print_runs(items):
+    print(f"{'RUN':42} {'STATUS':12} {'STEPS':5} STARTED")
+    for item in items:
+        started = (item.get("started_at") or "-")[:19]
+        print(f"{item.get('run_id', ''):42} {item.get('status', ''):12} "
+              f"{item.get('steps', 0):<5} {started}")
+
+
+def runs_list(api_url, limit=25, debug=False):
+    data = api.call(api_url, "GET", f"/api/agent/runs?limit={int(limit)}", debug=debug)
+    items = data.get("runs", [])
+    if not items:
+        print("No runs recorded yet. Runs appear once a workflow handles a trigger event.")
+        return 0
+    print_runs(items)
+    return 0
+
+
+def runs_show(api_url, run_id, debug=False):
+    data = api.call(api_url, "GET", f"/api/agent/runs/{quote(run_id, safe='')}", debug=debug)
+    run = data.get("run") or {}
+    print(f"run: {run.get('run_id') or run_id}")
+    for key in ("workflow_id", "status", "connector", "event_type", "steps",
+                "started_at", "finished_at", "duration_ms", "failed_step", "error"):
+        if run.get(key) not in (None, ""):
+            print(f"{key}: {run[key]}")
+    for index, step in enumerate(data.get("steps") or [], 1):
+        label = step.get("action_id") or "?"
+        if step.get("action_type"):
+            label = f"{label} ({step['action_type']})"
+        print(f"\nstep[{index}]: {label}  {step.get('status', '?')}"
+              + (f"  {step['duration_ms']}ms" if step.get("duration_ms") is not None else ""))
+        if step.get("error"):
+            print(f"  error: {step['error']}")
+        for field in ("input", "output"):
+            value = step.get(field)
+            if value not in (None, "", [], {}):
+                print(f"  {field}: {json.dumps(value, sort_keys=True, default=str)}")
     return 0
 
 

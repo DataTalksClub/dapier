@@ -16,7 +16,7 @@ def run_dataops(action, event):
         token = value
     if not token:
         raise ValueError("DataOps secret does not contain a token")
-    base._json_request(
+    return base._json_request(
         action.get("url") or os.environ[action.get("url_env", "DATAOPS_INTAKE_URL")],
         _intake_body(action, event),
         headers={"x-dataops-intake-secret": token},

@@ -67,30 +67,56 @@ def _execution_id(workflow_id, action_id, event):
     return f"{workflow_id}:{action_id}:{event['id']}"
 
 
+def _run_id(workflow_id, event):
+    """One run = one workflow's handling of one trigger event."""
+    return f"{workflow_id}:{event.get('id', '')}"
+
+
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _is_pending(workflow_id, action_id, event):
+def _trim(value, limit=6000):
+    """Cap a captured step value so execution items stay far below the
+    DynamoDB 400 KB limit; oversized values keep a JSON preview."""
+    try:
+        text = json.dumps(value, default=str)
+    except (TypeError, ValueError):
+        text = json.dumps(str(value))
+    if len(text) <= limit:
+        return value
+    return {"truncated": True, "preview": text[:limit]}
+
+
+def _is_pending(workflow_id, action_id, event, action_type=None):
     import boto3
     from botocore.exceptions import ClientError
 
     table = boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"])
     now = int(time.time())
+    item = {
+        "execution_id": _execution_id(workflow_id, action_id, event),
+        "run_id": _run_id(workflow_id, event),
+        "workflow_id": workflow_id,
+        "action_id": action_id,
+        "connector": event.get("connector"),
+        "event_type": event.get("event"),
+        "correlation_id": event.get("correlation_id") or event.get("id"),
+        "status": "processing",
+        "started_at": _now_iso(),
+        "lease_until": now + 300,
+        "expires_at": now + 90 * 86400,
+        # Step telemetry for the run view: the action type and the event data
+        # every action in the flow receives as its input.
+        "input": _trim(event.get("data") or {}),
+    }
+    if action_type:
+        item["action_type"] = action_type
+    if event.get("occurred_at"):
+        item["occurred_at"] = event["occurred_at"]
     try:
         table.put_item(
-            Item={
-                "execution_id": _execution_id(workflow_id, action_id, event),
-                "workflow_id": workflow_id,
-                "action_id": action_id,
-                "connector": event.get("connector"),
-                "event_type": event.get("event"),
-                "correlation_id": event.get("correlation_id") or event.get("id"),
-                "status": "processing",
-                "started_at": _now_iso(),
-                "lease_until": now + 300,
-                "expires_at": now + 90 * 86400,
-            },
+            Item=item,
             ConditionExpression="attribute_not_exists(execution_id) OR lease_until < :now",
             ExpressionAttributeValues={":now": now},
         )
@@ -101,40 +127,56 @@ def _is_pending(workflow_id, action_id, event):
     return True
 
 
-def _mark_completed(workflow_id, action_id, event):
+def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None):
     import boto3
 
+    sets = ["#status = :completed", "finished_at = :finished", "expires_at = :expires"]
+    names = {"#status": "status"}
+    values = {
+        ":completed": "completed",
+        ":finished": _now_iso(),
+        ":expires": int(time.time()) + 90 * 86400,
+    }
+    if output is not None:
+        sets.append("#output = :output")
+        names["#output"] = "output"
+        values[":output"] = _trim(output)
+    if duration_ms is not None:
+        sets.append("duration_ms = :duration")
+        values[":duration"] = int(duration_ms)
     boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).update_item(
         Key={"execution_id": _execution_id(workflow_id, action_id, event)},
-        UpdateExpression="SET #status = :completed, finished_at = :finished, expires_at = :expires",
-        ExpressionAttributeNames={"#status": "status"},
-        ExpressionAttributeValues={
-            ":completed": "completed",
-            ":finished": _now_iso(),
-            ":expires": int(time.time()) + 90 * 86400,
-        },
+        UpdateExpression="SET " + ", ".join(sets),
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
     )
 
 
-def _release_action(workflow_id, action_id, event, exc=None):
+def _release_action(workflow_id, action_id, event, exc=None, duration_ms=None):
     import boto3
 
     now = int(time.time())
     message = (str(exc) or exc.__class__.__name__) if exc is not None else "Action failed"
+    sets = [
+        "#status = :failed", "finished_at = :finished", "#error = :error",
+        "lease_until = :lease", "expires_at = :expires",
+    ]
+    names = {"#status": "status", "#error": "error"}
+    values = {
+        ":failed": "failed",
+        ":finished": _now_iso(),
+        ":error": message[:500],
+        ":lease": now - 1,
+        ":expires": now + 90 * 86400,
+    }
+    if duration_ms is not None:
+        sets.append("duration_ms = :duration")
+        values[":duration"] = int(duration_ms)
     boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).update_item(
         Key={"execution_id": _execution_id(workflow_id, action_id, event)},
-        UpdateExpression=(
-            "SET #status = :failed, finished_at = :finished, #error = :error, "
-            "lease_until = :lease, expires_at = :expires"
-        ),
-        ExpressionAttributeNames={"#status": "status", "#error": "error"},
-        ExpressionAttributeValues={
-            ":failed": "failed",
-            ":finished": _now_iso(),
-            ":error": message[:500],
-            ":lease": now - 1,
-            ":expires": now + 90 * 86400,
-        },
+        UpdateExpression="SET " + ", ".join(sets),
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
     )
 
 

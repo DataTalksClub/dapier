@@ -1,12 +1,15 @@
-"""Designer save path: validate workflow YAML and commit it to GitHub.
+"""Designer save path: validate workflow YAML, commit it to GitHub, publish it live.
 
 The console designer at /designer edits workflows/<id>.yaml in the dapier
 repo. Saves are validated server-side (structure only — action types beyond
 the catalog are legal and preserved verbatim) and committed with the GitHub
 git data API, so one save can create, update, and rename in a single commit
-on the configured branch. The deploy pipeline picks the commit up and
-refreshes the bundle the engine reads; until then reads still show the
-previously deployed YAML.
+on the configured branch. The commit is the version record; a successful save
+then publishes the parsed definition to PUBLISHED_WORKFLOWS_TABLE, which the
+engine merges over the deployed bundle — so a save runs on the next event
+without waiting for the deploy pipeline. The enable/disable toggle flips the
+published item the same way (live immediately) and commits the flipped YAML
+best-effort so the next deploy agrees with the live state.
 """
 
 import base64
@@ -18,6 +21,8 @@ import urllib.request
 from pathlib import Path
 
 import yaml
+
+from ..triggers import published_workflows
 
 DEFAULT_REPO_URL = "https://github.com/DataTalksClub/dapier"
 REPO_URL_ENV = "WORKFLOWS_REPO_URL"
@@ -70,26 +75,44 @@ def _bundle_root():
     return Path(os.environ.get("WORKFLOWS_DIR", Path(__file__).parent.parent / "workflows"))
 
 
-def bundled_summaries():
-    """The workflows this deployment's bundle carries (deploy-time git state)."""
+def _bundled_workflows():
+    """(workflow, filename) pairs this deployment's bundle carries (deploy-time git state)."""
+    from ..engine import matching
+
     result = []
     for path in sorted(_bundle_root().glob("*.yaml")):
         try:
             workflow = yaml.safe_load(path.read_text())
         except yaml.YAMLError:
             continue
-        if not isinstance(workflow, dict) or "id" not in workflow or "trigger" not in workflow:
-            continue
-        trigger = workflow.get("trigger") or {}
-        result.append({
-            "id": str(workflow["id"]),
-            "enabled": workflow.get("enabled", True),
-            "source": path.name,
-            "connector": str(trigger.get("connector", "?")),
-            "event": str(trigger.get("event", "?")),
-            "actionCount": len(workflow.get("actions") or []),
-        })
+        if isinstance(workflow, dict) and "id" in workflow and matching.workflow_triggers(workflow):
+            result.append((workflow, path.name))
     return result
+
+
+def _summary(workflow, source):
+    """One list row: primary trigger, how many there are, and the effective actions."""
+    from ..engine import matching
+
+    triggers = matching.workflow_triggers(workflow)
+    primary = triggers[0] if triggers else {}
+    actions = workflow.get("actions")
+    if workflow.get("flow"):
+        actions = matching.flow_actions(workflow["flow"])
+    return {
+        "id": str(workflow["id"]),
+        "enabled": workflow.get("enabled", True),
+        "source": source,
+        "connector": str(primary.get("connector", "?")),
+        "event": str(primary.get("event", "?")),
+        "triggerCount": len(triggers),
+        "actionCount": len(actions or []),
+    }
+
+
+def bundled_summaries():
+    """Summaries of the bundled workflows (deploy-time git state)."""
+    return [_summary(workflow, source) for workflow, source in _bundled_workflows()]
 
 
 def bundled_yaml(source):
@@ -105,16 +128,43 @@ def bundled_yaml(source):
         return None
 
 
+def _published_by_file(source):
+    """The published item for one file name, or None (invalid name / not published)."""
+    if not published_workflows.configured() or not FILE_PATTERN.fullmatch(source or ""):
+        return None
+    return published_workflows.get_item(source.removesuffix(".yaml"))
+
+
 def api_list():
-    return 200, {"workflows": bundled_summaries(), **sync_status()}
+    """Bundled workflows with the live published state overlaid by id.
+
+    A workflow saved but not yet picked up by the deploy pipeline shows up
+    here too — its published state is what actually runs.
+    """
+    summaries = {
+        summary["id"]: {**summary, "published": False}
+        for summary in bundled_summaries()
+    }
+    if published_workflows.configured():
+        for item in published_workflows.load_items():
+            workflow = item.get("workflow")
+            if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
+            if summary["id"] not in summaries:
+                summary["deployed"] = False
+            summaries[summary["id"]] = {**summary, "published": True}
+    ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
+    return 200, {"workflows": ordered, **sync_status()}
 
 
 def api_get(source):
-    """One workflow: from the bundle, falling back to committed git state.
-
-    The fallback covers a workflow saved minutes ago — committed by the
-    designer but not deployed until the pipeline finishes.
+    """One workflow: the live published state first, then the bundle, then
+    committed git state (covering a save whose deploy has not finished).
     """
+    item = _published_by_file(source)
+    if item and isinstance(item.get("workflow"), dict):
+        return 200, {"workflow": item["workflow"], "published": True}
     workflow = bundled_yaml(source)
     if workflow is None:
         try:
@@ -126,11 +176,16 @@ def api_get(source):
             return 404, {"error": f"no such workflow: {source}"}
         except (SyncError, WorkflowError) as exc:
             return 502, {"error": f"git fetch failed: {exc}"}
-    return 200, {"workflow": workflow}
+    return 200, {"workflow": workflow, "published": False}
 
 
-def api_save(body):
-    """Validate and commit a workflow definition. Returns (status, payload)."""
+def api_save(body, operator=None):
+    """Validate and commit a workflow definition, then publish it live.
+
+    Returns (status, payload). ``published`` in the payload says whether the
+    definition is already running; a publish failure after a successful commit
+    is a loud 502 (the commit sha is included), and retrying the save is safe.
+    """
     if not isinstance(body, dict):
         return 400, {"error": "request body must be an object"}
     yaml_text = body.get("yaml")
@@ -150,6 +205,59 @@ def api_save(body):
         return 503, {"error": str(exc)}
     except SyncError as exc:
         return 502, {"error": str(exc)}
+    return _publish_committed(workflow, result, rename_from=rename_from, operator=operator)
+
+
+def _publish_committed(workflow, result, *, rename_from=None, operator=None):
+    """Publish the just-committed definition; also drop a renamed-away id."""
+    if not published_workflows.configured():
+        return 200, {**result, "published": False}
+    try:
+        previous = published_workflows.get_item(workflow["id"])
+        published_workflows.publish(workflow, operator=operator, previous=previous)
+        if rename_from and rename_from != result["file"]:
+            published_workflows.unpublish(rename_from.removesuffix(".yaml"))
+    except Exception as exc:
+        return 502, {"error": f"committed to git but not live: {exc}",
+                     "file": result["file"], "commit": result["commit"], "published": False}
+    return 200, {**result, "published": True}
+
+
+def api_toggle(source, body, operator=None):
+    """Flip a workflow's enabled flag live, then commit the flipped YAML.
+
+    The published store is updated first — the toggle runs on the next event —
+    and the git commit follows best-effort so the next deploy agrees. A git
+    failure is reported in the payload but does not undo the live toggle.
+    """
+    if not isinstance(body, dict) or not isinstance(body.get("enabled"), bool):
+        return 400, {"error": 'body must be {"enabled": true|false}'}
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    status, payload = api_get(source)
+    if status != 200:
+        return status, payload
+    workflow = {**payload["workflow"], "enabled": body["enabled"]}
+    try:
+        previous = published_workflows.get_item(workflow["id"])
+        published_workflows.publish(workflow, operator=operator, previous=previous)
+    except Exception as exc:
+        return 502, {"error": f"publish failed: {exc}"}
+    result = {
+        "file": source,
+        "enabled": body["enabled"],
+        "published": True,
+    }
+    try:
+        committed = commit_workflow(
+            yaml.safe_dump(workflow, sort_keys=False),
+            message=f"designer: {'enable' if body['enabled'] else 'disable'} workflow {workflow['id']}",
+        )
+        result["commit"] = committed["commit"]
+    except (SyncConfigError, SyncError) as exc:
+        result["git_sync_error"] = str(exc)
     return 200, result
 
 
@@ -179,16 +287,31 @@ def parse_workflow(yaml_text):
         raise WorkflowError("workflow needs an id: letters, digits, hyphens or underscores (max 63 chars)")
     workflow_id = workflow_id.strip()
 
+    triggers = workflow.get("triggers")
     trigger = workflow.get("trigger")
-    if not isinstance(trigger, dict):
-        raise WorkflowError("workflow needs a trigger")
-    if not str(trigger.get("connector") or "").strip() or not str(trigger.get("event") or "").strip():
-        raise WorkflowError("trigger needs a connector and an event")
+    if isinstance(triggers, list) and triggers:
+        for entry in triggers:
+            if not isinstance(entry, dict) or not str(entry.get("connector") or "").strip() \
+                    or not str(entry.get("event") or "").strip():
+                raise WorkflowError("every trigger needs a connector and an event")
+    elif isinstance(trigger, dict):
+        if not str(trigger.get("connector") or "").strip() or not str(trigger.get("event") or "").strip():
+            raise WorkflowError("trigger needs a connector and an event")
+    else:
+        raise WorkflowError("workflow needs a trigger (or a triggers list)")
 
+    flow = str(workflow.get("flow") or "").strip()
     actions = workflow.get("actions")
-    if not isinstance(actions, list) or not actions:
+    if flow and actions:
+        raise WorkflowError("bind either inline actions or a flow, not both")
+    if flow:
+        from ..engine import matching
+
+        if matching.flow_actions(flow) is None:
+            raise WorkflowError(f"no shared flow named '{flow}'")
+    elif not isinstance(actions, list) or not actions:
         raise WorkflowError("connect at least one action to the trigger")
-    for action in actions:
+    for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():
             raise WorkflowError("every action needs a type")
     return workflow

@@ -597,3 +597,117 @@ def test_operator_token_lifecycle_over_bearer(monkeypatch):
     missing = agent_api.route(
         event(query={"token_id": "never-existed"}), "DELETE", "/api/agent/tokens")
     assert missing["statusCode"] == 404
+
+
+def _configure_runs_table(monkeypatch, items):
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+    monkeypatch.setattr(agent_api.runs, "_table", lambda: RunsTable())
+
+
+def test_runs_list_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    listed = agent_api.route(event(), "GET", "/api/agent/runs")
+
+    assert listed["statusCode"] == 403
+
+
+def test_runs_list_and_detail_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    steps = [
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "post", "action_type": "webhook", "connector": "email",
+         "event_type": "message.received", "correlation_id": "evt-1", "status": "completed",
+         "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+         "duration_ms": 980, "input": {"subject": "invoice"}, "output": {"status": 200}},
+        {"execution_id": "wf-1:notify:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "notify", "action_type": "slack", "connector": "email",
+         "event_type": "message.received", "correlation_id": "evt-1", "status": "failed",
+         "started_at": "2026-09-25T10:00:01+00:00", "finished_at": "2026-09-25T10:00:02+00:00",
+         "duration_ms": 340, "input": {"subject": "invoice"}, "error": "Slack rejected message"},
+    ]
+    _configure_runs_table(monkeypatch, steps)
+
+    listed = agent_api.route(event(query={"limit": "5"}), "GET", "/api/agent/runs")
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert body["runs"][0]["run_id"] == "wf-1:evt-1"
+    assert body["runs"][0]["status"] == "failed"
+    assert body["runs"][0]["steps"] == 2
+
+    detail = agent_api.route(event(), "GET", "/api/agent/runs/wf-1%3Aevt-1")
+    assert detail["statusCode"] == 200
+    flow = json.loads(detail["body"])
+    assert [step["action_id"] for step in flow["steps"]] == ["post", "notify"]
+    assert flow["steps"][1]["error"] == "Slack rejected message"
+    assert flow["steps"][0]["output"] == {"status": 200}
+
+    missing = agent_api.route(event(), "GET", "/api/agent/runs/wf-1:missing")
+    assert missing["statusCode"] == 404
+
+
+def _configure_runs_table(monkeypatch, items):
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+    monkeypatch.setattr(agent_api.runs, "_table", lambda: RunsTable())
+
+
+def test_runs_list_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    listed = agent_api.route(event(), "GET", "/api/agent/runs")
+
+    assert listed["statusCode"] == 403
+
+
+def test_runs_list_and_detail_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    steps = [
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "post", "action_type": "webhook", "connector": "email",
+         "event_type": "message.received", "correlation_id": "evt-1", "status": "completed",
+         "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+         "duration_ms": 980, "input": {"subject": "invoice"}, "output": {"status": 200}},
+        {"execution_id": "wf-1:notify:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "notify", "action_type": "slack", "connector": "email",
+         "event_type": "message.received", "correlation_id": "evt-1", "status": "failed",
+         "started_at": "2026-09-25T10:00:01+00:00", "finished_at": "2026-09-25T10:00:02+00:00",
+         "duration_ms": 340, "input": {"subject": "invoice"}, "error": "Slack rejected message"},
+    ]
+    _configure_runs_table(monkeypatch, steps)
+
+    listed = agent_api.route(event(query={"limit": "5"}), "GET", "/api/agent/runs")
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert body["runs"][0]["run_id"] == "wf-1:evt-1"
+    assert body["runs"][0]["status"] == "failed"
+    assert body["runs"][0]["steps"] == 2
+
+    detail = agent_api.route(event(), "GET", "/api/agent/runs/wf-1%3Aevt-1")
+    assert detail["statusCode"] == 200
+    flow = json.loads(detail["body"])
+    assert [step["action_id"] for step in flow["steps"]] == ["post", "notify"]
+    assert flow["steps"][1]["error"] == "Slack rejected message"
+    assert flow["steps"][0]["output"] == {"status": 200}
+
+    missing = agent_api.route(event(), "GET", "/api/agent/runs/wf-1:missing")
+    assert missing["statusCode"] == 404

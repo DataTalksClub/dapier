@@ -111,6 +111,7 @@ Globals:
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
+        PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
@@ -173,6 +174,8 @@ Resources:
             TableName: !Ref ApiTokensTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PublishedWorkflowsTable
         - Statement:
             Effect: Allow
             Action: [events:PutRule, events:PutTargets, events:DeleteRule,
@@ -387,6 +390,8 @@ Resources:
             TableName: !Ref HookTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref ScheduleTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PublishedWorkflowsTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -695,6 +700,16 @@ Resources:
         - {AttributeName: schedule_id, AttributeType: S}
       KeySchema:
         - {AttributeName: schedule_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  PublishedWorkflowsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: workflow_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: workflow_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   ApiTokensTable:

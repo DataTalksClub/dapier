@@ -1,7 +1,9 @@
 import json
 import os
+import tempfile
 import unittest
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.dapier.api import agent as agent_api
@@ -155,6 +157,64 @@ class WorkflowMergeTests(unittest.TestCase):
             merged = all_workflows()
         self.assertGreater(len(merged), 1)
         self.assertEqual(merged[-1]["id"], "email-trigger-income-2026-08")
+
+
+FLOW_BODY = {"name": "invoice-copy", "flow": "invoice-dataops"}
+
+
+class FlowBindingTests(unittest.TestCase):
+    """A trigger can bind a named shared flow instead of inlining actions."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        (self.dir / "flows.yaml").write_text(
+            "flows:\n"
+            "  invoice-dataops:\n"
+            "    description: common intake\n"
+            "    actions:\n"
+            "      - {type: webhook, url: 'https://intake.test/x'}\n")
+        env = patch.dict(os.environ, {"WORKFLOWS_DIR": str(self.dir)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_save_binds_the_flow_without_inline_actions(self):
+        stub = StubTable()
+        _status, payload = email_triggers.api_save(dict(FLOW_BODY), "op", table_ref=stub)
+        self.assertEqual(payload["flow"], "invoice-dataops")
+        self.assertEqual(payload["actions"], [])
+
+        workflow = email_triggers.load_workflows(table_ref=stub)[0]
+        self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
+        event = {"connector": "email", "event": "message.received", "data": {"route": "invoice-copy"}}
+        self.assertTrue(matches(workflow, event))
+
+    def test_rejects_flow_plus_actions_and_unknown_flows(self):
+        with self.assertRaises(email_triggers.TriggerError) as both:
+            email_triggers.build_item(
+                {"name": "invoice-x", "flow": "invoice-dataops",
+                 "actions": [{"type": "webhook", "url": "https://x"}]}, "op")
+        self.assertIn("not both", str(both.exception))
+        with self.assertRaises(email_triggers.TriggerError) as missing:
+            email_triggers.build_item({"name": "invoice-x", "flow": "nope"}, "op")
+        self.assertIn("no shared flow", str(missing.exception))
+
+    def test_list_reports_the_flow_catalog(self):
+        stub = StubTable()
+        _status, payload = email_triggers.api_list(table_ref=stub)
+        self.assertEqual([flow["name"] for flow in payload["flows"]], ["invoice-dataops"])
+
+    def test_flow_bound_trigger_fails_closed_when_the_flow_disappears(self):
+        stub = StubTable([email_triggers.build_item(dict(FLOW_BODY), "op")])
+        (self.dir / "flows.yaml").write_text("flows: {}\n")
+        from src.dapier.engine import matching
+
+        matching._documents.cache_clear()
+        matching._flows.cache_clear()
+        self.addCleanup(matching._documents.cache_clear)
+        self.addCleanup(matching._flows.cache_clear)
+        self.assertEqual(email_triggers.load_workflows(table_ref=stub), [])
 
 
 class FakeResponse:

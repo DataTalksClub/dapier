@@ -1,18 +1,25 @@
 import json
 import os
+import tempfile
 import unittest
 from copy import deepcopy
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.dapier.engine import (
+    all_workflows,
     execute,
+    flow_actions,
+    flow_catalog,
     matches,
     run_dataops,
     run_dropbox_delete,
     run_dropbox_upload,
     run_email_send,
     run_slack,
+    workflow_triggers,
 )
+from src.dapier.engine import matching
 
 
 class FakeTransport:
@@ -418,6 +425,183 @@ class EmailSendTests(unittest.TestCase):
              patch.dict(os.environ, {"TRIGGER_EMAIL_DOMAIN": "dtcdev.click"}):
             execute(event)
         self.assertEqual(self.ses.sent[0]["Message"]["Body"]["Text"]["Data"], "route todo")
+
+    def test_email_send_reports_what_happened(self):
+        output = run_email_send(
+            {"type": "email_send", "to": "ops@example.com", "subject": "s", "text": "hi"},
+            {"id": "evt-1", "data": {}}, ses=self.ses,
+        )
+        self.assertEqual(output, {"message_id": "mid-1", "to": ["ops@example.com"], "subject": "s"})
+
+
+class SlackOutputTests(unittest.TestCase):
+    @patch("src.dapier.engine.actions.base._json_request")
+    @patch("src.dapier.connections.credentials.get_credential")
+    def test_slack_reports_channel_and_ts(self, get_credential, json_request):
+        get_credential.return_value = {"token": "xoxb-private"}
+        json_request.return_value = {"ok": True, "channel": "C123", "ts": "1700.1"}
+
+        output = run_slack(
+            {"credential_id": "slack", "channel": "C123", "text": "hello"},
+            {"data": {}},
+        )
+
+        self.assertEqual(output, {"ok": True, "channel": "C123", "ts": "1700.1"})
+
+
+class ExecuteTelemetryTests(unittest.TestCase):
+    """execute() feeds the run ledger: action type in, output and duration out."""
+
+    WORKFLOW = {
+        "id": "wf-1", "enabled": True,
+        "trigger": {"connector": "email", "event": "message.received", "filters": {}},
+        "actions": [{"type": "webhook", "id": "post-it", "url": "https://example.test/hook"}],
+    }
+    EVENT = {"id": "evt-9", "connector": "email", "event": "message.received",
+             "data": {"route": "todo"}}
+
+    def run_execute(self, run_webhook, hooks):
+        with patch("src.dapier.engine.all_workflows", return_value=[self.WORKFLOW]), \
+             patch("src.dapier.engine.run_webhook", run_webhook):
+            execute(dict(self.EVENT), **hooks)
+
+    def test_reports_action_type_output_and_duration(self):
+        seen = {}
+        hooks = {
+            "before_action": lambda wf, action_id, event, action_type:
+                seen.setdefault("before", (wf, action_id, action_type)) or True,
+            "after_action": lambda wf, action_id, event, **kw:
+                seen.setdefault("after", (wf, action_id, kw)),
+            "on_action_error": lambda *args, **kw: seen.setdefault("error", True),
+        }
+        self.run_execute(lambda action, event: {"status": 200}, hooks)
+
+        self.assertEqual(seen["before"], ("wf-1", "post-it", "webhook"))
+        wf, action_id, kwargs = seen["after"]
+        self.assertEqual((wf, action_id), ("wf-1", "post-it"))
+        self.assertEqual(kwargs["output"], {"status": 200})
+        self.assertIsInstance(kwargs["duration_ms"], int)
+        self.assertNotIn("error", seen)
+
+    def test_failed_step_reports_duration_then_reraises(self):
+        seen = {}
+        hooks = {
+            "before_action": lambda *args: True,
+            "on_action_error": lambda wf, action_id, event, exc, **kw:
+                seen.update(step=(wf, action_id), error=exc, kwargs=kw),
+        }
+
+        def boom(action, event):
+            raise RuntimeError("webhook down")
+
+        with self.assertRaises(RuntimeError):
+            self.run_execute(boom, hooks)
+
+        self.assertEqual(seen["step"], ("wf-1", "post-it"))
+        self.assertEqual(str(seen["error"]), "webhook down")
+        self.assertIsInstance(seen["kwargs"]["duration_ms"], int)
+
+
+class MultiTriggerTests(unittest.TestCase):
+    """A workflow may list several triggers; they all share the action chain."""
+
+    WORKFLOW = {
+        "enabled": True,
+        "triggers": [
+            {"connector": "email", "event": "message.received",
+             "filters": {"route": {"equals": "invoice"}}},
+            {"connector": "email", "event": "message.received",
+             "filters": {"route": {"equals": "invoices"}}},
+            {"connector": "dropbox", "event": "file.created",
+             "filters": {"path": {"prefix": "/_dtc_paperwork/income-invoices/"}}},
+        ],
+    }
+
+    def test_matches_any_listed_trigger(self):
+        for route in ("invoice", "invoices"):
+            event = {"connector": "email", "event": "message.received", "data": {"route": route}}
+            self.assertTrue(matches(self.WORKFLOW, event))
+        dropbox = {"connector": "dropbox", "event": "file.created",
+                   "data": {"path": "/_dtc_paperwork/income-invoices/x.pdf"}}
+        self.assertTrue(matches(self.WORKFLOW, dropbox))
+
+    def test_each_trigger_keeps_its_own_filters(self):
+        event = {"connector": "email", "event": "message.received", "data": {"route": "todo"}}
+        self.assertFalse(matches(self.WORKFLOW, event))
+        event = {"connector": "dropbox", "event": "file.created", "data": {"path": "/other/x.pdf"}}
+        self.assertFalse(matches(self.WORKFLOW, event))
+
+    def test_disabled_workflow_matches_nothing(self):
+        self.assertFalse(matches({**self.WORKFLOW, "enabled": False},
+                                 {"connector": "email", "event": "message.received",
+                                  "data": {"route": "invoice"}}))
+
+    def test_singular_trigger_still_supported(self):
+        workflow = {"enabled": True, "trigger": {"connector": "email", "event": "message.received"}}
+        self.assertEqual(len(workflow_triggers(workflow)), 1)
+        self.assertTrue(matches(workflow, {"connector": "email", "event": "message.received", "data": {}}))
+
+
+FLOW_YAML = """\
+flows:
+  invoice-dataops:
+    description: common intake
+    actions:
+      - id: intake
+        type: webhook
+        url: https://example.test/intake
+id: invoice-email-intake
+enabled: true
+triggers:
+  - {connector: email, event: message.received, filters: {route: {equals: invoice}}}
+  - {connector: email, event: message.received, filters: {route: {equals: invoices}}}
+flow: invoice-dataops
+"""
+
+
+class SharedFlowTests(unittest.TestCase):
+    """Named flows let several triggers share one action chain definition."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        (self.dir / "invoice-intake.yaml").write_text(FLOW_YAML)
+        env = patch.dict(os.environ, {"WORKFLOWS_DIR": str(self.dir)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_flow_catalog_and_actions(self):
+        self.assertEqual([flow["name"] for flow in flow_catalog()], ["invoice-dataops"])
+        self.assertEqual(flow_actions("invoice-dataops")[0]["id"], "intake")
+        self.assertIsNone(flow_actions("no-such-flow"))
+
+    def test_all_workflows_resolves_the_flow_reference(self):
+        workflow = next(w for w in all_workflows() if w["id"] == "invoice-email-intake")
+        self.assertEqual([action["type"] for action in workflow["actions"]], ["webhook"])
+        self.assertEqual(len(workflow_triggers(workflow)), 2)
+
+    def test_undefined_flow_fails_closed(self):
+        (self.dir / "broken.yaml").write_text(
+            "id: broken\n"
+            "trigger: {connector: email, event: message.received}\n"
+            "flow: missing\n")
+        matching._documents.cache_clear()
+        matching._workflows.cache_clear()
+        self.addCleanup(matching._documents.cache_clear)
+        self.addCleanup(matching._workflows.cache_clear)
+        ids = [workflow["id"] for workflow in all_workflows()]
+        self.assertNotIn("broken", ids)
+        self.assertIn("invoice-email-intake", ids)
+
+    def test_common_actions_run_for_every_trigger(self):
+        run_webhook = MagicMock(return_value={"status": 200})
+        with patch("src.dapier.engine.run_webhook", run_webhook):
+            execute({"id": "e1", "connector": "email", "event": "message.received",
+                     "data": {"route": "invoice"}})
+            execute({"id": "e2", "connector": "email", "event": "message.received",
+                     "data": {"route": "invoices"}})
+        self.assertEqual(run_webhook.call_count, 2)
 
 
 if __name__ == "__main__":

@@ -58,6 +58,7 @@ def _static(path):
         "/assets/js/views/credentials.js": ("js/views/credentials.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/oauth-clients.js": ("js/views/oauth-clients.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/overview.js": ("js/views/overview.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/runs.js": ("js/views/runs.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/designer.js": ("js/views/designer.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),

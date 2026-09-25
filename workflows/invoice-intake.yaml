@@ -1,0 +1,31 @@
+# Merged invoice intake: several entry points share one action chain.
+#
+# The `flows` block names the common logic once; triggers bind to it with
+# `flow:` instead of repeating the actions. The two email routes below fire
+# the same chain, and any stored trigger (e.g. `dapier triggers save` with
+# {"name": "invoices-extra", "flow": "invoice-dataops"}) can join later
+# without duplicating the dataops config. Dropbox files land here too via
+# dropbox_on_upload, whose intake step builds the dropbox-shaped body.
+flows:
+  invoice-dataops:
+    description: Push an inbound invoice into the DataOps intake
+    actions:
+      - id: intake-invoice
+        type: dataops
+        url_env: DATAOPS_INTAKE_URL
+        auth_secret_id: dapier/dataops
+
+id: invoice-email-intake
+enabled: false  # flip on when the invoice addresses go live
+triggers:
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: invoice
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: invoices
+flow: invoice-dataops

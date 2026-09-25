@@ -37,3 +37,4 @@ def run_slack(action, event):
     )
     if not result.get("ok"):
         raise RuntimeError(f"Slack rejected message: {result.get('error', 'unknown_error')}")
+    return {"ok": True, "channel": result.get("channel"), "ts": result.get("ts")}

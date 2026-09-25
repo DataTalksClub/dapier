@@ -2,12 +2,13 @@
 import { state } from '../state.js';
 import { $, icons, showApp, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, triggerLabel, wrapTokens, formatTimestamp, formatDay, emptyRow, configRows, detailRows, pad2 } from '../format.js';
+import { escapeHtml, statusLine, triggerLabel, emptyRow, configRows, pad2 } from '../format.js';
 import { openDesigner } from './designer.js';
 import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
+import { renderRuns, openRun } from './runs.js';
 
 function workflowRow(workflow) {
   return `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
@@ -17,13 +18,25 @@ function workflowRow(workflow) {
   </tr>`;
 }
 
+function triggerBlocks(workflow) {
+  const many = (workflow.triggerCount || 1) > 1;
+  const list = many && Array.isArray(workflow.triggers) && workflow.triggers.length
+    ? workflow.triggers : [workflow.trigger];
+  return list.map((trigger) => {
+    const filters = (trigger && trigger.filters) || {};
+    const label = `${trigger.connector || '?'} · ${trigger.event || '?'}`;
+    return `<p class="detail-trigger">${escapeHtml(label)}</p>
+      ${Object.keys(filters).length ? `<h4>Filters</h4>${configRows(filters)}` : ''}`;
+  }).join('');
+}
+
 function openWorkflow(id) {
   const workflow = (state.data.workflows || []).find((item) => item.id === id);
   if (!workflow) return;
   /* The designer canvas is the workflow view; the plain-steps dialog below
      remains only for workflows without a source file in workflows/*.yaml. */
   if (workflow.source) return openDesigner(workflow.source);
-  const filters = workflow.trigger.filters || {};
+  const many = (workflow.triggerCount || 1) > 1;
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `
     <div class="detail-summary">
@@ -31,9 +44,9 @@ function openWorkflow(id) {
       ${workflow.source ? `<code>workflows/${escapeHtml(workflow.source)}</code>` : ''}
     </div>
     <section class="detail-block">
-      <h3>Trigger</h3>
-      <p class="detail-trigger">${escapeHtml(triggerLabel(workflow))}</p>
-      ${Object.keys(filters).length ? `<h4>Filters</h4>${configRows(filters)}` : ''}
+      <h3>Trigger${many ? 's' : ''}</h3>
+      ${triggerBlocks(workflow)}
+      ${workflow.flow ? `<h4>Shared flow</h4><p class="detail-trigger">${escapeHtml(workflow.flow)}</p>` : ''}
     </section>
     <section class="detail-block">
       <h3>Actions</h3>
@@ -61,30 +74,6 @@ function openWorkflow(id) {
   icons();
 }
 
-function openRun(executionId) {
-  const run = (state.data.executions || []).find((item) => item.execution_id === executionId);
-  if (!run) return;
-  const parts = String(executionId).split(':');
-  const workflowId = run.workflow_id || parts[0];
-  const actionId = run.action_id || parts[1];
-  $('#run-title').textContent = workflowId || 'Run';
-  $('#run-detail').innerHTML = `
-    <div class="detail-summary">${statusLine(run.status)}<code>${wrapTokens(executionId)}</code></div>
-    ${run.error ? `<div class="detail-error"><i data-lucide="alert-triangle"></i><span>${escapeHtml(run.error)}</span></div>` : ''}
-    <section class="detail-block">${detailRows([
-      ['Workflow', workflowId],
-      ['Action', actionId],
-      ['Connector', run.connector],
-      ['Event', run.event_type],
-      ['Correlation ID', run.correlation_id],
-      ['Started', formatTimestamp(run.started_at)],
-      ['Finished', formatTimestamp(run.finished_at)],
-      ['Retention until', formatTimestamp(run.expires_at)],
-    ])}</section>`;
-  $('#run-dialog').showModal();
-  icons();
-}
-
 function render() {
   const data = state.data;
   if (!data) return;
@@ -92,26 +81,23 @@ function render() {
   const configured = data.credentials.filter((credential) => credential.configured).length;
   $('#metric-workflows').textContent = enabled.length;
   $('#metric-connections').textContent = data.connections.length;
-  $('#metric-runs').textContent = data.executions.filter((execution) => execution.status === 'completed').length;
+  $('#metric-runs').textContent = (data.executions || []).filter((execution) => execution.status === 'completed').length;
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
-  $('#overview-runs').innerHTML = data.executions.slice(0, 6).map((execution) =>
-    `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0"><td class="mono">${wrapTokens(execution.execution_id)}</td><td data-label="Status">${statusLine(execution.status)}</td></tr>`).join('') || emptyRow(2);
+  $('#overview-runs').innerHTML = (data.runs || []).slice(0, 6).map((run) =>
+    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td></tr>`).join('') || emptyRow(2);
   $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
     <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
     <td class="mono muted-cell" data-label="Actions">${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
-    <td data-label="Status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}</td>
+    <td data-label="Status"><span class="workflow-status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}${workflow.published ? '' : ' <span class="muted-cell">(deploying)</span>'}
+      <button type="button" class="workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}">${workflow.enabled ? 'Disable' : 'Enable'}</button></span></td>
   </tr>`).join('');
   renderConnections(data.connections);
   renderCredentials(data.credentials);
   renderOAuthClients(data.oauth_clients || []);
   renderTokens(data.api_tokens || []);
-  $('#run-table').innerHTML = data.executions.map((execution) => `<tr class="run-open" data-run="${escapeHtml(execution.execution_id)}" role="button" tabindex="0">
-    <td class="cell-title mono"><span class="cell-name">${wrapTokens(execution.execution_id)}</span></td>
-    <td data-label="Status">${statusLine(execution.status)}</td>
-    <td class="mono muted-cell" data-label="Retention">${execution.expires_at ? wrapTokens(formatDay(execution.expires_at)) : '—'}</td>
-  </tr>`).join('') || emptyRow(3);
+  renderRuns();
   const now = new Date();
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();
@@ -131,6 +117,7 @@ export async function refresh() {
 }
 
 export function openRowFor(event) {
+  if (event.target.closest('.workflow-toggle')) return; // the toggle handles itself
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');

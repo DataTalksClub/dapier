@@ -1,5 +1,6 @@
 """Console admin API: the /api/admin/* and /auth/* dispatcher."""
 import re
+from urllib.parse import unquote
 
 from ... import http
 from ...auth import authz, session
@@ -37,6 +38,11 @@ def route(event, method, path):
     operator_subject = session.subject_fallback(operator_payload)
     if method == "GET" and path == "/api/admin/overview":
         return overview.overview()
+    if method == "GET" and path == "/api/admin/runs":
+        return routes.list_runs(event)
+    run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
+    if method == "GET" and run_match:
+        return routes.get_run(unquote(run_match.group(1)))
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return routes.save_credential(path.rsplit("/", 1)[1], event)
     if method == "GET" and path == "/api/admin/oauth-clients":
@@ -72,6 +78,8 @@ def route(event, method, path):
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1))
+    if method == "PUT" and designer_match:
+        return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1))
     if method == "GET" and path == "/api/admin/hook-triggers":
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":
@@ -103,11 +111,13 @@ from .routes import (  # noqa: F401
     delete_schedule_trigger,
     designer_get,
     designer_list,
+    get_run,
     import_connection,
     list_api_tokens,
     list_email_triggers,
     list_grants,
     list_hook_triggers,
+    list_runs,
     list_schedule_triggers,
     oauth_clients_view,
     revoke_api_token,
@@ -115,6 +125,7 @@ from .routes import (  # noqa: F401
     save_connection,
     save_credential,
     save_designer_workflow,
+    toggle_designer_workflow,
     save_email_trigger,
     save_grant,
     save_hook_trigger,

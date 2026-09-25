@@ -25,7 +25,9 @@ export function wrapTokens(value) {
 
 export function triggerLabel(workflow) {
   const trigger = workflow.trigger;
-  return `${trigger.connector} · ${trigger.event}`;
+  const base = `${trigger.connector} · ${trigger.event}`;
+  const extra = (workflow.triggerCount || 1) - 1;
+  return extra > 0 ? `${base} +${extra}` : base;
 }
 
 /* One timestamp family everywhere: YYYY-MM-DD HH:MM (24h, local). */
@@ -45,6 +47,26 @@ export function formatDay(value) {
   const date = toDate(value);
   return Number.isNaN(date.getTime()) ? String(value)
     : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+/* Step timing: sub-second stays in ms, everything else in seconds. */
+export function formatDuration(ms) {
+  if (ms == null || ms === '') return null;
+  const value = Number(ms);
+  if (Number.isNaN(value)) return String(ms);
+  return value < 1000 ? `${Math.round(value)}ms` : `${(value / 1000).toFixed(value < 10000 ? 2 : 1)}s`;
+}
+
+/* Machine data (step input/output) as one escaped JSON block. */
+export function jsonBlock(value) {
+  if (value == null || value === '') return '';
+  let text;
+  try {
+    text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  } catch (_) {
+    text = String(value);
+  }
+  return `<pre class="json-block">${escapeHtml(text)}</pre>`;
 }
 
 export function emptyRow(columns) {

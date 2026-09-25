@@ -2,7 +2,9 @@
 
 import json
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from src.dapier.api import agent as agent_api
@@ -130,6 +132,32 @@ class SaveTests(unittest.TestCase):
         self.assertEqual(
             [method for method, _ in events.calls][-2:],
             ["remove_targets", "delete_rule"])
+
+    def test_save_binds_a_shared_flow_without_inline_actions(self):
+        events = StubEvents()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "flows.yaml").write_text(
+                "flows:\n  digest-flow:\n    actions:\n      - {type: webhook, url: 'https://intake.test/x'}\n")
+            with patch.dict(os.environ, {**ENV, "WORKFLOWS_DIR": tmp}):
+                table = StubTable()
+                _status, payload = schedule_triggers.api_save(
+                    {"name": "morning-digest", "expression": "cron(0 8 * * ? *)",
+                     "flow": "digest-flow"},
+                    "op", table_ref=table, events_client=events)
+                self.assertEqual(payload["flow"], "digest-flow")
+                self.assertEqual(payload["actions"], [])
+
+                workflow = schedule_triggers.load_workflows(table_ref=table)[0]
+                self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
+                event = {"connector": "schedule", "event": "schedule.triggered",
+                         "data": {"schedule": "morning-digest"}}
+                self.assertTrue(matches(workflow, event))
+
+                with self.assertRaises(schedule_triggers.TriggerError):
+                    schedule_triggers.api_save(
+                        {"name": "evening-digest", "expression": "cron(0 20 * * ? *)",
+                         "flow": "digest-flow", "actions": [{"type": "webhook", "url": "https://x"}]},
+                        "op", table_ref=table, events_client=events)
 
 
 class EngineTests(unittest.TestCase):

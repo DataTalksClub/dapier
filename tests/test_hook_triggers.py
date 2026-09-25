@@ -2,7 +2,9 @@
 
 import json
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from src.dapier.api import agent as agent_api
@@ -59,6 +61,28 @@ class WebhookSaveTests(unittest.TestCase):
         self.assertGreaterEqual(len(payload["token"]), 32)
         self.assertEqual(payload["header"], "authorization")
         self.assertEqual(payload["auth_scheme"], "Bearer")
+
+    def test_save_binds_a_shared_flow_without_inline_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "flows.yaml").write_text(
+                "flows:\n  order-flow:\n    actions:\n      - {type: webhook, url: 'https://intake.test/x'}\n")
+            with patch.dict(os.environ, {"WORKFLOWS_DIR": tmp, "HOOK_TRIGGERS_TABLE": "hooks"}):
+                stub = StubTable()
+                _status, payload = hook_triggers.api_save(
+                    {"name": "orders", "flow": "order-flow"}, "op", table_ref=stub)
+                self.assertEqual(payload["flow"], "order-flow")
+                self.assertEqual(payload["actions"], [])
+
+                workflow = hook_triggers.load_workflows(table_ref=stub)[0]
+                self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
+                event = {"connector": "webhook", "event": "request.received", "data": {"hook": "orders"}}
+                self.assertTrue(matches(workflow, event))
+
+                with self.assertRaises(hook_triggers.TriggerError):
+                    hook_triggers.api_save(
+                        {"name": "orders2", "flow": "order-flow",
+                         "actions": [{"type": "webhook", "url": "https://x"}]},
+                        "op", table_ref=stub)
 
     def test_update_keeps_token_unless_rotated(self):
         stub = StubTable()

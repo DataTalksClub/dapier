@@ -17,3 +17,4 @@ def run_webhook(action, event):
     with urllib.request.urlopen(request, timeout=action.get("timeout_seconds", 10)) as response:
         if response.status >= 300:
             raise RuntimeError(f"webhook returned HTTP {response.status}")
+        return {"status": response.status}

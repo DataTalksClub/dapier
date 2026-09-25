@@ -66,9 +66,12 @@ def run_dropbox_upload(action, event, transport=None):
     access_token, _info = tokens.get_access_token(connection, transport=transport)
     stripped = str(action.get("folder") or "").strip("/")
     folder = f"/{stripped}" if stripped else ""
+    uploaded = []
     for file in _upload_files(action, event.get("data", {})):
         path = f"{folder}/{base._safe_filename(file['filename'])}"
         _dropbox_upload(access_token, path, base._s3_body(file["s3"]), transport=transport)
+        uploaded.append(path)
+    return {"uploaded": uploaded}
 
 def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dropbox call unreachable"):
     transport = transport or base._default_transport
@@ -123,3 +126,4 @@ def run_dropbox_delete(action, event, transport=None):
         DROPBOX_DELETE_URL, access_token, {"path": path},
         transport=transport, unreachable="dropbox delete unreachable",
     )
+    return {"deleted": path}

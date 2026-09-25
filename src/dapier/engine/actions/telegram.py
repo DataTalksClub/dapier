@@ -27,3 +27,7 @@ def run_telegram_send(action, event, *, transport=None):
     )
     if not result:
         raise RuntimeError("Telegram did not confirm the message")
+    return {
+        "message_id": result.get("message_id"),
+        "chat_id": (result.get("chat") or {}).get("id", chat_id),
+    }

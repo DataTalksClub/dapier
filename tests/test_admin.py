@@ -365,3 +365,143 @@ def test_admin_duplicate_token_is_conflict(monkeypatch):
     assert first["statusCode"] == 200
     assert second["statusCode"] == 409
 
+
+
+def _configure_runs(monkeypatch, items):
+    """Operator session plus a fake executions table for the runs routes."""
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                            "exp": int(time.time()) + 600})
+
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+    class Dynamo:
+        def Table(self, _name):
+            return RunsTable()
+
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    return [f"dapier_session={cookie}"]
+
+
+def test_admin_runs_list_groups_executions_into_runs(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    }])
+
+    listed = admin.route(operator_request("GET", "/api/admin/runs", cookies=cookies),
+                         "GET", "/api/admin/runs")
+
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert body["runs"][0]["run_id"] == "wf-1:evt-1"
+    assert body["runs"][0]["status"] == "completed"
+
+
+def test_admin_run_detail_returns_step_flow(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+        "error": "webhook returned HTTP 500", "duration_ms": 980,
+        "input": {"subject": "invoice"}, "output": None,
+    }])
+
+    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1%3Aevt-1", cookies=cookies),
+                         "GET", "/api/admin/runs/wf-1%3Aevt-1")
+
+    assert detail["statusCode"] == 200
+    body = json.loads(detail["body"])
+    assert body["run"]["status"] == "failed"
+    assert body["steps"][0]["error"] == "webhook returned HTTP 500"
+    assert body["steps"][0]["input"] == {"subject": "invoice"}
+
+
+def test_admin_run_detail_unknown_run_is_404(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [])
+
+    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1:missing", cookies=cookies),
+                         "GET", "/api/admin/runs/wf-1:missing")
+
+    assert detail["statusCode"] == 404
+
+
+def _configure_runs(monkeypatch, items):
+    """Operator session plus a fake executions table for the runs routes."""
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                            "exp": int(time.time()) + 600})
+
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+    class Dynamo:
+        def Table(self, _name):
+            return RunsTable()
+
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    return [f"dapier_session={cookie}"]
+
+
+def test_admin_runs_list_groups_executions_into_runs(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    }])
+
+    listed = admin.route(operator_request("GET", "/api/admin/runs", cookies=cookies),
+                         "GET", "/api/admin/runs")
+
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert body["runs"][0]["run_id"] == "wf-1:evt-1"
+    assert body["runs"][0]["status"] == "completed"
+
+
+def test_admin_run_detail_returns_step_flow(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+        "error": "webhook returned HTTP 500", "duration_ms": 980,
+        "input": {"subject": "invoice"}, "output": None,
+    }])
+
+    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1%3Aevt-1", cookies=cookies),
+                         "GET", "/api/admin/runs/wf-1%3Aevt-1")
+
+    assert detail["statusCode"] == 200
+    body = json.loads(detail["body"])
+    assert body["run"]["status"] == "failed"
+    assert body["steps"][0]["error"] == "webhook returned HTTP 500"
+    assert body["steps"][0]["input"] == {"subject": "invoice"}
+
+
+def test_admin_run_detail_unknown_run_is_404(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [])
+
+    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1:missing", cookies=cookies),
+                         "GET", "/api/admin/runs/wf-1:missing")
+
+    assert detail["statusCode"] == 404

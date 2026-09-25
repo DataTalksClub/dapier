@@ -660,3 +660,57 @@ def test_tokens_empty_list(isolated_home, monkeypatch, capsys):
 
     assert rc == 0
     assert "No API tokens" in capsys.readouterr().out
+
+
+RUN_STEPS = {
+    "run": {"run_id": "wf-1:evt-1", "workflow_id": "wf-1", "status": "failed",
+            "connector": "email", "event_type": "message.received", "steps": 2,
+            "started_at": "2026-09-25T10:00:00+00:00", "failed_step": "post",
+            "error": "Slack rejected message"},
+    "steps": [
+        {"execution_id": "wf-1:post:evt-1", "action_id": "post", "action_type": "webhook",
+         "status": "completed", "duration_ms": 980,
+         "input": {"subject": "invoice"}, "output": {"status": 200}},
+        {"execution_id": "wf-1:notify:evt-1", "action_id": "notify", "action_type": "slack",
+         "status": "failed", "duration_ms": 340, "input": {"subject": "invoice"},
+         "error": "Slack rejected message"},
+    ],
+}
+
+
+def test_runs_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"runs": [{"run_id": "wf-1:evt-1", "workflow_id": "wf-1", "status": "failed",
+                          "steps": 2, "started_at": "2026-09-25T10:00:00+00:00"}]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "list"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/runs?limit=25")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out and "failed" in out
+
+
+def test_runs_show_prints_the_step_flow(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return RUN_STEPS
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "show", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/runs/wf-1%3Aevt-1")]
+    out = capsys.readouterr().out
+    assert "step[1]: post (webhook)  completed  980ms" in out
+    assert "step[2]: notify (slack)  failed  340ms" in out
+    assert "error: Slack rejected message" in out
+    assert '{"status": 200}' in out

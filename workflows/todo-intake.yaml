@@ -1,0 +1,26 @@
+# Merged todo intake: email and Telegram entry points share one action chain.
+#
+# The `flows` block names the common logic once; the email route below binds
+# it with `flow:` instead of repeating the actions. Telegram joins the same
+# chain as a stored hook — save {"name": "todo", "kind": "telegram",
+# "connection_id": "<bot-connection>", "flow": "todo-dataops"} with
+# `dapier hooks save` — because Telegram delivery is registered per stored
+# hook, so the YAML bundle carries only the flow and the email entry point.
+flows:
+  todo-dataops:
+    description: Push an inbound todo into the DataOps intake
+    actions:
+      - id: create-intake
+        type: dataops
+        url_env: DATAOPS_INTAKE_URL
+        auth_secret_id: dapier/dataops
+
+id: todo-intake
+enabled: true
+triggers:
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: todo
+flow: todo-dataops

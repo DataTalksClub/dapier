@@ -35,8 +35,9 @@ def run_email_send(action, event, *, ses=None):
         body["Text"] = {"Data": text, "Charset": "utf-8"}
     if html:
         body["Html"] = {"Data": html, "Charset": "utf-8"}
-    ses.send_email(
+    response = ses.send_email(
         Source=sender,
         Destination={"ToAddresses": addresses},
         Message={"Subject": {"Data": subject, "Charset": "utf-8"}, "Body": body},
     )
+    return {"message_id": response.get("MessageId"), "to": addresses, "subject": subject}

@@ -10,8 +10,26 @@ import { openDesigner, designerFromLocation } from './views/designer.js';
 }));
 
 document.addEventListener('click', openRowFor);
+
+/* Enable/disable publishes live through the designer API, then refreshes. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-toggle');
+  if (!button || !button.dataset.file || button.disabled) return;
+  button.disabled = true;
+  try {
+    await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: button.dataset.enabled !== 'true' }),
+    });
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+    button.disabled = false;
+  }
+});
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
+  if (event.target.closest('button, a, input, select, textarea')) return; // native activation
   if (!event.target.closest('.workflow-open, .run-open')) return;
   event.preventDefault();
   openRowFor(event);

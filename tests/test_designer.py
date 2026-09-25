@@ -83,6 +83,41 @@ def test_parse_workflow_rejects_oversized_yaml():
         designer_store.parse_workflow("id: x\n# " + "x" * (designer_store.MAX_YAML_BYTES + 10))
 
 
+def test_parse_workflow_accepts_triggers_list_and_flow_reference(tmp_path, monkeypatch):
+    (tmp_path / "flows.yaml").write_text(
+        "flows:\n"
+        "  shared-intake:\n"
+        "    actions:\n"
+        "      - {type: webhook, url: 'https://intake.test/x'}\n")
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    workflow = designer_store.parse_workflow(
+        "id: multi\n"
+        "triggers:\n"
+        "  - {connector: email, event: message.received}\n"
+        "  - {connector: dropbox, event: file.created}\n"
+        "flow: shared-intake\n")
+    assert [trigger["connector"] for trigger in workflow["triggers"]] == ["email", "dropbox"]
+    assert workflow["flow"] == "shared-intake"
+
+
+@pytest.mark.parametrize("yaml_text,fragment", [
+    ("id: x\ntrigger: {connector: email, event: e}\nflow: shared\nactions: [{type: webhook, url: 'https://x'}]\n",
+     "not both"),
+    ("id: x\ntriggers: [{connector: email}]\nactions: [{type: webhook, url: 'https://x'}]\n",
+     "connector and an event"),
+])
+def test_parse_workflow_rejects_bad_multi_trigger_and_flow_shapes(yaml_text, fragment):
+    with pytest.raises(designer_store.WorkflowError, match=fragment):
+        designer_store.parse_workflow(yaml_text)
+
+
+def test_parse_workflow_rejects_unknown_flow_reference(tmp_path, monkeypatch):
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    with pytest.raises(designer_store.WorkflowError, match="no shared flow"):
+        designer_store.parse_workflow(
+            "id: x\ntrigger: {connector: email, event: e}\nflow: nope\n")
+
+
 def test_filename_for_derives_yaml_name():
     assert designer_store.filename_for("render-invoice") == "render-invoice.yaml"
 
@@ -294,7 +329,7 @@ def test_designer_get_serves_bundled_yaml_and_404(monkeypatch, tmp_path, operato
 
 def test_designer_save_commits_and_audits(monkeypatch, operator_session):
     saved = {}
-    monkeypatch.setattr(designer_store, "api_save", lambda body: (
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: (
         saved.update(body) or (200, {"file": "test-flow.yaml", "commit": "abc123", "removed": None})
     ))
     audits = []
@@ -311,7 +346,7 @@ def test_designer_save_commits_and_audits(monkeypatch, operator_session):
 
 
 def test_designer_save_maps_validation_errors(monkeypatch, operator_session):
-    monkeypatch.setattr(designer_store, "api_save", lambda body: (400, {"error": "workflow needs an id"}))
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: (400, {"error": "workflow needs an id"}))
     response = admin.route(
         admin_request("PUT", "/api/admin/designer/workflows", {"yaml": "id: [1]\n"}),
         "PUT", "/api/admin/designer/workflows",
@@ -363,7 +398,7 @@ def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_id
     assert listed["statusCode"] == 200
 
     calls = []
-    monkeypatch.setattr(designer_store, "api_save", lambda body: calls.append(body) or (
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: calls.append(body) or (
         200, {"file": "x.yaml", "commit": "abc", "removed": None},
     ))
     saved = agent_api.route(
@@ -454,7 +489,7 @@ def test_designer_get_serves_bundled_yaml_and_404(monkeypatch, tmp_path, operato
 
 def test_designer_save_commits_and_audits(monkeypatch, operator_session):
     saved = {}
-    monkeypatch.setattr(designer_store, "api_save", lambda body: (
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: (
         saved.update(body) or (200, {"file": "test-flow.yaml", "commit": "abc123", "removed": None})
     ))
     audits = []
@@ -471,7 +506,7 @@ def test_designer_save_commits_and_audits(monkeypatch, operator_session):
 
 
 def test_designer_save_maps_validation_errors(monkeypatch, operator_session):
-    monkeypatch.setattr(designer_store, "api_save", lambda body: (400, {"error": "workflow needs an id"}))
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: (400, {"error": "workflow needs an id"}))
     response = admin.route(
         admin_request("PUT", "/api/admin/designer/workflows", {"yaml": "id: [1]\n"}),
         "PUT", "/api/admin/designer/workflows",
@@ -523,7 +558,7 @@ def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_id
     assert listed["statusCode"] == 200
 
     calls = []
-    monkeypatch.setattr(designer_store, "api_save", lambda body: calls.append(body) or (
+    monkeypatch.setattr(designer_store, "api_save", lambda body, operator=None: calls.append(body) or (
         200, {"file": "x.yaml", "commit": "abc", "removed": None},
     ))
     saved = agent_api.route(
@@ -699,3 +734,73 @@ def test_deploy_script_heredoc_terminators_are_literal_lines():
     starts = len([line for line in script.splitlines() if "<<EOF" in line or "<<'EOF'" in line])
     terminators = len([line for line in script.splitlines() if line.strip() == "EOF"])
     assert starts > 0 and starts == terminators
+
+
+def test_designer_toggle_routes_to_the_store(monkeypatch, operator_session):
+    toggled = {}
+    monkeypatch.setattr(designer_store, "api_toggle", lambda source, body, operator=None: (
+        toggled.update(source=source, body=body, operator=operator)
+        or (200, {"file": source, "enabled": body["enabled"]})
+    ))
+    audits = []
+    monkeypatch.setattr(session, "_audit_event",
+                        lambda *args, **kwargs: audits.append((args, kwargs)) or None)
+
+    response = admin.route(
+        admin_request("PUT", "/api/admin/designer/workflows/test-flow.yaml", {"enabled": False}),
+        "PUT", "/api/admin/designer/workflows/test-flow.yaml",
+    )
+    assert response["statusCode"] == 200
+    assert toggled == {"source": "test-flow.yaml", "body": {"enabled": False}, "operator": "op-1"}
+    assert audits[0][0][1] == "workflow.toggle"
+
+
+def test_agent_designer_toggle_drives_the_same_store(monkeypatch, agent_identity):
+    toggled = {}
+    monkeypatch.setattr(designer_store, "api_toggle", lambda source, body, operator=None: (
+        toggled.update(source=source, body=body, operator=operator)
+        or (200, {"file": source, "enabled": body["enabled"]})
+    ))
+    response = agent_api.route(
+        agent_request("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": False}),
+        "PUT", "/api/agent/designer/workflows/test-flow.yaml",
+    )
+    assert response["statusCode"] == 200
+    assert toggled["source"] == "test-flow.yaml"
+    assert toggled["body"] == {"enabled": False}
+    assert toggled["operator"] == "agent-op"
+
+
+def test_designer_toggle_routes_to_the_store(monkeypatch, operator_session):
+    toggled = {}
+    monkeypatch.setattr(designer_store, "api_toggle", lambda source, body, operator=None: (
+        toggled.update(source=source, body=body, operator=operator)
+        or (200, {"file": source, "enabled": body["enabled"]})
+    ))
+    audits = []
+    monkeypatch.setattr(session, "_audit_event",
+                        lambda *args, **kwargs: audits.append((args, kwargs)) or None)
+
+    response = admin.route(
+        admin_request("PUT", "/api/admin/designer/workflows/test-flow.yaml", {"enabled": False}),
+        "PUT", "/api/admin/designer/workflows/test-flow.yaml",
+    )
+    assert response["statusCode"] == 200
+    assert toggled == {"source": "test-flow.yaml", "body": {"enabled": False}, "operator": "op-1"}
+    assert audits[0][0][1] == "workflow.toggle"
+
+
+def test_agent_designer_toggle_drives_the_same_store(monkeypatch, agent_identity):
+    toggled = {}
+    monkeypatch.setattr(designer_store, "api_toggle", lambda source, body, operator=None: (
+        toggled.update(source=source, body=body, operator=operator)
+        or (200, {"file": source, "enabled": body["enabled"]})
+    ))
+    response = agent_api.route(
+        agent_request("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": False}),
+        "PUT", "/api/agent/designer/workflows/test-flow.yaml",
+    )
+    assert response["statusCode"] == 200
+    assert toggled["source"] == "test-flow.yaml"
+    assert toggled["body"] == {"enabled": False}
+    assert toggled["operator"] == "agent-op"

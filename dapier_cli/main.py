@@ -78,6 +78,13 @@ def build_parser():
 
     sub.add_parser("overview", help="Operator overview: workflows, connections, credentials")
 
+    runs_p = sub.add_parser("runs", help="Workflow run history (one run per trigger event)")
+    runs_sub = runs_p.add_subparsers(dest="command", required=True)
+    runs_list_p = runs_sub.add_parser("list", help="Recent runs, newest first")
+    runs_list_p.add_argument("--limit", type=int, default=25)
+    runs_show_p = runs_sub.add_parser("show", help="Show one run's step-by-step flow")
+    runs_show_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+
     oac_p = sub.add_parser("oauth-clients", help="Shared OAuth clients per provider (same as the console's Credentials view)")
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
     oac_sub.add_parser("list", help="Show the configured shared OAuth clients (no secrets)")
@@ -111,13 +118,17 @@ def build_parser():
 
     wf_p = sub.add_parser("workflows", help="Workflow YAML committed by the console designer")
     wf_sub = wf_p.add_subparsers(dest="command", required=True)
-    wf_sub.add_parser("list", help="List deployed workflows and the git sync target")
+    wf_sub.add_parser("list", help="List workflows with their live published state")
     wf_show_p = wf_sub.add_parser("show", help="Show one workflow (JSON)")
     wf_show_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
-    wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo")
+    wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo and publish it live")
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
+    wf_enable_p = wf_sub.add_parser("enable", help="Publish a workflow as enabled (live immediately)")
+    wf_enable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_disable_p = wf_sub.add_parser("disable", help="Publish a workflow as disabled (live immediately)")
+    wf_disable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     hook_p = sub.add_parser("hooks", help="Webhook and Telegram triggers")
     hook_sub = hook_p.add_subparsers(dest="command", required=True)
     hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
@@ -174,6 +185,8 @@ def main(argv=None):
             return cmd_tokens(args, api_url, debug)
         if args.group == "overview":
             return commands.overview(api_url, debug)
+        if args.group == "runs":
+            return cmd_runs(args, api_url, debug)
         if args.group == "oauth-clients":
             return cmd_oauth_clients(args, api_url, debug)
     except ApiError as exc:
@@ -257,6 +270,8 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_show(api_url, args.file, debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
+    if args.command in ("enable", "disable"):
+        return commands.workflows_set_enabled(api_url, args.file, args.command == "enable", debug)
     return 2
 
 
@@ -314,6 +329,14 @@ def cmd_oauth_clients(args, api_url, debug):
     if args.command == "set":
         return commands.oauth_clients_set(api_url, args.provider, args.client_id,
                                           args.client_secret_file, debug)
+    return 2
+
+
+def cmd_runs(args, api_url, debug):
+    if args.command == "list":
+        return commands.runs_list(api_url, args.limit, debug)
+    if args.command == "show":
+        return commands.runs_show(api_url, args.run_id, debug)
     return 2
 
 
