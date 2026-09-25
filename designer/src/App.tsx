@@ -136,6 +136,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [savedSnapshot, setSavedSnapshot] = useState("[]");
   const [status, setStatus] = useState<{ kind: "idle" | "busy" | "error" | "ok"; message: string }>({ kind: "idle", message: "" });
   const [git, setGit] = useState<GitStatus | null>(null);
+  const [view, setView] = useState<"canvas" | "yaml">("canvas");
+  const [yamlText, setYamlText] = useState("");
+  const [savedYaml, setSavedYaml] = useState("");
+  /** The workflow as last loaded or saved; carries `flows:`/`flow:` through canvas saves. */
+  const [base, setBase] = useState<Workflow | null>(null);
   const [testOpen, setTestOpen] = useState(false);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);

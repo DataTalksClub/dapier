@@ -18033,7 +18033,7 @@
       filters: filterRulesToYaml(data.filters)
     };
   }
-  function workflowFromShapes(shapes, workflowId, enabled, base2) {
+  function workflowFromShapes(shapes, workflowId, enabled, base) {
     const problems = [];
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
     if (triggerNodes.length === 0) problems.push("Add a trigger node before saving.");
@@ -18043,11 +18043,11 @@
       id: workflowId.trim() || "untitled-workflow",
       enabled
     };
-    if (base2?.flow) {
-      const flows = isRecord(base2.flows) ? base2.flows : {};
-      const bound = isRecord(flows[base2.flow]) ? flows[base2.flow] : {};
-      workflow.flows = { ...flows, [base2.flow]: { ...bound, actions: actions.map(actionToYaml) } };
-      workflow.flow = base2.flow;
+    if (base?.flow) {
+      const flows = isRecord(base.flows) ? base.flows : {};
+      const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
+      workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map(actionToYaml) } };
+      workflow.flow = base.flow;
     } else {
       workflow.actions = actions.map(actionToYaml);
     }
@@ -19038,6 +19038,10 @@
     const [savedSnapshot, setSavedSnapshot] = reactExports.useState("[]");
     const [status, setStatus] = reactExports.useState({ kind: "idle", message: "" });
     const [git, setGit] = reactExports.useState(null);
+    const [view, setView] = reactExports.useState("canvas");
+    const [yamlText, setYamlText] = reactExports.useState("");
+    const [savedYaml, setSavedYaml] = reactExports.useState("");
+    const [base, setBase] = reactExports.useState(null);
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
