@@ -17,7 +17,8 @@ def build_parser():
     auth_sub = auth_p.add_subparsers(dest="command", required=True)
     login_p = auth_sub.add_parser(
         "login", help="Sign in by pairing this device (or --browser for the localhost flow)")
-    login_p.add_argument("--timeout", type=int, default=600)
+    login_p.add_argument("--timeout", type=int, default=900,
+                         help="Seconds to wait for approval (default: the code's 15-minute life)")
     login_p.add_argument("--browser", action="store_true",
                          help="Use the browser loopback flow instead of device pairing")
     auth_sub.add_parser("status", help="Show the stored session (no secrets)")
