@@ -62,6 +62,9 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                     else:
                         raise ValueError(f"unsupported action: {action['type']}")
                 except Exception as exc:
+                    # Tag the failing workflow for the worker's failure
+                    # notifications (see engine.notify).
+                    exc.dapier_workflow = workflow["id"]
                     if on_action_error:
                         on_action_error(workflow["id"], action_id, event, exc,
                                         duration_ms=_elapsed(started))

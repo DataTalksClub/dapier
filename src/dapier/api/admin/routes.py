@@ -27,6 +27,14 @@ def get_run(run_id):
     return http._json_response(status, payload)
 
 
+def replay_run(run_id, operator):
+    """Re-execute a run: its original trigger event goes back on the queue."""
+    status, payload = runs.api_replay(run_id)
+    if status == 202:
+        session._audit_event(run_id, "runs.replay", operator or "unknown", outcome="ok")
+    return http._json_response(status, payload)
+
+
 def oauth_clients_view():
     return http._json_response(200, {
         "clients": [overview._oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],

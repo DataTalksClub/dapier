@@ -505,3 +505,103 @@ def test_admin_run_detail_unknown_run_is_404(monkeypatch):
                          "GET", "/api/admin/runs/wf-1:missing")
 
     assert detail["statusCode"] == 404
+
+
+def _configure_replay_queue(monkeypatch):
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    calls = []
+
+    class Queue:
+        def send_message(self, **kwargs):
+            calls.append(kwargs)
+            return {"MessageId": "sqsm-1"}
+
+    monkeypatch.setattr(admin.routes.runs, "_queue", lambda: Queue())
+    return calls
+
+
+def test_admin_run_replay_reinjects_the_original_event(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+        "error": "webhook returned HTTP 500", "input": {"subject": "invoice"},
+    }])
+    calls = _configure_replay_queue(monkeypatch)
+
+    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/replay", cookies=cookies),
+                           "POST", "/api/admin/runs/wf-1%3Aevt-1/replay")
+
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["replayed_from"] == "wf-1:evt-1"
+    assert body["run_id"].startswith("wf-1:replay-")
+    envelope = json.loads(calls[0]["MessageBody"])
+    assert envelope["id"].startswith("replay-")
+    assert envelope["correlation_id"] == "evt-1"
+    assert envelope["data"] == {"subject": "invoice"}
+
+    missing = admin.route(operator_request("POST", "/api/admin/runs/wf-1:missing/replay", cookies=cookies),
+                          "POST", "/api/admin/runs/wf-1:missing/replay")
+    assert missing["statusCode"] == 404
+
+
+def test_admin_run_replay_requires_authentication(monkeypatch):
+    _configure_runs(monkeypatch, [])
+
+    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1:evt-1/replay", cookies=[]),
+                           "POST", "/api/admin/runs/wf-1:evt-1/replay")
+
+    assert replayed["statusCode"] == 401
+
+
+def _configure_replay_queue(monkeypatch):
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    calls = []
+
+    class Queue:
+        def send_message(self, **kwargs):
+            calls.append(kwargs)
+            return {"MessageId": "sqsm-1"}
+
+    monkeypatch.setattr(admin.routes.runs, "_queue", lambda: Queue())
+    return calls
+
+
+def test_admin_run_replay_reinjects_the_original_event(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+        "error": "webhook returned HTTP 500", "input": {"subject": "invoice"},
+    }])
+    calls = _configure_replay_queue(monkeypatch)
+
+    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/replay", cookies=cookies),
+                           "POST", "/api/admin/runs/wf-1%3Aevt-1/replay")
+
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["replayed_from"] == "wf-1:evt-1"
+    assert body["run_id"].startswith("wf-1:replay-")
+    envelope = json.loads(calls[0]["MessageBody"])
+    assert envelope["id"].startswith("replay-")
+    assert envelope["correlation_id"] == "evt-1"
+    assert envelope["data"] == {"subject": "invoice"}
+
+    missing = admin.route(operator_request("POST", "/api/admin/runs/wf-1:missing/replay", cookies=cookies),
+                          "POST", "/api/admin/runs/wf-1:missing/replay")
+    assert missing["statusCode"] == 404
+
+
+def test_admin_run_replay_requires_authentication(monkeypatch):
+    _configure_runs(monkeypatch, [])
+
+    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1:evt-1/replay", cookies=[]),
+                           "POST", "/api/admin/runs/wf-1:evt-1/replay")
+
+    assert replayed["statusCode"] == 401

@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import execute
+from .notify import notify_failure
 
 
 logger = logging.getLogger(__name__)
@@ -207,6 +208,7 @@ def handler(event, _context):
     if isinstance(event, dict) and event.get("trigger") == "schedule" and event.get("schedule_id"):
         # EventBridge invokes the function directly: the target input names
         # the trigger, and the envelope carries the fire's id and time.
+        normalized = None
         try:
             normalized = _schedule_event(event)
             execute(
@@ -215,12 +217,14 @@ def handler(event, _context):
                 after_action=_mark_completed,
                 on_action_error=_release_action,
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("schedule trigger failed", extra={"schedule_id": event.get("schedule_id")})
+            notify_failure(exc, normalized)
             raise
         return {"executed": event["schedule_id"]}
     failures = []
     for record in event.get("Records", []):
+        payload = None
         try:
             payload = json.loads(record["body"])
             payload = normalize_payload(payload)
@@ -230,7 +234,8 @@ def handler(event, _context):
                 after_action=_mark_completed,
                 on_action_error=_release_action,
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("workflow record failed", extra={"message_id": record.get("messageId")})
+            notify_failure(exc, payload)
             failures.append({"itemIdentifier": record["messageId"]})
     return {"batchItemFailures": failures}

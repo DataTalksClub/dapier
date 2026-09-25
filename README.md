@@ -54,6 +54,20 @@ the worker reads a Secrets Manager secret containing either a plain signing secr
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
+A workflow can opt into failure notifications with a top-level `notify` list of
+email addresses. When a run of that workflow fails, the worker sends one SES
+email per failed run (workflow id, run id, failing step's error); SQS
+redeliveries of the same record never re-notify:
+
+```yaml
+notify: [ops@example.com, lead@example.com]
+```
+
+Every run is recorded in run history (console → Runs, or `dapier runs list`),
+and any run — failed or successful — can be re-executed with its original
+trigger event via the Replay button in the run dialog or
+`dapier runs replay <run-id>`.
+
 Each workflow item carries its own connector config — there is no global
 channel or folder list. A YouTube trigger names the channel(s) it watches in
 its trigger filters (`channel_id: {equals: UC...}` for one, `channel_id:

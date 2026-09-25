@@ -158,5 +158,101 @@ def test_decimal_numbers_are_json_safe(monkeypatch):
     assert payload["steps"][0]["expires_at"] == 1789000000
 
 
+class FakeQueue:
+    def __init__(self):
+        self.messages = []
+
+    def send_message(self, **kwargs):
+        self.messages.append(kwargs)
+        return {"MessageId": "sqsm-1"}
+
+
+def _configure_queue(monkeypatch):
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    queue = FakeQueue()
+    monkeypatch.setattr(runs, "_queue", lambda: queue)
+    return queue
+
+
+def test_api_replay_reinjects_the_original_event(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1", connector="email",
+              input_data={"route": "invoice", "subject": "hello"}),
+    ])
+    queue = _configure_queue(monkeypatch)
+
+    status, payload = runs.api_replay("wf-1:evt-1")
+
+    assert status == 202
+    assert payload["accepted"] is True
+    assert payload["replayed_from"] == "wf-1:evt-1"
+    assert payload["run_id"].startswith("wf-1:replay-")
+    event = json.loads(queue.messages[0]["MessageBody"])
+    assert queue.messages[0]["QueueUrl"] == "https://sqs.test/events"
+    assert event["id"].startswith("replay-")  # a fresh run in history
+    assert event["correlation_id"] == "evt-1"  # tied to the original event
+    assert event["connector"] == "email"
+    assert event["event"] == "message.received"
+    assert event["data"] == {"route": "invoice", "subject": "hello"}
+
+
+def test_api_replay_blank_is_400_and_unknown_is_404(monkeypatch):
+    _configure(monkeypatch, [])
+    _configure_queue(monkeypatch)
+    assert runs.api_replay("  ")[0] == 400
+    assert runs.api_replay("wf-1:nope")[0] == 404
+
+
+def test_api_replay_refuses_runs_without_recorded_event_data(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1", input_data=None),
+    ])
+    _configure_queue(monkeypatch)
+
+    status, payload = runs.api_replay("wf-1:evt-1")
+
+    assert status == 409
+    assert "cannot be replayed" in payload["error"]
+
+
+def test_api_replay_refuses_truncated_event_data(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1",
+              input_data={"truncated": True, "preview": '{"route": "inv'}),
+    ])
+    _configure_queue(monkeypatch)
+
+    status, payload = runs.api_replay("wf-1:evt-1")
+
+    assert status == 409
+    assert "too large" in payload["error"]
+
+
+def test_recent_hides_failure_notice_items(monkeypatch):
+    notice = _step("wf-1", "failure-notice", "evt-1", status="notified",
+                   run_id="wf-1:evt-1#notice", started="2026-09-25T10:00:05+00:00")
+    notice["kind"] = "failure-notice"
+    notice["execution_id"] = "wf-1:failure-notice:evt-1"
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1",
+              started="2026-09-25T10:00:00+00:00", finished="2026-09-25T10:00:01+00:00"),
+        notice,
+    ])
+
+    status, payload = runs.api_list()
+
+    assert status == 200
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-1"]
+    assert payload["runs"][0]["steps"] == 1
+
+
+def test_replay_event_tolerates_a_colon_free_run_id():
+    event, error = runs.replay_event("legacy-run", [
+        {"connector": "webhook", "event_type": "received", "input": {"ok": True}},
+    ])
+    assert error is None
+    assert event["correlation_id"] == "legacy-run"
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

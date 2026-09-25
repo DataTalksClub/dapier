@@ -27,6 +27,26 @@ document.addEventListener('click', async (event) => {
     button.disabled = false;
   }
 });
+
+/* Replay re-injects a run's original trigger event; the rerun lands in the
+   list once the worker picks it up, so refresh without closing the dialog. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.run-replay');
+  if (!button || !button.dataset.run || button.disabled) return;
+  button.disabled = true;
+  try {
+    const data = await api(`/api/admin/runs/${encodeURIComponent(button.dataset.run)}/replay`, {
+      method: 'POST',
+      body: '{}',
+    });
+    notice(`Run replayed — ${data.run_id || 'the rerun'} appears in the list shortly.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   if (event.target.closest('button, a, input, select, textarea')) return; // native activation
