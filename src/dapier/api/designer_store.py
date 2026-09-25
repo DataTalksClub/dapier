@@ -319,6 +319,12 @@ def parse_workflow(yaml_text):
     for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():
             raise WorkflowError("every action needs a type")
+        from ..engine.actions import templating
+
+        try:
+            templating.validate_action(action)
+        except templating.TemplateError as exc:
+            raise WorkflowError(f"action '{action.get('type')}': {exc}") from exc
     _validate_steps(actions)
     return workflow
 
