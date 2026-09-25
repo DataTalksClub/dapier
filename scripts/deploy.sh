@@ -67,7 +67,6 @@ HostedZoneId: "Z05963572WVWFHDQZH5NE"
 HtmlRendererImageUri: "817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer:20260712-lambda"
 InboundEmailTopicArn: "arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events"
 DatamailerInboundBucketName: "datamailer-sandbox-817685572750-inbound-mail"
-YouTubeChannelIds: "UCDvErgK0j5ur3aLgn6U-LqQ"
 DataOpsIntakeUrl: "https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents"
 AuthBaseUrl: "https://auth.dtcdev.click"
 AuthClientId: "$AUTH_CLIENT_ID"
@@ -76,7 +75,6 @@ AuthJwksUrl: "$AUTH_JWKS_URL"
 AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
-DropboxRootPath: "${DROPBOX_ROOT_PATH:-}"
 ${oauth_override_lines}${github_token_lines}
 EOF
 
