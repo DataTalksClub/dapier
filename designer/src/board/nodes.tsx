@@ -63,6 +63,11 @@ export function nodeTitle(shape: DiagramShape): string {
 }
 
 export function nodeSubtitle(shape: DiagramShape): string {
-  if (shape.type === "note" || shape.data?.nodeKind === "trigger") return "";
+  if (shape.type === "note") return "";
+  if (shape.data?.nodeKind === "trigger") {
+    // Same-connector triggers differ by their first filter; show it.
+    const rule = (shape.data.filters ?? []).find((entry) => entry.field.trim());
+    return rule ? `${rule.field.trim()} ${rule.operator} ${rule.value}`.trim() : "";
+  }
   return actionNodeSubtitle(shape.data ?? { nodeKind: "action" });
 }

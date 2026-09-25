@@ -48,15 +48,28 @@ export interface DiagramShape {
   targetHandleId?: string;
 }
 
+export interface TriggerSpec {
+  connector: string;
+  event: string;
+  filters: Record<string, Record<string, unknown>>;
+}
+
+/** A named action chain in the file's `flows:` block, bound via `flow:`. */
+export interface FlowSpec {
+  description?: string;
+  actions: Array<Record<string, unknown>>;
+}
+
 export interface Workflow {
   id: string;
   enabled: boolean;
-  trigger: {
-    connector: string;
-    event: string;
-    filters: Record<string, Record<string, unknown>>;
-  };
-  actions: Array<Record<string, unknown>>;
+  /** Exactly one of trigger / triggers is set. */
+  trigger?: TriggerSpec;
+  triggers?: TriggerSpec[];
+  /** Inline actions, or a `flow` binding whose chain lives in `flows`. */
+  actions?: Array<Record<string, unknown>>;
+  flow?: string;
+  flows?: Record<string, FlowSpec>;
 }
 
 export interface WorkflowSummary {

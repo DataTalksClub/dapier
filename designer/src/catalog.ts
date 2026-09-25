@@ -4,7 +4,7 @@ import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
- * new engine action (see run_* dispatch in src/engine.py) or trigger connector.
+ * new engine action (see run_* dispatch in src/dapier/engine/__init__.py) or trigger connector.
  *
  * Adding an action is one object in `actionCatalog`:
  *   1. type   — the exact string written to the action's `type` YAML key;
@@ -76,7 +76,7 @@ export interface ConnectorEntry {
   events: string[];
 }
 
-/** Mirrors the run_* dispatch in src/engine.py. */
+/** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
   {
     type: "webhook",
