@@ -14312,34 +14312,15 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$f = [
-    ["path", { d: "M12 13v8", key: "1l5pq0" }],
-    ["path", { d: "M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242", key: "1pljnt" }],
-    ["path", { d: "m8 17 4-4 4 4", key: "1quai1" }]
-  ];
-  const CloudUpload = createLucideIcon("cloud-upload", __iconNode$f);
-  const __iconNode$e = [
+  const __iconNode$c = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$e);
-  const __iconNode$d = [
-    [
-      "path",
-      {
-        d: "M11.35 22H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v5.35",
-        key: "17jvcc"
-      }
-    ],
-    ["path", { d: "M14 2v5a1 1 0 0 0 1 1h5", key: "wfsgrz" }],
-    ["path", { d: "M14 19h6", key: "bvotb8" }],
-    ["path", { d: "M17 16v6", key: "18yu1i" }]
-  ];
-  const FilePlusCorner = createLucideIcon("file-plus-corner", __iconNode$d);
-  const __iconNode$c = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$c);
+  const __iconNode$b = [
     [
       "path",
       {
@@ -14352,15 +14333,15 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$c);
-  const __iconNode$b = [
+  const FileText = createLucideIcon("file-text", __iconNode$b);
+  const __iconNode$a = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$b);
-  const __iconNode$a = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$a);
+  const __iconNode$9 = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14373,12 +14354,12 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$a);
-  const __iconNode$9 = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$9);
-  const __iconNode$8 = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$8);
-  const __iconNode$7 = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$9);
+  const __iconNode$8 = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$8);
+  const __iconNode$7 = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$7);
+  const __iconNode$6 = [
     [
       "path",
       {
@@ -14387,24 +14368,12 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$7);
-  const __iconNode$6 = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$6);
+  const __iconNode$5 = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$6);
-  const __iconNode$5 = [
-    [
-      "path",
-      {
-        d: "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
-        key: "1c8476"
-      }
-    ],
-    ["path", { d: "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7", key: "1ydtos" }],
-    ["path", { d: "M7 3v4a1 1 0 0 0 1 1h7", key: "t51u73" }]
-  ];
-  const Save = createLucideIcon("save", __iconNode$5);
+  const Plus = createLucideIcon("plus", __iconNode$5);
   const __iconNode$4 = [
     [
       "path",
@@ -18809,6 +18778,7 @@
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
         {
+          className: "mono-input",
           type: field.type === "number" ? "number" : "text",
           step: field.type === "number" ? "any" : void 0,
           value,
@@ -18965,41 +18935,49 @@
     const triggerNode = shapes.find((shape) => shape.data?.nodeKind === "trigger") ?? null;
     const selectedInspector = () => {
       if (!selected || selected.type !== "node" || !selected.data) {
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Select a node on the canvas to edit it. Drag from a node's handles to connect actions." });
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-empty", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Select a node on the canvas to edit its properties." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Drag from a node's handle to connect it; double-click a node to rename it." })
+        ] });
       }
       const data = selected.data;
       if (data.nodeKind === "trigger") {
         const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom")) ?? { events: [] };
         return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-            "Connector",
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "select",
-              {
-                value: data.connector ?? "custom",
-                onChange: (event) => updateSelected((current) => ({ ...current, connector: event.target.value })),
-                children: connectorCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.name, children: entry.label }, entry.name))
-              }
-            )
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Source" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Connector",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "select",
+                {
+                  value: data.connector ?? "custom",
+                  onChange: (event) => updateSelected((current) => ({ ...current, connector: event.target.value })),
+                  children: connectorCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.name, children: entry.label }, entry.name))
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Event",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "mono-input",
+                  value: data.event ?? "",
+                  list: "trigger-events",
+                  onChange: (event) => updateSelected((current) => ({ ...current, event: event.target.value }))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: "trigger-events", children: connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: event }, event)) })
+            ] })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-            "Event",
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "input",
-              {
-                value: data.event ?? "",
-                list: "trigger-events",
-                onChange: (event) => updateSelected((current) => ({ ...current, event: event.target.value }))
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: "trigger-events", children: connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: event }, event)) })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "field-block", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "field-label", children: "Filters" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Filters" }),
             (data.filters ?? []).map((rule, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "filter-row", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "input",
                 {
+                  className: "mono-input",
                   placeholder: "field",
                   value: rule.field,
                   onChange: (event) => updateSelected((current) => ({
@@ -19020,18 +18998,6 @@
                 }
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "input",
-                {
-                  className: "filter-value",
-                  placeholder: "value",
-                  value: rule.value,
-                  onChange: (event) => updateSelected((current) => ({
-                    ...current,
-                    filters: (current.filters ?? []).map((entry, i) => i === index ? { ...entry, value: event.target.value } : entry)
-                  }))
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "button",
                 {
                   className: "icon-button",
@@ -19043,12 +19009,24 @@
                   })),
                   children: "×"
                 }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "mono-input filter-value",
+                  placeholder: "value",
+                  value: rule.value,
+                  onChange: (event) => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).map((entry, i) => i === index ? { ...entry, value: event.target.value } : entry)
+                  }))
+                }
               )
             ] }, index)),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "button quiet",
+                className: "add-row",
                 type: "button",
                 onClick: () => updateSelected((current) => ({
                   ...current,
@@ -19067,49 +19045,57 @@
         fields: { ...current.fields, [key]: value }
       }));
       return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-          "Action type",
-          meta ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "select",
-            {
-              value: data.actionType,
-              onChange: (event) => updateSelected((current) => ({
-                ...current,
-                actionType: event.target.value,
-                fields: defaultFields(event.target.value),
-                raw: void 0
-              })),
-              children: actionCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.type, children: entry.label }, entry.type))
-            }
-          ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              value: data.actionType ?? "",
-              onChange: (event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))
-            }
-          )
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Identity" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Action type",
+            meta ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "select",
+              {
+                value: data.actionType,
+                onChange: (event) => updateSelected((current) => ({
+                  ...current,
+                  actionType: event.target.value,
+                  fields: defaultFields(event.target.value),
+                  raw: void 0
+                })),
+                children: actionCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.type, children: entry.label }, entry.type))
+              }
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                value: data.actionType ?? "",
+                onChange: (event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Action ID",
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                value: data.fields?.id ?? "",
+                placeholder: "action-1",
+                onChange: (event) => setField("id", event.target.value)
+              }
+            )
+          ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-          "Action ID",
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
+        meta ? /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
+          meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
             {
-              value: data.fields?.id ?? "",
-              placeholder: "action-1",
-              onChange: (event) => setField("id", event.target.value)
-            }
-          )
-        ] }),
-        meta ? meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          FieldInput,
-          {
-            field,
-            value: data.fields?.[field.key] ?? "",
-            onChange: (value) => setField(field.key, value)
-          },
-          field.key
-        )) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "field-block", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "field-label", children: "Unknown action" }),
+              field,
+              value: data.fields?.[field.key] ?? "",
+              onChange: (value) => setField(field.key, value)
+            },
+            field.key
+          ))
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Unknown action" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Not in the catalog — the YAML is kept as-is on save. Edit it as JSON:" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             RawJsonInput,
@@ -19131,10 +19117,7 @@
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "brand-mark", children: "D" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", onClick: newWorkflow, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(FilePlusCorner, { size: 15 }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" })
-        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: newWorkflow, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
           summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
@@ -19176,10 +19159,16 @@
       /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-              "Workflow ID",
-              /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "id-input", value: workflowId, onChange: (event) => setWorkflowId(event.target.value) })
-            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "id-input",
+                value: workflowId,
+                "aria-label": "Workflow ID",
+                placeholder: "workflow-id",
+                onChange: (event) => setWorkflowId(event.target.value)
+              }
+            ),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "checkbox", checked: enabled, onChange: (event) => setEnabled(event.target.checked) }),
               "Enabled"
@@ -19192,17 +19181,11 @@
               status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 14 }),
               status.message
             ] }),
-            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(CloudUpload, { size: 15 }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
-                "Push ",
-                git && git.ahead > 0 ? `(${git.ahead})` : ""
-              ] })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(Save, { size: 15 }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: dirty ? "Save to git" : "Saved" })
-            ] })
+            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+              "Push ",
+              git && git.ahead > 0 ? `(${git.ahead})` : ""
+            ] }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: dirty ? "Save to git" : "Saved" }) })
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", children: [
@@ -19221,7 +19204,10 @@
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "inspector", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected?.type === "node" ? selected.data?.nodeKind === "trigger" ? "Trigger" : "Action" : "Inspector" }),
+            selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ") })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
             selectedInspector(),
             selected?.type === "arrow" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Connector. Drag an endpoint handle to reattach it; Delete removes it." })
           ] })

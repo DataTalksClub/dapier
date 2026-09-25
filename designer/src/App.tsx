@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CloudUpload, FilePlus2, GitBranch, Loader2, Save, TriangleAlert } from "lucide-react";
+import { GitBranch, Loader2, TriangleAlert } from "lucide-react";
 import { dump } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
@@ -71,6 +71,7 @@ function FieldInput({ field, value, onChange }: {
   return (
     <label>{field.label}{field.required ? " *" : ""}
       <input
+        className="mono-input"
         type={field.type === "number" ? "number" : "text"}
         step={field.type === "number" ? "any" : undefined}
         value={value}
@@ -253,7 +254,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const triggerNode = shapes.find((shape) => shape.data?.nodeKind === "trigger") ?? null;
   const selectedInspector = () => {
     if (!selected || selected.type !== "node" || !selected.data) {
-      return <p className="inspector-hint">Select a node on the canvas to edit it. Drag from a node's handles to connect actions.</p>;
+      return (
+        <div className="inspector-empty">
+          <p className="inspector-hint">Select a node on the canvas to edit its properties.</p>
+          <p className="inspector-hint">Drag from a node's handle to connect it; double-click a node to rename it.</p>
+        </div>
+      );
     }
     const data = selected.data;
     if (data.nodeKind === "trigger") {
@@ -261,29 +267,34 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         ?? { name: "custom", events: [] as string[] };
       return (
         <>
-          <label>Connector
-            <select
-              value={data.connector ?? "custom"}
-              onChange={(event) => updateSelected((current) => ({ ...current, connector: event.target.value as NodeData["connector"] }))}
-            >
-              {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.label}</option>)}
-            </select>
-          </label>
-          <label>Event
-            <input
-              value={data.event ?? ""}
-              list="trigger-events"
-              onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
-            />
-            <datalist id="trigger-events">
-              {connectorEntry.events.map((event) => <option key={event} value={event} />)}
-            </datalist>
-          </label>
-          <div className="field-block">
-            <span className="field-label">Filters</span>
+          <section className="inspector-group">
+            <h3>Source</h3>
+            <label>Connector
+              <select
+                value={data.connector ?? "custom"}
+                onChange={(event) => updateSelected((current) => ({ ...current, connector: event.target.value as NodeData["connector"] }))}
+              >
+                {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.label}</option>)}
+              </select>
+            </label>
+            <label>Event
+              <input
+                className="mono-input"
+                value={data.event ?? ""}
+                list="trigger-events"
+                onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
+              />
+              <datalist id="trigger-events">
+                {connectorEntry.events.map((event) => <option key={event} value={event} />)}
+              </datalist>
+            </label>
+          </section>
+          <section className="inspector-group">
+            <h3>Filters</h3>
             {(data.filters ?? []).map((rule, index) => (
               <div key={index} className="filter-row">
                 <input
+                  className="mono-input"
                   placeholder="field"
                   value={rule.field}
                   onChange={(event) => updateSelected((current) => ({
@@ -302,15 +313,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 >
                   {filterOperators.map((op) => <option key={op} value={op}>{op}</option>)}
                 </select>
-                <input
-                  className="filter-value"
-                  placeholder="value"
-                  value={rule.value}
-                  onChange={(event) => updateSelected((current) => ({
-                    ...current,
-                    filters: (current.filters ?? []).map((entry, i): FilterRule => i === index ? { ...entry, value: event.target.value } : entry)
-                  }))}
-                />
                 <button
                   className="icon-button"
                   title="Remove filter"
@@ -322,10 +324,19 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 >
                   ×
                 </button>
+                <input
+                  className="mono-input filter-value"
+                  placeholder="value"
+                  value={rule.value}
+                  onChange={(event) => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).map((entry, i): FilterRule => i === index ? { ...entry, value: event.target.value } : entry)
+                  }))}
+                />
               </div>
             ))}
             <button
-              className="button quiet"
+              className="add-row"
               type="button"
               onClick={() => updateSelected((current) => ({
                 ...current,
@@ -334,7 +345,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             >
               Add filter
             </button>
-          </div>
+          </section>
         </>
       );
     }
@@ -347,45 +358,53 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }));
     return (
       <>
-        <label>Action type
-          {meta ? (
-            <select
-              value={data.actionType}
-              onChange={(event) => updateSelected((current) => ({
-                ...current,
-                actionType: event.target.value,
-                fields: defaultFields(event.target.value),
-                raw: undefined
-              }))}
-            >
-              {actionCatalog.map((entry) => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
-            </select>
-          ) : (
+        <section className="inspector-group">
+          <h3>Identity</h3>
+          <label>Action type
+            {meta ? (
+              <select
+                value={data.actionType}
+                onChange={(event) => updateSelected((current) => ({
+                  ...current,
+                  actionType: event.target.value,
+                  fields: defaultFields(event.target.value),
+                  raw: undefined
+                }))}
+              >
+                {actionCatalog.map((entry) => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
+              </select>
+            ) : (
+              <input
+                className="mono-input"
+                value={data.actionType ?? ""}
+                onChange={(event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))}
+              />
+            )}
+          </label>
+          <label>Action ID
             <input
-              value={data.actionType ?? ""}
-              onChange={(event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))}
+              className="mono-input"
+              value={data.fields?.id ?? ""}
+              placeholder="action-1"
+              onChange={(event) => setField("id", event.target.value)}
             />
-          )}
-        </label>
-        <label>Action ID
-          <input
-            value={data.fields?.id ?? ""}
-            placeholder="action-1"
-            onChange={(event) => setField("id", event.target.value)}
-          />
-        </label>
+          </label>
+        </section>
         {meta ? (
-          meta.fields.map((field) => (
-            <FieldInput
-              key={field.key}
-              field={field}
-              value={data.fields?.[field.key] ?? ""}
-              onChange={(value) => setField(field.key, value)}
-            />
-          ))
+          <section className="inspector-group">
+            <h3>Settings</h3>
+            {meta.fields.map((field) => (
+              <FieldInput
+                key={field.key}
+                field={field}
+                value={data.fields?.[field.key] ?? ""}
+                onChange={(value) => setField(field.key, value)}
+              />
+            ))}
+          </section>
         ) : (
-          <div className="field-block">
-            <span className="field-label">Unknown action</span>
+          <section className="inspector-group">
+            <h3>Unknown action</h3>
             <p className="inspector-hint">
               Not in the catalog — the YAML is kept as-is on save. Edit it as JSON:
             </p>
@@ -394,7 +413,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               value={data.raw ?? {}}
               onChange={(raw) => updateSelected((current) => ({ ...current, raw }))}
             />
-          </div>
+          </section>
         )}
       </>
     );
@@ -410,7 +429,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           <div className="brand"><span className="brand-mark">D</span><span>Workflow designer</span></div>
         )}
         <button className="button primary" type="button" onClick={newWorkflow}>
-          <FilePlus2 size={15} /><span>New workflow</span>
+          <span>New workflow</span>
         </button>
         <nav className="workflow-nav" aria-label="Workflows">
           {summaries.map((summary) => (
@@ -444,9 +463,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       <main className="designer-main">
         <header className="designer-topbar">
           <div className="topbar-title">
-            <label>Workflow ID
-              <input className="id-input" value={workflowId} onChange={(event) => setWorkflowId(event.target.value)} />
-            </label>
+            <input
+              className="id-input"
+              value={workflowId}
+              aria-label="Workflow ID"
+              placeholder="workflow-id"
+              onChange={(event) => setWorkflowId(event.target.value)}
+            />
             <label className="check-label">
               <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
               Enabled
@@ -463,11 +486,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "local" && (
               <button className="button secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
-                <CloudUpload size={15} /><span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
+                <span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
               </button>
             )}
             <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy"}>
-              <Save size={15} /><span>{dirty ? "Save to git" : "Saved"}</span>
+              <span>{dirty ? "Save to git" : "Saved"}</span>
             </button>
           </div>
         </header>
@@ -487,9 +510,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
           />
           <aside className="inspector">
-            <h2>{selected?.type === "node"
-              ? (selected.data?.nodeKind === "trigger" ? "Trigger" : "Action")
-              : "Inspector"}</h2>
+            {selected?.type === "node" && selected.data ? (
+              <header className={`inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`}>
+                <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : "Action"}</h2>
+                <p className="inspector-summary">{selected.data.nodeKind === "trigger"
+                  ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}`
+                  : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ")}</p>
+              </header>
+            ) : (
+              <header className="inspector-head">
+                <h2>Inspector</h2>
+              </header>
+            )}
             {selectedInspector()}
             {selected?.type === "arrow" && (
               <p className="inspector-hint">Connector. Drag an endpoint handle to reattach it; Delete removes it.</p>

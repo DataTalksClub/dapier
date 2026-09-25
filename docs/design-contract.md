@@ -108,3 +108,55 @@ and error callouts — feedback surfaces, never decoration.
 - **Loading:** a single 2px `--accent` band pulsing across the top. **Mobile
   (≤560):** tables become stacked ledger rows — identity first, then labelled
   slots (`data-label`); the rail becomes a drawer.
+
+## The designer canvas (binding for `designer/src/` and the console's designer view)
+
+The canvas is the view. The designer section fills the viewport under the
+console topbar exactly — `calc(100dvh - var(--topbar-h))`, flex column, iframe
+`flex: 1; min-height: 0`. The page never scrolls and no paper band shows below
+the frame; any new chrome must be paid for by removing old chrome.
+
+- **One chrome row per side.** Console side: the topbar only — its `h1` becomes
+  the open workflow's id in mono while the designer view is active, and
+  "Edit on GitHub" lives in the topbar actions. No section-head over the
+  canvas; the nav rail is the way back. Designer side: one slim bar carrying
+  the workflow id input (placeholder-labelled), the enabled toggle, save
+  status inline, and the save button.
+- **Machine voice:** workflow id, event names, filter field/value, action ids
+  render in IBM Plex Mono — in the h1, in inputs, in panel summaries.
+- **Properties panel:** identity first — a kind marker (2px rule in the node's
+  canvas color: trigger amber, action green), the kind as `h2`, then a mono
+  summary line of what the node is. Fields group under 11.5px muted
+  sentence-case group titles separated by hairlines (`--section-border`), in
+  the table-header idiom — never boxed cards, never tint chips. Filter rows
+  get real widths; "Add filter" is a dashed quiet row, not a filled button.
+  Nothing selected shows a hint block with the canvas gestures, not filler.
+- **Banned in the designer:** page-scrolling canvas views, stacked explainer
+  bands above the canvas, duplicate workflow-name bands, icons inside labelled
+  buttons (Save / Push / New workflow included), sans-serif machine inputs.
+
+## The designer canvas (binding for `designer/src/` and the console's designer view)
+
+The canvas is the view. The designer section fills the viewport under the
+console topbar exactly — `calc(100dvh - var(--topbar-h))`, flex column, iframe
+`flex: 1; min-height: 0`. The page never scrolls and no paper band shows below
+the frame; any new chrome must be paid for by removing old chrome.
+
+- **One chrome row per side.** Console side: the topbar only — its `h1` becomes
+  the open workflow's id in mono while the designer view is active, and
+  "Edit on GitHub" lives in the topbar actions. No section-head over the
+  canvas; the nav rail is the way back. Designer side: one slim bar carrying
+  the workflow id input (placeholder-labelled), the enabled toggle, save
+  status inline, and the save button.
+- **Machine voice:** workflow id, event names, filter field/value, action ids
+  render in IBM Plex Mono — in the h1, in inputs, in panel summaries.
+- **Properties panel:** identity first — a kind marker (2px rule in the node's
+  canvas color: trigger amber, action green), the kind as `h2`, then a mono
+  summary line of what the node is. Fields group under 11.5px muted
+  sentence-case group titles separated by hairlines (`--section-border`), in
+  the table-header idiom — never boxed cards, never tint chips. Filter rows
+  get real widths; "Add filter" is a dashed quiet row, not a filled button.
+  Nothing selected shows a hint block with the canvas gestures, not filler.
+- **Banned in the designer:** page-scrolling canvas views, stacked explainer
+  bands above the canvas, duplicate workflow-name bands, icons inside labelled
+  buttons (Save / Push / New workflow included), sans-serif machine inputs.

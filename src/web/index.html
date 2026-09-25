@@ -48,6 +48,7 @@
         <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu"><i data-lucide="menu"></i></button>
         <h1 id="view-title">Overview</h1>
         <div class="top-actions">
+          <a id="designer-github" class="text-link view-link" target="_blank" rel="noopener" hidden><i data-lucide="arrow-up-right"></i>Edit on GitHub</a>
           <span id="last-updated" class="last-updated mono"></span>
           <button id="refresh" class="icon-button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
         </div>
@@ -101,11 +102,6 @@
       </section>
 
       <section class="view" data-page="designer">
-        <div class="section-head">
-          <div class="section-head-text"><h2 id="designer-title">Workflow designer</h2><p class="sub">Saving publishes live and commits to <code>workflows/*.yaml</code>.</p></div>
-          <a id="designer-github" class="text-link view-link" target="_blank" rel="noopener" hidden><i data-lucide="arrow-up-right"></i>Edit on GitHub</a>
-          <a class="text-link view-link" href="/workflows" data-target="workflows"><i data-lucide="arrow-left"></i>Back to workflows</a>
-        </div>
         <div class="designer-embed">
           <iframe id="designer-frame" title="Workflow designer"></iframe>
         </div>

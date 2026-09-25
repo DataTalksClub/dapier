@@ -56,6 +56,7 @@
   --red-line: #e6c9bb;
   --off-dot: #b5ac99;
   /* type */
+  --topbar-h: 88px;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color: var(--ink);
@@ -488,10 +489,31 @@ dialog form { display: contents; }
 }
 
 /* --- embedded designer -------------------------------------------------------- */
+/* The canvas is the view: the section fills the viewport under the topbar and
+   the frame takes exactly what remains — no page scroll, no dead band below
+   (design-contract "The designer canvas"). */
+section.view[data-page="designer"].active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--topbar-h));
+}
+body[data-view="designer"] main { padding-bottom: 0; }
+body[data-view="designer"] .topbar h1 {
+  font-family: var(--mono);
+  font-size: 19px;
+  letter-spacing: 0;
+}
+.top-actions #designer-github { display: none; }
+body[data-view="designer"] .top-actions #designer-github { display: inline-flex; }
+.designer-embed {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
 .designer-embed iframe {
+  flex: 1;
   width: 100%;
-  height: calc(100dvh - 248px);
-  min-height: 520px;
+  min-height: 0;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: var(--paper);
@@ -524,6 +546,8 @@ dialog form { display: contents; }
 @media (max-width: 560px) {
   main { padding: 0 20px 40px; }
   .loading { margin: 0 -20px; }
+  :root { --topbar-h: 72px; }
+  :root { --topbar-h: 72px; }
   .topbar { min-height: 72px; gap: 12px; }
   .topbar h1 { font-size: 20px; }
   .last-updated { font-size: 11.5px; }

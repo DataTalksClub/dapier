@@ -1,6 +1,7 @@
 /* Designer view: hosts the designer app shell (/designer/app) in an iframe.
-   This is the console's workflow view — every workflow row opens it — so the
-   section head names the open workflow and links to it on GitHub. */
+   This is the console's workflow view — every workflow row opens it. The
+   canvas owns the viewport under the topbar: the topbar's h1 names the open
+   workflow (mono) and the topbar actions link to it on GitHub. */
 import { state } from '../state.js';
 import { $ } from '../ui.js';
 import { setView } from '../router.js';
@@ -15,7 +16,8 @@ function syncHead(source) {
   const workflow = source
     ? (state.data?.workflows || []).find((item) => item.source === source)
     : null;
-  $('#designer-title').textContent = workflow ? workflow.id : source ? source.replace(/\.yaml$/, '') : 'Workflow designer';
+  /* Runs after setView, which resets the h1 to the plain view name. */
+  $('#view-title').textContent = workflow ? workflow.id : source ? source.replace(/\.yaml$/, '') : 'Designer';
   const github = $('#designer-github');
   if (workflow && state.data.workflows_edit_base) {
     github.href = `${state.data.workflows_edit_base}/${encodeURIComponent(workflow.source)}`;

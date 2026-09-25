@@ -11,6 +11,7 @@ export function viewFromPath(path) {
 
 export function setView(view, push = true) {
   state.view = view;
+  document.body.dataset.view = view; // CSS hooks (designer full-height canvas)
   $$('.nav-item').forEach((item) => {
     item.classList.toggle('active', item.dataset.view === view);
     if (item.dataset.view === view) item.setAttribute('aria-current', 'page');
