@@ -278,7 +278,7 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
         query={"code": "provider-code", "state": state},
     ))
     assert callback["statusCode"] == 302, callback
-    assert callback["headers"]["location"] == "/?oauth=connected"
+    assert callback["headers"]["location"] == "/connections?oauth=connected"
 
     credential = stored["oauth#youtube-personal"]
     assert credential["access_token"] == "at"

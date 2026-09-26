@@ -1,4 +1,6 @@
 import pytest
+import io
+import urllib.error
 
 from src.dapier.connections.providers import oauth_providers
 from src.dapier.connections.providers.oauth_providers import (
@@ -105,6 +107,38 @@ def test_exchange_code_provider_error_is_redacted():
             transport=fake_transport(calls, status=400, payload={"error": "invalid_grant"}),
         )
     assert "super-secret-value" not in str(exc.value)
+
+
+def test_http_error_response_reports_safe_oauth_error(monkeypatch):
+    def rejected(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "Bad Request", {},
+            io.BytesIO(b'{"error":"invalid_grant","error_description":"code=secret-code"}'),
+        )
+
+    monkeypatch.setattr(oauth_providers.urllib.request, "urlopen", rejected)
+    with pytest.raises(ProviderError, match=r"token endpoint returned HTTP 400 \(invalid_grant\)") as exc:
+        exchange_code(
+            "dropbox", code="secret-code", client_id="cid", client_secret="secret",
+            redirect_uri="https://dapier.example.test/oauth/callback",
+        )
+    assert "secret-code" not in str(exc.value)
+
+
+def test_http_error_response_hides_unrecognized_provider_text(monkeypatch):
+    def rejected(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "Bad Request", {},
+            io.BytesIO(b'{"error":"bad-code-secret-code","error_description":"secret-code"}'),
+        )
+
+    monkeypatch.setattr(oauth_providers.urllib.request, "urlopen", rejected)
+    with pytest.raises(ProviderError, match="token endpoint returned HTTP 400") as exc:
+        exchange_code(
+            "dropbox", code="secret-code", client_id="cid", client_secret="secret",
+            redirect_uri="https://dapier.example.test/oauth/callback",
+        )
+    assert "secret-code" not in str(exc.value)
 
 
 def test_refresh_preserves_omitted_refresh_token():

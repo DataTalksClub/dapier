@@ -111,7 +111,7 @@ def oauth_callback(event):
         # always carry the state cookie set by oauth_start.
         return http._json_response(400, {"error": "Invalid or expired OAuth state"})
     if query.get("error"):
-        return http._redirect(f"/?oauth={urllib.parse.quote(query['error'])}")
+        return http._redirect(f"/connections?oauth={urllib.parse.quote(query['error'])}")
     if not payload.get("jti") or not _claim_oauth_state(payload["jti"]):
         return http._json_response(400, {"error": "Invalid or expired OAuth state"})
     session_subject = session._session_subject(event)
@@ -193,6 +193,6 @@ def oauth_callback(event):
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator, outcome="ok")
     return http._redirect(
-        "/?oauth=connected",
+        "/connections?oauth=connected",
         cookies=[f"{OAUTH_COOKIE}=; Path=/oauth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"],
     )
