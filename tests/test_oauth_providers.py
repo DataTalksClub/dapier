@@ -331,3 +331,171 @@ def test_revoke_google_posts_to_google_revoke():
     calls = []
     assert revoke_token("google", "t", transport=fake_transport(calls, status=200)) is True
     assert calls[0]["url"] == "https://oauth2.googleapis.com/revoke"
+
+
+def test_normalize_scopes_zoom_allows_empty():
+    assert normalize_scopes("zoom", []) == []
+
+
+def test_zoom_authorization_url_carries_scopes_without_google_extras():
+    url = authorization_url(
+        "zoom",
+        client_id="zoom-cid",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        scopes=["meeting:write:meeting"],
+        state="state-token",
+    )
+    assert url.startswith("https://zoom.us/oauth/authorize?")
+    assert "meeting%3Awrite%3Ameeting" in url or "meeting:write:meeting" in url
+    assert "access_type" not in url
+
+
+def test_zoom_token_requests_authenticate_with_basic_header_only():
+    calls = []
+    exchange_code(
+        "zoom", code="auth-code", client_id="cid", client_secret="sec",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        transport=fake_transport(calls, payload={"access_token": "at"}),
+    )
+    import base64 as _b64
+    expected = "Basic " + _b64.b64encode(b"cid:sec").decode()
+    assert calls[0]["headers"]["authorization"] == expected
+    body = calls[0]["body"].decode()
+    assert "grant_type=authorization_code" in body
+    assert "sec" not in body and "client_id" not in body
+
+    calls.clear()
+    refresh_access_token(
+        "zoom", refresh_token="old-refresh", client_id="cid", client_secret="sec",
+        transport=fake_transport(calls, payload={"access_token": "at2"}),
+    )
+    assert calls[0]["headers"]["authorization"] == expected
+    body = calls[0]["body"].decode()
+    assert "grant_type=refresh_token" in body
+    assert "old-refresh" in body
+    assert "sec" not in body and "client_id" not in body
+
+
+def test_zoom_token_request_without_client_secret_fails_closed():
+    with pytest.raises(ProviderError):
+        exchange_code(
+            "zoom", code="c", client_id="cid", client_secret="",
+            redirect_uri="https://x.example.test/cb",
+            transport=fake_transport([], payload={"access_token": "at"}),
+        )
+
+
+def test_verify_zoom_account_prefers_name_over_email():
+    calls = []
+    transport = fake_transport(calls, payload={
+        "id": "zoom-user-1", "first_name": "Alexey", "last_name": "Grigorev",
+        "email": "alexey@datatalks.club"})
+    account_id, title = verify_account("zoom", "token", transport=transport)
+    assert account_id == "zoom-user-1"
+    assert title == "Alexey Grigorev"
+    assert calls[0]["url"] == "https://zoom.us/v2/users/me"
+
+
+def test_verify_zoom_without_user_id_fails_closed():
+    transport = fake_transport([], payload={"email": "a@b.c"})
+    with pytest.raises(ProviderError):
+        verify_account("zoom", "token", transport=transport)
+
+
+def test_revoke_zoom_sends_token_and_client_credentials():
+    import base64 as _b64
+    calls = []
+    assert revoke_token("zoom", "t", transport=fake_transport(calls, status=200),
+                        client_id="cid", client_secret="sec") is True
+    assert calls[0]["url"] == "https://zoom.us/oauth/revoke"
+    assert calls[0]["headers"]["authorization"] == \
+        "Basic " + _b64.b64encode(b"cid:sec").decode()
+    assert "token=t" in calls[0]["body"].decode()
+
+    calls.clear()
+    # Without client credentials the attempt degrades benignly to False.
+    assert revoke_token("zoom", "t", transport=fake_transport(calls, status=401)) is False
+
+
+def test_normalize_scopes_zoom_allows_empty():
+    assert normalize_scopes("zoom", []) == []
+
+
+def test_zoom_authorization_url_carries_scopes_without_google_extras():
+    url = authorization_url(
+        "zoom",
+        client_id="zoom-cid",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        scopes=["meeting:write:meeting"],
+        state="state-token",
+    )
+    assert url.startswith("https://zoom.us/oauth/authorize?")
+    assert "meeting%3Awrite%3Ameeting" in url or "meeting:write:meeting" in url
+    assert "access_type" not in url
+
+
+def test_zoom_token_requests_authenticate_with_basic_header_only():
+    calls = []
+    exchange_code(
+        "zoom", code="auth-code", client_id="cid", client_secret="sec",
+        redirect_uri="https://dapier.example.test/oauth/callback",
+        transport=fake_transport(calls, payload={"access_token": "at"}),
+    )
+    import base64 as _b64
+    expected = "Basic " + _b64.b64encode(b"cid:sec").decode()
+    assert calls[0]["headers"]["authorization"] == expected
+    body = calls[0]["body"].decode()
+    assert "grant_type=authorization_code" in body
+    assert "sec" not in body and "client_id" not in body
+
+    calls.clear()
+    refresh_access_token(
+        "zoom", refresh_token="old-refresh", client_id="cid", client_secret="sec",
+        transport=fake_transport(calls, payload={"access_token": "at2"}),
+    )
+    assert calls[0]["headers"]["authorization"] == expected
+    body = calls[0]["body"].decode()
+    assert "grant_type=refresh_token" in body
+    assert "old-refresh" in body
+    assert "sec" not in body and "client_id" not in body
+
+
+def test_zoom_token_request_without_client_secret_fails_closed():
+    with pytest.raises(ProviderError):
+        exchange_code(
+            "zoom", code="c", client_id="cid", client_secret="",
+            redirect_uri="https://x.example.test/cb",
+            transport=fake_transport([], payload={"access_token": "at"}),
+        )
+
+
+def test_verify_zoom_account_prefers_name_over_email():
+    calls = []
+    transport = fake_transport(calls, payload={
+        "id": "zoom-user-1", "first_name": "Alexey", "last_name": "Grigorev",
+        "email": "alexey@datatalks.club"})
+    account_id, title = verify_account("zoom", "token", transport=transport)
+    assert account_id == "zoom-user-1"
+    assert title == "Alexey Grigorev"
+    assert calls[0]["url"] == "https://zoom.us/v2/users/me"
+
+
+def test_verify_zoom_without_user_id_fails_closed():
+    transport = fake_transport([], payload={"email": "a@b.c"})
+    with pytest.raises(ProviderError):
+        verify_account("zoom", "token", transport=transport)
+
+
+def test_revoke_zoom_sends_token_and_client_credentials():
+    import base64 as _b64
+    calls = []
+    assert revoke_token("zoom", "t", transport=fake_transport(calls, status=200),
+                        client_id="cid", client_secret="sec") is True
+    assert calls[0]["url"] == "https://zoom.us/oauth/revoke"
+    assert calls[0]["headers"]["authorization"] == \
+        "Basic " + _b64.b64encode(b"cid:sec").decode()
+    assert "token=t" in calls[0]["body"].decode()
+
+    calls.clear()
+    # Without client credentials the attempt degrades benignly to False.
+    assert revoke_token("zoom", "t", transport=fake_transport(calls, status=401)) is False

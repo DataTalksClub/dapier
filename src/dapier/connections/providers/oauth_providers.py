@@ -8,6 +8,7 @@ stays unit-testable without HTTP mocks:
     transport(method, url, *, headers, body) -> (status_code, body_bytes)
 """
 
+import base64
 import json
 import urllib.error
 import urllib.parse
@@ -33,6 +34,11 @@ GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 YOUTUBE_CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 
+ZOOM_AUTHORIZATION_URL = "https://zoom.us/oauth/authorize"
+ZOOM_TOKEN_URL = "https://zoom.us/oauth/token"
+ZOOM_ACCOUNT_URL = "https://zoom.us/v2/users/me"
+ZOOM_REVOKE_URL = "https://zoom.us/oauth/revoke"
+
 # Scopes sufficient for the account-identity check of each provider. A
 # connection whose granted scopes fall outside these sets cannot be verified
 # and must fail closed (see verify_account).
@@ -43,6 +49,7 @@ IDENTITY_SCOPES = {
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.upload",
     ),
+    "zoom": ("user:read:user",),
 }
 
 PROVIDERS = {
@@ -65,6 +72,13 @@ PROVIDERS = {
         # Google re-issues a refresh token only with offline access plus an
         # explicit consent prompt.
         "extra": {"access_type": "offline", "prompt": "consent"},
+    },
+    "zoom": {
+        "authorization_url": ZOOM_AUTHORIZATION_URL,
+        "token_url": ZOOM_TOKEN_URL,
+        # Zoom's confidential token requests authenticate with HTTP Basic
+        # credentials; the client secret never travels in the body.
+        "auth": "basic",
     },
 }
 
@@ -103,7 +117,7 @@ def authorization_url(provider_name, *, client_id, redirect_uri, scopes, state, 
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "state": state,
-        **spec["extra"],
+        **spec.get("extra", {}),
     }
     if scopes:
         params["scope"] = " ".join(scopes)
@@ -124,14 +138,20 @@ def _default_transport(method, url, *, headers=None, body=None, timeout=15):
         return exc.code, exc.read()
 
 
-def _form_post(url, fields, *, transport, timeout=15):
+def _basic_credentials_header(client_id, client_secret):
+    return "Basic " + base64.b64encode(
+        f"{client_id}:{client_secret}".encode()).decode()
+
+
+def _form_post(url, fields, *, transport, timeout=15, headers=None):
     body = urllib.parse.urlencode(fields).encode()
     transport = transport or _default_transport
     try:
         status, raw = transport(
             "POST",
             url,
-            headers={"content-type": "application/x-www-form-urlencoded"},
+            headers={"content-type": "application/x-www-form-urlencoded",
+                     **(headers or {})},
             body=body,
             timeout=timeout,
         )
@@ -159,6 +179,29 @@ def _form_post(url, fields, *, transport, timeout=15):
     return data
 
 
+def _token_request(spec, fields, *, client_id, client_secret, transport,
+                   code_verifier=None):
+    """POST a grant to the provider's token endpoint.
+
+    Basic-auth providers (Zoom) carry the client credentials in the
+    Authorization header — RFC 6749 §2.3.1 forbids mixing authentication
+    methods, so they never also travel in the body.
+    """
+    headers = None
+    if spec.get("auth") == "basic":
+        if not (client_id and client_secret):
+            raise ProviderError("this provider requires a client ID and secret")
+        headers = {"authorization": _basic_credentials_header(client_id, client_secret)}
+        fields = {k: v for k, v in fields.items() if k != "client_id"}
+    else:
+        fields = dict(fields)
+        if client_secret:
+            fields["client_secret"] = client_secret
+        if code_verifier is not None:
+            fields["code_verifier"] = code_verifier
+    return _form_post(spec["token_url"], fields, transport=transport, headers=headers)
+
+
 def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri,
                   code_verifier=None, transport=None):
     """Exchange an authorization code for tokens (PKCE when ``code_verifier``)."""
@@ -169,11 +212,9 @@ def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri
         "client_id": client_id,
         "redirect_uri": redirect_uri,
     }
-    if client_secret:
-        fields["client_secret"] = client_secret
-    if code_verifier is not None:
-        fields["code_verifier"] = code_verifier
-    data = _form_post(spec["token_url"], fields, transport=transport)
+    data = _token_request(spec, fields, client_id=client_id,
+                          client_secret=client_secret, transport=transport,
+                          code_verifier=code_verifier)
     if "access_token" not in data:
         raise ProviderError("token endpoint response did not include an access token")
     return data
@@ -187,9 +228,8 @@ def refresh_access_token(provider_name, *, refresh_token, client_id, client_secr
         "refresh_token": refresh_token,
         "client_id": client_id,
     }
-    if client_secret:
-        fields["client_secret"] = client_secret
-    data = _form_post(spec["token_url"], fields, transport=transport)
+    data = _token_request(spec, fields, client_id=client_id,
+                          client_secret=client_secret, transport=transport)
     if "access_token" not in data:
         raise ProviderError("refresh response did not include an access token")
     return data
@@ -278,6 +318,17 @@ def verify_account(provider_name, access_token, *, transport=None):
             )
         snippet = items[0].get("snippet") or {}
         return items[0]["id"], snippet.get("title") or snippet.get("customUrl") or items[0]["id"]
+    if provider_name == "zoom":
+        data = _get_json(ZOOM_ACCOUNT_URL, access_token, transport=transport)
+        account_id = data.get("id")
+        if not account_id:
+            raise ProviderError(
+                "Zoom account verification returned no user id; "
+                "grant the user:read:user scope"
+            )
+        name = " ".join(part for part in (data.get("first_name"), data.get("last_name"))
+                        if part)
+        return account_id, name or data.get("email") or account_id
     url = DROPBOX_ACCOUNT_URL
     transport = transport or _default_transport
     try:
@@ -298,12 +349,25 @@ def verify_account(provider_name, access_token, *, transport=None):
     return data["account_id"], name.get("display_name") or data.get("email") or data["account_id"]
 
 
-def revoke_token(provider_name, token, *, transport=None):
+def revoke_token(provider_name, token, *, transport=None,
+                 client_id=None, client_secret=None):
     """Best-effort provider-side revocation. Returns True when revoked."""
     get(provider_name)
     transport = transport or _default_transport
     try:
-        if provider_name in ("youtube", "google"):
+        if provider_name == "zoom":
+            # Zoom's revoke endpoint wants the client credentials; absent
+            # ones degrade to an unauthenticated attempt that fails benignly.
+            headers = {"content-type": "application/x-www-form-urlencoded"}
+            if client_id and client_secret:
+                headers["authorization"] = _basic_credentials_header(
+                    client_id, client_secret)
+            status, _ = transport(
+                "POST", ZOOM_REVOKE_URL,
+                headers=headers,
+                body=urllib.parse.urlencode({"token": token}).encode(), timeout=15,
+            )
+        elif provider_name in ("youtube", "google"):
             status, _ = transport(
                 "POST", GOOGLE_REVOKE_URL,
                 headers={"content-type": "application/x-www-form-urlencoded"},

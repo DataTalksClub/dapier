@@ -155,9 +155,19 @@ def revoke_connection(connection, *, transport=None):
     """Revoke tokens and mark the connection revoked. Returns the updated item."""
     record = _record(connection["connection_id"])
     stored = _stored_tokens(record)
+    # Providers whose revoke endpoint authenticates the client (Zoom) get the
+    # shared credentials; an unconfigured client degrades to the same
+    # best-effort attempt every provider gets.
+    try:
+        client_id, client_secret = oauth_clients.get(connection["provider"])
+    except (oauth_clients.ClientConfigError, KeyError):
+        client_id = client_secret = ""
     for token in (stored.get("access_token"), stored.get("refresh_token")):
         if token:
-            oauth_providers.revoke_token(connection["provider"], token, transport=transport)
+            oauth_providers.revoke_token(connection["provider"], token,
+                                         transport=transport,
+                                         client_id=client_id,
+                                         client_secret=client_secret)
     cleared = _client_override(stored)
     try:
         put_credential_if_version(

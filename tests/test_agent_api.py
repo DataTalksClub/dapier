@@ -529,7 +529,7 @@ def test_oauth_clients_roundtrip_over_bearer(monkeypatch):
     listed = agent_api.route(event(), "GET", "/api/agent/oauth-clients")
     assert listed["statusCode"] == 200
     clients = {item["provider"]: item for item in json.loads(listed["body"])["clients"]}
-    assert set(clients) == {"dropbox", "google"}
+    assert set(clients) == {"dropbox", "google", "zoom"}
     assert clients["dropbox"]["source"] == "config"
     assert clients["google"]["client_id"] == "g-id"
 
@@ -1010,3 +1010,65 @@ def test_poll_trigger_save_list_delete_over_bearer(monkeypatch):
     assert table.items == {} and removed == ["drive-updates"]
 
 
+
+
+def test_zoom_oauth_connection_issues_tokens(monkeypatch):
+    """A Zoom meeting connection is a regular OAuth connection: once granted,
+    the agent token endpoint issues its access token like any other provider.
+    (The old blanket zoom block only ever served the webhook connection.)"""
+    zoom_connection = {
+        **CONNECTION, "connection_id": "zoom-meetings", "provider": "zoom",
+        "scopes": ["meeting:write:meeting"],
+        "expected_account_id": "zoom-user-1",
+        "verified_account_id": "zoom-user-1",
+    }
+    configure(monkeypatch, claims={"sub": "subject-1"},
+              connections={"zoom-meetings": zoom_connection},
+              grants={("zoom-meetings", "subject-1#buildcamp-uploader"): GRANT})
+    monkeypatch.setattr(
+        agent_api.tokens, "get_access_token",
+        lambda connection: ("zoom-access", {
+            "expires_at": 123, "scope": "meeting:write:meeting",
+            "provider_account_id": "zoom-user-1", "account_title": "A",
+            "refreshed": False,
+        }),
+    )
+    response = agent_api.route(
+        event({"connection_id": "zoom-meetings", "agent": "buildcamp-uploader"}),
+        "POST", "/api/agent/token",
+    )
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["access_token"] == "zoom-access"
+    assert body["provider"] == "zoom"
+
+
+def test_zoom_oauth_connection_issues_tokens(monkeypatch):
+    """A Zoom meeting connection is a regular OAuth connection: once granted,
+    the agent token endpoint issues its access token like any other provider.
+    (The old blanket zoom block only ever served the webhook connection.)"""
+    zoom_connection = {
+        **CONNECTION, "connection_id": "zoom-meetings", "provider": "zoom",
+        "scopes": ["meeting:write:meeting"],
+        "expected_account_id": "zoom-user-1",
+        "verified_account_id": "zoom-user-1",
+    }
+    configure(monkeypatch, claims={"sub": "subject-1"},
+              connections={"zoom-meetings": zoom_connection},
+              grants={("zoom-meetings", "subject-1#buildcamp-uploader"): GRANT})
+    monkeypatch.setattr(
+        agent_api.tokens, "get_access_token",
+        lambda connection: ("zoom-access", {
+            "expires_at": 123, "scope": "meeting:write:meeting",
+            "provider_account_id": "zoom-user-1", "account_title": "A",
+            "refreshed": False,
+        }),
+    )
+    response = agent_api.route(
+        event({"connection_id": "zoom-meetings", "agent": "buildcamp-uploader"}),
+        "POST", "/api/agent/token",
+    )
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["access_token"] == "zoom-access"
+    assert body["provider"] == "zoom"

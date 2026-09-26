@@ -195,8 +195,6 @@ def issue_token(event):
                              connection_id=connection_id, operation="use"):
         audit.emit(connection_id, audit.TOKEN, subject, agent=agent, outcome="denied-no-grant")
         return _json_response(403, {"error": "No grant for this connection and agent"})
-    if connection.get("provider") == "zoom":
-        return _json_response(400, {"error": "Zoom webhook connections do not issue provider access tokens"})
     try:
         access_token, info = tokens.get_access_token(connection)
     except BindingError as exc:
