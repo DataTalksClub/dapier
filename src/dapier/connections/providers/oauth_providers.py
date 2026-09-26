@@ -185,7 +185,8 @@ def _token_request(spec, fields, *, client_id, client_secret, transport,
 
     Basic-auth providers (Zoom) carry the client credentials in the
     Authorization header — RFC 6749 §2.3.1 forbids mixing authentication
-    methods, so they never also travel in the body.
+    methods, so they never also travel in the body. Zoom's confidential-client
+    PKCE flow still requires the code_verifier in the form body.
     """
     headers = None
     if spec.get("auth") == "basic":
@@ -193,6 +194,8 @@ def _token_request(spec, fields, *, client_id, client_secret, transport,
             raise ProviderError("this provider requires a client ID and secret")
         headers = {"authorization": _basic_credentials_header(client_id, client_secret)}
         fields = {k: v for k, v in fields.items() if k != "client_id"}
+        if code_verifier is not None:
+            fields["code_verifier"] = code_verifier
     else:
         fields = dict(fields)
         if client_secret:
