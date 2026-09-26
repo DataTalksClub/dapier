@@ -22,12 +22,12 @@ export async function setView(view, push = true) {
   state.view = view;
   document.body.dataset.view = view; // CSS hooks (designer full-height canvas)
   $$('.nav-item').forEach((item) => {
-    item.classList.toggle('active', item.dataset.view === view);
-    if (item.dataset.view === view) item.setAttribute('aria-current', 'page');
+    item.classList.toggle('active', item.dataset.view === (view === 'designer' ? 'workflows' : view));
+    if (item.dataset.view === (view === 'designer' ? 'workflows' : view)) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
-  $('#view-title').textContent = view[0].toUpperCase() + view.slice(1);
+  $('#view-title').textContent = ({ runs: 'Run history', tokens: 'API tokens' })[view] || view[0].toUpperCase() + view.slice(1);
   $('.sidebar').classList.remove('open');
   $('#menu-toggle')?.setAttribute('aria-expanded', 'false');
   if (push) history.pushState(null, '', view === 'overview' ? '/' : `/${view}`);

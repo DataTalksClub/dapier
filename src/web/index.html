@@ -61,12 +61,15 @@
     <aside id="main-sidebar" class="sidebar">
       <div class="brand"><span class="wordmark">Dapier</span><button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close menu"><i data-lucide="x"></i></button></div>
       <nav aria-label="Main navigation">
+        <p class="nav-group-label">Monitor</p>
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
+        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Run history</span></a>
+        <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
+        <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
-        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
