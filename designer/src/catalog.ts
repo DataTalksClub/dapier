@@ -1,6 +1,6 @@
 import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Video, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
-import { DropboxLogo, MailLogo, SheetsLogo, SlackLogo, YouTubeLogo } from "./logos";
+import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
@@ -141,6 +141,20 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
       { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+    ]
+  },
+  {
+    type: "s3_upload",
+    label: "Amazon S3",
+    icon: S3Logo,
+    description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
+    fields: [
+      { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+      { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true },
+      { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true },
+      { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+      { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL" },
+      { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
     ]
   },
   {

@@ -7,6 +7,7 @@ import boto3
 CREDENTIAL_SPECS = {
     "slack": {"credential_id": "slack", "fields": ("token",)},
     "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
+    "aws": {"credential_id": "aws", "fields": ("access_key_id", "secret_access_key")},
 }
 
 
@@ -109,6 +110,17 @@ def api_save_credential(provider, body):
         if not token.startswith(("xoxb-", "xapp-")) or len(token) < 20:
             return 400, {"error": "Enter a valid Slack bot token"}
         secret_value = {"token": token}
+    elif provider == "aws":
+        access_key_id = str(body.get("access_key_id", "")).strip()
+        secret_access_key = str(body.get("secret_access_key", "")).strip()
+        # ASIA covers temporary STS keys; AKIA/other long-lived prefixes are
+        # 20 characters of uppercase letters and digits. Secrets are 40 chars
+        # of base64 characters.
+        if not re.fullmatch(r"[A-Za-z0-9]{16,128}", access_key_id):
+            return 400, {"error": "Enter a valid AWS access key ID"}
+        if not re.fullmatch(r"[A-Za-z0-9/+=]{40}", secret_access_key):
+            return 400, {"error": "Enter a valid AWS secret access key"}
+        secret_value = {"access_key_id": access_key_id, "secret_access_key": secret_access_key}
     else:
         api_key = str(body.get("api_key", "")).strip()
         if not re.fullmatch(r"[A-Za-z0-9_-]{20,}-us\d{1,3}", api_key):

@@ -121,3 +121,23 @@ export function MailLogo({ size = 16, className, x, y }: IconProps) {
     </svg>
   );
 }
+
+/** Bucket mark for the Amazon S3 connector (S3 green). */
+export function S3Logo({ size = 16, className, x, y }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      role="img"
+      aria-label="Amazon S3"
+      className={className}
+      x={x}
+      y={y}
+    >
+      <rect x="3" y="4.6" width="18" height="3" rx="1.5" fill="#232F3E" />
+      <path d="M4.6 9.1h14.8l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H7.98a2.1 2.1 0 0 1-2.08-1.8z" fill="#7AA116" />
+      <path d="M12 9.1h7.4l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H12z" fill="#5a7e10" />
+    </svg>
+  );
+}

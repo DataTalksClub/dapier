@@ -16,6 +16,7 @@ from . import (  # noqa: F401  (import = registration)
     ingress,
     logic,
     render,
+    s3,
     sheets,
     slack,
     telegram,

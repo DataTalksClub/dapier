@@ -1,0 +1,27 @@
+# Google Drive -> S3 backup for the Drive "mailchimp" folder.
+#
+# The trigger is a poll trigger against Drive's files.list; this file only
+# names the action chain it binds to with `flow: drive-mailchimp-s3`. Each
+# new file (watermark: createdTime) is fetched from Drive through the
+# google-drive connection's token and put into the backup bucket with the
+# `aws` credential's key pair.
+#
+# Create the trigger with `dapier polls save` (FOLDER_ID = the mailchimp
+# folder's ID; `dapier token exec google-drive -- sh -c 'curl ...'` finds it):
+#   {"name": "drive-mailchimp-s3", "expression": "rate(2 minutes)",
+#    "url": "https://www.googleapis.com/drive/v3/files?q=%27FOLDER_ID%27+in+parents+and+trashed=false&orderBy=createdTime%20desc&fields=files(id%2Cname%2CmimeType%2CcreatedTime%2Csize%2CwebViewLink)&pageSize=100",
+#    "list_path": "files", "id_path": "createdTime",
+#    "connection_id": "google-drive", "max_items": 10,
+#    "flow": "drive-mailchimp-s3",
+#    "description": "New files in the Drive mailchimp folder"}
+flows:
+  drive-mailchimp-s3:
+    description: Back up new files from the Drive "mailchimp" folder to S3
+    actions:
+      - id: backup-to-s3
+        type: s3_upload
+        credential_id: aws
+        bucket: datatalks-mailchimp-backup
+        key: "mailchimp/{name}"
+        source_url: "https://www.googleapis.com/drive/v3/files/{id}?alt=media"
+        source_connection_id: google-drive

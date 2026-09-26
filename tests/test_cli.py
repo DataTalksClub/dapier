@@ -498,6 +498,35 @@ def test_credentials_set_rejects_unknown_provider_and_empty_value(monkeypatch, t
                                     str(tmp_path / "missing")) == 2
 
 
+def test_credentials_set_aws_posts_the_key_pair_json(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "aws", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    keys = tmp_path / "aws.json"
+    keys.write_text(json.dumps({"access_key_id": "AKIAIOSFODNN7EXAMPLE",
+                                "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}))
+    assert commands.credentials_set("https://api.example.test", "aws", str(keys)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/credentials/aws",
+                      "body": {"access_key_id": "AKIAIOSFODNN7EXAMPLE",
+                               "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}
+    out, _ = capsys.readouterr()
+    assert "AKIA" not in out
+
+
+def test_credentials_set_aws_rejects_non_json_and_wrong_keys(monkeypatch, tmp_path):
+    monkeypatch.setattr(commands.api, "call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    raw = tmp_path / "raw.txt"
+    raw.write_text("AKIAIOSFODNN7EXAMPLE")
+    assert commands.credentials_set("https://api.example.test", "aws", str(raw)) == 2
+    partial = tmp_path / "partial.json"
+    partial.write_text(json.dumps({"access_key_id": "AKIAIOSFODNN7EXAMPLE"}))
+    assert commands.credentials_set("https://api.example.test", "aws", str(partial)) == 2
+
+
 GRANT_BODY = {
     "connection_id": "youtube-personal",
     "subject": "subject-9",
