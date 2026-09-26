@@ -8,15 +8,20 @@
 # dropbox_on_upload, whose intake step builds the dropbox-shaped body.
 flows:
   invoice-dataops:
-    description: Push an inbound invoice into the DataOps intake
+    description: Save the attachment to Dropbox, then push the invoice into the DataOps intake
     actions:
+      - id: save-attachment-to-dropbox
+        type: dropbox_upload
+        connection_id: dropbox
+        source: attachment
+        folder: _dtc_paperwork/income-invoices
       - id: intake-invoice
         type: dataops
         url_env: DATAOPS_INTAKE_URL
         auth_secret_id: dapier/dataops
 
 id: invoice-email-intake
-enabled: false  # flip on when the invoice addresses go live
+enabled: true
 flow: invoice-dataops
 triggers:
   - connector: email
