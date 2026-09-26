@@ -74,7 +74,12 @@ def _static(path):
         "/assets/fonts/IBMPlexMono-Medium.woff2": ("assets/fonts/IBMPlexMono-Medium.woff2", "font/woff2"),
     }
     if path not in assets:
-        return None
+        # Workflow deep links (/workflows/<id>) load the same console shell;
+        # the client router resolves the workflow.
+        if path.startswith("/workflows/"):
+            path = "/workflows"
+        else:
+            return None
     filename, content_type = assets[path]
     asset_path = Path(__file__).resolve().parents[2] / "web" / filename
     if filename.endswith(".woff2"):

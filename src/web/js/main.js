@@ -133,7 +133,7 @@ function designerClick(event) {
   if (!target) return;
   event.preventDefault();
   if (target.id === 'workflow-edit') $('#workflow-dialog').close();
-  void openDesigner(target.id === 'workflow-edit' ? target.dataset.source : null);
+  void openDesigner(target.id === 'workflow-edit' ? target.dataset.workflow : null);
 }
 document.addEventListener('click', designerClick);
 $('#refresh').addEventListener('click', refresh);

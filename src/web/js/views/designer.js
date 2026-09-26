@@ -1,9 +1,10 @@
 /* Designer view: hosts the designer app shell (/designer/app) in an iframe.
-   This is the console's workflow view — every workflow row opens it. The
-   canvas owns the viewport under the topbar: the topbar's h1 names the open
-   workflow and the adjacent Rename button edits the name (the edit
-   lands in the iframe's draft and commits with "Save to git"). The iframe
-   reports what the title should show via designer:meta messages below. */
+   This is the console's workflow view — every workflow row opens it at
+   /workflows/<id>. The canvas owns the viewport under the topbar: the
+   topbar's h1 names the open workflow and the adjacent Rename button edits
+   the name (the edit lands in the iframe's draft and commits with "Save to
+   git"). The iframe reports what the title should show via designer:meta
+   messages below. */
 import { state } from '../state.js';
 import { $ } from '../ui.js';
 import { setView, rememberViewUrl, setViewGuard } from '../router.js';
@@ -13,6 +14,12 @@ let meta = null;
 let editing = false;
 let leaveSequence = 0;
 const leaveRequests = new Map();
+
+/* /workflows/<id> is the shareable URL for one workflow; "new" is the
+   unsaved draft. */
+function workflowUrl(ref) {
+  return ref ? `/workflows/${encodeURIComponent(ref)}` : '/workflows/new';
+}
 
 function frameSrc(source) {
   const params = new URLSearchParams({ embed: '1' });
@@ -31,7 +38,8 @@ function syncGithub(source) {
 }
 
 /* Paints the topbar from the iframe's live meta (id, file, renamable) and
-   keeps /designer?workflow=… in step so the view stays deep-linkable. */
+   keeps /workflows/<id> in step so the view stays deep-linkable — a rename
+   moves the URL with it. */
 function applyMeta() {
   if (state.view !== 'designer') return;
   const title = $('#view-title');
@@ -45,25 +53,26 @@ function applyMeta() {
     title.title = '';
   }
   syncGithub(meta ? meta.source : null);
-  const url = meta && meta.source ? `/designer?workflow=${encodeURIComponent(meta.source)}` : '/designer';
+  const url = workflowUrl(meta && meta.id);
   if (`${window.location.pathname}${window.location.search}` !== url) {
     history.replaceState(null, '', url);
   }
   rememberViewUrl(url);
 }
 
-function syncHead(source) {
+function syncHead(ref) {
   /* Runs after setView, which resets the h1 to the plain view name. A live
      iframe that already holds this exact file wins — the console's workflow
-     list can be stale right after a rename. */
-  if (meta && (meta.source ?? null) === (source ?? null)) {
+     list can be stale right after a rename. The ref is a workflow id (the
+     URL form) or, for legacy /designer?workflow= links, a source file. */
+  if (meta && ((meta.source ?? null) === (ref ?? null) || (meta.id ?? null) === (ref ?? null))) {
     applyMeta();
     return;
   }
-  const workflow = source
-    ? (state.data?.workflows || []).find((item) => item.source === source)
+  const workflow = ref
+    ? (state.data?.workflows || []).find((item) => item.id === ref || item.source === ref)
     : null;
-  $('#view-title').textContent = workflow ? workflow.id : source ? source.replace(/\.yaml$/, '') : 'Designer';
+  $('#view-title').textContent = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : 'Designer';
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
   $('#designer-rename').hidden = true;
@@ -170,26 +179,31 @@ export async function confirmDesignerLeave() {
 
 setViewGuard((next) => next === 'designer' ? Promise.resolve(true) : confirmDesignerLeave());
 
-export async function openDesigner(source, push = true) {
+/* Opens the workflow `ref` (an id, a legacy source filename, or null for a
+   new workflow) and leaves /workflows/<ref> as the shareable URL. */
+export async function openDesigner(ref, push = true) {
   const frame = $('#designer-frame');
-  const src = frameSrc(source);
+  const src = frameSrc(ref);
   if (frame.getAttribute('src') !== src) {
     if (!(await confirmDesignerLeave())) return false;
     meta = null; // a fresh page posts its own meta once loaded
     frame.setAttribute('src', src);
   }
   await setView('designer', false);
-  syncHead(source);
-  const url = source ? `/designer?workflow=${encodeURIComponent(source)}` : '/designer';
+  syncHead(ref);
+  const url = workflowUrl(ref);
   if (push) history.pushState(null, '', url);
   rememberViewUrl(url);
   return true;
 }
 
-/* Re-syncs the frame after a full-page load of, or popstate to, /designer. */
+/* Re-syncs the frame after a full-page load of, or popstate to,
+   /workflows/<id> (or the legacy /designer?workflow=<source> links). */
 export function designerFromLocation() {
-  return openDesigner(new URLSearchParams(window.location.search).get('workflow'), false).then((opened) => {
-    if (!opened) history.pushState(null, '', meta?.source ? `/designer?workflow=${encodeURIComponent(meta.source)}` : '/designer');
+  const match = window.location.pathname.match(/^\/workflows\/(.+)$/);
+  const ref = match ? decodeURIComponent(match[1]) : new URLSearchParams(window.location.search).get('workflow');
+  return openDesigner(ref === 'new' ? null : ref, false).then((opened) => {
+    if (!opened) history.pushState(null, '', workflowUrl(meta && meta.id));
     return opened;
   });
 }

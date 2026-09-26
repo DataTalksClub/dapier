@@ -116,7 +116,7 @@
           <section>
             <div class="section-head"><div><h2>Enabled workflows</h2><p class="sub">Select a workflow to open it.</p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-workflows-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead><tbody id="overview-workflows"></tbody></table></div>
-            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
+            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
           </section>
         </div>
       </section>
@@ -124,10 +124,10 @@
       <section class="view" data-page="workflows">
         <div class="section-head">
           <div class="section-head-text"><h2>Your workflows</h2><p class="sub">Choose a workflow to edit its triggers and actions. Saving commits YAML to GitHub; deployment publishes it in a few minutes.</p></div>
-          <a id="new-workflow" class="button primary" href="/designer">New workflow</a>
+          <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
         </div>
         <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name or trigger"></label><label>Status<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
-        <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
+        <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>

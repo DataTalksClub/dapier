@@ -11,6 +11,7 @@ export function rememberViewUrl(url) { rememberedUrl = url; }
 
 export function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');
+  if (name.startsWith('workflows/')) return 'designer'; // /workflows/<id> opens the canvas
   return VIEWS.includes(name) ? name : 'overview';
 }
 

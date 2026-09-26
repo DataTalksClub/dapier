@@ -19179,7 +19179,7 @@
     reactExports.useEffect(() => {
       refreshList().then((workflows) => {
         const requested = new URLSearchParams(window.location.search).get("workflow");
-        const match = requested ? workflows.find((summary) => summary.source === requested) : null;
+        const match = requested ? workflows.find((summary) => summary.source === requested || summary.id === requested) : null;
         if (match) return openWorkflow(match);
         if (config.mode === "console") newWorkflow();
       }).catch((error) => setStatus({ kind: "error", message: String(error) }));

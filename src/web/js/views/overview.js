@@ -33,9 +33,10 @@ function triggerBlocks(workflow) {
 function openWorkflow(id) {
   const workflow = (state.data.workflows || []).find((item) => item.id === id);
   if (!workflow) return;
-  /* The designer canvas is the workflow view; the plain-steps dialog below
-     remains only for workflows without a source file in workflows/*.yaml. */
-  if (workflow.source) return openDesigner(workflow.source);
+  /* The designer canvas is the workflow view at /workflows/<id>; the
+     plain-steps dialog below remains only for workflows without a source
+     file in workflows/*.yaml. */
+  if (workflow.source) return openDesigner(workflow.id);
   const many = (workflow.triggerCount || 1) > 1;
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `
@@ -57,8 +58,8 @@ function openWorkflow(id) {
     </section>`;
   const designer = $('#workflow-edit');
   if (workflow.source) {
-    designer.href = `/designer?workflow=${encodeURIComponent(workflow.source)}`;
-    designer.dataset.source = workflow.source;
+    designer.href = `/workflows/${encodeURIComponent(workflow.id)}`;
+    designer.dataset.workflow = workflow.id;
     designer.hidden = false;
   } else {
     designer.hidden = true;

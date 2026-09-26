@@ -181,12 +181,21 @@ def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
     index = ingress._static("/")["body"]
     workflows_view = re.search(r'data-page="workflows".*?</section>', index, re.S).group(0)
     new_link = re.search(r'<a id="new-workflow" class="button primary" href="([^"]+)">New workflow</a>', workflows_view)
-    assert new_link and new_link.group(1) == "/designer"
+    assert new_link and new_link.group(1) == "/workflows/new"
     assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
 
     # The workflow dialog deep-links the designer with the workflow source.
     assert 'id="workflow-edit"' in index
     assert ingress._static("/designer")["statusCode"] == 200
+
+
+def test_workflow_deep_links_serve_the_console():
+    # Clicking a workflow lands on /workflows/<id>; a reload of that URL must
+    # come back as the console shell and let the SPA resolve the id.
+    for path in ("/workflows/my-workflow", "/workflows/new", "/workflows/my%20workflow"):
+        response = ingress._static(path)
+        assert response["statusCode"] == 200, path
+        assert "forbidden-view" in response["body"], path
 
 
 def test_designer_serves_the_console_with_the_embedded_canvas():

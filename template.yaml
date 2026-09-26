@@ -220,6 +220,11 @@ Resources:
         ConsoleWorkflows:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /workflows, Method: GET}
+        # Workflow deep links (/workflows/<id>) serve the console shell; the
+        # client router resolves the workflow.
+        ConsoleWorkflowDetail:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: '/workflows/{proxy+}', Method: GET}
         ConsoleConnections:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /connections, Method: GET}
