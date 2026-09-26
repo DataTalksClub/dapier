@@ -69,16 +69,8 @@ immediately — no redeploy.
    This URI is fixed — it comes from the stack's `OAUTH_CALLBACK_URL` and both
    the console and the CLI drive consent through it.
 6. Copy the new **client ID** and **client secret**. Google's console won't
-   show the secret again later. Store it immediately through the authenticated
-   CLI; the secret is read from stdin, not typed into the command line:
-
-   ```powershell
-   Get-Clipboard -Raw | uv run dapier oauth-clients set google --client-id '<client-id>' --client-secret-file -
-   Set-Clipboard -Value ''
-   ```
-
-   Copy only the secret before running the pipeline. The command strips the
-   clipboard's trailing newline. Clear the clipboard after storage.
+   show the secret again later. Store both immediately with the credential
+   update procedure below.
 
 ### Dropbox
 
@@ -109,16 +101,56 @@ immediately — no redeploy.
    `https://dapier.dtcdev.click/oauth/callback` and click **Add** to commit the
    URI.
 4. Copy the **App key**. Click **Show** beside **App secret**, then copy the
-   secret. Store both immediately through the authenticated CLI:
+   secret. Store both immediately with the credential update procedure below.
+   The current `Dapier DTC Dev` app key is `aia0r7fjj4ls6j9`; check that the
+   console still shows this key before updating Dapier.
 
-   ```powershell
-   Get-Clipboard -Raw | uv run dapier oauth-clients set dropbox --client-id '<app-key>' --client-secret-file -
-   Set-Clipboard -Value ''
-   ```
+### Updating or rotating OAuth client credentials
 
-   Copy only the app secret before running the pipeline, then clear the
-   clipboard. Dapier reports whether a client is configured but never shows
-   the saved secret again.
+Use this procedure when a client secret was entered incorrectly, a provider
+secret was rotated, or a client ID changed. The ID and secret must come from
+the same provider app: the Dropbox **App key** is the OAuth client ID, and its
+matching **App secret** is the client secret. `oauth-clients set` replaces
+both stored values together and takes effect immediately; it does not require
+a redeploy. The command reads the secret from stdin or a file, never from a
+command-line argument.
+
+For Dropbox, open **App Console → Dapier DTC Dev → Settings → OAuth 2**, copy
+the current **App key**, click **Show** beside **App secret**, and copy the
+current secret. For Google, use **Google Auth Platform → Clients → Dapier**;
+create/reset a client secret there if the old value is unavailable (Google
+does not reveal an existing secret again). Then in Windows PowerShell, copy
+only that fresh secret to the Windows clipboard and run the matching provider
+command. Example for Dropbox:
+
+```powershell
+$secret = Get-Clipboard -Raw
+if ([string]::IsNullOrWhiteSpace($secret)) { throw 'Windows clipboard is empty; copy the current app secret first.' }
+try {
+  $secret | uv run dapier oauth-clients set dropbox --client-id 'aia0r7fjj4ls6j9' --client-secret-file -
+  if ($LASTEXITCODE -ne 0) { throw 'Dapier did not store the Dropbox OAuth client.' }
+} finally {
+  Remove-Variable secret -ErrorAction SilentlyContinue
+  Set-Clipboard -Value ''
+}
+```
+
+For Google, change `dropbox` to `google` and replace the client ID with the
+Google `Dapier` client ID. `--client-secret-file -` means stdin; Dapier strips
+surrounding whitespace. If `uv` is not on this PowerShell session's `PATH`,
+use the installed executable explicitly, for example
+`& "$env:USERPROFILE\.local\bin\uv.exe" run dapier ...`.
+
+Copy the secret from the provider console immediately before running the
+command. Chrome automation may copy into a browser-only clipboard that
+PowerShell cannot read; if `Get-Clipboard -Raw` is empty, stop and copy through
+the Windows clipboard or use a private temporary file with
+`--client-secret-file <path>`, then delete that file. Do not paste the secret
+into command arguments, shell history, chat, or repository files. Afterward,
+run `uv run dapier oauth-clients list` to confirm the provider says
+**configured**. This confirms storage only, not that the provider accepts the
+secret; finish by retrying the OAuth setup. The set command's success message
+also confirms the update was stored, and the saved secret cannot be read back.
 
 ### Setup notes for the next run
 
@@ -143,7 +175,23 @@ immediately — no redeploy.
   adding it.
 - Before starting, run `uv run dapier oauth-clients list`; afterward run it
   again and confirm Google and Dropbox both say **configured**. This verifies
-  storage without exposing either secret.
+  storage without exposing either secret. It does not validate that a copied
+  secret matches the provider app; a successful OAuth retry is the end-to-end
+  check.
+- If Dropbox reports **Account could not be verified** after correcting the
+  client key/secret, check the existing connection's requested scopes too.
+  The connected account lookup needs `account_info.read`; the invoice workflow
+  also needs `files.metadata.read`, `files.content.read`, and
+  `files.content.write`. A correct OAuth client does not add scopes to an
+  existing connection. Set the exact list in **Connectors → Edit** or with
+  `uv run dapier connections scopes dropbox --scopes account_info.read
+  files.metadata.read files.content.read files.content.write`, then reconnect
+  and approve the updated request. The provider app's **Permissions** must
+  allow the same scopes, and Dropbox saves those changes only after **Submit**.
+  In the previous setup, the app permissions were already correct, but the
+  existing `dropbox` connection requested only `files.content.read` and
+  `files.metadata.read`; that mismatch was why retrying with the corrected
+  secret still failed account verification.
 - Setting shared OAuth clients does not connect a Google or Dropbox account.
   Each account still needs **Connectors → Create new** and provider consent.
 - Keep the existing `DTC` consent branding and `DTC DEV Auth` client
@@ -303,6 +351,15 @@ To add a scope:
    The Dapier connection stores the requested scope list separately from the
    OAuth client credentials. Changing a preset affects newly created
    connections only; edit existing connections explicitly.
+
+For Dropbox's current invoice connection, the complete requested list is
+`account_info.read`, `files.metadata.read`, `files.content.read`, and
+`files.content.write`. This list is needed even when the Dropbox app already
+allows all four scopes: provider permissions and the Dapier connection's
+requested scopes are separate settings. In particular, without
+`account_info.read`, Dropbox account verification can fail with **Account
+could not be verified**; without `files.content.write`, the workflow cannot
+delete processed invoices.
 
 To remove a scope, update the Dapier connection list, revoke its old token, and
 reconnect it so the provider issues a token for the reduced access:
