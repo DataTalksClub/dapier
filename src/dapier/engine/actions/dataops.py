@@ -2,9 +2,30 @@
 import json
 import mimetypes
 import os
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from ...connections import tokens
 from . import base, dropbox
+
+
+def _received_at(value):
+    """Second-precision UTC Z form — the only timestamp shape the DataOps
+    intake contract accepts. Email events carry RFC 2822 Date headers and
+    stored events carry +00:00 ISO timestamps; both are rejected as-is."""
+    text = str(value or "").strip()
+    if not text:
+        return text
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(text)
+        except (TypeError, ValueError):
+            return text
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def run_dataops(action, event):
@@ -58,7 +79,7 @@ def _dropbox_intake_body(action, event):
         "recipientRoute": "dropbox-upload",
         "from": "dropbox",
         "subject": filename,
-        "receivedAt": event["occurred_at"],
+        "receivedAt": _received_at(event["occurred_at"]),
         "documents": [{
             "kind": "dropbox-file",
             "storageUri": f"s3://{bucket}/{key}",
@@ -102,6 +123,6 @@ def _email_intake_body(action, event):
         "recipientRoute": data.get("route") or source_data["route"],
         "from": sender_value,
         "subject": source_data.get("subject") or "Inbound email",
-        "receivedAt": source_data.get("date") or event["occurred_at"],
+        "receivedAt": _received_at(source_data.get("date") or event["occurred_at"]),
         "documents": documents,
     }

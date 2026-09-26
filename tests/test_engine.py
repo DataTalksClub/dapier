@@ -20,6 +20,7 @@ from src.dapier.engine import (
     run_slack,
     workflow_triggers,
 )
+from src.dapier.engine.actions.dataops import _email_intake_body
 from src.dapier.engine import matching
 
 
@@ -332,12 +333,64 @@ class DropboxIntakeTests(unittest.TestCase):
 
         self.assertEqual(body["messageId"], "dropbox:acct1:fid:rev1")
         self.assertEqual(body["subject"], "1.pdf")
-        self.assertEqual(body["receivedAt"], "2026-09-24T15:00:00+00:00")
+        self.assertEqual(body["receivedAt"], "2026-09-24T15:00:00Z")
+
+    def test_normalizes_timestamps_to_utc_z(self):
+        for occurred, expected in [
+            ("2026-09-24T15:00:00+00:00", "2026-09-24T15:00:00Z"),
+            ("2026-09-24T17:30:05+02:00", "2026-09-24T15:30:05Z"),
+        ]:
+            event = deepcopy(self.event)
+            event["occurred_at"] = occurred
+            body, _s3 = self.run_dataops_action(event=event)
+            self.assertEqual(body["receivedAt"], expected)
 
     def test_fails_without_a_path(self):
         with self.assertRaises(ValueError):
             self.run_dataops_action(event={"connector": "dropbox", "event": "file.created",
                                            "id": "x", "occurred_at": "now", "data": {}})
+
+
+class EmailIntakeTests(unittest.TestCase):
+    """The email intake body: raw mail events must satisfy the DataOps
+    timestamp contract (second-precision UTC Z), not just Dropbox ones."""
+
+    def event(self, date):
+        return {
+            "connector": "email", "event": "message.received",
+            "id": "evt-email-1", "occurred_at": "2026-09-26T22:10:40.831145+00:00",
+            "data": {
+                "route": "invoice",
+                "message_id": "<invoice-e2e-20260926-2210@dtcdev.click>",
+                "subject": "Dapier invoice e2e 20260926-2210",
+                "date": date,
+                "sender": {"header": "no-reply@dtcdev.click",
+                           "addresses": ["no-reply@dtcdev.click"]},
+                "attachments": [{
+                    "filename": "invoice-e2e-20260926-2210.pdf",
+                    "content_type": "application/pdf",
+                    "size": 69,
+                    "checksum": "sha256:abc",
+                    "s3": {"bucket": "raw-bucket",
+                           "key": "artifacts/x/attachments/001-invoice.pdf"},
+                }],
+            },
+        }
+
+    def test_normalizes_rfc2822_date_header(self):
+        body = _email_intake_body({}, self.event("Sat, 26 Sep 2026 22:10:40 +0000"))
+        self.assertEqual(body["receivedAt"], "2026-09-26T22:10:40Z")
+
+    def test_falls_back_to_normalized_occurred_at(self):
+        body = _email_intake_body({}, self.event(""))
+        self.assertEqual(body["receivedAt"], "2026-09-26T22:10:40Z")
+        self.assertEqual(body["recipientRoute"], "invoice")
+        self.assertEqual(body["messageId"], "<invoice-e2e-20260926-2210@dtcdev.click>")
+        self.assertEqual(body["from"], "no-reply@dtcdev.click")
+        doc = body["documents"][0]
+        self.assertEqual(doc["storageUri"],
+                         "s3://raw-bucket/artifacts/x/attachments/001-invoice.pdf")
+        self.assertEqual(doc["checksum"], "sha256:abc")
 
 
 class StubSes:
