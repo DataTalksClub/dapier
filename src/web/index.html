@@ -78,8 +78,8 @@
       <section class="view active" data-page="overview">
         <div class="metrics">
           <div class="metric"><span class="metric-label">Enabled workflows</span><span class="metric-value mono" id="metric-workflows">-</span></div>
-          <div class="metric"><span class="metric-label">Connections</span><span class="metric-value mono" id="metric-connections">-</span></div>
-          <div class="metric"><span class="metric-label">Completed actions</span><span class="metric-value mono" id="metric-runs">-</span></div>
+          <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span></div>
+          <div class="metric"><span class="metric-label">Completed, latest 25</span><span class="metric-value mono" id="metric-runs">-</span></div>
           <div class="metric"><span class="metric-label">Credentials</span><span class="metric-value mono" id="metric-credentials">-</span></div>
         </div>
 
@@ -127,18 +127,19 @@
 
       <section class="view" data-page="connections">
         <div class="section-head">
-          <div class="section-head-text"><h2>Create new</h2><p class="sub">Select one of the connectors to add it — approve access, done, the token is stored for you. If a connection ever expires, reconnect it below.</p></div>
+          <p id="connection-summary" class="register-summary mono">Loading accounts…</p>
+          <button id="add-connection" class="button primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>
         </div>
-        <div class="connect-grid" id="connect-grid"></div>
-        <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">Connected accounts</h2></div>
-        </div>
-        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Select a connector above to let workflows call it.</p></div>
+        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a provider to connect your first account.</p></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Provider</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th>Connection</th><th>Provider</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="connection-table"></tbody>
           </table>
+        </div>
+        <div id="connect-picker" hidden>
+          <div class="section-head"><div class="section-head-text"><h2>Add an account</h2><p class="sub">Choose the service. Existing unfinished setups are offered first.</p></div></div>
+          <div class="connect-grid" id="connect-grid"></div>
         </div>
       </section>
 
@@ -165,7 +166,7 @@
 
       <section class="view" data-page="tokens">
         <div class="section-head">
-          <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent — grant the subject access per connection with <code>dapier grants save</code>, and revoke it here any time. The value is shown once, at creation.</p></div>
+          <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent. Grant access from a connection's Manage panel, and revoke the token here any time. The value is shown once, at creation.</p></div>
           <button id="new-token" class="button primary" type="button">New token</button>
         </div>
         <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
@@ -308,7 +309,7 @@
   <dialog id="edit-connection-dialog">
     <form id="edit-connection-form" method="dialog" autocomplete="off">
       <div class="dialog-head">
-        <h2 id="edit-connection-title">Edit connection</h2>
+        <h2 id="edit-connection-title">Manage connection</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
       <div class="dialog-body">
@@ -320,9 +321,45 @@
         <p id="edit-connection-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
+        <button id="edit-connection-access" class="button secondary" type="button">Access grants</button>
+        <button id="edit-connection-revoke" class="button secondary" type="button">Revoke tokens</button>
+        <a id="edit-connection-reconnect" class="button secondary" target="_blank" rel="noopener" hidden>Reconnect</a>
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Save changes</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="connection-access-dialog">
+    <div class="dialog-head">
+      <h2 id="connection-access-title">Access grants</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p class="sub">Grant an identity and agent permission to use or reconnect this account.</p>
+      <div id="connection-grant-list" class="grant-list"></div>
+      <form id="connection-grant-form" autocomplete="off">
+        <h3 id="connection-grant-heading">Add grant</h3>
+        <label>Subject<input name="subject" required placeholder="token:my-agent or DTC subject"></label>
+        <label>Agent<input name="agent" required pattern="[a-z0-9][a-z0-9_-]{1,62}" placeholder="my-agent"></label>
+        <fieldset class="grant-operations"><legend>Allowed operations</legend>
+          <label><input type="checkbox" name="operations" value="use" checked>Use tokens</label>
+          <label><input type="checkbox" name="operations" value="connect">Reconnect</label>
+          <label><input type="checkbox" name="operations" value="admin">Admin</label>
+        </fieldset>
+        <small class="field-hint">Admin includes token use and reconnection for this connection.</small>
+        <label>Expires <input name="expires_at" type="datetime-local"><small class="field-hint">Optional. Uses your local time.</small></label>
+        <p id="connection-grant-error" class="form-error" role="alert"></p>
+      </form>
+    </div>
+    <div class="dialog-actions"><button id="connection-grant-cancel" class="button secondary" type="button" hidden>Cancel edit</button><button class="button secondary dialog-close" type="button">Done</button><button class="button primary" type="submit" form="connection-grant-form">Save grant</button></div>
+  </dialog>
+
+  <dialog id="connection-confirm-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2 id="connection-confirm-title">Revoke access</h2></div>
+      <div class="dialog-body"><p id="connection-confirm-message"></p></div>
+      <div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="connection-confirm-yes" class="button danger" value="confirm">Revoke</button></div>
     </form>
   </dialog>
 </body>

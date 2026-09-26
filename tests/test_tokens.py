@@ -270,3 +270,17 @@ def test_revoke_preserves_record_client_override(monkeypatch):
     transport_for(monkeypatch)
     revoke_connection(connection())
     assert writes[0] == {"client_id": "legacy-id", "client_secret": "legacy-secret"}
+
+
+def test_revoke_direct_token_connection_clears_local_secret(monkeypatch):
+    writes = []
+    configure_store(monkeypatch, {
+        "credential_id": "oauth#youtube-personal",
+        "value": {"token": "xoxb-example"},
+        "version": 1,
+    }, writes=writes)
+
+    updated = revoke_connection(connection(provider="slack"))
+
+    assert updated["status"] == "revoked"
+    assert writes == [{}]

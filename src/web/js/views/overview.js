@@ -80,7 +80,7 @@ function render() {
   const enabled = data.workflows.filter((workflow) => workflow.enabled);
   const configured = data.credentials.filter((credential) => credential.configured).length;
   $('#metric-workflows').textContent = enabled.length;
-  $('#metric-connections').textContent = data.connections.length;
+  $('#metric-connections').textContent = data.connections.filter((connection) => connection.status === 'connected').length;
   $('#metric-runs').textContent = (data.executions || []).filter((execution) => execution.status === 'completed').length;
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');

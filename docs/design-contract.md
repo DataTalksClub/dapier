@@ -1,162 +1,67 @@
 # Dapier console — design contract
 
-The operator console (`src/web/`) and its satellite page (`/auth/error`, rendered
-in `src/admin.py`) are the only user-facing surfaces of Dapier. This document is
-binding: every change to `app.css` / `index.html` must comply. It exists because
-the previous design was technically competent but anonymous — the AI-default
-admin panel. The direction that replaces it is **the operator's ledger**: warm
-paper, near-black ink, hairline rules, a dark rail for navigation, one deep
-control green, and IBM Plex as the voice of the machine.
+## Attack: what the current console gets wrong
 
-## The attack (what was wrong and is now banned)
+1. The dark sidebar beside a pale content field makes the shell resemble a stock admin template. The rail is louder than the operator's work.
+2. Four metrics march across Overview at equal weight, even though connected accounts and recent runs answer different questions. The values lack a clear time or scope cue.
+3. The Connections page repeats the page title, then explains the section before showing any account. Five equally sized provider cards once pushed the actual accounts below the fold.
+4. Generic rounded controls make actions with different consequences look alike. In the connection dialog, save, grant management, reconnect, and revoke compete in one button band.
+5. The table spends a full column repeating provider names while the account identity—the information that distinguishes two Google Calendars—has been absent.
+6. Helper prose appears under most headings. It can bury the status and next action an operator came to see.
+7. The modal has the same soft card treatment as every other app surface. Long forms and access grants need the clarity of a working sheet, not a decorative card.
 
-1. Inter-first font stack — no typographic identity.
-2. Pastel tint pill badges for every status.
-3. One soft border radius shared by every element.
-4. An 11px uppercase "eyebrow" micro-label above every heading.
-5. Marketing explainer sentences under every heading (one *informational* `.sub`
-   line per section is allowed — "Read from `workflows/*.yaml`" — filler is not).
-6. Icons inside labelled buttons ("Sign in", "Save credential").
-7. The 4-equal-cell SaaS metric card row.
-8. Heavy uppercase table headers.
-9. Gradients, glassmorphism, decoration that carries no data.
+These are claims about the UI in this repository. They are the checklist for screenshot review.
 
-**Banned permanently:** Inter-first stacks, CDN/webfont requests, gradients,
-pastel tint chips on statuses, eyebrow micro-labels, icons inside labelled
-buttons, more than one shadow idiom per surface. The dark rail and the dialog's
-ambient shadow are *committed* choices of this direction — listed here so they
-are not "fixed" back into anonymity by a future pass.
+## Direction: the operations register
 
-## Type
+Dapier is a control plane. It should look like a working register: quiet paper, sharp rules, strong type, and one green action signal. Navigation belongs on the same plane as the work, separated by a vertical rule. Account identity and state outrank decorative provider branding. The interface is deliberately dense where people compare records and spacious where they make a decision.
 
-Two faces, self-hosted under `/assets/fonts/` (OFL-licensed IBM Plex), with
-system fallbacks so the console still renders offline. The `/auth/error` CSP
-permits no external requests, so that page declares the same stacks and falls
-back to the system faces:
+### Type
 
-- **IBM Plex Mono (400/500)** — the voice of machine truth: workflow IDs,
-  execution IDs, triggers, scopes, metric values, timestamps, code, the
-  environment line. Workflow IDs are YAML filenames, so mono is truthful.
-- **IBM Plex Sans (variable, 400–700)** — prose: headings, labels, helper
-  sentences, table prose cells.
+- IBM Plex Sans (self-hosted) for prose, controls, and the single large page title.
+- IBM Plex Mono (self-hosted) for IDs, timestamps, technical values, small structural labels, and metric numbers.
+- Scale: 11px structural labels; 12px metadata; 13px table/control text; 15px section headings; 18px dialog titles; 32px page title; 38px principal metric. Weight 500/600 provides hierarchy; no all-caps micro-labels above every heading.
 
-Fallbacks: `ui-monospace, "SF Mono", Menlo, Consolas, monospace` /
-`ui-sans-serif, system-ui, "Segoe UI", sans-serif`.
+### Color
 
-Scale in use: 11 / 11.5 / 12 / 12.5 / 13 / 13.5 / 15 / 16 / 19 / 24 / 34.
-Character comes from the sans/mono split — sans states intent, mono quotes the
-machine — never from decoration. Machine values wrap at token separators
-(`:`, `.`, `/`, `_`) via `<wbr>`, never mid-token.
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| Paper | `#eeede6` | `#101611` | page and navigation plane |
+| Surface | `#faf9f4` | `#182019` | forms and dialogs |
+| Ink | `#202820` | `#edf2e9` | primary text |
+| Secondary ink | `#485348` | `#bac8b8` | table prose |
+| Muted ink | `#667166` | `#91a090` | metadata |
+| Rule | `#c4cabf` | `#344235` | rows and controls |
+| Strong rule | `#879688` | `#627563` | shell and section boundaries |
+| Signal green | `#0b6745` | `#49b981` | primary action and active navigation |
+| Signal dark | `#074e33` | `#70d59e` | hover/focus |
+| Alert | `#9c4b20` | `#e6a36f` | errors and incomplete setup |
 
-## Color
+No gradients. No colored status chips. A dot and a word carry state; a rule or solid fill marks the chosen action. Feedback may use a faint paper tint but routine content does not.
 
-Warm paper + warm ink + one deep control green. Status colors are ink-adjacent
-and appear as a dot plus a word — never as tinted chips.
+### Geometry and spacing
 
-| Token | Value | Use |
-|---|---|---|
-| `--paper` | `#f4f1e9` | page canvas |
-| `--surface` | `#fdfcf7` | cards, inputs, dialogs |
-| `--ink` | `#231f17` | primary text |
-| `--ink-soft` | `#514b3e` | secondary text |
-| `--muted` | `#6e6656` | tertiary text, helper lines |
-| `--line` / `--line-strong` | `#ddd5c4` / `#c9c0aa` | hairlines / structural rules |
-| `--rail` / `--rail-ink` / `--rail-muted` | `#211c14` / `#ece7da` / `#a89f8c` | dark nav rail |
-| `--accent` (+`-deep`/`-soft`/`-line`) | `#166a44` (`#0f5233`/`#e7ede0`/`#ccd8c2`) | primary actions, links, active nav, loading |
-| `--ok-dot` | `#1d7a4f` | status: ok |
-| `--run-dot` / `--run-text` | `#a5730f` / `#7d5a0d` | status: in progress |
-| `--red` (+`-deep`/`-soft`/`-line`) | `#9a3b24` (`#8c3018`/`#f6e6de`/`#e6c9bb`) | status: failed, errors |
-| `--off-dot` | `#b5ac99` | status: disabled/neutral |
+- Navigation width: 204px desktop; drawer on narrow screens. Navigation and content share the paper color; a 1px strong rule separates them.
+- Content gutters: 40px desktop, 24px tablet, 18px mobile. Major section rhythm: 40px; table rows: at least 52px.
+- Controls are square (`0px` radius), 38px tall. Dialogs also have square corners. The only circles are status dots and the environment indicator.
+- One-pixel rules provide structure. No drop shadows on cards, buttons, or tables. A dialog uses a single hard `4px 4px 0` offset shadow.
+- Provider choices are ruled rows, not equal-height cards. The connection table is the first content block.
+- Mobile tables become stacked records with the account identity first. Actions wrap below metadata; no horizontal overflow for common operations.
 
-The sanctioned tint pair: `--accent-soft` / `--red-soft` for the notice banner
-and error callouts — feedback surfaces, never decoration.
+### Components
 
-## Structure
+- Page title: one 32px title in the top bar. Sections get a distinct heading only when they introduce a new task; no duplicate “Connections” heading.
+- Primary button: solid signal green. Secondary: transparent with a strong rule. Destructive actions are text/rule and visually separated from routine save.
+- Status: 7px dot plus plain text. “Setup incomplete” and “Needs reconnection” use alert ink; connected uses signal green.
+- Table: one hairline per record, no zebra tint. Name and verified account identity share the first cell; internal ID lives in Manage.
+- Form: labels above inputs, square borders, generous grouping rules. Grants are working rows with permission and expiry metadata.
+- Dialog: flat surface, strong top and bottom rules, hard offset shadow. It must remain usable without visual dependence on the backdrop.
+- Icons: navigation and unlabelled controls only. Never inside a labelled action button.
 
-- **Radius system:** 4px controls (buttons, inputs, callouts, copy fields),
-  3px inline code chips, 6px dialogs, 50% dots. Nothing else.
-- **Hairlines, not cards.** Sections separate by 1px `--line`; structural rules
-  (under the topbar, under table headers, the metrics baseline) are 1px
-  `--line-strong`.
-- **One shadow idiom per surface:** the dialog's ambient
-  `0 24px 64px rgba(33,28,20,.22)`; the mobile drawer's while open. Nothing else.
-- **Dark rail, paper canvas.** The rail is `--rail` with a 2px green active
-  marker; the canvas is `--paper`. The rail is navigation, never content.
-- Table rows ~46px; content column unbounded within `main`'s 32px gutters.
+### Banned tells
 
-## Components
+Dark sidebar against a light page; equal metric cards; uniform rounded rectangles; pastel status pills; eyebrow text above every heading; decorative icons in labelled buttons; generic explainer copy; gradients; glass effects; repeated shadows; equal-size provider cards above account data.
 
-- **Status language:** one pattern everywhere — 7px dot + lowercase word
-  (`.status ok/run/err/off`). No chips, no pills, no background.
-- **Buttons:** 40px tall. Primary: `--accent` fill, paper text, hover
-  `--accent-deep`. Secondary: 1px `--line-strong`, transparent, hover wash.
-  Text links: `--accent`, underline on hover. No icons inside labelled buttons.
-- **Metrics:** an inline baseline row (sans label + mono value), not cards.
-- **Tables:** sentence-case 11.5px muted headers on a `--line-strong` rule;
-  13px body cells; mono for machine values; row hover `rgba(35,31,23,.035)`;
-  clickable rows open dialogs.
-- **Inputs:** 1px `--line-strong`, `--surface` fill, 4px radius; mono for
-  machine input (`.mono-input`); focus = 2px `--accent` outline, offset 0.
-- **Dialogs:** `--surface` card, 1px `--line-strong`, 6px radius, ambient
-  shadow; header / body / actions bands with hairlines between.
-- **Icons** (lucide) only where they carry information: nav, refresh / menu /
-  logout / close / copy, the text-link arrow. Never inside labelled buttons.
-- **Login, forbidden and `/auth/error`:** paper canvas, centered 400px panel —
-  Plex Sans wordmark 34px, muted sub-line, hairline-topped content block, mono
-  foot line `eu-west-1 · single-operator control plane`. No brand-letter tile,
-  no split-screen brand panel.
-- **Loading:** a single 2px `--accent` band pulsing across the top. **Mobile
-  (≤560):** tables become stacked ledger rows — identity first, then labelled
-  slots (`data-label`); the rail becomes a drawer.
+## Verification
 
-## The designer canvas (binding for `designer/src/` and the console's designer view)
-
-The canvas is the view. The designer section fills the viewport under the
-console topbar exactly — `calc(100dvh - var(--topbar-h))`, flex column, iframe
-`flex: 1; min-height: 0`. The page never scrolls and no paper band shows below
-the frame; any new chrome must be paid for by removing old chrome.
-
-- **One chrome row per side.** Console side: the topbar only — its `h1` becomes
-  the open workflow's id in mono while the designer view is active, and
-  "Edit on GitHub" lives in the topbar actions. No section-head over the
-  canvas; the nav rail is the way back. Designer side: one slim bar carrying
-  the workflow id input (placeholder-labelled), the enabled toggle, save
-  status inline, and the save button.
-- **Machine voice:** workflow id, event names, filter field/value, action ids
-  render in IBM Plex Mono — in the h1, in inputs, in panel summaries.
-- **Properties panel:** identity first — a kind marker (2px rule in the node's
-  canvas color: trigger amber, action green), the kind as `h2`, then a mono
-  summary line of what the node is. Fields group under 11.5px muted
-  sentence-case group titles separated by hairlines (`--section-border`), in
-  the table-header idiom — never boxed cards, never tint chips. Filter rows
-  get real widths; "Add filter" is a dashed quiet row, not a filled button.
-  Nothing selected shows a hint block with the canvas gestures, not filler.
-- **Banned in the designer:** page-scrolling canvas views, stacked explainer
-  bands above the canvas, duplicate workflow-name bands, icons inside labelled
-  buttons (Save / Push / New workflow included), sans-serif machine inputs.
-
-## The designer canvas (binding for `designer/src/` and the console's designer view)
-
-The canvas is the view. The designer section fills the viewport under the
-console topbar exactly — `calc(100dvh - var(--topbar-h))`, flex column, iframe
-`flex: 1; min-height: 0`. The page never scrolls and no paper band shows below
-the frame; any new chrome must be paid for by removing old chrome.
-
-- **One chrome row per side.** Console side: the topbar only — its `h1` becomes
-  the open workflow's id in mono while the designer view is active, and
-  "Edit on GitHub" lives in the topbar actions. No section-head over the
-  canvas; the nav rail is the way back. Designer side: one slim bar carrying
-  the workflow id input (placeholder-labelled), the enabled toggle, save
-  status inline, and the save button.
-- **Machine voice:** workflow id, event names, filter field/value, action ids
-  render in IBM Plex Mono — in the h1, in inputs, in panel summaries.
-- **Properties panel:** identity first — a kind marker (2px rule in the node's
-  canvas color: trigger amber, action green), the kind as `h2`, then a mono
-  summary line of what the node is. Fields group under 11.5px muted
-  sentence-case group titles separated by hairlines (`--section-border`), in
-  the table-header idiom — never boxed cards, never tint chips. Filter rows
-  get real widths; "Add filter" is a dashed quiet row, not a filled button.
-  Nothing selected shows a hint block with the canvas gestures, not filler.
-- **Banned in the designer:** page-scrolling canvas views, stacked explainer
-  bands above the canvas, duplicate workflow-name bands, icons inside labelled
-  buttons (Save / Push / New workflow included), sans-serif machine inputs.
+Render the real HTML, CSS, and JS at desktop and mobile widths. Capture login/forbidden, Overview, Connections (including add picker and pending/connected states), a management dialog, the grants dialog, and a mobile table. Check the attack list against the images, then smoke-check navigation, picker, dialogs, grant save/revoke, token revoke, and browser console errors. The designer iframe keeps its full-height canvas behavior and gets a navigation smoke check; its own editor visual system is outside this console reskin.
