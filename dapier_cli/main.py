@@ -36,7 +36,8 @@ def build_parser():
     connect_p.add_argument("--timeout", type=int, default=300)
     create_p = conn_sub.add_parser("create", help="Provision a new OAuth connection before consent")
     create_p.add_argument("connection_id")
-    create_p.add_argument("--provider", required=True, choices=("google", "youtube", "dropbox"))
+    create_p.add_argument("--provider", required=True,
+                          choices=("google", "youtube", "dropbox", "zoom"))
     create_p.add_argument("--display-name", default=None)
     create_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
     create_p.add_argument("--root-path", default=None, help="Dropbox only: listing root")
@@ -112,7 +113,7 @@ def build_parser():
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
     oac_sub.add_parser("list", help="Show the configured shared OAuth clients (no secrets)")
     oac_set_p = oac_sub.add_parser("set", help="Store the shared OAuth client for a provider")
-    oac_set_p.add_argument("provider", help="dropbox, google, or youtube")
+    oac_set_p.add_argument("provider", help="dropbox, google, youtube, or zoom")
     oac_set_p.add_argument("--client-id", required=True)
     oac_set_p.add_argument("--client-secret-file", required=True,
                            help="File with the client secret, or - for stdin")
