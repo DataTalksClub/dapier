@@ -7,7 +7,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Google | [Google Calendar, YouTube, Drive, Docs, and Sheets](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
 | Dropbox | [Dropbox](dropbox.md) | `dropbox` | OAuth |
 | Slack | [Slack](slack.md) | `slack` | Pasted bot or user token |
-| Zoom | [Zoom](zoom.md) | `zoom` | Webhook Secret Token |
+| Zoom | [Zoom](zoom.md) | `zoom` (recording webhook), `zoom-api` (OAuth example) | OAuth for API access; webhook token for recordings |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle
 procedures. A connection is a named record (`connection_id`, provider, display
@@ -18,21 +18,23 @@ token and checks the agent's grant before using it.
 
 ## Shared OAuth client credentials
 
-Google connectors share one Google OAuth client; Dropbox has its own OAuth
-client. Configure each client once in the provider console, then save its ID
-and secret with `dapier oauth-clients set`. The values are stored in the
-credentials table and take effect immediately; no redeploy is needed.
+Google connectors share one Google OAuth client; Dropbox and Zoom each have a
+separate OAuth client. Configure each client once in its provider console,
+then save its ID and secret with `dapier oauth-clients set`. The values are
+stored in the credentials table and take effect immediately; no redeploy is
+needed.
 
-The redirect URI for both provider clients is exactly:
+The redirect URI for these OAuth clients is exactly:
 
 ```
 https://dapier.dtcdev.click/oauth/callback
 ```
 
 For client creation, scope requirements, and the verified state of each
-provider app, see the [Google](google.md) and [Dropbox](dropbox.md) guides.
-YouTube uses the shared Google client. Slack uses a pasted token, and Zoom
-uses a webhook signing token; neither needs an OAuth client.
+provider app, see the [Google](google.md), [Dropbox](dropbox.md), and
+[Zoom](zoom.md) guides. YouTube uses the shared Google client. Slack uses a
+pasted token. Zoom's recording webhook uses a separate signing token in
+addition to its OAuth client for Zoom API access.
 
 Before provider-console work, run `uv run dapier oauth-clients list` in the
 already authenticated CLI session. Reuse configured clients rather than
@@ -49,15 +51,15 @@ a redeploy.
 
 1. In the provider console, open the Dapier app and copy its current client ID.
    For Dropbox, the **App key** is the client ID. For Google, use the `Dapier`
-   Web client in `dtcdev-click`.
+   Web client in `dtcdev-click`. For Zoom, use the OAuth app's **Client ID**.
 2. Copy the matching current secret. Dropbox lets you reveal its current app
    secret. Google does not reveal an existing client secret again; create a
    replacement secret if the value was lost. Use the provider-specific guide
    for the exact console path.
 3. Immediately copy only the fresh secret to the Windows clipboard and run
    the matching command below in PowerShell. Replace the Dropbox example's
-   key with the current app key if it changed. For Google, use the Google
-   client ID and change `dropbox` to `google`.
+   key with the current app key if it changed. For Google or Zoom, use that
+   OAuth client ID and change `dropbox` to `google` or `zoom`.
 
 ```powershell
 $secret = Get-Clipboard -Raw
@@ -98,7 +100,9 @@ The deploy-time environment (`GOOGLE_OAUTH_CLIENT_ID` /
 `DROPBOX_OAUTH_CLIENT_SECRET`) remains a fallback for a fresh stack. Export
 the variables before `make deploy` when the deployment should seed or rotate
 them; omit them and CloudFormation keeps the previous values. Values set in
-the console/CLI take precedence.
+the console/CLI take precedence. The current deploy script does not seed the
+Zoom OAuth client from environment variables; set it at runtime with
+`uv run dapier oauth-clients set zoom` or **Credentials → OAuth clients**.
 
 ## Creating and connecting a provider account
 
@@ -115,7 +119,8 @@ uv run dapier connections create youtube-team --provider youtube \
 uv run dapier connections connect youtube-team --agent <agent-name>
 ```
 
-For Slack or Telegram, import a token with
+For Slack or Telegram, or to set up a Zoom recording webhook, import a token
+with
 `uv run dapier connections import <connection-id> --provider <provider>
 --token-file <private-file>`; use `--display-name` to set its label.
 
@@ -133,14 +138,19 @@ To add or change a scope:
 
 1. Allow the scope in the provider console. Google uses the Cloud project's
    **Google Auth Platform → Data access** scope table. Dropbox uses the app's
-   **Permissions** tab; click **Submit** after changing it. See the
+   **Permissions** tab; click **Submit** after changing it. Zoom uses the
+   OAuth app's **Scopes** page. See the
    [Google scope instructions](google.md#google-cloud-scope-configuration) or
-   [Dropbox permissions instructions](dropbox.md#app-configuration).
+   [Dropbox permissions instructions](dropbox.md#app-configuration) or
+   [Zoom OAuth instructions](zoom.md#zoom-oauth-for-api-access).
 2. Replace the connection's scope list in **Connectors → Edit**, or run:
 
    ```sh
    uv run dapier connections scopes <connection-id> --scopes <scope> [<scope> ...]
    ```
+
+   Zoom OAuth connections currently use the CLI for scope changes; the
+   console's Zoom connection editor manages the recording webhook token.
 
    `uv run dapier connections edit <connection-id>` can also change the
    display name, scopes, or Dropbox root path (`--clear-root-path` selects the
@@ -180,6 +190,7 @@ verification. For the current required scopes by provider, see its guide.
 | Scopes on an existing connection | Console **Connectors → Edit**, or `uv run dapier connections scopes <connection-id> --scopes ...` (`connections edit` also updates scopes) |
 | Scopes allowed by Google consent | Google Cloud project `dtcdev-click` → **Google Auth Platform → Data access** |
 | Scopes allowed by Dropbox | Dropbox App Console → app **Permissions**; also check Full Dropbox vs App Folder access |
+| Scopes allowed by Zoom | Zoom App Marketplace → OAuth app **Scopes** |
 | Scope validation, identity scopes, and provider consent behavior | [`src/dapier/connections/records.py`](../../src/dapier/connections/records.py) and [`src/dapier/connections/providers/oauth_providers.py`](../../src/dapier/connections/providers/oauth_providers.py) |
 | Dropbox file access required by the invoice workflow | [`workflows/dropbox_on_upload.yaml`](../../workflows/dropbox_on_upload.yaml) and its Dropbox actions |
 

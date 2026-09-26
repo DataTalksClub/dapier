@@ -166,13 +166,14 @@ by `connection_id` (the `youtube-slack` workflow posts with `connection_id:
 slack`); actions may still use a raw `credential_id` for global credentials.
 
 OAuth clients are created once in each provider console (Google Cloud project
-`dtcdev-click` for Calendar/YouTube, Dropbox App Console for Dropbox) with the
-redirect URI `https://dapier.dtcdev.click/oauth/callback`. Store them with
+`dtcdev-click` for Calendar/YouTube, Dropbox App Console for Dropbox, and Zoom
+App Marketplace for Zoom API access) with the redirect URI
+`https://dapier.dtcdev.click/oauth/callback`. Store them with
 `uv run dapier oauth-clients set` or in the console under
 **Credentials → OAuth clients** — the values are stored in the credentials
 table and take effect immediately, with no redeploy. YouTube shares the Google
 client. See the [connector guides](docs/connectors/README.md) for the current
-Google consent, test-user, Dropbox access-level, and scope requirements.
+Google consent, test-user, Dropbox access-level, Zoom OAuth, and scope requirements.
 Rotating a Dropbox client there is also how you re-webhook Dropbox: the
 ingress accepts the configured secret and the deploy-time one during a
 rotation window. The deploy-time environment remains a fallback for a fresh
@@ -184,6 +185,11 @@ GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \
 DROPBOX_OAUTH_CLIENT_ID=... DROPBOX_OAUTH_CLIENT_SECRET=... \
   make deploy
 ```
+
+Zoom OAuth credentials are configured at runtime with
+`uv run dapier oauth-clients set zoom` or in **Credentials → OAuth clients**;
+the current deploy script does not seed Zoom OAuth credentials from
+environment variables.
 
 The `CredentialsTableName` and `CredentialsTableArn` stack outputs allow
 authorized consumers such as DataOps to receive exact-table, read-only IAM
@@ -325,8 +331,9 @@ dapier connections create youtube-team --provider youtube --scopes https://www.g
 dapier connections connect youtube-team --agent my-agent   # open consent in Chrome
 dapier connections edit dropbox --root-path /incoming
 dapier connections scopes dropbox --scopes account_info.read files.metadata.read files.content.read files.content.write
-dapier oauth-clients list                    # shared OAuth clients (dropbox/google/youtube)
+dapier oauth-clients list                    # shared OAuth clients (dropbox/google/zoom; youtube shares google)
 dapier oauth-clients set google --client-id my-id --client-secret-file -   # or a file path
+dapier oauth-clients set zoom --client-id my-id --client-secret-file -
 dapier tokens list                           # operator-issued API tokens (no secrets)
 dapier tokens create --name personal-scheduler --agent personal-scheduler
 dapier tokens revoke personal-scheduler
