@@ -366,6 +366,53 @@ def test_admin_duplicate_token_is_conflict(monkeypatch):
     assert second["statusCode"] == 409
 
 
+def test_admin_connection_revoke_route(monkeypatch):
+    from src.dapier.auth import session
+    from src.dapier.connections import tokens as connection_tokens
+
+    connection = {
+        "connection_id": "youtube-personal",
+        "provider": "youtube",
+        "credential_id": "oauth#youtube-personal",
+        "status": "connected",
+    }
+    stored = []
+
+    class Table:
+        def get_item(self, **kwargs):
+            return {"Item": connection}
+
+        def put_item(self, **kwargs):
+            stored.append(kwargs["Item"])
+
+    class Dynamo:
+        def Table(self, _name):
+            return Table()
+
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    monkeypatch.setattr(connection_tokens, "revoke_connection",
+                        lambda item: {**item, "status": "revoked"})
+    cookie = session._sign({
+        "sub": "op@datatalks.club", "subject": "op-1", "exp": int(time.time()) + 600,
+    })
+    path = "/api/admin/connections/youtube-personal/tokens"
+
+    response = admin.route(
+        operator_request("DELETE", path, cookies=[f"dapier_session={cookie}"]),
+        "DELETE", path,
+    )
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {
+        "connection_id": "youtube-personal", "status": "revoked",
+    }
+    assert stored[0]["status"] == "revoked"
+
+
 
 def _configure_runs(monkeypatch, items):
     """Operator session plus a fake executions table for the runs routes."""

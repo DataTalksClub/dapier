@@ -25,7 +25,7 @@ const CONNECT_PROVIDERS = {
     blurb: 'File watchers, uploads, and the invoice pipeline.',
     connectionId: 'dropbox',
     displayName: 'Dropbox',
-    scopes: ['files.metadata.read', 'files.content.read'],
+    scopes: ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write'],
   },
   slack: {
     label: 'Slack',
@@ -192,11 +192,13 @@ function renderConnections(connections) {
   $('#connection-table').innerHTML = connections.map((connection) => {
     const reconnect = TOKEN_PROVIDERS.includes(connection.provider) ? ''
       : `<a class="button secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" target="_blank" rel="noopener">${['connected', 'expired'].includes(connection.status) ? 'Reconnect' : 'Connect'}</a>`;
+    const revoke = !TOKEN_PROVIDERS.includes(connection.provider) && ['connected', 'expired'].includes(connection.status)
+      ? `<button class="button secondary connection-revoke" data-connection="${escapeHtml(connection.connection_id)}" type="button">Revoke</button>` : '';
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
     <td data-label="Status">${statusLine(connection.status, CONNECTION_STATUS_LABELS)}</td>
-    <td class="action-cell">${reconnect}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button></td>
+    <td class="action-cell">${reconnect}${revoke}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button></td>
   </tr>`;
   }).join('');
   $$('.connection-oauth').forEach((link) => link.addEventListener('click', (event) => {
@@ -207,6 +209,15 @@ function renderConnections(connections) {
     watchOAuthPopup(popup);
   }));
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  $$('.connection-revoke').forEach((button) => button.addEventListener('click', async () => {
+    const connectionId = button.dataset.connection;
+    if (!window.confirm(`Revoke provider tokens for ${connectionId}? Reconnect it to use this connection again.`)) return;
+    try {
+      await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/tokens`, { method: 'DELETE' });
+      notice(`Revoked ${connectionId}. Reconnect it to use the connection again.`);
+      await refresh();
+    } catch (error) { notice(error.message, true); }
+  }));
 }
 
 export { TOKEN_PROVIDERS, TOKEN_PROVIDER_META, renderConnections, nextConnectionId, notice };

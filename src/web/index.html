@@ -314,7 +314,7 @@
       <div class="dialog-body">
         <p id="edit-connection-meta" class="sub mono"></p>
         <label>Display name<input name="display_name" maxlength="100" required></label>
-        <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Applied the next time you reconnect.</small></label>
+          <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Requested on the next reconnect. Revoke the old token before reducing scopes.</small></label>
         <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">Dropbox only: the folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
         <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
         <p id="edit-connection-error" class="form-error" role="alert"></p>

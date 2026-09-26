@@ -31,13 +31,35 @@ immediately — no redeploy.
 ### Google (Calendar + YouTube)
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   and pick (or create) the project Dapier should authenticate against.
-2. **APIs & Services → Library**: enable **Google Calendar API** and
-   **YouTube Data API v3** (enable only what you use).
-3. **APIs & Services → OAuth consent screen**: configure the app, add your
-   DTC accounts as test users if the app is still in *Testing* mode.
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID**,
-   type **Web application**. Under *Authorized redirect URIs* add exactly:
+   and select the `dtcdev-click` project.
+2. In **APIs & Services → Library**, enable **Google Calendar API** and
+   **YouTube Data API v3** before editing consent scopes. The scope picker only
+   offers scopes for APIs already enabled in the project.
+3. Open **Google Auth Platform → Audience**. The `dtcdev-click` app is External
+   and in *Testing* mode. Under **Test users**, click **Add users**, enter
+   `alexey.s.grigoriev@gmail.com`, press **Enter** so it becomes a chip, then
+   click **Save**. Add any other account only if it also needs to authorize a
+   Dapier connection.
+   The project-wide consent branding currently says `DTC`; it is shared with
+   existing OAuth clients, so don't change it just for Dapier.
+4. Open **Google Auth Platform → Data access** and click **Add or remove
+   scopes**. Ensure the exact Dapier scopes listed below are present in the
+   project-wide scope table:
+   `https://www.googleapis.com/auth/calendar.freebusy`,
+   `https://www.googleapis.com/auth/calendar.events.owned`,
+   `https://www.googleapis.com/auth/userinfo.email`, and
+   `https://www.googleapis.com/auth/youtube.readonly`. Keep this project-wide
+   list in sync with the connection scopes below. Do not remove scopes that
+   another client in this project still uses. See Google's [consent and scope
+   setup guide](https://developers.google.com/workspace/guides/configure-oauth-consent)
+   and [OAuth policies](https://developers.google.com/identity/protocols/oauth2/policies).
+   In the scope dialog, choose **Add to table**, then **Update**; back on the
+   Data access page, click **Save** to persist the change.
+5. In **Google Auth Platform → Clients**, select the existing `Dapier` client
+   if present; otherwise click **Create client**, choose **Web application**,
+   and create a client named `Dapier`. Don't modify the existing `DTC DEV Auth`
+   client, whose redirect URI is for `auth.dtcdev.click`. Under *Authorized
+   redirect URIs* add exactly:
 
    ```
    https://dapier.dtcdev.click/oauth/callback
@@ -45,26 +67,116 @@ immediately — no redeploy.
 
    This URI is fixed — it comes from the stack's `OAUTH_CALLBACK_URL` and both
    the console and the CLI drive consent through it.
-5. Copy the **client ID** and **client secret**.
-6. In the Dapier console open **Credentials → OAuth clients**, click
-   **Set up** on the *Google (also YouTube)* row, paste both values, save.
+6. Copy the new **client ID** and **client secret**. Google's console won't
+   show the secret again later. Store it immediately through the authenticated
+   CLI; the secret is read from stdin, not typed into the command line:
+
+   ```powershell
+   Get-Clipboard -Raw | uv run dapier oauth-clients set google --client-id '<client-id>' --client-secret-file -
+   Set-Clipboard -Value ''
+   ```
+
+   Copy only the secret before running the pipeline. The command strips the
+   clipboard's trailing newline. Clear the clipboard after storage.
 
 ### Dropbox
 
 1. Open the [Dropbox App Console](https://www.dropbox.com/developers/apps) and
-   **Create app** (scoped access, app folder or full Dropbox as the workflows
-   need).
-2. On the **Permissions** tab grant `files.metadata.read` and
-   `files.content.read` (plus `files.content.write` if workflows upload).
-3. On the **Settings** tab add the same redirect URI:
-   `https://dapier.dtcdev.click/oauth/callback`.
-4. Copy the **App key** and **App secret**.
-5. In the Dapier console, **Credentials → OAuth clients → Set up** on the
-   *Dropbox* row, paste both values, save.
+   open **My apps**. Select the existing **Dapier DTC Dev** app if present;
+   otherwise create it with these settings: choose **Scoped access** for the
+   API type and **Full Dropbox** for the access type. The enabled
+   `dropbox_on_upload`
+   workflow watches `/_dtc_paperwork/income-invoices/` and deletes each
+   processed file, so the current workflow needs **Full Dropbox** access; an
+   app-folder app cannot reach that root-level path. Dropbox treats access type
+   (App Folder vs Full Dropbox) separately from scopes, and changing access
+   type requires deleting and recreating an app; create a separate Full Dropbox
+   app if the existing app is App Folder. The new-app form requires checking
+   **I agree to the Dropbox API Terms and Conditions** before it will create
+   the app. See Dropbox's [App Console
+   guide](https://docs.dropboxapi.com/dropbox-api/docs/get-started/tutorial/app-console)
+   and [content access and scope guide](https://docs.dropboxapi.com/dropbox-api/docs/oauth).
+   Use app-folder access only after moving the workflow's Dropbox paths under
+   the app folder.
+2. On **Permissions**, grant `files.metadata.read`, `files.content.read`,
+   and `files.content.write`; `account_info.read` is enabled by default and
+   may appear checked but disabled. Click **Submit** at the bottom to save
+   scope changes. Dapier uses `account_info.read` to verify the connected
+   account; the enabled workflow needs `files.content.write` to delete
+   processed files.
+3. On **Settings**, under **OAuth 2 → Redirect URIs**, add exactly
+   `https://dapier.dtcdev.click/oauth/callback` and click **Add** to commit the
+   URI.
+4. Copy the **App key**. Click **Show** beside **App secret**, then copy the
+   secret. Store both immediately through the authenticated CLI:
+
+   ```powershell
+   Get-Clipboard -Raw | uv run dapier oauth-clients set dropbox --client-id '<app-key>' --client-secret-file -
+   Set-Clipboard -Value ''
+   ```
+
+   Copy only the app secret before running the pipeline, then clear the
+   clipboard. Dapier reports whether a client is configured but never shows
+   the saved secret again.
+
+### Setup notes for the next run
+
+- Use the existing signed-in Chrome session and authenticated `uv run dapier`
+  CLI. Start with `uv run dapier oauth-clients list`; reuse the existing
+  provider clients when configured instead of creating duplicates.
+- Use the current **Google Auth Platform** navigation. The older **APIs &
+  Services → OAuth consent screen** entry may redirect to Auth Platform
+  Overview; use **Audience**, **Data access**, and **Clients** in its menu.
+- The Google console can show a blank content pane briefly while a section
+  loads. Wait a few seconds before retrying navigation; a short blank state did
+  not mean the project or page was unavailable.
+- Enable Calendar and YouTube APIs before adding scopes. Adding a scope has
+  three commits: **Add to table → Update → Save**. Adding a test user also
+  needs **Enter** to turn the address into a chip before **Save**.
+- If Dropbox asks for a passkey during sign-in and offers **Set up later**, use
+  that option to continue the existing session. An initially empty **My apps**
+  page means there is no app in that account yet; create the dedicated app
+  described above.
+- Dropbox scope changes are not saved by toggling permissions alone; click
+  **Submit**. A redirect URI must also be committed from **Settings** after
+  adding it.
+- Before starting, run `uv run dapier oauth-clients list`; afterward run it
+  again and confirm Google and Dropbox both say **configured**. This verifies
+  storage without exposing either secret.
+- Setting shared OAuth clients does not connect a Google or Dropbox account.
+  Each account still needs **Connectors → Create new** and provider consent.
+- Keep the existing `DTC` consent branding and `DTC DEV Auth` client
+  unchanged. Use the dedicated Dapier client and callback URI above.
+
+### Approval for repeating the DTC Dev setup
+
+The user explicitly authorized repeating the following configuration without
+asking again, including accepting the Dropbox API Terms checkbox at app
+creation:
+
+- Google Cloud project `dtcdev-click`, External / Testing app, test user
+  `alexey.s.grigoriev@gmail.com`, scopes
+  `https://www.googleapis.com/auth/calendar.freebusy`,
+  `https://www.googleapis.com/auth/calendar.events.owned`,
+  `https://www.googleapis.com/auth/userinfo.email`, and
+  `https://www.googleapis.com/auth/youtube.readonly`; dedicated Web client
+  `Dapier` with callback `https://dapier.dtcdev.click/oauth/callback`.
+- The same Dropbox account, `Dapier DTC Dev`, Scoped access / Full Dropbox,
+  scopes `account_info.read`, `files.metadata.read`, `files.content.read`,
+  and `files.content.write`, with callback
+  `https://dapier.dtcdev.click/oauth/callback`.
+
+This approval is limited to these accounts, app names, access type, scopes, and
+callback. Ask for fresh direction if Dropbox terms materially change, or if
+the account, app, access type, or scopes differ. Store secrets only through the
+authenticated CLI command above; verify configuration with
+`uv run dapier oauth-clients list`.
 
 ### Notes
 
 - **YouTube shares the Google client** — one Google entry covers both.
+- `uv run dapier oauth-clients list` reports whether each client is configured
+  without returning client secrets.
 - The deploy-time environment (`GOOGLE_OAUTH_CLIENT_ID`/`..._SECRET`,
   `DROPBOX_OAUTH_CLIENT_ID`/`..._SECRET` exported before `make deploy`)
   remains a fallback so a fresh stack works before anyone configures anything.
@@ -82,6 +194,19 @@ Slack needs no OAuth client at all — see section 3.
 The console's **Connectors** view shows one **Create new** card per connector.
 Creating never clobbers an existing connection: Dapier derives the first free
 ID (`google-calendar`, then `google-calendar-2`, …).
+
+The CLI can provision OAuth connection metadata and then open the same provider
+consent flow:
+
+```sh
+uv run dapier connections create youtube-team --provider youtube \
+  --scopes https://www.googleapis.com/auth/youtube.readonly
+uv run dapier connections connect youtube-team --agent <agent-name>
+```
+
+For Slack or Telegram, create or replace a connection with
+`uv run dapier connections import <connection-id> --provider <provider>
+--token-file <private-file>`; add `--display-name` to set its label.
 
 ### Google Calendar, step by step
 
@@ -106,9 +231,91 @@ ID (`google-calendar`, then `google-calendar-2`, …).
 ### Dropbox, step by step
 
 1. **Connectors → Dropbox → Create new.**
-2. Approve the consent screen (`files.metadata.read`, `files.content.read`).
-   Dapier always requests offline access, so the refresh token is long-lived.
+2. Approve the consent screen (`account_info.read`, `files.metadata.read`,
+   `files.content.read`, `files.content.write`). Dapier always requests offline
+   access, so the refresh token is long-lived.
 3. The connection turns **connected** and records the Dropbox account ID.
+
+### Changing requested scopes
+
+Scopes are configured in two places. The provider project/app must allow each
+scope, and each Dapier connection requests only the scopes it needs. The OAuth
+client ID and secret do not contain the scope list.
+
+To add a scope:
+
+1. Enable the provider scope first. In Google Cloud, use **Google Auth
+   Platform → Data access**. In Dropbox, use the app's **Permissions** tab and
+   save/submit the changes. Dropbox app permissions set the scopes the app may
+   request; Dapier sends the connection's selected scope list during consent.
+2. In Dapier open **Connectors → Edit** and replace the connection's scope list,
+   or use the CLI. The focused command is:
+
+   ```sh
+   uv run dapier connections scopes <connection-id> --scopes <scope> [<scope> ...]
+   ```
+
+   The general `uv run dapier connections edit <connection-id>` command can
+   also change `--display-name`, `--scopes`, or a Dropbox `--root-path` (use
+   `--clear-root-path` to list from the Dropbox root).
+
+   For example, to add Dropbox write access to the current standard scopes:
+
+   ```sh
+   uv run dapier connections scopes dropbox --scopes account_info.read \
+     files.metadata.read files.content.read files.content.write
+   ```
+
+3. Reconnect the connection and approve the updated consent request. From the
+   console use **Reconnect**; from the CLI run
+   `uv run dapier connections connect <connection-id> --agent <agent-name>`.
+   The Dapier connection stores the requested scope list separately from the
+   OAuth client credentials. Changing a preset affects newly created
+   connections only; edit existing connections explicitly.
+
+To remove a scope, update the Dapier connection list, revoke its old token, and
+reconnect it so the provider issues a token for the reduced access:
+
+```sh
+uv run dapier connections scopes <connection-id> --scopes <remaining-scope> [<scope> ...]
+uv run dapier connections revoke <connection-id>
+uv run dapier connections connect <connection-id> --agent <agent-name>
+```
+
+The console's **Revoke** action does the same as `connections revoke`. Keep
+required identity scopes: Google Calendar needs
+`https://www.googleapis.com/auth/userinfo.email`, YouTube needs a channel scope
+such as `https://www.googleapis.com/auth/youtube.readonly`, and Dropbox needs
+`account_info.read` for account verification. Dropbox file watching needs
+`files.metadata.read`; reading files needs `files.content.read`; uploading or
+deleting files needs `files.content.write`.
+
+### Where to make future scope changes
+
+Use this map when a provider or workflow needs another permission:
+
+| Change | Update |
+|--------|--------|
+| Default scopes on newly created connections | `CONNECT_PROVIDERS` in [`src/web/js/views/connections.js`](../src/web/js/views/connections.js) |
+| Scopes on an existing connection | Console **Connectors → Edit**, or `uv run dapier connections scopes <connection-id> --scopes <scope> [<scope> ...]` (`connections edit` can also update scopes) |
+| Scopes allowed by Google consent | Google Cloud project `dtcdev-click` → **Google Auth Platform → Data access** |
+| Scopes allowed by Dropbox | Dropbox App Console → app **Permissions**; check the app's Full Dropbox vs App Folder access type too |
+| Scope validation, identity scopes, and provider consent behavior | [`src/dapier/connections/records.py`](../src/dapier/connections/records.py) and [`src/dapier/connections/providers/oauth_providers.py`](../src/dapier/connections/providers/oauth_providers.py) |
+| File access the invoice workflow needs | [`workflows/dropbox_on_upload.yaml`](../workflows/dropbox_on_upload.yaml) and its Dropbox actions |
+
+After changing an existing connection's scopes, reconnect it. To reduce
+permissions, first update the requested list, run `uv run dapier connections
+revoke <connection-id>`, then reconnect; revocation attempts provider-side
+token revocation and clears Dapier's stored tokens. Check all workflows using
+that connection before removing a scope. The Dropbox [get current account
+endpoint](https://docs.dropboxapi.com/dropbox-api/api-reference/user-endpoints/users/get-current-account)
+requires `account_info.read` for Dapier's identity verification.
+
+For Dropbox, adding an app permission does not add it to tokens already issued;
+those connections must reconnect. For Google, update **Data access** to match
+the scopes the app requests. Published External apps may need Google's review
+for sensitive or restricted scopes. The current `dtcdev-click` app remains in
+Testing, so every account that completes consent must be in its test-user list.
 
 ### Expected-account binding (optional)
 

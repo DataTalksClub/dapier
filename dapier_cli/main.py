@@ -34,6 +34,22 @@ def build_parser():
     connect_p.add_argument("connection_id")
     connect_p.add_argument("--agent", required=True)
     connect_p.add_argument("--timeout", type=int, default=300)
+    create_p = conn_sub.add_parser("create", help="Provision a new OAuth connection before consent")
+    create_p.add_argument("connection_id")
+    create_p.add_argument("--provider", required=True, choices=("google", "youtube", "dropbox"))
+    create_p.add_argument("--display-name", default=None)
+    create_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
+    create_p.add_argument("--root-path", default=None, help="Dropbox only: listing root")
+    edit_p = conn_sub.add_parser("edit", help="Edit connection display name, scopes, or Dropbox path")
+    edit_p.add_argument("connection_id")
+    edit_p.add_argument("--display-name", default=None)
+    edit_p.add_argument("--scopes", nargs="+", default=None, metavar="SCOPE")
+    root_group = edit_p.add_mutually_exclusive_group()
+    root_group.add_argument("--root-path", default=None, help="Dropbox only: listing root")
+    root_group.add_argument("--clear-root-path", action="store_true", help="Dropbox only: list from the Dropbox root")
+    scopes_p = conn_sub.add_parser("scopes", help="Replace a connection's requested OAuth scopes")
+    scopes_p.add_argument("connection_id")
+    scopes_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
     import_p = conn_sub.add_parser("import", help="One-time operator import of an existing credential")
     import_p.add_argument("connection_id")
     import_p.add_argument("--provider", required=True)
@@ -45,6 +61,7 @@ def build_parser():
                           help="Refresh-token JSON for OAuth providers")
     import_p.add_argument("--token-file", default=None,
                           help="Pasted provider token for slack/telegram connections")
+    import_p.add_argument("--display-name", default=None)
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])
     import_p.add_argument("--root-path", default=None,
@@ -256,12 +273,26 @@ def cmd_connections(args, api_url, debug):
         return commands.connections_show(api_url, args.connection_id, args.agent, debug)
     if args.command == "connect":
         return commands.connections_connect(api_url, args.connection_id, args.agent, args.timeout, debug)
+    if args.command == "create":
+        return commands.connections_create(
+            api_url, args.connection_id, args.provider, args.scopes,
+            display_name=args.display_name, root_path=args.root_path, debug=debug,
+        )
+    if args.command == "edit":
+        root_path = "" if args.clear_root_path else args.root_path
+        return commands.connections_edit(
+            api_url, args.connection_id, display_name=args.display_name,
+            scopes=args.scopes, root_path=root_path, debug=debug,
+        )
+    if args.command == "scopes":
+        return commands.connections_scopes(api_url, args.connection_id, args.scopes, debug)
     if args.command == "import":
         return commands.connections_import(
             api_url, args.connection_id, args.provider, args.client_id,
             args.client_secret_file, args.authorized_user_file,
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
             token_path=args.token_file, root_path=args.root_path,
+            display_name=args.display_name,
         )
     if args.command == "revoke":
         return commands.connections_revoke(api_url, args.connection_id, debug)

@@ -256,6 +256,8 @@ def show_connection(event, connection_id):
     connection = connections.get_connection(connections_table, connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
+    if _is_operator(event, subject):
+        return _json_response(200, connections.public_view(connection))
     if agent:
         try:
             authz.validate_agent(agent)
@@ -283,6 +285,85 @@ def show_connection(event, connection_id):
     return _json_response(200, connections.public_view(connection))
 
 
+def create_connection(event):
+    """Operator-only provision of an OAuth connection before consent."""
+    subject, error = require_operator(event, audit.CONNECT)
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path"}
+    if not isinstance(body, dict) or not {"connection_id", "provider"} <= set(body) or set(body) - allowed:
+        return _json_response(400, {"error": "Provide connection_id, provider, and supported connection fields"})
+    try:
+        fields = connections.validate_new_connection(body)
+    except connections.ConnectionError as exc:
+        return _json_response(400, {"error": str(exc)})
+    if fields["provider"] in connections.TOKEN_PROVIDERS:
+        return _json_response(400, {"error": "Token providers must be created with connections import and a verified token"})
+
+    connections_table, _ = _tables()
+    if connections.get_connection(connections_table, fields["connection_id"]):
+        return _json_response(409, {"error": "Connection already exists"})
+    item = connections.build_item(fields, owner_subject=subject)
+    connections.put_connection(connections_table, item)
+    audit.emit(item["connection_id"], audit.CONNECT, subject, outcome="created")
+    return _json_response(200, connections.public_view(item))
+
+
+def update_connection_metadata(event, connection_id, *, scopes_only=False):
+    """Operator-only edit of a connection's display name, scopes, or Dropbox path."""
+    subject, error = require_operator(event, audit.CONNECT)
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    allowed = {"scopes"} if scopes_only else {"display_name", "scopes", "root_path"}
+    if not isinstance(body, dict) or not body or set(body) - allowed:
+        return _json_response(400, {"error": "Provide supported connection fields"})
+    if scopes_only and set(body) != {"scopes"}:
+        return _json_response(400, {"error": "Provide only the requested scopes"})
+    if "scopes" in body and (
+        not isinstance(body["scopes"], list)
+        or not all(isinstance(scope, str) for scope in body["scopes"])
+    ):
+        return _json_response(400, {"error": "Scopes must be a list of strings"})
+
+    connections_table, _ = _tables()
+    previous = connections.get_connection(connections_table, connection_id)
+    if not previous:
+        return _json_response(404, {"error": "Connection not found"})
+    if previous.get("provider") in connections.TOKEN_PROVIDERS and "scopes" in body:
+        return _json_response(400, {"error": "This provider carries its scopes in the supplied token"})
+    try:
+        fields = connections.validate_new_connection({
+            "connection_id": connection_id,
+            "provider": previous.get("provider"),
+            "display_name": body.get("display_name", previous.get("display_name") or connection_id),
+            "scopes": body.get("scopes", previous.get("scopes") or []),
+            "expected_account_id": previous.get("expected_account_id"),
+            "root_path": body.get("root_path", previous.get("root_path") or ""),
+        })
+        item = connections.build_item(fields, owner_subject=subject, previous=previous)
+    except connections.BindingError as exc:
+        return _json_response(409, {"error": str(exc)})
+    except connections.ConnectionError as exc:
+        return _json_response(400, {"error": str(exc)})
+
+    connections.put_connection(connections_table, item)
+    audit.emit(connection_id, audit.CONNECT, subject, outcome="ok")
+    return _json_response(200, connections.public_view(item))
+
+
+def update_connection_scopes(event, connection_id):
+    """Backward-compatible focused route for replacing requested scopes."""
+    return update_connection_metadata(event, connection_id, scopes_only=True)
+
+
 def route(event, method, path):
     if method == "GET" and path == "/api/agent/config":
         return public_config()
@@ -300,9 +381,16 @@ def route(event, method, path):
         return issue_token(event)
     if method == "GET" and path == "/api/agent/connections":
         return list_for_caller(event)
+    if method == "PUT" and path == "/api/agent/connections":
+        return create_connection(event)
     match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)", path)
     if match and method == "GET":
         return show_connection(event, match.group(1))
+    if match and method == "PUT":
+        return update_connection_metadata(event, match.group(1))
+    scopes_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/scopes", path)
+    if scopes_match and method == "PUT":
+        return update_connection_scopes(event, scopes_match.group(1))
     connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
     if connect_match and method == "POST":
         return start_connect(event, connect_match.group(1))

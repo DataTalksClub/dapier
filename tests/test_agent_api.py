@@ -50,7 +50,7 @@ class Table:
         if "grantee" in item:
             self.items[(item["connection_id"], item["grantee"])] = item
         else:
-            self.items[item.get("credential_id") or item.get("connection_id")
+            self.items[item.get("connection_id") or item.get("credential_id")
                        or item.get("token_hash")] = item
 
     def update_item(self, **kwargs):
@@ -249,6 +249,7 @@ def test_list_and_show_require_grants(monkeypatch):
     configure(monkeypatch, claims={"sub": "subject-1"},
               connections={"youtube-personal": CONNECTION},
               grants={("youtube-personal", "subject-1#buildcamp-uploader"): GRANT})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
 
     listed = agent_api.route(event(), "GET", "/api/agent/connections")
     assert listed["statusCode"] == 200
@@ -275,6 +276,96 @@ def test_list_and_show_require_grants(monkeypatch):
     assert agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["statusCode"] == 404
 
 
+def test_update_connection_scopes_preserves_existing_connection(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+                       connections={"youtube-personal": CONNECTION})
+    scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
+
+    response = agent_api.route(
+        event({"scopes": scopes}), "PUT", "/api/agent/connections/youtube-personal/scopes",
+    )
+
+    assert response["statusCode"] == 200
+    view = json.loads(response["body"])
+    assert view["scopes"] == scopes
+    assert view["granted_scopes"] == CONNECTION["granted_scopes"]
+    stored = tables["connections"].items["youtube-personal"]
+    assert stored["status"] == CONNECTION["status"]
+    assert stored["verified_account_id"] == CONNECTION["verified_account_id"]
+
+
+def test_operator_can_create_and_edit_oauth_connection_metadata(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
+    created = agent_api.route(
+        event({"connection_id": "youtube-team", "provider": "youtube",
+               "display_name": "Team YouTube", "scopes": scopes}),
+        "PUT", "/api/agent/connections",
+    )
+    assert created["statusCode"] == 200
+    assert json.loads(created["body"])["status"] == "ready"
+
+    edited = agent_api.route(
+        event({"display_name": "DTC YouTube", "scopes": scopes}),
+        "PUT", "/api/agent/connections/youtube-team",
+    )
+    assert edited["statusCode"] == 200
+    view = json.loads(edited["body"])
+    assert view["display_name"] == "DTC YouTube"
+    assert view["scopes"] == scopes
+    assert tables["connections"].items["youtube-team"]["status"] == "ready"
+
+
+def test_operator_can_show_connection_without_agent_grant(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+    response = agent_api.route(
+        event(), "GET", "/api/agent/connections/youtube-personal",
+    )
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["connection_id"] == "youtube-personal"
+
+
+def test_create_connection_rejects_duplicate_and_token_provider(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+    duplicate = agent_api.route(
+        event({"connection_id": "youtube-personal", "provider": "youtube",
+               "scopes": ["https://www.googleapis.com/auth/youtube.readonly"]}),
+        "PUT", "/api/agent/connections",
+    )
+    assert duplicate["statusCode"] == 409
+    token_provider = agent_api.route(
+        event({"connection_id": "slack-team", "provider": "slack"}),
+        "PUT", "/api/agent/connections",
+    )
+    assert token_provider["statusCode"] == 400
+
+
+def test_update_connection_scopes_validates_operator_and_request(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"},
+              connections={"youtube-personal": CONNECTION})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    path = "/api/agent/connections/youtube-personal/scopes"
+    assert agent_api.route(event({"scopes": ["x"]}), "PUT", path)["statusCode"] == 403
+
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": CONNECTION})
+    assert agent_api.route(event({"scopes": "not-a-list"}), "PUT", path)["statusCode"] == 400
+    assert agent_api.route(event({"scopes": []}), "PUT", path)["statusCode"] == 400
+    assert agent_api.route(event({"scopes": ["x"]}), "PUT",
+                           "/api/agent/connections/missing/scopes")["statusCode"] == 404
+
+    token_connection = {
+        **CONNECTION, "connection_id": "slack-team", "provider": "slack",
+        "scopes": [], "granted_scopes": [],
+    }
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"slack-team": token_connection})
+    assert agent_api.route(event({"scopes": ["x"]}), "PUT",
+                           "/api/agent/connections/slack-team/scopes")["statusCode"] == 400
+
+
 def test_operator_endpoints_reject_non_operators(monkeypatch):
     configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
     monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
@@ -283,6 +374,10 @@ def test_operator_endpoints_reject_non_operators(monkeypatch):
         (event(), "GET", "/api/agent/grants"),
         (event({"token": "xoxb-" + "a" * 20}), "PUT", "/api/agent/credentials/slack"),
         (event(), "DELETE", "/api/agent/connections/youtube-personal/tokens"),
+        (event({"scopes": ["x"]}), "PUT", "/api/agent/connections/youtube-personal/scopes"),
+        (event({"connection_id": "youtube-team", "provider": "youtube",
+                "scopes": ["https://www.googleapis.com/auth/youtube.readonly"]}),
+         "PUT", "/api/agent/connections"),
         (event(), "GET", "/api/agent/oauth-clients"),
         (event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/google"),
     )

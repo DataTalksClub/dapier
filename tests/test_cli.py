@@ -594,6 +594,27 @@ def test_main_operator_command_parsing(monkeypatch):
     assert main.main(["connections", "revoke", "youtube-personal"]) == 0
     assert seen["revoked"] == "youtube-personal"
 
+    monkeypatch.setattr(commands, "connections_scopes",
+                        lambda api_url, connection_id, scopes, debug=False:
+                        seen.update(scoped=connection_id, scopes=scopes) or 0)
+    assert main.main(["connections", "scopes", "dropbox", "--scopes",
+                      "account_info.read", "files.metadata.read"]) == 0
+    assert seen["scoped"] == "dropbox"
+    assert seen["scopes"] == ["account_info.read", "files.metadata.read"]
+
+    monkeypatch.setattr(commands, "connections_create",
+                        lambda api_url, connection_id, provider, scopes, **kwargs:
+                        seen.update(created=connection_id, provider=provider, create_scopes=scopes) or 0)
+    assert main.main(["connections", "create", "youtube-team", "--provider", "youtube",
+                      "--scopes", "https://www.googleapis.com/auth/youtube.readonly"]) == 0
+    assert seen["created"] == "youtube-team" and seen["provider"] == "youtube"
+
+    monkeypatch.setattr(commands, "connections_edit",
+                        lambda api_url, connection_id, **kwargs:
+                        seen.update(edited=connection_id, edit_kwargs=kwargs) or 0)
+    assert main.main(["connections", "edit", "dropbox", "--clear-root-path"]) == 0
+    assert seen["edited"] == "dropbox" and seen["edit_kwargs"]["root_path"] == ""
+
 
 HOOK = {
     "hook_id": "orders",
@@ -687,10 +708,11 @@ def test_connections_import_token_provider_uses_token_file(monkeypatch, tmp_path
 
     code = commands.connections_import(
         "https://api.example.test", "tg-bot", "telegram", None, None, None,
-        debug=False, token_path=str(token_file))
+        debug=False, token_path=str(token_file), display_name="Dapier test bot")
     assert code == 0
     assert seen["path"] == "/api/agent/connections/import"
     assert seen["body"]["token"] == "123456:AAAtokentokentokentokentoken"
+    assert seen["body"]["display_name"] == "Dapier test bot"
     assert "authorized_user" not in seen["body"]
     out, _ = capsys.readouterr()
     assert "@dapier_bot" in out and "123456" not in out
@@ -717,6 +739,55 @@ def test_connections_import_passes_root_path(monkeypatch, tmp_path):
 
     assert code == 0
     assert seen["body"]["root_path"] == "/incoming"
+
+
+def test_connections_scopes_posts_replacement_scopes(monkeypatch, capsys):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(method=method, path=path, body=body)
+        return {"connection_id": "dropbox"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    scopes = ["account_info.read", "files.metadata.read", "files.content.write"]
+    assert commands.connections_scopes("https://api.example.test", "dropbox", scopes) == 0
+    assert seen == {
+        "method": "PUT",
+        "path": "/api/agent/connections/dropbox/scopes",
+        "body": {"scopes": scopes},
+    }
+    out, _ = capsys.readouterr()
+    assert "Reconnect" in out
+
+
+def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        return {"connection_id": "dropbox"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    scopes = ["account_info.read", "files.metadata.read"]
+    assert commands.connections_create(
+        "https://api.example.test", "dropbox", "dropbox", scopes,
+        display_name="Invoices", root_path="/_dtc_paperwork/income-invoices",
+    ) == 0
+    assert commands.connections_edit(
+        "https://api.example.test", "dropbox", display_name="Incoming invoices",
+        root_path="/incoming",
+    ) == 0
+    assert calls == [
+        ("PUT", "/api/agent/connections", {
+            "connection_id": "dropbox", "provider": "dropbox", "scopes": scopes,
+            "display_name": "Invoices", "root_path": "/_dtc_paperwork/income-invoices",
+        }),
+        ("PUT", "/api/agent/connections/dropbox", {
+            "display_name": "Incoming invoices", "root_path": "/incoming",
+        }),
+    ]
+    out, _ = capsys.readouterr()
+    assert "Created dropbox" in out and "Updated dropbox" in out
 
 
 def test_oauth_clients_set_posts_secret_without_echoing(monkeypatch, tmp_path, capsys):

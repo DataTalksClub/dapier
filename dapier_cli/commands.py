@@ -88,6 +88,52 @@ def connections_connect(api_url, connection_id, agent, timeout=300, debug=False)
     return 5
 
 
+def connections_create(api_url, connection_id, provider, scopes, *, display_name=None,
+                       root_path=None, debug=False):
+    body = {
+        "connection_id": connection_id,
+        "provider": provider,
+        "scopes": list(scopes),
+    }
+    if display_name:
+        body["display_name"] = display_name
+    if root_path is not None:
+        body["root_path"] = root_path
+    data = api.call(api_url, "PUT", "/api/agent/connections", body, debug=debug)
+    created_id = data.get("connection_id", connection_id)
+    print(
+        f"Created {created_id}. Start consent with `dapier connections connect "
+        f"{created_id} --agent <agent-name>`."
+    )
+    return 0
+
+
+def connections_edit(api_url, connection_id, *, display_name=None, scopes=None,
+                     root_path=None, debug=False):
+    body = {}
+    if display_name is not None:
+        body["display_name"] = display_name
+    if scopes is not None:
+        body["scopes"] = list(scopes)
+    if root_path is not None:
+        body["root_path"] = root_path
+    if not body:
+        print("Provide --display-name, --scopes, --root-path, or --clear-root-path.")
+        return 2
+    api.call(api_url, "PUT", f"/api/agent/connections/{connection_id}", body, debug=debug)
+    print(f"Updated {connection_id}.")
+    if "scopes" in body:
+        print("Reconnect it to grant the updated scopes.")
+    return 0
+
+
+def connections_scopes(api_url, connection_id, scopes, debug=False):
+    api.call(api_url, "PUT", f"/api/agent/connections/{connection_id}/scopes",
+             {"scopes": list(scopes)}, debug=debug)
+    print(f"Updated requested scopes for {connection_id}. Reconnect it to grant the new scopes.")
+    return 0
+
+
 def _fetch_token(api_url, connection_id, agent, debug=False):
     """Return ``(connection_view, token_data)`` after verifying the account binding."""
     view = api.call(api_url, "GET",
@@ -149,12 +195,14 @@ TOKEN_PROVIDERS = ("slack", "telegram")
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
                        authorized_user_path, expected_account_id=None, scopes=(), debug=False,
-                       token_path=None, root_path=None):
+                       token_path=None, root_path=None, display_name=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
     body = {
         "connection_id": connection_id,
         "provider": provider,
     }
+    if display_name:
+        body["display_name"] = display_name
     if provider in TOKEN_PROVIDERS:
         # Token providers paste their credential directly; a refresh-token
         # file makes no sense for them.
