@@ -934,3 +934,79 @@ def test_runs_replay_over_bearer_reinjects_the_original_event(monkeypatch):
 
     missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/replay")
     assert missing["statusCode"] == 404
+
+
+def test_poll_triggers_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "agent-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    listed = agent_api.route(event(), "GET", "/api/agent/poll-triggers")
+
+    assert listed["statusCode"] == 403
+
+
+def test_poll_trigger_save_list_delete_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    from src.dapier.triggers import poll_triggers
+
+    class PollTable:
+        def __init__(self):
+            self.items = {}
+
+        def scan(self, **_kwargs):
+            return {"Items": [dict(item) for item in self.items.values()]}
+
+        def get_item(self, Key):
+            return {"Item": dict(self.items[Key["poll_id"]])} if Key["poll_id"] in self.items else {}
+
+        def put_item(self, Item):
+            self.items[Item["poll_id"]] = dict(Item)
+
+        def delete_item(self, Key):
+            self.items.pop(Key["poll_id"], None)
+
+    class CursorTable:
+        def __init__(self):
+            self.items = {}
+
+        def get_item(self, Key):
+            return {"Item": dict(self.items[Key["cursor_id"]])} if Key["cursor_id"] in self.items else {}
+
+        def put_item(self, Item):
+            self.items[Key["cursor_id"]] = dict(Item)
+
+        def delete_item(self, Key):
+            self.items.pop(Key["cursor_id"], None)
+
+    table, cursors = PollTable(), CursorTable()
+    rules, removed = [], []
+    monkeypatch.setattr(poll_triggers, "get_table", lambda table_ref=None: table_ref or table)
+    monkeypatch.setattr(poll_triggers, "cursor_table", lambda table_ref=None: cursors)
+    monkeypatch.setattr(poll_triggers, "sync_rule",
+                        lambda item, **_kwargs: rules.append(item["poll_id"]))
+    monkeypatch.setattr(poll_triggers, "remove_rule",
+                        lambda poll_id, **_kwargs: removed.append(poll_id))
+
+    body = {"name": "drive-updates", "expression": "rate(1 hour)",
+            "url": "https://example.test/list", "list_path": "data.items",
+            "id_path": "createdTime",
+            "actions": [{"type": "slack", "channel": "#news", "text": "new item"}]}
+    saved = agent_api.route(event(body), "PUT", "/api/agent/poll-triggers")
+
+    assert saved["statusCode"] == 200
+    assert json.loads(saved["body"])["created"] is True
+    assert rules == ["drive-updates"]
+
+    listed = agent_api.route(event(), "GET", "/api/agent/poll-triggers")
+
+    assert [item["poll_id"] for item in json.loads(listed["body"])["polls"]] == ["drive-updates"]
+
+    deleted = agent_api.route(event(query={"name": "drive-updates"}), "DELETE",
+                              "/api/agent/poll-triggers")
+
+    assert deleted["statusCode"] == 200
+    assert table.items == {} and removed == ["drive-updates"]
+
+

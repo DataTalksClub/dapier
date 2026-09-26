@@ -259,12 +259,23 @@ def delete_cursor(name, table=None):
 
 
 def _bearer_token(connection_id):
+    """The fetch's bearer token: refreshed for OAuth connections, stored for
+    static-token providers (whose credentials never expire)."""
     if not connection_id:
         return None
     from ..engine.actions import base
-    from ..connections import credentials
 
     connection = base._connected_connection(connection_id)
+    if connection.get("provider"):
+        from ..connections import tokens
+
+        try:
+            token, _info = tokens.get_access_token(connection)
+        except tokens.TokenError as exc:
+            raise TriggerError(f"connection {connection_id} has no usable token: {exc}") from None
+        return token
+    from ..connections import credentials
+
     secret = credentials.get_credential(connection["credential_id"])
     token = secret.get("token") or secret.get("access_token")
     if not token:
@@ -358,18 +369,21 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
         return {"poll": name, "fired": 0, "skipped": "disabled"}
 
     from ..engine import execute
+    from ..engine.notify import notify_failure
     from ..engine.worker import _is_pending, _mark_completed, _release_action
-    from .notify import notify_failure
 
     cursor = get_cursor(name, table=cursor_table_ref)
     items = fetch_page(item, cursor=cursor, transport=transport)
     if item.get("cursor_mode") == "watermark":
-        items = sorted(
-            (raw for raw in items
-             if _raw_id(item, raw) is not None
-             and _sort_key(_raw_id(item, raw)) > _sort_key(cursor)),
-            key=lambda raw: _sort_key(_raw_id(item, raw)),
-        )
+        candidates = [raw for raw in items if _raw_id(item, raw) is not None]
+        # No stored cursor (first fire) means nothing was emitted yet, so
+        # every listed item is new — an ISO-timestamp watermark would
+        # otherwise compare "less than" the unseeded cursor forever.
+        if cursor is not None:
+            candidates = [raw for raw in candidates
+                          if _sort_key(_raw_id(item, raw)) > _sort_key(cursor)]
+        # Oldest first, so the cursor ends at the newest emitted item.
+        items = sorted(candidates, key=lambda raw: _sort_key(_raw_id(item, raw)))
     fired = 0
     for raw in items[:item.get("max_items", 25)]:
         event = event_for(item, raw)
