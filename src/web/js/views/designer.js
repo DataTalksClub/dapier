@@ -128,6 +128,10 @@ function startRename() {
 
 $('#designer-rename').addEventListener('click', startRename);
 
+/* Back out of the canvas to the workflow list. setView runs the view guard,
+   so an unsaved draft raises the designer's own discard prompt first. */
+$('#designer-back').addEventListener('click', () => { setView('workflows'); });
+
 window.addEventListener('message', (event) => {
   if (event.origin !== window.location.origin) return;
   if (event.source !== $('#designer-frame').contentWindow) return;
