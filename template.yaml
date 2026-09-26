@@ -22,6 +22,12 @@ Parameters:
   DataOpsIntakeUrl:
     Type: String
     Default: https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/email-documents
+  DataOpsEmailDocumentsBucket:
+    Type: String
+    Default: dataops-v1-emaildocumentsbucket-1dbv70hrd4al
+    Description: >
+      DataOps intake documents bucket; the worker stages files under its
+      transfer/ prefix because the intake verifies each document's S3 source
   AuthBaseUrl:
     Type: String
     Default: https://auth.dtcdev.click
@@ -127,6 +133,7 @@ Globals:
         RENDER_QUEUE_URL: !Ref RenderQueue
         RENDER_ARTIFACTS_BUCKET: !Ref RenderArtifactsBucket
         DATAOPS_INTAKE_URL: !Ref DataOpsIntakeUrl
+        DATAOPS_EMAIL_DOCUMENTS_BUCKET: !Ref DataOpsEmailDocumentsBucket
         AUTH_BASE_URL: !Ref AuthBaseUrl
         AUTH_CLIENT_ID: !Ref AuthClientId
         AUTH_CLI_CLIENT_ID: !Ref AuthCliClientId
@@ -470,6 +477,8 @@ Resources:
             TableName: !Ref ExecutionsTable
         - S3CrudPolicy:
             BucketName: !Ref RenderArtifactsBucket
+        - S3CrudPolicy:
+            BucketName: !Ref DataOpsEmailDocumentsBucket
         - S3ReadPolicy:
             BucketName: !Ref DatamailerInboundBucketName
       Events:

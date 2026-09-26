@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import tempfile
@@ -310,7 +311,7 @@ class DropboxIntakeTests(unittest.TestCase):
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
              patch("src.dapier.engine.actions.dropbox._dropbox_download", return_value=b"pdf-bytes"), \
              patch("boto3.client", return_value=s3), \
-             patch.dict("os.environ", {"RENDER_ARTIFACTS_BUCKET": "artifacts",
+             patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging",
                                        "DATAOPS_INTAKE_URL": "https://intake.test"}):
             run_dataops(action, event or deepcopy(self.event))
         return json_request.call_args.args[1], s3
@@ -318,15 +319,16 @@ class DropboxIntakeTests(unittest.TestCase):
     def test_intakes_a_copy_of_the_file(self):
         body, s3 = self.run_dataops_action()
 
-        key = s3.put_object.call_args.kwargs["Key"]
-        self.assertEqual(key, "dropbox/dropbox:acct1:fid:rev1/1.pdf")
-        self.assertTrue(key.startswith("dropbox/"))
+        kwargs = s3.put_object.call_args.kwargs
+        self.assertEqual(kwargs["Bucket"], "staging")
+        self.assertEqual(kwargs["Key"], "transfer/dropbox/dropbox:acct1:fid:rev1/1.pdf")
+        self.assertEqual(kwargs["Metadata"], {"sha256": hashlib.sha256(b"pdf-bytes").hexdigest()})
         doc = body["documents"][0]
-        self.assertEqual(doc["storageUri"], f"s3://artifacts/{key}")
+        self.assertEqual(doc["storageUri"], f"s3://staging/{kwargs['Key']}")
         self.assertEqual(doc["filename"], "1.pdf")
         self.assertEqual(doc["contentType"], "application/pdf")
         self.assertEqual(doc["sizeBytes"], len(b"pdf-bytes"))
-        self.assertEqual(doc["checksum"], "sha256:abc123")
+        self.assertEqual(doc["checksum"], f"sha256:{hashlib.sha256(b'pdf-bytes').hexdigest()}")
 
     def test_uses_deterministic_event_id_as_message_id(self):
         body, _s3 = self.run_dataops_action()
@@ -377,19 +379,37 @@ class EmailIntakeTests(unittest.TestCase):
             },
         }
 
+    def run_intake_body(self, event):
+        s3 = MagicMock()
+        s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"%PDF-bytes")}
+        with patch("boto3.client", return_value=s3), \
+             patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}):
+            return _email_intake_body({}, event), s3
+
     def test_normalizes_rfc2822_date_header(self):
-        body = _email_intake_body({}, self.event("Sat, 26 Sep 2026 22:10:40 +0000"))
+        body, _s3 = self.run_intake_body(self.event("Sat, 26 Sep 2026 22:10:40 +0000"))
         self.assertEqual(body["receivedAt"], "2026-09-26T22:10:40Z")
 
     def test_falls_back_to_normalized_occurred_at(self):
-        body = _email_intake_body({}, self.event(""))
+        body, _s3 = self.run_intake_body(self.event(""))
         self.assertEqual(body["receivedAt"], "2026-09-26T22:10:40Z")
         self.assertEqual(body["recipientRoute"], "invoice")
         self.assertEqual(body["messageId"], "<invoice-e2e-20260926-2210@dtcdev.click>")
         self.assertEqual(body["from"], "no-reply@dtcdev.click")
+
+    def test_stages_attachments_into_the_intake_bucket(self):
+        body, s3 = self.run_intake_body(self.event("Sat, 26 Sep 2026 22:10:40 +0000"))
+
+        kwargs = s3.put_object.call_args.kwargs
+        self.assertEqual(kwargs["Bucket"], "staging")
+        self.assertTrue(kwargs["Key"].startswith("transfer/"))
+        self.assertTrue(kwargs["Key"].endswith("invoice-e2e-20260926-2210.pdf"))
+        self.assertEqual(kwargs["Metadata"], {"sha256": "abc"})
+        self.assertEqual(kwargs["ContentType"], "application/pdf")
         doc = body["documents"][0]
-        self.assertEqual(doc["storageUri"],
-                         "s3://raw-bucket/artifacts/x/attachments/001-invoice.pdf")
+        self.assertEqual(doc["storageUri"], f"s3://staging/{kwargs['Key']}")
+        self.assertEqual(doc["filename"], "invoice-e2e-20260926-2210.pdf")
+        self.assertEqual(doc["sizeBytes"], len(b"%PDF-bytes"))
         self.assertEqual(doc["checksum"], "sha256:abc")
 
 

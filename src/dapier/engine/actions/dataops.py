@@ -1,12 +1,43 @@
 """dataops action: push the event into a DataOps intake."""
+import hashlib
 import json
 import mimetypes
 import os
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from uuid import uuid4
 
 from ...connections import tokens
 from . import base, dropbox
+
+
+STAGING_PREFIX = "transfer/"
+
+
+def _s3():
+    import boto3
+    return boto3.client("s3")
+
+
+def _stage_document(key, body, content_type, checksum):
+    """Copy a document into the DataOps staging bucket and return its URI.
+
+    The intake Head-verifies every document's S3 source and only accepts
+    objects under the transfer/ prefix of its own documents bucket, so
+    nothing can be referenced in place. The sha256 goes into object
+    metadata because that is where the intake expects to find it."""
+    bucket = os.environ["DATAOPS_EMAIL_DOCUMENTS_BUCKET"]
+    digest = checksum.split(":", 1)[1] if checksum.startswith("sha256:") else checksum
+    key = f"{STAGING_PREFIX}{key}"
+    _s3().put_object(
+        Bucket=bucket, Key=key, Body=body, ContentType=content_type,
+        Metadata={"sha256": digest}, ServerSideEncryption="AES256",
+    )
+    return f"s3://{bucket}/{key}"
+
+
+def _s3_bytes(bucket, key):
+    return _s3().get_object(Bucket=bucket, Key=key)["Body"].read()
 
 
 def _received_at(value):
@@ -53,11 +84,10 @@ def _dropbox_intake_body(action, event):
     """Build a DataOps intake for a Dropbox file event.
 
     The intake contract references documents by S3 URI, so the file is
-    copied into the artifacts bucket (which the intake can already read
-    from the rendered-invoice flow) before the request is built.
+    downloaded and staged into the intake's documents bucket before the
+    request is built. Dropbox content hashes are not file sha256s, so the
+    checksum is computed over the downloaded bytes.
     """
-    import boto3
-
     data = event.get("data", {})
     path = data.get("path")
     if not path:
@@ -67,12 +97,9 @@ def _dropbox_intake_body(action, event):
     connection = dropbox._dropbox_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection)
     body = dropbox._dropbox_download(access_token, path)
-    bucket = os.environ["RENDER_ARTIFACTS_BUCKET"]
+    checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
     key = f"dropbox/{str(event['id']).replace('/', '_')}/{filename}"
-    boto3.client("s3").put_object(
-        Bucket=bucket, Key=key, Body=body, ContentType=content_type,
-        ServerSideEncryption="AES256",
-    )
+    storage_uri = _stage_document(key, body, content_type, checksum)
     return {
         "version": "2026-07-01",
         "messageId": event["id"],
@@ -82,11 +109,11 @@ def _dropbox_intake_body(action, event):
         "receivedAt": _received_at(event["occurred_at"]),
         "documents": [{
             "kind": "dropbox-file",
-            "storageUri": f"s3://{bucket}/{key}",
+            "storageUri": storage_uri,
             "filename": filename,
             "contentType": content_type,
             "sizeBytes": len(body),
-            "checksum": f"sha256:{data.get('content_hash') or ''}",
+            "checksum": checksum,
         }],
     }
 
@@ -96,23 +123,34 @@ def _email_intake_body(action, event):
     for attachment in data.get("attachments", []):
         ref = attachment.get("s3") or {}
         if ref.get("bucket") and ref.get("key"):
+            body = _s3_bytes(ref["bucket"], ref["key"])
+            filename = base._safe_filename(attachment.get("filename") or "attachment")
+            content_type = attachment.get("content_type") or "application/octet-stream"
+            storage_uri = _stage_document(
+                f"{uuid4().hex}/{filename}", body, content_type, attachment["checksum"])
             documents.append({
                 "kind": "attachment",
-                "storageUri": f"s3://{ref['bucket']}/{ref['key']}",
-                "filename": attachment.get("filename") or "attachment",
-                "contentType": attachment.get("content_type") or "application/octet-stream",
-                "sizeBytes": attachment.get("size", 0),
+                "storageUri": storage_uri,
+                "filename": filename,
+                "contentType": content_type,
+                "sizeBytes": len(body),
                 "checksum": attachment["checksum"],
             })
     output = data.get("output") or {}
     if output.get("bucket") and output.get("key"):
+        body = _s3_bytes(output["bucket"], output["key"])
+        filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
+        content_type = data.get("content_type", "application/pdf")
+        checksum = f"sha256:{data['checksum']}"
+        storage_uri = _stage_document(
+            f"{uuid4().hex}/{filename}", body, content_type, checksum)
         documents.append({
             "kind": "rendered-email-pdf",
-            "storageUri": f"s3://{output['bucket']}/{output['key']}",
-            "filename": action.get("filename", "invoice-email.pdf"),
-            "contentType": data.get("content_type", "application/pdf"),
-            "sizeBytes": data["size_bytes"],
-            "checksum": f"sha256:{data['checksum']}",
+            "storageUri": storage_uri,
+            "filename": filename,
+            "contentType": content_type,
+            "sizeBytes": len(body),
+            "checksum": checksum,
         })
     source_data = data.get("source_event", {}).get("data", data)
     sender = source_data.get("sender", {})
