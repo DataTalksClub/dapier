@@ -985,6 +985,18 @@ textarea:focus {
   line-height: 1.5;
 }
 
+/* Under a connection field: which account the typed ID resolves to, or a
+   nudge when it matches nothing in Connections. */
+.connection-hint {
+  color: var(--text-soft);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.connection-hint.warn {
+  color: var(--danger-text);
+}
+
 /* Typed values are YAML-bound machine truth; they speak mono. */
 .mono-input {
   font-family: var(--mono);

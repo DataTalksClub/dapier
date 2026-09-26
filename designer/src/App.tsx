@@ -6,9 +6,32 @@ import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
 import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
-import type { DiagramShape, FilterRule, GitStatus, NodeData, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import type { ConnectionOption, DiagramShape, FilterRule, GitStatus, NodeData, TestRunResult, Workflow, WorkflowSummary } from "./types";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
+
+/** Plain words for a connection status, mirroring the console's labels. */
+const CONNECTION_STATUS_LABELS: Record<string, string> = {
+  connected: "connected",
+  ready: "setup incomplete",
+  expired: "needs reconnection",
+  revoked: "revoked",
+};
+
+/** What to call a connection: its display name, or the verified identity. */
+function connectionTitle(connection: ConnectionOption): string {
+  if (connection.display_name && connection.display_name !== connection.connection_id) {
+    return connection.display_name;
+  }
+  return connection.account_title || connection.connection_id;
+}
+
+/** "display_name · status" for the datalist entries and the selected hint. */
+function connectionHint(connection: ConnectionOption): string {
+  const title = connectionTitle(connection);
+  const status = CONNECTION_STATUS_LABELS[connection.status ?? ""] ?? connection.status;
+  return status && status !== "connected" ? `${title} · ${status}` : title;
+}
 
 /** Product logo for a workflow's trigger connector, used in list rows. */
 function TriggerLogo({ connector }: { connector: string }) {
@@ -35,10 +58,11 @@ function workflowYaml(workflow: Workflow): string {
 }
 
 /** One catalog field, rendered per its declared type. */
-function FieldInput({ field, value, onChange }: {
+function FieldInput({ field, value, onChange, connections }: {
   field: CatalogField;
   value: string;
   onChange: (value: string) => void;
+  connections?: ConnectionOption[] | null;
 }) {
   if (field.type === "boolean") {
     return (
@@ -78,6 +102,38 @@ function FieldInput({ field, value, onChange }: {
     return (
       <label>{field.label}{field.required ? " *" : ""}
         <textarea value={value} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />
+      </label>
+    );
+  }
+  // Connection fields suggest the operator's real connections (display name,
+  // verified identity, status) over a bare ID typed from memory; the value
+  // stays the plain connection_id in the YAML, and free text still works for
+  // anything the snapshot does not know (offline mode, brand-new records).
+  if (field.provider && connections) {
+    const matches = connections.filter((connection) => connection.provider === field.provider);
+    const current = matches.find((connection) => connection.connection_id === value);
+    return (
+      <label>{field.label}{field.required ? " *" : ""}
+        <input
+          className="mono-input"
+          list={`connections-${field.key}`}
+          value={value}
+          placeholder={matches.length === 1 && !value ? matches[0].connection_id : field.placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <datalist id={`connections-${field.key}`}>
+          {matches.map((connection) => (
+            <option key={connection.connection_id} value={connection.connection_id}>
+              {connectionHint(connection)}
+            </option>
+          ))}
+        </datalist>
+        {value !== "" && current && <span className="connection-hint">{connectionHint(current)}</span>}
+        {value !== "" && !current && (
+          <span className="connection-hint warn">
+            Not one of your {field.provider} connections — pick one from the list or check the ID.
+          </span>
+        )}
       </label>
     );
   }
@@ -147,6 +203,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const allowUnload = useRef(false);
   const [status, setStatus] = useState<{ kind: "idle" | "busy" | "error" | "ok"; message: string }>({ kind: "idle", message: "" });
   const [git, setGit] = useState<GitStatus | null>(null);
+  /** The operator's connections from the console host; null = unknown (the
+     text inputs render without suggestions or match warnings). */
+  const [connections, setConnections] = useState<ConnectionOption[] | null>(null);
   const [view, setView] = useState<"canvas" | "yaml">("canvas");
   const [yamlText, setYamlText] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
@@ -273,6 +332,23 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [config.embedded, view]);
+
+  useEffect(() => {
+    if (!config.embedded) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; connections?: unknown };
+      if (data?.type !== "designer:set-connections" || !Array.isArray(data.connections)) return;
+      const options = data.connections.filter((entry): entry is ConnectionOption => {
+        if (!entry || typeof entry !== "object") return false;
+        const record = entry as Partial<ConnectionOption>;
+        return typeof record.connection_id === "string" && typeof record.provider === "string";
+      });
+      setConnections(options);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [config.embedded]);
 
   const refreshGit = useCallback(() => {
     if (config.mode !== "local") return;
@@ -697,6 +773,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 key={field.key}
                 field={field}
                 value={data.fields?.[field.key] ?? ""}
+                connections={connections}
                 onChange={(value) => setField(field.key, value)}
               />
             ))}

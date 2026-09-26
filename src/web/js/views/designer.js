@@ -4,7 +4,8 @@
    topbar's h1 names the open workflow and the adjacent Rename button edits
    the name (the edit lands in the iframe's draft and commits with "Save to
    git"). The iframe reports what the title should show via designer:meta
-   messages below. */
+   messages below, and the console answers with the connections snapshot the
+   inspector's connection suggestions render from. */
 import { state } from '../state.js';
 import { $ } from '../ui.js';
 import { setView, rememberViewUrl, setViewGuard } from '../router.js';
@@ -132,6 +133,22 @@ $('#designer-rename').addEventListener('click', startRename);
    so an unsaved draft raises the designer's own discard prompt first. */
 $('#designer-back').addEventListener('click', () => { setView('workflows'); });
 
+/* Connections snapshot for the designer's connection suggestions: only the
+   metadata the inspector renders (never secrets). Exported for
+   overview.refresh, which re-posts when data lands after the iframe did. */
+export function postConnectionsToDesigner() {
+  const frame = $('#designer-frame').contentWindow;
+  if (!frame || !state.data) return;
+  const connections = (state.data.connections || []).map((connection) => ({
+    connection_id: connection.connection_id,
+    provider: connection.provider,
+    display_name: connection.display_name || '',
+    account_title: connection.account_title || '',
+    status: connection.status || '',
+  }));
+  frame.postMessage({ type: 'designer:set-connections', connections }, window.location.origin);
+}
+
 window.addEventListener('message', (event) => {
   if (event.origin !== window.location.origin) return;
   if (event.source !== $('#designer-frame').contentWindow) return;
@@ -153,6 +170,9 @@ window.addEventListener('message', (event) => {
     dirty: data.dirty === true
   };
   applyMeta();
+  // The iframe announces itself on mount; answer with the current snapshot
+  // so suggestions are ready before the first node is selected.
+  postConnectionsToDesigner();
 });
 
 /* Opens the designer for `source` (a workflow filename, or null for a new

@@ -253,6 +253,42 @@ def test_save_slack_connection_rejects_token_slack_rejects(monkeypatch):
     assert records == []
 
 
+def test_save_telegram_connection_names_itself_after_the_verified_bot(monkeypatch):
+    records = []
+    _fake_connections_table(monkeypatch, records)
+    monkeypatch.setattr(telegram_api, "get_me", lambda token: ("987654321", "@dtc_alerts_bot"))
+    monkeypatch.setattr(credentials_module, "put_credential", lambda *args, **kwargs: None)
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "telegram-bot-2",
+        "provider": "telegram",
+        "token": "987654321:" + "A" * 35,
+    }))
+
+    assert response["statusCode"] == 200
+    # No display name was supplied, so the verified bot identity becomes it —
+    # that is what tells several bots of one provider apart in the console.
+    assert records[0]["account_title"] == "@dtc_alerts_bot"
+    assert records[0]["display_name"] == "@dtc_alerts_bot"
+
+
+def test_save_telegram_connection_keeps_operator_rename(monkeypatch):
+    records = []
+    _fake_connections_table(monkeypatch, records)
+    monkeypatch.setattr(telegram_api, "get_me", lambda token: ("987654321", "@dtc_alerts_bot"))
+    monkeypatch.setattr(credentials_module, "put_credential", lambda *args, **kwargs: None)
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "telegram-bot-2",
+        "provider": "telegram",
+        "display_name": "Announcements bot",
+        "token": "987654321:" + "A" * 35,
+    }))
+
+    assert response["statusCode"] == 200
+    assert records[0]["display_name"] == "Announcements bot"
+
+
 def test_oauth_start_rejects_token_provider(monkeypatch):
     monkeypatch.setattr(oauth_flow, "_connection", lambda connection_id: {
         "connection_id": "slack", "provider": "slack", "status": "connected",
@@ -288,7 +324,7 @@ from src.dapier import http
 from src.dapier.api.admin import login
 from src.dapier.connections import oauth_flow
 from src.dapier.auth import session
-from src.dapier.connections.providers import slack_tokens
+from src.dapier.connections.providers import slack_tokens, telegram_api
 from src.dapier.auth import dtc_auth
 from src.dapier.api.admin import routes
 

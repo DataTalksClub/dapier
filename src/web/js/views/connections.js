@@ -50,6 +50,19 @@ const CONNECT_PROVIDERS = {
   },
 };
 
+/* Provider names for table group headers — wider than the connect cards
+   (a "google" group holds calendar, Drive, and Sheets connections alike). */
+const PROVIDER_LABELS = {
+  google: 'Google',
+  youtube: 'YouTube',
+  dropbox: 'Dropbox',
+  zoom: 'Zoom',
+  slack: 'Slack',
+  telegram: 'Telegram',
+};
+
+const providerLabel = (provider) => PROVIDER_LABELS[provider] || provider;
+
 /* Token providers paste a credential instead of browser consent. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
 
@@ -140,13 +153,14 @@ function renderConnectCards(connections) {
     const needsClient = !TOKEN_PROVIDERS.includes(provider) && oauthClient && !oauthClient.configured;
     const pending = !TOKEN_PROVIDERS.includes(provider)
       ? connections.find((connection) => connection.provider === provider && connection.status === 'ready') : null;
+    const accounts = connections.filter((connection) => connection.provider === provider);
     const action = pending
       ? `<a class="button primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
          <button class="button secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
       : `<button class="button secondary connect-button" data-provider="${provider}" type="button">${provider === 'zoom' ? 'Add Zoom app' : 'Add account'}</button>`;
     return `
     <div class="connect-card">
-      <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span></div>
+      <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span>${accounts.length > 1 ? `<span class="connect-count">${accounts.length} accounts</span>` : ''}</div>
       <p class="connect-blurb">${meta.blurb}</p>
       ${needsClient ? `<p class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> before consent.</p>` : ''}
       ${pending ? `<p class="connect-pending">${escapeHtml(pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
@@ -176,7 +190,7 @@ function nextConnectionId(base) {
 async function connectProvider(provider) {
   if (TOKEN_PROVIDERS.includes(provider)) return openTokenDialog(provider);
   const meta = CONNECT_PROVIDERS[provider];
-  const { id, suffix } = nextConnectionId(meta.connectionId);
+  const { id } = nextConnectionId(meta.connectionId);
   // Open during the click: browsers block windows opened after the PUT awaits.
   const popup = window.open('', '_blank', 'width=680,height=760');
   if (!popup) return notice('Allow pop-ups to add this connection, then try again.', true);
@@ -185,13 +199,15 @@ async function connectProvider(provider) {
   const stopWatching = watchOAuthPopup(popup, id);
   try {
     // Provision the new record with the provider's standard scopes, then
-    // bounce straight to the consent screen.
+    // bounce straight to the consent screen. No display name: once consent
+    // verifies the account, the record takes the verified identity (the
+    // account email) as its name — that is what tells same-provider
+    // accounts apart, not a "Google Calendar 2" counter.
     await api('/api/admin/connections', {
       method: 'PUT',
       body: JSON.stringify({
         connection_id: id,
         provider,
-        display_name: suffix ? `${meta.displayName} ${suffix}` : meta.displayName,
         scopes: meta.scopes,
       }),
     });
@@ -309,9 +325,27 @@ function renderConnections(connections) {
       connection.account_title, connection.verified_account_id].some((value) => String(value || '').toLowerCase().includes(query));
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
-  const ordered = [...filtered].sort((a, b) =>
-    (priority[a.status] ?? 4) - (priority[b.status] ?? 4));
-  $('#connection-table').innerHTML = ordered.map((connection) => {
+  const withinGroup = (a, b) =>
+    (priority[a.status] ?? 4) - (priority[b.status] ?? 4) ||
+    String(a.display_name || a.connection_id).localeCompare(String(b.display_name || b.connection_id));
+  const groups = new Map();
+  for (const connection of filtered) {
+    groups.set(connection.provider, [...(groups.get(connection.provider) || []), connection]);
+  }
+  /* Accounts of one provider stay together; a header row appears only where
+     it carries information (a provider with several accounts). */
+  $('#connection-table').innerHTML = [...groups.entries()].sort(([a], [b]) =>
+    providerLabel(a).localeCompare(providerLabel(b))).map(([provider, group]) => {
+    const rows = [...group].sort(withinGroup).map(connectionRow).join('');
+    if (group.length < 2) return rows;
+    const attention = group.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status)).length;
+    return `<tr class="provider-group-row"><th colspan="4" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span><span class="provider-group-meta">${group.length} account${group.length === 1 ? '' : 's'}${attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} attention` : ''}</span></th></tr>${rows}`;
+  }).join('');
+  $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  bindOAuthLinks();
+}
+
+function connectionRow(connection) {
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && connection.status !== 'connected'
       ? `<a class="button ${connection.status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${connection.status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     const identity = connection.account_title || connection.verified_account_id;
@@ -321,9 +355,6 @@ function renderConnections(connections) {
     <td data-label="Status">${statusLine(connection.status, CONNECTION_STATUS_LABELS)}</td>
     <td class="action-cell">${nextAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
-  }).join('');
-  $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
-  bindOAuthLinks();
 }
 
 $('#connection-search')?.addEventListener('input', () => renderConnections((state.data || {}).connections || []));
@@ -561,9 +592,12 @@ $('#connection-form').addEventListener('submit', async (event) => {
   const body = {
     connection_id: id,
     provider,
-    display_name: suffix ? `${meta.displayName} ${suffix}` : meta.displayName,
     token: form.token.value,
   };
+  // Zoom verifies via its webhook callback, not at save time, so it keeps a
+  // plain label; Slack and Telegram are verified here and take their
+  // workspace / bot identity as the display name (see mark_connected).
+  if (provider === 'zoom') body.display_name = suffix ? `${meta.displayName} ${suffix}` : meta.displayName;
   try {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
     form.token.value = '';

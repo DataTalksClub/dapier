@@ -14312,21 +14312,21 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$l = [
+  const __iconNode$m = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$l);
-  const __iconNode$k = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$m);
+  const __iconNode$l = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$k);
-  const __iconNode$j = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$l);
+  const __iconNode$k = [
     [
       "path",
       {
@@ -14339,8 +14339,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$j);
-  const __iconNode$i = [
+  const FileText = createLucideIcon("file-text", __iconNode$k);
+  const __iconNode$j = [
     [
       "path",
       {
@@ -14351,8 +14351,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$i);
-  const __iconNode$h = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$j);
+  const __iconNode$i = [
     [
       "path",
       {
@@ -14361,15 +14361,15 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$h);
-  const __iconNode$g = [
+  const Funnel = createLucideIcon("funnel", __iconNode$i);
+  const __iconNode$h = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$g);
-  const __iconNode$f = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$h);
+  const __iconNode$g = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14382,27 +14382,27 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$f);
-  const __iconNode$e = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$g);
+  const __iconNode$f = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$e);
-  const __iconNode$d = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$d);
-  const __iconNode$c = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$f);
+  const __iconNode$e = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$c);
-  const __iconNode$b = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$b);
-  const __iconNode$a = [
+  const Maximize = createLucideIcon("maximize", __iconNode$d);
+  const __iconNode$c = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$c);
+  const __iconNode$b = [
     [
       "path",
       {
@@ -14411,8 +14411,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$a);
-  const __iconNode$9 = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$b);
+  const __iconNode$a = [
     [
       "path",
       {
@@ -14421,12 +14421,23 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$9);
-  const __iconNode$8 = [
+  const Play = createLucideIcon("play", __iconNode$a);
+  const __iconNode$9 = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$8);
+  const Plus = createLucideIcon("plus", __iconNode$9);
+  const __iconNode$8 = [
+    [
+      "path",
+      {
+        d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
+        key: "1ffxy3"
+      }
+    ],
+    ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
+  ];
+  const Send = createLucideIcon("send", __iconNode$8);
   const __iconNode$7 = [
     [
       "path",
@@ -17787,6 +17798,26 @@
       }
     );
   }
+  function S3Logo({ size = 16, className, x, y }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        role: "img",
+        "aria-label": "Amazon S3",
+        className,
+        x,
+        y,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "4.6", width: "18", height: "3", rx: "1.5", fill: "#232F3E" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4.6 9.1h14.8l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H7.98a2.1 2.1 0 0 1-2.08-1.8z", fill: "#7AA116" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 9.1h7.4l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H12z", fill: "#5a7e10" })
+        ]
+      }
+    );
+  }
   const logicOperators = ["equals", "in", "prefix", "suffix", "contains"];
   const actionCatalog = [
     {
@@ -17805,12 +17836,24 @@
       icon: SlackLogo,
       fields: [
         { key: "credential_id", label: "Credential ID" },
-        { key: "connection_id", label: "Connection ID", placeholder: "resolves the credential" },
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
         { key: "channel", label: "Channel", placeholder: "#alerts", required: true },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
         { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
         { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "telegram_send",
+      label: "Telegram",
+      icon: Send,
+      description: "Post a message through a Telegram bot connection. The chat defaults to the triggering Telegram message; other triggers name the chat explicitly.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat" },
+        { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
     },
     {
@@ -17821,7 +17864,7 @@
         { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
         { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
         { key: "url", label: "URL (overrides env)" },
-        { key: "connection_id", label: "Dropbox connection ID", placeholder: "dropbox — for file-event intakes" },
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
         { key: "filename", label: "Filename override" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
@@ -17831,7 +17874,7 @@
       label: "Dropbox upload",
       icon: DropboxLogo,
       fields: [
-        { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
         { key: "folder", label: "Folder", placeholder: "/Invoices" },
         { key: "filename", label: "Filename override" }
@@ -17842,8 +17885,22 @@
       label: "Dropbox delete",
       icon: DropboxLogo,
       fields: [
-        { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+      ]
+    },
+    {
+      type: "s3_upload",
+      label: "Amazon S3",
+      icon: S3Logo,
+      description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true },
+        { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true },
+        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
+        { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
       ]
     },
     {
@@ -17852,7 +17909,7 @@
       icon: SheetsLogo,
       description: "Append a row to a worksheet (Create Spreadsheet Row)",
       fields: [
-        { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
         { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
         { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
         {
@@ -19093,6 +19150,23 @@
   }
   const localConfig = { apiBase: "/api", mode: "local" };
   const EMPTY_SHAPES = [];
+  const CONNECTION_STATUS_LABELS = {
+    connected: "connected",
+    ready: "setup incomplete",
+    expired: "needs reconnection",
+    revoked: "revoked"
+  };
+  function connectionTitle(connection) {
+    if (connection.display_name && connection.display_name !== connection.connection_id) {
+      return connection.display_name;
+    }
+    return connection.account_title || connection.connection_id;
+  }
+  function connectionHint(connection) {
+    const title = connectionTitle(connection);
+    const status = CONNECTION_STATUS_LABELS[connection.status ?? ""] ?? connection.status;
+    return status && status !== "connected" ? `${title} · ${status}` : title;
+  }
   function TriggerLogo({ connector }) {
     const Logo = connectorMeta(connector)?.logo;
     return Logo ? /* @__PURE__ */ jsxRuntimeExports.jsx(Logo, { size: 12 }) : null;
@@ -19113,7 +19187,7 @@
   function workflowYaml(workflow) {
     return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
   }
-  function FieldInput({ field, value, onChange }) {
+  function FieldInput({ field, value, onChange, connections }) {
     if (field.type === "boolean") {
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -19155,6 +19229,31 @@
         field.label,
         field.required ? " *" : "",
         /* @__PURE__ */ jsxRuntimeExports.jsx("textarea", { value, placeholder: field.placeholder, onChange: (event) => onChange(event.target.value) })
+      ] });
+    }
+    if (field.provider && connections) {
+      const matches = connections.filter((connection) => connection.provider === field.provider);
+      const current = matches.find((connection) => connection.connection_id === value);
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "mono-input",
+            list: `connections-${field.key}`,
+            value,
+            placeholder: matches.length === 1 && !value ? matches[0].connection_id : field.placeholder,
+            onChange: (event) => onChange(event.target.value)
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connection.connection_id, children: connectionHint(connection) }, connection.connection_id)) }),
+        value !== "" && current && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: connectionHint(current) }),
+        value !== "" && !current && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint warn", children: [
+          "Not one of your ",
+          field.provider,
+          " connections — pick one from the list or check the ID."
+        ] })
       ] });
     }
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
@@ -19220,6 +19319,7 @@
     const allowUnload = reactExports.useRef(false);
     const [status, setStatus] = reactExports.useState({ kind: "idle", message: "" });
     const [git, setGit] = reactExports.useState(null);
+    const [connections, setConnections] = reactExports.useState(null);
     const [view, setView] = reactExports.useState("canvas");
     const [yamlText, setYamlText] = reactExports.useState("");
     const [savedYaml, setSavedYaml] = reactExports.useState("");
@@ -19328,6 +19428,22 @@
       window.addEventListener("message", onMessage);
       return () => window.removeEventListener("message", onMessage);
     }, [config.embedded, view]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data;
+        if (data?.type !== "designer:set-connections" || !Array.isArray(data.connections)) return;
+        const options = data.connections.filter((entry) => {
+          if (!entry || typeof entry !== "object") return false;
+          const record = entry;
+          return typeof record.connection_id === "string" && typeof record.provider === "string";
+        });
+        setConnections(options);
+      };
+      window.addEventListener("message", onMessage);
+      return () => window.removeEventListener("message", onMessage);
+    }, [config.embedded]);
     const refreshGit = reactExports.useCallback(() => {
       if (config.mode !== "local") return;
       api(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -19729,6 +19845,7 @@
             {
               field,
               value: data.fields?.[field.key] ?? "",
+              connections,
               onChange: (value) => setField(field.key, value)
             },
             field.key

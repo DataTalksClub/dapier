@@ -1,4 +1,4 @@
-import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Video, Webhook } from "lucide-react";
+import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Send, Timer, Video, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, YouTubeLogo } from "./logos";
 
@@ -54,6 +54,12 @@ export interface CatalogField {
   default?: string;
   /** Nest under this object in the action YAML, e.g. group: "pdf" → action.pdf.page_format. */
   group?: string;
+  /**
+   * The connection record's provider this field must name (a `connection_id`
+   * key). The inspector suggests the operator's connections of that provider
+   * by display name and verified identity instead of a bare ID field.
+   */
+  provider?: string;
 }
 
 export interface ActionEntry {
@@ -102,12 +108,24 @@ export const actionCatalog: ActionEntry[] = [
     icon: SlackLogo,
     fields: [
       { key: "credential_id", label: "Credential ID" },
-      { key: "connection_id", label: "Connection ID", placeholder: "resolves the credential" },
+      { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", placeholder: "#alerts", required: true },
       { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
       { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
       { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
+    ]
+  },
+  {
+    type: "telegram_send",
+    label: "Telegram",
+    icon: Send,
+    description: "Post a message through a Telegram bot connection. The chat defaults to the triggering Telegram message; other triggers name the chat explicitly.",
+    fields: [
+      { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+      { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat" },
+      { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   },
   {
@@ -118,7 +136,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
       { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
       { key: "url", label: "URL (overrides env)" },
-      { key: "connection_id", label: "Dropbox connection ID", placeholder: "dropbox — for file-event intakes" },
+      { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
       { key: "filename", label: "Filename override" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
@@ -128,7 +146,7 @@ export const actionCatalog: ActionEntry[] = [
     label: "Dropbox upload",
     icon: DropboxLogo,
     fields: [
-      { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
+      { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
       { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
       { key: "folder", label: "Folder", placeholder: "/Invoices" },
       { key: "filename", label: "Filename override" }
@@ -139,7 +157,7 @@ export const actionCatalog: ActionEntry[] = [
     label: "Dropbox delete",
     icon: DropboxLogo,
     fields: [
-      { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
+      { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
       { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
     ]
   },
@@ -153,7 +171,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true },
       { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true },
       { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
-      { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL" },
+      { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
       { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
     ]
   },
@@ -163,7 +181,7 @@ export const actionCatalog: ActionEntry[] = [
     icon: SheetsLogo,
     description: "Append a row to a worksheet (Create Spreadsheet Row)",
     fields: [
-      { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+      { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
       { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
       { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
       { key: "values", label: "Row values (JSON)", type: "textarea", required: true,

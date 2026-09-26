@@ -24,8 +24,10 @@ STATUS_READY = "ready"
 STATUS_CONNECTED = "connected"
 
 # Providers that authenticate with a directly supplied token instead of an
-# OAuth consent round-trip (see admin._save_token_connection).
-TOKEN_PROVIDERS = {"slack", "telegram", "zoom"}
+# OAuth consent round-trip (see admin._save_token_connection). Zoom's meeting
+# connections are regular OAuth; its webhook signing token is not a provider
+# credential — the console's webhook setup has its own provider=="zoom" path.
+TOKEN_PROVIDERS = {"slack", "telegram"}
 
 
 class ConnectionError(ValueError):
@@ -183,6 +185,13 @@ def mark_connected(item, *, verified_account_id, account_title, granted_scopes, 
         "updated_at": now,
         "version": int(item.get("version", 0)) + 1,
     })
+    # A connection created without a name (the API default is the
+    # connection_id) takes the verified account identity — bot handle,
+    # workspace, account email — as its display name. That is what tells
+    # several accounts of one provider apart; an operator's explicit rename
+    # (anything other than the default) always wins.
+    if account_title and updated.get("display_name") in (None, "", updated["connection_id"]):
+        updated["display_name"] = account_title
     return updated
 
 

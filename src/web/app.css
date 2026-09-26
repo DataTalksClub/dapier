@@ -439,6 +439,7 @@ th:last-child, td:last-child { padding-right: 0; }
 .connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .connect-title { display: inline-flex; align-items: center; gap: 9px; }
 .connect-name { font-weight: 600; letter-spacing: -0.01em; }
+.connect-count { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
 .brand-mark { flex: none; }
 .provider-cell { display: inline-flex; align-items: center; gap: 8px; }
 .connect-blurb { margin: 0; color: var(--ink-soft); font-size: 12.5px; font-weight: 500; line-height: 1.45; }
@@ -474,6 +475,18 @@ td.mono, .mono-cell { font-family: var(--mono); font-size: 12.5px; }
 .cell-name { font-weight: 600; font-size: 14px; color: var(--ink); }
 .cell-sub { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 td[data-label="Retention"] { white-space: nowrap; }
+
+/* Group header for a provider with several accounts; single-account
+   providers render as plain rows with no header. Hidden on phones, where
+   the table becomes stacked cards and the header would float free. */
+.provider-group-row th {
+  border-bottom: 1px solid var(--line-strong);
+  padding: 14px 0 6px;
+  text-align: left;
+}
+.provider-group-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.provider-group-meta { margin-left: 10px; font-size: 12px; color: var(--ink-soft); }
+@media (max-width: 860px) { .table-wrap .provider-group-row { display: none; } }
 
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }

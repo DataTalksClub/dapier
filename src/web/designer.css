@@ -1,9 +1,6 @@
 /* BUILD ARTIFACT - do not edit by hand.
  *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
  *  Rebuild into src/web/ with: make designer-console */
-/* BUILD ARTIFACT - do not edit by hand.
- *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
- *  Rebuild into src/web/ with: make designer-console */
 /* Dapier "Operator's Ledger" tokens — same paper, ink, hairlines and single
    green accent as the console (src/web/app.css). Font files live on the
    console origin (/assets/fonts); outside it the Plex stacks fall back. */
@@ -989,6 +986,18 @@ textarea:focus {
   color: var(--text-soft);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Under a connection field: which account the typed ID resolves to, or a
+   nudge when it matches nothing in Connections. */
+.connection-hint {
+  color: var(--text-soft);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.connection-hint.warn {
+  color: var(--danger-text);
 }
 
 /* Typed values are YAML-bound machine truth; they speak mono. */

@@ -89,6 +89,16 @@ export interface GitStatus {
   lastCommit?: string;
 }
 
+/** One of the operator's connections, posted in by the console host
+    (designer:set-connections) for the inspector's connection suggestions. */
+export interface ConnectionOption {
+  connection_id: string;
+  provider: string;
+  display_name?: string;
+  account_title?: string;
+  status?: string;
+}
+
 /** One action of a test run: what it would receive, or what went wrong. */
 export interface TestStepResult {
   action_id: string;
