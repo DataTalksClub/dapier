@@ -89,7 +89,7 @@ def _post_json(url, api_key, payload):
         return response.status
 
 
-def notify_failure(day, results, errors):
+def notify_failure(day, results, errors, manifest_error=None):
     """Email the failure report; never raises (best-effort like notify_run.sh)."""
     url = os.environ.get("DATAMAILER_URL", "").rstrip("/")
     api_key = os.environ.get("DATAMAILER_API_KEY", "")
@@ -101,6 +101,8 @@ def notify_failure(day, results, errors):
     backed_up = "\n".join(
         f"  {name}: {stats['items']} items" for name, stats in sorted(results.items())
     ) or "  (none)"
+    if manifest_error:
+        failed += f"\n  manifest.json: {manifest_error}"
     body = (
         f"Something didn't work — the dapier DynamoDB backup failed.\n"
         f"\n"
@@ -150,15 +152,20 @@ def handler(event, context):
         "date": day,
         "tables": {**results, **{name: {"error": err} for name, err in errors.items()}},
     }
-    s3.put_object(
-        Bucket=bucket, Key=f"backups/{day}/manifest.json",
-        Body=json.dumps(manifest, indent=2), ContentType="application/json",
-    )
+    manifest_error = None
+    try:
+        s3.put_object(
+            Bucket=bucket, Key=f"backups/{day}/manifest.json",
+            Body=json.dumps(manifest, indent=2), ContentType="application/json",
+        )
+    except Exception as exc:  # e.g. the bucket itself is gone — report, don't die
+        manifest_error = str(exc)
     print(
         f"backup {day}: {sum(r['items'] for r in results.values())} items "
         f"across {len(results)}/{len(names)} tables"
     )
-    if errors:
-        notify_failure(day, results, errors)
-        raise RuntimeError(f"backup failed for: {', '.join(sorted(errors))}")
+    if errors or manifest_error:
+        notify_failure(day, results, errors, manifest_error)
+        detail = ", ".join(sorted(errors)) or f"manifest.json ({manifest_error})"
+        raise RuntimeError(f"backup failed for: {detail}")
     return manifest

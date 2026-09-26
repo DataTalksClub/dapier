@@ -30,6 +30,15 @@ class FakeS3:
         self.objects[Key] = Body
 
 
+class BrokenManifestS3(FakeS3):
+    """The bucket itself rejects writes — the S3-side catastrophe case."""
+
+    def put_object(self, Bucket, Key, Body, **kwargs):
+        if "manifest.json" in Key:
+            raise RuntimeError("The specified bucket does not exist")
+        self.objects[Key] = Body
+
+
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.setenv("BACKUP_BUCKET", "dapier-backups-test")
@@ -169,3 +178,30 @@ def test_failure_email_skipped_without_config(env, monkeypatch):
         backup.handler({}, {})
 
     assert posts == []  # only the CloudWatch alarm remains
+
+
+def test_manifest_failure_also_triggers_the_email(env, monkeypatch):
+    """If even the manifest can't be written (bucket gone), the email must
+    still go out — this is exactly the all-bets-are-off case."""
+    posts = []
+    monkeypatch.setattr(
+        backup, "_post_json",
+        lambda url, key, payload: posts.append((url, payload)),
+    )
+    monkeypatch.setenv("DATAMAILER_URL", "https://datamailer.example")
+    monkeypatch.setenv("DATAMAILER_API_KEY", "dm-key")
+    monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
+    monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
+        "dapier-ConnectionsTable-x": [],
+        "dapier-CredentialsTable-x": [],
+    }))
+    monkeypatch.setattr(backup, "_s3", lambda: BrokenManifestS3())
+
+    with pytest.raises(RuntimeError, match="manifest.json"):
+        backup.handler({}, {})
+
+    assert len(posts) == 1
+    url, payload = posts[0]
+    assert "0 of 2 tables" in payload["context"]["subject"]
+    assert "manifest.json" in payload["context"]["body"]
+    assert "The specified bucket does not exist" in payload["context"]["body"]
