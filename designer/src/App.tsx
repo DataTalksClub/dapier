@@ -935,7 +935,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               )}
             </section>
           )}
-          <aside className="inspector">
+          {/* "empty" lets the narrow-frame layout drop the panel until a node
+             is selected — on a phone the hints would cost half the canvas. */}
+          <aside className={selected?.type === "node" ? "inspector" : "inspector empty"}>
             {selected?.type === "node" && selected.data ? (
               <header className={`inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`}>
                 <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : "Action"}</h2>

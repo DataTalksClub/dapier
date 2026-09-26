@@ -64,7 +64,6 @@
   --backdrop: rgba(18, 28, 19, .53);
   --dialog-shadow: 4px 4px 0 #202820;
   /* type */
-  --topbar-h: 91px;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
@@ -626,15 +625,23 @@ dialog form { display: contents; }
 }
 
 /* --- embedded designer -------------------------------------------------------- */
-/* The canvas is the view: the section fills the viewport under the topbar and
-   the frame takes exactly what remains — no page scroll, no dead band below
-   (design-contract "The designer canvas"). */
+/* The canvas is the view: main becomes a flex column pinned to the dynamic
+   viewport so the frame gets exactly what the real topbar leaves — no page
+   scroll, no dead band below, whatever the topbar wraps to (design-contract
+   "The designer canvas"). */
+body[data-view="designer"] main {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-bottom: 0;
+}
 section.view[data-page="designer"].active {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - var(--topbar-h));
+  flex: 1;
+  height: auto;
+  min-height: 0;
 }
-body[data-view="designer"] main { padding-bottom: 0; }
 body[data-view="designer"] .topbar h1 {
   font-family: var(--mono);
   font-size: 19px;
@@ -710,7 +717,6 @@ body[data-view="designer"] .top-actions #designer-github { display: inline-flex;
 @media (max-width: 560px) {
   main { padding: 0 18px 40px; }
   .loading { margin: 0 -18px; }
-  :root { --topbar-h: 72px; }
   .topbar { min-height: 72px; gap: 12px; }
   .topbar h1 { font-size: 25px; }
   .designer-rename { font-size: 11px; }

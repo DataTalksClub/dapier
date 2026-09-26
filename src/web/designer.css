@@ -151,6 +151,9 @@ button {
 .designer-shell {
   display: grid;
   grid-template-columns: 248px 1fr;
+  /* A definite row: content min-heights (the canvas SVG's intrinsic ratio)
+     must not stretch the shell past its viewport — panels shrink instead. */
+  grid-template-rows: 100%;
   height: 100%;
 }
 
@@ -277,6 +280,7 @@ a.brand:hover span:last-child {
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100%;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -285,14 +289,19 @@ a.brand:hover span:last-child {
   background: var(--surface);
   border-bottom: 1px solid var(--panel-border);
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
   padding: 8px 12px;
 }
 
+/* Wrapping the title's row: the switch keeps its measured width, so a tight
+   frame drops the actions to their own row instead of overlapping them. */
 .topbar-title {
   align-items: center;
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: 14px;
   min-width: 0;
 }
@@ -390,6 +399,7 @@ a.brand:hover span:last-child {
 .topbar-actions {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -576,6 +586,7 @@ textarea:focus {
 .board-panel {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
   position: relative;
 }
@@ -652,6 +663,7 @@ textarea:focus {
   cursor: crosshair;
   display: block;
   flex: 1;
+  min-height: 0;
   touch-action: none;
   user-select: none;
   width: 100%;
@@ -803,7 +815,9 @@ textarea:focus {
 }
 
 /* Narrow frames (the console iframe on phones): the properties panel stacks
-   under the canvas behind a hairline; the palette scrolls horizontally. */
+   under the canvas behind a hairline and only takes space when a node is
+   selected; the palette scrolls horizontally; the test panel becomes a
+   full-cover sheet (its desktop offset assumes the side inspector column). */
 @media (max-width: 720px) {
   .designer-body {
     grid-template-columns: 1fr;
@@ -812,58 +826,29 @@ textarea:focus {
   .inspector {
     border-left: 0;
     border-top: 1px solid var(--panel-border);
-    max-height: 42%;
+    max-height: 45%;
+    padding: 12px 14px;
   }
-  .inspector-head::before {
-    left: -16px;
-  }
-  .designer-topbar {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .topbar-title {
-    flex: 1;
-    flex-wrap: wrap;
-    gap: 10px;
-    row-gap: 8px;
-  }
-  .topbar-title .id-input {
-    flex: 1;
-    min-width: 0;
+  .inspector.empty { display: none; }
+  .inspector-head::before { left: -14px; }
+  .topbar-actions { row-gap: 6px; }
+  .topbar-actions .button { min-height: 36px; padding: 0 14px; }
+  .topbar-actions .check-label { min-height: 36px; }
+  .topbar-title .id-input { flex: 1; min-width: 0; width: auto; }
+  .test-panel {
+    inset: 10px;
+    max-height: none;
+    max-width: none;
     width: auto;
   }
-}
-
-/* Narrow frames (the console iframe on phones): the properties panel stacks
-   under the canvas behind a hairline; the palette scrolls horizontally. */
-@media (max-width: 720px) {
-  .designer-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+  .component-chip { height: 36px; min-width: 36px; width: 36px; }
+  .canvas-zoom-controls {
+    bottom: 10px;
+    right: 10px;
   }
-  .inspector {
-    border-left: 0;
-    border-top: 1px solid var(--panel-border);
-    max-height: 42%;
-  }
-  .inspector-head::before {
-    left: -16px;
-  }
-  .designer-topbar {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .topbar-title {
-    flex: 1;
-    flex-wrap: wrap;
-    gap: 10px;
-    row-gap: 8px;
-  }
-  .topbar-title .id-input {
-    flex: 1;
-    min-width: 0;
-    width: auto;
-  }
+  .canvas-zoom-controls .icon-button,
+  .canvas-zoom-controls .zoom-button { height: 34px; }
+  .canvas-zoom-controls .zoom-button { min-width: 48px; }
 }
 
 /* ---- inspector ---- */
