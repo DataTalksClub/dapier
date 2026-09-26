@@ -96,12 +96,14 @@ function FieldInput({ field, value, onChange }: {
 }
 
 /** Escape hatch for action types the catalog does not model: raw JSON editing. */
-function RawJsonInput({ value, onChange }: {
+function RawJsonInput({ value, draft, onChange, onInvalidChange }: {
   value: Record<string, unknown>;
+  draft?: string;
   onChange: (next: Record<string, unknown>) => void;
+  onInvalidChange: (text: string | null) => void;
 }) {
-  const [text, setText] = useState(() => JSON.stringify(value, null, 2));
-  const [invalid, setInvalid] = useState(false);
+  const [text, setText] = useState(() => draft ?? JSON.stringify(value, null, 2));
+  const [invalid, setInvalid] = useState(draft !== undefined);
   return (
     <>
       <textarea
@@ -114,11 +116,13 @@ function RawJsonInput({ value, onChange }: {
             const parsed: unknown = JSON.parse(event.target.value);
             if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
               setInvalid(false);
+              onInvalidChange(null);
               onChange(parsed as Record<string, unknown>);
               return;
             }
           } catch { /* not JSON yet */ }
           setInvalid(true);
+          onInvalidChange(event.target.value);
         }}
       />
       {invalid && <span className="save-problems">Invalid JSON — fixes apply once it parses.</span>}
@@ -137,6 +141,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [savedId, setSavedId] = useState("new-workflow");
   const [savedEnabled, setSavedEnabled] = useState(true);
   const [canvasExtraDirty, setCanvasExtraDirty] = useState(false);
+  const [invalidRawDrafts, setInvalidRawDrafts] = useState<Record<string, string>>({});
   const [leaveOpen, setLeaveOpen] = useState(false);
   const leaveResolver = useRef<((allowed: boolean) => void) | null>(null);
   const allowUnload = useRef(false);
@@ -155,9 +160,20 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const dirty = useMemo(
     () => view === "yaml"
       ? yamlText !== savedYaml
-      : canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
-    [view, yamlText, savedYaml, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
+      : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
+    [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
   );
+
+  // Removing an unknown node or changing its action type also removes its
+  // unparseable editor text; other unknown nodes keep their draft on selection.
+  useEffect(() => {
+    setInvalidRawDrafts((current) => {
+      const retained = Object.fromEntries(Object.entries(current).filter(([id]) =>
+        shapes.some((shape) => shape.id === id && shape.type === "node" &&
+          shape.data?.nodeKind === "action" && !actionCatalog.some((action) => action.type === shape.data?.actionType))));
+      return Object.keys(retained).length === Object.keys(current).length ? current : retained;
+    });
+  }, [shapes]);
 
   function askToLeave(): Promise<boolean> {
     if (!dirty) return Promise.resolve(true);
@@ -299,6 +315,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSavedId(workflow.id);
       setSavedEnabled(workflow.enabled !== false);
       setCanvasExtraDirty(false);
+      setInvalidRawDrafts({});
       setBase(workflow);
       setYamlText(yaml);
       setSavedYaml(yaml);
@@ -325,6 +342,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] }
     };
     setSourceName(null);
+    setInvalidRawDrafts({});
     setWorkflowId("new-workflow");
     setEnabled(true);
     setShapes([trigger]);
@@ -359,6 +377,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   function switchView(next: "canvas" | "yaml") {
     if (next === view) return;
     if (next === "yaml") {
+      if (Object.keys(invalidRawDrafts).length) {
+        setStatus({ kind: "error", message: "Fix the invalid action JSON before switching to YAML." });
+        return;
+      }
       const built = workflowFromShapes(shapes, workflowId, enabled, base);
       if (built.lost.length) {
         const noun = built.lost.length === 1 ? "node is" : "nodes are";
@@ -380,10 +402,15 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setEnabled(parsed.enabled !== false);
       setSelectedId(null);
     }
+    setTestOpen(false);
     setView(next);
   }
 
   async function save(): Promise<boolean> {
+    if (Object.keys(invalidRawDrafts).length) {
+      setStatus({ kind: "error", message: "Fix the invalid action JSON before saving." });
+      return false;
+    }
     let yamlOut: string;
     let workflow: Workflow;
     let nextShapes: DiagramShape[];
@@ -680,6 +707,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <RawJsonInput
               key={selected.id}
               value={data.raw ?? {}}
+              draft={invalidRawDrafts[selected.id]}
+              onInvalidChange={(text) => setInvalidRawDrafts((current) => {
+                const next = { ...current };
+                if (text === null) delete next[selected.id];
+                else next[selected.id] = text;
+                return next;
+              })}
               onChange={(raw) => updateSelected((current) => ({ ...current, raw }))}
             />
           </section>
@@ -797,13 +831,14 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 className={testOpen ? "button secondary active" : "button secondary"}
                 type="button"
                 onClick={() => setTestOpen(!testOpen)}
-                disabled={status.kind === "busy"}
+                disabled={status.kind === "busy" || view === "yaml"}
+                title={view === "yaml" ? "Switch to Canvas to test this workflow" : undefined}
               >
                 <span>Test run</span>
               </button>
             )}
-            <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy"}>
-              <span>{dirty ? "Save to git" : "Saved"}</span>
+            <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
+              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save to git" : "Saved"}</span>
             </button>
           </div>
         </header>
@@ -943,7 +978,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <div className="leave-actions">
               <button className="button secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
               <button className="button secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
-              <button className="button primary" type="button" disabled={status.kind === "busy"} onClick={leaveAfterSave}>Save and continue</button>
+              <button className="button primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
             </div>
           </section>
         </div>

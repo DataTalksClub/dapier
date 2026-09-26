@@ -426,6 +426,9 @@ function renderGrants() {
     form.agent.readOnly = true;
     form.dataset.grantee = grant.grantee;
     renderGrantTokenChoices(grant.subject);
+    // Grant identity is subject + agent. Editing permissions must retain both,
+    // including manual subjects absent from the active-token picker.
+    form.agent.readOnly = true;
     $('#connection-grant-token').disabled = true;
     $$('input[name="operations"]', form).forEach((input) => { input.checked = (grant.operations || []).includes(input.value); });
     form.expires_at.value = localDateTime(grant.expires_at);

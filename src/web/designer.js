@@ -19000,9 +19000,9 @@
       )
     ] });
   }
-  function RawJsonInput({ value, onChange }) {
-    const [text, setText] = reactExports.useState(() => JSON.stringify(value, null, 2));
-    const [invalid, setInvalid] = reactExports.useState(false);
+  function RawJsonInput({ value, draft, onChange, onInvalidChange }) {
+    const [text, setText] = reactExports.useState(() => draft ?? JSON.stringify(value, null, 2));
+    const [invalid, setInvalid] = reactExports.useState(draft !== void 0);
     return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "textarea",
@@ -19016,12 +19016,14 @@
               const parsed = JSON.parse(event.target.value);
               if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
                 setInvalid(false);
+                onInvalidChange(null);
                 onChange(parsed);
                 return;
               }
             } catch {
             }
             setInvalid(true);
+            onInvalidChange(event.target.value);
           }
         }
       ),
@@ -19039,6 +19041,7 @@
     const [savedId, setSavedId] = reactExports.useState("new-workflow");
     const [savedEnabled, setSavedEnabled] = reactExports.useState(true);
     const [canvasExtraDirty, setCanvasExtraDirty] = reactExports.useState(false);
+    const [invalidRawDrafts, setInvalidRawDrafts] = reactExports.useState({});
     const [leaveOpen, setLeaveOpen] = reactExports.useState(false);
     const leaveResolver = reactExports.useRef(null);
     const allowUnload = reactExports.useRef(false);
@@ -19053,9 +19056,15 @@
     const [testBusy, setTestBusy] = reactExports.useState(false);
     const [testResult, setTestResult] = reactExports.useState(null);
     const dirty = reactExports.useMemo(
-      () => view === "yaml" ? yamlText !== savedYaml : canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
-      [view, yamlText, savedYaml, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
+      () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
+      [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
     );
+    reactExports.useEffect(() => {
+      setInvalidRawDrafts((current) => {
+        const retained = Object.fromEntries(Object.entries(current).filter(([id]) => shapes.some((shape) => shape.id === id && shape.type === "node" && shape.data?.nodeKind === "action" && !actionCatalog.some((action) => action.type === shape.data?.actionType))));
+        return Object.keys(retained).length === Object.keys(current).length ? current : retained;
+      });
+    }, [shapes]);
     function askToLeave() {
       if (!dirty) return Promise.resolve(true);
       return new Promise((resolve) => {
@@ -19179,6 +19188,7 @@
         setSavedId(workflow.id);
         setSavedEnabled(workflow.enabled !== false);
         setCanvasExtraDirty(false);
+        setInvalidRawDrafts({});
         setBase(workflow);
         setYamlText(yaml2);
         setSavedYaml(yaml2);
@@ -19204,6 +19214,7 @@
         data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] }
       };
       setSourceName(null);
+      setInvalidRawDrafts({});
       setWorkflowId("new-workflow");
       setEnabled(true);
       setShapes([trigger]);
@@ -19234,6 +19245,10 @@
     function switchView(next) {
       if (next === view) return;
       if (next === "yaml") {
+        if (Object.keys(invalidRawDrafts).length) {
+          setStatus({ kind: "error", message: "Fix the invalid action JSON before switching to YAML." });
+          return;
+        }
         const built = workflowFromShapes(shapes, workflowId, enabled, base);
         if (built.lost.length) {
           const noun = built.lost.length === 1 ? "node is" : "nodes are";
@@ -19255,9 +19270,14 @@
         setEnabled(parsed.enabled !== false);
         setSelectedId(null);
       }
+      setTestOpen(false);
       setView(next);
     }
     async function save() {
+      if (Object.keys(invalidRawDrafts).length) {
+        setStatus({ kind: "error", message: "Fix the invalid action JSON before saving." });
+        return false;
+      }
       let yamlOut;
       let workflow;
       let nextShapes;
@@ -19547,6 +19567,13 @@
             RawJsonInput,
             {
               value: data.raw ?? {},
+              draft: invalidRawDrafts[selected.id],
+              onInvalidChange: (text) => setInvalidRawDrafts((current) => {
+                const next = { ...current };
+                if (text === null) delete next[selected.id];
+                else next[selected.id] = text;
+                return next;
+              }),
               onChange: (raw) => updateSelected((current) => ({ ...current, raw }))
             },
             selected.id
@@ -19676,11 +19703,12 @@
                 className: testOpen ? "button secondary active" : "button secondary",
                 type: "button",
                 onClick: () => setTestOpen(!testOpen),
-                disabled: status.kind === "busy",
+                disabled: status.kind === "busy" || view === "yaml",
+                title: view === "yaml" ? "Switch to Canvas to test this workflow" : void 0,
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: dirty ? "Save to git" : "Saved" }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save to git" : "Saved" }) })
           ] })
         ] }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
@@ -19807,7 +19835,7 @@
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", disabled: status.kind === "busy", onClick: leaveAfterSave, children: "Save and continue" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
         ] })
       ] }) })
     ] });

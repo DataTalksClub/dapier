@@ -97,12 +97,15 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   if (link.dataset.external) return; // full-page view with its own asset bundle
   if (!link.dataset.view && !link.dataset.target) return;
   event.preventDefault();
-  if (await setView(link.dataset.view || link.dataset.target)) closeMobileMenu();
+  // The designer's leave prompt lives in main. Remove the drawer's inert
+  // layer before the asynchronous guard can show that prompt.
+  closeMobileMenu(true);
+  await setView(link.dataset.view || link.dataset.target);
 }));
 window.addEventListener('popstate', async () => {
   const view = viewFromPath(window.location.pathname);
+  closeMobileMenu(true);
   if (await setView(view, false)) {
-    closeMobileMenu();
     if (view === 'designer') await designerFromLocation();
   }
 });
