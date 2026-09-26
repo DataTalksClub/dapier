@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'credentials', 'tokens', 'runs'];
+const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'credentials', 'tokens', 'runs'];
 let viewGuard = null;
 let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 
@@ -28,7 +28,7 @@ export async function setView(view, push = true) {
     else item.removeAttribute('aria-current');
   });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
-  $('#view-title').textContent = ({ runs: 'Run history', tokens: 'API tokens' })[view] || view[0].toUpperCase() + view.slice(1);
+  $('#view-title').textContent = ({ runs: 'Run history', tokens: 'API tokens', emails: 'Emails' })[view] || view[0].toUpperCase() + view.slice(1);
   $('.sidebar').classList.remove('open');
   $('#menu-toggle')?.setAttribute('aria-expanded', 'false');
   if (push) history.pushState(null, '', view === 'overview' ? '/' : `/${view}`);

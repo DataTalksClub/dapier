@@ -22,11 +22,15 @@ DOMAIN_ENV = "TRIGGER_EMAIL_DOMAIN"
 DEFAULT_DOMAIN = "dtcdev.click"
 
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$")
+# Only infrastructure addresses are reserved here. Routes claimed by bundled
+# YAML workflows are guarded separately: build_item refuses to shadow them
+# (yaml_email_routes), so a route becomes app-manageable as soon as the YAML
+# stops claiming it — no reserved-list change needed.
 RESERVED_NAMES = {
     "abuse", "admin", "api", "auth", "billing", "dmarc", "datamailer", "e2e",
-    "hostmaster", "imap", "invoice", "invoice-pdf", "invoice-attachment",
-    "mail", "no-reply", "noreply", "pop", "postmaster", "relay", "root",
-    "security", "smtp", "support", "todo", "webmaster", "webmail", "www",
+    "hostmaster", "imap", "mail", "no-reply", "noreply", "pop", "postmaster",
+    "relay", "root", "security", "smtp", "support", "webmaster", "webmail",
+    "www",
 }
 
 # Required and optional keys per action type live in the connector registry

@@ -40,8 +40,13 @@ class NameValidationTests(unittest.TestCase):
 
     def test_rejects_reserved(self):
         with self.assertRaises(email_triggers.TriggerError) as ctx:
-            email_triggers.validate_name("todo")
+            email_triggers.validate_name("postmaster")
         self.assertIn("reserved", str(ctx.exception))
+
+    def test_routes_freed_from_yaml_are_no_longer_reserved(self):
+        # invoice moved from bundled YAML to app-managed triggers; only
+        # infrastructure addresses stay hard-reserved.
+        self.assertEqual(email_triggers.validate_name("invoice"), "invoice")
 
 
 class ActionValidationTests(unittest.TestCase):

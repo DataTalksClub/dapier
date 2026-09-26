@@ -67,6 +67,7 @@
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
+        <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
         <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
@@ -191,6 +192,20 @@
         </div>
       </section>
 
+      <section class="view" data-page="emails">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Emails</h2><p class="sub">Reserve an address at your trigger domain and bind actions to it — mail arrives, the actions run. Changes here are live immediately; no YAML and no deploy.</p></div>
+          <button id="new-email" class="button primary" type="button">New email</button>
+        </div>
+        <div id="email-empty" class="empty-state" hidden><h3>No email triggers</h3><p>Reserve an address, then bind actions — for example, save every attachment to Dropbox.</p></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Address</th><th>Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="email-table"></tbody>
+          </table>
+        </div>
+        <p id="email-yaml-routes" class="sub" hidden>Also handled by bundled workflows (edit in the repo, not here): <span id="email-yaml-list" class="mono"></span></p>
+      </section>
       <section class="view" data-page="tokens">
         <div class="section-head">
           <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent. Grant access from a connection's Manage panel, and revoke the token here any time. The value is shown once, at creation.</p></div>
@@ -314,6 +329,38 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Create token</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="email-dialog" aria-label="Configure email">
+    <form id="email-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="email-dialog-title">New email</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <label>Address<input name="name" class="mono-input" placeholder="invoice" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" required><small class="field-hint">Lowercase letters, numbers, dashes. Mail to <code>&lt;address&gt;@<span id="email-domain-hint"></span></code> runs the actions.</small></label>
+        <label>Description<input name="description" placeholder="What happens when mail arrives" maxlength="200"></label>
+        <label><input type="checkbox" name="enabled" checked> Enabled</label>
+        <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input" required></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
+        <p id="email-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="email-confirm-dialog" aria-label="Delete email trigger">
+    <form id="email-confirm-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="email-confirm-title"></h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body"><p id="email-confirm-message"></p></div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" value="confirm" type="submit">Delete</button>
       </div>
     </form>
   </dialog>

@@ -7,7 +7,7 @@ import yaml
 
 from ..auth import api_tokens
 from .. import http
-from ..triggers import published_workflows
+from ..triggers import email_triggers, published_workflows
 from . import runs
 from ..connections.credentials import CREDENTIAL_SPECS, credential_status
 from ..connections.providers import oauth_clients
@@ -80,6 +80,23 @@ def _credential_status(provider):
 def _oauth_client_status(provider):
     return oauth_clients.status(provider)
 
+def _email_triggers():
+    """Stored email triggers plus the routes bundled YAML still handles.
+
+    Best-effort: the console's startup fetch must survive a triggers-table
+    problem, so a failure renders as an empty list rather than an error.
+    """
+    try:
+        triggers = [email_triggers.public_view(item) for item in email_triggers.load_items()]
+        yaml_routes = sorted(email_triggers.yaml_email_routes())
+    except Exception:  # noqa: BLE001 — degrade to an empty view, never block the console
+        return {"domain": "", "triggers": [], "yaml_routes": []}
+    return {
+        "domain": email_triggers.trigger_domain(),
+        "triggers": triggers,
+        "yaml_routes": yaml_routes,
+    }
+
 def overview():
     executions = sorted(
         _scan(os.environ["EXECUTIONS_TABLE"]),
@@ -98,4 +115,5 @@ def overview():
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
         "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
         "api_tokens": [api_tokens.public_view(item) for item in api_tokens.list_all()],
+        "email_triggers": _email_triggers(),
     })

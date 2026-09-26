@@ -3,11 +3,12 @@ import { state } from '../state.js';
 import { $, icons, showApp, showStartupError, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
-import { openDesigner } from './designer.js';
+import { openDesigner, postConnectionsToDesigner } from './designer.js';
 import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
+import { renderEmails } from './emails.js';
 import { renderRuns, openRun } from './runs.js';
 
 function workflowRow(workflow) {
@@ -102,6 +103,7 @@ function render() {
   renderCredentials(data.credentials);
   renderOAuthClients(data.oauth_clients || []);
   renderTokens(data.api_tokens || []);
+  renderEmails(data.email_triggers);
   renderRuns();
   const now = new Date();
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
@@ -148,6 +150,9 @@ export async function refresh() {
     state.data = await api('/api/admin/overview');
     render();
     showApp();
+    // Fresh connections data for an open designer: the iframe may have
+    // mounted before this fetch answered.
+    if (state.view === 'designer') postConnectionsToDesigner();
     return true;
   } catch (error) {
     if (!$('#forbidden-view').hidden) return;
