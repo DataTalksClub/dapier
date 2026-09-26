@@ -43,6 +43,7 @@ export function renderRuns() {
     [...new Set(runs.map((run) => run.workflow_id).filter(Boolean))].sort().map((id) =>
       `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
   statusFilter.innerHTML = '<option value="">All statuses</option>' +
+    (runs.some((run) => ['failed', 'error'].includes(run.status)) ? '<option value="problems">Failures</option>' : '') +
     [...new Set(runs.map((run) => run.status).filter(Boolean))].sort().map((status) =>
       `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`).join('');
   workflowFilter.value = selectedWorkflow;
@@ -51,7 +52,8 @@ export function renderRuns() {
   const maxAge = dateFilter.value === 'day' ? 86400000 : dateFilter.value === 'week' ? 604800000 : null;
   const shown = runs.filter((run) =>
     (!workflowFilter.value || run.workflow_id === workflowFilter.value) &&
-    (!statusFilter.value || run.status === statusFilter.value) &&
+    (!statusFilter.value || run.status === statusFilter.value ||
+      (statusFilter.value === 'problems' && ['failed', 'error'].includes(run.status))) &&
     (maxAge === null || (Number.isFinite(Date.parse(run.started_at)) && now - Date.parse(run.started_at) <= maxAge)));
   $('#run-table').innerHTML = shown.map(runRow).join('') ||
     `<tr><td colspan="5" class="muted-cell">${runs.length ? 'No runs match these filters' : 'No runs yet'}</td></tr>`;

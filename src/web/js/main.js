@@ -102,6 +102,21 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   closeMobileMenu(true);
   await setView(link.dataset.view || link.dataset.target);
 }));
+$('#overview-attention').addEventListener('click', async (event) => {
+  const link = event.target.closest('.view-link');
+  if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  closeMobileMenu(true);
+  if (!await setView(link.dataset.target)) return;
+  if (link.dataset.runStatus) {
+    $('#runs-status-filter').value = link.dataset.runStatus;
+    $('#runs-status-filter').dispatchEvent(new Event('change'));
+  }
+  if (link.dataset.connectionStatus) {
+    $('#connection-status-filter').value = link.dataset.connectionStatus;
+    $('#connection-status-filter').dispatchEvent(new Event('change'));
+  }
+});
 window.addEventListener('popstate', async () => {
   const view = viewFromPath(window.location.pathname);
   closeMobileMenu(true);

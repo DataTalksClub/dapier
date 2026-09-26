@@ -98,6 +98,8 @@
       <div id="notice" class="notice" role="status" hidden></div>
 
       <section class="view active" data-page="overview">
+        <div class="section-head page-intro"><div><h2>Automation health</h2><p class="sub">Review recent activity and resolve anything that needs attention.</p></div></div>
+        <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <div class="metrics">
           <div class="metric"><span class="metric-label">Enabled workflows</span><span class="metric-value mono" id="metric-workflows">-</span></div>
           <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span><span class="metric-detail" id="metric-connection-detail"></span></div>
@@ -105,35 +107,28 @@
           <div class="metric"><span class="metric-label">Credentials</span><span class="metric-value mono" id="metric-credentials">-</span></div>
         </div>
 
-        <div class="section-head">
-          <div class="section-head-text"><h2>Active automations</h2><p class="sub">Current YAML deployment</p></div>
-          <a class="text-link view-link" href="/workflows" data-target="workflows">View all<i data-lucide="arrow-right"></i></a>
+        <div class="overview-columns">
+          <section>
+            <div class="section-head"><div><h2>Recent runs</h2><p class="sub">Select a run to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">Run history<i data-lucide="arrow-right"></i></a></div>
+            <div id="overview-runs-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Status</th><th>Started</th></tr></thead><tbody id="overview-runs"></tbody></table></div>
+            <div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
+          </section>
+          <section>
+            <div class="section-head"><div><h2>Enabled workflows</h2><p class="sub">Select a workflow to open it.</p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
+            <div id="overview-workflows-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead><tbody id="overview-workflows"></tbody></table></div>
+            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
+          </section>
         </div>
-        <div id="overview-workflows-table" class="table-wrap">
-          <table>
-            <thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead>
-            <tbody id="overview-workflows"></tbody>
-          </table>
-        </div><div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
-
-        <div class="section-head">
-          <div class="section-head-text"><h2>Recent activity</h2><p class="sub">Latest runs — open one to see the step flow</p></div>
-          <a class="text-link view-link" href="/runs" data-target="runs">View all<i data-lucide="arrow-right"></i></a>
-        </div>
-        <div id="overview-runs-table" class="table-wrap">
-          <table>
-            <thead><tr><th>Run</th><th>Status</th></tr></thead>
-            <tbody id="overview-runs"></tbody>
-          </table>
-        </div><div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
       </section>
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Workflows</h2><p class="sub">Edit in the visual designer. Saving commits YAML to GitHub; deployment publishes it in a few minutes.</p></div>
+          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">Choose a workflow to edit its triggers and actions. Saving commits YAML to GitHub; deployment publishes it in a few minutes.</p></div>
           <a id="new-workflow" class="button primary" href="/designer">New workflow</a>
         </div>
+        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name or trigger"></label><label>Status<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
+        <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
             <thead><tr><th>Workflow</th><th>Trigger</th><th>Actions</th><th>Status</th></tr></thead>
@@ -211,7 +206,7 @@
 
       <section class="view" data-page="runs">
         <div class="section-head">
-          <div class="section-head-text"><h2>Runs</h2><p class="sub">One run per trigger event — open one to see the flow of data between the steps. Records are kept for 90 days.</p></div>
+          <div class="section-head-text"><h2>Recent runs</h2><p class="sub">Open a run to trace its steps and errors. Records are kept for 90 days.</p></div>
         </div>
         <div class="run-filters"><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span></div>
         <div class="table-wrap">

@@ -356,6 +356,26 @@ main { min-width: 0; padding: 0 40px 64px; }
 .metric-detail { min-height: 1em; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .metric:first-child .metric-value { font-size: 38px; }
 
+/* Put actionable health signals before inventory; keep the two lists scannable. */
+.page-intro { margin-top: 28px; }
+.page-intro h2 { font-size: 20px; }
+.attention-panel { margin-top: 12px; padding: 18px 20px; border: 1px solid var(--line-strong); background: var(--surface); }
+.attention-panel h3 { font-size: 14px; margin-bottom: 6px; }
+.attention-panel .sub { max-width: 70ch; }
+.attention-items { display: flex; flex-wrap: wrap; gap: 12px 32px; }
+.attention-item { display: grid; gap: 3px; color: var(--ink); text-decoration: none; }
+.attention-item strong { font-size: 14px; }
+.attention-item span { color: var(--accent); font-size: 13px; font-weight: 500; }
+.attention-item:hover span { text-decoration: underline; }
+.overview-columns { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 36px; }
+.overview-columns > section { min-width: 0; }
+.overview-columns .section-head { align-items: flex-start; gap: 12px; }
+.list-tools { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px 18px; margin: 12px 0 24px; }
+.list-tools label:first-child { flex: 1; min-width: 180px; max-width: 420px; }
+.list-tools label { min-width: 160px; }
+.list-tools > .field-hint { margin-bottom: 10px; }
+@media (max-width: 1200px) { .overview-columns { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+
 /* --- section headers -------------------------------------------------------- */
 .section-head {
   display: flex;
@@ -367,7 +387,7 @@ main { min-width: 0; padding: 0 40px 64px; }
   padding-bottom: 10px;
 }
 .section-head h2 { font-size: 15px; font-weight: 600; }
-.sub { margin-top: 3px; font-size: 12px; color: var(--muted); }
+.sub { margin-top: 3px; font-size: 13px; line-height: 1.5; font-weight: 500; color: var(--ink-soft); }
 .register-summary { color: var(--muted); font-size: 12px; }
 .oauth-result { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding: 16px 18px; border-left: 3px solid var(--run-text); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
 .oauth-result strong { font-size: 14px; }
@@ -381,7 +401,7 @@ th {
   text-align: left;
   font-size: 11.5px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--ink-soft);
   padding: 0 18px 9px 0;
   border-bottom: 1px solid var(--line-strong);
   white-space: nowrap;
@@ -410,7 +430,7 @@ th:last-child, td:last-child { padding-right: 0; }
 .connect-name { font-weight: 600; letter-spacing: -0.01em; }
 .brand-mark { flex: none; }
 .provider-cell { display: inline-flex; align-items: center; gap: 8px; }
-.connect-blurb { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.connect-blurb { margin: 0; color: var(--ink-soft); font-size: 12.5px; font-weight: 500; line-height: 1.45; }
 .connect-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; grid-column: 3; grid-row: 1 / span 2; }
 .connect-pending { color: var(--run-text); font-size: 12px; grid-column: 2; }
 #connect-picker { margin-top: 28px; border-top: 1px solid var(--line-strong); }
@@ -434,7 +454,7 @@ th:last-child, td:last-child { padding-right: 0; }
 #edit-connection-revoke { color: var(--red); border-color: var(--red-line); }
 .sub-head { font-size: 1.05rem; }
 td.mono, .mono-cell { font-family: var(--mono); font-size: 12.5px; }
-.muted-cell { color: var(--muted); }
+.muted-cell { color: var(--ink-soft); }
 /* .cell-title stays a real table-cell — display:grid here would strip the td of
    its cell role, so its border paints at content height and rows split apart
    whenever another cell (e.g. a wrapped date) is taller. Stack spans instead. */
@@ -697,6 +717,9 @@ body[data-view="designer"] .top-actions #designer-github { display: inline-flex;
   .run-filters label { flex: 1 1 140px; }
   .run-filters .field-hint { margin: 4px 0 0; flex-basis: 100%; }
   .connection-filters input, .connection-filters select { width: 100%; flex: 1 1 130px; }
+  .list-tools { align-items: stretch; }
+  .list-tools label, .list-tools label:first-child { min-width: 0; flex: 1 1 100%; max-width: none; }
+  .list-tools > .field-hint { margin: 0; }
   .last-updated { display: none; }
 
   .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 0; padding: 22px 0 20px; }

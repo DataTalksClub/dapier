@@ -2,7 +2,7 @@
 import { state } from '../state.js';
 import { $, icons, showApp, showStartupError, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, triggerLabel, configRows, pad2 } from '../format.js';
+import { escapeHtml, statusLine, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { openDesigner } from './designer.js';
 import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
@@ -92,18 +92,11 @@ function render() {
   $('#overview-workflows-empty').hidden = enabled.length > 0;
   $('#overview-workflows-table').hidden = enabled.length === 0;
   $('#overview-runs').innerHTML = (data.runs || []).slice(0, 6).map((run) =>
-    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td></tr>`).join('');
+    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td><td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td></tr>`).join('');
   $('#overview-runs-empty').hidden = recentRuns.length > 0;
   $('#overview-runs-table').hidden = recentRuns.length === 0;
-  $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
-    <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
-    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
-    <td class="mono muted-cell" data-label="Actions">${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
-    <td data-label="Status"><span class="workflow-status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}${workflow.published ? '' : ' <span class="muted-cell">(deploying)</span>'}
-      <button type="button" class="workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}">${workflow.enabled ? 'Disable' : 'Enable'}</button></span></td>
-  </tr>`).join('');
-  $('#workflow-empty').hidden = data.workflows.length > 0;
-  $('#workflow-table-wrap').hidden = data.workflows.length === 0;
+  renderAttention(data);
+  renderWorkflows();
   renderConnections(data.connections);
   renderCredentials(data.credentials);
   renderOAuthClients(data.oauth_clients || []);
@@ -113,6 +106,40 @@ function render() {
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();
 }
+
+export function renderWorkflows() {
+  const all = state.data?.workflows || [];
+  const query = $('#workflow-search').value.trim().toLowerCase();
+  const status = $('#workflow-filter').value;
+  const shown = all.filter((workflow) =>
+    `${workflow.id} ${triggerLabel(workflow)}`.toLowerCase().includes(query) &&
+    (status === 'all' || workflow.enabled === (status === 'enabled')));
+  $('#workflow-count').textContent = `${shown.length} of ${all.length} workflows`;
+  $('#workflow-table').innerHTML = shown.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
+    <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
+    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
+    <td class="mono muted-cell" data-label="Actions">${workflow.actions.map((action) => escapeHtml(action.type)).join(', ')}</td>
+    <td data-label="Status"><span class="workflow-status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}${workflow.published ? '' : ' <span class="muted-cell">(deploying)</span>'}
+      <button type="button" class="workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}">${workflow.enabled ? 'Disable' : 'Enable'}</button></span></td>
+  </tr>`).join('');
+  $('#workflow-empty').hidden = all.length > 0;
+  $('#workflow-filter-empty').hidden = all.length === 0 || shown.length > 0;
+  $('#workflow-table-wrap').hidden = shown.length === 0;
+}
+
+function renderAttention(data) {
+  const failed = (data.runs || []).filter((run) => ['failed', 'error'].includes(run.status));
+  const connections = data.connections.filter((connection) => connection.status !== 'connected');
+  const items = [];
+  if (failed.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${failed.length} failed ${failed.length === 1 ? 'run' : 'runs'} in recent history</strong><span>Inspect failures →</span></a>`);
+  if (connections.length) items.push(`<a class="attention-item view-link" href="/connections" data-target="connections" data-connection-status="attention"><strong>${connections.length} ${connections.length === 1 ? 'account needs' : 'accounts need'} attention</strong><span>Complete setup or reconnect →</span></a>`);
+  $('#overview-attention').innerHTML = items.length
+    ? `<h3>Needs attention</h3><div class="attention-items">${items.join('')}</div>`
+    : `<h3>${data.workflows.length ? 'No issues in recent history' : 'Start your first automation'}</h3><p class="sub">${data.workflows.length ? 'No failed runs or disconnected accounts in the loaded records.' : 'Connect an account, then create a workflow to automate a task.'}</p>${data.workflows.length ? '' : '<a class="text-link view-link" href="/connections" data-target="connections">Connect an account →</a>'}`;
+}
+
+$('#workflow-search').addEventListener('input', renderWorkflows);
+$('#workflow-filter').addEventListener('change', renderWorkflows);
 
 export async function refresh() {
   $('#loading').hidden = false;
