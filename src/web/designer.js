@@ -14312,21 +14312,21 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$k = [
+  const __iconNode$l = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$k);
-  const __iconNode$j = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$l);
+  const __iconNode$k = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$j);
-  const __iconNode$i = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$k);
+  const __iconNode$j = [
     [
       "path",
       {
@@ -14339,8 +14339,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$i);
-  const __iconNode$h = [
+  const FileText = createLucideIcon("file-text", __iconNode$j);
+  const __iconNode$i = [
     [
       "path",
       {
@@ -14351,8 +14351,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$h);
-  const __iconNode$g = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$i);
+  const __iconNode$h = [
     [
       "path",
       {
@@ -14361,15 +14361,15 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$g);
-  const __iconNode$f = [
+  const Funnel = createLucideIcon("funnel", __iconNode$h);
+  const __iconNode$g = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$f);
-  const __iconNode$e = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$g);
+  const __iconNode$f = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14382,17 +14382,24 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$e);
-  const __iconNode$d = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$f);
+  const __iconNode$e = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$d);
-  const __iconNode$c = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$c);
+  const ListTree = createLucideIcon("list-tree", __iconNode$e);
+  const __iconNode$d = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$d);
+  const __iconNode$c = [
+    ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
+    ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
+    ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
+    ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
+  ];
+  const Maximize = createLucideIcon("maximize", __iconNode$c);
   const __iconNode$b = [["path", { d: "M5 12h14", key: "1ays0h" }]];
   const Minus = createLucideIcon("minus", __iconNode$b);
   const __iconNode$a = [
@@ -17564,7 +17571,7 @@
   const noteColor = "var(--diagram-note)";
   const handleColor = "var(--diagram-handle)";
   const shapeLabelSize = 16;
-  const minZoom = 0.5;
+  const minZoom = 0.25;
   const maxZoom = 2;
   function shapeColor(shape) {
     if (shape.type === "note") return noteColor;
@@ -18259,7 +18266,7 @@
     const [contextMenu, setContextMenu] = reactExports.useState(null);
     const [editingId, setEditingId] = reactExports.useState(null);
     const [editingLabel, setEditingLabel] = reactExports.useState("");
-    const [canvasViewBox, setCanvasViewBox] = reactExports.useState({ width: 1200, height: 760 });
+    const [canvasViewBox, setCanvasViewBox] = reactExports.useState({ width: 0, height: 0 });
     const [zoom, setZoom] = reactExports.useState(1);
     const [pan, setPan] = reactExports.useState({ x: 0, y: 0 });
     const [undoStack, setUndoStack] = reactExports.useState([]);
@@ -18269,6 +18276,9 @@
     const dragSnapshotRef = reactExports.useRef(null);
     const didDragRef = reactExports.useRef(false);
     const skipNextEditCommitRef = reactExports.useRef(false);
+    const pointersRef = reactExports.useRef(/* @__PURE__ */ new Map());
+    const pinchRef = reactExports.useRef(null);
+    const didFitRef = reactExports.useRef(false);
     const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
     const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
     const canvasClass = reactExports.useMemo(() => [
@@ -18374,6 +18384,20 @@
       setTool("select");
     }
     function onPointerDown(event) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointersRef.current.size === 2) {
+        const active = Array.from(pointersRef.current.values());
+        setDragStart(null);
+        setPanStart(null);
+        setConnectorDrag(null);
+        setReattachDrag(null);
+        pinchRef.current = {
+          distance: Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y),
+          zoom
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
       const point = toCanvasPoint(event);
       const hit = findNodeAt(shapes, point);
       const connectorHit = hit ? void 0 : findConnectorAt(shapes, point);
@@ -18396,6 +18420,26 @@
       }
     }
     function onPointerMove(event) {
+      if (pointersRef.current.has(event.pointerId)) {
+        pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      const pinch = pinchRef.current;
+      if (pinch && pointersRef.current.size >= 2) {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const active = Array.from(pointersRef.current.values());
+        const distance = Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y);
+        const midX = (active[0].x + active[1].x) / 2;
+        const midY = (active[0].y + active[1].y) / 2;
+        const nextZoom = Math.min(maxZoom, Math.max(minZoom, Math.round(pinch.zoom * distance / pinch.distance * 100) / 100));
+        const worldPerPx = canvasViewBox.width / zoom / rect.width;
+        const midWorldX = canvasViewBox.width / 2 + pan.x + (midX - rect.left - rect.width / 2) * worldPerPx;
+        const midWorldY = canvasViewBox.height / 2 + pan.y + (midY - rect.top - rect.height / 2) * worldPerPx;
+        setZoom(nextZoom);
+        setPan({ x: midWorldX - canvasViewBox.width / 2, y: midWorldY - canvasViewBox.height / 2 });
+        return;
+      }
       if (panStart) {
         const svg = svgRef.current;
         if (!svg) return;
@@ -18429,6 +18473,8 @@
       setDragStart(point);
     }
     function onPointerUp(event) {
+      pointersRef.current.delete(event.pointerId);
+      if (pointersRef.current.size < 2) pinchRef.current = null;
       if (reattachDrag) {
         const point = toCanvasPoint(event);
         const target = findNodeAt(shapes, point);
@@ -18494,6 +18540,49 @@
     }
     function changeZoom(delta) {
       setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
+    }
+    function fitToContent() {
+      if (!shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const shape of shapes) {
+        const box = shape.type === "arrow" ? (() => {
+          const endpoints = connectorEndpoints(shape, shapes);
+          return {
+            left: Math.min(endpoints.start.x, endpoints.end.x),
+            right: Math.max(endpoints.start.x, endpoints.end.x),
+            top: Math.min(endpoints.start.y, endpoints.end.y),
+            bottom: Math.max(endpoints.start.y, endpoints.end.y)
+          };
+        })() : {
+          left: Math.min(shape.x, shape.x + shape.width),
+          right: Math.max(shape.x, shape.x + shape.width),
+          top: Math.min(shape.y, shape.y + shape.height),
+          bottom: Math.max(shape.y, shape.y + shape.height)
+        };
+        minX = Math.min(minX, box.left);
+        minY = Math.min(minY, box.top);
+        maxX = Math.max(maxX, box.right);
+        maxY = Math.max(maxY, box.bottom);
+      }
+      const pad = 48;
+      const nextZoom = Math.min(
+        1,
+        Math.max(
+          minZoom,
+          Math.round(Math.min(
+            canvasViewBox.width / (maxX - minX + pad * 2),
+            canvasViewBox.height / (maxY - minY + pad * 2)
+          ) * 100) / 100
+        )
+      );
+      setZoom(nextZoom);
+      setPan({
+        x: minX + (maxX - minX) / 2 - canvasViewBox.width / 2,
+        y: minY + (maxY - minY) / 2 - canvasViewBox.height / 2
+      });
     }
     function deleteSelected() {
       if (!selectedId) return;
@@ -18642,8 +18731,8 @@
       function updateViewBox() {
         const rect = observedSvg.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
-        const nextHeight = Math.round(1200 * rect.height / rect.width);
-        setCanvasViewBox((current) => current.height === nextHeight ? current : { width: 1200, height: nextHeight });
+        const nextViewBox = { width: Math.round(rect.width), height: Math.round(rect.height) };
+        setCanvasViewBox((current) => current.width === nextViewBox.width && current.height === nextViewBox.height ? current : nextViewBox);
       }
       updateViewBox();
       const observer = new ResizeObserver(updateViewBox);
@@ -18654,6 +18743,11 @@
         window.removeEventListener("resize", updateViewBox);
       };
     }, []);
+    reactExports.useEffect(() => {
+      if (didFitRef.current || !shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+      didFitRef.current = true;
+      fitToContent();
+    }, [shapes, canvasViewBox]);
     const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
     const editorFontSize = toViewportFontSize();
     const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
@@ -18705,7 +18799,8 @@
           Math.round(zoom * 100),
           "%"
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 18 }) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 18 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 18 }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "svg",
@@ -18716,6 +18811,7 @@
           onPointerDown,
           onPointerMove,
           onPointerUp,
+          onPointerCancel: onPointerUp,
           onDoubleClick: onCanvasDoubleClick,
           onDragOver: onCanvasDragOver,
           onDrop: onCanvasDrop,

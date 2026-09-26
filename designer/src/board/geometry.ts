@@ -7,7 +7,7 @@ export const triggerColor = "var(--diagram-trigger)";
 export const noteColor = "var(--diagram-note)";
 export const handleColor = "var(--diagram-handle)";
 export const shapeLabelSize = 16;
-export const minZoom = 0.5;
+export const minZoom = 0.25;
 export const maxZoom = 2;
 export function shapeColor(shape: DiagramShape) {
   if (shape.type === "note") return noteColor;

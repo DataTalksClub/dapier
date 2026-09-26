@@ -1,4 +1,5 @@
 import {
+  Maximize,
   Minus,
   MousePointer2,
   Plus,
@@ -43,7 +44,7 @@ export function WorkflowBoard({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
-  const [canvasViewBox, setCanvasViewBox] = useState({ width: 1200, height: 760 });
+  const [canvasViewBox, setCanvasViewBox] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
@@ -53,6 +54,9 @@ export function WorkflowBoard({
   const dragSnapshotRef = useRef<DiagramShape[] | null>(null);
   const didDragRef = useRef(false);
   const skipNextEditCommitRef = useRef(false);
+  const pointersRef = useRef(new Map<number, Point>());
+  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const didFitRef = useRef(false);
 
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
@@ -169,6 +173,21 @@ export function WorkflowBoard({
   }
 
   function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointersRef.current.size === 2) {
+      const active = Array.from(pointersRef.current.values());
+      setDragStart(null);
+      setPanStart(null);
+      setConnectorDrag(null);
+      setReattachDrag(null);
+      pinchRef.current = {
+        distance: Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y),
+        zoom
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
     const point = toCanvasPoint(event);
     const hit = findNodeAt(shapes, point);
     const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
@@ -194,6 +213,26 @@ export function WorkflowBoard({
   }
 
   function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (pointersRef.current.has(event.pointerId)) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    const pinch = pinchRef.current;
+    if (pinch && pointersRef.current.size >= 2) {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const active = Array.from(pointersRef.current.values());
+      const distance = Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y);
+      const midX = (active[0].x + active[1].x) / 2;
+      const midY = (active[0].y + active[1].y) / 2;
+      const nextZoom = Math.min(maxZoom, Math.max(minZoom, Math.round(((pinch.zoom * distance) / pinch.distance) * 100) / 100));
+      const worldPerPx = canvasViewBox.width / zoom / rect.width;
+      const midWorldX = canvasViewBox.width / 2 + pan.x + (midX - rect.left - rect.width / 2) * worldPerPx;
+      const midWorldY = canvasViewBox.height / 2 + pan.y + (midY - rect.top - rect.height / 2) * worldPerPx;
+      setZoom(nextZoom);
+      setPan({ x: midWorldX - canvasViewBox.width / 2, y: midWorldY - canvasViewBox.height / 2 });
+      return;
+    }
     if (panStart) {
       const svg = svgRef.current;
       if (!svg) return;
@@ -228,6 +267,8 @@ export function WorkflowBoard({
   }
 
   function onPointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
     if (reattachDrag) {
       const point = toCanvasPoint(event);
       const target = findNodeAt(shapes, point);
@@ -300,6 +341,54 @@ export function WorkflowBoard({
 
   function changeZoom(delta: number) {
     setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
+  }
+
+  function fitToContent() {
+    if (!shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const shape of shapes) {
+      // Arrows store placeholder rects at the origin; measure their real
+      // endpoints instead.
+      const box = shape.type === "arrow"
+        ? (() => {
+          const endpoints = connectorEndpoints(shape, shapes);
+          return {
+            left: Math.min(endpoints.start.x, endpoints.end.x),
+            right: Math.max(endpoints.start.x, endpoints.end.x),
+            top: Math.min(endpoints.start.y, endpoints.end.y),
+            bottom: Math.max(endpoints.start.y, endpoints.end.y)
+          };
+        })()
+        : {
+          left: Math.min(shape.x, shape.x + shape.width),
+          right: Math.max(shape.x, shape.x + shape.width),
+          top: Math.min(shape.y, shape.y + shape.height),
+          bottom: Math.max(shape.y, shape.y + shape.height)
+        };
+      minX = Math.min(minX, box.left);
+      minY = Math.min(minY, box.top);
+      maxX = Math.max(maxX, box.right);
+      maxY = Math.max(maxY, box.bottom);
+    }
+    const pad = 48;
+    const nextZoom = Math.min(
+      1,
+      Math.max(
+        minZoom,
+        Math.round(Math.min(
+          canvasViewBox.width / (maxX - minX + pad * 2),
+          canvasViewBox.height / (maxY - minY + pad * 2)
+        ) * 100) / 100
+      )
+    );
+    setZoom(nextZoom);
+    setPan({
+      x: minX + (maxX - minX) / 2 - canvasViewBox.width / 2,
+      y: minY + (maxY - minY) / 2 - canvasViewBox.height / 2
+    });
   }
 
   function deleteSelected() {
@@ -470,9 +559,9 @@ export function WorkflowBoard({
     function updateViewBox() {
       const rect = observedSvg.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
-      const nextHeight = Math.round((1200 * rect.height) / rect.width);
+      const nextViewBox = { width: Math.round(rect.width), height: Math.round(rect.height) };
       setCanvasViewBox((current) => (
-        current.height === nextHeight ? current : { width: 1200, height: nextHeight }
+        current.width === nextViewBox.width && current.height === nextViewBox.height ? current : nextViewBox
       ));
     }
 
@@ -485,6 +574,13 @@ export function WorkflowBoard({
       window.removeEventListener("resize", updateViewBox);
     };
   }, []);
+
+  useEffect(() => {
+    if (didFitRef.current || !shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+    didFitRef.current = true;
+    fitToContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shapes, canvasViewBox]);
 
   const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
   const editorFontSize = toViewportFontSize();
@@ -547,6 +643,9 @@ export function WorkflowBoard({
         <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
           <Plus size={18} />
         </button>
+        <button className="icon-button" onClick={fitToContent} title="Fit to view" type="button">
+          <Maximize size={18} />
+        </button>
       </div>
 
       <svg
@@ -556,6 +655,7 @@ export function WorkflowBoard({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         onDoubleClick={onCanvasDoubleClick}
         onDragOver={onCanvasDragOver}
         onDrop={onCanvasDrop}
