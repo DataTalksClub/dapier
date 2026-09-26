@@ -78,7 +78,12 @@ def sync_status():
 
 
 def _bundle_root():
-    return Path(os.environ.get("WORKFLOWS_DIR", Path(__file__).parent.parent / "workflows"))
+    # Same default as matching._root and overview._workflows: the repo's
+    # workflows/ two levels above src/ (parents[3] of this file) — the parent-
+    # parent default used to point at src/dapier/workflows, which never exists,
+    # so the designer's workflow list lost every bundled workflow and the
+    # console opened the same seeded draft for all of them.
+    return Path(os.environ.get("WORKFLOWS_DIR", Path(__file__).resolve().parents[3] / "workflows"))
 
 
 def _bundled_workflows():

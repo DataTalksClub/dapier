@@ -60,6 +60,29 @@ def test_parse_workflow_accepts_known_and_unknown_actions():
     assert [action["type"] for action in workflow["actions"]] == ["webhook", "mystery_action"]
 
 
+def test_bundle_default_resolves_to_the_repo_workflows(monkeypatch):
+    """The deployed Lambdas run without WORKFLOWS_DIR, so the default bundle
+    root must land on the repo's workflows/ like matching._root and
+    overview._workflows do. A wrong default empties the designer's list while
+    the console table still shows the workflows — opening one then falls back
+    to a blank new draft, so every flow renders the same seeded canvas."""
+    from src.dapier.triggers import published_workflows
+
+    monkeypatch.delenv("WORKFLOWS_DIR", raising=False)
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    assert designer_store._bundle_root().is_dir()
+
+    status, payload = designer_store.api_list()
+    assert status == 200
+    ids = {item["id"] for item in payload["workflows"]}
+    assert "custom-demo" in ids  # workflows/example.yaml: file name differs from id
+
+    status, payload = designer_store.api_get("example.yaml")
+    assert status == 200
+    assert payload["workflow"]["id"] == "custom-demo"
+    assert payload["published"] is False
+
+
 @pytest.mark.parametrize("yaml_text,fragment", [
     ("", "required"),
     ("- just\n- a list\n", "YAML object"),
