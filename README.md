@@ -171,9 +171,9 @@ redirect URI `https://dapier.dtcdev.click/oauth/callback`. Store them with
 `uv run dapier oauth-clients set` or in the console under
 **Credentials → OAuth clients** — the values are stored in the credentials
 table and take effect immediately, with no redeploy. YouTube shares the Google
-client. See [docs/connectors.md](docs/connectors.md) for the current consent,
-test-user, Dropbox access-level, and scope requirements. Rotating a Dropbox
-client there is also how you re-webhook Dropbox: the
+client. See the [connector guides](docs/connectors/README.md) for the current
+Google consent, test-user, Dropbox access-level, and scope requirements.
+Rotating a Dropbox client there is also how you re-webhook Dropbox: the
 ingress accepts the configured secret and the deploy-time one during a
 rotation window. The deploy-time environment remains a fallback for a fresh
 stack — export the variables before a deploy that should seed or rotate them;
@@ -337,9 +337,10 @@ dapier schedules save schedule.json          # {"name", "expression": "cron(0 8 
 Credential values travel only in the request body and are never echoed; like
 the console's write-only credential fields, they cannot be read back.
 After changing requested scopes, reconnect that connection to grant them. See
-[docs/connectors.md](docs/connectors.md#changing-requested-scopes) for the
-Google Cloud and Dropbox permission steps and the source files to update when
-changing the default scopes for new connections.
+[the shared scope-change procedure](docs/connectors/README.md#changing-requested-scopes)
+and the [Google](docs/connectors/google.md) or
+[Dropbox](docs/connectors/dropbox.md) provider guide for provider-specific
+permission steps and the source files to update when changing defaults.
 
 ### API tokens for headless consumers
 
