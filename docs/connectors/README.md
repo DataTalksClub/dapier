@@ -7,7 +7,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Google | [Google Calendar, YouTube, Drive, Docs, and Sheets](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
 | Dropbox | [Dropbox](dropbox.md) | `dropbox` | OAuth |
 | Slack | [Slack](slack.md) | `slack` | Pasted bot or user token |
-| Zoom | [Zoom](zoom.md) | `zoom` (recording webhook), `zoom-api` (OAuth example) | OAuth for API access; webhook token for recordings |
+| Zoom | [Zoom](zoom.md) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle
 procedures. A connection is a named record (`connection_id`, provider, display
