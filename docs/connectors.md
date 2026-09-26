@@ -115,17 +115,25 @@ publishing:
 
 The pages are implemented as public static routes before authentication in
 `src/dapier/api/router.py`; their API Gateway GET routes are in `template.yaml`.
-The root `/` remains the authenticated console. After deploying the pages,
-open each URL in a signed-out browser and confirm it loads before saving the
-links in **Google Auth Platform → Branding**. The domain `dtcdev.click` is
-already authorized. The displayed app name/support email and the `DTC DEV Auth`
-client are shared by this Google project. Switching its audience to Production
-affects every OAuth client in `dtcdev-click`; Google recommends separate
-testing and production projects. `drive.readonly` is a Restricted scope, so
-production may require verification and, depending on the app's use, a
-security assessment. See Google's [production readiness
+The root `/` remains the authenticated console. The pages are deployed and each
+URL was fetched without browser credentials: all returned HTTP 200 with no
+redirect. These exact URLs are now saved in **Google Auth Platform → Branding**.
+The domain `dtcdev.click` is already authorized. The displayed app name/support
+email and the `DTC DEV Auth` client are shared by this Google project. Switching
+its audience to Production affects every OAuth client in `dtcdev-click`; Google
+recommends separate testing and production projects. `drive.readonly` is a
+Restricted scope, so production may require verification and, depending on the
+app's use, a security assessment. See Google's [production readiness
 overview](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview)
 and [restricted-scope verification requirements](https://developers.google.com/identity/protocols/oauth2/restricted-scope-verification).
+
+After the public links are saved, the status change is **Google Auth Platform →
+Audience → Publish app**. Confirm the dialog and verify that Audience shows
+**In production**. Production removes the Testing seven-day refresh-token
+expiry. If sensitive or restricted scopes remain unverified, Google may show
+an unverified-app warning and enforce a 100-new-user cap until verification;
+existing test-user status does not remove those restrictions. Treat this as a
+project-wide change because it applies to `DTC DEV Auth` as well as Dapier.
 
 The Google Branding page does not require an app logo to publish. Uploading a
 logo starts a verification requirement, so do not add one just to publish.
@@ -228,6 +236,10 @@ also confirms the update was stored, and the saved secret cannot be read back.
   client too. Production removes the seven-day Testing refresh-token expiry,
   but `drive.readonly` is Restricted and may need verification. Google currently
   recommends separating test and production projects.
+- The public Google OAuth URLs are `/about`, `/privacy`, and `/terms`. They are
+  static routes served before sign-in in `src/dapier/api/router.py`; the root
+  `/` is the operator console and is not the OAuth homepage. Check the three
+  pages with an unauthenticated GET before saving them in Google Branding.
 - Enable each required API before adding scopes. Adding a scope has
   three commits: **Add to table → Update → Save**. Adding a test user also
   needs **Enter** to turn the address into a chip before **Save**.
