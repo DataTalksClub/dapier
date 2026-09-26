@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical, GitBranch, Loader2, Play, TriangleAlert, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
@@ -134,6 +134,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [shapes, setShapes] = useState<DiagramShape[]>(EMPTY_SHAPES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("[]");
+  const [savedId, setSavedId] = useState("new-workflow");
+  const [savedEnabled, setSavedEnabled] = useState(true);
+  const [canvasExtraDirty, setCanvasExtraDirty] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const leaveResolver = useRef<((allowed: boolean) => void) | null>(null);
+  const allowUnload = useRef(false);
   const [status, setStatus] = useState<{ kind: "idle" | "busy" | "error" | "ok"; message: string }>({ kind: "idle", message: "" });
   const [git, setGit] = useState<GitStatus | null>(null);
   const [view, setView] = useState<"canvas" | "yaml">("canvas");
@@ -147,9 +153,62 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [testResult, setTestResult] = useState<TestRunResult | null>(null);
 
   const dirty = useMemo(
-    () => (view === "yaml" ? yamlText !== savedYaml : JSON.stringify(shapes) !== savedSnapshot),
-    [view, yamlText, savedYaml, shapes, savedSnapshot]
+    () => view === "yaml"
+      ? yamlText !== savedYaml
+      : canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
+    [view, yamlText, savedYaml, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
   );
+
+  function askToLeave(): Promise<boolean> {
+    if (!dirty) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      if (leaveResolver.current) return resolve(false);
+      leaveResolver.current = resolve;
+      setLeaveOpen(true);
+    });
+  }
+
+  function resolveLeave(allowed: boolean) {
+    allowUnload.current = allowed;
+    setLeaveOpen(false);
+    leaveResolver.current?.(allowed);
+    leaveResolver.current = null;
+  }
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (allowUnload.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!leaveOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        resolveLeave(false);
+      }
+      if (event.key !== "Tab") return;
+      const buttons = [...document.querySelectorAll<HTMLButtonElement>(".leave-prompt button:not(:disabled)")];
+      if (!buttons.length) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leaveOpen]);
 
   /** Tells the framing console what the title bar should show and edit.
      The console owns the h1 rename affordance; it answers with set-id. */
@@ -161,11 +220,25 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         id: workflowId,
         enabled,
         source: sourceName,
-        editable: view === "canvas"
+        editable: view === "canvas",
+        dirty
       },
       window.location.origin
     );
-  }, [config.embedded, workflowId, enabled, sourceName, view]);
+  }, [config.embedded, workflowId, enabled, sourceName, view, dirty]);
+
+  useEffect(() => {
+    if (!config.embedded) return;
+    const onLeaveRequest = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      const data = event.data as { type?: string; requestId?: unknown };
+      if (data?.type !== "designer:request-leave" || typeof data.requestId !== "string") return;
+      const allowed = await askToLeave();
+      window.parent.postMessage({ type: "designer:leave-result", requestId: data.requestId, allowed }, window.location.origin);
+    };
+    window.addEventListener("message", onLeaveRequest);
+    return () => window.removeEventListener("message", onLeaveRequest);
+  });
 
   useEffect(() => {
     if (!config.embedded) return;
@@ -215,6 +288,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     try {
       const data = await api<{ workflow: Workflow }>(config, `/workflows/${summary.source}`);
       const workflow = data.workflow;
+      allowUnload.current = false;
       const shapes = shapesFromWorkflow(workflow);
       const yaml = workflowYaml(workflow);
       setSourceName(summary.source);
@@ -222,6 +296,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setEnabled(workflow.enabled !== false);
       setShapes(shapes);
       setSavedSnapshot(JSON.stringify(shapes));
+      setSavedId(workflow.id);
+      setSavedEnabled(workflow.enabled !== false);
+      setCanvasExtraDirty(false);
       setBase(workflow);
       setYamlText(yaml);
       setSavedYaml(yaml);
@@ -236,6 +313,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   }
 
   function newWorkflow() {
+    allowUnload.current = false;
     const trigger: DiagramShape = {
       id: "trigger",
       type: "node",
@@ -251,6 +329,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setEnabled(true);
     setShapes([trigger]);
     setSavedSnapshot("[]");
+    setSavedId("new-workflow");
+    setSavedEnabled(true);
+    setCanvasExtraDirty(false);
     setBase(null);
     setYamlText("");
     setSavedYaml("");
@@ -293,7 +374,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       if (!parsed) return;
       const shapes = shapesFromWorkflow(parsed);
       setShapes(shapes);
-      setSavedSnapshot(JSON.stringify(shapes));
+      setCanvasExtraDirty(yamlText !== savedYaml);
       setBase(parsed);
       if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
       setEnabled(parsed.enabled !== false);
@@ -302,13 +383,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setView(next);
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     let yamlOut: string;
     let workflow: Workflow;
     let nextShapes: DiagramShape[];
     if (view === "yaml") {
       const parsed = parseYamlText(yamlText);
-      if (!parsed) return;
+      if (!parsed) return false;
       workflow = parsed;
       yamlOut = yamlText;
       nextShapes = shapesFromWorkflow(parsed);
@@ -316,7 +397,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       const built = workflowFromShapes(shapes, workflowId, enabled, base);
       if (built.problems.length) {
         setStatus({ kind: "error", message: built.problems.join(" ") });
-        return;
+        return false;
       }
       workflow = built.workflow;
       yamlOut = workflowYaml(workflow);
@@ -330,6 +411,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       });
       setBase(workflow);
       setSavedYaml(yamlOut);
+      setSavedId(workflow.id);
+      setSavedEnabled(workflow.enabled !== false);
+      setCanvasExtraDirty(false);
       if (view === "yaml") {
         setShapes(nextShapes);
         setSavedSnapshot(JSON.stringify(nextShapes));
@@ -355,9 +439,25 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             ? `Committed ${result.commit.slice(0, 7)} — the deploy pipeline publishes it in a few minutes`
             : `Saved and committed ${result.commit.slice(0, 7)}`
       });
+      return true;
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
+      return false;
     }
+  }
+
+  async function leaveAfterSave() {
+    if (await save()) resolveLeave(true);
+  }
+
+  async function openWorkflowSafely(summary: WorkflowSummary) {
+    if (summary.source === sourceName || !(await askToLeave())) return;
+    await openWorkflow(summary);
+  }
+
+  async function newWorkflowSafely() {
+    if (!(await askToLeave())) return;
+    newWorkflow();
   }
 
   async function push() {
@@ -597,7 +697,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         ) : (
           <div className="brand"><span className="brand-mark">D</span><span>Workflow designer</span></div>
         )}
-        <button className="button primary" type="button" onClick={newWorkflow}>
+        <button className="button primary" type="button" onClick={newWorkflowSafely}>
           <span>New workflow</span>
         </button>
         <nav className="workflow-nav" aria-label="Workflows">
@@ -605,7 +705,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <button
               key={summary.source}
               className={summary.source === sourceName ? "workflow-item active" : "workflow-item"}
-              onClick={() => openWorkflow(summary)}
+              onClick={() => openWorkflowSafely(summary)}
               type="button"
             >
               <span className="workflow-name">{summary.id}</span>
@@ -810,6 +910,22 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <h2>Inspector</h2>
               </header>
             )}
+            {shapes.some((shape) => shape.type === "node") && (
+              <nav className="node-jump" aria-label="Select a workflow node">
+                <p>Nodes</p>
+                {shapes.filter((shape) => shape.type === "node").map((shape) => (
+                  <button
+                    key={shape.id}
+                    type="button"
+                    className={shape.id === selectedId ? "node-jump-item selected" : "node-jump-item"}
+                    aria-current={shape.id === selectedId ? "true" : undefined}
+                    onClick={() => setSelectedId(shape.id)}
+                  >
+                    {shape.label || shape.data?.actionType || shape.id}
+                  </button>
+                ))}
+              </nav>
+            )}
             {selectedInspector()}
             {selected?.type === "arrow" && (
               <p className="inspector-hint">Connector. Drag an endpoint handle to reattach it; Delete removes it.</p>
@@ -818,6 +934,20 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         </div>
         )}
       </main>
+      {leaveOpen && (
+        <div className="leave-backdrop" role="presentation">
+          <section className="leave-prompt" role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-description">
+            <h2 id="leave-title">Unsaved workflow changes</h2>
+            <p id="leave-description">Save this draft before opening another workflow?</p>
+            {status.kind === "error" && <p className="leave-error" role="alert">{status.message}</p>}
+            <div className="leave-actions">
+              <button className="button secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
+              <button className="button secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
+              <button className="button primary" type="button" disabled={status.kind === "busy"} onClick={leaveAfterSave}>Save and continue</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -222,10 +222,10 @@ export function workflowFromShapes(
     // emit inline actions next to a flow binding — the engine rejects that.
     const flows = isRecord(base.flows) ? base.flows : {};
     const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
-    workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map(actionToYaml) } };
+    workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map((action, index) => actionToYaml(action, index, problems)) } };
     workflow.flow = base.flow;
   } else {
-    workflow.actions = actions.map(actionToYaml);
+    workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
   }
   if (triggerNodes.length === 1) {
     workflow.trigger = triggerToYaml(triggerNodes[0].data!);

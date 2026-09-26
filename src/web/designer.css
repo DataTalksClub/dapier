@@ -1136,3 +1136,54 @@ textarea:focus {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.leave-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 58%);
+  padding: 20px;
+}
+
+.leave-prompt {
+  width: min(100%, 440px);
+  background: var(--surface);
+  border: 1px solid var(--section-border);
+  box-shadow: 8px 8px 0 rgb(0 0 0 / 25%);
+  padding: 24px;
+}
+
+.leave-prompt h2 { margin: 0 0 8px; font-size: 20px; }
+.leave-prompt p { margin: 0 0 22px; color: var(--text-soft); }
+.leave-prompt .leave-error { color: var(--danger-text); margin-bottom: 14px; }
+.leave-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+.node-jump {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--section-border);
+  padding: 10px 12px 12px;
+}
+.node-jump p {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.node-jump-item {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  text-align: left;
+}
+.node-jump-item:hover, .node-jump-item.selected { background: var(--active-bg); border-color: var(--active-border); color: var(--active-text); }
+.node-jump-item:focus-visible { outline: 2px solid var(--active-border); outline-offset: 1px; }

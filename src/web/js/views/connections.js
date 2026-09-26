@@ -29,7 +29,7 @@ const CONNECT_PROVIDERS = {
   },
   slack: {
     label: 'Slack',
-    blurb: 'Post notifications with a bot token — no browser consent.',
+    blurb: 'Connect a Slack account for agent access with a bot or user token. Workflow Slack actions can also use the shared Service credential.',
     connectionId: 'slack',
     displayName: 'DataTalks Slack',
     scopes: [],
@@ -49,7 +49,7 @@ const TOKEN_PROVIDERS = ['slack', 'telegram'];
 const TOKEN_PROVIDER_META = {
   slack: {
     heading: 'New Slack connection',
-    blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. It is verified against Slack and stored as the connection\'s secret.',
+    blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials.',
     label: 'Slack token',
     placeholder: 'xoxb-… or xoxp-…',
     displayName: 'DataTalks Slack',
@@ -120,6 +120,9 @@ $('#oauth-dismiss').addEventListener('click', () => { $('#oauth-result').hidden 
 
 function renderConnectCards(connections) {
   $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => {
+    const clientProvider = provider === 'youtube' ? 'google' : provider;
+    const oauthClient = ((state.data || {}).oauth_clients || []).find((item) => item.provider === clientProvider);
+    const needsClient = !TOKEN_PROVIDERS.includes(provider) && oauthClient && !oauthClient.configured;
     const pending = !TOKEN_PROVIDERS.includes(provider)
       ? connections.find((connection) => connection.provider === provider && connection.status === 'ready') : null;
     const action = pending
@@ -130,11 +133,19 @@ function renderConnectCards(connections) {
     <div class="connect-card">
       <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span></div>
       <p class="connect-blurb">${meta.blurb}</p>
+      ${needsClient ? `<p class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> before consent.</p>` : ''}
       ${pending ? `<p class="connect-pending">${escapeHtml(pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
       <div class="connect-card-actions">${action}</div>
     </div>`;
   }).join('');
-  $$('.connect-button').forEach((button) => button.addEventListener('click', () => connectProvider(button.dataset.provider)));
+  $$('.connect-button').forEach((button) => button.addEventListener('click', async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = 'Starting…';
+    try { await connectProvider(button.dataset.provider); }
+    finally { button.disabled = false; button.textContent = label; }
+  }));
 }
 
 /* New connections must not clobber existing records, so derive the first
@@ -262,7 +273,17 @@ function renderConnections(connections) {
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   const priority = { ready: 0, expired: 1, revoked: 2, connected: 3 };
-  const ordered = [...connections].sort((a, b) =>
+  const query = ($('#connection-search')?.value || '').trim().toLowerCase();
+  const statusFilter = $('#connection-status-filter')?.value || 'all';
+  const filtered = connections.filter((connection) => {
+    if (statusFilter === 'connected' && connection.status !== 'connected') return false;
+    if (statusFilter === 'attention' && !['ready', 'expired', 'revoked'].includes(connection.status)) return false;
+    if (!query) return true;
+    return [connection.display_name, connection.connection_id, connection.provider,
+      connection.account_title, connection.verified_account_id].some((value) => String(value || '').toLowerCase().includes(query));
+  });
+  $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
+  const ordered = [...filtered].sort((a, b) =>
     (priority[a.status] ?? 4) - (priority[b.status] ?? 4));
   $('#connection-table').innerHTML = ordered.map((connection) => {
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && connection.status !== 'connected'
@@ -278,6 +299,9 @@ function renderConnections(connections) {
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   bindOAuthLinks();
 }
+
+$('#connection-search')?.addEventListener('input', () => renderConnections((state.data || {}).connections || []));
+$('#connection-status-filter')?.addEventListener('change', () => renderConnections((state.data || {}).connections || []));
 
 function bindOAuthLinks() {
   $$('.connection-oauth').forEach((link) => link.addEventListener('click', (event) => {
@@ -301,6 +325,12 @@ $('#add-connection').addEventListener('click', () => {
   addPickerOpen = $('#connect-picker').hidden;
   $('#connect-picker').hidden = !addPickerOpen;
   $('#add-connection').setAttribute('aria-expanded', String(addPickerOpen));
+  if (addPickerOpen) {
+    const heading = $('#connect-picker h2');
+    heading.setAttribute('tabindex', '-1');
+    heading.scrollIntoView({ behavior: 'instant', block: 'start' });
+    heading.focus({ preventScroll: true });
+  }
 });
 
 $('#edit-connection-reconnect').addEventListener('click', (event) => {
@@ -309,19 +339,57 @@ $('#edit-connection-reconnect').addEventListener('click', (event) => {
   openOAuthWindow(event.currentTarget.href, $('#edit-connection-form').dataset.connectionId);
 });
 
-$('#edit-connection-revoke').addEventListener('click', async () => {
+$('#edit-connection-revoke').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
   const connectionId = $('#edit-connection-form').dataset.connectionId;
   if (!await confirmRevoke('Revoke connection access',
     `Revoke access for ${connectionId} in Dapier? You will need to connect it again.`)) return;
+  button.disabled = true;
+  button.textContent = 'Revoking…';
   try {
     await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/tokens`, { method: 'DELETE' });
     $('#edit-connection-dialog').close();
     notice(`Access for ${connectionId} revoked in Dapier. Reconnect it to use the connection again.`);
     await refresh();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
+  finally { button.disabled = false; button.textContent = 'Revoke tokens'; }
 });
 
 let shownGrants = [];
+
+function setGrantStatus(message, error = false) {
+  const status = $('#connection-grant-status');
+  status.textContent = message;
+  status.classList.toggle('form-error', error);
+}
+
+function renderGrantTokenChoices(selectedSubject = '') {
+  const select = $('#connection-grant-token');
+  select.disabled = false;
+  const tokens = ((state.data || {}).api_tokens || []).filter((token) => !token.revoked_at);
+  select.innerHTML = `<option value="manual">Enter another subject…</option>${tokens.map((token) => `<option value="${escapeHtml(`token:${token.token_id}`)}">${escapeHtml(token.token_id)} · ${escapeHtml(token.agent)}</option>`).join('')}`;
+  select.value = tokens.some((token) => `token:${token.token_id}` === selectedSubject) ? selectedSubject : 'manual';
+  $('#connection-grant-subject-field').hidden = select.value !== 'manual';
+  $('#connection-grant-form').agent.readOnly = select.value !== 'manual';
+  if (select.value !== 'manual') $('#connection-grant-form').subject.value = select.value;
+}
+
+$('#connection-grant-token').addEventListener('change', (event) => {
+  const form = $('#connection-grant-form');
+  const subject = event.currentTarget.value;
+  $('#connection-grant-subject-field').hidden = subject !== 'manual';
+  if (subject !== 'manual') {
+    form.subject.value = subject;
+    form.agent.readOnly = true;
+    const tokenId = subject.slice('token:'.length);
+    const token = ((state.data || {}).api_tokens || []).find((item) => item.token_id === tokenId);
+    if (token) form.agent.value = token.agent;
+  } else {
+    form.subject.value = '';
+    form.agent.readOnly = false;
+    form.subject.focus();
+  }
+});
 
 function resetGrantForm() {
   const form = $('#connection-grant-form');
@@ -332,6 +400,8 @@ function resetGrantForm() {
   $('#connection-grant-heading').textContent = 'Add grant';
   $('#connection-grant-cancel').hidden = true;
   $('#connection-grant-error').textContent = '';
+  setGrantStatus('');
+  renderGrantTokenChoices();
 }
 
 function localDateTime(epochSeconds) {
@@ -355,23 +425,29 @@ function renderGrants() {
     form.subject.readOnly = true;
     form.agent.readOnly = true;
     form.dataset.grantee = grant.grantee;
+    renderGrantTokenChoices(grant.subject);
+    $('#connection-grant-token').disabled = true;
     $$('input[name="operations"]', form).forEach((input) => { input.checked = (grant.operations || []).includes(input.value); });
     form.expires_at.value = localDateTime(grant.expires_at);
     $('#connection-grant-heading').textContent = 'Edit grant';
     $('#connection-grant-cancel').hidden = false;
     $('#connection-grant-error').textContent = '';
+    setGrantStatus('');
     form.scrollIntoView({ block: 'nearest' });
   }));
   $$('.grant-delete').forEach((button) => button.addEventListener('click', async () => {
     const connectionId = $('#connection-grant-form').dataset.connectionId;
     if (!await confirmRevoke('Revoke access grant',
       `Revoke ${button.dataset.grantee} on ${connectionId}?`)) return;
+    button.disabled = true;
+    button.textContent = 'Revoking…';
     try {
       await api(`/api/admin/grants?connection_id=${encodeURIComponent(connectionId)}&grantee=${encodeURIComponent(button.dataset.grantee)}`, { method: 'DELETE' });
-      resetGrantForm();
-      notice('Grant revoked');
       await loadGrants(connectionId);
+      resetGrantForm();
+      setGrantStatus('Grant revoked.');
     } catch (error) { $('#connection-grant-error').textContent = error.message; }
+    finally { button.disabled = false; button.textContent = 'Revoke'; }
   }));
 }
 
@@ -381,17 +457,32 @@ async function loadGrants(connectionId) {
   renderGrants();
 }
 
-$('#edit-connection-access').addEventListener('click', async () => {
-  const connectionId = $('#edit-connection-form').dataset.connectionId;
+export async function openAccessGrants(connectionId, prefill = null) {
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   resetGrantForm();
   $('#connection-grant-form').dataset.connectionId = connectionId;
   $('#connection-access-title').textContent = `Access · ${connection?.display_name || connectionId}`;
-  try {
-    await loadGrants(connectionId);
-    $('#edit-connection-dialog').close();
-    $('#connection-access-dialog').showModal();
-  } catch (error) { $('#edit-connection-error').textContent = error.message; }
+  await loadGrants(connectionId);
+  if ($('#edit-connection-dialog').open) $('#edit-connection-dialog').close();
+  $('#connection-access-dialog').showModal();
+  if (prefill) {
+    const form = $('#connection-grant-form');
+    renderGrantTokenChoices(prefill.subject);
+    form.subject.value = prefill.subject;
+    form.agent.value = prefill.agent;
+    $('#connection-grant-heading').textContent = `Grant ${prefill.subject}`;
+    form.agent.focus();
+  }
+}
+
+$('#edit-connection-access').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const connectionId = $('#edit-connection-form').dataset.connectionId;
+  button.disabled = true;
+  button.textContent = 'Loading grants…';
+  try { await openAccessGrants(connectionId); }
+  catch (error) { $('#edit-connection-error').textContent = error.message; }
+  finally { button.disabled = false; button.textContent = 'Access grants'; }
 });
 
 $('#connection-grant-cancel').addEventListener('click', resetGrantForm);
@@ -399,12 +490,16 @@ $('#connection-grant-cancel').addEventListener('click', resetGrantForm);
 $('#connection-grant-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = $('#connection-access-dialog [type="submit"][form="connection-grant-form"]');
+  if (submit.disabled) return;
   const operations = $$('input[name="operations"]:checked', form).map((input) => input.value);
   $('#connection-grant-error').textContent = '';
   if (!operations.length) {
     $('#connection-grant-error').textContent = 'Choose at least one operation.';
     return;
   }
+  submit.disabled = true;
+  submit.textContent = 'Saving…';
   const body = {
     connection_id: form.dataset.connectionId,
     subject: form.subject.value.trim(),
@@ -416,8 +511,9 @@ $('#connection-grant-form').addEventListener('submit', async (event) => {
     await api('/api/admin/grants', { method: 'PUT', body: JSON.stringify(body) });
     resetGrantForm();
     await loadGrants(body.connection_id);
-    notice('Grant saved');
+    setGrantStatus('Grant saved.');
   } catch (error) { $('#connection-grant-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Save grant'; }
 });
 
 export { TOKEN_PROVIDERS, TOKEN_PROVIDER_META, renderConnections, nextConnectionId, notice };
@@ -425,6 +521,10 @@ export { TOKEN_PROVIDERS, TOKEN_PROVIDER_META, renderConnections, nextConnection
 $('#connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.textContent = 'Connecting…';
   const provider = form.dataset.provider || 'slack';
   const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   $('#connection-error').textContent = '';
@@ -442,11 +542,16 @@ $('#connection-form').addEventListener('submit', async (event) => {
     notice(`${meta.displayName} connected`);
     await refresh();
   } catch (error) { $('#connection-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Create connection'; }
 });
 
 $('#edit-connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.textContent = 'Saving…';
   const connectionId = form.dataset.connectionId;
   const provider = form.dataset.provider;
   $('#edit-connection-error').textContent = '';
@@ -471,4 +576,5 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     notice('Connection updated');
     await refresh();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Save changes'; }
 });

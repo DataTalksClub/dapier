@@ -1,8 +1,8 @@
 /* Overview view: metrics, workflow/run tables, and the detail dialogs. */
 import { state } from '../state.js';
-import { $, icons, showApp, notice } from '../ui.js';
+import { $, icons, showApp, showStartupError, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, triggerLabel, emptyRow, configRows, pad2 } from '../format.js';
+import { escapeHtml, statusLine, triggerLabel, configRows, pad2 } from '../format.js';
 import { openDesigner } from './designer.js';
 import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
@@ -89,8 +89,12 @@ function render() {
   $('#metric-runs-detail').textContent = recentRuns.length ? `of ${recentRuns.length} available runs` : 'No recent runs';
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
+  $('#overview-workflows-empty').hidden = enabled.length > 0;
+  $('#overview-workflows-table').hidden = enabled.length === 0;
   $('#overview-runs').innerHTML = (data.runs || []).slice(0, 6).map((run) =>
-    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td></tr>`).join('') || emptyRow(2);
+    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td></tr>`).join('');
+  $('#overview-runs-empty').hidden = recentRuns.length > 0;
+  $('#overview-runs-table').hidden = recentRuns.length === 0;
   $('#workflow-table').innerHTML = data.workflows.map((workflow) => `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
     <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
@@ -98,6 +102,8 @@ function render() {
     <td data-label="Status"><span class="workflow-status">${statusLine(workflow.enabled ? 'enabled' : 'disabled')}${workflow.published ? '' : ' <span class="muted-cell">(deploying)</span>'}
       <button type="button" class="workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}">${workflow.enabled ? 'Disable' : 'Enable'}</button></span></td>
   </tr>`).join('');
+  $('#workflow-empty').hidden = data.workflows.length > 0;
+  $('#workflow-table-wrap').hidden = data.workflows.length === 0;
   renderConnections(data.connections);
   renderCredentials(data.credentials);
   renderOAuthClients(data.oauth_clients || []);
@@ -112,10 +118,14 @@ export async function refresh() {
   $('#loading').hidden = false;
   try {
     state.data = await api('/api/admin/overview');
-    showApp();
     render();
+    showApp();
+    return true;
   } catch (error) {
-    if (!$('#app').hidden) notice(error.message, true);
+    if (!$('#forbidden-view').hidden) return;
+    if ($('#app').hidden) showStartupError(error.message);
+    else notice(error.message, true);
+    return false;
   } finally {
     $('#loading').hidden = true;
   }

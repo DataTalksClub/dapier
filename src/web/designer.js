@@ -18046,10 +18046,10 @@
     if (base?.flow) {
       const flows = isRecord(base.flows) ? base.flows : {};
       const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
-      workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map(actionToYaml) } };
+      workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map((action, index) => actionToYaml(action, index, problems)) } };
       workflow.flow = base.flow;
     } else {
-      workflow.actions = actions.map(actionToYaml);
+      workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
     }
     if (triggerNodes.length === 1) {
       workflow.trigger = triggerToYaml(triggerNodes[0].data);
@@ -19036,6 +19036,12 @@
     const [shapes, setShapes] = reactExports.useState(EMPTY_SHAPES);
     const [selectedId, setSelectedId] = reactExports.useState(null);
     const [savedSnapshot, setSavedSnapshot] = reactExports.useState("[]");
+    const [savedId, setSavedId] = reactExports.useState("new-workflow");
+    const [savedEnabled, setSavedEnabled] = reactExports.useState(true);
+    const [canvasExtraDirty, setCanvasExtraDirty] = reactExports.useState(false);
+    const [leaveOpen, setLeaveOpen] = reactExports.useState(false);
+    const leaveResolver = reactExports.useRef(null);
+    const allowUnload = reactExports.useRef(false);
     const [status, setStatus] = reactExports.useState({ kind: "idle", message: "" });
     const [git, setGit] = reactExports.useState(null);
     const [view, setView] = reactExports.useState("canvas");
@@ -19047,9 +19053,56 @@
     const [testBusy, setTestBusy] = reactExports.useState(false);
     const [testResult, setTestResult] = reactExports.useState(null);
     const dirty = reactExports.useMemo(
-      () => view === "yaml" ? yamlText !== savedYaml : JSON.stringify(shapes) !== savedSnapshot,
-      [view, yamlText, savedYaml, shapes, savedSnapshot]
+      () => view === "yaml" ? yamlText !== savedYaml : canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
+      [view, yamlText, savedYaml, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
     );
+    function askToLeave() {
+      if (!dirty) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        if (leaveResolver.current) return resolve(false);
+        leaveResolver.current = resolve;
+        setLeaveOpen(true);
+      });
+    }
+    function resolveLeave(allowed) {
+      allowUnload.current = allowed;
+      setLeaveOpen(false);
+      leaveResolver.current?.(allowed);
+      leaveResolver.current = null;
+    }
+    reactExports.useEffect(() => {
+      if (!dirty) return;
+      const warn = (event) => {
+        if (allowUnload.current) return;
+        event.preventDefault();
+        event.returnValue = "";
+      };
+      window.addEventListener("beforeunload", warn);
+      return () => window.removeEventListener("beforeunload", warn);
+    }, [dirty]);
+    reactExports.useEffect(() => {
+      if (!leaveOpen) return;
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          resolveLeave(false);
+        }
+        if (event.key !== "Tab") return;
+        const buttons = [...document.querySelectorAll(".leave-prompt button:not(:disabled)")];
+        if (!buttons.length) return;
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [leaveOpen]);
     reactExports.useEffect(() => {
       if (!config.embedded || window.parent === window) return;
       window.parent.postMessage(
@@ -19058,11 +19111,24 @@
           id: workflowId,
           enabled,
           source: sourceName,
-          editable: view === "canvas"
+          editable: view === "canvas",
+          dirty
         },
         window.location.origin
       );
-    }, [config.embedded, workflowId, enabled, sourceName, view]);
+    }, [config.embedded, workflowId, enabled, sourceName, view, dirty]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onLeaveRequest = async (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        const data = event.data;
+        if (data?.type !== "designer:request-leave" || typeof data.requestId !== "string") return;
+        const allowed = await askToLeave();
+        window.parent.postMessage({ type: "designer:leave-result", requestId: data.requestId, allowed }, window.location.origin);
+      };
+      window.addEventListener("message", onLeaveRequest);
+      return () => window.removeEventListener("message", onLeaveRequest);
+    });
     reactExports.useEffect(() => {
       if (!config.embedded) return;
       const onMessage = (event) => {
@@ -19102,6 +19168,7 @@
       try {
         const data = await api(config, `/workflows/${summary.source}`);
         const workflow = data.workflow;
+        allowUnload.current = false;
         const shapes2 = shapesFromWorkflow(workflow);
         const yaml2 = workflowYaml(workflow);
         setSourceName(summary.source);
@@ -19109,6 +19176,9 @@
         setEnabled(workflow.enabled !== false);
         setShapes(shapes2);
         setSavedSnapshot(JSON.stringify(shapes2));
+        setSavedId(workflow.id);
+        setSavedEnabled(workflow.enabled !== false);
+        setCanvasExtraDirty(false);
         setBase(workflow);
         setYamlText(yaml2);
         setSavedYaml(yaml2);
@@ -19122,6 +19192,7 @@
       }
     }
     function newWorkflow() {
+      allowUnload.current = false;
       const trigger = {
         id: "trigger",
         type: "node",
@@ -19137,6 +19208,9 @@
       setEnabled(true);
       setShapes([trigger]);
       setSavedSnapshot("[]");
+      setSavedId("new-workflow");
+      setSavedEnabled(true);
+      setCanvasExtraDirty(false);
       setBase(null);
       setYamlText("");
       setSavedYaml("");
@@ -19175,7 +19249,7 @@
         if (!parsed) return;
         const shapes2 = shapesFromWorkflow(parsed);
         setShapes(shapes2);
-        setSavedSnapshot(JSON.stringify(shapes2));
+        setCanvasExtraDirty(yamlText !== savedYaml);
         setBase(parsed);
         if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
         setEnabled(parsed.enabled !== false);
@@ -19189,7 +19263,7 @@
       let nextShapes;
       if (view === "yaml") {
         const parsed = parseYamlText(yamlText);
-        if (!parsed) return;
+        if (!parsed) return false;
         workflow = parsed;
         yamlOut = yamlText;
         nextShapes = shapesFromWorkflow(parsed);
@@ -19197,7 +19271,7 @@
         const built = workflowFromShapes(shapes, workflowId, enabled, base);
         if (built.problems.length) {
           setStatus({ kind: "error", message: built.problems.join(" ") });
-          return;
+          return false;
         }
         workflow = built.workflow;
         yamlOut = workflowYaml(workflow);
@@ -19211,6 +19285,9 @@
         });
         setBase(workflow);
         setSavedYaml(yamlOut);
+        setSavedId(workflow.id);
+        setSavedEnabled(workflow.enabled !== false);
+        setCanvasExtraDirty(false);
         if (view === "yaml") {
           setShapes(nextShapes);
           setSavedSnapshot(JSON.stringify(nextShapes));
@@ -19232,9 +19309,22 @@
           kind: "ok",
           message: !result.commit ? "No changes to commit" : config.mode === "console" ? `Committed ${result.commit.slice(0, 7)} — the deploy pipeline publishes it in a few minutes` : `Saved and committed ${result.commit.slice(0, 7)}`
         });
+        return true;
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
+        return false;
       }
+    }
+    async function leaveAfterSave() {
+      if (await save()) resolveLeave(true);
+    }
+    async function openWorkflowSafely(summary) {
+      if (summary.source === sourceName || !await askToLeave()) return;
+      await openWorkflow(summary);
+    }
+    async function newWorkflowSafely() {
+      if (!await askToLeave()) return;
+      newWorkflow();
     }
     async function push() {
       setStatus({ kind: "busy", message: "Pushing…" });
@@ -19473,13 +19563,13 @@
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "brand-mark", children: "D" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: newWorkflow, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
           summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
             {
               className: summary.source === sourceName ? "workflow-item active" : "workflow-item",
-              onClick: () => openWorkflow(summary),
+              onClick: () => openWorkflowSafely(summary),
               type: "button",
               children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
@@ -19691,11 +19781,35 @@
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ") })
             ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
+            shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Nodes" }),
+              shapes.filter((shape) => shape.type === "node").map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: shape.id === selectedId ? "node-jump-item selected" : "node-jump-item",
+                  "aria-current": shape.id === selectedId ? "true" : void 0,
+                  onClick: () => setSelectedId(shape.id),
+                  children: shape.label || shape.data?.actionType || shape.id
+                },
+                shape.id
+              ))
+            ] }),
             selectedInspector(),
             selected?.type === "arrow" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Connector. Drag an endpoint handle to reattach it; Delete removes it." })
           ] })
         ] })
-      ] })
+      ] }),
+      leaveOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "leave-backdrop", role: "presentation", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "leave-prompt", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "leave-title", "aria-describedby": "leave-description", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "leave-title", children: "Unsaved workflow changes" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
+        status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: status.message }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", disabled: status.kind === "busy", onClick: leaveAfterSave, children: "Save and continue" })
+        ] })
+      ] }) })
     ] });
   }
   function applyStoredTheme() {

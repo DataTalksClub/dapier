@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { $, icons } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, wrapTokens, formatTimestamp, formatDuration, jsonBlock, emptyRow } from '../format.js';
+import { escapeHtml, statusLine, wrapTokens, formatTimestamp, formatDuration, jsonBlock } from '../format.js';
 
 const STEP_ICONS = {
   webhook: 'webhook',
@@ -34,8 +34,32 @@ function runRow(run) {
 
 export function renderRuns() {
   const runs = state.data?.runs || [];
-  $('#run-table').innerHTML = runs.map(runRow).join('') || emptyRow(5);
+  const workflowFilter = $('#runs-workflow-filter');
+  const statusFilter = $('#runs-status-filter');
+  const dateFilter = $('#runs-date-filter');
+  const selectedWorkflow = workflowFilter.value;
+  const selectedStatus = statusFilter.value;
+  workflowFilter.innerHTML = '<option value="">All workflows</option>' +
+    [...new Set(runs.map((run) => run.workflow_id).filter(Boolean))].sort().map((id) =>
+      `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+  statusFilter.innerHTML = '<option value="">All statuses</option>' +
+    [...new Set(runs.map((run) => run.status).filter(Boolean))].sort().map((status) =>
+      `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`).join('');
+  workflowFilter.value = selectedWorkflow;
+  statusFilter.value = selectedStatus;
+  const now = Date.now();
+  const maxAge = dateFilter.value === 'day' ? 86400000 : dateFilter.value === 'week' ? 604800000 : null;
+  const shown = runs.filter((run) =>
+    (!workflowFilter.value || run.workflow_id === workflowFilter.value) &&
+    (!statusFilter.value || run.status === statusFilter.value) &&
+    (maxAge === null || (Number.isFinite(Date.parse(run.started_at)) && now - Date.parse(run.started_at) <= maxAge)));
+  $('#run-table').innerHTML = shown.map(runRow).join('') ||
+    `<tr><td colspan="5" class="muted-cell">${runs.length ? 'No runs match these filters' : 'No runs yet'}</td></tr>`;
+  $('#runs-sample-note').textContent = `Showing ${shown.length} of ${runs.length} loaded runs · recent sample, up to 25`;
 }
+
+['#runs-workflow-filter', '#runs-status-filter', '#runs-date-filter'].forEach((selector) =>
+  $(selector).addEventListener('change', renderRuns));
 
 /* One flow card: head row plus optional data sections. */
 function stepCard({ icon, title, badge, status, duration, at, data, error }) {
@@ -85,6 +109,9 @@ function flow(data) {
 
 export async function openRun(runId) {
   $('#run-title').textContent = 'Run';
+  $('#run-replay-result').hidden = true;
+  $('#run-replay-result').textContent = '';
+  $('#run-replay-result').classList.remove('error');
   $('#run-detail').innerHTML = '<p class="detail-muted">Loading flow…</p>';
   $('#run-dialog').showModal();
   let data;

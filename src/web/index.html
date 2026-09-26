@@ -27,6 +27,10 @@
 </head>
 <body>
 
+  <section id="startup-loading" class="login-view" role="status" aria-live="polite">
+    <div class="login-panel"><header class="login-head"><p class="wordmark">Dapier</p><p class="login-sub">Operator console for AWS automation</p></header><div class="login-formless"><p>Loading console…</p></div></div>
+  </section>
+
   <section id="forbidden-view" class="login-view" hidden>
     <div class="login-panel">
       <header class="login-head">
@@ -41,9 +45,21 @@
     <p class="login-foot mono">eu-west-1 · single-operator control plane</p>
   </section>
 
+  <section id="startup-error" class="login-view" hidden>
+    <div class="login-panel">
+      <header class="login-head"><p class="wordmark">Dapier</p><p class="login-sub">Operator console for AWS automation</p></header>
+      <div class="login-formless">
+        <h1>Console could not load</h1>
+        <p id="startup-error-message" class="form-error" role="alert"></p>
+        <button id="startup-retry" class="button primary" type="button">Retry</button>
+        <a class="button secondary" href="/auth/logout">Sign out</a>
+      </div>
+    </div>
+  </section>
+
   <div id="app" class="app-shell" hidden>
-    <aside class="sidebar">
-      <div class="brand"><span class="wordmark">Dapier</span></div>
+    <aside id="main-sidebar" class="sidebar">
+      <div class="brand"><span class="wordmark">Dapier</span><button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close menu"><i data-lucide="x"></i></button></div>
       <nav aria-label="Main navigation">
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
@@ -61,10 +77,13 @@
       </div>
     </aside>
 
+    <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
+
     <main>
       <header class="topbar">
-        <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu"><i data-lucide="menu"></i></button>
+        <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu" aria-expanded="false" aria-controls="main-sidebar"><i data-lucide="menu"></i></button>
         <h1 id="view-title">Overview</h1>
+        <button id="designer-rename" class="text-link designer-rename" type="button" aria-label="Rename workflow" hidden><i data-lucide="pencil"></i>Rename</button>
         <div class="top-actions">
           <a id="designer-github" class="text-link view-link" target="_blank" rel="noopener" hidden><i data-lucide="arrow-up-right"></i>Edit on GitHub</a>
           <span id="last-updated" class="last-updated mono"></span>
@@ -87,31 +106,32 @@
           <div class="section-head-text"><h2>Active automations</h2><p class="sub">Current YAML deployment</p></div>
           <a class="text-link view-link" href="/workflows" data-target="workflows">View all<i data-lucide="arrow-right"></i></a>
         </div>
-        <div class="table-wrap">
+        <div id="overview-workflows-table" class="table-wrap">
           <table>
             <thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead>
             <tbody id="overview-workflows"></tbody>
           </table>
-        </div>
+        </div><div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
 
         <div class="section-head">
           <div class="section-head-text"><h2>Recent activity</h2><p class="sub">Latest runs — open one to see the step flow</p></div>
           <a class="text-link view-link" href="/runs" data-target="runs">View all<i data-lucide="arrow-right"></i></a>
         </div>
-        <div class="table-wrap">
+        <div id="overview-runs-table" class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Status</th></tr></thead>
             <tbody id="overview-runs"></tbody>
           </table>
-        </div>
+        </div><div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
       </section>
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Workflows</h2><p class="sub">Edit in the visual designer; saving publishes live and commits to <code>workflows/*.yaml</code>.</p></div>
+          <div class="section-head-text"><h2>Workflows</h2><p class="sub">Edit in the visual designer. Saving commits YAML to GitHub; deployment publishes it in a few minutes.</p></div>
           <a id="new-workflow" class="button primary" href="/designer">New workflow</a>
         </div>
-        <div class="table-wrap">
+        <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/designer" data-new-workflow>Create workflow</a></div>
+        <div id="workflow-table-wrap" class="table-wrap">
           <table>
             <thead><tr><th>Workflow</th><th>Trigger</th><th>Actions</th><th>Status</th></tr></thead>
             <tbody id="workflow-table"></tbody>
@@ -135,11 +155,11 @@
           </div>
         </div>
         <div class="section-head">
-          <p id="connection-summary" class="register-summary mono">Loading accounts…</p>
+          <p id="connection-summary" class="register-summary mono">Loading accounts…</p><div class="connection-filters"><label class="visually-hidden" for="connection-search">Search connections</label><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"><label class="visually-hidden" for="connection-status-filter">Connection status</label><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></div>
           <button id="add-connection" class="button primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>
         </div>
         <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a provider to connect your first account.</p></div>
-        <div class="table-wrap">
+        <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div><div class="table-wrap">
           <table>
             <thead><tr><th>Connection</th><th>Provider</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="connection-table"></tbody>
@@ -153,7 +173,7 @@
 
       <section class="view" data-page="credentials">
         <div class="section-head">
-          <div class="section-head-text"><h2>OAuth clients</h2><p class="sub">Shared per provider — set once and the Connect buttons work. Saved live, no redeploy needed.</p></div>
+          <div class="section-head-text"><h2>OAuth clients</h2><p class="sub">Configure a client here before connecting an account. Saved live, no redeploy needed.</p></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -162,7 +182,7 @@
           </table>
         </div>
         <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">Service credentials</h2><p class="sub">Protected by DynamoDB encryption at rest</p></div>
+          <div class="section-head-text"><h2 class="sub-head">Service credentials</h2><p class="sub">Used by legacy workflow actions. For an account with its own access grants, use <a href="/connections" class="view-link" data-target="connections">Connections</a>. Protected by DynamoDB encryption at rest.</p></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -190,6 +210,7 @@
         <div class="section-head">
           <div class="section-head-text"><h2>Runs</h2><p class="sub">One run per trigger event — open one to see the flow of data between the steps. Records are kept for 90 days.</p></div>
         </div>
+        <div class="run-filters"><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
@@ -200,7 +221,7 @@
     </main>
   </div>
 
-  <dialog id="credential-dialog">
+  <dialog id="credential-dialog" aria-labelledby="credential-title">
     <form id="credential-form" method="dialog">
       <div class="dialog-head">
         <h2 id="credential-title">Add credential</h2>
@@ -218,7 +239,7 @@
     </form>
   </dialog>
 
-  <dialog id="oauth-client-dialog">
+  <dialog id="oauth-client-dialog" aria-labelledby="oauth-client-title">
     <form id="oauth-client-form" method="dialog">
       <div class="dialog-head">
         <h2 id="oauth-client-title">OAuth client</h2>
@@ -237,18 +258,19 @@
     </form>
   </dialog>
 
-  <dialog id="run-dialog">
+  <dialog id="run-dialog" aria-labelledby="run-title">
     <div class="dialog-head">
       <h2 id="run-title">Run</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
     <div id="run-detail" class="dialog-body detail"></div>
+    <div id="run-replay-result" class="dialog-feedback" role="status" hidden></div>
     <div class="dialog-actions">
       <button class="button secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
-  <dialog id="workflow-dialog">
+  <dialog id="workflow-dialog" aria-labelledby="workflow-title">
     <div class="dialog-head">
       <h2 id="workflow-title">Workflow</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
@@ -261,7 +283,7 @@
     </div>
   </dialog>
 
-  <dialog id="connection-dialog">
+  <dialog id="connection-dialog" aria-labelledby="connection-heading">
     <form id="connection-form" method="dialog">
       <div class="dialog-head">
         <h2 id="connection-heading">New Slack connection</h2>
@@ -279,7 +301,7 @@
     </form>
   </dialog>
 
-  <dialog id="token-dialog">
+  <dialog id="token-dialog" aria-label="New API token">
     <form id="token-form" method="dialog" autocomplete="off">
       <div class="dialog-head">
         <h2>New API token</h2>
@@ -297,7 +319,7 @@
     </form>
   </dialog>
 
-  <dialog id="token-reveal-dialog">
+  <dialog id="token-reveal-dialog" aria-labelledby="token-reveal-title">
     <div class="dialog-head">
       <h2 id="token-reveal-title">Token created</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
@@ -310,11 +332,11 @@
       </div>
     </div>
     <div class="dialog-actions">
-      <button class="button primary dialog-close" type="button">Done</button>
+      <label class="token-grant-choice">Connection<select id="token-grant-connection"></select></label><button id="token-grant" class="button secondary" type="button">Grant connection access</button><button class="button primary dialog-close" type="button">Done</button>
     </div>
   </dialog>
 
-  <dialog id="edit-connection-dialog">
+  <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title">
     <form id="edit-connection-form" method="dialog" autocomplete="off">
       <div class="dialog-head">
         <h2 id="edit-connection-title">Manage connection</h2>
@@ -323,7 +345,7 @@
       <div class="dialog-body">
         <p id="edit-connection-meta" class="sub mono"></p>
         <label>Display name<input name="display_name" maxlength="100" required></label>
-          <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Requested on the next reconnect. Revoke the old token before reducing scopes.</small></label>
+          <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Advanced provider permission identifiers. Changes take effect after reconnect; revoke the old token before reducing scopes.</small></label>
         <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">Dropbox only: the folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
         <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
@@ -338,7 +360,7 @@
     </form>
   </dialog>
 
-  <dialog id="connection-access-dialog">
+  <dialog id="connection-access-dialog" aria-labelledby="connection-access-title">
     <div class="dialog-head">
       <h2 id="connection-access-title">Access grants</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
@@ -348,7 +370,8 @@
       <div id="connection-grant-list" class="grant-list"></div>
       <form id="connection-grant-form" autocomplete="off">
         <h3 id="connection-grant-heading">Add grant</h3>
-        <label>Subject<input name="subject" required placeholder="token:my-agent or DTC subject"></label>
+        <label>Identity<select id="connection-grant-token"><option value="manual">Enter a subject manually</option></select></label>
+        <label id="connection-grant-subject-field">Subject<input name="subject" required placeholder="token:my-agent or DTC subject"></label>
         <label>Agent<input name="agent" required pattern="[a-z0-9][a-z0-9_-]{1,62}" placeholder="my-agent"></label>
         <fieldset class="grant-operations"><legend>Allowed operations</legend>
           <label><input type="checkbox" name="operations" value="use" checked>Use tokens</label>
@@ -357,18 +380,24 @@
         </fieldset>
         <small class="field-hint">Admin includes token use and reconnection for this connection.</small>
         <label>Expires <input name="expires_at" type="datetime-local"><small class="field-hint">Optional. Uses your local time.</small></label>
-        <p id="connection-grant-error" class="form-error" role="alert"></p>
+        <p id="connection-grant-error" class="form-error" role="alert"></p><p id="connection-grant-status" class="inline-status" role="status"></p>
       </form>
     </div>
     <div class="dialog-actions"><button id="connection-grant-cancel" class="button secondary" type="button" hidden>Cancel edit</button><button class="button secondary dialog-close" type="button">Done</button><button class="button primary" type="submit" form="connection-grant-form">Save grant</button></div>
   </dialog>
 
-  <dialog id="connection-confirm-dialog">
+  <dialog id="connection-confirm-dialog" aria-labelledby="connection-confirm-title">
     <form method="dialog">
       <div class="dialog-head"><h2 id="connection-confirm-title">Revoke access</h2></div>
       <div class="dialog-body"><p id="connection-confirm-message"></p></div>
       <div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="connection-confirm-yes" class="button danger" value="confirm">Revoke</button></div>
     </form>
+  </dialog>
+  <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="button danger" value="confirm">Revoke token</button></div></form>
+  </dialog>
+  <dialog id="replay-confirm-dialog" aria-labelledby="replay-confirm-title" aria-describedby="replay-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="replay-confirm-yes" class="button danger" value="confirm">Replay run</button></div></form>
   </dialog>
 </body>
 </html>

@@ -250,7 +250,9 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
   border-right: 1px solid var(--rail-line);
   z-index: 20;
 }
-.brand { padding: 25px 20px 24px; border-bottom: 1px solid var(--rail-line); font-size: 23px; letter-spacing: -.045em; }
+.sidebar-backdrop { display: none; }
+.brand { display: flex; align-items: center; justify-content: space-between; padding: 25px 20px 24px; border-bottom: 1px solid var(--rail-line); font-size: 23px; letter-spacing: -.045em; }
+.sidebar-close { display: none; }
 nav { display: grid; align-content: start; gap: 0; padding: 23px 0; }
 .nav-item {
   height: 45px;
@@ -302,6 +304,8 @@ main { min-width: 0; padding: 0 40px 64px; }
   border-bottom: 1px solid var(--line-strong);
 }
 .topbar h1 { font-size: 32px; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; }
+.designer-rename { gap: 5px; height: 32px; }
+.designer-rename svg { width: 13px; height: 13px; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .last-updated { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .menu-toggle { display: none; }
@@ -314,6 +318,19 @@ main { min-width: 0; padding: 0 40px 64px; }
 
 .notice { margin-top: 16px; border: 1px solid var(--accent-line); background: var(--accent-soft); padding: 10px 14px; font-size: 12.5px; color: var(--ink-soft); }
 .notice.error { border-color: var(--red-line); background: var(--red-soft); color: var(--red-deep); }
+.notice a { margin-left: 5px; color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+.dialog-feedback { border-top: 1px solid var(--accent-line); background: var(--accent-soft); padding: 10px 22px; color: var(--ink-soft); font-size: 12.5px; }
+.dialog-feedback.error { border-color: var(--red-line); background: var(--red-soft); color: var(--red-deep); }
+.dialog-feedback a { margin-left: 4px; color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+.inline-status { color: var(--accent); font-size: 12.5px; min-height: 1em; }
+.run-filters, .connection-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.run-filters { padding: 18px 0 8px; }
+.run-filters label { min-width: 150px; }
+.run-filters .field-hint { margin: 0 0 10px auto; }
+.connection-filters { margin-left: auto; }
+.connection-filters input { width: min(190px, 30vw); }
+.connection-filters select { width: 150px; }
+.token-grant-choice { margin-right: auto; min-width: 170px; }
 
 /* --- metrics --------------------------------------------------------------- */
 .metrics {
@@ -633,6 +650,7 @@ body[data-view="designer"] .top-actions #designer-github { display: inline-flex;
 /* --- drawer behaviour (≤860) --------------------------------------------------- */
 @media (max-width: 860px) {
   .app-shell { grid-template-columns: 1fr; }
+  .sidebar-backdrop:not([hidden]) { position: fixed; display: block; inset: 0; z-index: 19; width: 100%; height: 100dvh; border: 0; background: var(--backdrop); cursor: pointer; }
   .sidebar {
     position: fixed;
     left: 0;
@@ -648,9 +666,12 @@ body[data-view="designer"] .top-actions #designer-github { display: inline-flex;
     transition-delay: 0s;
     box-shadow: none;
   }
+  .sidebar-close { display: inline-grid; width: 30px; height: 30px; }
   main { padding: 0 24px 48px; }
   .loading { margin: 0 -24px; }
   .menu-toggle { display: inline-grid; }
+  .connection-filters { width: 100%; order: 3; margin-left: 0; }
+  .connection-filters input { width: min(240px, 55vw); }
   .connect-card { grid-template-columns: minmax(155px, 28%) minmax(0, 1fr); }
   .connect-card-actions { grid-column: 2; grid-row: auto; justify-content: flex-start; }
   .connect-pending { grid-column: 2; }
@@ -663,6 +684,10 @@ body[data-view="designer"] .top-actions #designer-github { display: inline-flex;
   :root { --topbar-h: 72px; }
   .topbar { min-height: 72px; gap: 12px; }
   .topbar h1 { font-size: 25px; }
+  .designer-rename { font-size: 11px; }
+  .run-filters label { flex: 1 1 140px; }
+  .run-filters .field-hint { margin: 4px 0 0; flex-basis: 100%; }
+  .connection-filters input, .connection-filters select { width: 100%; flex: 1 1 130px; }
   .last-updated { display: none; }
 
   .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 0; padding: 22px 0 20px; }

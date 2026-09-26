@@ -36,6 +36,10 @@ function openCredential(provider) {
 $('#credential-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.textContent = 'Saving…';
   const provider = form.provider.value;
   const field = provider === 'slack' ? 'token' : 'api_key';
   $('#credential-error').textContent = '';
@@ -46,6 +50,7 @@ $('#credential-form').addEventListener('submit', async (event) => {
     notice('Credential saved');
     await refresh();
   } catch (error) { $('#credential-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Save credential'; }
 });
 
 export { renderCredentials };

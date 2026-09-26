@@ -5,6 +5,21 @@
   var codeInput = document.getElementById("pair-code");
   var button = document.getElementById("pair-button");
   var status = document.getElementById("pair-status");
+  var identity = document.getElementById("device-identity");
+
+  fetch("/api/admin/me", { credentials: "same-origin" }).then(function (response) {
+    if (!response.ok) {
+      if (identity) identity.textContent = "Sign in to approve this dapier CLI request.";
+      return null;
+    }
+    return response.json();
+  }).then(function (me) {
+    if (me && me.username && identity) {
+      identity.textContent = "You are signed in as " + me.username + ". Approve only if the code matches the one shown by your dapier CLI.";
+    }
+  }).catch(function () {
+    if (identity) identity.textContent = "Check the code against your dapier CLI before approving.";
+  });
 
   function note(text, kind) {
     status.textContent = text;
@@ -57,7 +72,7 @@
   var prefill = new URLSearchParams(window.location.search).get("code");
   if (prefill) {
     codeInput.value = prefill;
-    approve(prefill);
+    note("Check this code against your dapier CLI, then choose Approve.");
   }
   codeInput.focus();
 })();

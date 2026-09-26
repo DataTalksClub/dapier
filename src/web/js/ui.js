@@ -7,17 +7,33 @@ export function icons() {
 }
 
 export function showLogin() {
-  window.location.assign('/auth/login');
+  const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  window.location.assign(`/auth/login?next=${encodeURIComponent(destination)}`);
 }
 
 export function showForbidden(message = 'Your account is not an operator for this console.') {
+  $$('dialog[open]').forEach((dialog) => dialog.close());
+  $('#app').hidden = true;
+  $('#startup-loading').hidden = true;
+  $('#startup-error').hidden = true;
   $('#forbidden-view').hidden = false;
   $('#forbidden-message').textContent = message;
 }
 
 export function showApp() {
+  $('#startup-loading').hidden = true;
+  $('#startup-error').hidden = true;
   $('#app').hidden = false;
   icons();
+}
+
+export function showStartupError(message) {
+  $$('dialog[open]').forEach((dialog) => dialog.close());
+  $('#app').hidden = true;
+  $('#startup-loading').hidden = true;
+  $('#startup-error-message').textContent = message || 'The console could not reach its API. Check your connection and try again.';
+  $('#startup-error').hidden = false;
+  $('#startup-retry').focus();
 }
 
 export function notice(message, error = false) {

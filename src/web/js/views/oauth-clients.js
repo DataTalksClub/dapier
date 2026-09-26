@@ -29,6 +29,10 @@ function openOAuthClient(provider) {
 $('#oauth-client-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.textContent = 'Saving…';
   $('#oauth-client-error').textContent = '';
   try {
     await api(`/api/admin/oauth-clients/${form.dataset.provider}`, {
@@ -40,6 +44,7 @@ $('#oauth-client-form').addEventListener('submit', async (event) => {
     notice('OAuth client saved — Connect buttons are live');
     await refresh();
   } catch (error) { $('#oauth-client-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Save client'; }
 });
 
 export { renderOAuthClients };
