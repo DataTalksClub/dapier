@@ -805,6 +805,71 @@ Resources:
             Status: Enabled
             ExpirationInDays: 30
 
+  # Daily DynamoDB snapshots (src/dapier/backup.py). Retained even if the
+  # stack is deleted — losing the backups together with the tables they
+  # exist for would defeat the point.
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-backups-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-backups
+            Status: Enabled
+            ExpirationInDays: 30
+
+  BackupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.backup.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 300
+      Environment:
+        Variables:
+          BACKUP_BUCKET: !Ref BackupBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref BackupBucket
+        # Scan access to every table the stack owns, including future ones.
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:Scan]
+            Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-*
+      Events:
+        Daily:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *)
+
+  BackupErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Dapier daily DynamoDB backup Lambda errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BackupFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+
 Outputs:
   ApiUrl:
     Value: !Sub https://${DomainName}
@@ -832,3 +897,5 @@ Outputs:
     Value: !Ref CursorsTable
   AuditTableName:
     Value: !Ref AuditTable
+  BackupBucketName:
+    Value: !Ref BackupBucket
