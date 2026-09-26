@@ -11,7 +11,6 @@ from .. import audit as audit_log
 from .. import http
 from ..auth import session
 from ..auth.session import OAUTH_COOKIE
-from ..auth.session import OAUTH_COOKIE
 from . import records as connection_model
 from . import credentials
 from .providers import oauth_clients, oauth_providers
@@ -28,6 +27,17 @@ def oauth_callback_url():
     """The single registered provider redirect URI. Never derived from headers."""
     url = os.environ.get("OAUTH_CALLBACK_URL", "").strip()
     return url
+
+
+def _callback_result(code, connection_id=None):
+    """Return a safe, actionable result to the browser that started consent."""
+    query = {"oauth": code}
+    if connection_id:
+        query["connection"] = connection_id
+    return http._redirect(
+        f"/connections?{urllib.parse.urlencode(query)}",
+        cookies=[f"{OAUTH_COOKIE}=; Path=/oauth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"],
+    )
 
 def _claim_oauth_state(jti):
     """Consume an OAuth state ID exactly once. Returns False on replay."""
@@ -100,34 +110,35 @@ def oauth_callback(event):
     state = query.get("state", "")
     payload = session._verify(state, "oauth")
     if not payload:
-        return http._json_response(400, {"error": "Invalid or expired OAuth state"})
+        return _callback_result("session_expired")
     cookie_state = session._cookie(event, OAUTH_COOKIE)
     if cookie_state:
         if not hmac.compare_digest(state, cookie_state):
-            return http._json_response(400, {"error": "Invalid or expired OAuth state"})
+            return _callback_result("session_expired")
     elif not payload.get("operator_subject") or not payload.get("jti"):
         # Cookieless callbacks only for CLI-initiated flows, where the signed
         # state binds the operator subject and is single-use. Browser flows
         # always carry the state cookie set by oauth_start.
-        return http._json_response(400, {"error": "Invalid or expired OAuth state"})
-    if query.get("error"):
-        return http._redirect(f"/connections?oauth={urllib.parse.quote(query['error'])}")
+        return _callback_result("session_expired")
+    connection_id = payload.get("connection_id")
     if not payload.get("jti") or not _claim_oauth_state(payload["jti"]):
-        return http._json_response(400, {"error": "Invalid or expired OAuth state"})
+        return _callback_result("session_expired", connection_id)
+    if query.get("error"):
+        return _callback_result("access_denied", connection_id)
     session_subject = session._session_subject(event)
     operator = payload.get("operator_subject") or session_subject or "unknown"
     if session_subject and payload.get("operator_subject") != session_subject:
         session._audit_event(payload.get("connection_id", "unknown"), audit_log.CALLBACK,
                      session_subject, outcome="denied-wrong-operator")
-        return http._json_response(400, {"error": "OAuth session does not match the connection request"})
+        return _callback_result("wrong_operator", connection_id)
     connection = _connection(payload["connection_id"])
     if not connection or not query.get("code"):
-        return http._json_response(400, {"error": "OAuth connection or code is missing"})
+        return _callback_result("incomplete", connection_id)
 
     try:
         client_id, client_secret = oauth_clients.get(connection["provider"])
     except oauth_clients.ClientConfigError as exc:
-        return http._json_response(503, {"error": str(exc)})
+        return _callback_result("client_configuration", connection_id)
     try:
         previous = credentials.get_credential(connection["credential_id"])
     except KeyError:
@@ -145,7 +156,7 @@ def oauth_callback(event):
     except oauth_providers.ProviderError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return http._json_response(400, {"error": str(exc)})
+        return _callback_result("exchange_failed", connection_id)
     requested = set(connection.get("scopes") or [])
     granted_raw = token_data.get("scope")
     if granted_raw:
@@ -154,10 +165,7 @@ def oauth_callback(event):
         if missing:
             session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                          outcome="error", error="missing scopes")
-            return http._json_response(400, {
-                "error": "Provider did not grant the requested scopes",
-                "missing_scopes": missing,
-            })
+            return _callback_result("missing_scopes", connection_id)
     else:
         granted = requested
     try:
@@ -167,13 +175,13 @@ def oauth_callback(event):
     except oauth_providers.ProviderError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return http._json_response(400, {"error": f"Could not verify the provider account: {exc}"})
+        return _callback_result("verification_failed", connection_id)
     try:
         connection_model.check_binding(connection, account_id)
     except connection_model.BindingError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="denied-account-mismatch", error=str(exc))
-        return http._json_response(409, {"error": str(exc)})
+        return _callback_result("wrong_account", connection_id)
     stored = oauth_providers.normalize_token_data(
         token_data, previous_refresh_token=previous.get("refresh_token"),
     )
@@ -189,10 +197,7 @@ def oauth_callback(event):
     except connection_model.BindingError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return http._json_response(409, {"error": str(exc)})
+        return _callback_result("wrong_account", connection_id)
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator, outcome="ok")
-    return http._redirect(
-        "/connections?oauth=connected",
-        cookies=[f"{OAUTH_COOKIE}=; Path=/oauth/callback; Max-Age=0; HttpOnly; Secure; SameSite=Lax"],
-    )
+    return _callback_result("connected")

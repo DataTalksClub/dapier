@@ -295,7 +295,8 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
                  f"dapier_session={session}"],
         query={"code": "provider-code", "state": state},
     ))
-    assert replay["statusCode"] == 400
+    assert replay["statusCode"] == 302
+    assert replay["headers"]["location"] == "/connections?oauth=session_expired&connection=youtube-personal"
 
     forged = invoke(http_event(
         "GET", "/oauth/callback",
@@ -303,7 +304,8 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
                  f"dapier_session={session}"],
         query={"code": "provider-code", "state": state[:-2] + "xx"},
     ))
-    assert forged["statusCode"] == 400
+    assert forged["statusCode"] == 302
+    assert forged["headers"]["location"] == "/connections?oauth=session_expired"
 
 
 def test_login_rejects_mismatched_state(monkeypatch):

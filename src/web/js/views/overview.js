@@ -79,9 +79,14 @@ function render() {
   if (!data) return;
   const enabled = data.workflows.filter((workflow) => workflow.enabled);
   const configured = data.credentials.filter((credential) => credential.configured).length;
+  const connected = data.connections.filter((connection) => connection.status === 'connected').length;
+  const attention = data.connections.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status)).length;
+  const recentRuns = data.runs || [];
   $('#metric-workflows').textContent = enabled.length;
-  $('#metric-connections').textContent = data.connections.filter((connection) => connection.status === 'connected').length;
-  $('#metric-runs').textContent = (data.executions || []).filter((execution) => execution.status === 'completed').length;
+  $('#metric-connections').textContent = connected;
+  $('#metric-connection-detail').textContent = attention ? `${attention} need attention` : 'No setup issues';
+  $('#metric-runs').textContent = recentRuns.filter((run) => run.status === 'completed').length;
+  $('#metric-runs-detail').textContent = recentRuns.length ? `of ${recentRuns.length} available runs` : 'No recent runs';
   $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
   $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
   $('#overview-runs').innerHTML = (data.runs || []).slice(0, 6).map((run) =>

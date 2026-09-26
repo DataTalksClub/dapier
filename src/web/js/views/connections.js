@@ -73,12 +73,57 @@ const CONNECTION_STATUS_LABELS = {
 
 let addPickerOpen = false;
 
+const OAUTH_RESULTS = {
+  access_denied: ['Access was not approved', 'Retry setup and approve the requested permissions.'],
+  session_expired: ['Setup link expired', 'Start connection setup again from this page. Consent links can only be used once.'],
+  wrong_operator: ['Different operator account', 'Sign in with the account that started setup, then try again.'],
+  incomplete: ['Setup could not finish', 'The connection or authorization code was missing. Retry setup.'],
+  client_configuration: ['OAuth client needs attention', 'Check this provider’s client ID and secret in Credentials, then retry.'],
+  exchange_failed: ['Provider authorization failed', 'The authorization code may have expired. Retry setup.'],
+  missing_scopes: ['Permissions were not granted', 'Retry setup and approve every requested permission.'],
+  verification_failed: ['Account could not be verified', 'Retry setup. If it happens again, check the provider account and OAuth client.'],
+  wrong_account: ['Wrong provider account', 'Choose the account already linked to this connection, or add a separate connection for the other account.'],
+};
+
+export function showOAuthResult(code, connectionId) {
+  const banner = $('#oauth-result');
+  if (code === 'connected') {
+    banner.hidden = true;
+    notice('Connection ready');
+    return;
+  }
+  const [title, message] = OAUTH_RESULTS[code] || ['Setup could not finish', 'Return to Connections and try setup again.'];
+  $('#oauth-result-title').textContent = title;
+  $('#oauth-result-message').textContent = message;
+  const known = ((state.data || {}).connections || []).some((item) => item.connection_id === connectionId);
+  $('#oauth-retry').hidden = !known || code === 'client_configuration';
+  $('#oauth-retry').dataset.connection = known ? connectionId : '';
+  $('#oauth-credentials').hidden = code !== 'client_configuration';
+  banner.hidden = false;
+}
+
+function openOAuthWindow(url, connectionId) {
+  const popup = window.open(url, '_blank', 'width=680,height=760');
+  if (!popup) {
+    notice('Allow pop-ups to connect this account, then try again.', true);
+    return;
+  }
+  popup.focus();
+  watchOAuthPopup(popup, connectionId);
+}
+
+$('#oauth-retry').addEventListener('click', (event) => {
+  const connectionId = event.currentTarget.dataset.connection;
+  if (connectionId) openOAuthWindow(`/api/admin/oauth/${encodeURIComponent(connectionId)}/start`, connectionId);
+});
+$('#oauth-dismiss').addEventListener('click', () => { $('#oauth-result').hidden = true; });
+
 function renderConnectCards(connections) {
   $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => {
     const pending = !TOKEN_PROVIDERS.includes(provider)
       ? connections.find((connection) => connection.provider === provider && connection.status === 'ready') : null;
     const action = pending
-      ? `<a class="button primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" target="_blank" rel="noopener">Finish setup</a>
+      ? `<a class="button primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
          <button class="button secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
       : `<button class="button secondary connect-button" data-provider="${provider}" type="button">Add account</button>`;
     return `
@@ -111,7 +156,7 @@ async function connectProvider(provider) {
   if (!popup) return notice('Allow pop-ups to add this connection, then try again.', true);
   popup.document.title = `Connect ${meta.label}`;
   if (popup.document.body) popup.document.body.textContent = 'Preparing connection…';
-  const stopWatching = watchOAuthPopup(popup);
+  const stopWatching = watchOAuthPopup(popup, id);
   try {
     // Provision the new record with the provider's standard scopes, then
     // bounce straight to the consent screen.
@@ -139,22 +184,25 @@ async function connectProvider(provider) {
   }
 }
 
-function watchOAuthPopup(popup) {
-  const timer = setInterval(() => {
+function watchOAuthPopup(popup, connectionId) {
+  const timer = setInterval(async () => {
     if (popup.closed) {
       clearInterval(timer);
-      notice('Consent window closed. Checking the connection status…');
-      refresh();
+      await refresh();
+      const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+      if (connection?.status === 'connected') notice('Consent window closed. Current connection status refreshed.');
+      else showOAuthResult('incomplete', connectionId);
       return;
     }
     try {
       // The callback redirects to /connections?oauth=... after consent.
-      const result = new URLSearchParams(popup.location.search).get('oauth');
+      const params = new URLSearchParams(popup.location.search);
+      const result = params.get('oauth');
       if (popup.location.pathname === '/connections' && result) {
         clearInterval(timer);
-        if (result === 'connected') popup.close();
-        else notice(`Connection failed: ${result}`, true);
-        refresh();
+        popup.close();
+        await refresh();
+        showOAuthResult(result, params.get('connection') || connectionId);
       }
     } catch (_) {
       // The provider's consent page is on another origin until it redirects.
@@ -218,7 +266,7 @@ function renderConnections(connections) {
     (priority[a.status] ?? 4) - (priority[b.status] ?? 4));
   $('#connection-table').innerHTML = ordered.map((connection) => {
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && connection.status !== 'connected'
-      ? `<a class="button ${connection.status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" target="_blank" rel="noopener">${connection.status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+      ? `<a class="button ${connection.status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${connection.status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     const identity = connection.account_title || connection.verified_account_id;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span></td>
@@ -227,21 +275,14 @@ function renderConnections(connections) {
     <td class="action-cell">${nextAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
   }).join('');
-  bindOAuthLinks();
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  bindOAuthLinks();
 }
 
 function bindOAuthLinks() {
   $$('.connection-oauth').forEach((link) => link.addEventListener('click', (event) => {
-    const popup = window.open(link.href, '_blank', 'width=680,height=760');
-    if (!popup) {
-      event.preventDefault();
-      notice('Allow pop-ups to connect this account, then try again.', true);
-      return;
-    }
     event.preventDefault();
-    popup.focus();
-    watchOAuthPopup(popup);
+    openOAuthWindow(link.href, link.dataset.connection);
   }));
 }
 
@@ -264,15 +305,8 @@ $('#add-connection').addEventListener('click', () => {
 
 $('#edit-connection-reconnect').addEventListener('click', (event) => {
   $('#edit-connection-dialog').close();
-  const popup = window.open(event.currentTarget.href, '_blank', 'width=680,height=760');
-  if (!popup) {
-    event.preventDefault();
-    notice('Allow pop-ups to reconnect this account, then try again.', true);
-    return;
-  }
   event.preventDefault();
-  popup.focus();
-  watchOAuthPopup(popup);
+  openOAuthWindow(event.currentTarget.href, $('#edit-connection-form').dataset.connectionId);
 });
 
 $('#edit-connection-revoke').addEventListener('click', async () => {

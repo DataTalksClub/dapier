@@ -197,28 +197,29 @@ def test_callback_success_is_single_use(monkeypatch):
     assert any(key.startswith("oauth-state:") for key in executions.items)
 
     replay = oauth_flow.oauth_callback(event)
-    assert replay["statusCode"] == 400
-    assert json.loads(replay["body"])["error"] == "Invalid or expired OAuth state"
+    assert replay["statusCode"] == 302
+    assert replay["headers"]["location"] == "/connections?oauth=session_expired&connection=youtube-personal"
 
 
 def test_callback_rejects_wrong_operator(monkeypatch):
     _, _, _, _, response = start_flow(monkeypatch)
     event = callback_event(response, subject="subject-2")
     result = oauth_flow.oauth_callback(event)
-    assert result["statusCode"] == 400
-    assert "does not match" in json.loads(result["body"])["error"]
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=wrong_operator&connection=youtube-personal"
 
 
 def test_callback_provider_denial_returns_to_connections(monkeypatch):
     _, _, stored, requests, response = start_flow(monkeypatch)
     event = callback_event(response)
     event["queryStringParameters"] = {
-        "error": "access_denied",
+        "error": "access_denied&next=https://evil.example.test",
         "state": event["queryStringParameters"]["state"],
     }
     result = oauth_flow.oauth_callback(event)
     assert result["statusCode"] == 302
-    assert result["headers"]["location"] == "/connections?oauth=access_denied"
+    assert result["headers"]["location"] == "/connections?oauth=access_denied&connection=youtube-personal"
+    assert any("Max-Age=0" in cookie for cookie in result["cookies"])
     assert not stored
     assert not requests
 
@@ -237,7 +238,8 @@ def test_callback_provider_error_stores_nothing(monkeypatch):
     seed_connection(connections)
     response = oauth_flow.oauth_start(start_event(), "youtube-personal")
     result = oauth_flow.oauth_callback(callback_event(response))
-    assert result["statusCode"] == 400
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=exchange_failed&connection=youtube-personal"
     assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
 
@@ -256,9 +258,8 @@ def test_callback_rejects_missing_scopes(monkeypatch):
     )
     response = oauth_flow.oauth_start(start_event(), "youtube-personal")
     result = oauth_flow.oauth_callback(callback_event(response))
-    assert result["statusCode"] == 400
-    body = json.loads(result["body"])
-    assert body["missing_scopes"] == [YOUTUBE_SCOPE]
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=missing_scopes&connection=youtube-personal"
     assert writes == []
     assert connections.items["youtube-personal"]["status"] == "ready"
 
@@ -273,7 +274,8 @@ def test_callback_rejects_expired_state(monkeypatch):
         "cookies": [f"dapier_oauth_state={stale}"],
         "queryStringParameters": {"code": "c", "state": stale},
     })
-    assert result["statusCode"] == 400
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=session_expired"
 
 
 def test_callback_rejects_wrong_provider_account(monkeypatch):
@@ -286,7 +288,8 @@ def test_callback_rejects_wrong_provider_account(monkeypatch):
     seed_connection(connections, expected_account_id="UC-personal")
     response = oauth_flow.oauth_start(start_event(), "youtube-personal")
     result = oauth_flow.oauth_callback(callback_event(response))
-    assert result["statusCode"] == 409
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=wrong_account&connection=youtube-personal"
     assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
     assert connections.items["youtube-personal"]["verified_account_id"] is None
@@ -303,8 +306,8 @@ def test_callback_fails_closed_when_verification_fails(monkeypatch):
     seed_connection(connections)
     response = oauth_flow.oauth_start(start_event(), "youtube-personal")
     result = oauth_flow.oauth_callback(callback_event(response))
-    assert result["statusCode"] == 400
-    assert "verify" in json.loads(result["body"])["error"].lower()
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=verification_failed&connection=youtube-personal"
     assert "oauth#youtube-personal" not in stored
     assert connections.items["youtube-personal"]["status"] == "ready"
 
@@ -347,4 +350,5 @@ def test_cookieless_callback_without_subject_is_rejected(monkeypatch):
         "headers": {},
         "queryStringParameters": {"code": "auth-code", "state": state},
     })
-    assert result["statusCode"] == 400
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=session_expired"

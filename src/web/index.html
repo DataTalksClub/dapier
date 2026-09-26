@@ -78,8 +78,8 @@
       <section class="view active" data-page="overview">
         <div class="metrics">
           <div class="metric"><span class="metric-label">Enabled workflows</span><span class="metric-value mono" id="metric-workflows">-</span></div>
-          <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span></div>
-          <div class="metric"><span class="metric-label">Completed, latest 25</span><span class="metric-value mono" id="metric-runs">-</span></div>
+          <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span><span class="metric-detail" id="metric-connection-detail"></span></div>
+          <div class="metric"><span class="metric-label">Recent runs completed</span><span class="metric-value mono" id="metric-runs">-</span><span class="metric-detail" id="metric-runs-detail"></span></div>
           <div class="metric"><span class="metric-label">Credentials</span><span class="metric-value mono" id="metric-credentials">-</span></div>
         </div>
 
@@ -126,6 +126,14 @@
       </section>
 
       <section class="view" data-page="connections">
+        <div id="oauth-result" class="oauth-result" role="alert" hidden>
+          <div><strong id="oauth-result-title"></strong><p id="oauth-result-message"></p></div>
+          <div class="oauth-result-actions">
+            <button id="oauth-retry" class="button primary" type="button" hidden>Retry setup</button>
+            <a id="oauth-credentials" class="button secondary" href="/credentials" hidden>Open credentials</a>
+            <button id="oauth-dismiss" class="button secondary" type="button">Dismiss</button>
+          </div>
+        </div>
         <div class="section-head">
           <p id="connection-summary" class="register-summary mono">Loading accounts…</p>
           <button id="add-connection" class="button primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>

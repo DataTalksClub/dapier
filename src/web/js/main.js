@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { setView, viewFromPath } from './router.js';
 import { refresh, openRowFor } from './views/overview.js';
 import { openDesigner, designerFromLocation } from './views/designer.js';
+import { showOAuthResult } from './views/connections.js';
 import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
@@ -94,6 +95,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   setView(initialView, false);
   if (initialView === 'designer') designerFromLocation();
   await refresh();
+  const oauth = new URLSearchParams(window.location.search);
+  if (initialView === 'connections' && oauth.has('oauth')) {
+    showOAuthResult(oauth.get('oauth'), oauth.get('connection'));
+  }
   /* The deep-link header sync above ran before the overview data arrived;
      now the workflow name and GitHub link can be filled in. */
   if (initialView === 'designer') designerFromLocation();
