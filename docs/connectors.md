@@ -382,8 +382,9 @@ For Slack or Telegram, create or replace a connection with
 
 ### Google Drive, Docs, and Sheets connections
 
-The Gmail Google connection keeps its Calendar scopes and also requests the
-three Workspace scopes. Its configured request is:
+The Gmail Google connection (`google-calendar`, display name **Google Calendar
++ Drive (Gmail)**) keeps its Calendar scopes and also requests the three
+Workspace scopes. Its configured request is:
 
 ```powershell
 uv run dapier connections scopes google-calendar --scopes `
@@ -399,23 +400,20 @@ Updating this list does not update the token already held for Gmail. Reconnect
 `google-calendar` and approve the new consent screen while signed in as
 `alexey.s.grigoriev@gmail.com` to grant the scopes.
 
-Create the second account as its own Google connection, with no Calendar or
-YouTube scopes:
+The second account has a separate Google connection (`google-sheets`, display
+name **Google Drive, Docs & Sheets (DataTalks)**). Its saved request is
+`drive.readonly`, `documents`, `spreadsheets`, and `userinfo.email`; it has no
+Calendar or YouTube scopes. The record is currently **setup incomplete** with
+no verified account. Connect it with:
 
 ```powershell
-uv run dapier connections create google-drive-dtc --provider google `
-  --display-name "Google Drive (DataTalks)" `
-  --scopes https://www.googleapis.com/auth/drive.readonly `
-  https://www.googleapis.com/auth/documents `
-  https://www.googleapis.com/auth/spreadsheets `
-  https://www.googleapis.com/auth/userinfo.email
-uv run dapier connections connect google-drive-dtc --agent <agent-name>
+uv run dapier connections connect google-sheets --agent <agent-name>
 ```
 
 Complete consent while signed in as `alexey@datatalks.club`. Check the account
 shown by Google before approving so the token is bound to the intended account.
 The connection's configured scope list and the scopes actually granted to its
-token are separate; inspect `dapier connections show google-drive-dtc` after
+token are separate; inspect `dapier connections show google-sheets` after
 consent and reconnect if the account granted fewer scopes.
 
 ### YouTube, step by step
