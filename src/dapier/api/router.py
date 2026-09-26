@@ -341,6 +341,20 @@ def handler(event, _context):
         if not _verify_youtube(event, body):
             return _response(401, {"error": "invalid signature"})
         _youtube(body)
+    elif path.startswith("/hooks/zoom/"):
+        from ..triggers.intake import zoom_webhooks
+
+        connection_id = path.removeprefix("/hooks/zoom/").strip("/")
+        if not connection_id or "/" in connection_id:
+            return _response(404, {"error": "not found"})
+        if len(body) > MAX_HOOK_BODY_BYTES:
+            return _response(413, {"error": "body too large"})
+        table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+        status, payload = zoom_webhooks.handle(
+            connection_id, event.get("headers"), body,
+            connections_table=table, publish=_publish,
+        )
+        return _response(status, payload)
     elif path.startswith("/hooks/webhook/") or path.startswith("/hooks/telegram/"):
         prefix = "/hooks/webhook/" if path.startswith("/hooks/webhook/") else "/hooks/telegram/"
         name = (path.split(prefix, 1)[1] or "").strip("/").lower()

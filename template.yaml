@@ -291,6 +291,12 @@ Resources:
         YouTubePost:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /hooks/youtube, Method: POST}
+        ZoomRecordingHook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: '/hooks/zoom/{proxy+}'
+            Method: POST
         WebhookTriggerHook:
           Type: HttpApi
           Properties:

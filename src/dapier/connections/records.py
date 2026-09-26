@@ -25,7 +25,7 @@ STATUS_CONNECTED = "connected"
 
 # Providers that authenticate with a directly supplied token instead of an
 # OAuth consent round-trip (see admin._save_token_connection).
-TOKEN_PROVIDERS = {"slack", "telegram"}
+TOKEN_PROVIDERS = {"slack", "telegram", "zoom"}
 
 
 class ConnectionError(ValueError):

@@ -27,6 +27,13 @@ const CONNECT_PROVIDERS = {
     displayName: 'Dropbox',
     scopes: ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write'],
   },
+  zoom: {
+    label: 'Zoom',
+    blurb: 'Start workflows when a Zoom cloud recording video finishes processing.',
+    connectionId: 'zoom',
+    displayName: 'Zoom recordings',
+    scopes: [],
+  },
   slack: {
     label: 'Slack',
     blurb: 'Connect a Slack account for agent access with a bot or user token. Workflow Slack actions can also use the shared Service credential.',
@@ -44,7 +51,7 @@ const CONNECT_PROVIDERS = {
 };
 
 /* Token providers paste a credential instead of browser consent. */
-const TOKEN_PROVIDERS = ['slack', 'telegram'];
+const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
 
 const TOKEN_PROVIDER_META = {
   slack: {
@@ -60,6 +67,14 @@ const TOKEN_PROVIDER_META = {
     label: 'Bot token',
     placeholder: '123456:ABC-DEF…',
     displayName: 'Telegram bot',
+  },
+  zoom: {
+    heading: 'New Zoom recording connection',
+    blurb: 'Create a Zoom Webhook Only app, then paste its Secret Token. After creating this connection, copy its callback URL into the Zoom event subscription and select recording.completed.',
+    label: 'Webhook Secret Token',
+    placeholder: 'Secret Token from Zoom Marketplace',
+    displayName: 'Zoom recordings',
+    connectionId: 'zoom',
   },
 };
 
@@ -128,7 +143,7 @@ function renderConnectCards(connections) {
     const action = pending
       ? `<a class="button primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
          <button class="button secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
-      : `<button class="button secondary connect-button" data-provider="${provider}" type="button">Add account</button>`;
+      : `<button class="button secondary connect-button" data-provider="${provider}" type="button">${provider === 'zoom' ? 'Add Zoom app' : 'Add account'}</button>`;
     return `
     <div class="connect-card">
       <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span></div>
@@ -252,10 +267,21 @@ function openEditConnection(connectionId) {
   $('#edit-root-path-field').hidden = connection.provider !== 'dropbox';
   form.token.value = '';
   $('#edit-token-field').hidden = !TOKEN_PROVIDERS.includes(connection.provider);
+  $('#edit-token-field').firstChild.textContent = connection.provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
+  form.token.placeholder = connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
+  $('#edit-token-field .field-hint').textContent = connection.provider === 'zoom'
+    ? 'Leave blank to keep the stored secret. Replacing it requires Zoom to validate the callback again.'
+    : 'Leave blank to keep the stored token — it is re-verified on save.';
+  const zoomSetup = $('#edit-zoom-setup');
+  zoomSetup.hidden = connection.provider !== 'zoom';
+  if (connection.provider === 'zoom') $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = TOKEN_PROVIDERS.includes(connection.provider) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
-  $('#edit-connection-revoke').hidden = !['connected', 'expired'].includes(connection.status);
+  $('#edit-connection-revoke').hidden = !(['connected', 'expired'].includes(connection.status) ||
+    (connection.provider === 'zoom' && connection.status === 'ready'));
+  $('#edit-connection-revoke').textContent = connection.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens';
+  $('#edit-connection-access').hidden = connection.provider === 'zoom';
   $('#edit-connection-error').textContent = '';
   $('#edit-connection-dialog').showModal();
   form.display_name.focus();
@@ -352,7 +378,7 @@ $('#edit-connection-revoke').addEventListener('click', async (event) => {
     notice(`Access for ${connectionId} revoked in Dapier. Reconnect it to use the connection again.`);
     await refresh();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
-  finally { button.disabled = false; button.textContent = 'Revoke tokens'; }
+  finally { button.disabled = false; button.textContent = $('#edit-connection-form').dataset.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens'; }
 });
 
 let shownGrants = [];
@@ -531,7 +557,7 @@ $('#connection-form').addEventListener('submit', async (event) => {
   const provider = form.dataset.provider || 'slack';
   const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   $('#connection-error').textContent = '';
-  const { id, suffix } = nextConnectionId(meta === TOKEN_PROVIDER_META.slack ? 'slack' : 'telegram-bot');
+  const { id, suffix } = nextConnectionId(meta.connectionId || (provider === 'slack' ? 'slack' : 'telegram-bot'));
   const body = {
     connection_id: id,
     provider,
@@ -542,8 +568,9 @@ $('#connection-form').addEventListener('submit', async (event) => {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
     form.token.value = '';
     $('#connection-dialog').close();
-    notice(`${meta.displayName} connected`);
+    notice(provider === 'zoom' ? 'Zoom connection created. Add its callback URL in Zoom.' : `${meta.displayName} connected`);
     await refresh();
+    if (provider === 'zoom') openEditConnection(id);
   } catch (error) { $('#connection-error').textContent = error.message; }
   finally { submit.disabled = false; submit.textContent = 'Create connection'; }
 });

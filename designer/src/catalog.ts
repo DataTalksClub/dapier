@@ -1,4 +1,4 @@
-import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Webhook } from "lucide-react";
+import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Video, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
 
@@ -223,6 +223,7 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
   { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
   { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
+  { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "custom", label: "Custom", logo: Webhook, events: [] }
 ];

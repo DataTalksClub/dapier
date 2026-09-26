@@ -190,7 +190,7 @@ def token_write(api_url, connection_id, agent, output, force=False, debug=False)
     return 0
 
 
-TOKEN_PROVIDERS = ("slack", "telegram")
+TOKEN_PROVIDERS = ("slack", "telegram", "zoom")
 
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
@@ -258,8 +258,12 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
     # Secrets travel only in the TLS request body to the operator endpoint;
     # they never appear in argv, logs, or output. The local files are only read.
     data = api.call(api_url, "POST", "/api/agent/connections/import", body, debug=debug)
-    print(f"Imported {data.get('connection_id')} "
-          f"({data.get('account_title') or data.get('verified_account_id')}).")
+    if provider == "zoom":
+        print(f"Created {data.get('connection_id')}. Set Zoom's Event Notification Endpoint URL to "
+              f"{api_url.rstrip('/')}/hooks/zoom/{data.get('connection_id')} and subscribe to recording.completed.")
+    else:
+        print(f"Imported {data.get('connection_id')} "
+              f"({data.get('account_title') or data.get('verified_account_id')}).")
     return 0
 
 

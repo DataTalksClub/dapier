@@ -21,7 +21,7 @@ function confirmTokenRevoke(token) {
 
 function renderGrantConnections() {
   const select = $('#token-grant-connection');
-  const connections = ((state.data || {}).connections || []);
+  const connections = ((state.data || {}).connections || []).filter((connection) => connection.provider !== 'zoom');
   select.innerHTML = connections.map((connection) => `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(connection.display_name || connection.connection_id)}</option>`).join('');
   select.closest('label').hidden = connections.length === 0;
   $('#token-grant').hidden = connections.length === 0;

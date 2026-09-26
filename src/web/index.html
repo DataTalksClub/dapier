@@ -348,6 +348,12 @@
           <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Advanced provider permission identifiers. Changes take effect after reconnect; revoke the old token before reducing scopes.</small></label>
         <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">Dropbox only: the folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
         <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
+        <section id="edit-zoom-setup" class="detail-block" hidden>
+          <h3>Zoom event subscription</h3>
+          <p>Set this Event Notification Endpoint URL in your Zoom app, select <code>recording.completed</code>, then click Validate in Zoom. Cloud recording must be enabled for the host.</p>
+          <code id="edit-zoom-url" class="break-all"></code>
+          <p class="field-hint">The connection becomes active after Zoom validates the URL. Use the <code>zoom / recording.completed</code> trigger in a workflow.</p>
+        </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">

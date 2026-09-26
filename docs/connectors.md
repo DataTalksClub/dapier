@@ -18,6 +18,7 @@ Today's connectors:
 | YouTube    | OAuth (Google client) | Published-video triggers for a channel | `youtube`               |
 | Dropbox    | OAuth (Dropbox client) | File watchers, uploads, invoice pipeline | `dropbox`               |
 | Slack      | Pasted bot/user token | Posting notifications                     | `slack`                 |
+| Zoom       | Webhook Secret Token | Cloud recording video ready trigger       | `zoom`                  |
 
 ---
 
@@ -186,6 +187,36 @@ authenticated CLI command above; verify configuration with
   secret.
 
 Slack needs no OAuth client at all — see section 3.
+Zoom also needs no OAuth client: it uses a webhook signing token from a Zoom app.
+
+### Zoom cloud recording trigger
+
+1. Enable cloud recording for the Zoom host. In the Zoom App Marketplace, create
+   a **Webhook Only** app with an event subscription for `recording.completed`.
+2. In Dapier **Connections → Zoom → Add account**, paste the app's **Secret
+   Token**. Dapier stores it write-only and shows the connection's endpoint URL
+   (`https://dapier.dtcdev.click/hooks/zoom/<connection-id>`).
+3. Paste that URL as the Zoom Event Notification Endpoint URL and click
+   **Validate** in Zoom. Dapier answers Zoom's signed challenge. Save the event
+   subscription. The connection then shows **connected**.
+4. Create a workflow with `connector: zoom` and `event: recording.completed`,
+   or choose **Zoom → recording.completed** in the designer. Dapier emits one
+   event per completed cloud recording that contains at least one MP4 or M4V
+   video. The event contains `connection_id`, `account_id`, `meeting_id`,
+   `meeting_uuid`, `topic`, `host_email`, `share_url`, and `video_files` metadata.
+   Download tokens are never placed in workflow events.
+
+The same setup is available from the CLI:
+
+```sh
+uv run dapier connections import zoom --provider zoom --token-file /path/to/zoom-secret
+```
+
+The CLI prints the endpoint URL. Use `--display-name` to name additional Zoom
+apps. Replacing the secret returns the connection to **setup incomplete** until
+Zoom validates it again. Dapier validates each webhook's signature and rejects
+requests more than five minutes from their signed timestamp. See
+[Zoom's webhook setup and validation guide](https://developers.zoom.us/docs/api/webhooks/).
 
 ---
 

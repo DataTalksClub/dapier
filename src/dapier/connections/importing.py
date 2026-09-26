@@ -1,6 +1,6 @@
 """Operator imports and pasted-token verification for provider connections."""
 from .. import audit
-from . import credentials
+from . import credentials, zoom
 from . import records as connections
 from .providers import oauth_clients, oauth_providers, slack_tokens, telegram_api
 
@@ -66,6 +66,12 @@ def import_core(body, *, operator_subject, connections_table):
     verify refresh + provider account before storing, and bind the
     connection. Existing backups are never touched.
     """
+    if str(body.get("provider", "")).strip().lower() == "zoom":
+        status, payload = zoom.save(body, operator_subject=operator_subject,
+                                    connections_table=connections_table)
+        audit.emit(str(body.get("connection_id", "zoom")), audit.IMPORT, operator_subject,
+                   outcome="ok" if status == 200 else "error")
+        return status, payload
     if str(body.get("provider", "")).strip().lower() in connections.TOKEN_PROVIDERS:
         return _import_token_connection(
             body, operator_subject=operator_subject, connections_table=connections_table)

@@ -8,7 +8,7 @@ from ... import audit as audit_log
 from ... import http
 from ...auth import api_tokens, authz, session
 from ... import copilot
-from ...connections import credentials, importing
+from ...connections import credentials, importing, zoom
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
 from ...triggers import email_triggers, hook_triggers, schedule_triggers
@@ -80,6 +80,11 @@ def save_connection(event):
     previous = connection_model.get_connection(connections_table, fields["connection_id"])
     operator = session._session_subject(event)
 
+    if fields["provider"] == "zoom":
+        status, payload = zoom.save(body, operator_subject=operator, connections_table=connections_table)
+        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                             outcome="ok" if status == 200 else "error")
+        return http._json_response(status, payload)
     if fields["provider"] in connection_model.TOKEN_PROVIDERS:
         return _save_token_connection(fields, body, previous, operator, connections_table)
 

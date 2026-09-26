@@ -60,7 +60,7 @@ def build_parser():
     import_p.add_argument("--authorized-user-file", default=None,
                           help="Refresh-token JSON for OAuth providers")
     import_p.add_argument("--token-file", default=None,
-                          help="Pasted provider token for slack/telegram connections")
+                          help="Provider token or Zoom webhook Secret Token (read from file)")
     import_p.add_argument("--display-name", default=None)
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])

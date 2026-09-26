@@ -14312,21 +14312,21 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$j = [
+  const __iconNode$k = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$j);
-  const __iconNode$i = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$k);
+  const __iconNode$j = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$i);
-  const __iconNode$h = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$j);
+  const __iconNode$i = [
     [
       "path",
       {
@@ -14339,8 +14339,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$h);
-  const __iconNode$g = [
+  const FileText = createLucideIcon("file-text", __iconNode$i);
+  const __iconNode$h = [
     [
       "path",
       {
@@ -14351,8 +14351,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$g);
-  const __iconNode$f = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$h);
+  const __iconNode$g = [
     [
       "path",
       {
@@ -14361,15 +14361,15 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$f);
-  const __iconNode$e = [
+  const Funnel = createLucideIcon("funnel", __iconNode$g);
+  const __iconNode$f = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$e);
-  const __iconNode$d = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$f);
+  const __iconNode$e = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14382,20 +14382,20 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$d);
-  const __iconNode$c = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$c);
-  const __iconNode$b = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$b);
-  const __iconNode$a = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$a);
-  const __iconNode$9 = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$d);
+  const __iconNode$c = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$c);
+  const __iconNode$b = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$b);
+  const __iconNode$a = [
     [
       "path",
       {
@@ -14404,8 +14404,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$9);
-  const __iconNode$8 = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$a);
+  const __iconNode$9 = [
     [
       "path",
       {
@@ -14414,13 +14414,13 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$8);
-  const __iconNode$7 = [
+  const Play = createLucideIcon("play", __iconNode$9);
+  const __iconNode$8 = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$7);
-  const __iconNode$6 = [
+  const Plus = createLucideIcon("plus", __iconNode$8);
+  const __iconNode$7 = [
     [
       "path",
       {
@@ -14430,22 +14430,22 @@
     ],
     ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
   ];
-  const StickyNote = createLucideIcon("sticky-note", __iconNode$6);
-  const __iconNode$5 = [
+  const StickyNote = createLucideIcon("sticky-note", __iconNode$7);
+  const __iconNode$6 = [
     ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
     ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
     ["circle", { cx: "12", cy: "14", r: "8", key: "1e1u0o" }]
   ];
-  const Timer = createLucideIcon("timer", __iconNode$5);
-  const __iconNode$4 = [
+  const Timer = createLucideIcon("timer", __iconNode$6);
+  const __iconNode$5 = [
     ["path", { d: "M10 11v6", key: "nco0om" }],
     ["path", { d: "M14 11v6", key: "outv1u" }],
     ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
     ["path", { d: "M3 6h18", key: "d0wm0j" }],
     ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
   ];
-  const Trash2 = createLucideIcon("trash-2", __iconNode$4);
-  const __iconNode$3 = [
+  const Trash2 = createLucideIcon("trash-2", __iconNode$5);
+  const __iconNode$4 = [
     [
       "path",
       {
@@ -14456,7 +14456,18 @@
     ["path", { d: "M12 9v4", key: "juzpu7" }],
     ["path", { d: "M12 17h.01", key: "p32p05" }]
   ];
-  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$3);
+  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$4);
+  const __iconNode$3 = [
+    [
+      "path",
+      {
+        d: "m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5",
+        key: "ftymec"
+      }
+    ],
+    ["rect", { x: "2", y: "6", width: "14", height: "12", rx: "2", key: "158x01" }]
+  ];
+  const Video = createLucideIcon("video", __iconNode$3);
   const __iconNode$2 = [
     [
       "path",
@@ -17875,6 +17886,7 @@
     { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
     { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
+    { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed"] },
     { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
     { name: "custom", label: "Custom", logo: Webhook, events: [] }
   ];
