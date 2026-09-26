@@ -35,6 +35,11 @@ Add a file under `workflows/`:
 ```yaml
 id: new-dropbox-pdf
 enabled: true
+actions:
+  - type: webhook
+    url: https://example.com/hooks/new-file
+    secret_id: dapier/webhooks/example
+    timeout_seconds: 10
 trigger:
   connector: dropbox
   event: file.created
@@ -42,11 +47,6 @@ trigger:
     path:
       prefix: /incoming/
       suffix: .pdf
-actions:
-  - type: webhook
-    url: https://example.com/hooks/new-file
-    secret_id: dapier/webhooks/example
-    timeout_seconds: 10
 ```
 
 The webhook receives the normalized event as JSON. When `secret_id` is present,

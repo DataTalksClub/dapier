@@ -73,11 +73,16 @@ def get_me(token, *, transport=None):
 
 
 def set_webhook(token, url, secret_token, *, transport=None):
-    """Point the bot's (single) delivery URL at Dapier with a shared secret."""
+    """Point the bot's (single) delivery URL at Dapier with a shared secret.
+
+    Channel posts are included so a bot sitting in announcement channels can
+    drive workflows (the au-tomator port); private/group messages stay
+    subscribed for trigger-and-reply workflows.
+    """
     call(token, "setWebhook", {
         "url": url,
         "secret_token": secret_token,
-        "allowed_updates": ["message", "edited_message"],
+        "allowed_updates": ["message", "edited_message", "channel_post", "edited_channel_post"],
     }, transport=transport)
 
 

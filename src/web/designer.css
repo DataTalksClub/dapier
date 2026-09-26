@@ -1,6 +1,9 @@
 /* BUILD ARTIFACT - do not edit by hand.
  *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
  *  Rebuild into src/web/ with: make designer-console */
+/* BUILD ARTIFACT - do not edit by hand.
+ *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
+ *  Rebuild into src/web/ with: make designer-console */
 /* Dapier "Operator's Ledger" tokens — same paper, ink, hairlines and single
    green accent as the console (src/web/app.css). Font files live on the
    console origin (/assets/fonts); outside it the Plex stacks fall back. */
@@ -55,6 +58,7 @@
   --ok-text: #1d7a4f;
   --panel-border: #c9c0aa;
   --section-border: #ddd5c4;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2338483b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --selection: #dbe5d4;
   --soft-border: #ddd5c4;
   --surface: #fdfcf7;
@@ -94,6 +98,7 @@
   --ok-text: #6ee7b7;
   --panel-border: #2c3442;
   --section-border: #293241;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23bac8b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --selection: #1e3a2b;
   --soft-border: #303949;
   --surface: #141922;
@@ -534,6 +539,18 @@ select {
   padding: 5px 10px;
 }
 
+select {
+  appearance: none;
+  padding-right: 30px;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+select:hover:not(:disabled) { border-color: var(--hover-border); }
+select:disabled { opacity: .5; cursor: default; }
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -607,49 +624,73 @@ textarea:focus {
 }
 
 .component-toolbar {
+  align-content: center;
   display: flex;
-  flex-wrap: nowrap;
-  gap: 7px;
-  overflow-x: auto;
-  padding-left: 4px;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  min-width: 0;
+}
+
+.chip-group {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .chip-group-label {
   align-self: center;
-  color: var(--text-muted);
+  color: var(--text-soft);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.08em;
-  padding-left: 4px;
+  padding-left: 2px;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.chip-divider {
-  align-self: center;
-  background: var(--soft-border);
-  height: 18px;
-  width: 1px;
-}
-
 .component-chip {
+  align-items: center;
   background: transparent;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-  height: 30px;
-  min-width: 30px;
-  padding: 0;
-  width: 30px;
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: grab;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  white-space: nowrap;
 }
+
+.component-chip:active { cursor: grabbing; }
+
+.component-chip:hover:not(.active) {
+  background: var(--muted-bg);
+  border-color: var(--hover-border);
+  color: var(--text-strong);
+}
+
+/* Triggers carry the canvas's amber trigger stroke so palette and board read
+   as one language even when a wrapped row loses its group label. */
+.component-chip.trigger:not(.active) {
+  box-shadow: inset 2px 0 0 0 var(--diagram-trigger);
+}
+
+.component-chip .component-chip-label { color: var(--text); }
+
+/* Notes are annotations, not steps — dashed like their canvas rendering. */
+.component-chip.note { border-style: dashed; }
 
 .component-chip.active {
   background: var(--active-bg);
   border-color: var(--active-border);
   color: var(--active-text);
 }
+
+.component-chip.active .component-chip-label { color: var(--active-text); }
 
 .canvas-session-controls {
   align-items: center;
@@ -818,6 +859,31 @@ textarea:focus {
    under the canvas behind a hairline and only takes space when a node is
    selected; the palette scrolls horizontally; the test panel becomes a
    full-cover sheet (its desktop offset assumes the side inspector column). */
+/* Below desktop widths the labeled palette can't wrap (the board column is
+   too narrow) — fall back to the one-row swipeable strip: icon-only chips,
+   hidden scrollbar, flex basis 0 so siblings can't squeeze it away. Kept
+   before the phone block so the 720px rules below win where both apply. */
+@media (max-width: 1359px) {
+  .component-toolbar {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .component-toolbar::-webkit-scrollbar { display: none; }
+  .chip-group { flex: 0 0 auto; flex-wrap: nowrap; }
+  .component-chip {
+    height: 28px;
+    justify-content: center;
+    min-width: 28px;
+    padding: 0;
+    width: 28px;
+  }
+  .component-chip .component-chip-label { display: none; }
+  .component-chip.trigger:not(.active) { box-shadow: none; }
+}
+
 @media (max-width: 720px) {
   .designer-body {
     grid-template-columns: 1fr;
@@ -841,6 +907,8 @@ textarea:focus {
     max-width: none;
     width: auto;
   }
+  /* Phones: bigger touch targets; group labels are noise while swiping. */
+  .chip-group-label { display: none; }
   .component-chip { height: 36px; min-width: 36px; width: 36px; }
   .canvas-zoom-controls {
     bottom: 10px;

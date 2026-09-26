@@ -11,7 +11,7 @@ from ... import copilot
 from ...connections import credentials, importing, zoom
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
-from ...triggers import email_triggers, hook_triggers, schedule_triggers
+from ...triggers import email_triggers, hook_triggers, poll_triggers, schedule_triggers
 from .. import designer_store, overview, runs
 
 
@@ -316,6 +316,30 @@ def delete_schedule_trigger(event, operator):
     except email_triggers.TriggerError as exc:
         return http._json_response(404, {"error": str(exc)})
     session._audit_event(payload.get("schedule_id", "unknown"), "schedule-trigger.delete",
+                 operator, outcome="deleted")
+    return http._json_response(status, payload)
+
+def list_poll_triggers(event):
+    status, payload = poll_triggers.api_list()
+    return http._json_response(status, payload)
+
+def save_poll_trigger(event, operator):
+    try:
+        body = http._request_json(event)
+        status, payload = poll_triggers.api_save(body, operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(payload.get("poll_id", "unknown"), "poll-trigger.save", operator,
+                 outcome="created" if payload.get("created") else "updated")
+    return http._json_response(status, payload)
+
+def delete_poll_trigger(event, operator):
+    try:
+        query = event.get("queryStringParameters") or {}
+        status, payload = poll_triggers.api_delete(query.get("name", ""), operator)
+    except email_triggers.TriggerError as exc:
+        return http._json_response(404, {"error": str(exc)})
+    session._audit_event(payload.get("poll_id", "unknown"), "poll-trigger.delete",
                  operator, outcome="deleted")
     return http._json_response(status, payload)
 

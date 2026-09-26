@@ -144,8 +144,11 @@ def _form_post(url, fields, *, transport, timeout=15):
     if status >= 300 or not isinstance(data, dict):
         # Provider descriptions can echo request values such as an auth code.
         # Only expose the standard OAuth error code, never arbitrary body text.
+        # Some providers (Dropbox) append a description to the code itself
+        # ("invalid_client: …"), so match on the code before the colon.
         error = data.get("error") if isinstance(data, dict) else None
-        safe_error = error if isinstance(error, str) and error in {
+        code = error.split(":", 1)[0].strip() if isinstance(error, str) else ""
+        safe_error = code if code in {
             "invalid_request", "invalid_client", "invalid_grant",
             "unauthorized_client", "unsupported_grant_type", "invalid_scope",
         } else None

@@ -25,19 +25,35 @@ WORKFLOW = {
 SAMPLE = {"title": "Dry-run demo", "url": "https://yt.test/x"}
 
 
+def swap_runner(monkeypatch, action_type, runner):
+    """Stub one registered connector's runner, keeping the real dispatch."""
+    from dataclasses import replace
+
+    from src.dapier.connectors import registry
+
+    entry = registry.ACTIONS[action_type]
+    monkeypatch.setitem(
+        registry.ACTIONS, action_type,
+        replace(entry, run=lambda action, event, workflow_id=None, steps=None:
+                runner(action, event)),
+    )
+
+
 @pytest.fixture
 def no_runners(monkeypatch):
-    """Dry-runs must never reach a real connector: every runner explodes."""
-    from src.dapier import engine
+    """Dry-runs must never reach a real connector: every runner explodes.
 
-    def explode(name):
-        def boom(*args, **kwargs):
-            raise AssertionError(f"dry-run invoked the {name} runner")
-        return boom
+    The runners swap, not the dispatcher: unknown action types must still
+    fail with the registry's "unsupported action" error.
+    """
+    from dataclasses import replace
 
-    for name in ("run_webhook", "run_slack", "run_telegram_send", "run_email_send",
-                 "run_dataops", "run_dropbox_upload", "run_dropbox_delete", "run_render_job"):
-        monkeypatch.setattr(engine, name, explode(name))
+    from src.dapier.connectors import registry
+
+    for action_type, entry in list(registry.ACTIONS.items()):
+        def boom(action, event, workflow_id=None, steps=None, _type=entry.type):
+            raise AssertionError(f"dry-run invoked the {_type} runner")
+        monkeypatch.setitem(registry.ACTIONS, action_type, replace(entry, run=boom))
 
 
 # ---- engine: dry-run ----
@@ -111,8 +127,6 @@ def test_dry_run_undefined_flow_is_an_error(no_runners):
 # ---- engine: execute ----
 
 def test_execute_runs_the_chain_through_the_real_engine(monkeypatch):
-    from src.dapier import engine
-
     calls = []
 
     def fake_dataops(action, event):
@@ -123,8 +137,8 @@ def test_execute_runs_the_chain_through_the_real_engine(monkeypatch):
         calls.append(("slack", action["channel"], event["data"]["title"]))
         return {"ok": True, "ts": "1"}
 
-    monkeypatch.setattr(engine, "run_dataops", fake_dataops)
-    monkeypatch.setattr(engine, "run_slack", fake_slack)
+    swap_runner(monkeypatch, "dataops", fake_dataops)
+    swap_runner(monkeypatch, "slack", fake_slack)
     report = dryrun.test_run(WORKFLOW, SAMPLE, execute=True)
     assert report["mode"] == "execute"
     assert report["ok"] is True
@@ -134,8 +148,6 @@ def test_execute_runs_the_chain_through_the_real_engine(monkeypatch):
 
 
 def test_execute_stops_the_chain_on_a_failed_step(monkeypatch):
-    from src.dapier import engine
-
     ran = []
 
     def failing(action, event):
@@ -145,8 +157,8 @@ def test_execute_stops_the_chain_on_a_failed_step(monkeypatch):
     def never(action, event):
         raise AssertionError("chain continued past a failed step")
 
-    monkeypatch.setattr(engine, "run_dataops", failing)
-    monkeypatch.setattr(engine, "run_slack", never)
+    swap_runner(monkeypatch, "dataops", failing)
+    swap_runner(monkeypatch, "slack", never)
     report = dryrun.test_run(WORKFLOW, SAMPLE, execute=True)
     assert ran == ["prep"]
     assert report["ok"] is False
@@ -298,8 +310,6 @@ def test_agent_test_requires_an_operator_bearer(monkeypatch):
 
 
 def test_agent_test_dry_run_and_execute_over_bearer(operator_bearer, monkeypatch):
-    from src.dapier import engine
-
     draft = {**WORKFLOW, "id": "cli-draft"}
     dry = agent_api.route(
         agent_request({"event": SAMPLE, "workflow": draft}),
@@ -311,8 +321,8 @@ def test_agent_test_dry_run_and_execute_over_bearer(operator_bearer, monkeypatch
     assert payload["file"] == "cli-draft.yaml"
     assert payload["ok"] is True
 
-    monkeypatch.setattr(engine, "run_dataops", lambda action, event: {"accepted": True})
-    monkeypatch.setattr(engine, "run_slack", lambda action, event, steps=None: {"ok": True, "ts": "9"})
+    swap_runner(monkeypatch, "dataops", lambda action, event: {"accepted": True})
+    swap_runner(monkeypatch, "slack", lambda action, event, steps=None: {"ok": True, "ts": "9"})
     live = agent_api.route(
         agent_request({"event": SAMPLE, "workflow": draft, "execute": True}),
         "POST", "/api/agent/designer/workflows/test",

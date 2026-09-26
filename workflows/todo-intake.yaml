@@ -17,10 +17,10 @@ flows:
 
 id: todo-intake
 enabled: true
+flow: todo-dataops
 triggers:
   - connector: email
     event: message.received
     filters:
       route:
         equals: todo
-flow: todo-dataops

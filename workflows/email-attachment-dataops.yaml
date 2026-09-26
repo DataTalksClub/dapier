@@ -1,14 +1,14 @@
 id: email-attachment-dataops
 enabled: true
-trigger:
-  connector: email
-  event: message.received
-  filters:
-    route:
-      equals: invoice-attachment
 actions:
   - id: file-invoice-to-dropbox
     type: dropbox_upload
     connection_id: dropbox
     source: attachment
     folder: _dtc_paperwork/income-invoices
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route:
+      equals: invoice-attachment

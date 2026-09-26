@@ -76,6 +76,10 @@ def route(event, method, path):
         return routes.delete_email_trigger(event, operator_subject)
     if method == "GET" and path == "/api/admin/designer/workflows":
         return routes.designer_list(event)
+    if method == "GET" and path == "/api/admin/designer/catalog":
+        from ...connectors import registry
+
+        return http._json_response(200, registry.catalog())
     if method == "PUT" and path == "/api/admin/designer/workflows":
         return routes.save_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test":
@@ -103,6 +107,12 @@ def route(event, method, path):
         return routes.save_schedule_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/schedule-triggers":
         return routes.delete_schedule_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/poll-triggers":
+        return routes.list_poll_triggers(event)
+    if method == "PUT" and path == "/api/admin/poll-triggers":
+        return routes.save_poll_trigger(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/poll-triggers":
+        return routes.delete_poll_trigger(event, operator_subject)
     match = re.fullmatch(r"/api/admin/oauth/([a-z0-9_-]+)/start", path)
     if method == "GET" and match:
         return oauth_start(event, match.group(1))
@@ -120,6 +130,7 @@ from .routes import (  # noqa: F401
     delete_email_trigger,
     delete_grant,
     delete_hook_trigger,
+    delete_poll_trigger,
     delete_schedule_trigger,
     designer_get,
     designer_list,
@@ -129,6 +140,7 @@ from .routes import (  # noqa: F401
     list_email_triggers,
     list_grants,
     list_hook_triggers,
+    list_poll_triggers,
     list_runs,
     list_schedule_triggers,
     oauth_clients_view,
@@ -144,6 +156,7 @@ from .routes import (  # noqa: F401
     save_grant,
     save_hook_trigger,
     save_oauth_client,
+    save_poll_trigger,
     save_schedule_trigger,
 )
 from ...connections.oauth_flow import (  # noqa: F401

@@ -141,6 +141,24 @@ def test_http_error_response_hides_unrecognized_provider_text(monkeypatch):
     assert "secret-code" not in str(exc.value)
 
 
+def test_http_error_response_reports_code_prefixed_with_description(monkeypatch):
+    # Dropbox returns {"error": "invalid_client: Invalid client_id or
+    # client_secret"} — one string, code and description together.
+    def rejected(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "Bad Request", {},
+            io.BytesIO(b'{"error":"invalid_client: app secret secret-code"}'),
+        )
+
+    monkeypatch.setattr(oauth_providers.urllib.request, "urlopen", rejected)
+    with pytest.raises(ProviderError, match=r"token endpoint returned HTTP 400 \(invalid_client\)") as exc:
+        exchange_code(
+            "dropbox", code="secret-code", client_id="cid", client_secret="secret",
+            redirect_uri="https://dapier.example.test/oauth/callback",
+        )
+    assert "secret-code" not in str(exc.value)
+
+
 def test_refresh_preserves_omitted_refresh_token():
     data = refresh_access_token(
         "youtube", refresh_token="old-refresh", client_id="cid", client_secret="s",

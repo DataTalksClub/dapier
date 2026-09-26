@@ -131,6 +131,10 @@ def all_workflows():
         from ..triggers import schedule_triggers
 
         extra = extra + schedule_triggers.load_workflows()
+    if os.environ.get("POLL_TRIGGERS_TABLE"):
+        from ..triggers import poll_triggers
+
+        extra = extra + poll_triggers.load_workflows()
     return list(merged.values()) + extra
 
 def _matches_filter(value, rule):

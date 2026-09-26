@@ -5,6 +5,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from ..connectors.ingress import normalize_event
 from . import execute
 from .notify import notify_failure
 
@@ -14,54 +15,11 @@ logger.setLevel(logging.INFO)
 
 
 def normalize_payload(payload):
+    """SES envelope unwrap, then per-connector normalization
+    (src/dapier/connectors/ingress.py)."""
     if payload.get("Type") == "Notification" and isinstance(payload.get("Message"), str):
         payload = json.loads(payload["Message"])
-    if payload.get("contract") == "inbound-email" and payload.get("version") == 1:
-        return {
-            "schema_version": "1.0",
-            "id": payload["event_id"],
-            "correlation_id": payload["event_id"],
-            "connector": "email",
-            "event": "message.received",
-            "source": payload["route"],
-            "occurred_at": payload["occurred_at"],
-            "data": {
-                "route": payload["route"],
-                "message_id": payload["message_id"],
-                "sender": payload["sender"],
-                "recipients": payload["recipients"],
-                "subject": payload["subject"],
-                "date": payload.get("date") or payload["occurred_at"],
-                "body": payload["body"],
-                "html": payload["body"].get("html"),
-                "attachments": payload["attachments"],
-                "raw_mime": payload["raw_mime"],
-            },
-        }
-    if payload.get("contract") == "inbound-email":
-        raise ValueError(f"unsupported inbound-email contract version: {payload.get('version')}")
-    if payload.get("schema") == "html-renderer.completed.v1":
-        source = payload.get("context", {}).get("source_event", {})
-        return {
-            "schema_version": "1.0",
-            "id": payload["job_id"],
-            "correlation_id": source.get("correlation_id", payload["job_id"]),
-            "connector": "renderer",
-            "event": "job.completed",
-            "source": "html-renderer",
-            "occurred_at": payload["timestamp"],
-            "data": {
-                "job_id": payload["job_id"],
-                "output": payload["output"],
-                "content_type": payload.get("content_type"),
-                "size_bytes": payload.get("size_bytes"),
-                "checksum": payload.get("checksum"),
-                "source_event": source,
-                "message_id": source.get("data", {}).get("message_id"),
-                "route": source.get("data", {}).get("route"),
-            },
-        }
-    return payload
+    return normalize_event(payload)
 
 
 def _execution_id(workflow_id, action_id, event):
@@ -208,6 +166,18 @@ def _schedule_event(payload):
 
 
 def handler(event, _context):
+    if isinstance(event, dict) and event.get("trigger") == "poll" and event.get("poll_id"):
+        # EventBridge invokes the function directly (dapier-poll-* rules):
+        # fetch one page, emit each new item as its own event.
+        try:
+            from ..triggers import poll_triggers
+
+            poll_triggers.fire(event["poll_id"])
+        except Exception as exc:
+            logger.exception("poll trigger failed", extra={"poll_id": event.get("poll_id")})
+            notify_failure(exc, None)
+            raise
+        return {"executed": event["poll_id"]}
     if isinstance(event, dict) and event.get("trigger") == "schedule" and event.get("schedule_id"):
         # EventBridge invokes the function directly: the target input names
         # the trigger, and the envelope carries the fire's id and time.

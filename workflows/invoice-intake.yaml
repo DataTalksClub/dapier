@@ -17,6 +17,7 @@ flows:
 
 id: invoice-email-intake
 enabled: false  # flip on when the invoice addresses go live
+flow: invoice-dataops
 triggers:
   - connector: email
     event: message.received
@@ -28,4 +29,3 @@ triggers:
     filters:
       route:
         equals: invoices
-flow: invoice-dataops

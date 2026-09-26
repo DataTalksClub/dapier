@@ -333,7 +333,7 @@ class ExecuteIntegrationTests(unittest.TestCase):
         event = {**EVENT, "data": EVENT["data"] if data is None else data}
         hooks = Hooks()
         with patch("src.dapier.engine.all_workflows", return_value=[workflow]), \
-             patch("src.dapier.engine.run_webhook", return_value={"status": 200}) as run_webhook:
+             patch("src.dapier.connectors.registry.run_action", return_value={"status": 200}) as run_webhook:
             execute(event, before_action=hooks.before, after_action=hooks.after,
                     on_action_error=hooks.error)
         return hooks, run_webhook
@@ -415,7 +415,8 @@ class ExecuteIntegrationTests(unittest.TestCase):
                                               "event": "message.received",
                                               "filters": {}},
                                   "actions": workflow_actions}]), \
-             patch("src.dapier.engine.run_webhook", lambda action, event: {"status": 200}), \
+             patch("src.dapier.connectors.registry.run_action",
+                   lambda action, event, workflow_id=None, steps=None: {"status": 200}), \
              patch("src.dapier.engine.logic.time") as fake_time:
             fake_time.monotonic.side_effect = [0.0, 0.01, 0.02, 0.03]
             execute({**EVENT}, before_action=hooks.before, after_action=hooks.after,

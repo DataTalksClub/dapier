@@ -17720,6 +17720,38 @@
       fill: "#0061FF"
     }
   ]);
+  function SheetsLogo({ size = 16, className, x, y }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        role: "img",
+        "aria-label": "Google Sheets",
+        className,
+        x,
+        y,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M5.4 1.8h8.4l4.8 4.8v13.8a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8V3.6a1.8 1.8 0 0 1 1.8-1.8z",
+              fill: "#0F9D58"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13.8 1.8l4.8 4.8h-4.8z", fill: "#87CEAC" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M7.5 11.25h9v6.6h-9zm1.5 1.5v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2zm-3.6 2.4v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2z",
+              fill: "#fff"
+            }
+          )
+        ]
+      }
+    );
+  }
   function MailLogo({ size = 16, className, x, y }) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "svg",
@@ -17812,6 +17844,25 @@
       fields: [
         { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
         { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+      ]
+    },
+    {
+      type: "sheets_append_row",
+      label: "Google Sheets",
+      icon: SheetsLogo,
+      description: "Append a row to a worksheet (Create Spreadsheet Row)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+        { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
+        { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
+        {
+          key: "values",
+          label: "Row values (JSON)",
+          type: "textarea",
+          required: true,
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
       ]
     },
     {
@@ -18752,35 +18803,49 @@
     const editorFontSize = toViewportFontSize();
     const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
     const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
-    const renderChip = ({ kind, label, icon: Icon2 }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-      "button",
-      {
-        "aria-grabbed": draggingKind === kind,
-        className: tool === "component" && paletteKind === kind ? "component-chip active" : "component-chip",
-        draggable: true,
-        onClick: () => {
-          setPaletteKind(kind);
-          selectTool("component");
+    const renderChip = ({ kind, label, icon: Icon2 }) => {
+      const isTrigger = kind.startsWith("trigger:");
+      const classes = [
+        "component-chip",
+        isTrigger ? "trigger" : "",
+        kind === "note" ? "note" : "",
+        tool === "component" && paletteKind === kind ? "active" : ""
+      ].filter(Boolean).join(" ");
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          "aria-grabbed": draggingKind === kind,
+          className: classes,
+          draggable: true,
+          onClick: () => {
+            setPaletteKind(kind);
+            selectTool("component");
+          },
+          onDragEnd: () => setDraggingKind(null),
+          onDragStart: (event) => startChipDrag(event, kind),
+          title: isTrigger ? `${label} trigger` : label,
+          type: "button",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Icon2, { size: 14 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "component-chip-label", children: label })
+          ]
         },
-        onDragEnd: () => setDraggingKind(null),
-        onDragStart: (event) => startChipDrag(event, kind),
-        title: kind.startsWith("trigger:") ? `${label} trigger` : label,
-        type: "button",
-        children: /* @__PURE__ */ jsxRuntimeExports.jsx(Icon2, { size: 15 })
-      },
-      kind
-    );
+        kind
+      );
+    };
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "board-panel", "aria-label": "Workflow board", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "board-toolbar", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "tool-strip", "aria-label": "Board actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: tool === "select" ? "icon-button active" : "icon-button", onClick: () => selectTool("select"), title: "Pointer", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(MousePointer2, { size: 18 }) }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "component-toolbar", "aria-label": "Node types", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Triggers" }),
-          triggerPalette.map(renderChip),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-divider", "aria-hidden": "true" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Actions" }),
-          actionPalette.map(renderChip),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-divider", "aria-hidden": "true" }),
-          notePalette.map(renderChip)
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chip-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Triggers" }),
+            triggerPalette.map(renderChip)
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chip-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Actions" }),
+            actionPalette.map(renderChip),
+            notePalette.map(renderChip)
+          ] })
         ] }),
         sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({
           canRedo: redoStack.length > 0,

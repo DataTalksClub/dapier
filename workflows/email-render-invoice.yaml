@@ -1,11 +1,5 @@
 id: email-render-invoice
 enabled: true
-trigger:
-  connector: email
-  event: message.received
-  filters:
-    route:
-      equals: invoice-pdf
 actions:
   - id: render-pdf
     type: render_html_to_pdf
@@ -15,3 +9,9 @@ actions:
     pdf:
       page_format: A4
       print_background: true
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route:
+      equals: invoice-pdf

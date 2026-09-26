@@ -21,27 +21,12 @@ from .logic import run_chain
 
 
 def _run_connector(action, event, workflow_id, steps=None):
-    """Run one connector action; the engine's dispatch table. ``steps`` is
-    the run's accumulated step outputs, for the templating runners."""
-    if action["type"] == "webhook":
-        return run_webhook(action, event)
-    if action["type"] == "slack":
-        return run_slack(action, event, steps=steps)
-    if action["type"] == "telegram_send":
-        return run_telegram_send(action, event, steps=steps)
-    if action["type"] == "email_send":
-        return run_email_send(action, event, steps=steps)
-    if action["type"] == "dataops":
-        return run_dataops(action, event)
-    if action["type"] == "dropbox_upload":
-        return run_dropbox_upload(action, event)
-    if action["type"] == "dropbox_delete":
-        return run_dropbox_delete(action, event)
-    if action["type"] == "render_html_to_pdf":
-        return run_render_job(action, event, workflow_id)
-    if action["type"] == "code":
-        return run_code(action, event)
-    raise ValueError(f"unsupported action: {action['type']}")
+    """Run one connector action through the connector registry (the engine's
+    dispatch table — see src/dapier/connectors/registry.py). ``steps`` is the
+    run's accumulated step outputs, for the templating runners."""
+    from ..connectors import registry
+
+    return registry.run_action(action, event, workflow_id, steps=steps)
 
 
 def execute(event, before_action=None, after_action=None, on_action_error=None, workflows=None):

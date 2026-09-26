@@ -1,11 +1,5 @@
 id: dropbox_on_upload
 enabled: true
-trigger:
-  connector: dropbox
-  event: file.created
-  filters:
-    path:
-      prefix: /_dtc_paperwork/income-invoices/
 actions:
   - id: intake-invoice
     type: dataops
@@ -15,3 +9,9 @@ actions:
   - id: delete-processed-file
     type: dropbox_delete
     connection_id: dropbox
+trigger:
+  connector: dropbox
+  event: file.created
+  filters:
+    path:
+      prefix: /_dtc_paperwork/income-invoices/

@@ -3,6 +3,7 @@
 import datetime
 
 import pytest
+import yaml
 
 from src.dapier.api import designer_store
 from src.dapier.engine import matching
@@ -150,6 +151,23 @@ def test_toggle_publishes_and_commits(github_ready, published):
     assert payload["published"] is True
     assert payload["commit"] == "commit456"
     assert published.items["test-flow"]["enabled"] is False
+
+
+def test_toggle_commits_actions_before_trigger(github_ready, published, monkeypatch):
+    # The toggle commits the stored dict (here: trigger before actions); the
+    # dumped YAML still gets the canonical order the designer writes.
+    published_workflows.publish(seeded_workflow())
+    captured = {}
+
+    def github(method, path, token, payload=None):
+        if method == "POST" and path.endswith("/git/trees"):
+            captured["blob"] = payload["tree"][0]["content"]
+        return GITHUB_SCRIPT[(method, path)]
+
+    monkeypatch.setattr(designer_store, "_github", github)
+    status, _ = designer_store.api_toggle("test-flow.yaml", {"enabled": False})
+    assert status == 200
+    assert list(yaml.safe_load(captured["blob"])) == ["id", "enabled", "actions", "trigger"]
 
 
 def test_toggle_survives_a_git_failure(github_ready, published, monkeypatch):

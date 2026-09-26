@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from conftest import stubbed_action
 from src.dapier.engine import (
     all_workflows,
     execute,
@@ -462,7 +463,7 @@ class ExecuteTelemetryTests(unittest.TestCase):
 
     def run_execute(self, run_webhook, hooks):
         with patch("src.dapier.engine.all_workflows", return_value=[self.WORKFLOW]), \
-             patch("src.dapier.engine.run_webhook", run_webhook):
+             stubbed_action("webhook", run_webhook):
             execute(dict(self.EVENT), **hooks)
 
     def test_reports_action_type_output_and_duration(self):
@@ -596,7 +597,7 @@ class SharedFlowTests(unittest.TestCase):
 
     def test_common_actions_run_for_every_trigger(self):
         run_webhook = MagicMock(return_value={"status": 200})
-        with patch("src.dapier.engine.run_webhook", run_webhook):
+        with stubbed_action("webhook", run_webhook):
             execute({"id": "e1", "connector": "email", "event": "message.received",
                      "data": {"route": "invoice"}})
             execute({"id": "e2", "connector": "email", "event": "message.received",
@@ -614,23 +615,7 @@ class ExecuteFailureTests(unittest.TestCase):
         runner = MagicMock(side_effect=ValueError("webhook exploded"))
         event = {"id": "e1", "connector": "email", "event": "message.received", "data": {}}
         with patch("src.dapier.engine.all_workflows", lambda: [workflow]):
-            with patch("src.dapier.engine.run_webhook", runner):
-                with self.assertRaises(ValueError) as caught:
-                    execute(event)
-        self.assertEqual(caught.exception.dapier_workflow, "wf-1")
-
-
-class ExecuteFailureTests(unittest.TestCase):
-    def test_execute_tags_exceptions_with_the_failing_workflow(self):
-        workflow = {
-            "id": "wf-1", "enabled": True,
-            "trigger": {"connector": "email", "event": "message.received"},
-            "actions": [{"id": "post", "type": "webhook", "url": "https://x.test/hook"}],
-        }
-        runner = MagicMock(side_effect=ValueError("webhook exploded"))
-        event = {"id": "e1", "connector": "email", "event": "message.received", "data": {}}
-        with patch("src.dapier.engine.all_workflows", lambda: [workflow]):
-            with patch("src.dapier.engine.run_webhook", runner):
+            with patch("src.dapier.connectors.registry.run_action", runner):
                 with self.assertRaises(ValueError) as caught:
                     execute(event)
         self.assertEqual(caught.exception.dapier_workflow, "wf-1")

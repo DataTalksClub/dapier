@@ -144,6 +144,8 @@ Schema (all validated server-side; the draft must satisfy all of it):
     in doubt use inline actions).
 - Never put both `actions` and `flow` on one workflow.
 - Every action needs an `id` (unique in the workflow) and a `type`.
+- Write `actions` (or the `flows`/`flow` binding) before `trigger` in the
+  document; `id` and `enabled` come first.
 
 Action catalog (type: fields):
 - webhook: url (POSTs the event JSON), optional secret_id, timeout_seconds

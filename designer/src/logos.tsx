@@ -67,6 +67,32 @@ export const DropboxLogo = brandMark("Dropbox", [
   }
 ]);
 
+/** Sheet mark for the Google Sheets connector (Sheets green). */
+export function SheetsLogo({ size = 16, className, x, y }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      role="img"
+      aria-label="Google Sheets"
+      className={className}
+      x={x}
+      y={y}
+    >
+      <path
+        d="M5.4 1.8h8.4l4.8 4.8v13.8a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8V3.6a1.8 1.8 0 0 1 1.8-1.8z"
+        fill="#0F9D58"
+      />
+      <path d="M13.8 1.8l4.8 4.8h-4.8z" fill="#87CEAC" />
+      <path
+        d="M7.5 11.25h9v6.6h-9zm1.5 1.5v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2zm-3.6 2.4v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
 /** Envelope mark for the email connector (Gmail red). */
 export function MailLogo({ size = 16, className, x, y }: IconProps) {
   return (

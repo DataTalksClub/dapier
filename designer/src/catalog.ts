@@ -1,6 +1,6 @@
 import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Timer, Video, Webhook } from "lucide-react";
 import type { ReactNode } from "react";
-import { DropboxLogo, MailLogo, SlackLogo, YouTubeLogo } from "./logos";
+import { DropboxLogo, MailLogo, SheetsLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
@@ -141,6 +141,20 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Connection ID", placeholder: "dropbox", required: true },
       { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+    ]
+  },
+  {
+    type: "sheets_append_row",
+    label: "Google Sheets",
+    icon: SheetsLogo,
+    description: "Append a row to a worksheet (Create Spreadsheet Row)",
+    fields: [
+      { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
+      { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
+      { key: "values", label: "Row values (JSON)", type: "textarea", required: true,
+        placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]' },
+      { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
     ]
   },
   {

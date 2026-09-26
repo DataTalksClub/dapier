@@ -182,6 +182,15 @@ def build_parser():
     sched_save_p.add_argument("file", help="Path to the schedule JSON, or - for stdin")
     sched_del_p = sched_sub.add_parser("delete", help="Delete a schedule trigger and its rule")
     sched_del_p.add_argument("name")
+    poll_p = sub.add_parser("polls", help="API poll triggers: fetch on a schedule, one event per new item")
+    poll_sub = poll_p.add_subparsers(dest="command", required=True)
+    poll_sub.add_parser("list", help="List poll triggers")
+    poll_save_p = poll_sub.add_parser("save", help="Create or update a poll trigger from a JSON file")
+    poll_save_p.add_argument("file", help="Path to the poll trigger JSON, or - for stdin")
+    poll_del_p = poll_sub.add_parser("delete", help="Delete a poll trigger and its rule")
+    poll_del_p.add_argument("name")
+    catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
+    catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
     return parser
 
 
@@ -212,6 +221,10 @@ def main(argv=None):
             return cmd_hooks(args, api_url, debug)
         if args.group == "schedules":
             return cmd_schedules(args, api_url, debug)
+        if args.group == "polls":
+            return cmd_polls(args, api_url, debug)
+        if args.group == "catalog":
+            return commands.catalog_show(api_url, debug, as_json=args.json)
         if args.group == "credentials":
             return cmd_credentials(args, api_url, debug)
         if args.group == "grants":
@@ -356,6 +369,16 @@ def cmd_schedules(args, api_url, debug):
         return commands.schedules_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.schedules_delete(api_url, args.name, debug)
+    return 2
+
+
+def cmd_polls(args, api_url, debug):
+    if args.command == "list":
+        return commands.polls_list(api_url, debug)
+    if args.command == "save":
+        return commands.polls_save(api_url, args.file, debug)
+    if args.command == "delete":
+        return commands.polls_delete(api_url, args.name, debug)
     return 2
 
 

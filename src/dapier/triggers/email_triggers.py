@@ -29,26 +29,14 @@ RESERVED_NAMES = {
     "security", "smtp", "support", "todo", "webmaster", "webmail", "www",
 }
 
-# Required and optional keys per action type, mirroring what src/engine.py reads.
-ACTION_SPECS = {
-    "webhook": ({"url"}, {"secret_id", "timeout_seconds"}),
-    "slack": (
-        {"credential_id", "channel"},
-        {"text", "unfurl_links", "unfurl_media", "timeout_seconds"},
-    ),
-    "telegram_send": (
-        {"connection_id"},
-        {"chat_id", "text", "timeout_seconds"},
-    ),
-    "email_send": ({"to"}, {"subject", "text", "html", "sender"}),
-    "dataops": ({"auth_secret_id"}, {"url", "url_env", "timeout_seconds", "connection_id"}),
-    "dropbox_upload": ({"connection_id", "folder"}, {"source", "filename"}),
-    "dropbox_delete": ({"connection_id"}, {"path"}),
-    "render_html_to_pdf": (
-        {"input_field", "output_bucket_env", "output_key"},
-        {"pdf", "id"},
-    ),
-}
+# Required and optional keys per action type live in the connector registry
+# (src/dapier/connectors/registry.py); ACTION_SPECS reads them from there.
+def __getattr__(name):
+    if name == "ACTION_SPECS":
+        from ..connectors import registry
+
+        return registry.action_specs()
+    raise AttributeError(name)
 
 
 class TriggerError(ValueError):
@@ -73,28 +61,14 @@ def validate_name(name):
 
 
 def validate_actions(actions):
-    if not isinstance(actions, list) or not actions:
-        raise TriggerError("at least one action is required")
-    from ..engine.actions import templating
+    """Validation lives in the connector registry (one spec set for the
+    engine, the API and the designer); TriggerError is this module's dialect."""
+    from ..connectors import registry
 
-    for action in actions:
-        if not isinstance(action, dict):
-            raise TriggerError("each action must be an object")
-        action_type = action.get("type")
-        if action_type not in ACTION_SPECS:
-            raise TriggerError(f"unsupported action type: {action_type!r}")
-        required, optional = ACTION_SPECS[action_type]
-        missing = sorted(key for key in required if not str(action.get(key) or "").strip())
-        if missing:
-            raise TriggerError(f"{action_type} action is missing: {', '.join(missing)}")
-        unknown = sorted(set(action) - required - optional - {"type", "id"})
-        if unknown:
-            raise TriggerError(f"{action_type} action has unknown keys: {', '.join(unknown)}")
-        try:
-            templating.validate_action(action)
-        except templating.TemplateError as exc:
-            raise TriggerError(f"{action_type}: {exc}") from exc
-    return actions
+    try:
+        return registry.validate_action_chain(actions)
+    except registry.ActionError as exc:
+        raise TriggerError(str(exc)) from None
 
 
 def resolve_actions_flow(body):

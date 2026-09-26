@@ -1,12 +1,12 @@
 id: rendered-invoice-dataops
 enabled: true
-trigger:
-  connector: renderer
-  event: job.completed
-  filters: {}
 actions:
   - id: file-rendered-pdf-to-dropbox
     type: dropbox_upload
     connection_id: dropbox
     source: output
     folder: _dtc_paperwork/income-invoices
+trigger:
+  connector: renderer
+  event: job.completed
+  filters: {}

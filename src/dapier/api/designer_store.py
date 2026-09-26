@@ -263,7 +263,7 @@ def api_toggle(source, body, operator=None):
     }
     try:
         committed = commit_workflow(
-            yaml.safe_dump(workflow, sort_keys=False),
+            yaml.safe_dump(ordered_workflow(workflow), sort_keys=False),
             message=f"designer: {'enable' if body['enabled'] else 'disable'} workflow {workflow['id']}",
         )
         result["commit"] = committed["commit"]
@@ -328,6 +328,22 @@ def api_test_run(source, body, operator=None):
         return 400, {"error": str(exc)}
     payload["file"] = label
     return 200, payload
+
+
+# Top-level key order for workflow YAML the server writes; the designer
+# client emits the same order. Stored dicts keep whatever order they were
+# parsed in — this only applies at dump time.
+WORKFLOW_KEY_ORDER = ("id", "enabled", "actions", "flows", "flow", "trigger", "triggers")
+
+
+def ordered_workflow(workflow):
+    """The workflow mapping in canonical key order (actions before trigger),
+    with keys outside the canon kept at the end in their original order."""
+    ordered = {key: workflow[key] for key in WORKFLOW_KEY_ORDER if key in workflow}
+    ordered.update(
+        (key, value) for key, value in workflow.items() if key not in ordered
+    )
+    return ordered
 
 
 def parse_workflow(yaml_text):

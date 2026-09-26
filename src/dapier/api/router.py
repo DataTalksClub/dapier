@@ -297,7 +297,10 @@ def _telegram_hook(event, name, body):
         return _response(400, {"error": "invalid json"})
     if not isinstance(update, dict):
         return _response(400, {"error": "invalid update"})
-    message = update.get("message") or update.get("edited_message") or {}
+    # Channel posts (announcement channels) carry no "from"; text may arrive
+    # as a media caption with caption_entities instead of entities.
+    message = (update.get("message") or update.get("edited_message")
+               or update.get("channel_post") or update.get("edited_channel_post") or {})
     chat = message.get("chat") or {}
     sender = message.get("from") or {}
     _publish("telegram", hook_triggers.TELEGRAM_EVENT, {
@@ -305,6 +308,8 @@ def _telegram_hook(event, name, body):
         "update_id": update.get("update_id"),
         "message_id": message.get("message_id"),
         "text": message.get("text") or message.get("caption") or "",
+        "entities": message.get("entities") or message.get("caption_entities") or [],
+        "is_channel_post": bool(update.get("channel_post") or update.get("edited_channel_post")),
         "chat_id": chat.get("id"),
         "chat": chat,
         "from": sender,
@@ -328,6 +333,13 @@ def handler(event, _context):
 
     if method == "GET" and path == "/health":
         return _response(200, {"ok": True, "service": "dapier"})
+
+    if method == "GET" and path == "/api/catalog":
+        # Public, read-only manifests: the action/trigger/logic catalog the
+        # designer and CLI render from (src/dapier/connectors/registry.py).
+        from ..connectors import registry
+
+        return _response(200, registry.catalog())
 
     if method == "GET" and path in ("/hooks/dropbox", "/hooks/youtube"):
         challenge = query.get("challenge") or query.get("hub.challenge")

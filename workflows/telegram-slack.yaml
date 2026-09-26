@@ -1,0 +1,98 @@
+# Telegram announcement channels -> Slack course channels (au-tomator port).
+#
+# The au-tomator-telegram-bot reposted every post in the DTC announcement
+# channels to the matching Slack channel: Telegram entities rendered as Slack
+# mrkdwn, long posts continued in a thread, and a link to the original post
+# appended in the thread. That behavior now lives in the `slack` action
+# (`telegram_format: true` + `source_link`), and the chat -> channel mapping
+# is this flow's condition chain, so new channels are one YAML edit.
+#
+# Bind the flow to a Telegram trigger saved with `dapier hooks save`:
+#   {"name": "automator-telegram", "kind": "telegram",
+#    "connection_id": "<automator-bot-connection>", "flow": "telegram-to-slack"}
+# Telegram keeps one webhook per bot, so one stored trigger serves every
+# channel the bot is in; the conditions route each chat.
+flows:
+  telegram-to-slack:
+    description: Repost Telegram channel posts to their Slack course channel
+    actions:
+      - id: mlops
+        type: condition
+        when: {chat_id: {equals: "-1001730331343"}}
+        then:
+          - id: post-mlops
+            type: slack
+            connection_id: slack
+            channel: course-mlops-zoomcamp
+            telegram_format: true
+            source_link: https://t.me/dtc_courses/{message_id}
+      - id: ml
+        type: condition
+        when: {chat_id: {equals: "-1001435532197"}}
+        then:
+          - id: post-ml
+            type: slack
+            connection_id: slack
+            channel: course-ml-zoomcamp
+            telegram_format: true
+            source_link: https://t.me/mlzoomcamp/{message_id}
+      - id: de
+        type: condition
+        when: {chat_id: {equals: "-1001708295427"}}
+        then:
+          - id: post-de
+            type: slack
+            connection_id: slack
+            channel: course-data-engineering
+            telegram_format: true
+            source_link: https://t.me/dezoomcamp/{message_id}
+      - id: integration-test
+        type: condition
+        when: {chat_id: {equals: "-1001707092787"}}
+        then:
+          - id: post-integration-test
+            type: slack
+            connection_id: slack
+            channel: integration_test
+            telegram_format: true
+            source_link: https://t.me/dtc_test/{message_id}
+      - id: stocks
+        type: condition
+        when: {chat_id: {equals: "-1002070983780"}}
+        then:
+          - id: post-stocks
+            type: slack
+            connection_id: slack
+            channel: course-stocks-analytics-zoomcamp
+            telegram_format: true
+            source_link: https://t.me/stockanalyticszoomcamp/{message_id}
+      - id: llm
+        type: condition
+        when: {chat_id: {equals: "-1002136268305"}}
+        then:
+          - id: post-llm
+            type: slack
+            connection_id: slack
+            channel: course-llm-zoomcamp
+            telegram_format: true
+            source_link: https://t.me/llm_zoomcamp/{message_id}
+      - id: oss-llm
+        type: condition
+        when: {chat_id: {equals: "-1002261309914"}}
+        then:
+          - id: post-oss-llm
+            type: slack
+            connection_id: slack
+            channel: course-open-source-llm
+            telegram_format: true
+            source_link: https://t.me/oss_llm_zoomcamp/{message_id}
+      - id: ai-dev-tools
+        type: condition
+        when: {chat_id: {equals: "-1003188609266"}}
+        then:
+          - id: post-ai-dev-tools
+            type: slack
+            connection_id: slack
+            channel: course-ai-dev-tools-zoomcamp
+            telegram_format: true
+            source_link: https://t.me/aidevtoolszoomcamp/{message_id}

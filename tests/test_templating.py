@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import stubbed_action
 from src.dapier.engine import execute, run_email_send, run_slack
 from src.dapier.engine.actions.templating import (
     TemplateError,
@@ -195,7 +196,7 @@ class ExecuteMappingTests(unittest.TestCase):
 
     def test_second_step_reads_the_first_steps_output(self):
         with patch("src.dapier.engine.all_workflows", return_value=[self.WORKFLOW]), \
-             patch("src.dapier.engine.run_webhook", lambda action, event: {"url": "https://x/y"}), \
+             stubbed_action("webhook", lambda action, event: {"url": "https://x/y"}), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "t"}):
             execute(dict(self.EVENT))
@@ -207,7 +208,7 @@ class ExecuteMappingTests(unittest.TestCase):
             return action_id != "fetch"  # lease held elsewhere: skip the first step
 
         with patch("src.dapier.engine.all_workflows", return_value=[self.WORKFLOW]), \
-             patch("src.dapier.engine.run_webhook", lambda action, event: {"url": "u"}), \
+             stubbed_action("webhook", lambda action, event: {"url": "u"}), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "t"}):
             execute(dict(self.EVENT), before_action=before_action)
@@ -217,7 +218,7 @@ class ExecuteMappingTests(unittest.TestCase):
         workflows = [self.WORKFLOW, dict(self.WORKFLOW, id="wf-map-2")]
         texts = []
         with patch("src.dapier.engine.all_workflows", return_value=workflows), \
-             patch("src.dapier.engine.run_webhook", lambda action, event: {"url": "u"}), \
+             stubbed_action("webhook", lambda action, event: {"url": "u"}), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "t"}):
             execute(dict(self.EVENT))

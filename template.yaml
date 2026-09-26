@@ -141,6 +141,7 @@ Globals:
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
+        POLL_TRIGGERS_TABLE: !Ref PollTriggersTable
         PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
         DEVICE_SESSIONS_TABLE: !Ref DeviceSessionsTable
@@ -208,12 +209,16 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref PollTriggersTable
+        - DynamoDBCrudPolicy:
             TableName: !Ref PublishedWorkflowsTable
         - Statement:
             Effect: Allow
             Action: [events:PutRule, events:PutTargets, events:DeleteRule,
                      events:RemoveTargets, events:DescribeRule]
-            Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
+            Resource:
+              - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
+              - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-poll-*
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -442,7 +447,11 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBReadPolicy:
+            TableName: !Ref PollTriggersTable
+        - DynamoDBReadPolicy:
             TableName: !Ref PublishedWorkflowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CursorsTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -469,6 +478,15 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
+
+  # Same bargain as ScheduleInvokePermission, for the poll trigger rule family.
+  PollInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WorkerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-poll-*
 
   DropboxResolverFunction:
     Type: AWS::Serverless::Function
@@ -753,6 +771,16 @@ Resources:
         - {AttributeName: schedule_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  PollTriggersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: poll_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: poll_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   PublishedWorkflowsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -887,7 +915,6 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
-
 Outputs:
   ApiUrl:
     Value: !Sub https://${DomainName}
@@ -913,6 +940,8 @@ Outputs:
     Value: !Ref GrantsTable
   CursorsTableName:
     Value: !Ref CursorsTable
+  PollTriggersTableName:
+    Value: !Ref PollTriggersTable
   AuditTableName:
     Value: !Ref AuditTable
   BackupBucketName:

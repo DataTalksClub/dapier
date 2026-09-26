@@ -1,11 +1,5 @@
 id: youtube-slack
 enabled: true
-trigger:
-  connector: youtube
-  event: video.published
-  filters:
-    channel_id:
-      equals: UCDvErgK0j5ur3aLgn6U-LqQ
 actions:
   - id: notify-slack
     type: slack
@@ -18,3 +12,9 @@ actions:
 
       Link: {url}
     unfurl_links: true
+trigger:
+  connector: youtube
+  event: video.published
+  filters:
+    channel_id:
+      equals: UCDvErgK0j5ur3aLgn6U-LqQ

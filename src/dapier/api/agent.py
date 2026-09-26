@@ -18,7 +18,7 @@ from ..connections import tokens
 from ..connections.providers import oauth_clients, oauth_providers
 from ..connections.records import BindingError
 from ..connections.tokens import TokenError
-from ..triggers import email_triggers, hook_triggers, schedule_triggers
+from ..triggers import email_triggers, hook_triggers, poll_triggers, schedule_triggers
 from ..auth.dtc_auth import auth_config
 from ..connections import oauth_flow
 from . import overview
@@ -404,6 +404,8 @@ def route(event, method, path):
         return hook_triggers_api(event, method)
     if path == "/api/agent/schedule-triggers" and method in ("GET", "PUT", "DELETE"):
         return schedule_triggers_api(event, method)
+    if path == "/api/agent/poll-triggers" and method in ("GET", "PUT", "DELETE"):
+        return poll_triggers_api(event, method)
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
         return grants_api(event, method)
     if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):
@@ -614,6 +616,30 @@ def schedule_triggers_api(event, method):
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(payload.get("schedule_id", "unknown"), "schedule-trigger", subject,
+               outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def poll_triggers_api(event, method):
+    """Operator-only poll trigger management over the CLI's bearer authentication."""
+    subject, error = require_operator(event, "poll-trigger")
+    if error:
+        return error
+    table_ref = poll_triggers.get_table()
+    try:
+        if method == "GET":
+            status, payload = poll_triggers.api_list(table_ref)
+        elif method == "PUT":
+            body = json.loads(event.get("body") or "{}")
+            status, payload = poll_triggers.api_save(body, subject, table_ref=table_ref)
+        else:
+            query = event.get("queryStringParameters") or {}
+            status, payload = poll_triggers.api_delete(
+                query.get("name", ""), subject, table_ref=table_ref,
+            )
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(payload.get("poll_id", "unknown"), "poll-trigger", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
 

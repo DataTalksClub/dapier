@@ -587,21 +587,31 @@ export function WorkflowBoard({
   const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
-  const renderChip = ({ kind, label, icon: Icon }: PaletteEntry) => (
-    <button
-      key={kind}
-      aria-grabbed={draggingKind === kind}
-      className={tool === "component" && paletteKind === kind ? "component-chip active" : "component-chip"}
-      draggable
-      onClick={() => { setPaletteKind(kind); selectTool("component"); }}
-      onDragEnd={() => setDraggingKind(null)}
-      onDragStart={(event) => startChipDrag(event, kind)}
-      title={kind.startsWith("trigger:") ? `${label} trigger` : label}
-      type="button"
-    >
-      <Icon size={15} />
-    </button>
-  );
+  const renderChip = ({ kind, label, icon: Icon }: PaletteEntry) => {
+    const isTrigger = kind.startsWith("trigger:");
+    const classes = [
+      "component-chip",
+      isTrigger ? "trigger" : "",
+      kind === "note" ? "note" : "",
+      tool === "component" && paletteKind === kind ? "active" : ""
+    ].filter(Boolean).join(" ");
+    return (
+      <button
+        key={kind}
+        aria-grabbed={draggingKind === kind}
+        className={classes}
+        draggable
+        onClick={() => { setPaletteKind(kind); selectTool("component"); }}
+        onDragEnd={() => setDraggingKind(null)}
+        onDragStart={(event) => startChipDrag(event, kind)}
+        title={isTrigger ? `${label} trigger` : label}
+        type="button"
+      >
+        <Icon size={14} />
+        <span className="component-chip-label">{label}</span>
+      </button>
+    );
+  };
 
   return (
     <section className="board-panel" aria-label="Workflow board">
@@ -612,13 +622,17 @@ export function WorkflowBoard({
           </button>
         </div>
         <div className="component-toolbar" aria-label="Node types">
-          <span className="chip-group-label">Triggers</span>
-          {triggerPalette.map(renderChip)}
-          <span className="chip-divider" aria-hidden="true" />
-          <span className="chip-group-label">Actions</span>
-          {actionPalette.map(renderChip)}
-          <span className="chip-divider" aria-hidden="true" />
-          {notePalette.map(renderChip)}
+          <div className="chip-group">
+            <span className="chip-group-label">Triggers</span>
+            {triggerPalette.map(renderChip)}
+          </div>
+          <div className="chip-group">
+            <span className="chip-group-label">Actions</span>
+            {actionPalette.map(renderChip)}
+            {/* Notes flow with the actions so the chip never orphans on its
+                own wrapped row; the dashed border sets it apart. */}
+            {notePalette.map(renderChip)}
+          </div>
         </div>
         {sessionControls && (
           <div className="canvas-session-controls">
