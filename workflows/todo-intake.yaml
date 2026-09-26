@@ -7,10 +7,11 @@
 # `dapier hooks save` — because Telegram delivery is registered per stored
 # hook, so the YAML bundle carries only the flow and the email entry point.
 #
-# The Telegram path reproduces the retired Zapier zap (catch hook -> Google
-# Sheets "Create Spreadsheet Row"): the row lands in the TODO list sheet
-# (Date/Task/Status, Status=NEW), the DataOps intake push is kept, and the
-# bot confirms in the triggering chat.
+# Both paths reproduce the retired Zapier zaps (Telegram /todo hook and
+# "Add emails to TODO list" inbound email -> Google Sheets "Create
+# Spreadsheet Row"): rows land in the TODO list sheet (Date/Task/Status,
+# Status=NEW) with a trigger-shaped Task, the DataOps intake push is kept,
+# and the bot confirms in the triggering chat.
 flows:
   todo-dataops:
     description: Push an inbound todo into the DataOps intake
@@ -38,9 +39,23 @@ flows:
         connection_id: telegram-bot
         text: "Done! Saved \"{text|replace:/todo :|trim}\" to the todo list."
 
+  todo-email-sheet:
+    description: TODO list sheet row from an inbound email, then the DataOps intake
+    actions:
+      - id: append-row
+        type: sheets_append_row
+        connection_id: google-sheets
+        spreadsheet_id: 1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw
+        sheet_name: todo
+        values: [["{trigger.occurred_at|date_format:%Y-%m-%d}", "Process email \"{subject}\" from {from}", "", "NEW"]]
+      - id: create-intake
+        type: dataops
+        url_env: DATAOPS_INTAKE_URL
+        auth_secret_id: dapier/dataops
+
 id: todo-intake
 enabled: true
-flow: todo-dataops
+flow: todo-email-sheet
 triggers:
   - connector: email
     event: message.received

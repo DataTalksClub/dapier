@@ -137,6 +137,15 @@ class FormatterTests(unittest.TestCase):
     def test_date_format_handles_trailing_z(self):
         self.assertEqual(self.render_one("{v | date_format:%H:%M}", "2026-09-24T15:05:00Z"), "15:05")
 
+    def test_date_format_parses_rfc_2822_email_date_headers(self):
+        self.assertEqual(
+            self.render_one("{v | date_format:%Y-%m-%d}", "Fri, 26 Sep 2026 22:57:01 +0200"),
+            "2026-09-26",
+        )
+
+    def test_date_format_unparseable_value_renders_empty(self):
+        self.assertEqual(self.render_one("{v | date_format:%Y}", "not a date"), "")
+
     def test_date_offset_days_and_hours(self):
         self.assertEqual(self.render_one("{v | date_offset:1d}", "2026-09-24T15:00:00+00:00"),
                          "2026-09-25T15:00:00+00:00")

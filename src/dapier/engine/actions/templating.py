@@ -20,6 +20,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime
 
 
 logger = logging.getLogger(__name__)
@@ -228,7 +229,11 @@ def _parse_datetime(value):
     text = str(value).strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
-    return datetime.fromisoformat(text)
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        # Email events carry an RFC 2822 Date header ("Fri, 26 Sep 2026 ...").
+        return parsedate_to_datetime(text)
 
 
 def _date_format(value, spec):
