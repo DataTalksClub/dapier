@@ -31,10 +31,14 @@ _BUCKETS = {}
 
 
 def _json_response(status, body, *, headers=None):
+    from .. import http as http_helpers
+
     return {
         "statusCode": status,
         "headers": {"content-type": "application/json", **(headers or {})},
-        "body": json.dumps(body),
+        # Connection records carry DynamoDB Decimals (version, timestamps);
+        # a plain dumps 500s every view that returns them.
+        "body": json.dumps(body, default=http_helpers._json_default),
     }
 
 

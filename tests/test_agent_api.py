@@ -326,6 +326,32 @@ def test_operator_can_show_connection_without_agent_grant(monkeypatch):
     assert json.loads(response["body"])["connection_id"] == "youtube-personal"
 
 
+def test_show_connection_serializes_dynamodb_decimals(monkeypatch):
+    from decimal import Decimal
+
+    connection = {**CONNECTION, "version": Decimal("5"), "scopes": [Decimal("1")]}
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": connection})
+    response = agent_api.route(
+        event(), "GET", "/api/agent/connections/youtube-personal",
+    )
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["version"] == 5
+
+
+def test_show_connection_serializes_dynamodb_decimals(monkeypatch):
+    from decimal import Decimal
+
+    connection = {**CONNECTION, "version": Decimal("5"), "scopes": [Decimal("1")]}
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+              connections={"youtube-personal": connection})
+    response = agent_api.route(
+        event(), "GET", "/api/agent/connections/youtube-personal",
+    )
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["version"] == 5
+
+
 def test_create_connection_rejects_duplicate_and_token_provider(monkeypatch):
     configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
               connections={"youtube-personal": CONNECTION})
