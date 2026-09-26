@@ -173,7 +173,7 @@ def test_callback_success_is_single_use(monkeypatch):
 
     first = oauth_flow.oauth_callback(event)
     assert first["statusCode"] == 302
-    assert first["headers"]["location"] == "/?oauth=connected"
+    assert first["headers"]["location"] == "/connections?oauth=connected"
 
     token_request = requests[0]
     sent = token_request.data.decode()
@@ -207,6 +207,20 @@ def test_callback_rejects_wrong_operator(monkeypatch):
     result = oauth_flow.oauth_callback(event)
     assert result["statusCode"] == 400
     assert "does not match" in json.loads(result["body"])["error"]
+
+
+def test_callback_provider_denial_returns_to_connections(monkeypatch):
+    _, _, stored, requests, response = start_flow(monkeypatch)
+    event = callback_event(response)
+    event["queryStringParameters"] = {
+        "error": "access_denied",
+        "state": event["queryStringParameters"]["state"],
+    }
+    result = oauth_flow.oauth_callback(event)
+    assert result["statusCode"] == 302
+    assert result["headers"]["location"] == "/connections?oauth=access_denied"
+    assert not stored
+    assert not requests
 
 
 def test_callback_ignores_request_host(monkeypatch):

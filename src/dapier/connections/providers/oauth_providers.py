@@ -9,6 +9,7 @@ stays unit-testable without HTTP mocks:
 """
 
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -114,8 +115,13 @@ def authorization_url(provider_name, *, client_id, redirect_uri, scopes, state, 
 
 def _default_transport(method, url, *, headers=None, body=None, timeout=15):
     request = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as exc:
+        # HTTPError represents a response from the provider, not a connection
+        # failure. Keep its status and body so callers can report the error.
+        return exc.code, exc.read()
 
 
 def _form_post(url, fields, *, transport, timeout=15):
@@ -136,9 +142,17 @@ def _form_post(url, fields, *, transport, timeout=15):
     except (ValueError, UnicodeDecodeError):
         raise ProviderError(f"token endpoint returned HTTP {status} with an unreadable body")
     if status >= 300 or not isinstance(data, dict):
-        raise ProviderError(f"token endpoint returned HTTP {status}: {redact(data)}")
+        # Provider descriptions can echo request values such as an auth code.
+        # Only expose the standard OAuth error code, never arbitrary body text.
+        error = data.get("error") if isinstance(data, dict) else None
+        safe_error = error if isinstance(error, str) and error in {
+            "invalid_request", "invalid_client", "invalid_grant",
+            "unauthorized_client", "unsupported_grant_type", "invalid_scope",
+        } else None
+        suffix = f" ({safe_error})" if safe_error else ""
+        raise ProviderError(f"token endpoint returned HTTP {status}{suffix}")
     if data.get("error"):
-        raise ProviderError(f"token endpoint error: {redact(data)}")
+        raise ProviderError("token endpoint returned an error")
     return data
 
 

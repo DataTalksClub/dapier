@@ -96,6 +96,12 @@ async function connectProvider(provider) {
   if (TOKEN_PROVIDERS.includes(provider)) return openTokenDialog(provider);
   const meta = CONNECT_PROVIDERS[provider];
   const { id, suffix } = nextConnectionId(meta.connectionId);
+  // Open during the click: browsers block windows opened after the PUT awaits.
+  const popup = window.open('', '_blank', 'width=680,height=760');
+  if (!popup) return notice('Allow pop-ups to add this connection, then try again.', true);
+  popup.document.title = `Connect ${meta.label}`;
+  if (popup.document.body) popup.document.body.textContent = 'Preparing connection…';
+  watchOAuthPopup(popup);
   try {
     // Provision the new record with the provider's standard scopes, then
     // bounce straight to the consent screen.
@@ -108,8 +114,40 @@ async function connectProvider(provider) {
         scopes: meta.scopes,
       }),
     });
-    window.location.assign(`/api/admin/oauth/${encodeURIComponent(id)}/start`);
-  } catch (error) { notice(error.message, true); }
+    const startUrl = `/api/admin/oauth/${encodeURIComponent(id)}/start`;
+    if (!popup.closed) {
+      popup.location.assign(startUrl);
+      popup.focus();
+    } else {
+      notice('Connection created. Use Connect in the accounts table to finish setup.');
+    }
+    await refresh();
+  } catch (error) {
+    if (!popup.closed) popup.close();
+    notice(error.message, true);
+  }
+}
+
+function watchOAuthPopup(popup) {
+  const timer = setInterval(() => {
+    if (popup.closed) {
+      clearInterval(timer);
+      refresh();
+      return;
+    }
+    try {
+      // The callback redirects to /connections?oauth=... after consent.
+      const result = new URLSearchParams(popup.location.search).get('oauth');
+      if (popup.location.pathname === '/connections' && result) {
+        clearInterval(timer);
+        if (result === 'connected') popup.close();
+        else notice(`Connection failed: ${result}`, true);
+        refresh();
+      }
+    } catch (_) {
+      // The provider's consent page is on another origin until it redirects.
+    }
+  }, 500);
 }
 
 function openTokenDialog(provider) {
@@ -153,7 +191,7 @@ function renderConnections(connections) {
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
   $('#connection-table').innerHTML = connections.map((connection) => {
     const reconnect = TOKEN_PROVIDERS.includes(connection.provider) ? ''
-      : `<a class="button secondary" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start">${['connected', 'expired'].includes(connection.status) ? 'Reconnect' : 'Connect'}</a>`;
+      : `<a class="button secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" target="_blank" rel="noopener">${['connected', 'expired'].includes(connection.status) ? 'Reconnect' : 'Connect'}</a>`;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name)}</span><span class="cell-sub">${wrapTokens(connection.connection_id)}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
@@ -161,6 +199,13 @@ function renderConnections(connections) {
     <td class="action-cell">${reconnect}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Edit</button></td>
   </tr>`;
   }).join('');
+  $$('.connection-oauth').forEach((link) => link.addEventListener('click', (event) => {
+    const popup = window.open(link.href, '_blank', 'width=680,height=760');
+    if (!popup) return; // Let the browser's normal link handling remain available.
+    event.preventDefault();
+    popup.focus();
+    watchOAuthPopup(popup);
+  }));
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
 }
 
