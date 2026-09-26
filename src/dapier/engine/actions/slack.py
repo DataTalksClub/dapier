@@ -30,7 +30,6 @@ def run_slack(action, event, *, steps=None):
     token = _token_for(action)
     if action.get("telegram_format"):
         return _post_telegram_format(action, event, token)
-    data = event.get("data", {})
     text = render(action.get("text", "{title}\n{url}"), event, steps)
     result = base._json_request(
         "https://slack.com/api/chat.postMessage",
