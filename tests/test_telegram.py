@@ -49,6 +49,32 @@ class ApiCallTests(unittest.TestCase):
             telegram_api.get_me("123:tokenvaluetokenvaluevaluevalu",
                                 transport=lambda *a, **k: (_ for _ in ()).throw(OSError()))
 
+    def test_http_error_carries_telegrams_description(self):
+        # A non-2xx is Telegram answering, not the network failing: the
+        # raised error must carry the rejection description (e.g. a rate
+        # limit on setWebhook), not mask it as "unreachable".
+        import io
+        import urllib.error
+
+        def transport(method, url, **kwargs):
+            raise urllib.error.HTTPError(
+                url, 429, "Too Many Requests", None,
+                io.BytesIO(b'{"ok": false, "description": "Too Many Requests"}'))
+        with self.assertRaises(telegram_api.TelegramApiError) as ctx:
+            telegram_api.get_me("123:tokenvaluetokenvaluevaluevalu", transport=transport)
+        self.assertIn("Too Many Requests", str(ctx.exception))
+        self.assertNotIn("unreachable", str(ctx.exception))
+
+    def test_http_error_without_body_still_names_the_status(self):
+        import io
+        import urllib.error
+
+        def transport(method, url, **kwargs):
+            raise urllib.error.HTTPError(url, 502, "Bad Gateway", None, io.BytesIO(b""))
+        with self.assertRaises(telegram_api.TelegramApiError) as ctx:
+            telegram_api.get_me("123:tokenvaluetokenvaluevaluevalu", transport=transport)
+        self.assertIn("HTTP 502", str(ctx.exception))
+
     def test_set_webhook_sends_url_and_secret(self):
         calls = []
         transport = stub_transport(True, capture=calls)

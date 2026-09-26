@@ -44,12 +44,26 @@ def call(token, method, payload=None, *, transport=None, timeout=10):
     """
     transport = transport or _default_transport
     body = json.dumps(payload or {}).encode()
+    import urllib.error
+
     try:
         status, raw = transport(
             "POST", f"{BASE_URL}/bot{token}/{method}",
             headers={"content-type": "application/json"},
             body=body, timeout=timeout,
         )
+    except urllib.error.HTTPError as exc:
+        # A non-2xx is still Telegram answering: the error body carries the
+        # real rejection (rate limit, bad secret token), so surface it
+        # instead of masking it as a network problem.
+        try:
+            data = json.loads(exc.read().decode() or "{}")
+            description = data.get("description") if isinstance(data, dict) else None
+        except (ValueError, UnicodeDecodeError, OSError):
+            description = None
+        raise TelegramApiError(
+            f"Telegram rejected {method}: {description or f'HTTP {exc.code}'}"
+        ) from exc
     except Exception as exc:
         raise TelegramApiError(f"Telegram API unreachable: {type(exc).__name__}")
     try:
