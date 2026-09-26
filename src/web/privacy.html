@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How Dapier handles account, workflow, and Google user data.">
+  <title>Privacy Policy · Dapier</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/public.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/about"><img src="/assets/favicon.svg" alt="">Dapier</a>
+    <nav class="site-nav" aria-label="Legal information">
+      <a href="/privacy" aria-current="page">Privacy</a>
+      <a href="/terms">Terms</a>
+    </nav>
+  </header>
+  <main class="page legal-page">
+    <p class="eyebrow">Dapier</p>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Effective 26 September 2026</p>
+
+    <p>This policy explains how DataTalks.Club handles information when you use Dapier, an automation service maintained by Alexey Grigorev. Dapier processes information to connect accounts and run workflows that an operator configures.</p>
+
+    <h2>Information Dapier processes</h2>
+    <ul>
+      <li><strong>Account and connection information:</strong> provider account identifiers and email addresses, connection settings, and OAuth access and refresh tokens needed to keep a connection working.</li>
+      <li><strong>Google data:</strong> depending on the connection and approved scopes, Dapier may read Calendar availability and owned events, read YouTube channel information, read and download Drive files, and read or edit Google Docs and Sheets. The Google Docs and Sheets permissions also allow creating and deleting those document types. Dapier uses Google data only to verify a connection and carry out the workflow operations you configure.</li>
+      <li><strong>Workflow and run information:</strong> workflow configuration, trigger event data, action inputs and outputs, timestamps, status, and error summaries. These records help execute workflows and troubleshoot their results.</li>
+      <li><strong>Security and administration information:</strong> sign-in identifiers, connection changes, and security audit events.</li>
+    </ul>
+
+    <h2>How Dapier uses Google user data</h2>
+    <p>Dapier uses Google OAuth data to identify the connected account, confirm access, and run the Calendar, YouTube, Sheets, or other Google Workspace operations specifically configured for that connection. Dapier does not sell Google user data, use it for advertising, or transfer it to third parties for those purposes. Dapier does not use Google user data to train generalized AI or machine-learning models. Dapier's use of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including its Limited Use requirements.</p>
+    <p>Dapier currently supports Calendar lookups and owned-event edits, YouTube published-video triggers, and Sheets row appends. General Docs editing and Drive file watching are not yet available in the workflow catalog.</p>
+    <p>Google data may be sent to a destination you configure in a workflow, such as a webhook or another connected service, when that workflow runs. Dapier does not make that transfer independently of the configured workflow.</p>
+
+    <h2>Storage and service providers</h2>
+    <p>Dapier runs on Amazon Web Services in the configured AWS region. Connection records, OAuth tokens, workflow run records, and audit records are stored in AWS DynamoDB; AWS encrypts DynamoDB data at rest. Workflow files may be stored in the GitHub repository configured for the Dapier designer. Dapier sends requests to Google and other connected providers to verify accounts and run configured workflows. A workflow may also send data to the external destination named in its configuration.</p>
+
+    <h2>Retention and deletion</h2>
+    <p>OAuth tokens remain in the active connection store while the connection exists. Revoking a connection attempts provider-side token revocation and clears active token values from Dapier. Dapier sets a 90-day retention period for workflow execution details and connection audit events. Encrypted daily database backups have a 30-day lifecycle, so a deleted record may remain in a backup until that backup expires.</p>
+    <p>To disconnect a provider, revoke the connection in Dapier or in the provider's account settings. To request removal of connection records or ask a privacy question, contact <a href="mailto:alexey.s.grigoriev@gmail.com">alexey.s.grigoriev@gmail.com</a>.</p>
+
+    <h2>Security</h2>
+    <p>Dapier uses HTTPS for browser and provider connections, stores credentials separately from ordinary connection metadata, limits service access with AWS permissions, and does not display saved OAuth secrets in the console.</p>
+
+    <h2>Cookies and local storage</h2>
+    <p>The authenticated Dapier console uses a secure, HTTP-only session cookie to maintain sign-in. It may store a visual theme preference in your browser. The public information pages do not require sign-in.</p>
+
+    <h2>Changes and contact</h2>
+    <p>We may update this policy when Dapier's data handling changes. The effective date above indicates the latest revision. Contact <a href="mailto:alexey.s.grigoriev@gmail.com">alexey.s.grigoriev@gmail.com</a> with privacy questions or requests.</p>
+  </main>
+  <footer class="site-footer">
+    <span>Dapier · DataTalks.Club</span>
+    <nav class="footer-links" aria-label="Legal information">
+      <a href="/about">Home</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="mailto:alexey.s.grigoriev@gmail.com">Contact</a>
+    </nav>
+  </footer>
+</body>
+</html>

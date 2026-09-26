@@ -237,6 +237,15 @@ Resources:
         Root:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /, Method: GET}
+        PublicHome:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /about, Method: GET}
+        PrivacyPolicy:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /privacy, Method: GET}
+        TermsOfService:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /terms, Method: GET}
         ConsoleWorkflows:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /workflows, Method: GET}

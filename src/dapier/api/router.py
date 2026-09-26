@@ -44,12 +44,18 @@ def _static(path):
     frame_ancestors = "'self'" if embed else "'none'"
     assets = {
         **{view: ("index.html", "text/html; charset=utf-8") for view in CONSOLE_VIEWS},
+        # Public OAuth verification pages. These are served before auth routes
+        # so the URLs on the Google consent screen remain publicly reachable.
+        "/about": ("public-home.html", "text/html; charset=utf-8"),
+        "/privacy": ("privacy.html", "text/html; charset=utf-8"),
+        "/terms": ("terms.html", "text/html; charset=utf-8"),
         DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
         # The CLI device-pairing page (dapier auth login).
         "/device": ("device.html", "text/html; charset=utf-8"),
         "/assets/device.css": ("device.css", "text/css; charset=utf-8"),
         "/assets/js/device.js": ("js/device.js", "text/javascript; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
+        "/assets/public.css": ("public.css", "text/css; charset=utf-8"),
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
         "/assets/js/api.js": ("js/api.js", "text/javascript; charset=utf-8"),

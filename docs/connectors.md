@@ -33,14 +33,16 @@ immediately — no redeploy.
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
    and select the `dtcdev-click` project.
-2. In **APIs & Services → Library**, enable **Google Calendar API** and
-   **YouTube Data API v3** before editing consent scopes. The scope picker only
-   offers scopes for APIs already enabled in the project.
+2. In **APIs & Services → Library**, enable the APIs used by Dapier before
+   editing consent scopes. The `dtcdev-click` project currently has **Google
+   Calendar API**, **YouTube Data API v3**, **Google Drive API**, **Google Docs
+   API**, and **Google Sheets API** enabled. The scope picker only offers
+   scopes for APIs already enabled in the project.
 3. Open **Google Auth Platform → Audience**. The `dtcdev-click` app is External
-   and in *Testing* mode. Under **Test users**, click **Add users**, enter
-   `alexey.s.grigoriev@gmail.com`, press **Enter** so it becomes a chip, then
-   click **Save**. Add any other account only if it also needs to authorize a
-   Dapier connection.
+   and currently in *Testing* mode. Under **Test users**, the configured
+   accounts are `alexey.s.grigoriev@gmail.com` and
+   `alexey@datatalks.club`. To add another account, click **Add users**, enter
+   the address, press **Enter** so it becomes a chip, then click **Save**.
    The project-wide consent branding currently says `DTC`; it is shared with
    existing OAuth clients, so don't change it just for Dapier.
 4. Open **Google Auth Platform → Data access** and click **Add or remove
@@ -48,10 +50,13 @@ immediately — no redeploy.
    project-wide scope table:
    `https://www.googleapis.com/auth/calendar.freebusy`,
    `https://www.googleapis.com/auth/calendar.events.owned`,
-   `https://www.googleapis.com/auth/userinfo.email`, and
-   `https://www.googleapis.com/auth/youtube.readonly`. Keep this project-wide
-   list in sync with the connection scopes below. Do not remove scopes that
-   another client in this project still uses. See Google's [consent and scope
+   `https://www.googleapis.com/auth/userinfo.email`,
+   `https://www.googleapis.com/auth/youtube.readonly`,
+   `https://www.googleapis.com/auth/drive.readonly`,
+   `https://www.googleapis.com/auth/documents`, and
+   `https://www.googleapis.com/auth/spreadsheets`. Keep this project-wide list
+   in sync with each Dapier connection's requested scopes. Do not remove scopes
+   that another client in this project still uses. See Google's [consent and scope
    setup guide](https://developers.google.com/workspace/guides/configure-oauth-consent)
    and [OAuth policies](https://developers.google.com/identity/protocols/oauth2/policies).
    In the scope dialog, choose **Add to table**, then **Update**; back on the
@@ -71,6 +76,60 @@ immediately — no redeploy.
 6. Copy the new **client ID** and **client secret**. Google's console won't
    show the secret again later. Store both immediately with the credential
    update procedure below.
+
+### Google Drive, Docs, and Sheets scope meanings
+
+The `dtcdev-click` consent configuration includes these Workspace scopes:
+
+| Scope | Access granted | Google classification |
+|-------|----------------|-----------------------|
+| `https://www.googleapis.com/auth/drive.readonly` | Read and download all files in the consenting account's Drive; also accepted by the Drive Changes API, including `changes.watch` | Restricted |
+| `https://www.googleapis.com/auth/documents` | Read, create, edit, and delete all Google Docs in the consenting account | Sensitive |
+| `https://www.googleapis.com/auth/spreadsheets` | Read, create, edit, and delete all Google Sheets in the consenting account | Sensitive |
+
+There is no separate Drive scope for watching changes: `drive.readonly` is
+accepted by the Drive Changes API. A watch notification signals that changes
+are available; a workflow still needs code to fetch and process the changes
+feed. Dapier currently has a Sheets row-append action, but no general Docs
+editor or Drive file watcher. Adding consent scopes alone does not add those
+workflow features. See Google's [Docs scopes](https://developers.google.com/workspace/docs/api/auth),
+[Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes),
+and [Drive change notifications](https://developers.google.com/workspace/drive/api/guides/manage-changes).
+
+### Google OAuth publishing status
+
+`dtcdev-click` remains an External app in **Testing**. Google expires refresh
+tokens for Testing apps after seven days when consent includes scopes beyond
+basic identity. This is why each consenting account needs to authorize again
+weekly until the app leaves Testing. See Google's [audience and publishing
+status guide](https://support.google.com/cloud/answer/15549945?hl=en).
+
+The Google Auth Platform **Branding** page needs these public links before
+publishing:
+
+| Branding field | URL |
+|----------------|-----|
+| Application home page | `https://dapier.dtcdev.click/about` |
+| Application privacy policy | `https://dapier.dtcdev.click/privacy` |
+| Application Terms of Service | `https://dapier.dtcdev.click/terms` |
+
+The pages are implemented as public static routes before authentication in
+`src/dapier/api/router.py`; their API Gateway GET routes are in `template.yaml`.
+The root `/` remains the authenticated console. After deploying the pages,
+open each URL in a signed-out browser and confirm it loads before saving the
+links in **Google Auth Platform → Branding**. The domain `dtcdev.click` is
+already authorized. The displayed app name/support email and the `DTC DEV Auth`
+client are shared by this Google project. Switching its audience to Production
+affects every OAuth client in `dtcdev-click`; Google recommends separate
+testing and production projects. `drive.readonly` is a Restricted scope, so
+production may require verification and, depending on the app's use, a
+security assessment. See Google's [production readiness
+overview](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview)
+and [restricted-scope verification requirements](https://developers.google.com/identity/protocols/oauth2/restricted-scope-verification).
+
+The Google Branding page does not require an app logo to publish. Uploading a
+logo starts a verification requirement, so do not add one just to publish.
+If a separate production app needs a logo later, make it Dapier-specific.
 
 ### Dropbox
 
@@ -163,7 +222,13 @@ also confirms the update was stored, and the saved secret cannot be read back.
 - The Google console can show a blank content pane briefly while a section
   loads. Wait a few seconds before retrying navigation; a short blank state did
   not mean the project or page was unavailable.
-- Enable Calendar and YouTube APIs before adding scopes. Adding a scope has
+- Before switching Google Auth Platform from Testing to Production, complete
+  the Branding links in the publishing-status section. The status belongs to
+  the whole `dtcdev-click` project and affects the separate `DTC DEV Auth`
+  client too. Production removes the seven-day Testing refresh-token expiry,
+  but `drive.readonly` is Restricted and may need verification. Google currently
+  recommends separating test and production projects.
+- Enable each required API before adding scopes. Adding a scope has
   three commits: **Add to table → Update → Save**. Adding a test user also
   needs **Enter** to turn the address into a chip before **Save**.
 - If Dropbox asks for a passkey during sign-in and offers **Set up later**, use
@@ -203,13 +268,18 @@ The user explicitly authorized repeating the following configuration without
 asking again, including accepting the Dropbox API Terms checkbox at app
 creation:
 
-- Google Cloud project `dtcdev-click`, External / Testing app, test user
-  `alexey.s.grigoriev@gmail.com`, scopes
+- Google Cloud project `dtcdev-click`, External / Testing app, test users
+  `alexey.s.grigoriev@gmail.com` and `alexey@datatalks.club`, with Calendar,
+  YouTube, Drive, Docs, and Sheets APIs enabled. The Data access table includes
+  scopes
   `https://www.googleapis.com/auth/calendar.freebusy`,
   `https://www.googleapis.com/auth/calendar.events.owned`,
-  `https://www.googleapis.com/auth/userinfo.email`, and
-  `https://www.googleapis.com/auth/youtube.readonly`; dedicated Web client
-  `Dapier` with callback `https://dapier.dtcdev.click/oauth/callback`.
+  `https://www.googleapis.com/auth/userinfo.email`,
+  `https://www.googleapis.com/auth/youtube.readonly`,
+  `https://www.googleapis.com/auth/drive.readonly`,
+  `https://www.googleapis.com/auth/documents`, and
+  `https://www.googleapis.com/auth/spreadsheets`; dedicated Web client `Dapier`
+  with callback `https://dapier.dtcdev.click/oauth/callback`.
 - The same Dropbox account, `Dapier DTC Dev`, Scoped access / Full Dropbox,
   scopes `account_info.read`, `files.metadata.read`, `files.content.read`,
   and `files.content.write`, with callback
@@ -297,6 +367,44 @@ For Slack or Telegram, create or replace a connection with
 4. Pick the Google account the connection should be bound to and approve.
 5. You land back in the console; the connection now shows **connected** and
    the verified account email.
+
+### Google Drive, Docs, and Sheets connections
+
+The Gmail Google connection keeps its Calendar scopes and also requests the
+three Workspace scopes. Its configured request is:
+
+```powershell
+uv run dapier connections scopes google-calendar --scopes `
+  https://www.googleapis.com/auth/calendar.freebusy `
+  https://www.googleapis.com/auth/calendar.events.owned `
+  https://www.googleapis.com/auth/drive.readonly `
+  https://www.googleapis.com/auth/documents `
+  https://www.googleapis.com/auth/spreadsheets `
+  https://www.googleapis.com/auth/userinfo.email
+```
+
+Updating this list does not update the token already held for Gmail. Reconnect
+`google-calendar` and approve the new consent screen while signed in as
+`alexey.s.grigoriev@gmail.com` to grant the scopes.
+
+Create the second account as its own Google connection, with no Calendar or
+YouTube scopes:
+
+```powershell
+uv run dapier connections create google-drive-dtc --provider google `
+  --display-name "Google Drive (DataTalks)" `
+  --scopes https://www.googleapis.com/auth/drive.readonly `
+  https://www.googleapis.com/auth/documents `
+  https://www.googleapis.com/auth/spreadsheets `
+  https://www.googleapis.com/auth/userinfo.email
+uv run dapier connections connect google-drive-dtc --agent <agent-name>
+```
+
+Complete consent while signed in as `alexey@datatalks.club`. Check the account
+shown by Google before approving so the token is bound to the intended account.
+The connection's configured scope list and the scopes actually granted to its
+token are separate; inspect `dapier connections show google-drive-dtc` after
+consent and reconnect if the account granted fewer scopes.
 
 ### YouTube, step by step
 
