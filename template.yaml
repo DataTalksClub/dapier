@@ -91,6 +91,21 @@ Parameters:
     Type: String
     Default: gpt-4o-mini
     Description: Model name the copilot requests from the LLM endpoint
+  DatamailerUrl:
+    Type: String
+    Default: https://datamailer.dtcdev.click
+    Description: Base URL of the Datamailer API the backup emails failures through
+  DatamailerApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: >
+      Datamailer client API key; empty disables the backup failure email
+      (the CloudWatch alarm still covers failures)
+  BackupAlertEmail:
+    Type: String
+    Default: alexey.s.grigoriev@gmail.com
+    Description: Recipient of the DynamoDB backup failure email
 
 Conditions:
   HasGithubWorkflowsToken: !Not [!Equals [!Ref GithubWorkflowsTokenSecret, '']]
@@ -839,6 +854,9 @@ Resources:
       Environment:
         Variables:
           BACKUP_BUCKET: !Ref BackupBucket
+          DATAMAILER_URL: !Ref DatamailerUrl
+          DATAMAILER_API_KEY: !Ref DatamailerApiKey
+          BACKUP_ALERT_EMAIL: !Ref BackupAlertEmail
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref BackupBucket

@@ -10,6 +10,12 @@ as gzip-compressed NDJSON (one JSON item per line), followed by a
 manifest.json summarising the day. The bucket's lifecycle rule expires
 every object after 30 days, giving a rolling month of daily snapshots.
 
+A failed run also emails the operator through the Datamailer transactional
+API (same bargain as rds-export's notify_run.sh: report failures, stay
+silent on success). Unconfigured (no DATAMAILER_URL/API_KEY or
+BACKUP_ALERT_EMAIL) the email is skipped and only the CloudWatch alarm
+remains.
+
 Restoring replays a snapshot's lines back into a table with the same key
 schema:
 
@@ -23,6 +29,7 @@ import base64
 import gzip
 import json
 import os
+import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -67,6 +74,65 @@ def backup_table(dynamodb, s3, name, bucket, day):
     return {"key": key, "items": len(items), "bytes": len(body)}
 
 
+def _post_json(url, api_key, payload):
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return response.status
+
+
+def notify_failure(day, results, errors):
+    """Email the failure report; never raises (best-effort like notify_run.sh)."""
+    url = os.environ.get("DATAMAILER_URL", "").rstrip("/")
+    api_key = os.environ.get("DATAMAILER_API_KEY", "")
+    recipient = os.environ.get("BACKUP_ALERT_EMAIL", "")
+    if not (url and api_key and recipient):
+        print("backup failure email skipped: datamailer is not configured")
+        return
+    failed = "\n".join(f"  {name}: {err}" for name, err in sorted(errors.items()))
+    backed_up = "\n".join(
+        f"  {name}: {stats['items']} items" for name, stats in sorted(results.items())
+    ) or "  (none)"
+    body = (
+        f"Something didn't work — the dapier DynamoDB backup failed.\n"
+        f"\n"
+        f"Date: {day}\n"
+        f"Failed tables ({len(errors)} of {len(results) + len(errors)}):\n"
+        f"{failed}\n"
+        f"\n"
+        f"Tables that were still backed up ({len(results)}):\n"
+        f"{backed_up}\n"
+        f"\n"
+        f"Snapshots of the healthy tables are in s3://{os.environ['BACKUP_BUCKET']}/"
+        f"backups/{day}/. Retry with:\n"
+        f"  aws lambda invoke --function-name $BACKUP_FUNCTION_NAME out.json"
+    )
+    payload = {
+        "email": recipient,
+        "template_key": "cli-message",
+        "context": {
+            "subject": f"Backup failure: dapier dynamodb "
+                       f"({len(errors)} of {len(results) + len(errors)} tables)",
+            "body": body,
+        },
+        # Retries/manual re-invocations on the same day don't re-send.
+        "idempotency_key": f"dapier-backup-failure-{day}",
+    }
+    try:
+        _post_json(f"{url}/api/transactional/send", api_key, payload)
+        print(f"backup failure email sent to {recipient}")
+    except Exception as exc:  # the alarm still fires on the raise below
+        print(f"backup failure email could not be sent: {exc}")
+
+
 def handler(event, context):
     bucket = os.environ["BACKUP_BUCKET"]
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -93,5 +159,6 @@ def handler(event, context):
         f"across {len(results)}/{len(names)} tables"
     )
     if errors:
+        notify_failure(day, results, errors)
         raise RuntimeError(f"backup failed for: {', '.join(sorted(errors))}")
     return manifest

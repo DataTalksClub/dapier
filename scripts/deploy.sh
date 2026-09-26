@@ -54,6 +54,14 @@ if [ -n "${GITHUB_WORKFLOWS_TOKEN_SECRET:-}" ]; then
   github_token_lines="GithubWorkflowsTokenSecret: \"${GITHUB_WORKFLOWS_TOKEN_SECRET}\""$'\n'
 fi
 
+# The DynamoDB backup emails failures through the Datamailer transactional
+# API (src/dapier/backup.py). Like the OAuth clients, the key is omitted
+# when unset so CloudFormation keeps the previously deployed value.
+mailer_override_lines=""
+if [ -n "${DATAMAILER_API_KEY:-}" ]; then
+  mailer_override_lines="DatamailerApiKey: \"${DATAMAILER_API_KEY}\""$'\n'
+fi
+
 # Overrides go through a YAML file: SAM rejects empty values in the shorthand
 # key=value format and CloudFormation keeps a parameter's previous value when
 # an override is omitted — so this file passes every parameter explicitly
@@ -75,7 +83,7 @@ AuthJwksUrl: "$AUTH_JWKS_URL"
 AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
-${oauth_override_lines}${github_token_lines}
+${oauth_override_lines}${github_token_lines}${mailer_override_lines}
 EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"
