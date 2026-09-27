@@ -165,9 +165,29 @@ try {
 ```
 
 The CLI prints the endpoint URL. Paste that exact URL into the Zoom event
-subscription, select `recording.completed`, and click **Validate**. Zoom's
-`endpoint.url_validation` challenge marks the connection connected. Enable
-cloud recording on the Zoom host as well.
+subscription, select **All Recordings have completed** (`recording.completed`),
+and save. Zoom's documentation says to click **Validate** beneath the endpoint
+URL; its `endpoint.url_validation` challenge marks the Dapier connection
+connected. Enable cloud recording on the Zoom host as well.
+
+### Validation status and current Zoom UI behavior
+
+Do not treat recording delivery as ready until
+`uv run dapier connections show zoom` reports `status: connected`. The
+`zoom-api` OAuth connection can be connected while this separate webhook
+connection is still `ready`.
+
+On 2026-09-27, Zoom's current Build Flow **Features → Access** editor showed
+only **Save** and **Cancel** for an existing or new event subscription; it did
+not show the documented **Validate** action. Saving the existing subscription
+again and creating then removing a temporary retry subscription did not send a
+validation challenge. The original `Dapier cloud recordings` subscription is
+still configured, but its Dapier connection remains `ready`. Do not create
+duplicate subscriptions to retry validation. If the current UI still has no
+**Validate** control, stop and resolve the Marketplace UI/documentation
+mismatch before relying on recording notifications. Confirm the Dapier
+webhook Secret Token matches the app's current Secret Token before retrying;
+regenerating it invalidates the previous value.
 
 A workflow can listen for the event with:
 
