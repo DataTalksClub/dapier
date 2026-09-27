@@ -69,6 +69,16 @@ def build_parser():
                           help="Dropbox only: folder webhook resolution lists (empty lists everything)")
     revoke_p = conn_sub.add_parser("revoke", help="Revoke a connection's stored tokens")
     revoke_p.add_argument("connection_id")
+    discover_p = conn_sub.add_parser(
+        "discover", help="List a connection's discovery resources, or one resource's items")
+    discover_p.add_argument("connection_id")
+    discover_p.add_argument("resource", nargs="?", default=None,
+                            help="Resource to list, e.g. spreadsheets or channels (omit to list resources)")
+    discover_p.add_argument("--param", action="append", nargs="*", default=[],
+                            metavar="KEY=VALUE",
+                            help="Discovery param, repeatable (e.g. --param folder=/invoices)")
+    test_p = conn_sub.add_parser("test", help="Test a connection's stored tokens against its provider")
+    test_p.add_argument("connection_id")
 
     cred_p = sub.add_parser("credentials", help="Provider credentials used by workflows")
     cred_sub = cred_p.add_subparsers(dest="command", required=True)
@@ -104,10 +114,63 @@ def build_parser():
     runs_sub = runs_p.add_subparsers(dest="command", required=True)
     runs_list_p = runs_sub.add_parser("list", help="Recent runs, newest first")
     runs_list_p.add_argument("--limit", type=int, default=25)
+    runs_list_p.add_argument("--workflow", help="Only runs of this workflow id")
+    runs_list_p.add_argument("--status",
+                             help="success | failed | error | problems (failed or error), "
+                                  "or an exact status (completed, processing, filtered)")
+    runs_list_p.add_argument("--since",
+                             help="Only runs started at or after this ISO date/datetime")
+    runs_list_p.add_argument("--before",
+                             help="Only runs started before this ISO date/datetime (exclusive)")
+    runs_list_p.add_argument("--next", dest="next_token",
+                             help="Page token from the previous call's `next page:` footer")
     runs_show_p = runs_sub.add_parser("show", help="Show one run's step-by-step flow")
     runs_show_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
     runs_replay_p = runs_sub.add_parser("replay", help="Re-run a past run by re-injecting its original trigger event")
     runs_replay_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+    runs_replay_failed_p = runs_sub.add_parser(
+        "replay-failed", help="Re-run the latest failed runs of one workflow")
+    runs_replay_failed_p.add_argument("workflow_id", help="Workflow whose failed runs to replay")
+
+    usage_p = sub.add_parser("usage", help="Task usage rollup: tasks per workflow per month")
+    usage_p.add_argument("--months", type=int, default=12,
+                         help="How many months of rollup to show (default 12, max 24)")
+
+    errors_p = sub.add_parser("errors", help="Failed runs by workflow over the recent window")
+    errors_p.add_argument("--days", type=int, default=7,
+                          help="Window size in days (default 7, max 90)")
+
+    inbox_p = sub.add_parser("inbox", help="Trigger inbox: every inbound trigger event, matched or not")
+    inbox_sub = inbox_p.add_subparsers(dest="command", required=True)
+    inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
+    inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
+    inbox_list_p.add_argument("--limit", type=int, default=25)
+    inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
+    inbox_show_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
+    inbox_replay_p = inbox_sub.add_parser("replay", help="Send an inbox event through the engine again (fresh event id)")
+    inbox_replay_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
+
+    storage_p = sub.add_parser("storage",
+                               help="Workflow storage: per-workflow key-value state (what the storage_* actions read and write)")
+    storage_sub = storage_p.add_subparsers(dest="command", required=True)
+    storage_get_p = storage_sub.add_parser("get", help="Read one stored value")
+    storage_get_p.add_argument("workflow", help="Workflow ID whose storage to read")
+    storage_get_p.add_argument("key", help="Stored key")
+    storage_set_p = storage_sub.add_parser("set", help="Store a value for the workflow's runs")
+    storage_set_p.add_argument("workflow", help="Workflow ID whose storage to write")
+    storage_set_p.add_argument("key", help="Stored key")
+    storage_set_p.add_argument("value", help="Value to store")
+    storage_set_p.add_argument("--ttl-seconds", type=int, default=None,
+                               help="Expire the value after this many seconds")
+    storage_find_p = storage_sub.add_parser("find", help="List stored keys under a prefix")
+    storage_find_p.add_argument("workflow", help="Workflow ID whose storage to list")
+    storage_find_p.add_argument("prefix", nargs="?", default="",
+                                help="Key prefix (default: every key)")
+    storage_find_p.add_argument("--limit", type=int, default=None,
+                                help="Max keys to list (default 20, max 50)")
+    storage_delete_p = storage_sub.add_parser("delete", help="Remove one stored value")
+    storage_delete_p.add_argument("workflow", help="Workflow ID whose storage to change")
+    storage_delete_p.add_argument("key", help="Stored key")
 
     oac_p = sub.add_parser("oauth-clients", help="Shared OAuth clients per provider (same as the console's Credentials view)")
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
@@ -130,9 +193,26 @@ def build_parser():
     write_p.add_argument("--output", required=True)
     write_p.add_argument("--force", action="store_true")
 
-    trig_p = sub.add_parser("triggers", help="Email triggers (name@dtcdev.click)")
+    trig_p = sub.add_parser("triggers", help="Email triggers and trigger sample discovery")
     trig_sub = trig_p.add_subparsers(dest="command", required=True)
     trig_sub.add_parser("list", help="List email triggers and YAML-claimed routes")
+    trig_sample_p = trig_sub.add_parser(
+        "sample", help="Pull a sample event for a trigger connector, or a workflow's last trigger input")
+    trig_sample_p.add_argument("connector", nargs="?", default=None,
+                               help="e.g. custom, dataops, dropbox, email, poll, "
+                                    "renderer, schedule, telegram, webhook, youtube, zoom")
+    trig_sample_p.add_argument("--workflow", default=None,
+                               help="Workflow id: print its newest run's recorded "
+                                    "trigger input (else the connector's sample) "
+                                    "with the {trigger.*} fields it offers")
+    trig_sample_p.add_argument("--event", default=None,
+                               help="Event name override; for poll, the trigger's name")
+    trig_sample_p.add_argument("--connection-id", default=None,
+                               help="Prefer this connected account for live pulls")
+    trig_sample_p.add_argument("--limit", type=int, default=None,
+                               help="Max options when kind is options (1-25)")
+    trig_sample_p.add_argument("--resource", default=None,
+                               help="Options listing instead of a sample (e.g. slack.channels)")
     trig_show_p = trig_sub.add_parser("show", help="Show one email trigger")
     trig_show_p.add_argument("name")
     trig_save_p = trig_sub.add_parser("save", help="Create or update a trigger from a JSON file")
@@ -142,7 +222,7 @@ def build_parser():
 
     wf_p = sub.add_parser("workflows", help="Workflow YAML committed by the console designer")
     wf_sub = wf_p.add_subparsers(dest="command", required=True)
-    wf_sub.add_parser("list", help="List workflows with their live published state")
+    wf_sub.add_parser("list", help="List workflows and their On/Off state")
     wf_show_p = wf_sub.add_parser("show", help="Show one workflow (JSON)")
     wf_show_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo and publish it live")
@@ -155,16 +235,48 @@ def build_parser():
                             help='What the workflow should do, e.g. "when someone emails todo@, push it to slack"')
     wf_draft_p.add_argument("--save", action="store_true",
                             help="Also save the draft through the `workflows save` path (only when it validates)")
-    wf_enable_p = wf_sub.add_parser("enable", help="Publish a workflow as enabled (live immediately)")
+    wf_on_p = wf_sub.add_parser("on", help="Turn a workflow on (live immediately)")
+    wf_on_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_off_p = wf_sub.add_parser("off", help="Turn a workflow off (live immediately)")
+    wf_off_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_enable_p = wf_sub.add_parser("enable", help="Alias for workflows on")
     wf_enable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
-    wf_disable_p = wf_sub.add_parser("disable", help="Publish a workflow as disabled (live immediately)")
+    wf_disable_p = wf_sub.add_parser("disable", help="Alias for workflows off")
     wf_disable_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_dup_p = wf_sub.add_parser("duplicate", help="Copy a workflow under a new id and publish the copy live")
+    wf_dup_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_dup_p.add_argument("--name", default=None,
+                          help="New workflow name (defaults to <id>-copy)")
     wf_test_p = wf_sub.add_parser("test", help="Test-run a workflow YAML against a sample event (dry-run)")
     wf_test_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_test_p.add_argument("--event", required=True,
                            help="Sample event JSON, inline or @file (e.g. --event @event.json)")
     wf_test_p.add_argument("--execute", action="store_true",
                            help="Actually run the actions (real side effects); default is a dry-run")
+    wf_test_p.add_argument("--strict", action="store_true",
+                           help="Fail dry-run steps whose rendered inputs trip the field "
+                                "rules (required-but-empty, wrong type)")
+    wf_test_step_p = wf_sub.add_parser("test-step",
+                                       help="Test one step of a workflow against a sample event")
+    wf_test_step_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
+    wf_test_step_p.add_argument("--action", required=True,
+                                help="The step's action id (run-history id, e.g. send or route.a.0)")
+    wf_test_step_p.add_argument("--event", required=True,
+                                help="Sample event JSON, inline or @file (e.g. --event @event.json)")
+    wf_test_step_p.add_argument("--steps", default=None,
+                                help="Prior steps' outputs as JSON or @file, shaped like run "
+                                     "history ({id: {status, output}}); feeds {steps.*} templates")
+    wf_test_step_p.add_argument("--execute", action="store_true",
+                                help="Actually run this one step (real side effects); default "
+                                     "renders and evaluates only")
+    wf_versions_p = wf_sub.add_parser("versions",
+                                      help="List a workflow's published versions (newest first)")
+    wf_versions_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_rollback_p = wf_sub.add_parser("rollback",
+                                      help="Restore an old version of a workflow (live immediately)")
+    wf_rollback_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_rollback_p.add_argument("revision",
+                               help="Version number to restore, as shown by workflows versions")
     hook_p = sub.add_parser("hooks", help="Webhook and Telegram triggers")
     hook_sub = hook_p.add_subparsers(dest="command", required=True)
     hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
@@ -224,6 +336,10 @@ def main(argv=None):
             return cmd_schedules(args, api_url, debug)
         if args.group == "polls":
             return cmd_polls(args, api_url, debug)
+        if args.group == "usage":
+            return commands.usage(api_url, debug, months=args.months)
+        if args.group == "errors":
+            return commands.errors_summary(api_url, debug, days=args.days)
         if args.group == "catalog":
             return commands.catalog_show(api_url, debug, as_json=args.json)
         if args.group == "credentials":
@@ -236,6 +352,10 @@ def main(argv=None):
             return commands.overview(api_url, debug)
         if args.group == "runs":
             return cmd_runs(args, api_url, debug)
+        if args.group == "inbox":
+            return cmd_inbox(args, api_url, debug)
+        if args.group == "storage":
+            return cmd_storage(args, api_url, debug)
         if args.group == "oauth-clients":
             return cmd_oauth_clients(args, api_url, debug)
     except ApiError as exc:
@@ -310,6 +430,12 @@ def cmd_connections(args, api_url, debug):
         )
     if args.command == "revoke":
         return commands.connections_revoke(api_url, args.connection_id, debug)
+    if args.command == "discover":
+        return commands.connections_discover(
+            api_url, args.connection_id, args.resource,
+            params=[pair for group in args.param for pair in group], debug=debug)
+    if args.command == "test":
+        return commands.connections_test(api_url, args.connection_id, debug)
     return 2
 
 
@@ -332,6 +458,15 @@ def cmd_triggers(args, api_url, debug):
         return commands.triggers_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.triggers_delete(api_url, args.name, debug)
+    if args.command == "sample":
+        if args.workflow:
+            return commands.triggers_workflow_sample(api_url, args.workflow, debug=debug)
+        if not args.connector:
+            print("Error: give a connector (e.g. email) or --workflow <workflow_id>")
+            return 2
+        return commands.triggers_sample(api_url, args.connector, event=args.event,
+                                        connection_id=args.connection_id,
+                                        limit=args.limit, resource=args.resource, debug=debug)
     return 2
 
 
@@ -344,10 +479,21 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
     if args.command == "draft":
         return commands.workflows_draft(api_url, args.prompt, save=args.save, debug=debug)
-    if args.command in ("enable", "disable"):
-        return commands.workflows_set_enabled(api_url, args.file, args.command == "enable", debug)
+    if args.command in ("on", "off", "enable", "disable"):
+        return commands.workflows_set_enabled(api_url, args.file, args.command in ("on", "enable"), debug)
+    if args.command == "duplicate":
+        return commands.workflows_duplicate(api_url, args.file, name=args.name, debug=debug)
+    if args.command == "versions":
+        return commands.workflows_versions(api_url, args.file, debug=debug)
+    if args.command == "rollback":
+        return commands.workflows_rollback(api_url, args.file, args.revision, debug=debug)
     if args.command == "test":
-        return commands.workflows_test(api_url, args.file, args.event, args.execute, debug)
+        return commands.workflows_test(api_url, args.file, args.event, args.execute,
+                                       strict=args.strict, debug=debug)
+    if args.command == "test-step":
+        return commands.workflows_test_step(api_url, args.file, args.action, args.event,
+                                            steps_spec=args.steps, execute=args.execute,
+                                            debug=debug)
     return 2
 
 
@@ -420,11 +566,41 @@ def cmd_oauth_clients(args, api_url, debug):
 
 def cmd_runs(args, api_url, debug):
     if args.command == "list":
-        return commands.runs_list(api_url, args.limit, debug)
+        return commands.runs_list(api_url, args.limit, workflow=args.workflow,
+                                  status=args.status, since=args.since,
+                                  before=args.before, next_token=args.next_token,
+                                  debug=debug)
     if args.command == "show":
         return commands.runs_show(api_url, args.run_id, debug)
     if args.command == "replay":
         return commands.runs_replay(api_url, args.run_id, debug)
+    if args.command == "replay-failed":
+        return commands.runs_replay_failed(api_url, args.workflow_id, debug)
+    return 2
+
+
+def cmd_inbox(args, api_url, debug):
+    if args.command == "list":
+        return commands.inbox_list(api_url, connector=args.connector,
+                                   limit=args.limit, debug=debug)
+    if args.command == "show":
+        return commands.inbox_show(api_url, args.inbox_id, debug)
+    if args.command == "replay":
+        return commands.inbox_replay(api_url, args.inbox_id, debug)
+    return 2
+
+
+def cmd_storage(args, api_url, debug):
+    if args.command == "get":
+        return commands.storage_get(api_url, args.workflow, args.key, debug)
+    if args.command == "set":
+        return commands.storage_set(api_url, args.workflow, args.key, args.value,
+                                    ttl_seconds=args.ttl_seconds, debug=debug)
+    if args.command == "find":
+        return commands.storage_find(api_url, args.workflow, prefix=args.prefix,
+                                     limit=args.limit, debug=debug)
+    if args.command == "delete":
+        return commands.storage_delete(api_url, args.workflow, args.key, debug)
     return 2
 
 

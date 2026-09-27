@@ -40,12 +40,28 @@ def route(event, method, path):
         return overview.overview()
     if method == "GET" and path == "/api/admin/runs":
         return routes.list_runs(event)
+    if method == "POST" and path == "/api/admin/runs/replay-failed":
+        return routes.replay_failed_runs(event, operator_subject)
+    if method == "GET" and path == "/api/admin/usage":
+        return routes.usage(event)
+    if method == "GET" and path == "/api/admin/errors/summary":
+        return routes.errors_summary(event)
     run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
     if method == "POST" and run_replay_match:
         return routes.replay_run(unquote(run_replay_match.group(1)), operator_subject)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)))
+    if method == "GET" and path == "/api/admin/triggers/inbox":
+        return routes.list_inbox(event)
+    if method == "GET" and path == "/api/admin/triggers/sample":
+        return routes.trigger_sample(event, operator_subject)
+    inbox_replay_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)/replay", path)
+    if method == "POST" and inbox_replay_match:
+        return routes.replay_inbox_event(unquote(inbox_replay_match.group(1)), operator_subject)
+    inbox_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)", path)
+    if method == "GET" and inbox_match:
+        return routes.get_inbox_event(unquote(inbox_match.group(1)))
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return routes.save_credential(path.rsplit("/", 1)[1], event)
     if method == "GET" and path == "/api/admin/oauth-clients":
@@ -56,6 +72,19 @@ def route(event, method, path):
         return routes.save_connection(event)
     if method == "POST" and path == "/api/admin/connections/import":
         return routes.import_connection(event, operator_subject)
+    discover_resource_match = re.fullmatch(
+        r"/api/admin/connections/([a-z0-9_-]+)/discover/([a-z0-9_-]+)", path)
+    if method == "GET" and discover_resource_match:
+        return routes.discover_connection(discover_resource_match.group(1), event,
+                                          resource=discover_resource_match.group(2))
+    discover_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/discover", path)
+    if method == "GET" and discover_match:
+        return routes.discover_connection(discover_match.group(1), event)
+    if method == "POST" and path == "/api/admin/discover":
+        return routes.discover_samples(event, operator_subject)
+    test_connection_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/test", path)
+    if method == "POST" and test_connection_match:
+        return routes.test_connection(test_connection_match.group(1), event, operator_subject)
     if method == "GET" and path == "/api/admin/grants":
         return routes.list_grants(event)
     if method == "PUT" and path == "/api/admin/grants":
@@ -84,6 +113,8 @@ def route(event, method, path):
         return routes.save_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test":
         return routes.test_designer_workflow(event, operator_subject)
+    if method == "POST" and path == "/api/admin/designer/workflows/test-step":
+        return routes.test_designer_step(event, operator_subject)
     if method == "POST" and path == "/api/admin/copilot/draft":
         return routes.copilot_draft(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
@@ -95,6 +126,29 @@ def route(event, method, path):
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
     if method == "POST" and designer_test_match:
         return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1))
+    designer_test_step_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test-step", path)
+    if method == "POST" and designer_test_step_match:
+        return routes.test_designer_step(event, operator_subject, designer_test_step_match.group(1))
+    designer_duplicate_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
+    if method == "POST" and designer_duplicate_match:
+        return routes.duplicate_designer_workflow(event, operator_subject, designer_duplicate_match.group(1))
+    designer_versions_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
+    if method == "GET" and designer_versions_match:
+        return routes.versions_designer_workflow(designer_versions_match.group(1))
+    designer_rollback_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
+    if method == "POST" and designer_rollback_match:
+        return routes.rollback_designer_workflow(event, operator_subject, designer_rollback_match.group(1))
+    storage_match = re.fullmatch(r"/api/admin/storage/([^/]+)", path)
+    if method == "GET" and storage_match:
+        return routes.storage_read(event, unquote(storage_match.group(1)))
+    if method == "POST" and storage_match:
+        return routes.storage_write(event, unquote(storage_match.group(1)))
+    if method == "DELETE" and storage_match:
+        return routes.storage_delete(event, unquote(storage_match.group(1)))
     if method == "GET" and path == "/api/admin/hook-triggers":
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":
@@ -119,6 +173,9 @@ def route(event, method, path):
     revoke_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/tokens", path)
     if method == "DELETE" and revoke_match:
         return routes.revoke_connection_tokens(revoke_match.group(1), operator_subject)
+    token_issue_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/token", path)
+    if method == "POST" and token_issue_match:
+        return routes.issue_connection_token(unquote(token_issue_match.group(1)), operator_subject)
     return http._json_response(404, {"error": "Not found"})
 
 # Facade re-exports: the dispatcher plus every endpoint, so callers can use
@@ -134,22 +191,34 @@ from .routes import (  # noqa: F401
     delete_schedule_trigger,
     designer_get,
     designer_list,
+    discover_connection,
+    duplicate_designer_workflow,
+    errors_summary,
+    get_inbox_event,
     get_run,
     import_connection,
+    issue_connection_token,
     list_api_tokens,
     list_email_triggers,
     list_grants,
     list_hook_triggers,
+    list_inbox,
     list_poll_triggers,
     list_runs,
     list_schedule_triggers,
     oauth_clients_view,
+    replay_failed_runs,
+    replay_inbox_event,
     revoke_api_token,
     replay_run,
     revoke_connection_tokens,
     save_connection,
     save_credential,
     save_designer_workflow,
+    storage_delete,
+    storage_read,
+    storage_write,
+    test_designer_step,
     test_designer_workflow,
     toggle_designer_workflow,
     save_email_trigger,
@@ -158,6 +227,10 @@ from .routes import (  # noqa: F401
     save_oauth_client,
     save_poll_trigger,
     save_schedule_trigger,
+    test_connection,
+    trigger_sample,
+    rollback_designer_workflow,
+    versions_designer_workflow,
 )
 from ...connections.oauth_flow import (  # noqa: F401
     oauth_callback,

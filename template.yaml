@@ -129,6 +129,9 @@ Globals:
         CURSORS_TABLE: !Ref CursorsTable
         EXECUTIONS_TABLE: !Ref ExecutionsTable
         GRANTS_TABLE: !Ref GrantsTable
+        TASK_USAGE_TABLE: !Ref TaskUsageTable
+        STORAGE_TABLE: !Ref StorageTable
+        DIGESTS_TABLE: !Ref DigestsTable
         AUDIT_TABLE: !Ref AuditTable
         RENDER_QUEUE_URL: !Ref RenderQueue
         RENDER_ARTIFACTS_BUCKET: !Ref RenderArtifactsBucket
@@ -147,6 +150,7 @@ Globals:
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
+        TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
         POLL_TRIGGERS_TABLE: !Ref PollTriggersTable
         PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
@@ -170,6 +174,24 @@ Resources:
           HostedZoneId: !Ref HostedZoneId
           EvaluateTargetHealth: false
 
+  # JavaScript code steps run on an embedded V8 (py_mini_racer). Its wheel is
+  # manylinux_2_27-only, which SAM's PythonPipBuilder refuses to cross-resolve
+  # for arm64, so it ships as a prebuilt layer — `make layer` produces the zip
+  # under .aws-sam/layers-src/, which SAM's repo copy skips — rather than a
+  # requirements.txt entry. Attached only to the functions that can execute a
+  # chain: the API (test-run with execute=true) and the worker (real runs).
+  JsRuntimeLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: dapier-js-runtime
+      Description: py_mini_racer (embedded V8) for JavaScript code steps
+      ContentUri: .aws-sam/layers-src/js-runtime.zip
+      CompatibleRuntimes:
+        - python3.12
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
+
   IngressFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -177,6 +199,8 @@ Resources:
       Handler: src.dapier.api.router.handler
       Runtime: python3.12
       Architectures: [arm64]
+      Layers:
+        - Ref: JsRuntimeLayer
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
@@ -209,6 +233,8 @@ Resources:
             TableName: !Ref EmailTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref HookTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref TriggerInboxTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ApiTokensTable
         - DynamoDBCrudPolicy:
@@ -219,6 +245,16 @@ Resources:
             TableName: !Ref PollTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref PublishedWorkflowsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref TaskUsageTable
+        # The router runs designer test-runs in-process, so a workflow under
+        # test can exercise its storage_* (and run_workflow) steps exactly as
+        # the worker would.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StorageTable
+        # ... and its digest steps.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DigestsTable
         - Statement:
             Effect: Allow
             Action: [events:PutRule, events:PutTargets, events:DeleteRule,
@@ -276,6 +312,12 @@ Resources:
         ConsoleRuns:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}
+        ConsoleInbox:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /inbox, Method: GET}
+        ConsoleStorage:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
         # One greedy route for every static asset; the console Lambda's
         # allowlist (router._static) decides what is actually served.
         ConsoleAssets:
@@ -317,6 +359,11 @@ Resources:
         Health:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /health, Method: GET}
+        # Public, read-only action/trigger/logic catalog (registry.catalog());
+        # the gateway needs the explicit route or it 404s before the router.
+        Catalog:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /api/catalog, Method: GET}
         CustomHook:
           Type: HttpApi
           Properties:
@@ -437,6 +484,8 @@ Resources:
       Handler: src.dapier.engine.worker.handler
       Runtime: python3.12
       Architectures: [arm64]
+      Layers:
+        - Ref: JsRuntimeLayer
       Timeout: 60
       MemorySize: 512
       Environment:
@@ -447,6 +496,9 @@ Resources:
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          TASK_USAGE_TABLE: !Ref TaskUsageTable
+          STORAGE_TABLE: !Ref StorageTable
+          DIGESTS_TABLE: !Ref DigestsTable
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
@@ -457,12 +509,26 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem]
             Resource: !GetAtt CredentialsTable.Arn
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TaskUsageTable
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem,
+                     dynamodb:Query]
+            Resource: !GetAtt StorageTable.Arn
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem,
+                     dynamodb:UpdateItem, dynamodb:Query]
+            Resource: !GetAtt DigestsTable.Arn
         - DynamoDBReadPolicy:
             TableName: !Ref ConnectionsTable
         - DynamoDBReadPolicy:
             TableName: !Ref EmailTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref HookTriggersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TriggerInboxTable
         - DynamoDBReadPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBReadPolicy:
@@ -471,6 +537,11 @@ Resources:
             TableName: !Ref PublishedWorkflowsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CursorsTable
+        # A run parked on a long delay re-enters through the event queue
+        # (worker._enqueue_resume): the worker itself enqueues the parked
+        # continuation, hop by hop for waits past SQS's 15-minute cap.
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt EventQueue.QueueName
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RenderQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -690,6 +761,18 @@ Resources:
         - {AttributeName: connection_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  TaskUsageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: month, AttributeType: S}
+        - {AttributeName: workflow_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: month, KeyType: HASH}
+        - {AttributeName: workflow_id, KeyType: RANGE}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   CredentialsTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
@@ -782,6 +865,19 @@ Resources:
         - {AttributeName: hook_id, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  TriggerInboxTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: inbox_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: inbox_id, KeyType: HASH}
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   ScheduleTriggersTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -822,6 +918,39 @@ Resources:
         - {AttributeName: token_hash, AttributeType: S}
       KeySchema:
         - {AttributeName: token_hash, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  # Per-workflow key-value state for the storage_* actions
+  # (src/dapier/engine/actions/storage.py): the workflow's id is the
+  # partition, the stored key the sort; optional per-item TTL on expires.
+  StorageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: scope, AttributeType: S}
+        - {AttributeName: key, AttributeType: S}
+      KeySchema:
+        - {AttributeName: scope, KeyType: HASH}
+        - {AttributeName: key, KeyType: RANGE}
+      TimeToLiveSpecification: {AttributeName: expires, Enabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  # Accumulated digest items for the digest logic step
+  # (src/dapier/engine/actions/digests.py): the workflow's id is the
+  # partition, the digest's key the sort. A flush claims the batch by
+  # deleting the item (ReturnValues=ALL_OLD), so concurrent flushes never
+  # double-send; appends recreate the item from empty.
+  DigestsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: scope, AttributeType: S}
+        - {AttributeName: key, AttributeType: S}
+      KeySchema:
+        - {AttributeName: scope, KeyType: HASH}
+        - {AttributeName: key, KeyType: RANGE}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   # Pending CLI device pairings and issued CLI device sessions

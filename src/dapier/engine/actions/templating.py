@@ -120,15 +120,23 @@ def validate_action(action):
                 walk(item, f"{path}[{index}]")
 
     for key, value in (action or {}).items():
+        if key == "code":
+            # Code-step source is code, not a template: it is never rendered,
+            # so `{...}` (object literals) and `||` (JS or) are plain syntax
+            # and template validation would only produce false failures.
+            continue
         walk(value, str(key))
 
 
 def _expand(token, context):
     parts = [part.strip() for part in token.split("|")]
     value = _resolve(context, parts[0])
-    if value is None:
+    if value is None and len(parts) == 1:
         logger.debug("template token {%s} did not resolve; rendering as empty", token)
         return ""
+    # A missing path with formatters still runs the chain against the empty
+    # string: ``default`` can rescue it, and every other formatter renders
+    # empty exactly as the short-circuit above did.
     text = _stringify(value)
     for spec in parts[1:]:
         try:
@@ -225,6 +233,16 @@ def _format(value, spec):
     return format(number, spec)
 
 
+def _default(value, fallback):
+    """The fallback when the interpolated value is empty (or whitespace)."""
+    return value if value.strip() else fallback
+
+
+def _number_format(value, decimals="0"):
+    """Thousands separators with a fixed number of decimal places."""
+    return f"{float(value):,.{int(decimals)}f}"
+
+
 def _parse_datetime(value):
     text = str(value).strip()
     if text.endswith("Z"):
@@ -258,6 +276,8 @@ FORMATTERS = {
     "regex_extract": (_regex_extract, (1, 1), False),
     "round": (_round, (0, 1), True),
     "format": (_format, (1, 1), False),
+    "default": (_default, (1, 1), False),
+    "number_format": (_number_format, (0, 1), True),
     "date_format": (_date_format, (1, 1), False),
     "date_offset": (_date_offset, (1, 1), False),
 }

@@ -344,20 +344,65 @@ def triggers_delete(api_url, name, debug=False):
     return 0
 
 
+def triggers_sample(api_url, connector, event=None, connection_id=None, limit=None,
+                    resource=None, debug=False):
+    """Pull a sample event for a trigger connector (Zapier's 'pull in sample
+    data'): live from the connected account, else the newest recorded run,
+    else a documented example. --resource fetches a field's option list."""
+    body = {"connector": connector, "kind": "options" if resource else "sample"}
+    if resource:
+        body["resource"] = resource
+    if event:
+        body["event"] = event
+    if connection_id:
+        body["connection_id"] = connection_id
+    if limit:
+        body["limit"] = limit
+    data = api.call(api_url, "POST", "/api/agent/discover", body, debug=debug)
+    if resource:
+        print(f"{data.get('connector')}.{data.get('resource')} "
+              f"({data.get('connection_id') or 'no connection'}):")
+        for option in data.get("options") or []:
+            print(f"{option.get('value', ''):34} {option.get('label', '')}")
+        return 0
+    sample = data.get("sample") or {}
+    print(f"{data.get('connector')}.{sample.get('event')} "
+          f"[{data.get('source')}] {sample.get('occurred_at', '')}")
+    print(json.dumps(sample.get("data"), indent=2, sort_keys=True))
+    return 0
+
+
+def triggers_workflow_sample(api_url, workflow, debug=False):
+    """The workflow's own last trigger input, for filling {trigger.*}
+    templates: the newest run's recorded input, else the trigger-discovery
+    sample for the workflow's connector. The `--workflow` mode of
+    `triggers sample`; the designer's inspector offers the same fields as
+    click-to-insert chips."""
+    data = api.call(api_url, "GET",
+                    f"/api/agent/triggers/sample?workflow={quote(workflow)}",
+                    debug=debug)
+    print(f"{data.get('connector') or '?'}.{data.get('event') or '?'} "
+          f"[{data.get('source') or '?'}] {data.get('occurred_at') or ''}")
+    fields = data.get("data") if isinstance(data.get("data"), dict) else {}
+    print(json.dumps(fields, indent=2, sort_keys=True))
+    for key in sorted(fields):
+        print(f"{{trigger.{key}}}")
+    return 0
+
+
 def workflows_list(api_url, debug=False):
     data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
     items = data.get("workflows", [])
     if not items:
-        print("No workflows deployed yet. Draw one at /designer or run `dapier workflows save`.")
+        print("No workflows yet. Create one in the console or run `dapier workflows save`.")
     for item in items:
-        enabled = "yes" if item.get("enabled", True) else "no"
-        live = "live" if item.get("published") else "pending-deploy"
+        state = "On" if item.get("enabled", True) else "Off"
         trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
         extra = (item.get("triggerCount") or 1) - 1
         if extra > 0:
             trigger = f"{trigger} +{extra}"
         print(f"{item.get('source', ''):36} {trigger:34} "
-              f"{item.get('actionCount', 0)} action(s) enabled={enabled} {live}")
+              f"{item.get('actionCount', 0)} action(s) {state}")
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
@@ -421,8 +466,8 @@ def workflows_draft(api_url, prompt, save=False, debug=False):
 def workflows_set_enabled(api_url, file, enabled, debug=False):
     data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}",
                     {"enabled": enabled}, debug=debug)
-    state = "Enabled" if enabled else "Disabled"
-    print(f"{state} {data.get('file') or file} — live now.")
+    state = "On" if enabled else "Off"
+    print(f"{data.get('file') or file} is {state} — live now.")
     if data.get("commit"):
         print(f"Committed {str(data['commit'])[:7]}.")
     if data.get("git_sync_error"):
@@ -431,53 +476,123 @@ def workflows_set_enabled(api_url, file, enabled, debug=False):
     return 0
 
 
-def workflows_test(api_url, path, event_spec, execute=False, debug=False):
-    """Test-run a workflow YAML against a sample event, via the agent API.
+def workflows_duplicate(api_url, file, name=None, debug=False):
+    """Copy a saved workflow under a new id (the server slugifies `--name`,
+    default `<id>-copy`) through the same commit-and-publish path as a save."""
+    body = {"name": name} if name else {}
+    data = api.call(api_url, "POST", f"/api/agent/designer/workflows/{file}/duplicate",
+                    body, debug=debug)
+    new_file = data.get("file") or file
+    if data.get("published"):
+        print(f"Duplicated {file} as {new_file} ({str(data.get('commit', ''))[:7]}) and published it live.")
+    else:
+        print(f"Duplicated {file} as {new_file} ({str(data.get('commit', ''))[:7]}). "
+              "The deploy pipeline publishes it in a few minutes.")
+    return 0
 
-    Default is a dry-run: per-step rendered inputs with no side effects.
-    --execute really runs the actions. Exits 0 when every step is ok and a
-    trigger actually matched; 1 when the run found problems (a failed step,
-    an unsupported action, or no trigger match), so it can gate scripts.
-    """
+
+def workflows_versions(api_url, file, debug=False):
+    """Version history for one workflow: who published what, when, and why."""
+    data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}/versions", debug=debug)
+    print(f"{data.get('workflow') or file} is at revision {data.get('revision', '?')}.")
+    versions = data.get("versions") or []
+    if not versions:
+        print("No version history yet — versions are recorded from now on.")
+        return 0
+    for version in versions:
+        marker = " (current)" if version.get("current") else ""
+        state = "On" if version.get("enabled", True) else "Off"
+        print(f"v{version.get('revision')}  {version.get('published_at', '')}  "
+              f"{version.get('cause') or 'save':8} {version.get('published_by') or 'unknown'} "
+              f"{state}{marker}")
+    return 0
+
+
+def workflows_rollback(api_url, file, revision, debug=False):
+    """Restore an old version: re-committed through the save path so git and
+    the live engine agree, and recorded in the history as a rollback."""
+    body = {} if revision is None else {"revision": int(revision)}
+    label = f"v{revision}" if revision is not None else "the previous version"
+    data = api.call(api_url, "POST", f"/api/agent/designer/workflows/{file}/rollback",
+                    body, debug=debug)
+    if data.get("published"):
+        print(f"Rolled {file} back to {label} "
+              f"({str(data.get('commit', ''))[:7]}) and published it live.")
+    else:
+        print(f"Rolled {file} back to {label} "
+              f"({str(data.get('commit', ''))[:7]}). The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def _read_workflow_yaml(path):
+    """The workflow YAML from a path or stdin; (text, None) or (None, message)."""
     try:
         with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
-            yaml_text = handle.read()
+            return handle.read(), None
     except OSError as exc:
-        print(f"Cannot read {path}: {exc}")
-        return 2
+        return None, f"Cannot read {path}: {exc}"
+
+
+def _load_json_arg(spec, what):
+    """A JSON argument, inline or @file; (value, None) or (None, message)."""
     try:
-        if event_spec.startswith("@"):
-            with open(event_spec[1:], encoding="utf-8") as handle:
-                sample = json.load(handle)
-        else:
-            sample = json.loads(event_spec)
+        if spec.startswith("@"):
+            with open(spec[1:], encoding="utf-8") as handle:
+                return json.load(handle), None
+        return json.loads(spec), None
     except OSError as exc:
-        print(f"Cannot read {event_spec[1:]}: {exc}")
-        return 2
+        return None, f"Cannot read {spec[1:]}: {exc}"
     except ValueError as exc:
-        print(f"Invalid sample event JSON: {exc}")
-        return 2
-    if not isinstance(sample, dict):
-        print("The sample event must be a JSON object.")
-        return 2
-    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test",
-                    {"yaml": yaml_text, "event": sample, "execute": execute}, debug=debug)
-    label = data.get("file") or path
-    matched = bool(data.get("matched"))
-    enabled = bool(data.get("enabled", True))
-    print(f"{'Executed' if data.get('mode') == 'execute' else 'Dry run'}: {label} — "
-          f"{'a trigger matches' if matched else 'NO trigger matches'} the sample event"
-          + ("" if enabled else " (the workflow is disabled)"))
+        return None, f"Invalid {what} JSON: {exc}"
+
+
+def _print_test_steps(data):
+    """The steps list of a test-run (or per-step test) report."""
     for index, step in enumerate(data.get("steps") or [], 1):
         head = f"  {index}. {step.get('action_id', '?')} ({step.get('action_type', '?')})"
         if step.get("ok"):
             print(f"{head}: ok")
         else:
             print(f"{head}: {step.get('error') or 'failed'}")
+        for warning in step.get("warnings") or []:
+            print(f"     warning: {warning}")
         if step.get("rendered_input") is not None:
             print(f"     input: {json.dumps(step['rendered_input'], sort_keys=True)}")
         if step.get("output") is not None:
             print(f"     output: {json.dumps(step['output'], sort_keys=True)}")
+
+
+def workflows_test(api_url, path, event_spec, execute=False, strict=False, debug=False):
+    """Test-run a workflow YAML against a sample event, via the agent API.
+
+    Default is a dry-run: per-step rendered inputs with no side effects.
+    --execute really runs the actions; --strict makes dry-run warnings
+    (a required field the sample renders empty, a value implausible for its
+    declared type) fail the step. Exits 0 when every step is ok and a
+    trigger actually matched; 1 when the run found problems (a failed step,
+    an unsupported action, or no trigger match), so it can gate scripts.
+    """
+    yaml_text, error = _read_workflow_yaml(path)
+    if error:
+        print(error)
+        return 2
+    sample, error = _load_json_arg(event_spec, "sample event")
+    if error:
+        print(error)
+        return 2
+    if not isinstance(sample, dict):
+        print("The sample event must be a JSON object.")
+        return 2
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test",
+                    {"yaml": yaml_text, "event": sample, "execute": execute,
+                     "strict": strict}, debug=debug)
+    label = data.get("file") or path
+    matched = bool(data.get("matched"))
+    enabled = bool(data.get("enabled", True))
+    print(f"{'Executed' if data.get('mode') == 'execute' else 'Dry run'}: {label} — "
+          f"{'a trigger matches' if matched else 'NO trigger matches'} the sample event"
+          + ("" if enabled else " (the workflow is disabled)"))
+    _print_test_steps(data)
     if data.get("error"):
         print(f"Run error: {data['error']}")
     if not data.get("ok") or not matched:
@@ -485,6 +600,55 @@ def workflows_test(api_url, path, event_spec, execute=False, debug=False):
             print("Nothing would run: no trigger matches this event.")
         return 1
     return 0
+
+
+def workflows_test_step(api_url, path, action_id, event_spec, steps_spec=None,
+                        execute=False, debug=False):
+    """Test one step of a workflow against a sample event, via the agent API.
+
+    Zapier's per-step "Test step": the step's inputs render against the
+    sample (plus prior steps' outputs from --steps, shaped like the run
+    history, so {steps.<id>.output.*} templates fill in), and --execute
+    really runs this one step through the real dispatch. Logic steps are
+    evaluated, never executed: the branch a run would take, the wait a delay
+    would take, what a loop would iterate. Exits 0 when the step passed,
+    1 when it failed, 2 on input errors.
+    """
+    yaml_text, error = _read_workflow_yaml(path)
+    if error:
+        print(error)
+        return 2
+    sample, error = _load_json_arg(event_spec, "sample event")
+    if error:
+        print(error)
+        return 2
+    if not isinstance(sample, dict):
+        print("The sample event must be a JSON object.")
+        return 2
+    steps_context = None
+    if steps_spec:
+        steps_context, error = _load_json_arg(steps_spec, "steps")
+        if error:
+            print(error)
+            return 2
+        if not isinstance(steps_context, dict):
+            print("The steps context must be a JSON object shaped like run history "
+                  "({action_id: {status, output}}).")
+            return 2
+    body = {"yaml": yaml_text, "action_id": action_id, "event": sample,
+            "execute": execute}
+    if steps_context:
+        body["steps"] = steps_context
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test-step",
+                    body, debug=debug)
+    label = data.get("file") or path
+    print(f"{'Executed' if execute else 'Tested'} step "
+          f"{data.get('action_id') or action_id} of {label} — "
+          f"{'ok' if data.get('ok') else 'FAILED'}")
+    _print_test_steps(data)
+    if data.get("error"):
+        print(f"Run error: {data['error']}")
+    return 0 if data.get("ok") else 1
 
 
 def print_hook(item):
@@ -767,13 +931,90 @@ def connections_revoke(api_url, connection_id, debug=False):
     return 0
 
 
+def _param_label(param):
+    """One params-table entry: `name*` when required, `name` when optional."""
+    if isinstance(param, dict):
+        name = str(param.get("name", "?"))
+        required = bool(param.get("required"))
+    else:
+        name, required = str(param), False
+    return f"{name}*" if required else name
+
+
+def print_discovery_resources(resources):
+    print(f"{'RESOURCE':20} {'LABEL':26} {'PARAMS':28} DESCRIPTION")
+    for item in resources:
+        params = ", ".join(_param_label(param) for param in item.get("params") or []) or "-"
+        print(f"{item.get('name', ''):20} {item.get('label', ''):26} "
+              f"{params:28} {item.get('description', '')}")
+    print("* marks a required param; pass it with --param KEY=VALUE.")
+
+
+def print_discovery_items(items):
+    print(f"{'ID':40} {'NAME':28} DETAILS")
+    for item in items:
+        extra = " ".join(f"{key}={item[key]}" for key in sorted(item)
+                         if key not in ("id", "name"))
+        print(f"{str(item.get('id', '')):40} {str(item.get('name', '')):28} {extra}")
+
+
+def _parse_params(pairs):
+    """Flatten repeated --param KEY=VALUE values; None on a malformed pair."""
+    params = {}
+    for pair in pairs or []:
+        key, sep, value = str(pair).partition("=")
+        if not sep or not key:
+            return None
+        params[key] = value
+    return params
+
+
+def connections_discover(api_url, connection_id, resource=None, params=(), debug=False):
+    """List a connection's discovery resources, or one resource's items."""
+    if not resource:
+        data = api.call(api_url, "GET",
+                        f"/api/agent/connections/{connection_id}/discover", debug=debug)
+        resources = data.get("resources") or []
+        if not resources:
+            print(f"Connection {connection_id} exposes no discovery resources.")
+            return 0
+        print_discovery_resources(resources)
+        return 0
+    query_params = _parse_params(params)
+    if query_params is None:
+        print("Params must be KEY=VALUE pairs (e.g. --param spreadsheet_id=abc).")
+        return 2
+    path = f"/api/agent/connections/{connection_id}/discover/{resource}"
+    if query_params:
+        path += f"?{urlencode(query_params)}"
+    data = api.call(api_url, "GET", path, debug=debug)
+    items = data.get("items") or []
+    if not items:
+        print(f"No {resource} found for {connection_id}.")
+        return 0
+    print_discovery_items(items)
+    return 0
+
+
+def connections_test(api_url, connection_id, debug=False):
+    """Exercise the connection's stored tokens against its provider."""
+    data = api.call(api_url, "POST", f"/api/agent/connections/{connection_id}/test",
+                    body={}, debug=debug)
+    print(f"{'OK' if data.get('ok') else 'FAILED'} — {data.get('detail') or ''}")
+    identity = data.get("identity") or {}
+    if identity:
+        summary = ", ".join(f"{key}={value}" for key, value in sorted(identity.items()))
+        print(f"Identity: {summary}")
+    return 0 if data.get("ok") else 1
+
+
 def print_overview(data):
     print(f"{data.get('service', 'dapier')} in {data.get('region', '-')}")
     workflows = data.get("workflows") or []
-    enabled = sum(1 for item in workflows if item.get("enabled", True))
-    print(f"\nWORKFLOWS ({enabled}/{len(workflows)} enabled)")
+    on = sum(1 for item in workflows if item.get("enabled", True))
+    print(f"\nWORKFLOWS ({on}/{len(workflows)} On)")
     for item in workflows:
-        state = "" if item.get("enabled", True) else " (disabled)"
+        state = "On" if item.get("enabled", True) else "Off"
         print(f"  {item.get('id', ''):32} {state}")
     print("\nCONNECTIONS")
     for item in data.get("connections") or []:
@@ -812,13 +1053,59 @@ def print_runs(items):
               f"{item.get('steps', 0):<5} {started}")
 
 
-def runs_list(api_url, limit=25, debug=False):
-    data = api.call(api_url, "GET", f"/api/agent/runs?limit={int(limit)}", debug=debug)
+def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,
+              next_token=None, debug=False):
+    params = {"limit": int(limit)}
+    if workflow:
+        params["workflow_id"] = workflow
+    if status:
+        params["status"] = status
+    if since:
+        params["since"] = since
+    if before:
+        params["before"] = before
+    if next_token:
+        params["next"] = next_token
+    data = api.call(api_url, "GET", f"/api/agent/runs?{urlencode(params)}", debug=debug)
     items = data.get("runs", [])
     if not items:
-        print("No runs recorded yet. Runs appear once a workflow handles a trigger event.")
+        filtered = workflow or status or since or before or next_token
+        print("No runs match these filters." if filtered else
+              "No runs recorded yet. Runs appear once a workflow handles a trigger event.")
         return 0
     print_runs(items)
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
+    return 0
+
+
+def usage(api_url, debug=False, months=12):
+    data = api.call(api_url, "GET", f"/api/agent/usage?months={int(months)}", debug=debug)
+    items = data.get("usage", [])
+    if not items:
+        print("No task usage recorded yet. Usage appears once workflow actions complete.")
+        return 0
+    print(f"{'MONTH':8} {'WORKFLOW':40} TASKS")
+    for item in items:
+        print(f"{item.get('month', ''):8} {item.get('workflow_id', ''):40} {item.get('tasks', 0)}")
+    return 0
+
+
+def errors_summary(api_url, debug=False, days=7):
+    data = api.call(api_url, "GET", f"/api/agent/errors/summary?days={int(days)}", debug=debug)
+    workflows = data.get("workflows") or []
+    if not workflows:
+        print(f"No failed runs in the last {data.get('window_days', int(days))} days.")
+        return 0
+    print(f"Failed runs by workflow (last {data.get('window_days', int(days))} days, "
+          f"{data.get('total_failed_runs', 0)} total)")
+    print(f"{'WORKFLOW':40} {'FAILED RUNS':11} LAST FAILURE")
+    for item in workflows:
+        last = (item.get('last_failed_at') or '-')[:19]
+        print(f"{item.get('workflow_id', ''):40} {item.get('failed_runs', 0):<11} {last}")
+        if item.get("last_error"):
+            print(f"{'':40} {'':11} {item['last_error']}")
     return 0
 
 
@@ -850,6 +1137,113 @@ def runs_replay(api_url, run_id, debug=False):
     print(f"Replay accepted for {data.get('replayed_from') or run_id}.")
     print(f"The re-injected run ({data.get('run_id') or 'pending'}) appears in `dapier runs list` "
           "once the worker picks it up.")
+    return 0
+
+
+def runs_replay_failed(api_url, workflow_id, debug=False):
+    data = api.call(api_url, "POST", "/api/agent/runs/replay-failed",
+                    {"workflow_id": workflow_id}, debug=debug)
+    print(f"Replay accepted for {data.get('replayed', 0)} failed run(s) of {workflow_id}"
+          + (f"; {data.get('skipped', 0)} skipped." if data.get("skipped") else "."))
+    for item in data.get("runs") or []:
+        if item.get("replayed"):
+            print(f"  {item.get('run_id')}: replayed as {item.get('new_run_id')}")
+        else:
+            print(f"  {item.get('run_id')}: skipped ({item.get('reason')})")
+    print("The re-injected runs appear in `dapier runs list` once the worker picks them up.")
+    return 0
+
+
+def print_inbox(items):
+    print(f"{'INBOX ID':44} {'CONNECTOR':10} {'STATUS':10} RECEIVED")
+    for item in items:
+        received = (item.get("received_at") or "-")[:19]
+        print(f"{item.get('inbox_id', ''):44} {item.get('connector') or '-':10} "
+              f"{item.get('status', ''):10} {received}")
+
+
+def inbox_list(api_url, connector=None, limit=25, debug=False):
+    query = f"limit={int(limit)}"
+    if connector:
+        query += f"&connector={quote(connector, safe='')}"
+    data = api.call(api_url, "GET", f"/api/agent/triggers/inbox?{query}", debug=debug)
+    items = data.get("events", [])
+    if not items:
+        print("Inbox is empty. Every trigger event lands here once the worker picks it up — "
+              "matched or not.")
+        return 0
+    print_inbox(items)
+    return 0
+
+
+def inbox_show(api_url, inbox_id, debug=False):
+    data = api.call(api_url, "GET", f"/api/agent/triggers/inbox/{quote(inbox_id, safe='')}", debug=debug)
+    event = data.get("event") or {}
+    print(f"inbox event: {event.get('inbox_id') or inbox_id}")
+    for key in ("connector", "event", "source", "status", "occurred_at", "received_at",
+                "processed_at", "matched", "error"):
+        if event.get(key) not in (None, "", []):
+            print(f"  {key}: {event[key]}")
+    if event.get("data") not in (None, {}, []):
+        print(f"  data: {json.dumps(event['data'], sort_keys=True, default=str)}")
+    return 0
+
+
+def inbox_replay(api_url, inbox_id, debug=False):
+    data = api.call(api_url, "POST", f"/api/agent/triggers/inbox/{quote(inbox_id, safe='')}/replay", body={}, debug=debug)
+    print(f"Replay accepted for {data.get('replayed_from') or inbox_id}.")
+    print(f"The re-injected event ({data.get('run_id') or 'pending'}) appears in `dapier runs list` "
+          "once the worker picks it up.")
+    return 0
+
+
+def storage_get(api_url, workflow, key, debug=False):
+    data = api.call(api_url, "GET",
+                    f"/api/agent/storage/{quote(workflow, safe='')}?key={quote(key, safe='')}",
+                    debug=debug)
+    print(f"{data.get('key') or key} = {data.get('value', '')}")
+    for stamp in ("updated_at", "expires"):
+        if data.get(stamp):
+            print(f"  {stamp}: {data[stamp]}")
+    return 0
+
+
+def storage_set(api_url, workflow, key, value, ttl_seconds=None, debug=False):
+    body = {"key": key, "value": value}
+    if ttl_seconds is not None:
+        body["ttl_seconds"] = int(ttl_seconds)
+    data = api.call(api_url, "POST", f"/api/agent/storage/{quote(workflow, safe='')}",
+                    body=body, debug=debug)
+    suffix = f" (expires {data['expires']})" if data.get("expires") else ""
+    print(f"Stored {data.get('key') or key} for {workflow}{suffix}.")
+    print("Workflow runs read it back with the storage_get action (`{steps.<id>.output.value}`).")
+    return 0
+
+
+def storage_find(api_url, workflow, prefix="", limit=None, debug=False):
+    query = f"prefix={quote(prefix, safe='')}"
+    if limit:
+        query += f"&limit={int(limit)}"
+    data = api.call(api_url, "GET",
+                    f"/api/agent/storage/{quote(workflow, safe='')}?{query}", debug=debug)
+    items = data.get("items", [])
+    if not items:
+        print(f"No stored keys under '{prefix}' for {workflow}.")
+        return 0
+    print(f"{'KEY':40} VALUE")
+    for item in items:
+        print(f"{item.get('key', ''):40} {item.get('value', '')}")
+    return 0
+
+
+def storage_delete(api_url, workflow, key, debug=False):
+    data = api.call(api_url, "DELETE",
+                    f"/api/agent/storage/{quote(workflow, safe='')}?key={quote(key, safe='')}",
+                    debug=debug)
+    if data.get("deleted"):
+        print(f"Deleted {key} from {workflow}'s storage.")
+    else:
+        print(f"{key} was not stored for {workflow} (nothing to delete).")
     return 0
 
 

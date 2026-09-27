@@ -9,16 +9,69 @@ from ... import http
 from ...auth import api_tokens, authz, session
 from ... import copilot
 from ...connections import credentials, importing, zoom
+from ...connectors import trigger_discovery
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients, slack_tokens, telegram_api
-from ...triggers import email_triggers, hook_triggers, poll_triggers, schedule_triggers
-from .. import designer_store, overview, runs
+from ...triggers import email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
+from ...engine import usage as usage_rollup
+from .. import designer_store, discovery as discovery_api, errors as errors_api, overview, runs
+from .. import storage as storage_api
 
 
 def list_runs(event):
     """Recent runs, one row per workflow handling of a trigger event."""
     query = event.get("queryStringParameters") or {}
-    status, payload = runs.api_list(query.get("limit", 25))
+    status, payload = runs.api_list(
+        query.get("limit", 25),
+        workflow_id=query.get("workflow_id") or query.get("workflow") or None,
+        status=query.get("status") or None,
+        since=query.get("since") or None,
+        before=query.get("before") or None,
+        next_token=query.get("next") or None,
+    )
+    return http._json_response(status, payload)
+
+
+def usage(event):
+    """Task usage rollup: tasks per workflow per month, latest months first."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = usage_rollup.api_usage(query.get("months", 12))
+    return http._json_response(status, payload)
+
+
+def errors_summary(event):
+    """Failed-run counts by workflow over the recent window (default 7 days)."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = errors_api.api_summary(query.get("days", 7))
+    return http._json_response(status, payload)
+
+
+def storage_read(event, workflow_id):
+    """Workflow storage: one key (``key=``) or the keys under ``prefix=``."""
+    query = event.get("queryStringParameters") or {}
+    key = str(query.get("key") or "").strip()
+    if key:
+        status, payload = storage_api.get(workflow_id, key)
+    else:
+        status, payload = storage_api.find(workflow_id, query.get("prefix"),
+                                           query.get("limit"))
+    return http._json_response(status, payload)
+
+
+def storage_write(event, workflow_id):
+    """Store one workflow storage value: ``{key, value, ttl_seconds}``."""
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except ValueError:
+        return http._json_response(400, {"error": "Body must be JSON"})
+    status, payload = storage_api.set_value(workflow_id, body)
+    return http._json_response(status, payload)
+
+
+def storage_delete(event, workflow_id):
+    """Remove one workflow storage value: ``?key=``."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = storage_api.delete(workflow_id, query.get("key"))
     return http._json_response(status, payload)
 
 
@@ -33,6 +86,42 @@ def replay_run(run_id, operator):
     status, payload = runs.api_replay(run_id)
     if status == 202:
         session._audit_event(run_id, "runs.replay", operator or "unknown", outcome="ok")
+    return http._json_response(status, payload)
+
+
+def replay_failed_runs(event, operator):
+    """Re-execute the latest failed runs of the workflow named in the body."""
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    workflow_id = str((body or {}).get("workflow_id") or "").strip()
+    status, payload = runs.api_replay_failed(workflow_id)
+    if status == 202:
+        session._audit_event(workflow_id, "runs.replay-failed",
+                             operator or "unknown", outcome="ok")
+    return http._json_response(status, payload)
+
+
+def list_inbox(event):
+    """Trigger inbox: every inbound event, matched or not."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = inbox.api_list(query.get("connector"), query.get("limit", 25))
+    return http._json_response(status, payload)
+
+
+def get_inbox_event(inbox_id):
+    """One inbox event: the stored envelope and the workflows that matched."""
+    status, payload = inbox.api_get(inbox_id)
+    return http._json_response(status, payload)
+
+
+def replay_inbox_event(inbox_id, operator):
+    """Re-send an inbox event through the engine (fresh id, same data)."""
+    status, payload = inbox.api_replay(inbox_id)
+    if status == 202:
+        session._audit_event(inbox_id, "triggers.inbox-replay",
+                             operator or "unknown", outcome="ok")
     return http._json_response(status, payload)
 
 
@@ -244,6 +333,17 @@ def toggle_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
+def duplicate_designer_workflow(event, operator, source):
+    """Console mirror of the CLI duplicate: copy a workflow under a new id."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_duplicate(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.duplicate", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
 def test_designer_workflow(event, operator, source=None):
     """Dry-run (or, on execute, really run) one workflow on a sample event."""
     try:
@@ -252,6 +352,41 @@ def test_designer_workflow(event, operator, source=None):
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     session._audit_event(str(payload.get("file", source or "unknown")), "workflow.test", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+
+def test_designer_step(event, operator, source=None):
+    """Console mirror of the per-step test (same domain module as the CLI).
+
+    Zapier's "Test step": run one action against the sample event — for real
+    with execute: true, side effects limited to that step. The workflow comes
+    inline (the designer's unsaved draft) or from a saved file."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_test_step(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.test-step",
+                 operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+
+def versions_designer_workflow(source):
+    """Console mirror of the CLI versions list: one workflow's history."""
+    status, payload = designer_store.api_versions(source)
+    return http._json_response(status, payload)
+
+
+def rollback_designer_workflow(event, operator, source):
+    """Console mirror of the CLI rollback: republish an old version."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_rollback(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.rollback", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
@@ -392,3 +527,103 @@ def revoke_connection_tokens(connection_id, operator):
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     session._audit_event(connection_id, audit_log.REVOKE, operator, outcome="ok")
     return http._json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+def issue_connection_token(connection_id, operator):
+    """Console mirror of the CLI's fresh provider access token (same domain call).
+
+    `dapier token exec|write` mint short-lived provider tokens through
+    /api/agent/token; this gives the Connections view the same outcome
+    without the CLI. The value is only ever returned to an operator session
+    and never persisted.
+    """
+    from ...connections import tokens as token_lifecycle
+    from ...connections.records import BindingError
+    from ...connections.tokens import TokenError
+
+    connection = _connection(connection_id)
+    if not connection:
+        return http._json_response(404, {"error": "Connection not found"})
+    try:
+        access_token, info = token_lifecycle.get_access_token(connection)
+    except BindingError as exc:
+        session._audit_event(connection_id, "connections.token", operator or "unknown",
+                     outcome="error", error=str(exc))
+        return http._json_response(409, {"error": str(exc)})
+    except TokenError:
+        session._audit_event(connection_id, "connections.token", operator or "unknown",
+                     outcome="error", error="provider-token-unavailable")
+        return http._json_response(502, {"error": "Provider token is unavailable"})
+    session._audit_event(connection_id, "connections.token", operator or "unknown", outcome="ok")
+    response = http._json_response(200, {
+        "connection_id": connection_id,
+        "provider": connection["provider"],
+        "access_token": access_token,
+        "expires_at": info["expires_at"],
+        "scope": info["scope"],
+        "provider_account_id": info["provider_account_id"],
+        "account_title": info.get("account_title"),
+        "refreshed": info["refreshed"],
+    })
+    response["headers"]["cache-control"] = "no-store"
+    return response
+
+def discover_connection(connection_id, event, resource=None):
+    """Console mirror of the CLI discovery endpoints (same domain module).
+
+    Without a resource: the provider's discoverable-resource catalog; with
+    one: that resource's live items, fetched with the connection's token.
+    The domain layer is api.discovery, shared verbatim with the agent API;
+    resource metadata comes from the connector registry. Unknown connections
+    — including the aws/s3 pseudo-connections — are the domain's 404.
+    """
+    if resource is None:
+        status, payload = discovery_api.resources(connection_id)
+        return http._json_response(status, payload)
+    query = event.get("queryStringParameters") or {}
+    status, payload = discovery_api.discover(connection_id, resource, query)
+    return http._json_response(status, payload)
+
+def test_connection(connection_id, event, operator):
+    """Console mirror of the connection health test (same domain module)."""
+    status, payload = discovery_api.test_connection(connection_id)
+    session._audit_event(connection_id, "connections.test", operator or "unknown",
+                 outcome="ok" if payload.get("ok") else "error",
+                 error=None if payload.get("ok") else str(payload.get("detail")))
+    return http._json_response(status, payload)
+
+
+def discover_samples(event, operator):
+    """Console mirror of the CLI's trigger sample pull (same domain dispatch).
+
+    Zapier's 'pull in sample data': a realistic event envelope for one
+    trigger connector — live where the connector can fetch, else the newest
+    recorded run, else a documented example. The designer's test panel
+    and `dapier triggers sample` land here via their own surfaces.
+    """
+    try:
+        body = http._request_json(event)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    status, payload = trigger_discovery.api_discover(body)
+    session._audit_event(
+        str((body or {}).get("connector") or payload.get("connector") or "unknown"),
+        "triggers.sample", operator or "unknown",
+        outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+
+def trigger_sample(event, operator):
+    """The workflow's own last trigger input, for the inspector's template
+    autofill: the newest run's recorded input, else the trigger-discovery
+    sample for its connector (runs.api_trigger_sample, shared verbatim with
+    the agent route the CLI calls)."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_trigger_sample(
+        query.get("workflow") or query.get("workflow_id"))
+    session._audit_event(
+        str(query.get("workflow") or query.get("workflow_id") or "unknown"),
+        "triggers.sample", operator or "unknown",
+        outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+

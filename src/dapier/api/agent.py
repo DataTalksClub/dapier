@@ -9,7 +9,10 @@ import time
 from urllib.parse import unquote
 
 from .. import audit, copilot
-from . import designer_store, runs
+from ..connectors import trigger_discovery
+from ..engine import usage
+from . import designer_store, discovery as discovery_api, errors as errors_api, runs
+from . import storage as storage_api
 from ..auth import api_tokens, authz, device_sessions, session
 from ..auth.dtc_auth import verify_id_token
 from ..connections import credentials, importing
@@ -18,7 +21,7 @@ from ..connections import tokens
 from ..connections.providers import oauth_clients, oauth_providers
 from ..connections.records import BindingError
 from ..connections.tokens import TokenError
-from ..triggers import email_triggers, hook_triggers, poll_triggers, schedule_triggers
+from ..triggers import email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
 from ..auth.dtc_auth import auth_config
 from ..connections import oauth_flow
 from . import overview
@@ -398,6 +401,17 @@ def route(event, method, path):
     connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
     if connect_match and method == "POST":
         return start_connect(event, connect_match.group(1))
+    discover_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/discover", path)
+    if discover_match and method == "GET":
+        return connections_discover_api(event, discover_match.group(1))
+    discover_resource_match = re.fullmatch(
+        r"/api/agent/connections/([a-z0-9_-]+)/discover/([a-z0-9_-]+)", path)
+    if discover_resource_match and method == "GET":
+        return connections_discover_api(event, discover_resource_match.group(1),
+                                        resource=discover_resource_match.group(2))
+    test_connection_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/test", path)
+    if test_connection_match and method == "POST":
+        return connections_test_api(event, test_connection_match.group(1))
     if method == "POST" and path == "/api/agent/connections/import":
         return import_connection(event)
     if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
@@ -416,12 +430,28 @@ def route(event, method, path):
         return operator_overview(event)
     if path == "/api/agent/runs" and method == "GET":
         return runs_api(event)
+    if path == "/api/agent/runs/replay-failed" and method == "POST":
+        return runs_replay_failed_api(event)
+    if path == "/api/agent/usage" and method == "GET":
+        return usage_api(event)
+    if path == "/api/agent/errors/summary" and method == "GET":
+        return errors_summary_api(event)
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
     if runs_match and method == "GET":
         return runs_api(event, run_id=unquote(runs_match.group(1)))
     runs_replay_match = re.fullmatch(r"/api/agent/runs/([^/]+)/replay", path)
     if runs_replay_match and method == "POST":
         return runs_replay_api(event, unquote(runs_replay_match.group(1)))
+    if path == "/api/agent/triggers/inbox" and method == "GET":
+        return inbox_api(event)
+    if path == "/api/agent/triggers/sample" and method == "GET":
+        return trigger_sample_api(event)
+    inbox_replay_match = re.fullmatch(r"/api/agent/triggers/inbox/([^/]+)/replay", path)
+    if inbox_replay_match and method == "POST":
+        return inbox_replay_api(event, unquote(inbox_replay_match.group(1)))
+    inbox_match = re.fullmatch(r"/api/agent/triggers/inbox/([^/]+)", path)
+    if inbox_match and method == "GET":
+        return inbox_api(event, inbox_id=unquote(inbox_match.group(1)))
     if path == "/api/agent/oauth-clients" and method == "GET":
         return oauth_clients_view(event)
     oauth_client_match = re.fullmatch(r"/api/agent/oauth-clients/([a-z]+)", path)
@@ -437,6 +467,10 @@ def route(event, method, path):
         return designer_api(event, method)
     if path == "/api/agent/designer/workflows/test" and method == "POST":
         return designer_test_api(event, None)
+    if path == "/api/agent/designer/workflows/test-step" and method == "POST":
+        return designer_test_step_api(event, None)
+    if path == "/api/agent/discover" and method == "POST":
+        return discover_samples_api(event)
     if path == "/api/agent/copilot/draft" and method == "POST":
         return copilot_draft_api(event)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
@@ -448,6 +482,29 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
     if designer_test_match and method == "POST":
         return designer_test_api(event, designer_test_match.group(1))
+    designer_test_step_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test-step", path)
+    if designer_test_step_match and method == "POST":
+        return designer_test_step_api(event, designer_test_step_match.group(1))
+    designer_duplicate_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
+    if designer_duplicate_match and method == "POST":
+        return designer_duplicate_api(event, designer_duplicate_match.group(1))
+    designer_versions_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
+    if designer_versions_match and method == "GET":
+        return designer_versions_api(event, designer_versions_match.group(1))
+    designer_rollback_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
+    if designer_rollback_match and method == "POST":
+        return designer_rollback_api(event, designer_rollback_match.group(1))
+    storage_match = re.fullmatch(r"/api/agent/storage/([^/]+)", path)
+    if storage_match and method == "GET":
+        return storage_read_api(event, unquote(storage_match.group(1)))
+    if storage_match and method == "POST":
+        return storage_write_api(event, unquote(storage_match.group(1)))
+    if storage_match and method == "DELETE":
+        return storage_delete_api(event, unquote(storage_match.group(1)))
     return _json_response(404, {"error": "Not found"})
 
 
@@ -522,6 +579,47 @@ def designer_toggle_api(event, source):
     return _json_response(status, payload)
 
 
+def designer_duplicate_api(event, source):
+    """Operator-only workflow copy: a new id/file through the same
+    commit-and-publish path as a save; the original is untouched. Mirrors the
+    console's duplicate endpoint."""
+    subject, error = require_operator(event, "workflow.duplicate")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_duplicate(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.duplicate", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_versions_api(event, source):
+    """Operator-only version history: what was published, when, by whom, why."""
+    subject, error = require_operator(event, "workflow.versions")
+    if error:
+        return error
+    status, payload = designer_store.api_versions(source)
+    return _json_response(status, payload)
+
+
+def designer_rollback_api(event, source):
+    """Operator-only rollback: republish an old version as the next revision."""
+    subject, error = require_operator(event, "workflow.rollback")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_rollback(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.rollback", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
 def designer_test_api(event, source):
     """Operator-only test run: dry-run a workflow on a sample event, or run
     it for real with execute. Mirrors the console's test endpoint."""
@@ -536,6 +634,65 @@ def designer_test_api(event, source):
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.test", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
+
+
+def designer_test_step_api(event, source):
+    """Operator-only per-step test: run one action against a sample event —
+    for real with execute, side effects limited to that step. Mirrors the
+    console's test-step endpoint; same workflow.test grant as the whole-run
+    test, since it is the same capability at step granularity."""
+    subject, error = require_operator(event, "workflow.test")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_test_step(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.test-step", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def discover_samples_api(event):
+    """Operator-only trigger sample pull: a realistic event for one connector.
+
+    Zapier's 'pull in sample data', for the CLI: the same dispatch the
+    console's discover route shares (connectors.trigger_discovery.api_discover),
+    so a pulled sample is exactly what the designer's test panel fills in.
+    """
+    subject, error = require_operator(event, "triggers.sample")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    status, payload = trigger_discovery.api_discover(body)
+    audit.emit(str((body or {}).get("connector") or payload.get("connector") or "unknown"),
+               "triggers.sample", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def trigger_sample_api(event):
+    """Operator-only trigger sample for one workflow: the newest run's
+    recorded trigger input, else the connector's discovery sample.
+
+    The CLI twin of the console's GET /api/admin/triggers/sample — both
+    dispatch through runs.api_trigger_sample, so `dapier triggers sample
+    --workflow` autofills from exactly what the designer's inspector offers.
+    """
+    subject, error = require_operator(event, "triggers.sample")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_trigger_sample(
+        query.get("workflow") or query.get("workflow_id"))
+    audit.emit(str(query.get("workflow") or query.get("workflow_id") or "unknown"),
+               "triggers.sample", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _no_store(_json_response(status, payload))
 
 
 def email_triggers_api(event, method):
@@ -742,7 +899,80 @@ def runs_api(event, run_id=None):
         status, payload = runs.api_get(run_id)
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
-    status, payload = runs.api_list(query.get("limit", 25))
+    status, payload = runs.api_list(
+        query.get("limit", 25),
+        workflow_id=query.get("workflow_id") or query.get("workflow") or None,
+        status=query.get("status") or None,
+        since=query.get("since") or None,
+        before=query.get("before") or None,
+        next_token=query.get("next") or None,
+    )
+    return _no_store(_json_response(status, payload))
+
+
+def usage_api(event):
+    """Operator-only task usage rollup: tasks per workflow per month."""
+    _, error = require_operator(event, "usage")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = usage.api_usage(query.get("months", 12))
+    return _no_store(_json_response(status, payload))
+
+
+def errors_summary_api(event):
+    """Operator-only failed-run counts by workflow, mirroring the console's.
+
+    Same domain function as /api/admin/errors/summary (api/errors.py), so
+    the CLI and the console see the same grouping over the same window.
+    """
+    _, error = require_operator(event, "errors")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = errors_api.api_summary(query.get("days", 7))
+    return _no_store(_json_response(status, payload))
+
+
+def storage_read_api(event, workflow_id):
+    """Operator-only workflow storage: one key, or the keys under a prefix.
+
+    Same domain layer as the storage_* actions (api/storage.py over
+    engine.actions.storage), so the CLI sees exactly what a run sees.
+    """
+    _, error = require_operator(event, "storage.read")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    key = str(query.get("key") or "").strip()
+    if key:
+        status, payload = storage_api.get(workflow_id, key)
+    else:
+        status, payload = storage_api.find(workflow_id, query.get("prefix"),
+                                           query.get("limit"))
+    return _no_store(_json_response(status, payload))
+
+
+def storage_write_api(event, workflow_id):
+    """Operator-only workflow storage write: ``{key, value, ttl_seconds}``."""
+    _, error = require_operator(event, "storage.write")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except ValueError:
+        return _json_response(400, {"error": "Body must be JSON"})
+    status, payload = storage_api.set_value(workflow_id, body)
+    return _no_store(_json_response(status, payload))
+
+
+def storage_delete_api(event, workflow_id):
+    """Operator-only workflow storage delete: ``?key=``."""
+    _, error = require_operator(event, "storage.write")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = storage_api.delete(workflow_id, query.get("key"))
     return _no_store(_json_response(status, payload))
 
 
@@ -759,6 +989,62 @@ def runs_replay_api(event, run_id):
     status, payload = runs.api_replay(run_id)
     if status == 202:
         audit.emit(run_id, "runs.replay", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
+def runs_replay_failed_api(event):
+    """Operator-only bulk replay: re-inject the workflow's latest failed runs.
+
+    Same path as a single replay, applied to up to MAX_REPLAY_FAILED failed
+    runs of the workflow named in the body; runs without recorded event data
+    are skipped with a reason.
+    """
+    subject, error = require_operator(event, "runs")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    workflow_id = str((body or {}).get("workflow_id") or "").strip()
+    status, payload = runs.api_replay_failed(workflow_id)
+    if status == 202:
+        audit.emit(workflow_id, "runs.replay-failed", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
+def inbox_api(event, inbox_id=None):
+    """Operator-only trigger inbox: every inbound event, matched or not.
+
+    Without an id: recent events, filterable by connector — the row the run
+    history never shows for events no workflow claimed. With one: the stored
+    envelope (data, matched workflows, status).
+    """
+    _, error = require_operator(event, "triggers.inbox")
+    if error:
+        return error
+    if inbox_id:
+        status, payload = inbox.api_get(inbox_id)
+        return _no_store(_json_response(status, payload))
+    query = event.get("queryStringParameters") or {}
+    status, payload = inbox.api_list(query.get("connector"), query.get("limit", 25))
+    return _no_store(_json_response(status, payload))
+
+
+def inbox_replay_api(event, inbox_id):
+    """Operator-only inbox replay: send a recorded event through the engine.
+
+    The event goes back on the queue with a fresh id, so workflows are
+    matched afresh and the rerun lands in run history like a normal run —
+    the "test this trigger" button for events that arrived before their
+    workflow existed.
+    """
+    subject, error = require_operator(event, "triggers.inbox")
+    if error:
+        return error
+    status, payload = inbox.api_replay(inbox_id)
+    if status == 202:
+        audit.emit(inbox_id, "triggers.inbox-replay", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 
@@ -820,6 +1106,61 @@ def revoke_connection_tokens(event, connection_id):
     connections.put_connection(connections_table, updated)
     audit.emit(connection_id, audit.REVOKE, subject, outcome="ok")
     return _json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+
+def _operator_connection(event, connection_id, action):
+    """Authenticate an operator and load the connection they named.
+
+    Returns ``(subject, connection, None)`` or ``(None, None, error_response)``.
+    Discovery reads, like every other management action, are operator-gated.
+    """
+    subject, error = require_operator(event, action)
+    if error:
+        return None, None, error
+    connections_table, _ = _tables()
+    connection = connections.get_connection(connections_table, connection_id)
+    if not connection:
+        return None, None, _json_response(404, {"error": f"Unknown connection '{connection_id}'"})
+    return subject, connection, None
+
+
+def connections_discover_api(event, connection_id, resource=None):
+    """Operator-only Zapier-style discovery over the CLI's bearer authentication.
+
+    Without a resource: the connection provider's discoverable-resource
+    catalog. With one: the live items of that resource, fetched with the
+    connection's own token (query string carries the resource's params).
+    The domain layer is api.discovery, shared verbatim with the console;
+    resource metadata comes from the connector registry. Unknown connections
+    — including the aws/s3 pseudo-connections — are the domain's 404, so the
+    operator gate here is require_operator only.
+    """
+    subject, error = require_operator(event, "connections.discover")
+    if error:
+        return error
+    connections_table, _ = _tables()
+    if resource is None:
+        status, payload = discovery_api.resources(
+            connection_id, connections_table=connections_table)
+        return _json_response(status, payload)
+    query = event.get("queryStringParameters") or {}
+    status, payload = discovery_api.discover(
+        connection_id, resource, query, connections_table=connections_table)
+    return _json_response(status, payload)
+
+
+def connections_test_api(event, connection_id):
+    """Operator-only connection health test (mirrors the console's test)."""
+    subject, error = require_operator(event, "connections.test")
+    if error:
+        return error
+    connections_table, _ = _tables()
+    status, payload = discovery_api.test_connection(
+        connection_id, connections_table=connections_table)
+    audit.emit(connection_id, "connections.test", subject,
+               outcome="ok" if payload.get("ok") else "error",
+               error=None if payload.get("ok") else str(payload.get("detail")))
+    return _json_response(status, payload)
 
 
 def public_config():

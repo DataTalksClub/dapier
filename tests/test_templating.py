@@ -162,12 +162,35 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(render("{steps.fetch.output.pi | round:2}", EVENT, STEPS), "3.14")
         self.assertEqual(render("{trigger.subject | trim | upper}", EVENT), "INVOICE 42")
 
+    def test_default_falls_back_on_empty(self):
+        self.assertEqual(self.render_one("{v | default:anon}", ""), "anon")
+        self.assertEqual(self.render_one("{v | default:anon}", "   "), "anon")
+
+    def test_default_keeps_a_present_value(self):
+        self.assertEqual(self.render_one("{v | default:anon}", "sam"), "sam")
+
+    def test_default_covers_a_missing_field(self):
+        self.assertEqual(render("{nope | default:fallback}", EVENT), "fallback")
+
+    def test_default_value_may_contain_colons(self):
+        self.assertEqual(self.render_one("{v | default:http://x.test}", ""), "http://x.test")
+
+    def test_number_format_adds_thousands_separators(self):
+        self.assertEqual(self.render_one("{v | number_format}", "1234567"), "1,234,567")
+
+    def test_number_format_with_decimal_places(self):
+        self.assertEqual(self.render_one("{v | number_format:2}", "1234567.891"), "1,234,567.89")
+
+    def test_number_format_on_non_numeric_renders_empty(self):
+        self.assertEqual(self.render_one("{v | number_format}", "lots"), "")
+
 
 class ValidateTests(unittest.TestCase):
     def test_accepts_known_formatters_and_plain_templates(self):
         for template in ["plain text", "{a}", "{a.b.0.c}", "{a | trim | upper}",
                          "{a | slice:-5:}", "{a | round:2}", "{a | format:.2f}",
-                         "{a | regex_extract:(\\d+):end}", "{a | date_offset:-2h}"]:
+                         "{a | regex_extract:(\\d+):end}", "{a | date_offset:-2h}",
+                         "{a | default:x}", "{a | number_format:2}", "{a | number_format}"]:
             validate_template(template)  # must not raise
 
     def test_rejects_unknown_formatter(self):
@@ -179,7 +202,8 @@ class ValidateTests(unittest.TestCase):
             validate_template("{ | trim}")
 
     def test_rejects_wrong_argument_counts(self):
-        for template in ["{a | trim:1}", "{a | replace:x}", "{a | slice}", "{a | upper:x}"]:
+        for template in ["{a | trim:1}", "{a | replace:x}", "{a | slice}", "{a | upper:x}",
+                         "{a | default}", "{a | number_format:1:2}"]:
             with pytest.raises(TemplateError):
                 validate_template(template)
 

@@ -63,10 +63,32 @@ redeliveries of the same record never re-notify:
 notify: [ops@example.com, lead@example.com]
 ```
 
+A step that is allowed to fail can carry `on_fail: continue`: the failed step
+is recorded as `skipped` in run history (the error message is kept on the
+step, and later steps can template it as `{steps.<id>.error}`) and the rest
+of the chain runs; the run itself still completes. Without the key (or with
+`on_fail: halt`, the default) a failing step fails the run. The key works on
+any step — connector action or logic step (`filter`, `condition`, `paths`,
+`delay`, `for_each`, `digest`) alike.
+
 Every run is recorded in run history (console → Runs, or `dapier runs list`),
 and any run — failed or successful — can be re-executed with its original
 trigger event via the Replay button in the run dialog or
-`dapier runs replay <run-id>`.
+`dapier runs replay <run-id>`. The latest failed runs of one workflow can be
+replayed in bulk with `dapier runs replay-failed <workflow_id>` (runs whose
+event data was never recorded are skipped with a reason).
+
+A workflow can also retry its own transient action failures with a top-level
+`retry` mapping: `attempts` is the total try count (1–5) and `backoff_seconds`
+the delay between tries (1–900). The failed event is re-enqueued on the event
+queue with that delay; run history shows the attempt count, and once the
+attempts are exhausted the failure notification above fires as usual. Steps
+that handle their own failure (`on_fail`/`on_error`) are unaffected, and a
+workflow without the key gets exactly one attempt:
+
+```yaml
+retry: {attempts: 3, backoff_seconds: 120}
+```
 
 Each workflow item carries its own connector config — there is no global
 channel or folder list. A YouTube trigger names the channel(s) it watches in
