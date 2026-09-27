@@ -17,19 +17,6 @@ def clean_oauth_client_cache():
     oauth_clients.invalidate_cache()
 
 
-import pytest
-
-from src.dapier.connections.providers import oauth_clients
-
-
-@pytest.fixture(autouse=True)
-def clean_oauth_client_cache():
-    """The module-level client cache outlives a test; drop it around each one."""
-    oauth_clients.invalidate_cache()
-    yield
-    oauth_clients.invalidate_cache()
-
-
 class Table:
     def __init__(self, items=None):
         self.items = items or {}
@@ -1072,3 +1059,78 @@ def test_zoom_oauth_connection_issues_tokens(monkeypatch):
     body = json.loads(response["body"])
     assert body["access_token"] == "zoom-access"
     assert body["provider"] == "zoom"
+
+
+def _operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+
+def test_errors_summary_groups_failed_runs_by_workflow(monkeypatch):
+    _operator(monkeypatch)
+    from src.dapier.api import runs as runs_api
+
+    failed = [
+        {"run_id": "wf-1:e1", "workflow_id": "wf-1", "status": "failed",
+         "started_at": "2026-09-25T10:00:00+00:00", "error": "Slack rejected message"},
+        {"run_id": "wf-1:e2", "workflow_id": "wf-1", "status": "error",
+         "started_at": "2026-09-26T10:00:00+00:00", "error": "connection timeout"},
+        {"run_id": "wf-2:e3", "workflow_id": "wf-2", "status": "failed",
+         "started_at": "2026-09-26T11:00:00+00:00", "error": "boom"},
+        {"run_id": "wf-3:e4", "workflow_id": "wf-3", "status": "completed",
+         "started_at": "2026-09-26T12:00:00+00:00"},
+    ]
+    seen = {}
+
+    def fake_recent(limit, workflow_id=None, status=None, since=None, before=None):
+        seen["args"] = (limit, status, since)
+        return [run for run in failed if run["status"] in ("failed", "error")]
+
+    monkeypatch.setattr(runs_api, "recent", fake_recent)
+
+    response = agent_api.route(
+        event(query={"days": "7"}), "GET", "/api/agent/errors/summary")
+
+    assert response["statusCode"] == 200
+    limit, status, since = seen["args"]
+    assert status == "problems"
+    assert since < "2026-09-26"
+    body = json.loads(response["body"])
+    assert body["window_days"] == 7
+    assert body["total_failed_runs"] == 3
+    assert [row["workflow_id"] for row in body["workflows"]] == ["wf-1", "wf-2"]
+    assert body["workflows"][0]["failed_runs"] == 2
+    assert body["workflows"][0]["last_failed_at"] == "2026-09-26T10:00:00+00:00"
+    assert body["workflows"][0]["last_error"] == "connection timeout"
+    assert body["workflows"][1]["last_error"] == "boom"
+
+
+def test_errors_summary_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    response = agent_api.route(event(), "GET", "/api/agent/errors/summary")
+
+    assert response["statusCode"] == 403
+
+
+def test_usage_endpoint_serves_the_rollup_over_bearer(monkeypatch):
+    _operator(monkeypatch)
+    from src.dapier.api import agent as agent_api
+
+    class UsageTable:
+        def query(self, **kwargs):
+            wanted = kwargs["KeyConditionExpression"]._values[-1]
+            if wanted != "202609":
+                return {"Items": []}
+            return {"Items": [{"month": "202609", "workflow_id": "wf-1", "tasks": 7}]}
+
+    monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
+    monkeypatch.setattr(agent_api.usage, "_table", lambda: UsageTable())
+
+    response = agent_api.route(
+        event(query={"months": "1"}), "GET", "/api/agent/usage")
+
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["usage"] == [{"month": "202609", "workflow_id": "wf-1", "tasks": 7}]

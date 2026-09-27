@@ -24,6 +24,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - uses: aws-actions/setup-sam@v2
       - run: make test
+      - run: make layer
       - run: sam validate --lint
       - run: sam build --config-env sandbox
 
@@ -42,6 +43,7 @@ jobs:
           role-to-assume: arn:aws:iam::817685572750:role/dapier-github-actions-deploy
           role-session-name: dapier-deploy
           aws-region: ${{ env.AWS_REGION }}
+      - run: make layer
       - run: sam build --config-env sandbox
       # A failed deploy whose rollback also failed leaves the stack in
       # UPDATE_ROLLBACK_FAILED, where every further deploy is rejected.

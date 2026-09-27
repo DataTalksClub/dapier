@@ -103,8 +103,34 @@ the handled failures above) — and the chain runs on to completion; the run
 itself still completes successfully. Absent (or ``halt``) is today's
 behavior: the error fails the run to the queue's redrive. ``on_fail`` and
 ``on_error`` are mutually exclusive on one step.
+
+Autoretry (Zapier's autoretry) is the third key, connector actions only: it
+retries a transient failure in place, before any error policy applies.
+
+    - id: call-api
+      type: http_request
+      url: https://example.test
+      autoretry:
+        attempts: 2            # 1-3; total tries = attempts + 1
+        initial_seconds: 1     # optional (default 1, bounds 1-60)
+        max_seconds: 30        # optional (default 60, bounds 1-60): where
+                               # the doubling backoff caps
+
+On an exception the action retries up to ``attempts`` times with exponential
+backoff (``initial_seconds`` doubling per retry, capped at ``max_seconds``,
+plus small jitter so concurrent failures do not retry in lockstep). Once the
+retries are exhausted the failure falls through to the step's ``on_fail``/
+``on_error`` policy exactly as a single attempt would — and past both, to
+the workflow-level ``retry`` policy (the worker's queue redrive), which
+sees only the still-failing step. A step that needed its retries records
+``attempts`` (the tries made) in its output, so run history shows a step
+that succeeded on try 3. Retry is opt-in per step — absent by default and
+never auto-enabled on status codes. Logic steps (filter, condition, paths,
+delay, for_each, digest) cannot carry the key; the save-time validator
+(``registry.validate_autoretry_key``) and the engine both reject that.
 """
 import json
+import random
 import re
 import time
 from datetime import datetime, timezone
@@ -135,6 +161,11 @@ ON_FAIL_MODES = ("continue", "halt")
 # clears it (see engine.actions.digests). Keep in sync with the registry's
 # digest LogicStep options.
 DIGEST_MODES = ("accumulate", "flush")
+
+# Autoretry backoff defaults when the author sets only ``attempts``: the
+# first retry waits one second and the doubling caps at a minute (the same
+# bounds registry.AUTORETRY_SECONDS_BOUNDS enforces at save time).
+AUTORETRY_DEFAULTS = {"initial_seconds": 1, "max_seconds": 60}
 
 _TOKEN = re.compile(r"\{([^{}]+)\}")
 
@@ -379,13 +410,17 @@ def _run_step(workflow_id, step, index, event, run_action, *,
     if before_action and not before_action(workflow_id, action_id, event, step.get("type")):
         step_outputs[action_id] = {"status": "skipped"}
         return None
+    # The autoretry plan is parsed and validated before the step runs: a bad
+    # config is an authoring error, loud even when on_fail would absorb the
+    # step's failures (mirroring the lazy on_fail/on_error checks).
+    autoretry = _autoretry_plan(step, action_id)
     started = time.monotonic()
     try:
         stop, output, status = _execute_step(
             workflow_id, action_id, step, event, run_action,
             before_action=before_action, after_action=after_action,
             on_action_error=on_action_error, scope=scope,
-            step_outputs=step_outputs,
+            step_outputs=step_outputs, autoretry=autoretry,
         )
     except RunSuspended as susp:
         # Suspension is not a failure and no error policy applies: the step
@@ -495,7 +530,7 @@ def _handle_error(workflow_id, step, action_id, exc, event, run_action, *,
 
 def _execute_step(workflow_id, action_id, step, event, run_action, *,
                   before_action, after_action, on_action_error, scope=None,
-                  step_outputs=None):
+                  step_outputs=None, autoretry=None):
     """One step: returns (stop reason, output summary, run-history status)."""
     step_type = str(step.get("type"))
     if step_type == "filter":
@@ -527,7 +562,68 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
     if step_type == "digest":
         context = {**_predicate_scope(event, scope), "steps": step_outputs}
         return _run_digest(workflow_id, step, event, context)
-    return None, run_action(step, event, workflow_id, steps=step_outputs) or {}, "completed"
+    return None, _dispatch_action(
+        step, event, workflow_id, run_action, step_outputs, autoretry), "completed"
+
+
+def _dispatch_action(step, event, workflow_id, run_action, step_outputs, autoretry):
+    """One connector action through the caller's dispatch.
+
+    Without an autoretry plan this is today's single call. With one
+    (Zapier's autoretry) a failure is retried up to ``attempts`` times with
+    exponential backoff; once the retries are exhausted the exception
+    propagates untouched — the step's ``on_fail``/``on_error`` policy (and
+    past it the workflow-level ``retry`` redrive) sees the failure exactly
+    as a single attempt would have. A step that needed its retries records
+    ``attempts`` (the tries made) in its output, so run history shows a
+    step that succeeded on try 3.
+    """
+    if not autoretry:
+        return run_action(step, event, workflow_id, steps=step_outputs) or {}
+    attempts = int(autoretry["attempts"])
+    for tries in range(1, attempts + 2):
+        try:
+            output = run_action(step, event, workflow_id, steps=step_outputs) or {}
+        except Exception:
+            if tries > attempts:
+                raise
+            time.sleep(_autoretry_backoff(autoretry, tries))
+        else:
+            output = dict(output)
+            output["attempts"] = tries
+            return output
+
+
+def _autoretry_plan(step, action_id):
+    """The step's validated autoretry config as a plan dict with defaults
+    filled in, or None when the step does not opt in.
+
+    The shape and bounds are validated by ``registry.validate_autoretry_key``
+    (the save-time validator shares the checks, so both surfaces reject a
+    bad config with the same messages); the engine imports it lazily —
+    engine.logic stays import-light. A logic step carrying the key is
+    rejected here too.
+    """
+    config = step.get("autoretry")
+    if config is None or (isinstance(config, str) and not config.strip()):
+        return None
+    from ..connectors import registry
+
+    registry.validate_autoretry_key(step, f"step '{action_id}'", ValueError)
+    plan = {**AUTORETRY_DEFAULTS, **config}
+    return {"attempts": int(plan["attempts"]),
+            "initial_seconds": float(plan["initial_seconds"]),
+            "max_seconds": float(plan["max_seconds"])}
+
+
+def _autoretry_backoff(plan, retry_number):
+    """Seconds to wait before retry ``retry_number`` (1-based): the initial
+    delay doubling each retry, capped at ``max_seconds``, plus up to a
+    quarter of the delay as jitter so many failing steps do not retry in
+    lockstep. Bounds-checked at save time, the inline sleeps stay small."""
+    delay = min(float(plan["max_seconds"]),
+                float(plan["initial_seconds"]) * (2 ** (retry_number - 1)))
+    return delay + random.uniform(0, delay / 4)
 
 
 def _predicate_scope(event, scope):
@@ -759,10 +855,15 @@ def _run_digest(workflow_id, step, event, context):
 
     ``accumulate`` appends the step's rendered item(s) — ``item`` (one
     template) and/or ``items`` (a list of templates, appended in order,
-    ``item`` first) — to the workflow's digest under the required ``key``
+    ``item`` first) — to the digest under the required ``key``
     (a literal name: the accumulate and flush runs are different events, so
     the key must not depend on either). Output: ``{"key", "digested"}``
     with the new total count.
+
+    ``shared: true`` moves the digest to a partition every workflow can
+    reach — the canonical pattern accumulates in the event's workflow and
+    flushes from a schedule-triggered one, which are two workflow ids
+    sharing one key. The default scopes the digest to this workflow alone.
 
     ``flush`` claims and clears the batch in one atomic operation
     (``digests.digests_claim``), so concurrent flushes never double-send,
@@ -783,13 +884,14 @@ def _run_digest(workflow_id, step, event, context):
     key = str(step.get("key") or "").strip()
     if not key:
         raise ValueError(f"digest '{label}' requires a key")
+    scope = digests.SHARED_SCOPE if step.get("shared") else workflow_id
 
     if mode == "accumulate":
         batch = _digest_batch(step, context, label)
-        count = digests.digests_append(workflow_id, key, batch)
+        count = digests.digests_append(scope, key, batch)
         return None, {"key": key, "digested": count}, "completed"
 
-    items = digests.digests_claim(workflow_id, key)
+    items = digests.digests_claim(scope, key)
     data = event.get("data")
     if not isinstance(data, dict):
         data = {}

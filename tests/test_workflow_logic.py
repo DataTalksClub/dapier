@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from src.dapier.engine import execute, logic
+from src.dapier.engine.logic import parse_moment
 
 
 EVENT = {
@@ -198,21 +199,66 @@ class DelayTests(unittest.TestCase):
         assert ("after", "pause", "completed",
                 {"delay_seconds": 30, "slept_seconds": 30}) in hooks.calls
 
-    def test_clamps_to_the_lambda_limit(self):
+    def test_long_delay_suspends_the_run(self):
         with patch("src.dapier.engine.logic.time") as fake_time:
-            fake_time.monotonic.side_effect = [0.0, 0.05]
-            stop, hooks = run_chain([{"id": "pause", "type": "delay", "seconds": 3600}])
+            fake_time.time.return_value = 1000.0
+            with pytest.raises(logic.RunSuspended) as suspended:
+                run_chain([{"id": "pause", "type": "delay", "seconds": 3600}])
 
-        assert stop is None
-        fake_time.sleep.assert_called_once_with(logic.MAX_DELAY_SECONDS)
-        assert ("after", "pause", "completed",
-                {"delay_seconds": 3600, "slept_seconds": logic.MAX_DELAY_SECONDS}) in hooks.calls
+        fake_time.sleep.assert_not_called()
+        assert suspended.value.resume_at == 4600.0
+        assert suspended.value.output["suspended"] is True
+        assert suspended.value.output["delay_seconds"] == 3600
 
     def test_bad_seconds_is_a_config_error(self):
-        for seconds in (None, "30", True, -1):
+        for seconds in (None, True, -1, "later"):
             with self.subTest(seconds=seconds), \
-                    pytest.raises(ValueError, match="needs seconds"):
+                    pytest.raises(ValueError):
                 run_chain([{"id": "pause", "type": "delay", "seconds": seconds}])
+
+    def test_numeric_string_seconds_is_rendered(self):
+        with patch("src.dapier.engine.logic.time") as fake_time:
+            fake_time.time.return_value = 0.0
+            stop, hooks = run_chain([{"id": "pause", "type": "delay", "seconds": "30"}])
+
+        assert stop is None
+        fake_time.sleep.assert_called_once_with(30)
+        assert ("after", "pause", "completed",
+                {"delay_seconds": 30, "slept_seconds": 30}) in hooks.calls
+
+    def test_duration_fields_scale_to_seconds(self):
+        # minutes/hours/days are unit-multiplied, not read as raw seconds —
+        # "minutes: 5" is a five-minute pause (a suspension), not five seconds.
+        for step, total in ({"minutes": 5}, 300), \
+                ({"hours": 1, "minutes": 1}, 3660), ({"days": 2}, 2 * 86400):
+            with self.subTest(step=step), \
+                    patch("src.dapier.engine.logic.time") as fake_time:
+                fake_time.time.return_value = 0.0
+                with pytest.raises(logic.RunSuspended) as suspended:
+                    run_chain([{"id": "pause", "type": "delay", **step}])
+
+            assert suspended.value.resume_at == float(total)
+            assert suspended.value.output["delay_seconds"] == total
+
+    def test_until_parses_to_the_wake_up_moment(self):
+        with patch("src.dapier.engine.logic.time") as fake_time:
+            fake_time.time.return_value = parse_moment("2026-09-28T00:00:00+00:00")
+            with pytest.raises(logic.RunSuspended) as suspended:
+                run_chain([{"id": "pause", "type": "delay",
+                            "until": "2026-10-01T09:00:00Z"}])
+
+        assert suspended.value.resume_at == parse_moment("2026-10-01T09:00:00Z")
+
+    def test_until_in_the_past_resumes_immediately(self):
+        with patch("src.dapier.engine.logic.time") as fake_time:
+            fake_time.time.return_value = parse_moment("2026-10-01T09:00:00+00:00")
+            stop, hooks = run_chain([{"id": "pause", "type": "delay",
+                                      "until": "2026-10-01T09:00:00Z"}])
+
+        assert stop is None
+        fake_time.sleep.assert_called_once_with(0)
+        assert ("after", "pause", "completed",
+                {"delay_seconds": 0, "slept_seconds": 0}) in hooks.calls
 
 
 class ForEachTests(unittest.TestCase):

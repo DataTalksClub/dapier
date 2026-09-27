@@ -64,13 +64,16 @@
         <p class="nav-group-label">Monitor</p>
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Run history</span></a>
+        <a class="nav-item" href="/inbox" data-view="inbox"><i data-lucide="inbox"></i><span>Trigger inbox</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
+        <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
         <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
+        <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
@@ -103,7 +106,7 @@
         <div class="section-head page-intro"><div><h2>Automation health</h2><p class="sub">Review recent activity and resolve anything that needs attention.</p></div></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <div class="metrics">
-          <div class="metric"><span class="metric-label">Enabled workflows</span><span class="metric-value mono" id="metric-workflows">-</span></div>
+          <div class="metric"><span class="metric-label">Workflows on</span><span class="metric-value mono" id="metric-workflows">-</span></div>
           <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span><span class="metric-detail" id="metric-connection-detail"></span></div>
           <div class="metric"><span class="metric-label">Recent runs completed</span><span class="metric-value mono" id="metric-runs">-</span><span class="metric-detail" id="metric-runs-detail"></span></div>
           <div class="metric"><span class="metric-label">Credentials</span><span class="metric-value mono" id="metric-credentials">-</span></div>
@@ -116,24 +119,30 @@
             <div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
           </section>
           <section>
-            <div class="section-head"><div><h2>Enabled workflows</h2><p class="sub">Select a workflow to open it.</p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
+            <div class="section-head"><div><h2>Workflows on</h2><p class="sub">Select a workflow to edit it.</p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-workflows-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead><tbody id="overview-workflows"></tbody></table></div>
-            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No active workflows</h3><p>Create a workflow or enable an existing one to start automating.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
+            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No workflows on</h3><p>Create a workflow or turn an existing one on to start automating.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
+          </section>
+          <section>
+            <div class="section-head"><div><h2>Failed runs</h2><p class="sub">By workflow over the last 7 days.</p></div><a class="text-link view-link" href="/runs" data-target="runs" data-run-status="problems">Run history<i data-lucide="arrow-right"></i></a></div>
+            <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
+            <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
           </section>
         </div>
       </section>
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">Choose a workflow to edit its triggers and actions. Saving commits YAML to GitHub; deployment publishes it in a few minutes.</p></div>
+          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">See what starts each workflow and what it does. Turn it on or off here; open it to edit or test it.</p></div>
           <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
         </div>
-        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name or trigger"></label><label>Status<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
+        <p class="workflow-explainer"><strong>On</strong> means new triggers can run the workflow. <strong>Off</strong> stops new triggers. Changes to the on/off state take effect immediately.</p>
+        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name, trigger, or action"></label><label>Show<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
-            <thead><tr><th>Workflow</th><th>Trigger</th><th>Actions</th><th>Status</th></tr></thead>
+            <thead><tr><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
         </div>
@@ -206,6 +215,31 @@
         </div>
         <p id="email-yaml-routes" class="sub" hidden>Also handled by bundled workflows (edit in the repo, not here): <span id="email-yaml-list" class="mono"></span></p>
       </section>
+      <section class="view" data-page="schedules">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Schedules</h2><p class="sub">Cron and rate schedules that start a workflow or run actions on the clock — one EventBridge rule per schedule, reprogrammed live, no deploy. <code>dapier schedules</code> reaches the same triggers.</p></div>
+          <button id="new-schedule" class="button primary" type="button">New schedule</button>
+        </div>
+        <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
+        <div id="schedule-table-wrap" class="table-wrap" hidden>
+          <table>
+            <thead><tr><th>Schedule</th><th>Expression</th><th>Runs</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="schedule-table"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="view" data-page="inbox">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Trigger inbox</h2><p class="sub">Every inbound trigger event, matched or not — the record of what actually arrived. Open an event to inspect its envelope; replay re-injects it with a fresh id.</p></div>
+        </div>
+        <div id="inbox-empty" class="empty-state" hidden><h3>No inbox events</h3><p>Inbound trigger events land here as they arrive — including ones no workflow matched, so nothing silently disappears.</p></div>
+        <div id="inbox-table-wrap" class="table-wrap">
+          <table>
+            <thead><tr><th>Received</th><th>Trigger</th><th>Matched</th><th>Source</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="inbox-table"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="view" data-page="tokens">
         <div class="section-head">
           <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent. Grant access from a connection's Manage panel, and revoke the token here any time. The value is shown once, at creation.</p></div>
@@ -219,6 +253,31 @@
           </table>
         </div>
       </section>
+      <section class="view" data-page="storage">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Data store</h2><p class="sub">Each workflow's key-value state — what its <code>storage_set</code>/<code>storage_get</code> steps remember across runs (dedupe flags, counters, last-seen cursors). <code>dapier storage</code> reaches the same values.</p></div>
+        </div>
+        <form id="storage-browse" class="run-filters">
+          <label>Workflow ID<input name="workflow" placeholder="todo-email-sheet" required></label>
+          <label>Key prefix<input name="prefix" placeholder="(every key)"></label>
+          <button class="button secondary" type="submit">List keys</button>
+          <span class="field-hint">Empty prefix lists all of the workflow's keys.</span>
+        </form>
+        <div id="storage-empty" class="empty-state"><h3>No stored keys</h3><p>Keys appear here as a workflow's storage steps run. Store one below to try it, then read it back with a storage_get step.</p></div>
+        <div id="storage-table-wrap" class="table-wrap" hidden>
+          <table>
+            <thead><tr><th>Key</th><th>Value</th><th>Updated</th><th>Expires</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="storage-table"></tbody>
+          </table>
+        </div>
+        <form id="storage-put" class="storage-form">
+          <h3>Store a value</h3>
+          <label>Key<input name="key" required></label>
+          <label class="storage-value-field">Value<textarea name="value" rows="3" required></textarea></label>
+          <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="optional"></label>
+          <button class="button primary" type="submit">Store</button>
+        </form>
+      </section>
 
       <section class="view" data-page="runs">
         <div class="section-head">
@@ -231,6 +290,7 @@
             <tbody id="run-table"></tbody>
           </table>
         </div>
+        <button id="runs-load-more" class="button secondary" type="button" hidden>Load more</button>
       </section>
     </main>
   </div>
@@ -294,6 +354,18 @@
       <button class="button secondary dialog-close" type="button">Close</button>
       <a id="workflow-edit-github" class="button secondary" target="_blank" rel="noopener">Edit on GitHub</a>
       <a id="workflow-edit" class="button primary">Edit in designer</a>
+    </div>
+  </dialog>
+
+  <dialog id="versions-dialog" aria-labelledby="versions-title">
+    <div class="dialog-head">
+      <h2 id="versions-title">Version history</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="versions-detail" class="dialog-body detail"></div>
+    <div id="versions-feedback" class="dialog-feedback" role="status" hidden></div>
+    <div class="dialog-actions">
+      <button class="button secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
@@ -364,6 +436,34 @@
       </div>
     </form>
   </dialog>
+  <dialog id="schedule-dialog" aria-label="Configure schedule">
+    <form id="schedule-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="schedule-dialog-title">New schedule</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <label>Name<input name="name" class="mono-input" placeholder="morning-digest" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. The name is fixed after creation — it names the EventBridge rule.</small></label>
+        <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(1 day)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> — use <code>?</code> for day-or-weekday, e.g. <code>cron(0 7 * * ? *)</code> for 07:00 UTC daily — or <code>rate(&lt;number&gt; minutes|hours|days)</code>.</small></label>
+        <label>Description<input name="description" placeholder="What runs and why" maxlength="200"></label>
+        <label>Run<select name="flow" id="schedule-flow"></select><small class="field-hint">The workflow to start. Pick “(inline actions JSON)” to edit the action list instead of starting a whole workflow.</small></label>
+        <label id="schedule-actions-field" hidden>Actions (JSON)<textarea name="actions" rows="8" class="mono-input"></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
+        <label><input type="checkbox" name="enabled" checked> Enabled</label>
+        <p id="schedule-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="schedule-confirm-dialog" aria-label="Delete schedule">
+    <form method="dialog" autocomplete="off">
+      <div class="dialog-head"><h2 id="schedule-confirm-title">Delete schedule</h2></div>
+      <div class="dialog-body"><p id="schedule-confirm-message"></p></div>
+      <div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Delete</button></div>
+    </form>
+  </dialog>
 
   <dialog id="token-reveal-dialog" aria-labelledby="token-reveal-title">
     <div class="dialog-head">
@@ -401,15 +501,37 @@
           <p class="field-hint">The connection becomes active after Zoom validates the URL. Use the <code>zoom / recording.completed</code> trigger in a workflow.</p>
         </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
+        <p id="edit-connection-test-result" class="sub" hidden></p>
       </div>
       <div class="dialog-actions">
         <button id="edit-connection-access" class="button secondary" type="button">Access grants</button>
+        <button id="edit-connection-test" class="button secondary" type="button">Test</button>
+        <button id="edit-connection-discover" class="button secondary" type="button">Explore data</button>
         <button id="edit-connection-revoke" class="button secondary" type="button">Revoke tokens</button>
         <a id="edit-connection-reconnect" class="button secondary" target="_blank" rel="noopener" hidden>Reconnect</a>
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Save changes</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="connection-discover-dialog" aria-labelledby="connection-discover-title">
+    <div class="dialog-head">
+      <h2 id="connection-discover-title">Explore data</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p id="connection-discover-meta" class="sub mono"></p>
+      <label>Resource<select id="discover-resource"></select></label>
+      <p id="discover-resource-description" class="sub" hidden></p>
+      <div id="discover-params" hidden></div>
+      <p id="discover-error" class="form-error" role="alert"></p>
+      <div id="discover-result" hidden></div>
+    </div>
+    <div class="dialog-actions">
+      <button id="discover-run" class="button primary" type="button">Fetch items</button>
+      <button class="button secondary dialog-close" type="button">Close</button>
+    </div>
   </dialog>
 
   <dialog id="connection-access-dialog" aria-labelledby="connection-access-title">
@@ -448,8 +570,25 @@
   <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="button danger" value="confirm">Revoke token</button></div></form>
   </dialog>
+  <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Replay event</button></div></form>
+  </dialog>
+  <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title">
+    <div class="dialog-head">
+      <h2 id="inbox-event-title">Inbox event</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="inbox-event-detail" class="dialog-body detail"></div>
+    <div class="dialog-actions">
+      <button id="inbox-replay-button" class="button secondary" type="button">Replay</button>
+      <button class="button secondary dialog-close" type="button">Close</button>
+    </div>
+  </dialog>
   <dialog id="replay-confirm-dialog" aria-labelledby="replay-confirm-title" aria-describedby="replay-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="replay-confirm-yes" class="button danger" value="confirm">Replay run</button></div></form>
+  </dialog>
+  <dialog id="versions-confirm-dialog" aria-labelledby="versions-confirm-title" aria-describedby="versions-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body"><p id="versions-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Restore version</button></div></form>
   </dialog>
 </body>
 </html>

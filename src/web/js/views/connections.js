@@ -299,6 +299,7 @@ function openEditConnection(connectionId) {
   $('#edit-connection-revoke').textContent = connection.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens';
   $('#edit-connection-access').hidden = connection.provider === 'zoom';
   $('#edit-connection-error').textContent = '';
+  $('#edit-connection-test-result').hidden = true;
   $('#edit-connection-dialog').showModal();
   form.display_name.focus();
 }
@@ -410,6 +411,29 @@ $('#edit-connection-revoke').addEventListener('click', async (event) => {
     await refresh();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
   finally { button.disabled = false; button.textContent = $('#edit-connection-form').dataset.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens'; }
+});
+
+$('#edit-connection-test').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const connectionId = $('#edit-connection-form').dataset.connectionId;
+  const result = $('#edit-connection-test-result');
+  button.disabled = true;
+  button.textContent = 'Testing…';
+  result.hidden = true;
+  try {
+    const verdict = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/test`, { method: 'POST' });
+    const identity = verdict.identity?.name ? ` — ${verdict.identity.name}` : '';
+    result.textContent = `${verdict.ok ? '✓' : '✗'} ${verdict.detail || 'no health check for this provider'}${identity}`;
+    result.hidden = false;
+    result.classList.toggle('form-error', !verdict.ok);
+  } catch (error) {
+    result.textContent = error.message;
+    result.hidden = false;
+    result.classList.add('form-error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Test';
+  }
 });
 
 let shownGrants = [];

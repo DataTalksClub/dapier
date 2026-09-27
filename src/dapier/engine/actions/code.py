@@ -1,13 +1,15 @@
-"""code action: run a sandboxed Python snippet over the event data.
+"""code action: run a sandboxed Python or JavaScript snippet over the event
+data.
 
 The snippet transforms the triggering event and returns JSON for later steps
-(issue #12). Contract:
+(issue #12). Contract (both flavors):
 
 - the snippet runs with the event's ``data`` payload bound to the name
   ``input`` (a dict);
-- the step output is the snippet's last top-level *expression*, falling back
-  to a variable named ``output`` (``result`` is accepted as an alias); with
-  neither, the result is ``null``;
+- the step output is what the snippet produces — Python: its last top-level
+  *expression*, falling back to a variable named ``output`` (``result`` is
+  accepted as an alias); JavaScript: the value it ``return``s from the
+  snippet body — and with neither, the result is ``null``;
 - anything the snippet prints is captured and reported alongside the result.
 
 Sandbox (best-effort — see "Threat model"): the snippet executes with a
@@ -26,7 +28,8 @@ Threat model: this guards workflow authors against accidents and casual
 unsafe access, not determined adversaries — attribute tricks (``().__class__``)
 cannot be fully closed in-process, and workflow authors can already commit
 arbitrary YAML to the workflows repo. A hard boundary would need a separate
-runtime; v1 is Python-only (the Lambda image is python3.12, no Node).
+runtime; the JavaScript flavor gets one for free by executing in an embedded
+V8 (``py_mini_racer``) with no filesystem, network or process access at all.
 
 Limits: the snippet runs on a daemon thread and fails after
 ``timeout_seconds`` (default 5, clamped to [0.5, 15]); a timed-out thread is
@@ -201,4 +204,98 @@ def run_code(action, event):
     return {
         "result": _json_safe(outcome.get("result")),
         "stdout": _capped_text(stdout.getvalue()),
+    }
+
+
+# --- JavaScript flavor -------------------------------------------------
+#
+# The Python contract, executed by an embedded V8 instead of CPython: the
+# event data arrives as ``input``, the value the snippet ``return``s becomes
+# the step result, and console.log is captured like print. V8 has no
+# filesystem, network or process access, so the sandbox is the engine
+# boundary rather than an allowlist; runaway snippets are bounded by the
+# same ``timeout_seconds`` plus a hard V8 heap limit sized for the 512 MB
+# worker (the interpreter itself is lazy-imported, so Lambdas that never run
+# a js step never pay for V8).
+
+_JS_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024
+
+_JS_HARNESS = """\
+"use strict";
+var __lines = [];
+function __capture() {
+  var parts = [];
+  for (var i = 0; i < arguments.length; i++) {
+    var value = arguments[i];
+    parts.push(typeof value === "string" ? value : JSON.stringify(value));
+  }
+  __lines.push(parts.join(" "));
+}
+var console = {log: __capture, info: __capture, warn: __capture, error: __capture};
+var __input = __INPUT_JSON__;
+var __outcome = (function () {
+  try {
+    var result = (function (input) {
+__SOURCE__
+    })(__input);
+    return {ok: true, result: result === undefined ? null : result};
+  } catch (e) {
+    return {ok: false, error: String(e && e.name ? e.name + ": " + e.message : e)};
+  }
+})();
+JSON.stringify({ok: __outcome.ok, result: __outcome.result,
+                error: __outcome.error, stdout: __lines});
+"""
+
+
+def _js_script(source, data):
+    """The harness around one snippet: input as a JSON literal, a capturing
+    console, and the outcome JSON-stringified so it round-trips as plain
+    data (syntax errors fail the whole script and surface as JSParseException)."""
+    return _JS_HARNESS.replace("__INPUT_JSON__", json.dumps(data or {})).replace(
+        "__SOURCE__", source
+    )
+
+
+def run_js(action, event):
+    """Execute the JavaScript snippet and return what happened for the run
+    record — the same ``{"result", "stdout"}`` shape as the Python flavor."""
+    source = action.get("code")
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("js action needs a non-empty 'code' source")
+    timeout = _timeout_seconds(action)
+    try:
+        from py_mini_racer import (
+            JSEvalException,
+            JSOOMException,
+            JSParseException,
+            JSTimeoutException,
+            MiniRacer,
+        )
+    except ImportError as exc:  # pragma: no cover - the deploy ships the runtime
+        raise RuntimeError(
+            "code step failed: the JavaScript runtime (mini-racer) is not installed"
+        ) from exc
+
+    context = MiniRacer()
+    context.set_hard_memory_limit(_JS_MEMORY_LIMIT_BYTES)
+    try:
+        raw = context.eval(_js_script(source, event.get("data") or {}), timeout=timeout)
+    except JSTimeoutException:
+        raise RuntimeError(
+            f"code step timed out after {timeout:g}s (limit {MAX_TIMEOUT_SECONDS:g}s)"
+        ) from None
+    except JSOOMException:
+        raise RuntimeError(
+            "code step failed: RangeError: snippet exceeded its memory limit"
+        ) from None
+    except (JSParseException, JSEvalException) as exc:
+        raise RuntimeError(f"code step failed: {exc}") from None
+
+    outcome = json.loads(raw)
+    if not outcome.get("ok"):
+        raise RuntimeError(f"code step failed: {outcome.get('error') or 'error'}")
+    return {
+        "result": _json_safe(outcome.get("result")),
+        "stdout": _capped_text("\n".join(outcome.get("stdout") or [])),
     }

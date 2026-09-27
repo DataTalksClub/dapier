@@ -65,6 +65,14 @@ The scope meanings are:
 | `files.content.read` | Download invoice contents |
 | `files.content.write` | Upload or delete files; the invoice workflow deletes processed files |
 
+## Discovery
+
+Dropbox connections expose three live listings to the console/CLI pickers and
+`dapier connections discover <connection> [resource]`: `folders` and `files`
+(one level of a folder; `path` defaults to the connection's root) and
+`search` (files and folders matching a required `query` param, via Dropbox's
+`files/search_v2` — the same listing `dropbox_find`'s query field browses).
+
 ## Setup history and troubleshooting
 
 - The existing client key is `aia0r7fjj4ls6j9`. During the first setup, the

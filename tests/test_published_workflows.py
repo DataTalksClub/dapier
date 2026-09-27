@@ -253,7 +253,7 @@ def test_engine_keeps_bundle_when_publish_table_absent(monkeypatch, tmp_path):
     matching._flows.cache_clear()
 
 
-def test_cli_enable_and_disable_put_the_toggle(monkeypatch, capsys):
+def test_cli_on_and_off_put_the_toggle(monkeypatch, capsys):
     from dapier_cli import commands as cli_commands
 
     calls = []
@@ -269,7 +269,15 @@ def test_cli_enable_and_disable_put_the_toggle(monkeypatch, capsys):
     assert calls[0] == ("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": True})
     assert calls[1] == ("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": False})
     out = capsys.readouterr().out
-    assert "Enabled test-flow.yaml" in out and "Disabled test-flow.yaml" in out
+    assert "test-flow.yaml is On" in out and "test-flow.yaml is Off" in out
+
+    from dapier_cli.main import build_parser, cmd_workflows
+    parser = build_parser()
+    for command in ("on", "off", "enable", "disable"):
+        args = parser.parse_args(["workflows", command, "test-flow.yaml"])
+        assert (args.group, args.command, args.file) == ("workflows", command, "test-flow.yaml")
+        assert cmd_workflows(args, "https://api.test", False) == 0
+    assert [body["enabled"] for _, _, body in calls[2:]] == [True, False, True, False]
 
 
 def test_cli_enable_reports_git_failure_as_a_warning(monkeypatch, capsys):
@@ -283,3 +291,90 @@ def test_cli_enable_reports_git_failure_as_a_warning(monkeypatch, capsys):
         })
     assert cli_commands.workflows_set_enabled("https://api.test", "test-flow.yaml", False) == 0
     assert "may revert this toggle" in capsys.readouterr().out
+
+
+# ---- Version history and rollback ----
+
+def test_publish_records_a_version_history(published):
+    previous = published_workflows.publish(seeded_workflow(), operator="op-1")
+    published_workflows.publish(
+        seeded_workflow(actions=[{"id": "a1", "type": "slack", "text": "hi"}]),
+        operator="op-2", previous=previous,
+    )
+    versions = published_workflows.list_versions("test-flow")
+    assert [version["revision"] for version in versions] == [2, 1]
+    assert [version["published_by"] for version in versions] == ["op-2", "op-1"]
+    assert versions[0]["workflow"]["actions"][0]["type"] == "slack"
+    assert versions[0]["cause"] == "save"
+    assert published_workflows.get_version("test-flow", 1)["published_by"] == "op-1"
+    assert published_workflows.get_version("test-flow", 9) is None
+    assert published_workflows.get_item("test-flow")["revision"] == 2
+
+
+def test_version_records_stay_hidden_from_the_engine(published):
+    published_workflows.publish(seeded_workflow(), operator="op")
+    assert [item["workflow_id"] for item in published_workflows.load_items()] == ["test-flow"]
+    assert published_workflows.load_workflows() == [seeded_workflow()]
+
+
+def test_version_history_is_pruned(published):
+    previous = {}
+    for _ in range(published_workflows.MAX_VERSIONS + 5):
+        previous = published_workflows.publish(seeded_workflow(), previous=previous, operator="op")
+    revisions = [version["revision"] for version in published_workflows.list_versions("test-flow")]
+    assert revisions == list(range(published_workflows.MAX_VERSIONS + 5, 5, -1))
+    assert published_workflows.get_item("test-flow")["revision"] \
+        == published_workflows.MAX_VERSIONS + 5
+
+
+def test_rollback_restores_the_old_definition(published, github_ready):
+    published_workflows.publish(seeded_workflow(), operator="op-1")
+    designer_store.api_toggle("test-flow.yaml", {"enabled": False}, operator="op-2")
+    status, payload = designer_store.api_rollback(
+        "test-flow.yaml", {"revision": 1}, operator="op-3")
+    assert status == 200
+    assert payload["published"] is True
+    causes = {version["revision"]: version["cause"]
+              for version in published_workflows.list_versions("test-flow")}
+    assert causes == {1: "save", 2: "toggle", 3: "rollback"}
+    live = published_workflows.get_item("test-flow")
+    assert live["revision"] == 3
+    assert live["enabled"] is True  # v1's flag came back with the definition
+    assert live["workflow"] == published_workflows.get_version("test-flow", 1)["workflow"]
+    assert live["published_by"] == "op-3"
+
+
+def test_versions_lists_the_live_revision(published, github_ready):
+    published_workflows.publish(seeded_workflow(), operator="op-1")
+    status, payload = designer_store.api_versions("test-flow.yaml")
+    assert status == 200
+    assert payload["workflow"] == "test-flow"
+    assert payload["revision"] == 1
+    assert len(payload["versions"]) == 1
+    assert payload["versions"][0]["current"] is True
+
+
+def test_rollback_validates_input(published, github_ready):
+    published_workflows.publish(seeded_workflow(), operator="op-1")
+    # An omitted revision means "the version before the live one"; at v1 there is none.
+    assert designer_store.api_rollback("test-flow.yaml", {})[0] == 409
+    assert designer_store.api_rollback("test-flow.yaml", {"revision": "x"})[0] == 400
+    assert designer_store.api_rollback("test-flow.yaml", {"revision": True})[0] == 400
+    assert designer_store.api_rollback("test-flow.yaml", {"revision": 7})[0] == 404
+    # From v2, the revision-less form restores v1.
+    status, payload = designer_store.api_save(
+        {"yaml": yaml.safe_dump(
+            seeded_workflow(actions=[{"id": "a1", "type": "slack", "text": "hi"}]))},
+        operator="op-2")
+    assert status == 200
+    status, payload = designer_store.api_rollback("test-flow.yaml", {}, operator="op-3")
+    assert status == 200 and payload["published"] is True
+    live = published_workflows.get_item("test-flow")
+    assert live["revision"] == 3
+    assert live["workflow"]["actions"][0]["type"] == "webhook"
+
+
+def test_versions_and_rollback_unconfigured_are_503(monkeypatch):
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    assert designer_store.api_versions("test-flow.yaml")[0] == 503
+    assert designer_store.api_rollback("test-flow.yaml", {"revision": 1})[0] == 503

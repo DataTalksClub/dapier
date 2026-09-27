@@ -1055,3 +1055,173 @@ def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, 
     out = capsys.readouterr().out
     assert "wf-1:evt-1" in out
     assert "wf-1:replay-abc" in out
+
+
+def test_usage_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"usage": [{"month": "202609", "workflow_id": "wf-1", "tasks": 7}]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["usage"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/usage?months=12")]
+    out = capsys.readouterr().out
+    assert "wf-1" in out and "202609" in out
+
+
+def test_runs_list_forwards_filter_flags(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"runs": []}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "list", "--workflow", "wf-1", "--status", "failed",
+                    "--since", "2026-09-26T00:00:00+00:00"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/runs?limit=25&workflow_id=wf-1&status=failed"
+                              "&since=2026-09-26T00%3A00%3A00%2B00%3A00")]
+
+def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"events": [{"inbox_id": "evt-1", "connector": "webhook", "status": "unmatched",
+                            "received_at": "2026-09-27T10:00:00+00:00"}], "total": 1}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "list", "--connector", "webhook"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/triggers/inbox?limit=25&connector=webhook")]
+    out = capsys.readouterr().out
+    assert "evt-1" in out and "unmatched" in out
+
+
+def test_inbox_show_prints_the_stored_envelope(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/triggers/inbox/evt-1")
+        return {"event": {"inbox_id": "evt-1", "connector": "webhook", "status": "unmatched",
+                          "matched": [], "data": {"action": "opened"}}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "show", "evt-1"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "inbox event: evt-1" in out
+    assert "status: unmatched" in out
+    assert '{"action": "opened"}' in out
+
+
+def test_inbox_replay_posts_to_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("POST", "/api/agent/triggers/inbox/evt-1/replay")
+        return {"accepted": True, "replayed_from": "evt-1", "event_id": "inbox-replay-1",
+                "run_id": "webhook:inbox-replay-1"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "replay", "evt-1"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Replay accepted for evt-1" in out
+
+
+def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"events": [{"inbox_id": "evt-1", "connector": "webhook", "status": "unmatched",
+                            "received_at": "2026-09-27T10:00:00+00:00"}], "total": 1}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "list", "--connector", "webhook"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/triggers/inbox?limit=25&connector=webhook")]
+    out = capsys.readouterr().out
+    assert "evt-1" in out and "unmatched" in out
+
+
+def test_inbox_show_prints_the_stored_envelope(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/triggers/inbox/evt-1")
+        return {"event": {"inbox_id": "evt-1", "connector": "webhook", "status": "unmatched",
+                          "matched": [], "data": {"action": "opened"}}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "show", "evt-1"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "inbox event: evt-1" in out
+    assert "status: unmatched" in out
+    assert '{"action": "opened"}' in out
+
+
+def test_inbox_replay_posts_to_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("POST", "/api/agent/triggers/inbox/evt-1/replay")
+        return {"accepted": True, "replayed_from": "evt-1", "event_id": "inbox-replay-1",
+                "run_id": "webhook:inbox-replay-1"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["inbox", "replay", "evt-1"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Replay accepted for evt-1" in out
+
+
+def test_errors_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"window_days": 7, "total_failed_runs": 2, "workflows": [
+            {"workflow_id": "wf-1", "failed_runs": 2,
+             "last_failed_at": "2026-09-26T10:00:00+00:00",
+             "last_error": "connection timeout"},
+        ]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["errors"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/errors/summary?days=7")]
+    out = capsys.readouterr().out
+    assert "wf-1" in out and "2" in out and "connection timeout" in out
+
+
+def test_errors_days_flag_reaches_the_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"window_days": 30, "total_failed_runs": 0, "workflows": []}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["errors", "--days", "30"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/errors/summary?days=30")]
+    assert "No failed runs" in capsys.readouterr().out

@@ -14312,21 +14312,46 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$m = [
+  const __iconNode$u = [
+    [
+      "path",
+      { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
+    ],
+    [
+      "path",
+      {
+        d: "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",
+        key: "e1hn23"
+      }
+    ]
+  ];
+  const Braces = createLucideIcon("braces", __iconNode$u);
+  const __iconNode$t = [
+    ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
+    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
+  ];
+  const Clock = createLucideIcon("clock", __iconNode$t);
+  const __iconNode$s = [
+    ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
+    ["path", { d: "m12 21 4-4", key: "1lfcce" }],
+    ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
+  ];
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$s);
+  const __iconNode$r = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$m);
-  const __iconNode$l = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$r);
+  const __iconNode$q = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$l);
-  const __iconNode$k = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$q);
+  const __iconNode$p = [
     [
       "path",
       {
@@ -14339,8 +14364,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$k);
-  const __iconNode$j = [
+  const FileText = createLucideIcon("file-text", __iconNode$p);
+  const __iconNode$o = [
     [
       "path",
       {
@@ -14351,8 +14376,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$j);
-  const __iconNode$i = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$o);
+  const __iconNode$n = [
     [
       "path",
       {
@@ -14361,15 +14386,45 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$i);
-  const __iconNode$h = [
+  const Funnel = createLucideIcon("funnel", __iconNode$n);
+  const __iconNode$m = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$h);
-  const __iconNode$g = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$m);
+  const __iconNode$l = [
+    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+    ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
+    ["path", { d: "M2 12h20", key: "9i4pu4" }]
+  ];
+  const Globe = createLucideIcon("globe", __iconNode$l);
+  const __iconNode$k = [
+    [
+      "path",
+      {
+        d: "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
+        key: "zw3jo"
+      }
+    ],
+    [
+      "path",
+      {
+        d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
+        key: "1wduqc"
+      }
+    ],
+    [
+      "path",
+      {
+        d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
+        key: "kqbvx6"
+      }
+    ]
+  ];
+  const Layers = createLucideIcon("layers", __iconNode$k);
+  const __iconNode$j = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14382,27 +14437,32 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$g);
-  const __iconNode$f = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$j);
+  const __iconNode$i = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$f);
-  const __iconNode$e = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$e);
-  const __iconNode$d = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$i);
+  const __iconNode$h = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$h);
+  const __iconNode$g = [
+    ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
+    ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
+  ];
+  const Mail = createLucideIcon("mail", __iconNode$g);
+  const __iconNode$f = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$d);
-  const __iconNode$c = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$c);
-  const __iconNode$b = [
+  const Maximize = createLucideIcon("maximize", __iconNode$f);
+  const __iconNode$e = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$e);
+  const __iconNode$d = [
     [
       "path",
       {
@@ -14411,8 +14471,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$b);
-  const __iconNode$a = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$d);
+  const __iconNode$c = [
     [
       "path",
       {
@@ -14421,13 +14481,20 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$a);
-  const __iconNode$9 = [
+  const Play = createLucideIcon("play", __iconNode$c);
+  const __iconNode$b = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$9);
-  const __iconNode$8 = [
+  const Plus = createLucideIcon("plus", __iconNode$b);
+  const __iconNode$a = [
+    ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
+    ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
+    ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
+    ["path", { d: "M8 16H3v5", key: "1cv678" }]
+  ];
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$a);
+  const __iconNode$9 = [
     [
       "path",
       {
@@ -14437,8 +14504,8 @@
     ],
     ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
   ];
-  const Send = createLucideIcon("send", __iconNode$8);
-  const __iconNode$7 = [
+  const Send = createLucideIcon("send", __iconNode$9);
+  const __iconNode$8 = [
     [
       "path",
       {
@@ -14448,22 +14515,22 @@
     ],
     ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
   ];
-  const StickyNote = createLucideIcon("sticky-note", __iconNode$7);
-  const __iconNode$6 = [
+  const StickyNote = createLucideIcon("sticky-note", __iconNode$8);
+  const __iconNode$7 = [
     ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
     ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
     ["circle", { cx: "12", cy: "14", r: "8", key: "1e1u0o" }]
   ];
-  const Timer = createLucideIcon("timer", __iconNode$6);
-  const __iconNode$5 = [
+  const Timer = createLucideIcon("timer", __iconNode$7);
+  const __iconNode$6 = [
     ["path", { d: "M10 11v6", key: "nco0om" }],
     ["path", { d: "M14 11v6", key: "outv1u" }],
     ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
     ["path", { d: "M3 6h18", key: "d0wm0j" }],
     ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
   ];
-  const Trash2 = createLucideIcon("trash-2", __iconNode$5);
-  const __iconNode$4 = [
+  const Trash2 = createLucideIcon("trash-2", __iconNode$6);
+  const __iconNode$5 = [
     [
       "path",
       {
@@ -14474,8 +14541,8 @@
     ["path", { d: "M12 9v4", key: "juzpu7" }],
     ["path", { d: "M12 17h.01", key: "p32p05" }]
   ];
-  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$4);
-  const __iconNode$3 = [
+  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$5);
+  const __iconNode$4 = [
     [
       "path",
       {
@@ -14485,8 +14552,8 @@
     ],
     ["rect", { x: "2", y: "6", width: "14", height: "12", rx: "2", key: "158x01" }]
   ];
-  const Video = createLucideIcon("video", __iconNode$3);
-  const __iconNode$2 = [
+  const Video = createLucideIcon("video", __iconNode$4);
+  const __iconNode$3 = [
     [
       "path",
       {
@@ -14497,7 +14564,13 @@
     ["path", { d: "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", key: "1go1hn" }],
     ["path", { d: "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8", key: "qlwsc0" }]
   ];
-  const Webhook = createLucideIcon("webhook", __iconNode$2);
+  const Webhook = createLucideIcon("webhook", __iconNode$3);
+  const __iconNode$2 = [
+    ["rect", { width: "8", height: "8", x: "3", y: "3", rx: "2", key: "by2w9f" }],
+    ["path", { d: "M7 11v4a2 2 0 0 0 2 2h4", key: "xkn7yn" }],
+    ["rect", { width: "8", height: "8", x: "13", y: "13", rx: "2", key: "1cgmvn" }]
+  ];
+  const Workflow = createLucideIcon("workflow", __iconNode$2);
   const __iconNode$1 = [
     ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
     ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
@@ -17831,17 +17904,68 @@
       ]
     },
     {
+      type: "http_request",
+      label: "HTTP request",
+      icon: Globe,
+      description: "Call any API: templated URL, headers and body; basic, bearer or API-key auth. Output: {status, body}.",
+      fields: [
+        { key: "url", label: "URL", required: true, placeholder: "https://api.example.com/items/{id}" },
+        { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "PATCH", "DELETE"], default: "GET" },
+        { key: "auth_type", label: "Auth", type: "select", options: ["none", "basic", "bearer", "api_key"] },
+        { key: "auth_username", label: "Basic username" },
+        { key: "auth_password", label: "Basic password" },
+        { key: "auth_token", label: "Bearer token", placeholder: "or a connection ID" },
+        { key: "connection_id", label: "Connection ID", placeholder: "bearer token fallback" },
+        { key: "auth_key_name", label: "API key name", placeholder: "x-api-key" },
+        { key: "auth_key_value", label: "API key value" },
+        { key: "auth_key_in", label: "API key in", type: "select", options: ["header", "query"] },
+        { key: "headers", label: "Headers (YAML)", type: "textarea", placeholder: 'accept: application/json\nx-trace: "{trigger.id}"' },
+        { key: "body", label: "Body template", type: "textarea", placeholder: '{"subject": "{subject}"}' },
+        { key: "content_type", label: "Content type", placeholder: "application/json" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
       type: "slack",
       label: "Slack",
       icon: SlackLogo,
       fields: [
         { key: "credential_id", label: "Credential ID" },
         { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
-        { key: "channel", label: "Channel", placeholder: "#alerts", required: true },
+        {
+          key: "channel",
+          label: "Channel",
+          placeholder: "#alerts",
+          required: true,
+          discover: { resource: "channels" }
+        },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
         { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
         { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "slack_find_user",
+      label: "Slack: find user by email",
+      icon: SlackLogo,
+      description: "Look up one workspace user by email (users.lookupByEmail). Output: {found, user}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", required: true, provider: "slack" },
+        { key: "email", label: "Email", placeholder: "person@example.com", required: true, discover: { resource: "users", value: "{email}" } },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_find",
+      label: "Slack: find user or channel",
+      icon: SlackLogo,
+      description: "Look up one workspace user (by email) or channel (by name). Output: {found, user} or {found, channel}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "find", label: "Find", type: "select", options: ["user", "channel"], default: "user" },
+        { key: "query", label: "Query", placeholder: "person@example.com or #channel", required: true },
+        { key: "credential_id", label: "Credential ID" }
       ]
     },
     {
@@ -17851,9 +17975,42 @@
       description: "Post a message through a Telegram bot connection. The chat defaults to the triggering Telegram message; other triggers name the chat explicitly.",
       fields: [
         { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
-        { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_find_chat",
+      label: "Telegram find chat",
+      icon: Send,
+      description: "Look up one chat's profile (getChat); found is False when the bot cannot see it",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          required: true,
+          placeholder: "@channel or -100…",
+          discover: { resource: "chats" }
+        }
+      ]
+    },
+    {
+      type: "email_send",
+      label: "Send email",
+      icon: Mail,
+      fields: [
+        { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
+        { key: "subject", label: "Subject", placeholder: "{subject}" },
+        { key: "text", label: "Text body", type: "textarea" },
+        { key: "html", label: "HTML body", type: "textarea" },
+        { key: "sender", label: "Sender", placeholder: "defaults to the workflow sender" }
       ]
     },
     {
@@ -17876,7 +18033,12 @@
       fields: [
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
-        { key: "folder", label: "Folder", placeholder: "/Invoices" },
+        {
+          key: "folder",
+          label: "Folder",
+          placeholder: "/Invoices",
+          discover: { resource: "folders", value: "{path}" }
+        },
         { key: "filename", label: "Filename override" }
       ]
     },
@@ -17886,7 +18048,36 @@
       icon: DropboxLogo,
       fields: [
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
-        { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_find",
+      label: "Dropbox: find file or folder",
+      icon: DropboxLogo,
+      description: "Search the connection's Dropbox for one file or folder by name. Output: {found, item}; folder finds can create the folder when missing.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "query",
+          label: "Name to find",
+          placeholder: "{filename}",
+          required: true,
+          discover: { resource: "search", params: { query: "query" }, value: "{name}" }
+        },
+        { key: "kind", label: "Kind", type: "select", options: ["any", "file", "folder"], default: "any" },
+        {
+          key: "path",
+          label: "Folder to search",
+          placeholder: "defaults to the connection's root",
+          discover: { resource: "folders", value: "{path}" }
+        },
+        { key: "create_if_missing", label: "Create folder if missing", type: "boolean", default: "false" }
       ]
     },
     {
@@ -17896,11 +18087,79 @@
       description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
       fields: [
         { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
-        { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true },
-        { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true },
-        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "mailchimp/{name}",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        },
+        {
+          key: "source_url",
+          label: "Source URL",
+          placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media",
+          discover: { resource: "files", from: "source_connection_id", value: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" }
+        },
         { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
         { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
+      ]
+    },
+    {
+      type: "s3_find",
+      label: "S3: find object",
+      icon: S3Logo,
+      description: "Find the first object matching a name pattern in a bucket (Find Object)",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        { key: "pattern", label: "Name pattern", placeholder: "{name}.pdf", required: true },
+        {
+          key: "prefix",
+          label: "Key prefix",
+          placeholder: "reports/2026/",
+          discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } }
+        },
+        { key: "match", label: "Match", type: "select", options: ["exact", "prefix", "suffix", "contains"], default: "exact" }
+      ]
+    },
+    {
+      type: "drive_find_file",
+      label: "Drive: find file",
+      icon: FileText,
+      description: "Find the most recently modified Drive file matching a name (Find File)",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "name",
+          label: "File name",
+          placeholder: "report.pdf — substring unless Match is exact",
+          required: true,
+          discover: { resource: "files", value: "{name}" }
+        },
+        { key: "match", label: "Match", type: "select", options: ["contains", "exact"], default: "contains" }
+      ]
+    },
+    {
+      type: "youtube_find_video",
+      label: "YouTube: find video",
+      icon: YouTubeLogo,
+      description: "Find the top videos for a search query (Find Video)",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "query", label: "Search query", placeholder: "DataTalks kubernetes", required: true }
       ]
     },
     {
@@ -17910,8 +18169,19 @@
       description: "Append a row to a worksheet (Create Spreadsheet Row)",
       fields: [
         { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
-        { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
-        { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "sheet_name",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
         {
           key: "values",
           label: "Row values (JSON)",
@@ -17920,6 +18190,131 @@
           placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
         },
         { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "sheets_find_row",
+      label: "Google Sheets (find row)",
+      icon: SheetsLogo,
+      description: "Find a row by a column's value, optionally create it (Find-or-create Spreadsheet Row)",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "sheet_name",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "match_field",
+          label: "Match column (header name)",
+          placeholder: "Task",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "sheet_name" }, value: "{name}" }
+        },
+        { key: "match_value", label: "Match value", placeholder: "{text}", required: true },
+        { key: "create_if_missing", label: "Create the row when missing", type: "boolean", default: "false" },
+        {
+          key: "values",
+          label: "Row values for creation (JSON)",
+          type: "textarea",
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "sheets_lookup_row",
+      label: "Google Sheets (lookup row)",
+      icon: SheetsLogo,
+      description: "Find worksheet rows whose column equals a value (Lookup Spreadsheet Row). Output: {found, row, values, matches}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "column",
+          label: "Column",
+          placeholder: "B or Email",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{name}" }
+        },
+        { key: "value", label: "Value", placeholder: "{text}", required: true },
+        { key: "limit", label: "Max matches", type: "number", default: "1" }
+      ]
+    },
+    {
+      type: "sheets_update_row",
+      label: "Google Sheets (update row)",
+      icon: SheetsLogo,
+      description: "Overwrite one worksheet row starting at column A (Update Spreadsheet Row). Pairs with sheets_lookup_row's row output.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "row",
+          label: "Row number",
+          type: "number",
+          required: true,
+          placeholder: "{steps.lookup.output.row}",
+          discover: { resource: "rows", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{row}" }
+        },
+        {
+          key: "values",
+          label: "Row values (JSON)",
+          type: "textarea",
+          required: true,
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "DONE"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "zoom_find_meeting",
+      label: "Zoom find meeting",
+      icon: Video,
+      description: "Find a Zoom meeting by id, or by topic among upcoming meetings",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          discover: { resource: "meetings" }
+        },
+        { key: "topic", label: "Topic", placeholder: "used when no meeting id is given" },
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
       ]
     },
     {
@@ -17960,12 +18355,32 @@
       ]
     },
     {
+      type: "paths",
+      label: "Paths",
+      icon: GitBranch,
+      description: "Run the first matching branch's steps, or a default",
+      fields: [
+        {
+          key: "paths",
+          label: "Paths (YAML)",
+          type: "yaml",
+          required: true,
+          placeholder: '- label: invoices\n  when: {subject: {contains: invoice}}\n  actions:\n    - id: notify\n      type: slack\n      channel: "#alerts"\n      text: "{subject}"'
+        },
+        { key: "default", label: "Default steps (YAML)", type: "yaml" }
+      ]
+    },
+    {
       type: "delay",
       label: "Delay",
       icon: Timer,
-      description: "Pause the chain before the next step (max 60s)",
+      description: "Pause the chain before the next step — over 60s the run suspends and the queue resumes it automatically",
       fields: [
-        { key: "seconds", label: "Seconds (max 60)", type: "number", required: true, placeholder: "30" }
+        { key: "seconds", label: "Seconds", type: "number", placeholder: "30" },
+        { key: "minutes", label: "Minutes", type: "number" },
+        { key: "hours", label: "Hours", type: "number" },
+        { key: "days", label: "Days", type: "number" },
+        { key: "until", label: "Until (ISO datetime)", placeholder: "2026-10-01T09:00:00Z" }
       ]
     },
     {
@@ -17978,6 +18393,18 @@
         { key: "item", label: "Item variable", default: "item" },
         { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
         { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: '- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: "/Invoices/{item.filename}"' }
+      ]
+    },
+    {
+      type: "digest",
+      label: "Digest",
+      icon: Layers,
+      description: "Accumulate items across runs, then flush them as one batch (a schedule trigger usually fires the flush). Later steps template {digest.items} and {digest.count}.",
+      fields: [
+        { key: "mode", label: "Mode", type: "select", options: ["accumulate", "flush"], default: "accumulate" },
+        { key: "key", label: "Digest key", placeholder: "nightly-invoices", required: true },
+        { key: "item", label: "Item (accumulate)", type: "textarea", placeholder: "{subject}" },
+        { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: '- "{subject}"\n- "{trigger.occurred_at}"' }
       ]
     },
     {
@@ -17995,6 +18422,95 @@
         },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
+    },
+    {
+      type: "js",
+      label: "Code (JavaScript)",
+      icon: Braces,
+      description: "Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`; `return` a value to make it the step result. console.log is captured.",
+      fields: [
+        {
+          key: "code",
+          label: "JavaScript source",
+          type: "textarea",
+          required: true,
+          placeholder: "// event data is `input`; return the result\nreturn {route: input.route, score: (input.items || []).length}"
+        },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "run_workflow",
+      label: "Run workflow",
+      icon: Workflow,
+      description: "Run another published workflow in-process and expose its step outputs to later templating. Nested sub-runs cap at depth 2 (A→B→C runs, A→B→C→D fails); a workflow calling itself is rejected.",
+      fields: [
+        { key: "workflow_id", label: "Workflow ID", placeholder: "invoice-notify", required: true },
+        { key: "payload", label: "Payload (JSON or template)", type: "textarea", placeholder: '{"subject": "{subject}"}' },
+        { key: "output_field", label: "Output field", placeholder: "notify" }
+      ]
+    },
+    {
+      type: "storage_get",
+      label: "Storage: get",
+      icon: DatabaseZap,
+      description: "Read this workflow's persistent key-value state (cross-run memory). A missing key is {found: false}, not an error.",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+      ]
+    },
+    {
+      type: "storage_set",
+      label: "Storage: set",
+      icon: DatabaseZap,
+      description: "Write this workflow's persistent key-value state; templates render against the event and earlier steps. Optional TTL cleans the value up.",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true },
+        { key: "value", label: "Value", type: "textarea", required: true, placeholder: "{steps.lookup.output.row}" },
+        { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+      ]
+    },
+    {
+      type: "storage_delete",
+      label: "Storage: delete",
+      icon: DatabaseZap,
+      description: "Remove one key from this workflow's storage; deleting a missing key is fine ({deleted: false}).",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+      ]
+    },
+    {
+      type: "storage_find",
+      label: "Storage: find",
+      icon: DatabaseZap,
+      description: "List this workflow's stored keys under a prefix, ascending (default 20, at most 50) — the search half of Zapier Storage.",
+      fields: [
+        { key: "prefix", label: "Key prefix", placeholder: "seen/", required: true },
+        { key: "limit", label: "Max keys", type: "number" }
+      ]
+    },
+    {
+      type: "digest_add",
+      label: "Digest: add",
+      icon: ListTree,
+      description: "Collect an item into this workflow's digest so a later (e.g. scheduled) run can release the list together — Zapier's Digest. dedupe: true skips a repeat item; holds up to max_items pending (default 500), dropping the oldest beyond that.",
+      fields: [
+        { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+        { key: "item", label: "Item", type: "textarea", placeholder: "{text}" },
+        { key: "dedupe", label: "Skip if already pending", type: "boolean", default: "false" },
+        { key: "max_items", label: "Hold at most (drop oldest beyond)", type: "number" },
+        { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+      ]
+    },
+    {
+      type: "digest_flush",
+      label: "Digest: flush",
+      icon: ListTree,
+      description: "Release this workflow's collected digest items as one list ({items, count, empty}, arrival order) and empty it. Branch on empty with a filter step when a scheduled run may have nothing to release. reset: false peeks without clearing.",
+      fields: [
+        { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+        { key: "reset", label: "Clear after reading", type: "boolean", default: "true" }
+      ]
     }
   ];
   const connectorCatalog = [
@@ -18003,9 +18519,32 @@
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
     { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed"] },
     { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
+    { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
+    { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
     { name: "custom", label: "Custom", logo: Webhook, events: [] }
   ];
   const filterOperators = ["equals", "prefix", "suffix", "contains"];
+  const onErrorField = {
+    key: "on_error",
+    label: "On error",
+    type: "select",
+    options: ["halt", "continue", "run"],
+    default: "halt"
+  };
+  const errorActionsField = {
+    key: "error_actions",
+    label: "Error steps (YAML)",
+    type: "yaml",
+    placeholder: '- id: alert\n  type: slack\n  channel: "#alerts"\n  text: "step failed: {steps.upload.error}"'
+  };
+  const onFailField = {
+    key: "on_fail",
+    label: "On fail",
+    type: "select",
+    options: ["continue", "halt"],
+    default: "halt"
+  };
+  const errorHandlingFields = [onErrorField, onFailField, errorActionsField];
   const NODE_WIDTH = 264;
   const NODE_HEIGHT = 96;
   const NODE_GAP_Y = 130;
@@ -18118,7 +18657,7 @@
       return { ...action, ...data.raw ?? {} };
     }
     const written = {};
-    for (const field of meta.fields) {
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
       if (field.type === "boolean") {
         const raw = data.fields?.[field.key];
         if (raw === void 0) continue;
@@ -18142,11 +18681,12 @@
       }
       const value = (data.fields?.[field.key] ?? "").trim();
       if (value === "") continue;
+      if ((field.key === "on_error" || field.key === "on_fail") && value === "halt") continue;
       const parsed = field.type === "number" ? Number(value) : value;
       fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
     }
     const merged = { ...action, ...data.raw ?? {}, ...written };
-    for (const field of meta.fields) {
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
       if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
         delete merged[field.key];
       }
@@ -18199,7 +18739,7 @@
     const fields = { id: String(action.id ?? "") };
     const meta = actionMeta(type2);
     if (!meta) return fields;
-    for (const field of meta.fields) {
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
       const holder = field.group ? action[field.group] : action;
       const value = isRecord(holder) ? holder[field.key] : void 0;
       if (field.type === "yaml") {
@@ -18216,7 +18756,7 @@
   function rawExtras(action) {
     const extras = rawAction(action);
     const meta = actionMeta(String(action.type ?? "webhook"));
-    for (const field of meta?.fields ?? []) {
+    for (const field of [...meta?.fields ?? [], ...meta ? errorHandlingFields : []]) {
       if (!field.group) {
         delete extras[field.key];
         continue;
@@ -19171,8 +19711,8 @@
     const Logo = connectorMeta(connector)?.logo;
     return Logo ? /* @__PURE__ */ jsxRuntimeExports.jsx(Logo, { size: 12 }) : null;
   }
-  async function api(config, path, init) {
-    const response = await fetch(`${config.apiBase}${path}`, {
+  async function api(config, path, init, base = config.apiBase) {
+    const response = await fetch(`${base}${path}`, {
       headers: init?.body ? { "content-type": "application/json" } : void 0,
       ...init
     });
@@ -19187,7 +19727,8 @@
   function workflowYaml(workflow) {
     return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
   }
-  function FieldInput({ field, value, onChange, connections }) {
+  function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }) {
+    const [discovering, setDiscovering] = reactExports.useState(false);
     if (field.type === "boolean") {
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -19256,6 +19797,50 @@
         ] })
       ] });
     }
+    if (field.discover && config?.mode === "console") {
+      const discover = field.discover;
+      const fromKey = discover.from ?? "connection_id";
+      const account = discover.account ?? (fields?.[fromKey] ?? "").trim();
+      const fromLabel = discover.from ? siblingFields?.find((sibling) => sibling.key === fromKey)?.label.toLowerCase() : void 0;
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+          field.label,
+          field.required ? " *" : "",
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "discover-field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                type: field.type === "number" ? "number" : "text",
+                value,
+                placeholder: field.placeholder,
+                onChange: (event) => onChange(event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button quiet", type: "button", disabled: !account, onClick: () => setDiscovering(true), children: "Browse…" })
+          ] }),
+          !account && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint", children: [
+            "Set ",
+            fromLabel ?? "Connection ID",
+            " first"
+          ] })
+        ] }),
+        account && discovering && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          DiscoveryPicker,
+          {
+            config,
+            discover,
+            accountId: account,
+            fields: fields ?? {},
+            onPick: (picked) => {
+              setDiscovering(false);
+              onChange(picked);
+            },
+            onClose: () => setDiscovering(false)
+          }
+        )
+      ] });
+    }
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
       field.label,
       field.required ? " *" : "",
@@ -19271,6 +19856,105 @@
         }
       )
     ] });
+  }
+  function resourceSingular(resource) {
+    return resource.replace(/_/g, " ").replace(/s$/, "");
+  }
+  function article(word) {
+    return /^[aeiou]/i.test(word) ? "an" : "a";
+  }
+  function applyTemplate(template, item) {
+    return template.replace(/\{(\w+)\}/g, (_, key) => String(item[key] ?? ""));
+  }
+  function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose }) {
+    const [items, setItems] = reactExports.useState(null);
+    const [error, setError] = reactExports.useState("");
+    const [query, setQuery] = reactExports.useState("");
+    const adminBase = config.apiBase.replace(/\/designer$/, "");
+    const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
+    const url = reactExports.useMemo(() => {
+      const params = new URLSearchParams();
+      for (const [param, key] of Object.entries(discover.params ?? {})) {
+        const val = (fields[key] ?? "").trim();
+        if (val) params.set(param, val);
+      }
+      const qs = params.toString();
+      return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
+    }, [accountPath, discover.resource, discover.params, fields]);
+    reactExports.useEffect(() => {
+      let cancelled = false;
+      setItems(null);
+      setError("");
+      api(config, url, void 0, adminBase).then((data) => {
+        if (!cancelled) setItems(data.items ?? []);
+      }).catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [config, url, adminBase]);
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    const needle = query.trim().toLowerCase();
+    const matches = (items ?? []).filter((item) => !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
+    const resource = discover.resource.replace(/_/g, " ");
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "picker-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: "picker-title", children: [
+            "Pick ",
+            article(resourceSingular(discover.resource)),
+            " ",
+            resourceSingular(discover.resource)
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              value: query,
+              placeholder: `Filter ${resource}…`,
+              "aria-label": `Filter ${resource}`,
+              autoFocus: true,
+              onChange: (event) => setQuery(event.target.value)
+            }
+          ),
+          error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
+          !error && items === null && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Loading…" }),
+          items !== null && matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
+            "No ",
+            resource,
+            " found"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: matches.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              type: "button",
+              className: "picker-item",
+              onClick: () => onPick(applyTemplate(discover.value ?? "{id}", item)),
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: item.name }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: item.id })
+              ]
+            },
+            item.id
+          )) })
+        ]
+      }
+    ) });
   }
   function RawJsonInput({ value, draft, onChange, onInvalidChange }) {
     const [text, setText] = reactExports.useState(() => draft ?? JSON.stringify(value, null, 2));
@@ -19327,7 +20011,15 @@
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
+    const [sampleBusy, setSampleBusy] = reactExports.useState(false);
     const [testResult, setTestResult] = reactExports.useState(null);
+    const [stepTest, setStepTest] = reactExports.useState({
+      nodeId: null,
+      busy: false,
+      result: null
+    });
+    const [stepOutputs, setStepOutputs] = reactExports.useState({});
+    const [triggerSample, setTriggerSample] = reactExports.useState(null);
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
       [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
@@ -19444,6 +20136,29 @@
       window.addEventListener("message", onMessage);
       return () => window.removeEventListener("message", onMessage);
     }, [config.embedded]);
+    reactExports.useEffect(() => {
+      if (config.mode !== "console" || !workflowId || workflowId === "new-workflow") {
+        setTriggerSample(null);
+        return;
+      }
+      let cancelled = false;
+      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      api(
+        config,
+        `/triggers/sample?workflow=${encodeURIComponent(workflowId)}`,
+        void 0,
+        adminBase
+      ).then((payload) => {
+        if (cancelled) return;
+        const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+        setTriggerSample({ source: payload.source, fields: Object.keys(data) });
+      }).catch(() => {
+        if (!cancelled) setTriggerSample(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [config, workflowId]);
     const refreshGit = reactExports.useCallback(() => {
       if (config.mode !== "local") return;
       api(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -19482,6 +20197,8 @@
         setYamlText(yaml2);
         setSavedYaml(yaml2);
         setSelectedId(null);
+        setStepTest({ nodeId: null, busy: false, result: null });
+        setStepOutputs({});
         setStatus({ kind: "idle", message: "" });
         if (config.mode === "console" && !config.embedded) {
           history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
@@ -19515,6 +20232,8 @@
       setYamlText("");
       setSavedYaml("");
       setSelectedId(null);
+      setStepTest({ nodeId: null, busy: false, result: null });
+      setStepOutputs({});
       setStatus({ kind: "idle", message: "" });
     }
     function parseYamlText(text) {
@@ -19560,6 +20279,7 @@
         setSelectedId(null);
       }
       setTestOpen(false);
+      setStepTest({ nodeId: null, busy: false, result: null });
       setView(next);
     }
     async function save() {
@@ -19616,7 +20336,7 @@
         refreshGit();
         setStatus({
           kind: "ok",
-          message: !result.commit ? "No changes to commit" : config.mode === "console" ? `Committed ${result.commit.slice(0, 7)} — the deploy pipeline publishes it in a few minutes` : `Saved and committed ${result.commit.slice(0, 7)}`
+          message: result.published === false ? `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}; changes go live after deployment.` : `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
         });
         return true;
       } catch (error) {
@@ -19634,6 +20354,31 @@
     async function newWorkflowSafely() {
       if (!await askToLeave()) return;
       newWorkflow();
+    }
+    async function duplicateWorkflow() {
+      if (!sourceName) return;
+      const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
+      if (name === null) return;
+      const trimmed = name.trim();
+      setStatus({ kind: "busy", message: "Duplicating…" });
+      try {
+        const result = await api(
+          config,
+          `/workflows/${encodeURIComponent(sourceName)}/duplicate`,
+          {
+            method: "POST",
+            body: JSON.stringify(trimmed ? { name: trimmed } : {})
+          }
+        );
+        await refreshList();
+        refreshGit();
+        setStatus({
+          kind: "ok",
+          message: result.published === false ? `Duplicated as ${result.file}; goes live after deployment.` : `Duplicated as ${result.file}.`
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
     }
     async function push() {
       setStatus({ kind: "busy", message: "Pushing…" });
@@ -19675,6 +20420,111 @@
         setTestResult({ mode, matched: false, steps: [], error: String(error) });
       } finally {
         setTestBusy(false);
+      }
+    }
+    async function pullSample() {
+      const trigger = shapes.find((shape) => shape.data?.nodeKind === "trigger")?.data;
+      if (!trigger?.connector) {
+        setStatus({ kind: "error", message: "Add a trigger node first — the sample is pulled for its connector." });
+        return;
+      }
+      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      setSampleBusy(true);
+      try {
+        const pulled = await api(
+          config,
+          "/discover",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              connector: trigger.connector,
+              event: trigger.event || void 0,
+              connection_id: trigger.fields?.connection_id || void 0
+            })
+          },
+          adminBase
+        );
+        const sample = pulled.sample ?? {};
+        const data = sample.data;
+        setTestEvent(JSON.stringify(
+          data && typeof data === "object" && Object.keys(data).length > 0 ? data : sample,
+          null,
+          2
+        ));
+        setStatus({ kind: "ok", message: `Sample pulled for ${trigger.connector} (${pulled.source ?? "discovered"}).` });
+      } catch (error) {
+        setStatus({ kind: "error", message: `Sample pull failed: ${String(error)}` });
+      } finally {
+        setSampleBusy(false);
+      }
+    }
+    async function testSelectedStep(execute) {
+      if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
+      const nodeId = selected.id;
+      const actionId = (selected.data.fields?.id ?? "").trim();
+      if (!actionId) {
+        setStatus({ kind: "error", message: "Give this action an Action ID first — the step test targets it." });
+        return;
+      }
+      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+      if (problems.length) {
+        setStatus({ kind: "error", message: problems.join(" ") });
+        return;
+      }
+      let sample;
+      try {
+        sample = JSON.parse(testEvent);
+      } catch {
+        setTestOpen(true);
+        setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event is not valid JSON — fix it in the Test run panel." } });
+        return;
+      }
+      if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+        setTestOpen(true);
+        setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event must be a JSON object — fix it in the Test run panel." } });
+        return;
+      }
+      if (execute && !window.confirm(`Run the ${selected.data.actionType} step for real? It acts with live side effects.`)) return;
+      const steps = { ...stepOutputs };
+      for (const step of testResult?.steps ?? []) {
+        if (step.action_id && (step.output || step.error)) {
+          steps[step.action_id] = {
+            status: step.ok ? "completed" : "failed",
+            ...step.output ? { output: step.output } : {},
+            ...step.error ? { error: step.error } : {}
+          };
+        }
+      }
+      setStepTest({ nodeId, busy: true, result: null });
+      try {
+        const result = await api(config, "/workflows/test-step", {
+          method: "POST",
+          body: JSON.stringify({
+            action_id: actionId,
+            event: sample,
+            workflow,
+            execute,
+            ...Object.keys(steps).length ? { steps } : {}
+          })
+        });
+        setStepTest({ nodeId, busy: false, result });
+        if (execute && result.ok && !result.error) {
+          const output = result.steps[0]?.output;
+          setStepOutputs((current) => ({
+            ...current,
+            [actionId]: { status: "completed", ...output ? { output } : {} }
+          }));
+        }
+      } catch (error) {
+        setStepTest({ nodeId, busy: false, result: { mode: execute ? "execute-step" : "test-step", matched: false, steps: [], error: String(error) } });
+      }
+    }
+    async function copyTemplate(template) {
+      try {
+        await navigator.clipboard.writeText(template);
+        setStatus({ kind: "ok", message: `Copied ${template} — paste it into any action template.` });
+      } catch {
+        setStatus({ kind: "ok", message: template });
       }
     }
     function updateSelected(mutate) {
@@ -19725,6 +20575,25 @@
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: "trigger-events", children: connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: event }, event)) })
             ] })
+          ] }),
+          triggerSample && triggerSample.fields.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Sample fields" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+              "From this workflow's last trigger",
+              triggerSample.source ? ` (${triggerSample.source})` : "",
+              " — click to copy a field, paste it into any action template."
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "template-chips", children: triggerSample.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "template-chip",
+                title: `Copy {trigger.${field}}`,
+                onClick: () => copyTemplate(`{trigger.${field}}`),
+                children: `{trigger.${field}}`
+              },
+              field
+            )) })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Filters" }),
@@ -19846,6 +20715,9 @@
               field,
               value: data.fields?.[field.key] ?? "",
               connections,
+              fields: data.fields,
+              siblingFields: meta.fields,
+              config,
               onChange: (value) => setField(field.key, value)
             },
             field.key
@@ -19868,6 +20740,106 @@
             },
             selected.id
           )
+        ] }),
+        meta && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Error handling" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: onErrorField,
+              value: data.fields?.on_error ?? "",
+              onChange: (value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_error: value, ...value && value !== "halt" ? { on_fail: "" } : {} }
+              }))
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: onFailField,
+              value: data.fields?.on_fail ?? "",
+              onChange: (value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_fail: value, ...value === "continue" ? { on_error: "" } : {} }
+              }))
+            }
+          ),
+          ((data.fields?.on_error ?? "") === "run" || (data.fields?.error_actions ?? "").trim() !== "") && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: errorActionsField,
+              value: data.fields?.error_actions ?? "",
+              onChange: (value) => setField("error_actions", value)
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+            "What a failed step does. On error: halt (the default) fails the run, continue records the failure and moves on, run also executes the error steps. On fail: continue absorbs one failure — the step reads skipped in run history. A handled failure is visible to later steps as ",
+            "{steps.<id>.error}",
+            "."
+          ] })
+        ] }),
+        config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Test step" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Runs just this step against the Test run panel’s sample event. “Run step” executes it for real — side effects limited to this step — and its output feeds the next step’s test." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: "button secondary",
+                type: "button",
+                disabled: stepTest.busy,
+                onClick: () => testSelectedStep(false),
+                children: [
+                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 15 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: "button danger",
+                type: "button",
+                disabled: stepTest.busy,
+                onClick: () => testSelectedStep(true),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run step" })
+                ]
+              }
+            )
+          ] }),
+          stepTest.nodeId === selected.id && stepTest.result && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${stepTest.result.error && stepTest.result.steps.length === 0 ? "failed" : stepTest.result.ok ? "passed" : ""}`, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: stepTest.result.error && stepTest.result.steps.length === 0 ? stepTest.result.error : /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { children: [
+              stepTest.result.ok ? "Step ok" : "Step failed",
+              stepTest.result.mode === "test-step" ? " (dry)" : ""
+            ] }) }),
+            stepTest.result.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: step.ok ? "test-step ok" : "test-step failed", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-title", children: [
+                step.action_id,
+                " ",
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("em", { children: [
+                  "(",
+                  step.action_type || "?",
+                  ")"
+                ] }),
+                !step.ok && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                  " — ",
+                  step.error
+                ] })
+              ] }),
+              (step.warnings ?? []).map((warning) => /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                "warning: ",
+                warning
+              ] }, warning)),
+              step.rendered_input != null && /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "test-io", children: JSON.stringify(step.rendered_input, null, 2) }),
+              step.output != null && /* @__PURE__ */ jsxRuntimeExports.jsxs("pre", { className: "test-io", children: [
+                "output: ",
+                JSON.stringify(step.output, null, 2)
+              ] })
+            ] }, `${step.action_id}-${index}`))
+          ] })
         ] })
       ] });
     };
@@ -19900,7 +20872,7 @@
                   " action",
                   summary.actionCount === 1 ? "" : "s"
                 ] }),
-                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "disabled" })
+                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Off" })
               ]
             },
             summary.source
@@ -19963,7 +20935,7 @@
               "label",
               {
                 className: "check-label enabled-toggle",
-                title: view === "yaml" ? "Edit enabled in the YAML view" : void 0,
+                title: view === "yaml" ? "Edit the on/off state in YAML" : "Applies when you save",
                 children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "input",
@@ -19971,13 +20943,15 @@
                       type: "checkbox",
                       checked: enabled,
                       disabled: view === "yaml",
-                      onChange: (event) => setEnabled(event.target.checked)
+                      onChange: (event) => setEnabled(event.target.checked),
+                      "aria-label": "Workflow state after saving"
                     }
                   ),
-                  "Enabled"
+                  enabled ? "On" : "Off"
                 ]
               }
             ),
+            enabled !== savedEnabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "state-save-hint", children: "Save to apply" }),
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
               status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 14, className: "spin" }),
               status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 14 }),
@@ -19990,6 +20964,17 @@
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
+                className: "button secondary",
+                type: "button",
+                onClick: duplicateWorkflow,
+                disabled: status.kind === "busy" || !sourceName,
+                title: !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
                 className: testOpen ? "button secondary active" : "button secondary",
                 type: "button",
                 onClick: () => setTestOpen(!testOpen),
@@ -19998,7 +20983,7 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save to git" : "Saved" }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save changes" : "Saved" }) })
           ] })
         ] }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
@@ -20061,14 +21046,28 @@
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", disabled: testBusy, onClick: () => runTest(true), children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
-              ] })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  className: "button secondary",
+                  type: "button",
+                  disabled: sampleBusy || testBusy,
+                  onClick: pullSample,
+                  title: "Pull a real sample event for this workflow's trigger connector",
+                  children: [
+                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 15 }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
+                  ]
+                }
+              )
             ] }),
             testResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`, children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: testResult.error && testResult.steps.length === 0 ? testResult.error : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: testResult.mode === "execute" ? "Executed" : "Dry run" }),
                 " — ",
                 testResult.matched ? "a trigger matches the sample event." : "NO trigger matches the sample event.",
-                testResult.enabled === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: " The workflow is disabled." }),
+                testResult.enabled === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: " This workflow is Off." }),
                 testResult.error && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
                   " Run stopped: ",
                   testResult.error

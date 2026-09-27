@@ -1,9 +1,9 @@
 import { dump, load } from "js-yaml";
 import type { CatalogField } from "./catalog";
-import { actionCatalog, connectorCatalog, filterOperators, logicOperators } from "./catalog";
+import { actionCatalog, connectorCatalog, errorHandlingFields, filterOperators, logicOperators } from "./catalog";
 import type { ActionType, DiagramShape, FilterRule, NodeData, TriggerSpec, Workflow, WorkflowSummary } from "./types";
 
-export { actionCatalog, connectorCatalog, filterOperators, logicOperators };
+export { actionCatalog, connectorCatalog, errorHandlingFields, filterOperators, logicOperators };
 
 export const NODE_WIDTH = 264;
 export const NODE_HEIGHT = 96;
@@ -122,6 +122,17 @@ function orderedActions(shapes: DiagramShape[], roots: DiagramShape[]): { action
   return { actions, lost, problems };
 }
 
+/** Action nodes in run order (trigger-first traversal) — the same order a
+    save writes, so the insert-from-previous picker can name each step's
+    effective id (`fields.id` or the save-time `action-<n>` fallback) and
+    list only the steps that run before a given one. */
+export function orderedActionNodes(shapes: DiagramShape[]): DiagramShape[] {
+  const triggerNodes = shapes
+    .filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger")
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
+}
+
 function filterRulesToYaml(rules: FilterRule[] | undefined): Record<string, Record<string, unknown>> {
   const filters: Record<string, Record<string, unknown>> = {};
   for (const rule of rules ?? []) {
@@ -146,7 +157,9 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
     return { ...action, ...(data.raw ?? {}) };
   }
   const written: Record<string, unknown> = {};
-  for (const field of meta.fields) {
+  // The error-handling keys are the engine's generic step keys, owned here
+  // for every catalog action exactly like the per-entry fields.
+  for (const field of [...meta.fields, ...errorHandlingFields]) {
     // Presence-based: keys the YAML omits stay omitted (engine defaults
     // apply), keys it sets — or the inspector touches — are written back.
     if (field.type === "boolean") {
@@ -172,13 +185,17 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
     }
     const value = (data.fields?.[field.key] ?? "").trim();
     if (value === "") continue;
+    // halt is the engine default for both policies (engine/logic.py): the
+    // keys are written only for the non-default modes, so steps that never
+    // handled a failure save byte-identical YAML.
+    if ((field.key === "on_error" || field.key === "on_fail") && value === "halt") continue;
     const parsed = field.type === "number" ? Number(value) : value;
     fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
   }
   // Extras the catalog does not model (nested branch/loop steps, hand-written
   // keys) round-trip untouched; the form's values win where both exist.
   const merged: Record<string, unknown> = { ...action, ...(data.raw ?? {}), ...written };
-  for (const field of meta.fields) {
+  for (const field of [...meta.fields, ...errorHandlingFields]) {
     // A cleared yaml field removes the key (and any stale extra under it).
     if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
       delete merged[field.key];
@@ -253,7 +270,7 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
   const fields: Record<string, string> = { id: String(action.id ?? "") };
   const meta = actionMeta(type);
   if (!meta) return fields;
-  for (const field of meta.fields) {
+  for (const field of [...meta.fields, ...errorHandlingFields]) {
     const holder = field.group ? action[field.group] : action;
     const value = isRecord(holder) ? holder[field.key] : undefined;
     if (field.type === "yaml") {
@@ -281,7 +298,7 @@ function rawAction(action: Record<string, unknown>): Record<string, unknown> {
 function rawExtras(action: Record<string, unknown>): Record<string, unknown> | undefined {
   const extras = rawAction(action);
   const meta = actionMeta(String(action.type ?? "webhook"));
-  for (const field of meta?.fields ?? []) {
+  for (const field of [...(meta?.fields ?? []), ...(meta ? errorHandlingFields : [])]) {
     if (!field.group) {
       delete extras[field.key];
       continue;

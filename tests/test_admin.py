@@ -574,52 +574,6 @@ def _configure_runs(monkeypatch, items):
     return [f"dapier_session={cookie}"]
 
 
-def test_admin_runs_list_groups_executions_into_runs(monkeypatch):
-    cookies = _configure_runs(monkeypatch, [{
-        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
-        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
-        "connector": "email", "event_type": "message.received", "status": "completed",
-        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
-    }])
-
-    listed = admin.route(operator_request("GET", "/api/admin/runs", cookies=cookies),
-                         "GET", "/api/admin/runs")
-
-    assert listed["statusCode"] == 200
-    body = json.loads(listed["body"])
-    assert body["runs"][0]["run_id"] == "wf-1:evt-1"
-    assert body["runs"][0]["status"] == "completed"
-
-
-def test_admin_run_detail_returns_step_flow(monkeypatch):
-    cookies = _configure_runs(monkeypatch, [{
-        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
-        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
-        "connector": "email", "event_type": "message.received", "status": "failed",
-        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
-        "error": "webhook returned HTTP 500", "duration_ms": 980,
-        "input": {"subject": "invoice"}, "output": None,
-    }])
-
-    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1%3Aevt-1", cookies=cookies),
-                         "GET", "/api/admin/runs/wf-1%3Aevt-1")
-
-    assert detail["statusCode"] == 200
-    body = json.loads(detail["body"])
-    assert body["run"]["status"] == "failed"
-    assert body["steps"][0]["error"] == "webhook returned HTTP 500"
-    assert body["steps"][0]["input"] == {"subject": "invoice"}
-
-
-def test_admin_run_detail_unknown_run_is_404(monkeypatch):
-    cookies = _configure_runs(monkeypatch, [])
-
-    detail = admin.route(operator_request("GET", "/api/admin/runs/wf-1:missing", cookies=cookies),
-                         "GET", "/api/admin/runs/wf-1:missing")
-
-    assert detail["statusCode"] == 404
-
-
 def _configure_replay_queue(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
     calls = []
@@ -683,38 +637,23 @@ def _configure_replay_queue(monkeypatch):
     return calls
 
 
-def test_admin_run_replay_reinjects_the_original_event(monkeypatch):
-    cookies = _configure_runs(monkeypatch, [{
-        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
-        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
-        "connector": "email", "event_type": "message.received", "status": "failed",
-        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
-        "error": "webhook returned HTTP 500", "input": {"subject": "invoice"},
-    }])
-    calls = _configure_replay_queue(monkeypatch)
+def test_admin_errors_summary_route(monkeypatch):
+    from src.dapier.api import runs as runs_api
 
-    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/replay", cookies=cookies),
-                           "POST", "/api/admin/runs/wf-1%3Aevt-1/replay")
+    _, cookies = configure_tokens(monkeypatch)
+    monkeypatch.setattr(runs_api, "recent", lambda *a, **k: [
+        {"run_id": "wf-1:e1", "workflow_id": "wf-1", "status": "failed",
+         "started_at": "2026-09-25T10:00:00+00:00", "error": "boom"},
+    ])
 
-    assert replayed["statusCode"] == 202
-    body = json.loads(replayed["body"])
-    assert body["accepted"] is True
-    assert body["replayed_from"] == "wf-1:evt-1"
-    assert body["run_id"].startswith("wf-1:replay-")
-    envelope = json.loads(calls[0]["MessageBody"])
-    assert envelope["id"].startswith("replay-")
-    assert envelope["correlation_id"] == "evt-1"
-    assert envelope["data"] == {"subject": "invoice"}
+    response = admin.route(
+        operator_request("GET", "/api/admin/errors/summary", cookies=cookies),
+        "GET", "/api/admin/errors/summary",
+    )
 
-    missing = admin.route(operator_request("POST", "/api/admin/runs/wf-1:missing/replay", cookies=cookies),
-                          "POST", "/api/admin/runs/wf-1:missing/replay")
-    assert missing["statusCode"] == 404
-
-
-def test_admin_run_replay_requires_authentication(monkeypatch):
-    _configure_runs(monkeypatch, [])
-
-    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1:evt-1/replay", cookies=[]),
-                           "POST", "/api/admin/runs/wf-1:evt-1/replay")
-
-    assert replayed["statusCode"] == 401
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["total_failed_runs"] == 1
+    assert body["workflows"][0]["workflow_id"] == "wf-1"
+    assert body["workflows"][0]["failed_runs"] == 1
+    assert body["workflows"][0]["last_error"] == "boom"

@@ -371,6 +371,7 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
     from ..engine import execute
     from ..engine.notify import notify_failure
     from ..engine.worker import _is_pending, _mark_completed, _release_action
+    from . import inbox
 
     cursor = get_cursor(name, table=cursor_table_ref)
     items = fetch_page(item, cursor=cursor, transport=transport)
@@ -387,17 +388,20 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
     fired = 0
     for raw in items[:item.get("max_items", 25)]:
         event = event_for(item, raw)
+        inbox_id = inbox.record(event)
         try:
-            execute(
+            matched = execute(
                 event,
                 before_action=_is_pending,
                 after_action=_mark_completed,
                 on_action_error=_release_action,
             )
         except Exception as exc:
+            inbox.complete(inbox_id, None, error=exc)
             notify_failure(exc, event)
             logger.exception("poll trigger '%s' item failed", name, extra={"item_id": event["data"]["item_id"]})
             break
+        inbox.complete(inbox_id, matched)
         put_cursor(name, event["data"]["item_id"], table=cursor_table_ref)
         fired += 1
     return {"poll": name, "fired": fired}

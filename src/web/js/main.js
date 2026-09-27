@@ -2,10 +2,11 @@
 import { $, $$, icons, notice, hardenSecretInputs, showForbidden, showStartupError } from './ui.js';
 import { api } from './api.js';
 import { setView, viewFromPath } from './router.js';
-import { refresh, openRowFor } from './views/overview.js';
-import { openRun } from './views/runs.js';
+import { refresh, openRowFor, openWorkflow, openVersions, restoreVersion } from './views/overview.js';
+import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
 import { showOAuthResult } from './views/connections.js';
+import './views/storage.js';
 import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
@@ -20,16 +21,52 @@ document.addEventListener('click', async (event) => {
   if (!button || !button.dataset.file || button.disabled) return;
   button.disabled = true;
   try {
-    await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`, {
+    const result = await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`, {
       method: 'PUT',
       body: JSON.stringify({ enabled: button.dataset.enabled !== 'true' }),
     });
     await refresh();
+    if (result.git_sync_error) notice(`Workflow is ${result.enabled ? 'On' : 'Off'}, but Git sync failed: ${result.git_sync_error}`, true);
   } catch (error) {
     notice(error.message, true);
   } finally {
     button.disabled = false;
   }
+});
+
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('.workflow-edit');
+  if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  void openDesigner(link.dataset.workflow);
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.workflow-detail');
+  if (button) openWorkflow(button.dataset.workflow);
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.workflow-versions');
+  if (!button || button.disabled) return;
+  void openVersions(button.dataset.workflow);
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.version-restore');
+  if (!button || button.disabled) return;
+  void restoreVersion(button);
+});
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-runs, .workflow-run-link');
+  if (!button) return;
+  if (button.classList.contains('workflow-run-link')) return void openRun(button.dataset.run);
+  if (!await setView('runs')) return;
+  $('#runs-workflow-filter').value = button.dataset.workflow;
+  $('#runs-status-filter').value = '';
+  $('#runs-date-filter').value = '';
+  renderRuns();
 });
 
 /* Replay re-injects a run's original trigger event; the rerun lands in the

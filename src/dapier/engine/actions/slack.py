@@ -1,10 +1,16 @@
-"""slack action: post a templated message through a stored credential."""
+"""slack action: post a templated message through a stored credential,
+plus slack_find — look up a workspace user or channel before acting."""
+import json
 import os
 
 from ...connections import credentials
 from . import base
 from . import telegram_format
 from .templating import render
+
+SLACK_LOOKUP_BY_EMAIL_URL = "https://slack.com/api/users.lookupByEmail"
+SLACK_CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list"
+_CHANNEL_PAGES = 3
 
 
 def _token_for(action):
@@ -45,6 +51,127 @@ def run_slack(action, event, *, steps=None):
     if not result.get("ok"):
         raise RuntimeError(f"Slack rejected message: {result.get('error', 'unknown_error')}")
     return {"ok": True, "channel": result.get("channel"), "ts": result.get("ts")}
+
+
+def _slack_rpc(url, token, payload, *, transport=None):
+    """One Slack Web API POST through the injectable transport.
+
+    Unlike ``run_slack`` (which sits on ``base._json_request`` with no seam),
+    this takes ``transport`` so tests can fake the network. Returns the parsed
+    body; transport failures and HTTP >= 300 raise RuntimeError with the
+    Slack error code when the body carries one.
+    """
+    transport = transport or base._default_transport
+    try:
+        status, raw = transport(
+            "POST", url,
+            headers={
+                "authorization": f"Bearer {token}",
+                "content-type": "application/json",
+            },
+            body=json.dumps(payload).encode(),
+            timeout=15,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"slack call unreachable: {type(exc).__name__}")
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise RuntimeError(f"slack returned HTTP {status} with an unreadable body")
+    if status >= 300:
+        error = data.get("error") or "unknown_error"
+        raise RuntimeError(f"slack returned HTTP {status}: {error}")
+    return data
+
+
+def run_slack_find(action, event, steps=None, transport=None):
+    """Look up one workspace user or channel; a miss is a result, not an error.
+
+    ``find`` selects the kind (default ``user``): a user is looked up by
+    email via ``users.lookupByEmail``; a channel is matched case-insensitively
+    (leading ``#`` ignored) across up to three ``conversations.list`` pages.
+    Slack answers ``ok: false`` with ``users_not_found`` for an unknown email,
+    which becomes ``{"found": False, "user": None}``; any other Slack error
+    raises RuntimeError with the error code.
+    """
+    token = _token_for(action)
+    find = str(action.get("find") or "user").strip().lower() or "user"
+    if find not in ("user", "channel"):
+        raise ValueError(f"slack find must be 'user' or 'channel', not {find!r}")
+    query = render(action.get("query", ""), event, steps).strip()
+    if not query:
+        raise ValueError("slack_find requires a rendered query")
+
+    if find == "user":
+        data = _slack_rpc(SLACK_LOOKUP_BY_EMAIL_URL, token, {"email": query},
+                          transport=transport)
+        if data.get("ok"):
+            user = data.get("user") or {}
+            profile = user.get("profile") or {}
+            return {"found": True, "user": {
+                "id": user.get("id"),
+                "name": user.get("name"),
+                "real_name": user.get("real_name"),
+                "email": profile.get("email"),
+                "tz": user.get("tz"),
+            }}
+        if data.get("error") == "users_not_found":
+            return {"found": False, "user": None}
+        raise RuntimeError(f"Slack find failed: {data.get('error', 'unknown_error')}")
+
+    needle = query.lstrip("#").lower()
+    cursor = None
+    for _page in range(_CHANNEL_PAGES):
+        payload = {"limit": 200, "exclude_archived": True}
+        if cursor:
+            payload["cursor"] = cursor
+        data = _slack_rpc(SLACK_CONVERSATIONS_LIST_URL, token, payload,
+                          transport=transport)
+        if not data.get("ok"):
+            raise RuntimeError(f"Slack find failed: {data.get('error', 'unknown_error')}")
+        for channel in data.get("channels") or []:
+            if not isinstance(channel, dict):
+                continue
+            name = str(channel.get("name") or "").lstrip("#").lower()
+            if name and name == needle:
+                return {"found": True, "channel": {
+                    "id": channel.get("id"),
+                    "name": channel.get("name"),
+                    "is_private": bool(channel.get("is_private")),
+                }}
+        cursor = (data.get("response_metadata") or {}).get("next_cursor")
+        if not cursor:
+            break
+    return {"found": False, "channel": None}
+
+
+def run_slack_find_user(action, event, *, steps=None, transport=None):
+    """Look up one workspace user by email via ``users.lookupByEmail``.
+
+    The single-purpose counterpart of :func:`run_slack_find`'s user branch,
+    for find-then-act recipes: ``email`` is rendered from the event, a miss
+    (Slack's ``users_not_found``) is ``{"found": False, "user": None}`` and
+    any other Slack error raises RuntimeError with the error code.
+    """
+    token = _token_for(action)
+    email = render(action.get("email", ""), event, steps).strip()
+    if not email:
+        raise ValueError("slack_find_user requires a rendered email")
+    data = _slack_rpc(SLACK_LOOKUP_BY_EMAIL_URL, token, {"email": email},
+                      transport=transport)
+    if data.get("ok"):
+        user = data.get("user") or {}
+        profile = user.get("profile") or {}
+        return {"found": True, "user": {
+            "id": user.get("id"),
+            "name": user.get("name"),
+            "real_name": user.get("real_name"),
+            "email": profile.get("email"),
+            "tz": user.get("tz"),
+        }}
+    if data.get("error") == "users_not_found":
+        return {"found": False, "user": None}
+    raise RuntimeError(f"Slack find failed: {data.get('error', 'unknown_error')}")
 
 
 def _post_telegram_format(action, event, token):

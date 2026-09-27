@@ -29,7 +29,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/runs", "/designer")
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/runs", "/inbox", "/storage", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 
@@ -69,9 +69,11 @@ def _static(path):
         "/assets/js/views/oauth-clients.js": ("js/views/oauth-clients.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/overview.js": ("js/views/overview.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/runs.js": ("js/views/runs.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/inbox.js": ("js/views/inbox.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/designer.js": ("js/views/designer.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/emails.js": ("js/views/emails.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/storage.js": ("js/views/storage.js", "text/javascript; charset=utf-8"),
         "/assets/js/theme.js": ("js/theme.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
@@ -304,24 +306,10 @@ def _telegram_hook(event, name, body):
         return _response(400, {"error": "invalid json"})
     if not isinstance(update, dict):
         return _response(400, {"error": "invalid update"})
-    # Channel posts (announcement channels) carry no "from"; text may arrive
-    # as a media caption with caption_entities instead of entities.
-    message = (update.get("message") or update.get("edited_message")
-               or update.get("channel_post") or update.get("edited_channel_post") or {})
-    chat = message.get("chat") or {}
-    sender = message.get("from") or {}
-    _publish("telegram", hook_triggers.TELEGRAM_EVENT, {
-        "hook": item["hook_id"],
-        "update_id": update.get("update_id"),
-        "message_id": message.get("message_id"),
-        "text": message.get("text") or message.get("caption") or "",
-        "entities": message.get("entities") or message.get("caption_entities") or [],
-        "is_channel_post": bool(update.get("channel_post") or update.get("edited_channel_post")),
-        "chat_id": chat.get("id"),
-        "chat": chat,
-        "from": sender,
-        "update": update,
-    }, source=item["hook_id"])
+    # The data shape lives in hook_triggers so live discovery publishes the
+    # exact same shape a real delivery does.
+    _publish("telegram", hook_triggers.TELEGRAM_EVENT,
+             hook_triggers.update_data(update, item["hook_id"]), source=item["hook_id"])
     return _response(200, {"accepted": True})
 
 

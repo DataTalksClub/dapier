@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlaskConical, GitBranch, Loader2, Play, TriangleAlert, X } from "lucide-react";
+import { CloudDownload, FlaskConical, GitBranch, Loader2, Play, Sparkles, TriangleAlert, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
-import { actionCatalog, connectorCatalog, filterOperators } from "./catalog";
-import { actionMeta, connectorLabel, connectorMeta, defaultFields, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
+import { actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { ConnectionOption, DiagramShape, FilterRule, GitStatus, NodeData, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -39,8 +39,10 @@ function TriggerLogo({ connector }: { connector: string }) {
   return Logo ? <Logo size={12} /> : null;
 }
 
-async function api<T>(config: DesignerConfig, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${config.apiBase}${path}`, {
+/** `base` overrides apiBase for endpoints outside the designer prefix:
+    discovery answers on /api/admin, not /api/admin/designer. */
+async function api<T>(config: DesignerConfig, path: string, init?: RequestInit, base: string = config.apiBase): Promise<T> {
+  const response = await fetch(`${base}${path}`, {
     headers: init?.body ? { "content-type": "application/json" } : undefined,
     ...init
   });
@@ -58,12 +60,18 @@ function workflowYaml(workflow: Workflow): string {
 }
 
 /** One catalog field, rendered per its declared type. */
-function FieldInput({ field, value, onChange, connections }: {
+function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }: {
   field: CatalogField;
   value: string;
   onChange: (value: string) => void;
   connections?: ConnectionOption[] | null;
+  /** Sibling field values of the selected step — discovery's query params. */
+  fields?: Record<string, string>;
+  /** Sibling field definitions, for the discovery hint's label. */
+  siblingFields?: CatalogField[];
+  config?: DesignerConfig;
 }) {
+  const [discovering, setDiscovering] = useState(false);
   if (field.type === "boolean") {
     return (
       <label className="check-label">
@@ -137,6 +145,53 @@ function FieldInput({ field, value, onChange, connections }: {
       </label>
     );
   }
+  // Discoverable resource fields (Spreadsheet ID, Channel, …) keep their plain
+  // text input and gain a Browse… picker over the connector's live resources;
+  // console mode only — local dev has no admin API to discover against.
+  if (field.discover && config?.mode === "console") {
+    const discover = field.discover;
+    const fromKey = discover.from ?? "connection_id";
+    const account = discover.account ?? (fields?.[fromKey] ?? "").trim();
+    const fromLabel = discover.from
+      ? siblingFields?.find((sibling) => sibling.key === fromKey)?.label.toLowerCase()
+      : undefined;
+    return (
+      <>
+        <label>{field.label}{field.required ? " *" : ""}
+          <span className="discover-field">
+            <input
+              className="mono-input"
+              type={field.type === "number" ? "number" : "text"}
+              value={value}
+              placeholder={field.placeholder}
+              onChange={(event) => onChange(event.target.value)}
+            />
+            <button className="button quiet" type="button" disabled={!account} onClick={() => setDiscovering(true)}>
+              Browse…
+            </button>
+          </span>
+          {!account && (
+            <span className="connection-hint">
+              Set {fromLabel ?? "Connection ID"} first
+            </span>
+          )}
+        </label>
+        {account && discovering && (
+          <DiscoveryPicker
+            config={config}
+            discover={discover}
+            accountId={account}
+            fields={fields ?? {}}
+            onPick={(picked) => {
+              setDiscovering(false);
+              onChange(picked);
+            }}
+            onClose={() => setDiscovering(false)}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <label>{field.label}{field.required ? " *" : ""}
       <input
@@ -148,6 +203,116 @@ function FieldInput({ field, value, onChange, connections }: {
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
+  );
+}
+
+/** One live resource from the discovery API: id + display name plus extras. */
+interface DiscoveryItem {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+/** "spreadsheets" → "spreadsheet" for the picker's title. */
+function resourceSingular(resource: string): string {
+  return resource.replace(/_/g, " ").replace(/s$/, "");
+}
+
+/** "update" wants "an", "spreadsheet" wants "a". */
+function article(word: string): string {
+  return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
+/** Fills a "{key}" template from the picked item, e.g. a Drive download URL. */
+function applyTemplate(template: string, item: DiscoveryItem): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(item[key] ?? ""));
+}
+
+/** Modal browser over the discovery API for one field's resources. Mounts
+    open, fetches once, and applies the picked template through onPick. */
+function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose }: {
+  config: DesignerConfig;
+  discover: NonNullable<CatalogField["discover"]>;
+  accountId: string;
+  fields: Record<string, string>;
+  onPick: (value: string) => void;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<DiscoveryItem[] | null>(null);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const adminBase = config.apiBase.replace(/\/designer$/, "");
+  const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
+  // Only the tag's declared discovery params ride along, resolved from their
+  // sibling fields; the backend rejects any other query param with a 400.
+  const url = useMemo(() => {
+    const params = new URLSearchParams();
+    for (const [param, key] of Object.entries(discover.params ?? {})) {
+      const val = (fields[key] ?? "").trim();
+      if (val) params.set(param, val);
+    }
+    const qs = params.toString();
+    return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
+  }, [accountPath, discover.resource, discover.params, fields]);
+  useEffect(() => {
+    let cancelled = false;
+    setItems(null);
+    setError("");
+    api<{ items: DiscoveryItem[] }>(config, url, undefined, adminBase)
+      .then((data) => { if (!cancelled) setItems(data.items ?? []); })
+      .catch((err) => { if (!cancelled) setError(String(err)); });
+    return () => { cancelled = true; };
+  }, [config, url, adminBase]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const needle = query.trim().toLowerCase();
+  const matches = (items ?? []).filter((item) =>
+    !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
+  const resource = discover.resource.replace(/_/g, " ");
+  return (
+    <div className="picker-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="picker-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="picker-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="picker-title">Pick {article(resourceSingular(discover.resource))} {resourceSingular(discover.resource)}</h2>
+        <input
+          value={query}
+          placeholder={`Filter ${resource}…`}
+          aria-label={`Filter ${resource}`}
+          autoFocus
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {error && <p className="picker-error" role="alert">{error}</p>}
+        {!error && items === null && <p className="picker-status">Loading…</p>}
+        {items !== null && matches.length === 0 && <p className="picker-status">No {resource} found</p>}
+        <div className="picker-list">
+          {matches.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="picker-item"
+              onClick={() => onPick(applyTemplate(discover.value ?? "{id}", item))}
+            >
+              <span className="picker-item-name">{item.name}</span>
+              <span className="picker-item-id">{item.id}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -214,7 +379,21 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [testOpen, setTestOpen] = useState(false);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);
+  const [sampleBusy, setSampleBusy] = useState(false);
   const [testResult, setTestResult] = useState<TestRunResult | null>(null);
+  /** Per-step test (Zapier's "Test step"): the selected action runs alone
+     against the test panel's sample event. Keyed by node id so a stale
+     result never shows for another node. */
+  const [stepTest, setStepTest] = useState<{ nodeId: string | null; busy: boolean; result: TestRunResult | null }>({
+    nodeId: null, busy: false, result: null
+  });
+  /** Outputs of the steps already tested for real this session, shaped like
+     run history: testing step 2 sees step 1's output, like Zapier's editor. */
+  const [stepOutputs, setStepOutputs] = useState<Record<string, { status: string; output?: Record<string, unknown>; error?: string }>>({});
+  /** The workflow's own last trigger input (GET /api/admin/triggers/sample):
+      the {trigger.*} names action templates can rely on. Null = not fetched
+      (local mode has no admin API, or the workflow has no sample yet). */
+  const [triggerSample, setTriggerSample] = useState<{ source?: string; fields: string[] } | null>(null);
 
   const dirty = useMemo(
     () => view === "yaml"
@@ -350,6 +529,27 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     return () => window.removeEventListener("message", onMessage);
   }, [config.embedded]);
 
+  // Autofill: fetch the workflow's own last trigger input so the trigger
+  // inspector can offer {trigger.*} chips. Console mode only — the local
+  // companion has no admin API; failures just hide the chips.
+  useEffect(() => {
+    if (config.mode !== "console" || !workflowId || workflowId === "new-workflow") {
+      setTriggerSample(null);
+      return;
+    }
+    let cancelled = false;
+    const adminBase = config.apiBase.replace(/\/designer$/, "");
+    api<{ source?: string; data?: Record<string, unknown> }>(
+      config, `/triggers/sample?workflow=${encodeURIComponent(workflowId)}`, undefined, adminBase)
+      .then((payload) => {
+        if (cancelled) return;
+        const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+        setTriggerSample({ source: payload.source, fields: Object.keys(data) });
+      })
+      .catch(() => { if (!cancelled) setTriggerSample(null); });
+    return () => { cancelled = true; };
+  }, [config, workflowId]);
+
   const refreshGit = useCallback(() => {
     if (config.mode !== "local") return;
     api<GitStatus>(config, "/git/status").then(setGit).catch(() => setGit(null));
@@ -399,6 +599,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setYamlText(yaml);
       setSavedYaml(yaml);
       setSelectedId(null);
+      setStepTest({ nodeId: null, busy: false, result: null });
+      setStepOutputs({});
       setStatus({ kind: "idle", message: "" });
       if (config.mode === "console" && !config.embedded) {
         history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
@@ -433,6 +635,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setYamlText("");
     setSavedYaml("");
     setSelectedId(null);
+    setStepTest({ nodeId: null, busy: false, result: null });
+    setStepOutputs({});
     setStatus({ kind: "idle", message: "" });
   }
 
@@ -482,6 +686,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSelectedId(null);
     }
     setTestOpen(false);
+    setStepTest({ nodeId: null, busy: false, result: null });
     setView(next);
   }
 
@@ -511,7 +716,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
-      const result = await api<{ commit: string | null; html_url?: string }>(config, "/workflows", {
+      const result = await api<{ commit: string | null; published?: boolean; html_url?: string }>(config, "/workflows", {
         method: "PUT",
         body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
       });
@@ -539,11 +744,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       refreshGit();
       setStatus({
         kind: "ok",
-        message: !result.commit
-          ? "No changes to commit"
-          : config.mode === "console"
-            ? `Committed ${result.commit.slice(0, 7)} — the deploy pipeline publishes it in a few minutes`
-            : `Saved and committed ${result.commit.slice(0, 7)}`
+        message: result.published === false
+          ? `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}; changes go live after deployment.`
+          : `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
       });
       return true;
     } catch (error) {
@@ -564,6 +767,34 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   async function newWorkflowSafely() {
     if (!(await askToLeave())) return;
     newWorkflow();
+  }
+
+  /** Copies the saved workflow under a new id (server slugifies the name,
+     default `<id>-copy`) without touching this draft; the list then shows
+     both. The console's duplicate route commits and publishes like a save. */
+  async function duplicateWorkflow() {
+    if (!sourceName) return;
+    const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
+    if (name === null) return;
+    const trimmed = name.trim();
+    setStatus({ kind: "busy", message: "Duplicating…" });
+    try {
+      const result = await api<{ file: string; published?: boolean; commit?: string | null }>(
+        config, `/workflows/${encodeURIComponent(sourceName)}/duplicate`, {
+          method: "POST",
+          body: JSON.stringify(trimmed ? { name: trimmed } : {})
+        });
+      await refreshList();
+      refreshGit();
+      setStatus({
+        kind: "ok",
+        message: result.published === false
+          ? `Duplicated as ${result.file}; goes live after deployment.`
+          : `Duplicated as ${result.file}.`
+      });
+    } catch (error) {
+      setStatus({ kind: "error", message: String(error) });
+    }
   }
 
   async function push() {
@@ -609,6 +840,120 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setTestResult({ mode, matched: false, steps: [], error: String(error) });
     } finally {
       setTestBusy(false);
+    }
+  }
+
+  /** Pull a real sample event for the canvas's trigger connector into the
+     test panel (Zapier's "pull in sample data"): live from the connected
+     account, else the newest recorded run, else a documented example. */
+  async function pullSample() {
+    const trigger = shapes.find((shape) => shape.data?.nodeKind === "trigger")?.data;
+    if (!trigger?.connector) {
+      setStatus({ kind: "error", message: "Add a trigger node first — the sample is pulled for its connector." });
+      return;
+    }
+    // Sample discovery answers on /api/admin, not /api/admin/designer — the
+    // same base override the connection-field browser uses.
+    const adminBase = config.apiBase.replace(/\/designer$/, "");
+    setSampleBusy(true);
+    try {
+      const pulled = await api<{ sample: { data?: unknown } & Record<string, unknown>; source?: string }>(
+        config, "/discover", {
+          method: "POST",
+          body: JSON.stringify({
+            connector: trigger.connector,
+            event: trigger.event || undefined,
+            connection_id: trigger.fields?.connection_id || undefined,
+          })
+        }, adminBase);
+      const sample = pulled.sample ?? {};
+      const data = sample.data;
+      setTestEvent(JSON.stringify(
+        data && typeof data === "object" && Object.keys(data as object).length > 0 ? data : sample,
+        null, 2));
+      setStatus({ kind: "ok", message: `Sample pulled for ${trigger.connector} (${pulled.source ?? "discovered"}).` });
+    } catch (error) {
+      setStatus({ kind: "error", message: `Sample pull failed: ${String(error)}` });
+    } finally {
+      setSampleBusy(false);
+    }
+  }
+
+  /** Test just the selected action step against the test panel's sample
+     event (Zapier's per-step "Test step"). "Run step" executes it for real —
+     side effects limited to this one step — and its output joins the steps
+     context, so the next step's test sees it. The current draft goes inline:
+     the server tests exactly what would be saved. */
+  async function testSelectedStep(execute: boolean) {
+    if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
+    const nodeId = selected.id;
+    const actionId = (selected.data.fields?.id ?? "").trim();
+    if (!actionId) {
+      setStatus({ kind: "error", message: "Give this action an Action ID first — the step test targets it." });
+      return;
+    }
+    const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+    if (problems.length) {
+      setStatus({ kind: "error", message: problems.join(" ") });
+      return;
+    }
+    let sample: unknown;
+    try {
+      sample = JSON.parse(testEvent);
+    } catch {
+      setTestOpen(true);
+      setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event is not valid JSON — fix it in the Test run panel." } });
+      return;
+    }
+    if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+      setTestOpen(true);
+      setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event must be a JSON object — fix it in the Test run panel." } });
+      return;
+    }
+    if (execute && !window.confirm(`Run the ${selected.data.actionType} step for real? It acts with live side effects.`)) return;
+    // Prior steps' outputs: everything tested for real so far, overlaid with
+    // the last full test run's outputs (the fresher whole-chain picture).
+    const steps: Record<string, { status: string; output?: Record<string, unknown>; error?: string }> = { ...stepOutputs };
+    for (const step of testResult?.steps ?? []) {
+      if (step.action_id && (step.output || step.error)) {
+        steps[step.action_id] = {
+          status: step.ok ? "completed" : "failed",
+          ...(step.output ? { output: step.output } : {}),
+          ...(step.error ? { error: step.error } : {})
+        };
+      }
+    }
+    setStepTest({ nodeId, busy: true, result: null });
+    try {
+      const result = await api<TestRunResult>(config, "/workflows/test-step", {
+        method: "POST",
+        body: JSON.stringify({
+          action_id: actionId, event: sample, workflow, execute,
+          ...(Object.keys(steps).length ? { steps } : {})
+        })
+      });
+      setStepTest({ nodeId, busy: false, result });
+      if (execute && result.ok && !result.error) {
+        const output = result.steps[0]?.output;
+        setStepOutputs((current) => ({
+          ...current,
+          [actionId]: { status: "completed", ...(output ? { output } : {}) }
+        }));
+      }
+    } catch (error) {
+      setStepTest({ nodeId, busy: false, result: { mode: execute ? "execute-step" : "test-step", matched: false, steps: [], error: String(error) } });
+    }
+  }
+
+  /** Click-to-insert a {trigger.field} chip: copies the template so it can
+     be pasted into any action field; without clipboard access the template
+     itself lands in the status line, still readable and copyable. */
+  async function copyTemplate(template: string) {
+    try {
+      await navigator.clipboard.writeText(template);
+      setStatus({ kind: "ok", message: `Copied ${template} — paste it into any action template.` });
+    } catch {
+      setStatus({ kind: "ok", message: template });
     }
   }
 
@@ -664,6 +1009,28 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               </datalist>
             </label>
           </section>
+          {triggerSample && triggerSample.fields.length > 0 && (
+            <section className="inspector-group">
+              <h3>Sample fields</h3>
+              <p className="inspector-hint">
+                From this workflow's last trigger{triggerSample.source ? ` (${triggerSample.source})` : ""} —
+                click to copy a field, paste it into any action template.
+              </p>
+              <div className="template-chips">
+                {triggerSample.fields.map((field) => (
+                  <button
+                    key={field}
+                    type="button"
+                    className="template-chip"
+                    title={`Copy {trigger.${field}}`}
+                    onClick={() => copyTemplate(`{trigger.${field}}`)}
+                  >
+                    {`{trigger.${field}}`}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           <section className="inspector-group">
             <h3>Filters</h3>
             {(data.filters ?? []).map((rule, index) => (
@@ -774,6 +1141,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 field={field}
                 value={data.fields?.[field.key] ?? ""}
                 connections={connections}
+                fields={data.fields}
+                siblingFields={meta.fields}
+                config={config}
                 onChange={(value) => setField(field.key, value)}
               />
             ))}
@@ -796,6 +1166,95 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               })}
               onChange={(raw) => updateSelected((current) => ({ ...current, raw }))}
             />
+          </section>
+        )}
+        {meta && (
+          <section className="inspector-group">
+            <h3>Error handling</h3>
+            {/* on_fail and on_error are mutually exclusive on one step
+               (engine/logic.py); picking a real policy for one clears the
+               other, so a save can never carry both. */}
+            <FieldInput
+              field={onErrorField}
+              value={data.fields?.on_error ?? ""}
+              onChange={(value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_error: value, ...(value && value !== "halt" ? { on_fail: "" } : {}) }
+              }))}
+            />
+            <FieldInput
+              field={onFailField}
+              value={data.fields?.on_fail ?? ""}
+              onChange={(value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_fail: value, ...(value === "continue" ? { on_error: "" } : {}) }
+              }))}
+            />
+            {((data.fields?.on_error ?? "") === "run" ||
+              (data.fields?.error_actions ?? "").trim() !== "") && (
+              <FieldInput
+                field={errorActionsField}
+                value={data.fields?.error_actions ?? ""}
+                onChange={(value) => setField("error_actions", value)}
+              />
+            )}
+            <p className="inspector-hint">
+              What a failed step does. On error: halt (the default) fails the run,
+              continue records the failure and moves on, run also executes the
+              error steps. On fail: continue absorbs one failure — the step reads
+              skipped in run history. A handled failure is visible to later steps
+              as {"{steps.<id>.error}"}.
+            </p>
+          </section>
+        )}
+        {/* Console only, like the Test run panel: local mode has no admin
+           API to run the step against. */}
+        {config.mode === "console" && (
+          <section className="inspector-group">
+            <h3>Test step</h3>
+            <p className="inspector-hint">
+              Runs just this step against the Test run panel&rsquo;s sample event.
+              &ldquo;Run step&rdquo; executes it for real — side effects limited to
+              this step — and its output feeds the next step&rsquo;s test.
+            </p>
+            <div className="test-actions">
+              <button className="button secondary" type="button" disabled={stepTest.busy}
+                      onClick={() => testSelectedStep(false)}>
+                {stepTest.busy ? <Loader2 size={15} className="spin" /> : <FlaskConical size={15} />}
+                <span>Dry</span>
+              </button>
+              <button className="button danger" type="button" disabled={stepTest.busy}
+                      onClick={() => testSelectedStep(true)}>
+                <Play size={15} /><span>Run step</span>
+              </button>
+            </div>
+            {stepTest.nodeId === selected.id && stepTest.result && (
+              <div className={`test-result ${stepTest.result.error && stepTest.result.steps.length === 0 ? "failed" : stepTest.result.ok ? "passed" : ""}`}>
+                <p className="test-summary">
+                  {stepTest.result.error && stepTest.result.steps.length === 0
+                    ? stepTest.result.error
+                    : <strong>{stepTest.result.ok ? "Step ok" : "Step failed"}
+                        {stepTest.result.mode === "test-step" ? " (dry)" : ""}</strong>}
+                </p>
+                {stepTest.result.steps.map((step, index) => (
+                  <div key={`${step.action_id}-${index}`} className={step.ok ? "test-step ok" : "test-step failed"}>
+                    <span className="test-step-title">
+                      {step.action_id} <em>({step.action_type || "?"})</em>
+                      {!step.ok && <span className="test-step-error"> — {step.error}</span>}
+                    </span>
+                    {(step.warnings ?? []).map((warning) => (
+                      <span key={warning} className="test-step-error">warning: {warning}</span>
+                    ))}
+                    {step.rendered_input != null && (
+                      <pre className="test-io">{JSON.stringify(step.rendered_input, null, 2)}</pre>
+                    )}
+                    {step.output != null && (
+                      <pre className="test-io">output: {JSON.stringify(step.output, null, 2)}</pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
       </>
@@ -827,7 +1286,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <TriggerLogo connector={summary.connector} />
                 {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
               </span>
-              {!summary.enabled && <span className="workflow-disabled">disabled</span>}
+              {!summary.enabled && <span className="workflow-disabled">Off</span>}
             </button>
           ))}
           {summaries.length === 0 && <p className="inspector-hint">No workflows found.</p>}
@@ -884,16 +1343,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           <div className="topbar-actions">
             <label
               className="check-label enabled-toggle"
-              title={view === "yaml" ? "Edit enabled in the YAML view" : undefined}
+              title={view === "yaml" ? "Edit the on/off state in YAML" : "Applies when you save"}
             >
               <input
                 type="checkbox"
                 checked={enabled}
                 disabled={view === "yaml"}
                 onChange={(event) => setEnabled(event.target.checked)}
+                aria-label="Workflow state after saving"
               />
-              Enabled
+              {enabled ? "On" : "Off"}
             </label>
+            {enabled !== savedEnabled && <span className="state-save-hint">Save to apply</span>}
             {status.message && (
               <span className={`status-message ${status.kind}`}>
                 {status.kind === "busy" && <Loader2 size={14} className="spin" />}
@@ -908,6 +1369,17 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && (
               <button
+                className="button secondary"
+                type="button"
+                onClick={duplicateWorkflow}
+                disabled={status.kind === "busy" || !sourceName}
+                title={!sourceName ? "Save the workflow first — duplicates copy the saved file" : undefined}
+              >
+                <span>Duplicate</span>
+              </button>
+            )}
+            {config.mode === "console" && (
+              <button
                 className={testOpen ? "button secondary active" : "button secondary"}
                 type="button"
                 onClick={() => setTestOpen(!testOpen)}
@@ -918,7 +1390,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               </button>
             )}
             <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
-              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save to git" : "Saved"}</span>
+              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save changes" : "Saved"}</span>
             </button>
           </div>
         </header>
@@ -981,6 +1453,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <button className="button danger" type="button" disabled={testBusy} onClick={() => runTest(true)}>
                   <Play size={15} /><span>Run for real</span>
                 </button>
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={sampleBusy || testBusy}
+                  onClick={pullSample}
+                  title="Pull a real sample event for this workflow's trigger connector"
+                >
+                  {sampleBusy ? <Loader2 size={15} className="spin" /> : <CloudDownload size={15} />}
+                  <span>Pull sample</span>
+                </button>
               </div>
               {testResult && (
                 <div className={`test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`}>
@@ -993,7 +1475,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                           {testResult.matched
                             ? "a trigger matches the sample event."
                             : "NO trigger matches the sample event."}
-                          {testResult.enabled === false && <span> The workflow is disabled.</span>}
+                          {testResult.enabled === false && <span> This workflow is Off.</span>}
                           {testResult.error && <span> Run stopped: {testResult.error}</span>}
                         </>}
                   </p>

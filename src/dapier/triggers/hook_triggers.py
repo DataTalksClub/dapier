@@ -140,6 +140,33 @@ def get_item(name, table_ref=None):
     return {key: _decode_numbers(value) for key, value in item.items()} if item else None
 
 
+def update_data(update, hook_id):
+    """The published event data for one raw Telegram update.
+
+    Shared by the ingress hook (``api.router._telegram_hook``) and live
+    trigger discovery, so a discovered sample is exactly the shape a real
+    delivery publishes. Channel posts (announcement channels) carry no
+    "from"; text may arrive as a media caption with caption_entities
+    instead of entities.
+    """
+    message = (update.get("message") or update.get("edited_message")
+               or update.get("channel_post") or update.get("edited_channel_post") or {})
+    chat = message.get("chat") or {}
+    sender = message.get("from") or {}
+    return {
+        "hook": hook_id,
+        "update_id": update.get("update_id"),
+        "message_id": message.get("message_id"),
+        "text": message.get("text") or message.get("caption") or "",
+        "entities": message.get("entities") or message.get("caption_entities") or [],
+        "is_channel_post": bool(update.get("channel_post") or update.get("edited_channel_post")),
+        "chat_id": chat.get("id"),
+        "chat": chat,
+        "from": sender,
+        "update": update,
+    }
+
+
 def _telegram_connection(connection_id, connections_table):
     """Load the connection a telegram trigger binds to, verifying it fits."""
     if connections_table is not None:

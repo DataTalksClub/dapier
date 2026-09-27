@@ -1,10 +1,15 @@
-"""s3_upload action: put a fetched file into an S3 bucket with stored AWS keys.
+"""S3 actions: put a fetched file into a bucket and find objects by name.
 
-The file content comes from exactly one source: ``source_url`` (optionally
-authorized by a connection's bearer token) or ``source_s3`` (a staged
-``{bucket, key}`` object, like an email attachment or a render output). The
-target bucket is written with a credential's access key pair — the key/secret
-approach, not the stack's own identity — so backups can land in any bucket.
+``s3_upload`` sources the file from exactly one place: ``source_url``
+(optionally authorized by a connection's bearer token) or ``source_s3`` (a
+staged ``{bucket, key}`` object, like an email attachment or a render
+output). The target bucket is written with a credential's access key pair —
+the key/secret approach, not the stack's own identity — so backups can land
+in any bucket.
+
+``s3_find`` lists the bucket with the same stored keys and returns the first
+object whose key (or basename) matches a pattern; a miss is a ``found:
+False`` output, not an error.
 """
 from ...connections import credentials, tokens
 from . import base
@@ -12,6 +17,9 @@ from .templating import render
 
 DEFAULT_CREDENTIAL_ID = "aws"
 DOWNLOAD_TIMEOUT = 30
+FIND_MATCH_MODES = ("exact", "prefix", "suffix", "contains")
+FIND_PAGE_SIZE = 1000
+FIND_MAX_PAGES = 3
 
 
 def _aws_keys(action):
@@ -104,3 +112,76 @@ def run_s3_upload(action, event, *, transport=None, steps=None, s3_client=None):
         )
     client.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
     return {"bucket": bucket, "key": key, "bytes": len(body), "content_type": content_type}
+
+
+def _find_hit(mode, pattern, key):
+    """Whether ``key`` matches ``pattern`` under ``mode``.
+
+    The comparison runs against the full object key and — when that fails —
+    against the basename, so users can find ``report.pdf`` without spelling
+    the folder path.
+    """
+    for candidate in (key, key.rsplit("/", 1)[-1]):
+        if mode == "exact":
+            hit = candidate == pattern
+        elif mode == "prefix":
+            hit = candidate.startswith(pattern)
+        elif mode == "suffix":
+            hit = candidate.endswith(pattern)
+        else:  # contains
+            hit = pattern in candidate
+        if hit:
+            return True
+    return False
+
+
+def _find_client(action, s3_client):
+    """The injected test client, or a real one on the credential's key pair."""
+    if s3_client is not None:
+        return s3_client
+    access_key, secret_key = _aws_keys(action)
+    import boto3
+
+    return boto3.client(
+        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
+    )
+
+
+def run_s3_find(action, event, *, transport=None, steps=None, s3_client=None):
+    """Find the first object matching a pattern in a bucket (no exception on
+    a miss — the output's ``found`` flag carries the answer)."""
+    bucket = render(str(action.get("bucket") or ""), event, steps).strip()
+    if not bucket:
+        raise ValueError("s3_find requires a bucket")
+    pattern = render(str(action.get("pattern") or ""), event, steps).strip()
+    if not pattern:
+        raise ValueError("s3_find requires a pattern")
+    prefix = render(str(action.get("prefix") or ""), event, steps).strip()
+    mode = str(action.get("match") or "exact").strip().lower()
+    if mode not in FIND_MATCH_MODES:
+        raise ValueError(f"s3_find match must be one of: {', '.join(FIND_MATCH_MODES)}")
+    client = _find_client(action, s3_client)
+    token = None
+    for _page in range(FIND_MAX_PAGES):
+        kwargs = {"Bucket": bucket, "Prefix": prefix, "MaxKeys": FIND_PAGE_SIZE}
+        if token:
+            kwargs["ContinuationToken"] = token
+        response = client.list_objects_v2(**kwargs)
+        for item in response.get("Contents") or []:
+            key = str(item.get("Key") or "")
+            if not _find_hit(mode, pattern, key):
+                continue
+            last_modified = item.get("LastModified")
+            if hasattr(last_modified, "isoformat"):
+                last_modified = last_modified.isoformat()
+            return {
+                "found": True,
+                "key": key,
+                "size": item.get("Size"),
+                "last_modified": last_modified,
+                "bucket": bucket,
+            }
+        token = response.get("NextContinuationToken") if response.get("IsTruncated") else None
+        if not token:
+            break
+    return {"found": False, "key": None}

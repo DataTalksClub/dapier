@@ -4,7 +4,10 @@ import json
 import unittest
 from unittest.mock import patch
 
+from src.dapier.connections import credentials as credentials_module
+from src.dapier.connections import discovery as connections_discovery
 from src.dapier.connections.providers import telegram_api
+from src.dapier.connectors import registry
 from src.dapier.engine import execute, run_telegram_send
 from src.dapier.engine.actions import slack as slack_action
 
@@ -288,6 +291,83 @@ class TelegramToSlackFlowTests(unittest.TestCase):
         calls = self.run_event({"hook": "automator-telegram", "chat_id": "-1002136268305",
                                 "message_id": 3, "text": "llm news", "entities": []})
         self.assertEqual(calls[0]["channel"], "course-llm-zoomcamp")
+
+
+class ChatsDiscoveryTests(unittest.TestCase):
+    """The telegram.chats registry discovery behind the chat_id picker."""
+
+    CONNECTION = {"connection_id": "tg", "provider": "telegram",
+                  "status": "connected", "credential_id": "bot#tg"}
+
+    def chats_entry(self):
+        import src.dapier.connectors.telegram  # noqa: F401  (import = registration)
+
+        entry = next((d for d in registry.discoveries_for_provider("telegram")
+                      if f"{d.connector}.{d.name}" == "telegram.chats"), None)
+        self.assertIsNotNone(entry)
+        return entry
+
+    def test_dedupes_updates_into_id_name_items(self):
+        captured = []
+
+        def transport(method, url, *, headers=None, body=None, timeout=10):
+            captured.append((url, json.loads(body or b"{}")))
+            return 200, json.dumps({"ok": True, "result": [
+                {"update_id": 5, "message": {"chat": {"id": -10022, "title": "Bots",
+                                                      "type": "channel"},
+                                             "text": "hello"}},
+                {"update_id": 6, "channel_post": {"chat": {"id": -10022,
+                                                           "title": "Bots",
+                                                           "type": "channel"}}},
+                {"update_id": 7, "message": {"chat": {"id": 98765432, "type": "private",
+                                                      "username": "adaminer",
+                                                      "first_name": "Ada"}}},
+            ]}).encode()
+
+        with patch.object(credentials_module, "get_credential",
+                          lambda credential_id: {"token": "123456:AAAtok"}):
+            items = connections_discovery.discover(
+                self.CONNECTION, "telegram.chats", {}, limit=100, transport=transport)
+
+        self.assertEqual(items, [
+            {"id": "-10022", "name": "Bots", "type": "channel"},
+            {"id": "98765432", "name": "adaminer", "type": "private"},
+        ])
+        self.assertTrue(captured[0][0].endswith("/getUpdates"))
+        self.assertEqual(captured[0][1], {"limit": 100})
+
+    def test_missing_token_reports_a_verdict_not_an_item(self):
+        def transport(method, url, **kwargs):
+            return 200, json.dumps({"ok": True, "result": []}).encode()
+
+        with patch.object(credentials_module, "get_credential",
+                          lambda credential_id: {"token": ""}):
+            with self.assertRaises(connections_discovery.DiscoveryError) as ctx:
+                connections_discovery.discover(
+                    self.CONNECTION, "telegram.chats", {}, transport=transport)
+        self.assertIn("no stored token", str(ctx.exception))
+
+    def test_telegram_rejection_propagates(self):
+        def transport(method, url, **kwargs):
+            return 200, json.dumps({
+                "ok": False,
+                "description": "Conflict: can't use getUpdates method while webhook is active",
+            }).encode()
+
+        with patch.object(credentials_module, "get_credential",
+                          lambda credential_id: {"token": "123456:AAAtok"}):
+            with self.assertRaises(connections_discovery.DiscoveryError) as ctx:
+                connections_discovery.discover(
+                    self.CONNECTION, "telegram.chats", {}, transport=transport)
+        self.assertEqual(ctx.exception.status, 502)
+        self.assertIn("webhook", str(ctx.exception))
+
+    def test_chat_id_field_and_health_check_are_wired(self):
+        self.chats_entry()
+        action = registry.ACTIONS["telegram_send"]
+        chat_field = next(field for field in action.fields if field["key"] == "chat_id")
+        self.assertEqual(chat_field.get("discover"), {"resource": "telegram.chats"})
+        self.assertIsNotNone(registry.connection_test_for("telegram"))
 
 
 if __name__ == "__main__":

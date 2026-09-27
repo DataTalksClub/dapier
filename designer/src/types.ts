@@ -107,12 +107,17 @@ export interface TestStepResult {
   ok?: boolean;
   output?: Record<string, unknown>;
   error?: string;
+  warnings?: string[];
+  status?: string;
+  duration_ms?: number;
 }
 
-/** Payload of POST /designer/workflows/{file}/test (dry-run or execute). */
+/** Payload of POST /designer/workflows/{file}/test (dry-run or execute) and
+    POST /designer/workflows/test-step (one step, dry or live). */
 export interface TestRunResult {
   file?: string;
-  mode: "dry-run" | "execute";
+  mode: "dry-run" | "execute" | "test-step" | "execute-step";
+  action_id?: string;
   matched: boolean;
   enabled?: boolean;
   ok?: boolean;

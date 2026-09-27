@@ -271,5 +271,51 @@ def test_replay_event_tolerates_a_colon_free_run_id():
     assert event["correlation_id"] == "legacy-run"
 
 
+def test_api_list_filters_by_workflow(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1"),
+        _step("wf-2", "post", "evt-2"),
+        _step("wf-1", "post", "evt-3"),
+    ])
+
+    status, payload = runs.api_list(workflow_id="wf-1")
+    assert status == 200
+    listed = payload["runs"]
+    assert len(listed) == 2
+    assert all(run["workflow_id"] == "wf-1" for run in listed)
+
+
+def test_api_list_filters_by_status(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", status="failed"),
+        _step("wf-2", "post", "evt-2"),
+    ])
+
+    _, payload = runs.api_list(status="failed")
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-1"]
+
+
+def test_api_list_filters_by_since(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", started="2026-09-25T10:00:00+00:00"),
+        _step("wf-2", "post", "evt-2", started="2026-09-26T10:00:00+00:00"),
+        _step("wf-1", "post", "evt-3", started="2026-09-27T10:00:00+00:00"),
+    ])
+
+    _, payload = runs.api_list(since="2026-09-26T00:00:00+00:00")
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-3", "wf-2:evt-2"]
+
+
+def test_api_list_combines_filters(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", started="2026-09-25T10:00:00+00:00"),
+        _step("wf-1", "post", "evt-2", started="2026-09-26T10:00:00+00:00", status="failed"),
+        _step("wf-2", "post", "evt-3", started="2026-09-27T10:00:00+00:00"),
+    ])
+
+    _, payload = runs.api_list(workflow_id="wf-1", status="failed",
+                               since="2026-09-26T00:00:00+00:00")
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-2"]
+
 if __name__ == "__main__":
     pytest.main([__file__])

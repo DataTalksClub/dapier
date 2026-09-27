@@ -1,11 +1,11 @@
-import { Code2, DatabaseZap, FileText, Filter, GitBranch, ListTree, Send, Timer, Video, Webhook } from "lucide-react";
+import { Braces, Clock, Code2, DatabaseZap, FileText, Filter, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Timer, Video, Webhook, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, YouTubeLogo } from "./logos";
 
 /**
  * The node catalog — the single place to edit when the designer should know a
  * new engine action (see run_* dispatch in src/dapier/engine/__init__.py), an
- * in-workflow logic step (filter, condition, delay, for_each — executed by
+ * in-workflow logic step (filter, condition, paths, delay, for_each, digest — executed by
  * src/dapier/engine/logic.py), or trigger connector.
  *
  * Adding an action is one object in `actionCatalog`:
@@ -19,6 +19,11 @@ import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, YouTubeLogo } fro
  *      "boolean" writes true/false and stays out of the YAML while it matches
  *      its default, "select" offers fixed choices), `default` prefills new
  *      nodes and fills in values read from YAML that omit the key.
+ *
+ * `on_error`/`error_actions` are not per-entry fields: the engine accepts
+ * them on every step (engine/logic.py), so they render once as a generic
+ * "Error handling" inspector section and round-trip like catalog fields
+ * (errorHandlingFields, consumed by workflows.ts).
  *
  * Connectors are the products workflows hook into; each entry in
  * `connectorCatalog` renders as one trigger chip in the palette's Triggers
@@ -60,6 +65,25 @@ export interface CatalogField {
    * by display name and verified identity instead of a bare ID field.
    */
   provider?: string;
+  /**
+   * Offers a Browse… picker over the connector's live resources through the
+   * discovery API. `resource` is the serving catalog's bare resource name
+   * (the path segment after /discover/); `from` names the sibling field
+   * holding the account's connection id (default "connection_id"), which
+   * `account` overrides statically (e.g. the "aws" pseudo-connection);
+   * `params` maps discovery param names to sibling field keys — only these
+   * resolved, non-empty values ride along as the query string (the backend
+   * rejects unknown params with 400); `value` templates the picked item
+   * into the field (default "{id}", with {key} placeholders filled from
+   * the item).
+   */
+  discover?: {
+    resource: string;
+    from?: string;
+    params?: Record<string, string>;
+    account?: string;
+    value?: string;
+  };
 }
 
 export interface ActionEntry {
@@ -103,17 +127,63 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "http_request",
+    label: "HTTP request",
+    icon: Globe,
+    description: "Call any API: templated URL, headers and body; basic, bearer or API-key auth. Output: {status, body}.",
+    fields: [
+      { key: "url", label: "URL", required: true, placeholder: "https://api.example.com/items/{id}" },
+      { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "PATCH", "DELETE"], default: "GET" },
+      { key: "auth_type", label: "Auth", type: "select", options: ["none", "basic", "bearer", "api_key"], default: "none" },
+      { key: "auth_username", label: "Basic username" },
+      { key: "auth_password", label: "Basic password" },
+      { key: "auth_token", label: "Bearer token", placeholder: "or a connection ID" },
+      { key: "connection_id", label: "Connection ID", placeholder: "bearer token fallback" },
+      { key: "auth_key_name", label: "API key name", placeholder: "x-api-key" },
+      { key: "auth_key_value", label: "API key value" },
+      { key: "auth_key_in", label: "API key in", type: "select", options: ["header", "query"] },
+      { key: "headers", label: "Headers (YAML)", type: "textarea", placeholder: "accept: application/json\nx-trace: \"{trigger.id}\"" },
+      { key: "body", label: "Body template", type: "textarea", placeholder: '{"subject": "{subject}"}' },
+      { key: "content_type", label: "Content type", placeholder: "application/json" },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+    ]
+  },
+  {
     type: "slack",
     label: "Slack",
     icon: SlackLogo,
     fields: [
       { key: "credential_id", label: "Credential ID" },
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
-      { key: "channel", label: "Channel", placeholder: "#alerts", required: true },
+      { key: "channel", label: "Channel", placeholder: "#alerts", required: true,
+        discover: { resource: "channels" } },
       { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
       { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
       { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
+    ]
+  },
+  {
+    type: "slack_find_user",
+    label: "Slack: find user by email",
+    icon: SlackLogo,
+    description: "Look up one workspace user by email (users.lookupByEmail). Output: {found, user}.",
+    fields: [
+      { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", required: true, provider: "slack" },
+      { key: "email", label: "Email", placeholder: "person@example.com", required: true, discover: { resource: "users", value: "{email}" } },
+      { key: "credential_id", label: "Credential ID" }
+    ]
+  },
+  {
+    type: "slack_find",
+    label: "Slack: find user or channel",
+    icon: SlackLogo,
+    description: "Look up one workspace user (by email) or channel (by name). Output: {found, user} or {found, channel}.",
+    fields: [
+      { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+      { key: "find", label: "Find", type: "select", options: ["user", "channel"], default: "user" },
+      { key: "query", label: "Query", placeholder: "person@example.com or #channel", required: true },
+      { key: "credential_id", label: "Credential ID" }
     ]
   },
   {
@@ -123,9 +193,33 @@ export const actionCatalog: ActionEntry[] = [
     description: "Post a message through a Telegram bot connection. The chat defaults to the triggering Telegram message; other triggers name the chat explicitly.",
     fields: [
       { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
-      { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat" },
+      { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat",
+        discover: { resource: "chats" } },
       { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+    ]
+  },
+  {
+    type: "telegram_find_chat",
+    label: "Telegram find chat",
+    icon: Send,
+    description: "Look up one chat's profile (getChat); found is False when the bot cannot see it",
+    fields: [
+      { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+      { key: "chat_id", label: "Chat ID", required: true, placeholder: "@channel or -100…",
+        discover: { resource: "chats" } }
+    ]
+  },
+  {
+    type: "email_send",
+    label: "Send email",
+    icon: Mail,
+    fields: [
+      { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
+      { key: "subject", label: "Subject", placeholder: "{subject}" },
+      { key: "text", label: "Text body", type: "textarea" },
+      { key: "html", label: "HTML body", type: "textarea" },
+      { key: "sender", label: "Sender", placeholder: "defaults to the workflow sender" }
     ]
   },
   {
@@ -148,7 +242,8 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
       { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
-      { key: "folder", label: "Folder", placeholder: "/Invoices" },
+      { key: "folder", label: "Folder", placeholder: "/Invoices",
+        discover: { resource: "folders", value: "{path}" } },
       { key: "filename", label: "Filename override" }
     ]
   },
@@ -158,7 +253,23 @@ export const actionCatalog: ActionEntry[] = [
     icon: DropboxLogo,
     fields: [
       { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
-      { key: "path", label: "Path", placeholder: "defaults to the event's file path" }
+      { key: "path", label: "Path", placeholder: "defaults to the event's file path",
+        discover: { resource: "files", value: "{path}" } }
+    ]
+  },
+  {
+    type: "dropbox_find",
+    label: "Dropbox: find file or folder",
+    icon: DropboxLogo,
+    description: "Search the connection's Dropbox for one file or folder by name. Output: {found, item}; folder finds can create the folder when missing.",
+    fields: [
+      { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+      { key: "query", label: "Name to find", placeholder: "{filename}", required: true,
+        discover: { resource: "search", params: { query: "query" }, value: "{name}" } },
+      { key: "kind", label: "Kind", type: "select", options: ["any", "file", "folder"], default: "any" },
+      { key: "path", label: "Folder to search", placeholder: "defaults to the connection's root",
+        discover: { resource: "folders", value: "{path}" } },
+      { key: "create_if_missing", label: "Create folder if missing", type: "boolean", default: "false" }
     ]
   },
   {
@@ -168,11 +279,51 @@ export const actionCatalog: ActionEntry[] = [
     description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
     fields: [
       { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
-      { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true },
-      { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true },
-      { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+      { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true,
+        discover: { resource: "buckets", account: "aws" } },
+      { key: "key", label: "Object key", placeholder: "mailchimp/{name}", required: true,
+        discover: { resource: "objects", params: { bucket: "bucket" } } },
+      { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media",
+        discover: { resource: "files", from: "source_connection_id", value: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" } },
       { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
       { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
+    ]
+  },
+  {
+    type: "s3_find",
+    label: "S3: find object",
+    icon: S3Logo,
+    description: "Find the first object matching a name pattern in a bucket (Find Object)",
+    fields: [
+      { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+      { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true,
+        discover: { resource: "buckets", account: "aws" } },
+      { key: "pattern", label: "Name pattern", placeholder: "{name}.pdf", required: true },
+      { key: "prefix", label: "Key prefix", placeholder: "reports/2026/",
+        discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } } },
+      { key: "match", label: "Match", type: "select", options: ["exact", "prefix", "suffix", "contains"], default: "exact" }
+    ]
+  },
+  {
+    type: "drive_find_file",
+    label: "Drive: find file",
+    icon: FileText,
+    description: "Find the most recently modified Drive file matching a name (Find File)",
+    fields: [
+      { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+      { key: "name", label: "File name", placeholder: "report.pdf — substring unless Match is exact", required: true,
+        discover: { resource: "files", value: "{name}" } },
+      { key: "match", label: "Match", type: "select", options: ["contains", "exact"], default: "contains" }
+    ]
+  },
+  {
+    type: "youtube_find_video",
+    label: "YouTube: find video",
+    icon: YouTubeLogo,
+    description: "Find the top videos for a search query (Find Video)",
+    fields: [
+      { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+      { key: "query", label: "Search query", placeholder: "DataTalks kubernetes", required: true }
     ]
   },
   {
@@ -182,11 +333,81 @@ export const actionCatalog: ActionEntry[] = [
     description: "Append a row to a worksheet (Create Spreadsheet Row)",
     fields: [
       { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
-      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true },
-      { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)" },
+      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true,
+        discover: { resource: "spreadsheets" } },
+      { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)",
+        discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" } },
       { key: "values", label: "Row values (JSON)", type: "textarea", required: true,
         placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]' },
       { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+    ]
+  },
+  {
+    type: "sheets_find_row",
+    label: "Google Sheets (find row)",
+    icon: SheetsLogo,
+    description: "Find a row by a column's value, optionally create it (Find-or-create Spreadsheet Row)",
+    fields: [
+      { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true,
+        discover: { resource: "spreadsheets" } },
+      { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)",
+        discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" } },
+      { key: "match_field", label: "Match column (header name)", placeholder: "Task", required: true,
+        discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "sheet_name" }, value: "{name}" } },
+      { key: "match_value", label: "Match value", placeholder: "{text}", required: true },
+      { key: "create_if_missing", label: "Create the row when missing", type: "boolean", default: "false" },
+      { key: "values", label: "Row values for creation (JSON)", type: "textarea",
+        placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]' },
+      { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+    ]
+  },
+  {
+    type: "sheets_lookup_row",
+    label: "Google Sheets (lookup row)",
+    icon: SheetsLogo,
+    description: "Find worksheet rows whose column equals a value (Lookup Spreadsheet Row). Output: {found, row, values, matches}.",
+    fields: [
+      { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true,
+        discover: { resource: "spreadsheets" } },
+      { key: "worksheet", label: "Worksheet", placeholder: "todo", required: true,
+        discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" } },
+      { key: "column", label: "Column", placeholder: "B or Email", required: true,
+        discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{name}" } },
+      { key: "value", label: "Value", placeholder: "{text}", required: true },
+      { key: "limit", label: "Max matches", type: "number", default: "1" }
+    ]
+  },
+  {
+    type: "sheets_update_row",
+    label: "Google Sheets (update row)",
+    icon: SheetsLogo,
+    description: "Overwrite one worksheet row starting at column A (Update Spreadsheet Row). Pairs with sheets_lookup_row's row output.",
+    fields: [
+      { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+      { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true,
+        discover: { resource: "spreadsheets" } },
+      { key: "worksheet", label: "Worksheet", placeholder: "todo", required: true,
+        discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" } },
+      { key: "row", label: "Row number", type: "number", required: true, placeholder: "{steps.lookup.output.row}",
+        discover: { resource: "rows", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{row}" } },
+      { key: "values", label: "Row values (JSON)", type: "textarea", required: true,
+        placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "DONE"]' },
+      { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+    ]
+  },
+  {
+    type: "zoom_find_meeting",
+    label: "Zoom find meeting",
+    icon: Video,
+    description: "Find a Zoom meeting by id, or by topic among upcoming meetings",
+    fields: [
+      { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+      { key: "meeting_id", label: "Meeting ID",
+        discover: { resource: "meetings" } },
+      { key: "topic", label: "Topic", placeholder: "used when no meeting id is given" },
+      { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
     ]
   },
   {
@@ -227,12 +448,27 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "paths",
+    label: "Paths",
+    icon: GitBranch,
+    description: "Run the first matching branch's steps, or a default",
+    fields: [
+      { key: "paths", label: "Paths (YAML)", type: "yaml", required: true,
+        placeholder: "- label: invoices\n  when: {subject: {contains: invoice}}\n  actions:\n    - id: notify\n      type: slack\n      channel: \"#alerts\"\n      text: \"{subject}\"" },
+      { key: "default", label: "Default steps (YAML)", type: "yaml" }
+    ]
+  },
+  {
     type: "delay",
     label: "Delay",
     icon: Timer,
-    description: "Pause the chain before the next step (max 60s)",
+    description: "Pause the chain before the next step — over 60s the run suspends and the queue resumes it automatically",
     fields: [
-      { key: "seconds", label: "Seconds (max 60)", type: "number", required: true, placeholder: "30" }
+      { key: "seconds", label: "Seconds", type: "number", placeholder: "30" },
+      { key: "minutes", label: "Minutes", type: "number" },
+      { key: "hours", label: "Hours", type: "number" },
+      { key: "days", label: "Days", type: "number" },
+      { key: "until", label: "Until (ISO datetime)", placeholder: "2026-10-01T09:00:00Z" }
     ]
   },
   {
@@ -245,6 +481,18 @@ export const actionCatalog: ActionEntry[] = [
       { key: "item", label: "Item variable", default: "item" },
       { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
       { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: "- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: \"/Invoices/{item.filename}\"" }
+    ]
+  },
+  {
+    type: "digest",
+    label: "Digest",
+    icon: Layers,
+    description: "Accumulate items across runs, then flush them as one batch (a schedule trigger usually fires the flush). Later steps template {digest.items} and {digest.count}.",
+    fields: [
+      { key: "mode", label: "Mode", type: "select", options: ["accumulate", "flush"], default: "accumulate" },
+      { key: "key", label: "Digest key", placeholder: "nightly-invoices", required: true },
+      { key: "item", label: "Item (accumulate)", type: "textarea", placeholder: "{subject}" },
+      { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: "- \"{subject}\"\n- \"{trigger.occurred_at}\"" }
     ]
   },
   {
@@ -262,6 +510,95 @@ export const actionCatalog: ActionEntry[] = [
       },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
+  },
+  {
+    type: "js",
+    label: "Code (JavaScript)",
+    icon: Braces,
+    description: "Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`; `return` a value to make it the step result. console.log is captured.",
+    fields: [
+      {
+        key: "code",
+        label: "JavaScript source",
+        type: "textarea",
+        required: true,
+        placeholder: "// event data is `input`; return the result\nreturn {route: input.route, score: (input.items || []).length}"
+      },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+    ]
+  },
+  {
+    type: "run_workflow",
+    label: "Run workflow",
+    icon: Workflow,
+    description: "Run another published workflow in-process and expose its step outputs to later templating. Nested sub-runs cap at depth 2 (A→B→C runs, A→B→C→D fails); a workflow calling itself is rejected.",
+    fields: [
+      { key: "workflow_id", label: "Workflow ID", placeholder: "invoice-notify", required: true },
+      { key: "payload", label: "Payload (JSON or template)", type: "textarea", placeholder: "{\"subject\": \"{subject}\"}" },
+      { key: "output_field", label: "Output field", placeholder: "notify" }
+    ]
+  },
+  {
+    type: "storage_get",
+    label: "Storage: get",
+    icon: DatabaseZap,
+    description: "Read this workflow's persistent key-value state (cross-run memory). A missing key is {found: false}, not an error.",
+    fields: [
+      { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+    ]
+  },
+  {
+    type: "storage_set",
+    label: "Storage: set",
+    icon: DatabaseZap,
+    description: "Write this workflow's persistent key-value state; templates render against the event and earlier steps. Optional TTL cleans the value up.",
+    fields: [
+      { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true },
+      { key: "value", label: "Value", type: "textarea", required: true, placeholder: "{steps.lookup.output.row}" },
+      { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+    ]
+  },
+  {
+    type: "storage_delete",
+    label: "Storage: delete",
+    icon: DatabaseZap,
+    description: "Remove one key from this workflow's storage; deleting a missing key is fine ({deleted: false}).",
+    fields: [
+      { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+    ]
+  },
+  {
+    type: "storage_find",
+    label: "Storage: find",
+    icon: DatabaseZap,
+    description: "List this workflow's stored keys under a prefix, ascending (default 20, at most 50) — the search half of Zapier Storage.",
+    fields: [
+      { key: "prefix", label: "Key prefix", placeholder: "seen/", required: true },
+      { key: "limit", label: "Max keys", type: "number" }
+    ]
+  },
+  {
+    type: "digest_add",
+    label: "Digest: add",
+    icon: ListTree,
+    description: "Collect an item into this workflow's digest so a later (e.g. scheduled) run can release the list together — Zapier's Digest. dedupe: true skips a repeat item; holds up to max_items pending (default 500), dropping the oldest beyond that.",
+    fields: [
+      { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+      { key: "item", label: "Item", type: "textarea", placeholder: "{text}" },
+      { key: "dedupe", label: "Skip if already pending", type: "boolean", default: "false" },
+      { key: "max_items", label: "Hold at most (drop oldest beyond)", type: "number" },
+      { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+    ]
+  },
+  {
+    type: "digest_flush",
+    label: "Digest: flush",
+    icon: ListTree,
+    description: "Release this workflow's collected digest items as one list ({items, count, empty}, arrival order) and empty it. Branch on empty with a filter step when a scheduled run may have nothing to release. reset: false peeks without clearing.",
+    fields: [
+      { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+      { key: "reset", label: "Clear after reading", type: "boolean", default: "true" }
+    ]
   }
 ];
 
@@ -271,7 +608,46 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
   { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
+  { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
+  { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
   { name: "custom", label: "Custom", logo: Webhook, events: [] }
 ];
 
 export const filterOperators = ["equals", "prefix", "suffix", "contains"] as const;
+
+/**
+ * Generic per-step error handling (engine/logic.py): a step that fails runs
+ * its `on_error` policy — halt aborts the run (the default), continue records
+ * the failure and moves on, run also executes `error_actions` as a sub-chain.
+ * The failed step's message is templatable as `{steps.<id>.error}`. Legal on
+ * every action and logic step, so these live outside the per-entry fields.
+ */
+export const onErrorField: CatalogField = {
+  key: "on_error",
+  label: "On error",
+  type: "select",
+  options: ["halt", "continue", "run"],
+  default: "halt"
+};
+
+export const errorActionsField: CatalogField = {
+  key: "error_actions",
+  label: "Error steps (YAML)",
+  type: "yaml",
+  placeholder: '- id: alert\n  type: slack\n  channel: "#alerts"\n  text: "step failed: {steps.upload.error}"'
+};
+
+/**
+ * The lighter failure policy (engine/logic.py): `continue` absorbs one step's
+ * failure — the step reads `skipped` in run history — while absent or `halt`
+ * fails the run. Mutually exclusive with `on_error` on one step.
+ */
+export const onFailField: CatalogField = {
+  key: "on_fail",
+  label: "On fail",
+  type: "select",
+  options: ["continue", "halt"],
+  default: "halt"
+};
+
+export const errorHandlingFields: CatalogField[] = [onErrorField, onFailField, errorActionsField];

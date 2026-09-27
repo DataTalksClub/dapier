@@ -16,7 +16,7 @@ from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401
 from .actions.dropbox import run_dropbox_delete, run_dropbox_upload  # noqa: F401
 from .actions.render import run_render_job  # noqa: F401
-from .actions.code import run_code  # noqa: F401
+from .actions.code import run_code, run_js  # noqa: F401
 from .logic import run_chain
 
 
@@ -35,23 +35,31 @@ def execute(event, before_action=None, after_action=None, on_action_error=None, 
     ``workflows`` restricts the run to those definitions (the test-run path
     passes exactly the workflow under test); default is the full catalog.
 
-    The chain may mix connector actions with logic steps (filter, condition,
+    The chain may mix connector actions with logic steps (filter, condition, paths,
     delay, for_each — see engine.logic). The hooks carry the step telemetry:
     ``before_action`` also gets the action type, ``after_action`` gets the
     runner's output summary, the step duration, and the terminal status
-    (``completed`` or ``filtered``), and ``on_action_error`` gets the duration
-    of the failed attempt. Runners return a small JSON-safe dict describing
-    what happened (message ids, paths, HTTP statuses) — it lands on the run
-    record.
+    (``completed``, ``filtered``, or ``failed`` for a step that failed under
+    ``on_error: continue|run`` — engine.logic keeps the run going), and
+    ``on_action_error`` gets the duration of the failed attempt. Runners
+    return a small JSON-safe dict describing what happened (message ids,
+    paths, HTTP statuses) — it lands on the run record.
 
     Step outputs accumulate per workflow run in a ``steps`` mapping shaped
-    like the run history (``{action_id: {"status": ..., "output": ...}}``);
-    the templating runners receive it so later steps can reference earlier
-    ones: ``{steps.<action_id>.output.<path>}``, ``{steps.<action_id>.status}``.
+    like the run history (``{action_id: {"status": ..., "output": ...}}``;
+    handled step failures add ``"error"``); the templating runners receive it
+    so later steps can reference earlier ones:
+    ``{steps.<action_id>.output.<path>}``, ``{steps.<action_id>.status}``,
+    ``{steps.<action_id>.error}``.
+
+    Returns the ids of the workflows that matched and ran — the trigger
+    inbox records them so unmatched events stay visible.
 
     """
+    matched = []
     for workflow in (all_workflows() if workflows is None else workflows):
         if matches(workflow, event):
+            matched.append(workflow["id"])
             run_chain(
                 workflow["id"], workflow.get("actions", []), event,
                 _run_connector,
@@ -59,3 +67,4 @@ def execute(event, before_action=None, after_action=None, on_action_error=None, 
                 after_action=after_action,
                 on_action_error=on_action_error,
             )
+    return matched

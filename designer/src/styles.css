@@ -402,6 +402,8 @@ a.brand:hover span:last-child {
   gap: 8px;
 }
 
+.state-save-hint { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+
 /* Enabled sits with the save action: the workflow's on/off switch belongs
    next to the button that publishes it. */
 .topbar-actions .check-label {
@@ -1196,7 +1198,8 @@ textarea:focus {
   word-break: break-word;
 }
 
-.leave-backdrop {
+.leave-backdrop,
+.picker-backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -1218,6 +1221,91 @@ textarea:focus {
 .leave-prompt p { margin: 0 0 22px; color: var(--text-soft); }
 .leave-prompt .leave-error { color: var(--danger-text); margin-bottom: 14px; }
 .leave-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+/* Discovery picker: the leave prompt's dialog idiom over a scrollable list of
+   live resources; Browse… sits beside the field it fills. */
+.discover-field {
+  display: flex;
+  gap: 6px;
+}
+
+.discover-field input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.discover-field .button.quiet {
+  flex-shrink: 0;
+}
+
+.picker-panel {
+  width: min(100%, 480px);
+  background: var(--surface);
+  border: 1px solid var(--section-border);
+  box-shadow: 8px 8px 0 rgb(0 0 0 / 25%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(560px, 100%);
+  padding: 24px;
+}
+
+.picker-panel h2 {
+  font-size: 16px;
+}
+
+.picker-panel input {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.picker-status {
+  color: var(--text-soft);
+  font-size: 12.5px;
+}
+
+.picker-error {
+  color: var(--danger-text);
+  font-size: 12.5px;
+}
+
+.picker-list {
+  border-top: 1px solid var(--section-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.picker-item {
+  align-items: baseline;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--section-border);
+  color: var(--text-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 6px;
+  text-align: left;
+}
+
+.picker-item:hover {
+  background: var(--muted-bg-hover);
+}
+
+.picker-item-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.picker-item-id {
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 
 .node-jump {
   display: flex;
@@ -1246,3 +1334,22 @@ textarea:focus {
 }
 .node-jump-item:hover, .node-jump-item.selected { background: var(--active-bg); border-color: var(--active-border); color: var(--active-text); }
 .node-jump-item:focus-visible { outline: 2px solid var(--active-border); outline-offset: 1px; }
+
+/* {trigger.*} sample chips in the trigger inspector: click copies the
+   template for pasting into an action field. */
+.template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.template-chip {
+  background: var(--active-bg);
+  border: 1px solid var(--section-border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+}
+.template-chip:hover { border-color: var(--active-border); color: var(--active-text); }

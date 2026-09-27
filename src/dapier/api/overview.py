@@ -8,6 +8,7 @@ import yaml
 from ..auth import api_tokens
 from .. import http
 from ..triggers import email_triggers, published_workflows
+from ..engine import usage
 from . import runs
 from ..connections.credentials import CREDENTIAL_SPECS, credential_status
 from ..connections.providers import oauth_clients
@@ -97,6 +98,13 @@ def _email_triggers():
         "yaml_routes": yaml_routes,
     }
 
+def _usage():
+    """The 3-month usage block; empty when the rollup table is not wired."""
+    if not os.environ.get("TASK_USAGE_TABLE"):
+        return []
+    return usage.api_usage(3)[1].get("usage", [])
+
+
 def overview():
     executions = sorted(
         _scan(os.environ["EXECUTIONS_TABLE"]),
@@ -111,6 +119,7 @@ def overview():
         "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
         "runs": runs.recent(25),
+        "usage": _usage(),
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
         "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],

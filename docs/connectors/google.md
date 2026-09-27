@@ -72,11 +72,23 @@ There is no separate Drive scope for watching changes: `drive.readonly` is
 accepted by the Drive Changes API, including `changes.watch`. A watch
 notification only signals that changes are available; Dapier still needs code
 to fetch and process the changes feed. Current Dapier implementation includes
-a Sheets row-append action, but no general Docs editor or Drive file watcher.
-Configuring OAuth scopes does not implement those workflow features. See
-Google's [Docs scopes](https://developers.google.com/workspace/docs/api/auth),
+Sheets row-append and find-row actions, but no general Docs editor or Drive
+file watcher. Configuring OAuth scopes does not implement those workflow
+features. See Google's [Docs scopes](https://developers.google.com/workspace/docs/api/auth),
 [Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes),
 and [Drive change notifications](https://developers.google.com/workspace/drive/api/guides/manage-changes).
+
+## The Sheets find-row action
+
+`sheets_find_row` reads a worksheet (header row plus data) and returns the
+first row whose cell under the match column equals the match value; with
+**Create if missing** it appends the row from Row values instead of failing.
+Later steps read the result through the steps context, shaped as
+`{steps.<step id>.output.*}`: for a step with `id: find`, templates can use
+`{steps.find.output.found}`, `{steps.find.output.row.Task}`,
+`{steps.find.output.row_number}`, and, after a create,
+`{steps.find.output.updated_range}`. A `filter` step on
+`{steps.find.output.found}` gives found / not-found branching.
 
 ## The two Workspace account connections
 
@@ -129,6 +141,28 @@ uv run dapier connections connect google-sheets --agent <agent-name>
 
 Check the Google account on the consent screen before approving. Then inspect
 the connection to verify which scopes the token actually received.
+
+#### Sheets actions
+
+The catalog ships two actions against this connection. **Google Sheets**
+(`sheets_append_row`) appends rows after the worksheet's last row of data.
+**Google Sheets (find row)** (`sheets_find_row`) returns the first row whose
+cell under a header column matches a value: `found`, `row_number`,
+`row.<Column>`, and `values` land in the step output, so later steps template
+them as `{steps.<step-id>.output.row.Task}`. With **Create if missing**
+enabled, a miss appends the row from *Row values* instead and the output
+gains `created: true` — Zapier's find-or-create shape. The match column is
+matched against the header row trimmed and case-insensitively; the match
+value, trimmed and case-sensitively. Both fields offer discovery pickers
+(spreadsheets, worksheets, header columns) on the connection.
+
+### Discovery resources
+
+Google connections list live resources over `dapier connections discover <connection>`
+and the console/CLI pickers: `spreadsheets`, `files`, `folders` (Drive folders),
+`worksheets`, `columns`, and `rows` (the first rows of one worksheet, with
+`spreadsheet_id` and optional `worksheet` params; trailing empty cells are
+trimmed and each row keeps its spreadsheet row number).
 
 ### Calendar, YouTube, and other accounts
 

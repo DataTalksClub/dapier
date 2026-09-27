@@ -371,7 +371,8 @@ def test_workflows_test_dry_run(monkeypatch, tmp_path, capsys):
     assert code == 0
     assert (seen["method"], seen["path"]) == ("POST", "/api/agent/designer/workflows/test")
     assert seen["body"] == {"yaml": "id: notify-video\n",
-                            "event": {"title": "Dry-run demo"}, "execute": False}
+                            "event": {"title": "Dry-run demo"}, "execute": False,
+                            "strict": False}
     out, _ = capsys.readouterr()
     assert "Dry run: notify-video.yaml" in out
     assert "a trigger matches" in out
@@ -398,7 +399,8 @@ def test_workflows_test_event_file_and_execute(monkeypatch, tmp_path):
     code = commands.workflows_test("https://api.example.test", str(workflow_file),
                                    f"@{event_file}", execute=True)
     assert code == 0
-    assert seen["body"] == {"yaml": "id: wf\n", "event": {"title": "from file"}, "execute": True}
+    assert seen["body"] == {"yaml": "id: wf\n", "event": {"title": "from file"},
+                            "execute": True, "strict": False}
 
 
 def test_workflows_test_reports_problems_with_exit_code(monkeypatch, tmp_path, capsys):
@@ -438,12 +440,15 @@ def test_main_workflows_test_parsing(monkeypatch):
 
     seen = {}
 
-    def fake_test(api_url, path, event_spec, execute=False, debug=False):
-        seen.update(path=path, event=event_spec, execute=execute)
+    def fake_test(api_url, path, event_spec, execute=False, strict=False, debug=False):
+        seen.update(path=path, event=event_spec, execute=execute, strict=strict)
         return 0
 
     monkeypatch.setattr(commands, "workflows_test", fake_test)
     assert main.main(["workflows", "test", "wf.yaml", "--event", '{"a": 1}']) == 0
-    assert seen == {"path": "wf.yaml", "event": '{"a": 1}', "execute": False}
-    assert main.main(["workflows", "test", "wf.yaml", "--event", "@e.json", "--execute"]) == 0
+    assert seen == {"path": "wf.yaml", "event": '{"a": 1}', "execute": False,
+                    "strict": False}
+    assert main.main(["workflows", "test", "wf.yaml", "--event", "@e.json",
+                      "--execute", "--strict"]) == 0
     assert seen["execute"] is True and seen["event"] == "@e.json"
+    assert seen["strict"] is True

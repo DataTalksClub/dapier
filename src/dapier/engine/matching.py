@@ -137,7 +137,37 @@ def all_workflows():
         extra = extra + poll_triggers.load_workflows()
     return list(merged.values()) + extra
 
+def _ordered(left, right):
+    """A three-way compare for the ordering operators: numeric when BOTH
+    sides parse as float (so 9 < 10), else lexicographic — which is what
+    makes ISO dates ("2026-09-28T...") compare correctly. Unknown operators
+    and unparseable sides degrade to strings rather than erroring; a missing
+    value reads as "" (which parses as neither, so it orders lexicographically
+    below everything, like equals treats it as empty).
+    """
+    try:
+        left, right = float(left), float(right)
+    except (TypeError, ValueError):
+        left, right = str(left), str(right)
+    return (left > right) - (left < right)
+
+
+def _present(text):
+    return bool(text)
+
+
 def _matches_filter(value, rule):
+    """One filter rule: ``{operator: expected}`` (or a mapping of them, all
+    required), with the value stringified first like every trigger filter.
+
+    Operators: equals, not_equals, in, prefix, suffix, contains,
+    does_not_contain, gt, lt, gte, lte (numeric when both sides parse as
+    float, else lexicographic — see _ordered), exists and empty (present =
+    non-empty after stringifying; the expected boolean flips the sense, so
+    ``exists: true`` requires a value and ``empty: true`` requires its
+    absence). An unknown operator raises KeyError — the callers turn that
+    into a loud config error, never a quiet no-match.
+    """
     text = "" if value is None else str(value)
     if not isinstance(rule, dict):
         return value == rule
@@ -147,6 +177,14 @@ def _matches_filter(value, rule):
         "prefix": lambda expected: text.startswith(str(expected)),
         "suffix": lambda expected: text.endswith(str(expected)),
         "contains": lambda expected: str(expected) in text,
+        "not_equals": lambda expected: text != str(expected),
+        "does_not_contain": lambda expected: str(expected) not in text,
+        "gt": lambda expected: _ordered(text, str(expected)) > 0,
+        "gte": lambda expected: _ordered(text, str(expected)) >= 0,
+        "lt": lambda expected: _ordered(text, str(expected)) < 0,
+        "lte": lambda expected: _ordered(text, str(expected)) <= 0,
+        "exists": lambda expected: _present(text) == bool(expected),
+        "empty": lambda expected: _present(text) != bool(expected),
     }[operator](expected) for operator, expected in rule.items())
 
 def matches(workflow, event):

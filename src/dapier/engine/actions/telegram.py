@@ -31,3 +31,36 @@ def run_telegram_send(action, event, *, transport=None, steps=None):
         "message_id": result.get("message_id"),
         "chat_id": (result.get("chat") or {}).get("id", chat_id),
     }
+
+
+def run_telegram_find_chat(action, event, *, transport=None, steps=None):
+    """Look up one chat's profile through the bot connection (getChat).
+
+    A chat the bot cannot see is a verdict (``found: False``), not an error
+    — Telegram rejects getChat with "chat not found" — so a workflow can
+    branch on the outcome; every other Telegram rejection still raises.
+    """
+    connection = base._connected_connection(action["connection_id"])
+    secret = credentials.get_credential(connection["credential_id"])
+    token = secret.get("token")
+    if not token:
+        raise ValueError("Telegram connection has no stored bot token")
+    chat_id = render(str(action.get("chat_id") or ""), event, steps).strip()
+    if not chat_id:
+        raise ValueError("telegram_find_chat requires a chat_id")
+    try:
+        chat = telegram_api.call(
+            token, "getChat", {"chat_id": chat_id}, transport=transport) or {}
+    except telegram_api.TelegramApiError as exc:
+        if "chat not found" in str(exc).lower():
+            return {"found": False, "chat": None}
+        raise
+    return {
+        "found": True,
+        "chat": {
+            "id": chat.get("id"),
+            "title": chat.get("title"),
+            "username": chat.get("username"),
+            "type": chat.get("type"),
+        },
+    }
