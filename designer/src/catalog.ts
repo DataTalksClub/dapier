@@ -110,9 +110,16 @@ export interface ConnectorEntry {
 
 /**
  * Operators the in-workflow logic steps (filter, condition) accept — the same
- * matching engine as trigger filters, plus "in".
+ * matching engine as trigger filters (engine/matching.py _matches_filter,
+ * mirrored by registry.LOGIC_OPERATORS): compares run against the stringified
+ * value; gt/gte/lt/lte compare numerically when both sides parse as numbers,
+ * else lexicographically (so ISO dates order correctly); exists/empty test
+ * for a present, non-empty value (the expected boolean flips the sense).
  */
-export const logicOperators = ["equals", "in", "prefix", "suffix", "contains"] as const;
+export const logicOperators = [
+  "equals", "not_equals", "in", "prefix", "suffix", "contains",
+  "does_not_contain", "gt", "gte", "lt", "lte", "exists", "empty"
+] as const;
 
 /** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
@@ -122,6 +129,7 @@ export const actionCatalog: ActionEntry[] = [
     icon: Webhook,
     fields: [
       { key: "url", label: "URL", required: true },
+      { key: "payload", label: "Payload (JSON, templated)", type: "textarea", placeholder: '{"id": "{trigger.id}"}' },
       { key: "secret_id", label: "Signing secret ID", placeholder: "dapier/webhook" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
@@ -492,7 +500,8 @@ export const actionCatalog: ActionEntry[] = [
       { key: "mode", label: "Mode", type: "select", options: ["accumulate", "flush"], default: "accumulate" },
       { key: "key", label: "Digest key", placeholder: "nightly-invoices", required: true },
       { key: "item", label: "Item (accumulate)", type: "textarea", placeholder: "{subject}" },
-      { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: "- \"{subject}\"\n- \"{trigger.occurred_at}\"" }
+      { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: "- \"{subject}\"\n- \"{trigger.occurred_at}\"" },
+      { key: "shared", label: "Shared across workflows", type: "boolean", default: "false" }
     ]
   },
   {
@@ -613,7 +622,24 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "custom", label: "Custom", logo: Webhook, events: [] }
 ];
 
-export const filterOperators = ["equals", "prefix", "suffix", "contains"] as const;
+/** Mirrors registry.FILTER_OPERATORS (engine/matching.py): the operators a
+ * trigger's `filters` rules accept — the same evaluator as the logic steps. */
+export const filterOperators = [
+  "equals", "not_equals", "in", "prefix", "suffix", "contains",
+  "does_not_contain", "gt", "gte", "lt", "lte", "exists", "empty"
+] as const;
+
+/**
+ * Per-step autoretry (Zapier's autoretry, engine/logic.py): connector actions
+ * only, never logic steps. A failed action retries `attempts` times (1-3,
+ * total tries = attempts + 1) with exponential backoff — `initial_seconds`
+ * doubling up to `max_seconds` (both 1-60; defaults 1 and 60), plus jitter —
+ * and only then falls through to `on_fail`/`on_error`. The step's output
+ * records `attempts` (tries made), so run history shows a step that
+ * succeeded on try 3. Opt-in per step; no inspector field yet (it is a
+ * mapping, so edit it in the workflow YAML — the registry validates the
+ * shape at save time via registry.validate_autoretry_key).
+ */
 
 /**
  * Generic per-step error handling (engine/logic.py): a step that fails runs

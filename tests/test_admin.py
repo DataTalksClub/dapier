@@ -657,3 +657,97 @@ def test_admin_errors_summary_route(monkeypatch):
     assert body["workflows"][0]["workflow_id"] == "wf-1"
     assert body["workflows"][0]["failed_runs"] == 1
     assert body["workflows"][0]["last_error"] == "boom"
+
+
+# --- Cancel of a suspended run (POST /api/admin/runs/{id}/cancel) ---
+
+def _configure_delayed_run(monkeypatch, items):
+    """Operator session plus an executions table that records updates."""
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                            "exp": int(time.time()) + 600})
+    updates = []
+
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+        def update_item(self, **kwargs):
+            updates.append(kwargs)
+            for item in items:
+                if item.get("execution_id") == kwargs["Key"]["execution_id"]:
+                    item["status"] = kwargs["ExpressionAttributeValues"][":cancelled"]
+            return {}
+
+    class Dynamo:
+        def Table(self, _name):
+            return RunsTable()
+
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    return [f"dapier_session={cookie}"], updates
+
+
+def test_admin_run_cancel_closes_the_delayed_steps(monkeypatch):
+    cookies, updates = _configure_delayed_run(monkeypatch, [{
+        "execution_id": "wf-1:pause:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "pause", "action_type": "delay",
+        "connector": "email", "event_type": "message.received", "status": "delayed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:00+00:00",
+        "output": {"resume_at": "2026-09-26T10:00:00+00:00"},
+    }])
+    audited = []
+    monkeypatch.setattr(admin.routes.session, "_audit_event",
+                        lambda *a, **k: audited.append((a, k)))
+
+    cancelled = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/cancel", cookies=cookies),
+        "POST", "/api/admin/runs/wf-1%3Aevt-1/cancel",
+    )
+
+    assert cancelled["statusCode"] == 200
+    body = json.loads(cancelled["body"])
+    assert body["accepted"] is True
+    assert body["cancelled"] == 1
+    assert body["run"]["status"] == "cancelled"
+    flip = updates[0]
+    assert flip["Key"] == {"execution_id": "wf-1:pause:evt-1"}
+    # Conditional close-out: a resume landing at the same moment cannot
+    # double-write the step.
+    assert flip["ConditionExpression"] == "#status = :delayed"
+    assert flip["ExpressionAttributeValues"][":cancelled"] == "cancelled"
+    assert audited == [(("wf-1:evt-1", "runs.cancel", "op-sub"), {"outcome": "ok"})]
+
+
+def test_admin_run_cancel_not_suspended_is_409(monkeypatch):
+    cookies, updates = _configure_delayed_run(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    }])
+
+    cancelled = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/cancel", cookies=cookies),
+        "POST", "/api/admin/runs/wf-1%3Aevt-1/cancel",
+    )
+
+    assert cancelled["statusCode"] == 409
+    assert json.loads(cancelled["body"])["error"] == "Run is not suspended; nothing to cancel"
+    assert updates == []
+
+
+def test_admin_run_cancel_requires_authentication(monkeypatch):
+    _configure_delayed_run(monkeypatch, [])
+
+    cancelled = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1:evt-1/cancel", cookies=[]),
+        "POST", "/api/admin/runs/wf-1:evt-1/cancel",
+    )
+
+    assert cancelled["statusCode"] == 401

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 GSI_NAME = "runs-by-run-id"
 
@@ -78,7 +79,9 @@ def run_summary(run_id, items):
     A ``delayed`` step means the run is parked on a long wait — the queue
     resumes it at the recorded moment (engine.worker) — and ranks the same
     way; once the resume has closed the paused steps out ``completed``, the
-    rollup reads completed again.
+    rollup reads completed again. A ``cancelled`` step means a suspended run
+    was deliberately stopped — its workflow went away, or an operator
+    cancelled it — and the parked continuation was dropped: nothing resumes.
     """
     statuses = [item.get("status", "") for item in items]
     if any(status == "failed" for status in statuses):
@@ -87,6 +90,8 @@ def run_summary(run_id, items):
         status = "processing"
     elif any(status == "delayed" for status in statuses):
         status = "delayed"
+    elif any(status == "cancelled" for status in statuses):
+        status = "cancelled"
     elif any(status == "filtered" for status in statuses):
         status = "filtered"
     else:
@@ -382,6 +387,60 @@ def api_replay(run_id, *, queue=None):
         "replayed_from": run_id,
         "event_id": event["id"],
         "run_id": f"{workflow_id}:{event['id']}",
+    }
+
+
+def api_cancel(run_id):
+    """Cancel a suspended run: its parked steps close out ``cancelled``.
+
+    The durable record of a suspension is the run history itself — a parked
+    run's delay steps read ``delayed`` until the queue resumes it — so
+    cancelling means flipping every still-``delayed`` step of the run to
+    ``cancelled``. Each write is conditional on the step still being parked
+    (the same conditional-update style the worker's close-out uses), so a
+    resume landing at the same moment cannot double-write a step: exactly
+    one side wins, and the worker drops the envelope when it finds the pause
+    cancelled. The response carries the rolled-up run after the flip; a run
+    with nothing parked is not suspended, hence the 409.
+    """
+    run_id = str(run_id or "").strip()
+    if not run_id:
+        return 400, {"error": "run_id is required"}
+    status, payload = api_get(run_id)
+    if status != 200:
+        return status, payload
+    parked = [step for step in payload.get("steps") or []
+              if step.get("status") == "delayed"]
+    if not parked:
+        return 409, {"error": "Run is not suspended; nothing to cancel"}
+    table = _table()
+    cancelled = 0
+    for step in parked:
+        try:
+            table.update_item(
+                Key={"execution_id": step.get("execution_id")},
+                UpdateExpression=("SET #status = :cancelled, finished_at = :finished, "
+                                  "expires_at = :expires"),
+                ConditionExpression="#status = :delayed",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":cancelled": "cancelled",
+                    ":delayed": "delayed",
+                    ":finished": datetime.now(timezone.utc).isoformat(),
+                    ":expires": int(datetime.now(timezone.utc).timestamp()) + 90 * 86400,
+                },
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+            continue  # a resume (or a second cancel) already settled the step
+        cancelled += 1
+    _, refreshed = api_get(run_id)
+    return 200, {
+        "accepted": True,
+        "run_id": run_id,
+        "cancelled": cancelled,
+        "run": refreshed.get("run") or {},
     }
 
 

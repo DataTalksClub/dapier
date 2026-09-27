@@ -131,6 +131,9 @@ def build_parser():
     runs_replay_failed_p = runs_sub.add_parser(
         "replay-failed", help="Re-run the latest failed runs of one workflow")
     runs_replay_failed_p.add_argument("workflow_id", help="Workflow whose failed runs to replay")
+    runs_cancel_p = runs_sub.add_parser(
+        "cancel", help="Cancel a suspended run: it closes out cancelled and will not resume")
+    runs_cancel_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
 
     usage_p = sub.add_parser("usage", help="Task usage rollup: tasks per workflow per month")
     usage_p.add_argument("--months", type=int, default=12,
@@ -576,6 +579,8 @@ def cmd_runs(args, api_url, debug):
         return commands.runs_replay(api_url, args.run_id, debug)
     if args.command == "replay-failed":
         return commands.runs_replay_failed(api_url, args.workflow_id, debug)
+    if args.command == "cancel":
+        return commands.runs_cancel(api_url, args.run_id, debug)
     return 2
 
 

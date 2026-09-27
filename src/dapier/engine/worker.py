@@ -327,6 +327,70 @@ def _park_suspension(susp, *, queue=None):
     )
 
 
+def _run_steps(run_id):
+    """The run's step records, read the way the runs API reads them: one GSI
+    query over the same index api/runs.py groups runs by."""
+    from boto3.dynamodb.conditions import Key
+
+    import boto3
+
+    return boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).query(
+        IndexName="runs-by-run-id",
+        KeyConditionExpression=Key("run_id").eq(str(run_id)),
+    ).get("Items", [])
+
+
+def _cancel_paused_step(workflow_id, action_id, event):
+    """A suspended run that must not continue — its workflow was unpublished,
+    disabled, or deleted, or an operator cancelled it — closes its parked
+    steps out ``cancelled`` instead of ``completed``, so run history shows a
+    deliberate stop, not a pause. The write is conditional on the step still
+    being ``delayed``, so a resume landing on one side and an operator cancel
+    on the other cannot double-write a step: exactly one of them wins."""
+    if os.environ.get("EXECUTIONS_TABLE"):
+        import boto3
+        from botocore.exceptions import ClientError
+
+        try:
+            boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).update_item(
+                Key={"execution_id": _execution_id(workflow_id, action_id, event)},
+                UpdateExpression=("SET #status = :status, finished_at = :finished, "
+                                  "expires_at = :expires"),
+                ConditionExpression="#status = :delayed",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":status": "cancelled",
+                    ":delayed": "delayed",
+                    ":finished": _now_iso(),
+                    ":expires": int(time.time()) + 90 * 86400,
+                },
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+            # The step is no longer parked (a sibling delivery resumed it, or
+            # the cancel came from the other side): nothing left to close out.
+
+
+def _pause_cancelled(workflow_id, event, run_id, paused):
+    """Whether an operator cancelled the parked run while the envelope was in
+    flight: one consistent read of the run's step records, and any paused
+    step reading ``cancelled`` — api_cancel's mark — means the remainder must
+    not run. The still-``delayed`` siblings close out ``cancelled`` too, and
+    the caller drops the envelope. Steps the read cannot see (nothing
+    recorded under the run yet) keep the replay as today: the check only ever
+    stops a run it can see was cancelled."""
+    if not run_id or not paused or not os.environ.get("EXECUTIONS_TABLE"):
+        return False
+    recorded = {str(item.get("action_id") or ""): item.get("status")
+                for item in _run_steps(run_id)}
+    if not any(recorded.get(action_id) == "cancelled" for action_id in paused):
+        return False
+    for action_id in paused:
+        _cancel_paused_step(workflow_id, action_id, event)
+    return True
+
+
 def _close_paused_step(workflow_id, action_id, event, *, count_usage=False):
     """The resume arrived, so the run got past its pause: a step the unwind
     had closed out ``delayed`` reads ``completed`` again. Same record update
@@ -360,8 +424,13 @@ def _resume_run(resume, *, queue=None):
 
     An arrival can predate ``resume_at`` (the 900s cap chained the wait):
     the envelope goes straight back on the queue for the remainder and
-    nothing runs early. Once the moment has passed, the paused steps close
-    out ``completed`` (the pause is over) and the captured segments replay
+    nothing runs early. Once the moment has passed, the run still answers to
+    the workflow's current state — the fresh-event path re-matches on every
+    delivery, so the parked continuation checks here instead: a workflow
+    that was unpublished, disabled, or deleted cancels the parked steps and
+    the envelope is consumed (no replay, no redrive), as does a run an
+    operator cancelled in the meantime. Otherwise the paused steps close out
+    ``completed`` (the pause is over) and the captured segments replay
     through the same conditional-write step leases as a fresh run, so
     redeliveries of the continuation stay safe; a further delay in the
     remainder suspends again and the handler parks the run once more.
@@ -387,6 +456,19 @@ def _resume_run(resume, *, queue=None):
               (resume.get("paused_ids")
                or ([resume["delay_action_id"]] if resume.get("delay_action_id") else []))
               if action_id]
+    workflow = next((candidate for candidate in all_workflows()
+                     if candidate.get("id") == workflow_id), None)
+    if workflow is None or not workflow.get("enabled", True):
+        for action_id in paused:
+            _cancel_paused_step(workflow_id, action_id, event)
+        logger.info("suspended run dropped: workflow is gone or disabled",
+                    extra={"run_id": resume.get("run_id"), "workflow_id": workflow_id})
+        return None
+    if _pause_cancelled(workflow_id, event,
+                        resume.get("run_id") or _run_id(workflow_id, event), paused):
+        logger.info("suspended run dropped: cancelled by an operator",
+                    extra={"run_id": resume.get("run_id"), "workflow_id": workflow_id})
+        return None
     if paused:
         for position, action_id in enumerate(paused):
             _close_paused_step(workflow_id, action_id, event,

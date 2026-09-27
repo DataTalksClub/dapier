@@ -314,6 +314,53 @@ class TestIsolation:
         assert digests.digests_get("wf-a", "nightly") == ["Invoice 42"]
 
 
+class TestSharedScope:
+    """``shared: true`` puts the digest where any workflow can reach it:
+    accumulate in the event's workflow, flush from the schedule-triggered
+    one — two workflow ids, one key. Without the flag the batch stays
+    private to its workflow (TestIsolation)."""
+
+    def test_a_shared_digest_accumulates_in_one_workflow_and_flushes_from_another(
+            self, digest_table):
+        shared = {"id": "collect", "type": "digest", "key": "nightly",
+                  "item": "{subject}", "shared": True}
+        flush = {"id": "send-digest", "type": "digest", "mode": "flush",
+                 "key": "nightly", "shared": True}
+
+        run_chain([shared], workflow_id="wf-email")
+        # The shared partition, not either workflow's:
+        assert ("*shared*", "nightly") in digest_table.items
+
+        stop, hooks, event = run_chain([flush], workflow_id="wf-nightly")
+
+        assert stop is None
+        assert ("after", "send-digest", "completed",
+                {"key": "nightly", "items": ["Invoice 42"], "count": 1}) \
+            in hooks.calls
+        assert event["data"]["digest"] == {"items": ["Invoice 42"], "count": 1}
+
+    def test_shared_and_private_keys_never_meet(self, digest_table):
+        shared = {"id": "collect", "type": "digest", "key": "nightly",
+                  "item": "{subject}", "shared": True}
+        run_chain([shared], workflow_id="wf-a")
+        run_chain([ACCUMULATE], workflow_id="wf-a")
+
+        assert digests.digests_get(digests.SHARED_SCOPE, "nightly") == ["Invoice 42"]
+        assert digests.digests_get("wf-a", "nightly") == ["Invoice 42"]
+
+    def test_a_private_flush_cannot_drain_a_shared_batch(self, digest_table):
+        shared = {"id": "collect", "type": "digest", "key": "nightly",
+                  "item": "{subject}", "shared": True}
+        run_chain([shared], workflow_id="wf-email")
+
+        stop, hooks, _event = run_chain([FLUSH], workflow_id="wf-nightly")
+
+        assert ("after", "send-digest", "skipped",
+                {"key": "nightly", "items": [], "count": 0, "empty": True}) \
+            in hooks.calls
+        assert digests.digests_get(digests.SHARED_SCOPE, "nightly") == ["Invoice 42"]
+
+
 class TestConfigErrors:
     """Config errors fail the step loudly, like the other logic steps."""
 
@@ -362,7 +409,7 @@ class TestRegistryAndValidation:
         entry = registry.LOGIC.get("digest")
         assert entry is not None
         assert [field["key"] for field in entry.fields] == \
-            ["mode", "key", "item", "items"]
+            ["mode", "key", "item", "items", "shared"]
         catalog = registry.catalog()
         assert any(step["type"] == "digest" for step in catalog["actions"])
 
@@ -412,6 +459,8 @@ class TestRegistryAndValidation:
          "items must be a non-empty list of template strings"),
         ("  - {id: d, type: digest, key: k, mode: flush, item: x}\n",
          "item/items only apply to accumulate"),
+        ("  - {id: d, type: digest, key: k, item: x, shared: sometimes}\n",
+         "shared must be true or false"),
     ])
     def test_save_rejects_bad_digest_steps(self, yaml_text, fragment):
         from src.dapier.api import designer_store

@@ -89,8 +89,9 @@ class FakeSqs:
 
 
 class _CapturingTable:
-    def __init__(self, calls):
+    def __init__(self, calls, items=None):
         self._calls = calls
+        self._items = items or []
 
     def put_item(self, **kwargs):
         self._calls.append(("put_item", kwargs))
@@ -102,13 +103,17 @@ class _CapturingTable:
         self._calls.append(("get_item", kwargs))
         return {}
 
+    def query(self, **kwargs):
+        # The runs GSI read the resume's cancelled-check uses.
+        return {"Items": list(self._items)}
 
-def _patch_table(monkeypatch, calls):
+
+def _patch_table(monkeypatch, calls, items=None):
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
 
     class Dynamo:
         def Table(self, _name):
-            return _CapturingTable(calls)
+            return _CapturingTable(calls, items)
 
     import boto3
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
@@ -323,22 +328,26 @@ class TestPark:
         assert susp.segments == [{"steps": [POST], "prefix": "", "scope": None}]
 
 
+def resume_envelope(resume_at=None):
+    """A due resume envelope, as _enqueue_resume parks it."""
+    return json.loads(json.dumps({
+        "workflow_id": "wf-1",
+        "event": dict(EVENT),
+        "resume_at": resume_at if resume_at is not None else time.time() - 1,
+        "delay_action_id": "pause",
+        "paused_ids": ["pause"],
+        "segments": [{"steps": [POST], "prefix": "", "scope": None}],
+        "step_outputs": {"pause": {"status": "delayed",
+                                   "output": {"delay_seconds": 90}}},
+        "run_id": "wf-1:evt-1",
+    }))
+
+
 class TestResumeRun:
     """Continuing a parked run from its envelope."""
 
     def envelope(self, resume_at=None):
-        resume = json.loads(json.dumps({
-            "workflow_id": "wf-1",
-            "event": dict(EVENT),
-            "resume_at": resume_at if resume_at is not None else time.time() - 1,
-            "delay_action_id": "pause",
-            "paused_ids": ["pause"],
-            "segments": [{"steps": [POST], "prefix": "", "scope": None}],
-            "step_outputs": {"pause": {"status": "delayed",
-                                       "output": {"delay_seconds": 90}}},
-            "run_id": "wf-1:evt-1",
-        }))
-        return resume
+        return resume_envelope(resume_at)
 
     def test_resume_before_the_moment_reenqueues_without_running(self, monkeypatch):
         monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
@@ -356,6 +365,8 @@ class TestResumeRun:
         calls = []
         _patch_table(monkeypatch, calls)
         ran = []
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": True}])
         monkeypatch.setattr(worker, "_run_connector",
                             lambda action, event, workflow_id, steps=None:
                                 ran.append((action["id"], dict(steps))) or {"status": 200})
@@ -376,6 +387,8 @@ class TestResumeRun:
     def test_resume_closes_every_paused_step_out_completed(self, monkeypatch):
         calls = []
         _patch_table(monkeypatch, calls)
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": True}])
         monkeypatch.setattr(worker, "_run_connector",
                             lambda action, event, workflow_id, steps=None: {"ok": True})
         resume = self.envelope()
@@ -413,6 +426,8 @@ class TestResumeRun:
         monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
         calls = []
         _patch_table(monkeypatch, calls)
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": True}])
         sqs = FakeSqs()
         resume = self.envelope()
         resume["segments"] = [{"steps": [{"id": "pause2", "type": "delay",
@@ -427,6 +442,95 @@ class TestResumeRun:
         assert susp.segments == [{"steps": [POST], "prefix": "", "scope": None}]
         # The handler's RunSuspended path parks this just like a fresh run.
         assert worker._park_suspension(susp, queue=sqs) == 120
+
+
+class TestResumeGate:
+    """A parked run still answers to the workflow's current state.
+
+    The fresh-event path re-matches on every delivery; the parked
+    continuation bypasses matching, so the state check rides in the resume:
+    a workflow that was unpublished, disabled, or deleted — or a run an
+    operator cancelled — must not fire its remaining steps.
+    """
+
+    def test_resume_of_an_unpublished_workflow_cancels_the_parked_steps(self, monkeypatch):
+        calls = []
+        _patch_table(monkeypatch, calls)
+        ran = []
+        monkeypatch.setattr(worker, "all_workflows", lambda: [])
+        monkeypatch.setattr(worker, "_run_connector",
+                            lambda action, event, workflow_id, steps=None:
+                                ran.append(action["id"]) or {"ok": True})
+
+        assert worker._resume_run(resume_envelope(), queue=FakeSqs()) is None
+
+        assert ran == []  # nothing after the pause fired
+        cancelled = [kwargs for kind, kwargs in calls
+                     if kind == "update_item"
+                     and kwargs["ExpressionAttributeValues"].get(":status") == "cancelled"]
+        assert [kwargs["Key"]["execution_id"] for kwargs in cancelled] == \
+            ["wf-1:pause:evt-1"]
+        # Conditional close-out: only a still-parked step flips, so a cancel
+        # landing on the other side cannot double-write the step.
+        assert cancelled[0]["ConditionExpression"] == "#status = :delayed"
+
+    def test_resume_of_a_disabled_workflow_cancels_without_running(self, monkeypatch):
+        calls = []
+        _patch_table(monkeypatch, calls)
+        ran = []
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": False}])
+        monkeypatch.setattr(worker, "_run_connector",
+                            lambda action, event, workflow_id, steps=None:
+                                ran.append(action["id"]) or {"ok": True})
+        sqs = FakeSqs()
+
+        assert worker._resume_run(resume_envelope(), queue=sqs) is None
+
+        assert ran == []
+        assert sqs.messages == []  # the record is consumed, not redriven
+        completed = [kwargs for kind, kwargs in calls
+                     if kind == "update_item"
+                     and kwargs["ExpressionAttributeValues"].get(":status") == "completed"]
+        assert completed == []
+
+    def test_resume_after_an_operator_cancel_is_dropped(self, monkeypatch):
+        calls = []
+        _patch_table(monkeypatch, calls, items=[
+            {"execution_id": "wf-1:pause:evt-1", "run_id": "wf-1:evt-1",
+             "action_id": "pause", "status": "cancelled"},
+        ])
+        ran = []
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": True}])
+        monkeypatch.setattr(worker, "_run_connector",
+                            lambda action, event, workflow_id, steps=None:
+                                ran.append(action["id"]) or {"ok": True})
+        resume = resume_envelope()
+        resume["paused_ids"] = ["pause", "route"]
+
+        assert worker._resume_run(resume, queue=FakeSqs()) is None
+
+        assert ran == []  # the cancel wins over the in-flight envelope
+        statuses = {(kwargs["Key"]["execution_id"],
+                     kwargs["ExpressionAttributeValues"].get(":status"))
+                    for kind, kwargs in calls if kind == "update_item"}
+        assert ("wf-1:route:evt-1", "cancelled") in statuses  # the sibling closes too
+        assert ("wf-1:pause:evt-1", "completed") not in statuses
+
+    def test_a_cancelled_check_without_records_still_resumes(self, monkeypatch):
+        calls = []
+        _patch_table(monkeypatch, calls)  # the run reads as having no steps
+        ran = []
+        monkeypatch.setattr(worker, "all_workflows",
+                            lambda: [{"id": "wf-1", "enabled": True}])
+        monkeypatch.setattr(worker, "_run_connector",
+                            lambda action, event, workflow_id, steps=None:
+                                ran.append(action["id"]) or {"ok": True})
+
+        worker._resume_run(resume_envelope(), queue=FakeSqs())
+
+        assert ran == ["post"]  # nothing seen cancelled: behave as today
 
 
 class TestHandlerPark:

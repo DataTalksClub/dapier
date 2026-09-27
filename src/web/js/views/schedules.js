@@ -101,8 +101,10 @@ function renderFlowChoices(selected) {
   }
   options.push(`<option value="${INLINE_ACTIONS}">(inline actions JSON)</option>`);
   select.innerHTML = options.join('');
-  select.value = selected === INLINE_ACTIONS || current.flows.some((flow) => flow.name === selected) || selected
-    ? selected : (current.flows.length ? current.flows[0].name : INLINE_ACTIONS);
+  // Every truthy `selected` has an option with that exact value above (in
+  // the catalog, the always-present inline sentinel, or the missing-flow
+  // entry); falsy falls back to the first flow.
+  select.value = selected || (current.flows.length ? current.flows[0].name : INLINE_ACTIONS);
   $('#schedule-actions-field').hidden = select.value !== INLINE_ACTIONS;
 }
 

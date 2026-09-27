@@ -1,8 +1,8 @@
 /* Connections view: the create-new provider grid and the accounts table. */
 import { state } from '../state.js';
-import { $, $$, notice, providerMark } from '../ui.js';
+import { $, $$, icons, notice, providerMark } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, formatTimestamp, statusLine } from '../format.js';
+import { detailRows, escapeHtml, formatTimestamp, statusLine } from '../format.js';
 import { refresh } from './overview.js';
 
 const CONNECT_PROVIDERS = {
@@ -343,18 +343,24 @@ function renderConnections(connections) {
     return `<tr class="provider-group-row"><th colspan="4" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span><span class="provider-group-meta">${group.length} account${group.length === 1 ? '' : 's'}${attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} attention` : ''}</span></th></tr>${rows}`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  $$('.provider-token-button').forEach((button) => button.addEventListener('click', () => issueConnectionToken(button)));
   bindOAuthLinks();
 }
 
 function connectionRow(connection) {
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && connection.status !== 'connected'
       ? `<a class="button ${connection.status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${connection.status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+    /* Console mirror of `dapier token exec`: only OAuth connections hold a
+       refreshable provider access token — token providers (slack, telegram,
+       zoom) keep a pasted secret, and the shared domain call 502s for them. */
+    const tokenAction = connection.status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
+      ? `<button class="button secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
     const identity = connection.account_title || connection.verified_account_id;
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
     <td data-label="Status">${statusLine(connection.status, CONNECTION_STATUS_LABELS)}</td>
-    <td class="action-cell">${nextAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
+    <td class="action-cell">${nextAction}${tokenAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
 }
 
@@ -435,6 +441,335 @@ $('#edit-connection-test').addEventListener('click', async (event) => {
     button.textContent = 'Test';
   }
 });
+
+/* Fresh provider token: the console mirror of `dapier token exec` —
+   POST /api/admin/connections/{id}/token drives the same tokens domain the
+   agent API uses. The value is a live credential shown once; this dialog is
+   built here rather than in index.html because only this view needs it. */
+let tokenResultDialog = null;
+
+function tokenResultElements() {
+  if (tokenResultDialog) return tokenResultDialog;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'provider-token-dialog';
+  dialog.setAttribute('aria-labelledby', 'provider-token-title');
+  dialog.innerHTML = `
+    <div class="dialog-head">
+      <h2 id="provider-token-title">Provider token</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p id="provider-token-meta" class="sub mono"></p>
+      <p class="sub">This is a live credential for the provider account — treat it like a password. It is shown once; closing this dialog clears it.</p>
+      <div id="provider-token-reveal" class="token-reveal" hidden>
+        <code id="provider-token-value" class="mono"></code>
+        <button id="provider-token-copy" class="button secondary" type="button">Copy</button>
+      </div>
+      <dl id="provider-token-details"></dl>
+      <p id="provider-token-error" class="form-error" role="alert"></p>
+    </div>
+    <div class="dialog-actions">
+      <button class="button secondary dialog-close" type="button">Close</button>
+    </div>`;
+  document.body.appendChild(dialog);
+  icons();
+  // main.js binds .dialog-close only at load, so this dynamic dialog binds its own.
+  $$('.dialog-close', dialog).forEach((button) => button.addEventListener('click', () => dialog.close()));
+  $('#provider-token-copy').addEventListener('click', async () => {
+    const value = $('#provider-token-value').textContent;
+    try {
+      await navigator.clipboard.writeText(value);
+      $('#provider-token-copy').textContent = 'Copied';
+      setTimeout(() => { $('#provider-token-copy').textContent = 'Copy'; }, 2000);
+    } catch (_) {
+      // Clipboard refused (insecure context): fall back to manual selection.
+      const range = document.createRange();
+      range.selectNodeContents($('#provider-token-value'));
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  });
+  // The token never outlives the dialog: any close (button, Esc) wipes it.
+  dialog.addEventListener('close', () => {
+    $('#provider-token-value').textContent = '';
+    $('#provider-token-details').innerHTML = '';
+  });
+  tokenResultDialog = dialog;
+  return dialog;
+}
+
+/* api() surfaces only the response body's error text, not the status, so the
+   route's per-status copy is matched on that text: a 409 binding mismatch
+   names the provider account and 502's body is exactly the string asked of
+   this view; everything else falls back to one generic line. */
+function tokenIssueErrorMessage(error) {
+  const message = error?.message || '';
+  if (message === 'Provider token is unavailable' || /provider account/i.test(message)) return message;
+  return 'Could not get a provider token. Try again.';
+}
+
+function showConnectionTokenResult(connectionId, result, error) {
+  const dialog = tokenResultElements();
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  $('#provider-token-title').textContent = error ? 'Provider token unavailable' : 'Provider token';
+  $('#provider-token-meta').textContent = `${connection?.provider || 'connection'} · ${connectionId}`;
+  $('#provider-token-reveal').hidden = !result;
+  $('#provider-token-value').textContent = result ? result.access_token : '';
+  $('#provider-token-details').innerHTML = result ? detailRows([
+    ['Provider account', [result.account_title, result.provider_account_id].filter(Boolean).join(' · ')],
+    ['Scope', result.scope],
+    ['Expires', formatTimestamp(result.expires_at)],
+    ['Refreshed', result.refreshed ? 'Yes — a fresh token was fetched from the provider' : 'No — the connection\'s current token'],
+  ]) : '';
+  $('#provider-token-error').textContent = error ? tokenIssueErrorMessage(error) : '';
+  if (!dialog.open) dialog.showModal();
+}
+
+async function issueConnectionToken(button) {
+  const connectionId = button.dataset.connection;
+  button.disabled = true;
+  button.textContent = 'Fetching…';
+  try {
+    const result = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/token`, { method: 'POST' });
+    showConnectionTokenResult(connectionId, result, null);
+  } catch (error) {
+    showConnectionTokenResult(connectionId, null, error);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Get token';
+  }
+}
+
+/* Explore data: Zapier-style discovery over the connection's provider —
+   the same api.discovery domain `dapier connections discover` drives.
+   Select values are bare resource names: the admin route matches one
+   [a-z0-9_-]+ segment and the domain resolves the connector itself. */
+let discoverCatalog = { connectionId: '', resources: [] };
+
+function discoverResource(key) {
+  return discoverCatalog.resources.find((entry) => entry.name === key);
+}
+
+function renderDiscoverResource() {
+  const resource = discoverResource($('#discover-resource').value);
+  const description = $('#discover-resource-description');
+  description.hidden = !resource?.description;
+  description.textContent = resource?.description || '';
+  const params = $('#discover-params');
+  params.innerHTML = (resource?.params || []).map((param) => `
+    <label>${escapeHtml(param.label || param.key)}${param.required ? '' : ' <span class="muted-cell">(optional)</span>'}<input name="param-${escapeHtml(param.key)}" class="mono-input" value="${escapeHtml(param.default || '')}" ${param.required ? 'required' : ''}>${param.help ? `<small class="field-hint">${escapeHtml(param.help)}</small>` : ''}</label>`).join('');
+  params.hidden = !(resource?.params || []).length;
+  const result = $('#discover-result');
+  result.hidden = true;
+  result.innerHTML = '';
+}
+
+async function openDiscover(connectionId) {
+  discoverCatalog = { connectionId, resources: [] };
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  $('#connection-discover-title').textContent = `Explore data — ${connection?.display_name || connectionId}`;
+  $('#connection-discover-meta').textContent = connection ? `${connection.provider} · ${connectionId}` : connectionId;
+  $('#discover-error').textContent = '';
+  $('#discover-result').hidden = true;
+  $('#discover-result').innerHTML = '';
+  $('#discover-resource').innerHTML = '<option value="">Loading…</option>';
+  $('#discover-resource-description').hidden = true;
+  $('#discover-params').hidden = true;
+  $('#discover-params').innerHTML = '';
+  $('#discover-run').disabled = true;
+  $('#connection-discover-dialog').showModal();
+  let catalog;
+  try {
+    catalog = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/discover`);
+  } catch (error) {
+    $('#discover-error').textContent = error.message;
+    return;
+  }
+  discoverCatalog.resources = catalog.resources || [];
+  if (!discoverCatalog.resources.length) {
+    $('#discover-resource').innerHTML = '<option value="">No discoverable resources</option>';
+    $('#discover-error').textContent = 'This provider exposes nothing to browse; use Test to check the connection instead.';
+    return;
+  }
+  $('#discover-resource').innerHTML = discoverCatalog.resources.map((resource) =>
+    `<option value="${escapeHtml(resource.name)}">${escapeHtml(resource.label || resource.name)}</option>`).join('');
+  $('#discover-run').disabled = false;
+  renderDiscoverResource();
+}
+
+function renderDiscoverItems(data) {
+  const result = $('#discover-result');
+  const items = data.items || [];
+  const resolved = Object.entries(data.params || {}).map(([key, value]) => `${key}=${value}`).join(', ');
+  const head = `<p class="sub mono">${escapeHtml(data.resource || '')}${resolved ? ` · ${escapeHtml(resolved)}` : ''} · ${items.length} item${items.length === 1 ? '' : 's'}</p>`;
+  if (!items.length) {
+    result.innerHTML = `${head}<p class="detail-muted">No items came back for these parameters.</p>`;
+    result.hidden = false;
+    return;
+  }
+  const columns = [...new Set(items.flatMap((item) => Object.keys(item)))].slice(0, 5);
+  const cellText = (value) => {
+    const text = value == null ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+    return text.length > 120 ? `${text.slice(0, 119)}…` : text;
+  };
+  const rows = items.map((item) => `<tr>${columns.map((column) =>
+    `<td class="mono" data-label="${escapeHtml(column)}">${escapeHtml(cellText(item[column]))}</td>`).join('')}</tr>`).join('');
+  result.innerHTML = `${head}<div class="table-wrap"><table><thead><tr>${columns.map((column) =>
+    `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  result.hidden = false;
+}
+
+$('#discover-resource').addEventListener('change', renderDiscoverResource);
+
+$('#discover-run').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const key = $('#discover-resource').value;
+  const connectionId = discoverCatalog.connectionId;
+  if (!connectionId || !key || button.disabled) return;
+  const query = new URLSearchParams();
+  for (const param of discoverResource(key)?.params || []) {
+    const value = $(`#discover-params [name="param-${param.key}"]`)?.value.trim();
+    if (value) query.set(param.key, value);
+  }
+  button.disabled = true;
+  button.textContent = 'Fetching…';
+  $('#discover-error').textContent = '';
+  try {
+    const data = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/discover/${encodeURIComponent(key)}?${query}`);
+    renderDiscoverItems(data);
+  } catch (error) {
+    $('#discover-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Fetch items';
+  }
+});
+
+$('#edit-connection-discover').addEventListener('click', () => {
+  const connectionId = $('#edit-connection-form').dataset.connectionId;
+  if (!connectionId) return;
+  $('#edit-connection-dialog').close();
+  void openDiscover(connectionId);
+});
+
+/* Pull a trigger sample: one POST /api/admin/discover, the same dispatch
+   `dapier triggers sample` drives — a realistic event envelope (live from
+   the chosen account, else the newest recorded run, else a documented
+   example) or a field's option list. Read-only: nothing is stored or run.
+   Connector and field-option names come from the catalog's discovery
+   fragment, so the console list cannot drift from what the API accepts. */
+let sampleCatalog = null;
+
+function sampleConnectorLabel(name) {
+  const entry = ((sampleCatalog || {}).connectors || []).find((connector) => connector.name === name);
+  return entry?.label || name;
+}
+
+function renderSampleConnections() {
+  const connections = ((state.data || {}).connections || []);
+  $('#sample-connection').innerHTML = ['<option value="">(no account — example or recorded run)</option>']
+    .concat(connections.map((connection) =>
+      `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(connection.display_name || connection.connection_id)} (${escapeHtml(connection.provider)})</option>`))
+    .join('');
+  $('#sample-connection-field').hidden = !connections.length;
+}
+
+function renderSampleFields() {
+  const connector = $('#sample-connector').value;
+  const events = (((sampleCatalog || {}).connectors || []).find((entry) => entry.name === connector) || {}).events || [];
+  const resources = (((sampleCatalog || {}).discovery || {}).options || {})[connector] || [];
+  $('#sample-event-field').hidden = !events.length;
+  $('#sample-event').innerHTML = ['<option value="">(default)</option>']
+    .concat(events.map((event) => `<option value="${escapeHtml(event)}">${escapeHtml(event)}</option>`)).join('');
+  $('#sample-resource-field').hidden = !resources.length;
+  $('#sample-resource').innerHTML = ['<option value="">(event sample)</option>']
+    .concat(resources.map((resource) => `<option value="${escapeHtml(resource)}">${escapeHtml(resource)}</option>`)).join('');
+  renderSampleConnections();
+  $('#sample-result').hidden = true;
+  $('#sample-result').innerHTML = '';
+  $('#sample-error').textContent = '';
+}
+
+async function openSamplePuller() {
+  $('#sample-error').textContent = '';
+  $('#sample-result').hidden = true;
+  $('#sample-result').innerHTML = '';
+  $('#sample-run').disabled = true;
+  $('#sample-connector').innerHTML = '<option value="">Loading…</option>';
+  $('#trigger-sample-dialog').showModal();
+  if (!sampleCatalog) {
+    try {
+      sampleCatalog = await api('/api/admin/designer/catalog');
+    } catch (error) {
+      $('#sample-connector').innerHTML = '';
+      $('#sample-error').textContent = error.message;
+      return;
+    }
+  }
+  const connectors = ((sampleCatalog || {}).discovery || {}).sample || [];
+  if (!connectors.length) {
+    $('#sample-connector').innerHTML = '<option value="">No sample connectors</option>';
+    $('#sample-error').textContent = 'No trigger connector exposes a sample pull.';
+    return;
+  }
+  $('#sample-connector').innerHTML = connectors.map((name) =>
+    `<option value="${escapeHtml(name)}">${escapeHtml(sampleConnectorLabel(name))}</option>`).join('');
+  renderSampleFields();
+  $('#sample-run').disabled = false;
+}
+
+function renderSampleResult(data, resource) {
+  const result = $('#sample-result');
+  const origin = data.connection_id ? ` · ${escapeHtml(data.connection_id)}` : '';
+  if (resource) {
+    const options = data.options || [];
+    const rows = options.map((option) =>
+      `<tr><td class="mono" data-label="Value">${escapeHtml(String(option.value ?? ''))}</td><td data-label="Label">${escapeHtml(String(option.label ?? option.value ?? ''))}</td></tr>`).join('');
+    result.innerHTML = `<p class="sub mono">${escapeHtml(data.connector || '')} · ${escapeHtml(data.resource || resource)}${origin} · ${options.length} option${options.length === 1 ? '' : 's'}</p>
+      ${options.length ? `<div class="table-wrap"><table><thead><tr><th>Value</th><th>Label</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="detail-muted">No options came back.</p>'}`;
+  } else {
+    const sample = data.sample || {};
+    result.innerHTML = `<p class="sub mono">${escapeHtml(data.connector || '')}.${escapeHtml(sample.event || '')} [${escapeHtml(data.source || '')}]${origin} · ${escapeHtml(sample.occurred_at || '')}</p>
+      <pre class="sample-json mono">${escapeHtml(JSON.stringify(sample.data || {}, null, 2))}</pre>`;
+  }
+  result.hidden = false;
+}
+
+$('#sample-connector').addEventListener('change', renderSampleFields);
+$('#sample-resource').addEventListener('change', () => {
+  $('#sample-result').hidden = true;
+  $('#sample-result').innerHTML = '';
+});
+
+$('#sample-run').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const connector = $('#sample-connector').value;
+  if (!connector || button.disabled) return;
+  const resource = $('#sample-resource-field').hidden ? '' : $('#sample-resource').value;
+  const body = { connector, kind: resource ? 'options' : 'sample' };
+  if (resource) body.resource = resource;
+  const eventName = $('#sample-event-field').hidden ? '' : $('#sample-event').value;
+  if (eventName) body.event = eventName;
+  const connectionId = $('#sample-connection').value;
+  if (connectionId) body.connection_id = connectionId;
+  const limit = $('#sample-limit').value.trim();
+  if (limit) body.limit = Number(limit);
+  button.disabled = true;
+  button.textContent = 'Pulling…';
+  $('#sample-error').textContent = '';
+  try {
+    const data = await api('/api/admin/discover', { method: 'POST', body: JSON.stringify(body) });
+    renderSampleResult(data, resource);
+  } catch (error) {
+    $('#sample-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Pull sample';
+  }
+});
+
+$('#pull-trigger-sample').addEventListener('click', () => void openSamplePuller());
 
 let shownGrants = [];
 

@@ -41,7 +41,13 @@ ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 # table's 90-day TTL is the ceiling — see engine.logic.MAX_SUSPENDED_SECONDS).
 DELAY_MAX_DAYS = 90
 LOOP_MAX_ITERATIONS = 100
-FILTER_OPERATORS = ("equals", "in", "prefix", "suffix", "contains")
+# Mirrors engine.matching._matches_filter (and the designer's logicOperators):
+# the flat field/operator/value shorthand accepts any operator the engine's
+# ``when`` mappings do.
+FILTER_OPERATORS = (
+    "equals", "not_equals", "in", "prefix", "suffix", "contains",
+    "does_not_contain", "gt", "gte", "lt", "lte", "exists", "empty",
+)
 DELAY_TEMPLATE = re.compile(r"^\{[^{}]+\}$")
 
 
@@ -732,6 +738,7 @@ def _validate_steps(steps, where="actions"):
                     f"{LOOP_MAX_ITERATIONS}")
         registry.validate_error_keys(step, f"step '{label}'", WorkflowError)
         registry.validate_on_fail_key(step, f"step '{label}'", WorkflowError)
+        registry.validate_autoretry_key(step, f"step '{label}'", WorkflowError)
         # The same typed-field rules stored trigger chains answer to (see
         # validate_action_chain): a literal clearly wrong for its declared
         # field type fails the save. Templated values are skipped there; the

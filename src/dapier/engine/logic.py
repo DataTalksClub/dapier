@@ -5,7 +5,12 @@ same step telemetry (the before/after/error hooks), so run history shows them
 like any other step. A failed filter is not an error: the step is marked
 ``filtered`` and the rest of the chain is skipped quietly.
 
-Step shapes (all evaluated against the event's ``data``):
+Step shapes (predicates read the event's ``data`` — or the loop's scope —
+plus the ``steps`` outputs of every step before them, so mid-chain filters
+can route on what earlier steps found; operators are the trigger-filter set
+in ``engine.matching._matches_filter``: equals, not_equals, in, prefix,
+suffix, contains, does_not_contain, gt, gte, lt, lte — numeric when both
+sides parse as float — plus exists and empty):
 
     - id: only-invoices
       type: filter
@@ -15,6 +20,7 @@ Step shapes (all evaluated against the event's ``data``):
       # when:
       #   route: {equals: invoice}
       #   subject: {contains: invoice}
+      #   steps.find.output.row_id: {exists: true}
 
     - id: invoice-path
       type: condition
@@ -534,7 +540,11 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
     """One step: returns (stop reason, output summary, run-history status)."""
     step_type = str(step.get("type"))
     if step_type == "filter":
-        return _run_filter(step, _predicate_scope(event, scope))
+        # Mid-chain routing sees earlier outputs too: the rules read the
+        # trigger data (or the loop's scope) plus ``steps``, like the
+        # delay/digest contexts below.
+        return _run_filter(
+            step, {**_predicate_scope(event, scope), "steps": step_outputs or {}})
     if step_type == "condition":
         return _run_condition(
             workflow_id, action_id, step, event, run_action,
@@ -648,7 +658,8 @@ def _run_condition(workflow_id, action_id, step, event, run_action, *,
     rules = predicate_rules(step)
     if rules is None:
         raise ValueError(f"condition '{step.get('id', '')}' needs a when mapping or a field")
-    passed = evaluate_rules(rules, _predicate_scope(event, scope))
+    passed = evaluate_rules(
+        rules, {**_predicate_scope(event, scope), "steps": step_outputs or {}})
     branch = "then" if passed else "else"
     steps = step.get(branch) or []
     if not isinstance(steps, list):
@@ -679,7 +690,7 @@ def _run_paths(workflow_id, action_id, step, event, run_action, *,
     default_steps = step.get("default")
     if default_steps is not None and not isinstance(default_steps, list):
         raise ValueError(f"paths '{action_id}' default must be a list of steps")
-    data = _predicate_scope(event, scope)
+    data = {**_predicate_scope(event, scope), "steps": step_outputs or {}}
     for branch in branches:
         if not isinstance(branch, dict):
             raise ValueError(f"paths '{action_id}': every path must be a mapping")
@@ -807,7 +818,7 @@ def _run_for_each(workflow_id, action_id, step, event, run_action, *,
     path = str(step.get("list") or "").strip().strip("{}").strip()
     if not path:
         raise ValueError(f"for_each '{label}': needs a list field")
-    base = _predicate_scope(event, scope)
+    base = {**_predicate_scope(event, scope), "steps": step_outputs or {}}
     items, found = _lookup(base, path)
     if not found:
         raise ValueError(f"for_each '{label}': list field '{path}' not found in the event data")

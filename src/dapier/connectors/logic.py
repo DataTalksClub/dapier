@@ -92,8 +92,6 @@ logic_step(LogicStep(
          "placeholder": '- "{subject}"\n- "{trigger.occurred_at}"'},
         {"key": "shared", "label": "Shared across workflows", "type": "boolean",
          "default": False,
-         "help": "Accumulate in one workflow, flush from the schedule-triggered one",
-         "description": "Put the digest in a partition every workflow can reach "
-                        "instead of this workflow only"},
+         "help": "Accumulate in one workflow, flush from the schedule-triggered one"},
     ),
 ))

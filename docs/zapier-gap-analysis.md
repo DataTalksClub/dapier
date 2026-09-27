@@ -104,7 +104,60 @@
   `DIGESTS_TABLE`, scoped per workflow like StorageTable) with grants for
   the worker and the router; registered in `connectors/logic.py` and the
   designer mirror, with save-time validation in `api/designer_store.py`
-  (`_validate_digest`). Tests in `tests/test_digest_logic.py`.
+  (`_validate_digest`). Tests in `tests/test_digest_logic.py`. The logic
+  step also takes `shared: true`: the digest moves to a `*shared*`
+  partition every workflow can reach, because dapier's one-trigger-per-
+  workflow model makes the canonical pattern cross-workflow — accumulate
+  in the event's workflow, flush from the schedule-triggered one. (Both
+  surfaces coexist deliberately: actions for action-shaped flows on
+  StorageTable, the logic step for in-chain batching on DigestsTable;
+  `shared` exists on the logic step only.)
+- **Suspended run lifecycle** — a parked run no longer outlives its
+  workflow: `_resume_run` resolves the envelope's workflow through
+  `all_workflows()` (the same lookup fresh events match against) and, if
+  the workflow was unpublished/disabled/deleted, closes the paused
+  `delayed` steps out `cancelled` and consumes the envelope instead of
+  replaying — the remaining actions never fire. Cancelling is an operator
+  verb too: `runs.api_cancel` flips the still-`delayed` steps to
+  `cancelled` under a conditional write (a concurrent resume can't
+  double-write; the resume drops an envelope whose pause reads
+  `cancelled`), exposed as `POST /api/{admin,agent}/runs/{id}/cancel`
+  (operator-gated, audited `runs.cancel`, 409 when the run isn't
+  suspended), `dapier runs cancel`, and a Cancel button in the console run
+  dialog with `delayed_until` surfaced on delayed list rows; the run
+  rollup gained a `cancelled` status. Tests in `tests/test_delay_resume.py`,
+  `tests/test_worker.py`, `tests/test_admin.py`, `tests/test_agent_api.py`,
+  `tests/test_cli.py`.
+- **Per-step autoretry + richer filter operators** — Zapier's autoretry:
+  `autoretry: {attempts, initial_seconds, max_seconds}` on connector actions
+  retries a transient failure in place with exponential backoff (the initial
+  delay doubling up to max_seconds, plus jitter; attempts 1–3 and seconds
+  1–60 keep the inline sleeps small), records `attempts` (tries made) in the
+  step's output so run history shows a step that succeeded on try 3, and
+  only then falls through to `on_fail`/`on_error` — and past both, to the
+  workflow-level `retry` redrive. Opt-in per step, never auto-enabled, and
+  rejected on logic steps (`registry.validate_autoretry_key`, shared by the
+  engine's run-time plan parser and the designer save). The one predicate
+  evaluator behind trigger filters and logic rules
+  (`matching._matches_filter`) gained `not_equals`, `does_not_contain`,
+  `gt`/`gte`/`lt`/`lte` (numeric when both sides parse as floats, else
+  lexicographic — so ISO dates compare correctly), `exists` and `empty`
+  (present = non-empty after stringifying; the expected boolean flips the
+  sense), published via the catalog's `filter_operators`/`logic_operators`
+  and the designer mirror; unknown operators still fail loudly. Tests in
+  `tests/test_autoretry.py`, `tests/test_workflow_logic.py`.
+- **Rules see earlier steps, everywhere they are written** — chain predicates
+  (filter, condition, paths) and the `for_each` `list` resolve against the
+  accumulated `steps` outputs next to the trigger data (the delay/digest
+  contexts already did), so mid-chain routing can gate on what a search step
+  found: `when: {steps.find.output.count: {gt: 0}}` or
+  `list: steps.find.output.rows`. The full operator set is accepted at every
+  surface that writes rules: designer saves (`designer_store.FILTER_OPERATORS`
+  now mirrors `matching._matches_filter` — flat `operator:` saves with `gt`
+  etc. no longer bounce), the designer mirror, and trigger filters. The
+  designer save path also validates `autoretry` (`validate_autoretry_key`
+  wired into `_validate_steps`, matching stored-trigger saves). Tests in
+  `tests/test_filter_scopes.py`.
 
 Still open: none — G1–G13 are all landed.
 
@@ -151,12 +204,12 @@ the discovery/replay/test work already underway.
 | Action catalog with field schemas | `registry.Action.fields`, served by `GET /api/catalog` (`connectors/registry.py:146`) | have |
 | Search / find-record actions (lookup, create-if-missing) | none — only append/post/send/upload/delete (`connectors/*.py:6` registrations) | **missing** |
 | Multi-step workflows with data mapping | `steps` context + formatters (`engine/actions/templating.py:38`), `http_request` output capture (`connectors/webhook.py:44`) | have |
-| Filters and branching (Paths) | `filter` + `condition` then/else (`engine/logic.py:205-261`) | partial (2 branches, no n-way paths) |
+| Filters and branching (Paths) | `filter`/`condition`/n-way `paths` on the full trigger-filter operator set; rules read earlier `steps` outputs (`engine/logic.py`, `matching._matches_filter`) | have |
 | Looping | `for_each` (`engine/logic.py:275`) | have |
 | Delay / "schedule after" / requeue-until | `delay` sleeps in-process, capped 60 s (`engine/logic.py:42,270`) | **missing** (real delays) |
 | Digests / batching | nothing (`rg -i "digest\|batch"` finds only SQS batching) | **missing** |
 | Per-step error handling / on-failure action | a step error raises and fails the run (`engine/logic.py:187-193`) | **missing** |
-| Retry/backoff policy per action | SQS redrive only, 5/5/3 attempts then DLQ (`template.yaml:548-588`) | partial (no policy control) |
+| Retry/backoff policy per action | workflow-level `retry` redrive + per-step `autoretry` with exponential backoff (`engine/worker.py`, `engine/logic.py`) | have |
 | Task history (runs, step I/O) | EXECUTIONS_TABLE + run grouping (`api/runs.py`) | have |
 | Replay a task | `api_replay` re-injects the envelope onto the queue (`api/runs.py:190`) | have |
 | Test before publish (dry-run/execute) | `engine/dryrun.py`, designer Test panel, `wf test` CLI | have (stale runner list, below) |

@@ -1140,6 +1140,15 @@ def runs_replay(api_url, run_id, debug=False):
     return 0
 
 
+def runs_cancel(api_url, run_id, debug=False):
+    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/cancel", body={}, debug=debug)
+    run = data.get("run") or {}
+    print(f"Cancelled {data.get('cancelled', 0)} parked step(s) of "
+          f"{data.get('run_id') or run_id}; the run reads `{run.get('status', 'cancelled')}`.")
+    print("The parked continuation is dropped: the run's remaining actions will not fire.")
+    return 0
+
+
 def runs_replay_failed(api_url, workflow_id, debug=False):
     data = api.call(api_url, "POST", "/api/agent/runs/replay-failed",
                     {"workflow_id": workflow_id}, debug=debug)

@@ -1225,3 +1225,34 @@ def test_errors_days_flag_reaches_the_endpoint(isolated_home, monkeypatch, capsy
     assert rc == 0
     assert calls == [("GET", "/api/agent/errors/summary?days=30")]
     assert "No failed runs" in capsys.readouterr().out
+
+
+def test_runs_cancel_hits_the_agent_cancel_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"accepted": True, "run_id": "wf-1:evt-1", "cancelled": 1,
+                "run": {"run_id": "wf-1:evt-1", "status": "cancelled"}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "cancel", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/cancel")]
+    out = capsys.readouterr().out
+    assert "wf-1:evt-1" in out
+    assert "will not fire" in out
+
+
+def test_runs_cancel_of_a_run_not_suspended_reports_the_409(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        raise ApiError("Run is not suspended; nothing to cancel", status=409)
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "cancel", "wf-1:evt-1"])
+
+    assert rc == 5
+    assert "Run is not suspended; nothing to cancel" in capsys.readouterr().out

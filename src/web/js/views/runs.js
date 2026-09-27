@@ -23,10 +23,12 @@ function triggerLabel(run) {
 
 function runRow(run) {
   const failed = run.failed_step ? ` <span class="muted-cell mono">(${escapeHtml(run.failed_step)})</span>` : '';
+  const delayedUntil = run.status === 'delayed' && run.delayed_until
+    ? ` <span class="muted-cell mono">(until ${escapeHtml(formatTimestamp(run.delayed_until))})</span>` : '';
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(run.workflow_id || 'Run')}</span></td>
     <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(run))}</td>
-    <td data-label="Status">${statusLine(run.status)}${failed}</td>
+    <td data-label="Status">${statusLine(run.status)}${failed}${delayedUntil}</td>
     <td class="mono muted-cell" data-label="Steps">${run.steps ?? '—'}</td>
     <td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td>
   </tr>`;
@@ -206,14 +208,50 @@ export async function openRun(runId) {
   }
   const run = data.run || {};
   $('#run-title').textContent = run.workflow_id || 'Run';
+  const cancel = run.status === 'delayed'
+    ? `<button class="button secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+        title="Drop the parked continuation: the remaining actions will never fire">Cancel</button>`
+    : '';
   $('#run-detail').innerHTML = `
     <div class="detail-summary">
       ${statusLine(run.status)}
       <code>${wrapTokens(run.run_id || runId)}</code>
       ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
+      ${cancel}
       <button class="button secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Re-inject this run's original trigger event">Replay</button>
     </div>
     ${flow(data)}`;
   icons();
 }
+
+/* Cancel drops a suspended run's parked continuation: the delay steps close
+   out cancelled and the worker consumes the envelope when it next surfaces,
+   so the remaining actions never fire. Same confirm-then-refresh shape as
+   the replay handler in main.js — confirm() keeps this view self-contained. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.run-cancel');
+  if (!button || !button.dataset.run || button.disabled) return;
+  const runId = button.dataset.run;
+  if (!confirm(`Cancel suspended run ${runId}? Its remaining actions will never run.`)) return;
+  button.disabled = true;
+  try {
+    await api(`/api/admin/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      body: '{}',
+    });
+    await openRun(runId); // re-render with the rolled-up status
+    const result = $('#run-replay-result');
+    result.classList.remove('error');
+    result.textContent = 'Run cancelled: the parked continuation is dropped and the remaining actions will not run.';
+    result.hidden = false;
+    fetchRunsPage(); // the list row reads cancelled again
+  } catch (error) {
+    const result = $('#run-replay-result');
+    result.textContent = error.message;
+    result.classList.add('error');
+    result.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});

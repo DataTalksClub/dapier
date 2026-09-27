@@ -49,6 +49,9 @@ def route(event, method, path):
     run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
     if method == "POST" and run_replay_match:
         return routes.replay_run(unquote(run_replay_match.group(1)), operator_subject)
+    run_cancel_match = re.fullmatch(r"/api/admin/runs/([^/]+)/cancel", path)
+    if method == "POST" and run_cancel_match:
+        return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)))
@@ -207,6 +210,7 @@ from .routes import (  # noqa: F401
     list_runs,
     list_schedule_triggers,
     oauth_clients_view,
+    cancel_run,
     replay_failed_runs,
     replay_inbox_event,
     revoke_api_token,

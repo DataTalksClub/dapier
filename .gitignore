@@ -13,3 +13,6 @@ uv.lock
 designer/node_modules/
 designer/dist/
 
+
+# design-review evidence screenshots
+after-select/

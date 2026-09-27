@@ -40,7 +40,7 @@ class BasicAuthTests(unittest.TestCase):
         transport = recording_transport()
         run({"type": "http_request", "url": "https://example.test", "auth_type": "basic",
              "auth_username": "{trigger.user}", "auth_password": "{trigger.pass}"},
-            event={"trigger": {"user": "amy", "pass": "pw"}}, transport=transport)
+            event={"data": {"user": "amy", "pass": "pw"}}, transport=transport)
         expected = base64.b64encode(b"amy:pw").decode()
         self.assertEqual(transport.calls[0]["headers"]["authorization"], f"Basic {expected}")
 
@@ -54,7 +54,7 @@ class BearerAuthTests(unittest.TestCase):
     def test_explicit_token_is_sent(self):
         transport = recording_transport()
         run({"type": "http_request", "url": "https://example.test", "auth_type": "bearer",
-             "auth_token": "{trigger.tok}"}, event={"trigger": {"tok": "tok-1"}},
+             "auth_token": "{trigger.tok}"}, event={"data": {"tok": "tok-1"}},
             transport=transport)
         self.assertEqual(transport.calls[0]["headers"]["authorization"], "Bearer tok-1")
 

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import pathlib
 import re
 
 from src.dapier.api import router as ingress
@@ -226,6 +227,33 @@ def test_assets_are_served_without_caching():
     for path in ("/", "/assets/app.js", "/assets/designer.js", "/assets/app.css"):
         response = ingress._static(path)
         assert response["headers"]["cache-control"] == "no-store", path
+
+
+def test_every_console_module_in_the_import_graph_is_served():
+    # The console loads as a native ES-module graph from /assets/app.js; a
+    # view module missing from the router's asset map 404s in the browser
+    # and blanks the whole console without any Python test noticing.
+    root = pathlib.Path(__file__).resolve().parents[1] / "src" / "web"
+    seen, queue = set(), [root / "app.js"]
+    while queue:
+        module = queue.pop()
+        key = module.relative_to(root).as_posix()
+        if key in seen:
+            continue
+        seen.add(key)
+        asset = "/assets/app.js" if key == "app.js" else f"/assets/{key}"
+        response = ingress._static(asset)
+        assert response is not None and response["statusCode"] == 200, asset
+        graph = re.findall(
+            r"""from\s*['"]([^'"]+)['"]|import\s*['"]([^'"]+)['"]""",
+            module.read_text())
+        for groups in graph:
+            specifier = next(part for part in groups if part)
+            assert specifier.startswith("."), f"{key} imports {specifier}"
+            queue.append((module.parent / specifier).resolve())
+    # The walk must actually descend into the view modules, not just the entry.
+    assert "js/main.js" in seen
+    assert any(key.startswith("js/views/") for key in seen)
 
 
 def test_every_nav_link_has_an_api_gateway_route():

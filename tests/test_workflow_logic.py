@@ -490,5 +490,124 @@ class ExecuteIntegrationTests(unittest.TestCase):
         fake_time.sleep.assert_not_called()
 
 
+class FilterOperatorTests(unittest.TestCase):
+    """The expanded predicate operators (engine/matching._matches_filter):
+    the one evaluator behind trigger filters and every logic
+    filter/condition/paths rule. Existing operators keep their exact
+    stringified-compare behavior; the ordering operators go numeric when
+    both sides parse as numbers and lexicographic otherwise (ISO dates)."""
+
+    def filter_stop(self, operator, value, data, field="size"):
+        """None when the filter passes, 'filtered' when it stops the chain."""
+        steps = [{"id": "gate", "type": "filter", "field": field,
+                  "operator": operator, "value": value}]
+        return run_chain(steps, data=data)[0]
+
+    def test_not_equals_and_does_not_contain(self):
+        data = {"route": "invoice", "subject": "Invoice 42 from Acme"}
+        assert self.filter_stop("not_equals", "receipt", data, "route") is None
+        assert self.filter_stop("not_equals", "invoice", data, "route") == "filtered"
+        assert self.filter_stop("does_not_contain", "Urgent", data, "subject") is None
+        assert self.filter_stop("does_not_contain", "Acme", data, "subject") == "filtered"
+
+    def test_ordering_operators_compare_numerically(self):
+        data = {"size": "9"}
+        assert self.filter_stop("gt", 10, data) == "filtered"
+        assert self.filter_stop("gt", 8, data) is None
+        assert self.filter_stop("gte", 9, data) is None
+        assert self.filter_stop("gte", 9.5, data) == "filtered"
+        assert self.filter_stop("lt", 10, data) is None
+        assert self.filter_stop("lt", 9, data) == "filtered"
+        assert self.filter_stop("lte", 9, data) is None
+        assert self.filter_stop("lte", 8.5, data) == "filtered"
+
+    def test_numeric_compare_beats_string_compare(self):
+        # "10" < "9" lexicographically; the numeric reading wins when both
+        # sides parse as floats.
+        data = {"size": "10"}
+        assert self.filter_stop("gt", 9, data) is None
+        assert self.filter_stop("gt", "9", data) is None
+
+    def test_ordering_falls_back_to_lexicographic_for_dates(self):
+        # ISO timestamps do not parse as floats, so they compare as strings —
+        # which is exactly the ordering ISO dates should have.
+        data = {"occurred_at": "2026-09-28T10:00:00+00:00"}
+        assert self.filter_stop("gt", "2026-09-01", data, "occurred_at") is None
+        assert self.filter_stop("gte", "2026-09-28T10:00:00+00:00", data, "occurred_at") is None
+        assert self.filter_stop("lt", "2026-10-01", data, "occurred_at") is None
+        assert self.filter_stop("lte", "2026-09-01", data, "occurred_at") == "filtered"
+
+    def test_ordering_with_unparseable_other_side_is_lexicographic(self):
+        data = {"size": "banana"}
+        assert self.filter_stop("gt", "apple", data) is None
+        assert self.filter_stop("lt", "apple", data) == "filtered"
+
+    def test_ordering_missing_field_reads_as_empty(self):
+        # "" is below everything lexicographically and not a number.
+        assert self.filter_stop("gt", "0", {}) == "filtered"
+        assert self.filter_stop("lt", "0", {}) is None
+
+    def test_exists_and_empty(self):
+        data = {"route": "invoice", "note": "", "flag": None}
+        assert self.filter_stop("exists", True, data, "route") is None
+        assert self.filter_stop("exists", False, data, "route") == "filtered"
+        assert self.filter_stop("exists", True, data, "note") == "filtered"
+        assert self.filter_stop("exists", True, data, "flag") == "filtered"
+        assert self.filter_stop("exists", True, data, "missing") == "filtered"
+        assert self.filter_stop("empty", True, data, "missing") is None
+        assert self.filter_stop("empty", True, data, "note") is None
+        assert self.filter_stop("empty", True, data, "route") == "filtered"
+        assert self.filter_stop("empty", False, data, "route") is None
+
+    def test_operators_work_in_condition_when_rules(self):
+        runner_calls = []
+        steps = [{"id": "route", "type": "condition",
+                  "when": {"size": {"gte": 10}, "subject": {"does_not_contain": "spam"}},
+                  "then": [{"id": "post", "type": "webhook",
+                            "url": "https://example.test"}]}]
+        run_chain(steps, data={"size": "12", "subject": "Invoice 42"},
+                  run_action=lambda action, event, workflow_id, steps=None:
+                      runner_calls.append(action["id"]))
+        assert runner_calls == ["post"]
+
+        runner_calls.clear()
+        run_chain(steps, data={"size": "12", "subject": "spam offer"},
+                  run_action=lambda action, event, workflow_id, steps=None:
+                      runner_calls.append(action["id"]))
+        assert runner_calls == []
+
+    def test_trigger_filters_accept_the_new_operators(self):
+        from src.dapier.engine import matching
+
+        workflow = {"id": "wf", "enabled": True, "triggers": [{
+            "connector": "email", "event": "message.received",
+            "filters": {"amount": {"gte": 100}, "subject": {"does_not_contain": "spam"}},
+        }]}
+        event = {"connector": "email", "event": "message.received",
+                 "data": {"amount": "250", "subject": "Invoice 42"}}
+        assert matching.matches(workflow, event) is True
+        assert matching.matches(workflow, {**event,
+                                           "data": {"amount": "99", "subject": "Invoice 42"}}) is False
+
+    def test_unknown_operator_still_fails_loudly(self):
+        # A typo'd operator is a config error (ValueError from the logic
+        # rules, KeyError straight out of the trigger matching) — never a
+        # quiet no-match.
+        hooks = Hooks()
+        with pytest.raises(ValueError, match="unknown filter operator"):
+            run_chain([{"id": "gate", "type": "filter", "field": "size",
+                        "operator": "greater", "value": 5}], hooks=hooks)
+
+        from src.dapier.engine import matching
+
+        workflow = {"id": "wf", "enabled": True, "trigger": {
+            "connector": "email", "event": "message.received",
+            "filters": {"size": {"greater": 5}},
+        }}
+        with pytest.raises(KeyError):
+            matching.matches(workflow, {"connector": "email",
+                                        "event": "message.received", "data": {"size": "9"}})
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

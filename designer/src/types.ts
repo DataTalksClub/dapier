@@ -4,7 +4,9 @@ export type ShapeType = "node" | "note" | "arrow";
 /** Open set — the known actions and their fields live in catalog.ts. */
 export type ActionType = string;
 export type ConnectorName = string;
-export type FilterOperator = "equals" | "prefix" | "suffix" | "contains";
+export type FilterOperator =
+  | "equals" | "not_equals" | "in" | "prefix" | "suffix" | "contains"
+  | "does_not_contain" | "gt" | "gte" | "lt" | "lte" | "exists" | "empty";
 
 export interface Point {
   x: number;

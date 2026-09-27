@@ -7,6 +7,7 @@ import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
 import { showOAuthResult } from './views/connections.js';
 import './views/storage.js';
+import { renderTriggers } from './views/triggers.js';
 import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
@@ -237,6 +238,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const runId = new URLSearchParams(window.location.search).get('run');
     if (runId) await openRun(runId);
   }
+  if (initialView === 'triggers') renderTriggers();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

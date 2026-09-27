@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$u = [
+  const __iconNode$v = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14325,33 +14325,33 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$u);
-  const __iconNode$t = [
+  const Braces = createLucideIcon("braces", __iconNode$v);
+  const __iconNode$u = [
     ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
   ];
-  const Clock = createLucideIcon("clock", __iconNode$t);
-  const __iconNode$s = [
+  const Clock = createLucideIcon("clock", __iconNode$u);
+  const __iconNode$t = [
     ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
     ["path", { d: "m12 21 4-4", key: "1lfcce" }],
     ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
   ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$s);
-  const __iconNode$r = [
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$t);
+  const __iconNode$s = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$r);
-  const __iconNode$q = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$s);
+  const __iconNode$r = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$q);
-  const __iconNode$p = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$r);
+  const __iconNode$q = [
     [
       "path",
       {
@@ -14364,8 +14364,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$p);
-  const __iconNode$o = [
+  const FileText = createLucideIcon("file-text", __iconNode$q);
+  const __iconNode$p = [
     [
       "path",
       {
@@ -14376,8 +14376,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$o);
-  const __iconNode$n = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$p);
+  const __iconNode$o = [
     [
       "path",
       {
@@ -14386,21 +14386,21 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$n);
-  const __iconNode$m = [
+  const Funnel = createLucideIcon("funnel", __iconNode$o);
+  const __iconNode$n = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$m);
-  const __iconNode$l = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$n);
+  const __iconNode$m = [
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
     ["path", { d: "M2 12h20", key: "9i4pu4" }]
   ];
-  const Globe = createLucideIcon("globe", __iconNode$l);
-  const __iconNode$k = [
+  const Globe = createLucideIcon("globe", __iconNode$m);
+  const __iconNode$l = [
     [
       "path",
       {
@@ -14423,8 +14423,8 @@
       }
     ]
   ];
-  const Layers = createLucideIcon("layers", __iconNode$k);
-  const __iconNode$j = [
+  const Layers = createLucideIcon("layers", __iconNode$l);
+  const __iconNode$k = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14437,32 +14437,32 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$j);
-  const __iconNode$i = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$k);
+  const __iconNode$j = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$i);
-  const __iconNode$h = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$h);
-  const __iconNode$g = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$j);
+  const __iconNode$i = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$i);
+  const __iconNode$h = [
     ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
     ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
   ];
-  const Mail = createLucideIcon("mail", __iconNode$g);
-  const __iconNode$f = [
+  const Mail = createLucideIcon("mail", __iconNode$h);
+  const __iconNode$g = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$f);
-  const __iconNode$e = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$e);
-  const __iconNode$d = [
+  const Maximize = createLucideIcon("maximize", __iconNode$g);
+  const __iconNode$f = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$f);
+  const __iconNode$e = [
     [
       "path",
       {
@@ -14471,8 +14471,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$d);
-  const __iconNode$c = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$e);
+  const __iconNode$d = [
     [
       "path",
       {
@@ -14481,20 +14481,20 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$c);
-  const __iconNode$b = [
+  const Play = createLucideIcon("play", __iconNode$d);
+  const __iconNode$c = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$b);
-  const __iconNode$a = [
+  const Plus = createLucideIcon("plus", __iconNode$c);
+  const __iconNode$b = [
     ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
     ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
     ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
     ["path", { d: "M8 16H3v5", key: "1cv678" }]
   ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$a);
-  const __iconNode$9 = [
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$b);
+  const __iconNode$a = [
     [
       "path",
       {
@@ -14504,7 +14504,20 @@
     ],
     ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
   ];
-  const Send = createLucideIcon("send", __iconNode$9);
+  const Send = createLucideIcon("send", __iconNode$a);
+  const __iconNode$9 = [
+    [
+      "path",
+      {
+        d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
+        key: "1s2grr"
+      }
+    ],
+    ["path", { d: "M20 2v4", key: "1rf3ol" }],
+    ["path", { d: "M22 4h-4", key: "gwowj6" }],
+    ["circle", { cx: "4", cy: "20", r: "2", key: "6kqj1y" }]
+  ];
+  const Sparkles = createLucideIcon("sparkles", __iconNode$9);
   const __iconNode$8 = [
     [
       "path",
@@ -17891,7 +17904,21 @@
       }
     );
   }
-  const logicOperators = ["equals", "in", "prefix", "suffix", "contains"];
+  const logicOperators = [
+    "equals",
+    "not_equals",
+    "in",
+    "prefix",
+    "suffix",
+    "contains",
+    "does_not_contain",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "exists",
+    "empty"
+  ];
   const actionCatalog = [
     {
       type: "webhook",
@@ -17899,6 +17926,7 @@
       icon: Webhook,
       fields: [
         { key: "url", label: "URL", required: true },
+        { key: "payload", label: "Payload (JSON, templated)", type: "textarea", placeholder: '{"id": "{trigger.id}"}' },
         { key: "secret_id", label: "Signing secret ID", placeholder: "dapier/webhook" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
@@ -17911,7 +17939,7 @@
       fields: [
         { key: "url", label: "URL", required: true, placeholder: "https://api.example.com/items/{id}" },
         { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "PATCH", "DELETE"], default: "GET" },
-        { key: "auth_type", label: "Auth", type: "select", options: ["none", "basic", "bearer", "api_key"] },
+        { key: "auth_type", label: "Auth", type: "select", options: ["none", "basic", "bearer", "api_key"], default: "none" },
         { key: "auth_username", label: "Basic username" },
         { key: "auth_password", label: "Basic password" },
         { key: "auth_token", label: "Bearer token", placeholder: "or a connection ID" },
@@ -18404,7 +18432,8 @@
         { key: "mode", label: "Mode", type: "select", options: ["accumulate", "flush"], default: "accumulate" },
         { key: "key", label: "Digest key", placeholder: "nightly-invoices", required: true },
         { key: "item", label: "Item (accumulate)", type: "textarea", placeholder: "{subject}" },
-        { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: '- "{subject}"\n- "{trigger.occurred_at}"' }
+        { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: '- "{subject}"\n- "{trigger.occurred_at}"' },
+        { key: "shared", label: "Shared across workflows", type: "boolean", default: "false" }
       ]
     },
     {
@@ -18523,7 +18552,21 @@
     { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
     { name: "custom", label: "Custom", logo: Webhook, events: [] }
   ];
-  const filterOperators = ["equals", "prefix", "suffix", "contains"];
+  const filterOperators = [
+    "equals",
+    "not_equals",
+    "in",
+    "prefix",
+    "suffix",
+    "contains",
+    "does_not_contain",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "exists",
+    "empty"
+  ];
   const onErrorField = {
     key: "on_error",
     label: "On error",
@@ -18636,6 +18679,10 @@
       problems.push(`"${shape.label}" is not connected to a trigger and was not saved.`);
     }
     return { actions, lost, problems };
+  }
+  function orderedActionNodes(shapes) {
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
+    return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
   }
   function filterRulesToYaml(rules) {
     const filters = {};
@@ -19986,6 +20033,154 @@
       invalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Invalid JSON — fixes apply once it parses." })
     ] });
   }
+  function outputPaths(output, depth = 0, prefix = "") {
+    const paths = [];
+    for (const [key, value] of Object.entries(output)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      paths.push(path);
+      if (depth < 1 && value && typeof value === "object" && !Array.isArray(value)) {
+        paths.push(...outputPaths(value, depth + 1, path));
+      }
+    }
+    return paths;
+  }
+  function StepsTemplatePicker({ steps, onPick, onClose }) {
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "steps-templates-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "steps-templates-title", children: "Insert from previous steps" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Outputs from earlier steps’ test runs — click one to copy its template, then paste it into any action field." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: steps.map((step) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: step.id }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: step.label })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "template-chips", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  title: `Copy {steps.${step.id}.output}`,
+                  onClick: () => onPick(`{steps.${step.id}.output}`),
+                  children: `{steps.${step.id}.output}`
+                }
+              ),
+              outputPaths(step.output ?? {}).map((path) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  title: `Copy {steps.${step.id}.output.${path}}`,
+                  onClick: () => onPick(`{steps.${step.id}.output.${path}}`),
+                  children: `{steps.${step.id}.output.${path}}`
+                },
+                path
+              ))
+            ] })
+          ] }, step.id)) })
+        ]
+      }
+    ) });
+  }
+  function CopilotDraftDialog({ config, onLoad, onClose }) {
+    const [prompt, setPrompt] = reactExports.useState("");
+    const [busy, setBusy] = reactExports.useState(false);
+    const [draft, setDraft] = reactExports.useState(null);
+    const [error, setError] = reactExports.useState("");
+    const adminBase = config.apiBase.replace(/\/designer$/, "");
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    async function requestDraft() {
+      const text = prompt.trim();
+      if (!text || busy) return;
+      setBusy(true);
+      setError("");
+      setDraft(null);
+      try {
+        const payload = await api(
+          config,
+          "/copilot/draft",
+          { method: "POST", body: JSON.stringify({ prompt: text }) },
+          adminBase
+        );
+        setDraft({ yaml: payload.yaml ?? "", errors: payload.errors ?? [] });
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setBusy(false);
+      }
+    }
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel copilot-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "copilot-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "copilot-title", children: "Copilot draft" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Describe the workflow in plain words. The draft is never saved — you review it and save it yourself." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Prompt",
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                className: "copilot-prompt",
+                rows: 3,
+                value: prompt,
+                autoFocus: true,
+                spellCheck: false,
+                placeholder: "e.g. When a YouTube video is published, post it to our Slack #videos channel",
+                onChange: (event) => setPrompt(event.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: busy || !prompt.trim(), onClick: requestDraft, children: [
+              busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Draft workflow" })
+            ] }),
+            busy && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-status", children: "Drafting…" })
+          ] }),
+          error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
+          (draft?.errors ?? []).map((problem, index) => /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: problem }, index)),
+          draft?.yaml && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "picker-yaml", children: draft.yaml }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: onClose, children: "Discard" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: () => onLoad(draft.yaml), children: "Load into canvas" })
+            ] })
+          ] })
+        ]
+      }
+    ) });
+  }
   function App({ config = localConfig }) {
     const [summaries, setSummaries] = reactExports.useState([]);
     const [sourceName, setSourceName] = reactExports.useState(null);
@@ -20020,6 +20215,8 @@
     });
     const [stepOutputs, setStepOutputs] = reactExports.useState({});
     const [triggerSample, setTriggerSample] = reactExports.useState(null);
+    const [copilotOpen, setCopilotOpen] = reactExports.useState(false);
+    const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
       [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
@@ -20355,6 +20552,24 @@
       if (!await askToLeave()) return;
       newWorkflow();
     }
+    function loadCopilotDraft(text) {
+      if (dirty && !window.confirm("Load the copilot draft into the canvas? Unsaved changes on the canvas are lost.")) return;
+      const parsed = parseYamlText(text);
+      if (!parsed) return;
+      allowUnload.current = false;
+      const nextShapes = shapesFromWorkflow(parsed);
+      setShapes(nextShapes);
+      if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
+      setEnabled(parsed.enabled !== false);
+      setCanvasExtraDirty(false);
+      setInvalidRawDrafts({});
+      setBase(parsed);
+      setSelectedId(null);
+      setStepTest({ nodeId: null, busy: false, result: null });
+      setStepOutputs({});
+      setCopilotOpen(false);
+      setStatus({ kind: "ok", message: "Copilot draft loaded — review it, then save." });
+    }
     async function duplicateWorkflow() {
       if (!sourceName) return;
       const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
@@ -20538,6 +20753,20 @@
     }
     const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
+    const priorSteps = (() => {
+      const chain = orderedActionNodes(shapes);
+      const at = chain.findIndex((node) => node.id === selectedId);
+      if (at <= 0) return [];
+      return chain.map((node, index) => {
+        const id = (node.data?.fields?.id ?? "").trim() || `action-${index + 1}`;
+        const output = stepOutputs[id]?.output;
+        return {
+          id,
+          label: node.label || node.data?.actionType || id,
+          ...output ? { output } : {}
+        };
+      }).slice(0, at);
+    })();
     const selectedInspector = () => {
       if (!selected || selected.type !== "node" || !selected.data) {
         return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-empty", children: [
@@ -20740,6 +20969,15 @@
             },
             selected.id
           )
+        ] }),
+        config.mode === "console" && priorSteps.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Insert from previous steps" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+            "Earlier steps’ outputs as ",
+            "{steps.*}",
+            " templates — click one, paste it into any template field."
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => setStepsPickerOpen(true), children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Browse step outputs…" }) })
         ] }),
         meta && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Error handling" }),
@@ -20972,6 +21210,20 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               }
             ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: copilotOpen ? "button secondary active" : "button secondary",
+                type: "button",
+                onClick: () => setCopilotOpen(true),
+                disabled: view === "yaml",
+                title: view === "yaml" ? "Switch to Canvas to load a draft" : "Draft a workflow from a plain-language prompt",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 15 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copilot" })
+                ]
+              }
+            ),
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
@@ -21126,7 +21378,26 @@
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
         ] })
-      ] }) })
+      ] }) }),
+      stepsPickerOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        StepsTemplatePicker,
+        {
+          steps: priorSteps,
+          onPick: (template) => {
+            setStepsPickerOpen(false);
+            void copyTemplate(template);
+          },
+          onClose: () => setStepsPickerOpen(false)
+        }
+      ),
+      copilotOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        CopilotDraftDialog,
+        {
+          config,
+          onLoad: loadCopilotDraft,
+          onClose: () => setCopilotOpen(false)
+        }
+      )
     ] });
   }
   function applyStoredTheme() {

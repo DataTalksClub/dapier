@@ -318,6 +318,12 @@ Resources:
         ConsoleStorage:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
+        ConsoleSchedules:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /schedules, Method: GET}
+        ConsoleTriggers:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /triggers, Method: GET}
         # One greedy route for every static asset; the console Lambda's
         # allowlist (router._static) decides what is actually served.
         ConsoleAssets:

@@ -1134,3 +1134,86 @@ def test_usage_endpoint_serves_the_rollup_over_bearer(monkeypatch):
     assert response["statusCode"] == 200
     body = json.loads(response["body"])
     assert body["usage"] == [{"month": "202609", "workflow_id": "wf-1", "tasks": 7}]
+
+
+# --- Cancel of a suspended run (POST /api/agent/runs/{id}/cancel) ---
+
+DELAYED_STEP = {
+    "execution_id": "wf-1:pause:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+    "action_id": "pause", "action_type": "delay", "connector": "email",
+    "event_type": "message.received", "status": "delayed",
+    "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:00+00:00",
+    "output": {"resume_at": "2026-09-26T10:00:00+00:00"},
+}
+
+
+def _configure_cancellable_runs_table(monkeypatch, items):
+    updates = []
+
+    class RunsTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+        def query(self, **kwargs):
+            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
+            wanted = values[0] if values else None
+            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+
+        def update_item(self, **kwargs):
+            updates.append(kwargs)
+            for item in items:
+                if item.get("execution_id") == kwargs["Key"]["execution_id"]:
+                    item["status"] = kwargs["ExpressionAttributeValues"][":cancelled"]
+            return {}
+
+    monkeypatch.setattr(agent_api.runs, "_table", lambda: RunsTable())
+    return updates
+
+
+def test_runs_cancel_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_cancellable_runs_table(monkeypatch, [dict(DELAYED_STEP)])
+
+    cancelled = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/cancel")
+
+    assert cancelled["statusCode"] == 403
+
+
+def test_runs_cancel_over_bearer_closes_the_parked_steps(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    updates = _configure_cancellable_runs_table(monkeypatch, [dict(DELAYED_STEP)])
+    audited = []
+    monkeypatch.setattr(agent_api.audit, "emit", lambda *a, **k: audited.append((a, k)))
+
+    cancelled = agent_api.route(event(), "POST", "/api/agent/runs/wf-1%3Aevt-1/cancel")
+
+    assert cancelled["statusCode"] == 200
+    body = json.loads(cancelled["body"])
+    assert body["accepted"] is True
+    assert body["cancelled"] == 1
+    assert body["run"]["status"] == "cancelled"
+    # Conditional close-out, mirroring the worker's: only a still-parked
+    # step flips, so a concurrent resume cannot double-write it.
+    assert updates[0]["ConditionExpression"] == "#status = :delayed"
+    assert audited == [(("wf-1:evt-1", "runs.cancel", "op-1"), {"outcome": "ok"})]
+
+    missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/cancel")
+    assert missing["statusCode"] == 404
+
+
+def test_runs_cancel_over_bearer_rejects_a_run_not_suspended(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_cancellable_runs_table(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+        "action_id": "post", "connector": "email", "event_type": "message.received",
+        "status": "completed", "started_at": "2026-09-25T10:00:00+00:00",
+        "finished_at": "2026-09-25T10:00:01+00:00",
+    }])
+
+    cancelled = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/cancel")
+
+    assert cancelled["statusCode"] == 409
+    assert json.loads(cancelled["body"])["error"] == "Run is not suspended; nothing to cancel"

@@ -442,6 +442,9 @@ def route(event, method, path):
     runs_replay_match = re.fullmatch(r"/api/agent/runs/([^/]+)/replay", path)
     if runs_replay_match and method == "POST":
         return runs_replay_api(event, unquote(runs_replay_match.group(1)))
+    runs_cancel_match = re.fullmatch(r"/api/agent/runs/([^/]+)/cancel", path)
+    if runs_cancel_match and method == "POST":
+        return runs_cancel_api(event, unquote(runs_cancel_match.group(1)))
     if path == "/api/agent/triggers/inbox" and method == "GET":
         return inbox_api(event)
     if path == "/api/agent/triggers/sample" and method == "GET":
@@ -989,6 +992,23 @@ def runs_replay_api(event, run_id):
     status, payload = runs.api_replay(run_id)
     if status == 202:
         audit.emit(run_id, "runs.replay", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
+def runs_cancel_api(event, run_id):
+    """Operator-only cancel of a suspended run, mirroring the console's.
+
+    Flips the run's still-``delayed`` steps to ``cancelled`` (runs.api_cancel)
+    so the parked continuation is dropped: when the envelope next surfaces the
+    worker finds the pause cancelled and consumes it — the remaining actions
+    never fire.
+    """
+    subject, error = require_operator(event, "runs")
+    if error:
+        return error
+    status, payload = runs.api_cancel(run_id)
+    if status == 200:
+        audit.emit(run_id, "runs.cancel", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 

@@ -89,6 +89,15 @@ def replay_run(run_id, operator):
     return http._json_response(status, payload)
 
 
+def cancel_run(run_id, operator):
+    """Cancel a suspended run: its parked steps close out cancelled and the
+    parked continuation is dropped (the worker consumes the envelope)."""
+    status, payload = runs.api_cancel(run_id)
+    if status == 200:
+        session._audit_event(run_id, "runs.cancel", operator or "unknown", outcome="ok")
+    return http._json_response(status, payload)
+
+
 def replay_failed_runs(event, operator):
     """Re-execute the latest failed runs of the workflow named in the body."""
     try:

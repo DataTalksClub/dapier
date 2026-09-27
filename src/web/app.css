@@ -531,6 +531,9 @@ dialog::backdrop { background: var(--backdrop); }
 dialog form { display: contents; }
 #run-dialog { width: min(640px, calc(100vw - 32px)); }
 #workflow-dialog { width: min(680px, calc(100vw - 32px)); }
+/* Trigger-sample puller (Connections): the pulled envelope's data object. */
+#trigger-sample-dialog { width: min(620px, calc(100vw - 32px)); }
+.sample-json { margin: 0; font-size: 12.5px; color: var(--ink-soft); white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); padding: 10px 12px; max-height: 260px; overflow-y: auto; }
 .dialog-head {
   display: flex;
   align-items: center;
