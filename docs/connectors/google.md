@@ -18,7 +18,8 @@ rotation, CLI operations, and the general process for changing scopes.
 - OAuth callback: `https://dapier.dtcdev.click/oauth/callback`.
 - Enabled APIs: Google Calendar API, YouTube Data API v3, Google Drive API,
   Google Docs API, and Google Sheets API.
-- OAuth audience: External, **Testing** at last verification.
+- OAuth audience: External, **In production** as of 2026-09-27; Google
+  verification is still pending.
 - Test users: `alexey.s.grigoriev@gmail.com` and
   `alexey@datatalks.club`.
 - The shared consent branding is named `DTC`; do not change project-wide
@@ -98,11 +99,10 @@ uv run dapier connections scopes google-calendar --scopes `
   https://www.googleapis.com/auth/userinfo.email
 ```
 
-The stored Gmail token had the previous Calendar-only grants at last check.
-Reconnect as `alexey.s.grigoriev@gmail.com` and accept the expanded consent
-screen to grant Drive, Docs, and Sheets. Confirm the Google account before
-approving, then inspect `uv run dapier connections show google-calendar` to
-verify the token's granted scopes.
+Status: **connected** to `alexey.s.grigoriev@gmail.com`. Its granted scopes
+include the Calendar, Drive, Docs, Sheets, and account-identity scopes listed
+above. The connection is granted to `personal-scheduler` for `connect` and
+`use`. Verify with `uv run dapier connections show google-calendar`.
 
 ### DataTalks.club: `google-sheets`
 
@@ -116,16 +116,19 @@ https://www.googleapis.com/auth/spreadsheets
 https://www.googleapis.com/auth/userinfo.email
 ```
 
-At last check it was **setup incomplete**, with no verified account. Connect
-it while signed in as `alexey@datatalks.club`:
+Status: **connected** to `alexey@datatalks.club`, with Drive, Docs, Sheets, and
+account-identity scopes granted. The connection is granted to `todo-cli` for
+`use`. Verify with `uv run dapier connections show google-sheets --agent todo-cli`.
+
+To reconnect or add a Google account, use the connection command while signed
+in as the intended account:
 
 ```powershell
 uv run dapier connections connect google-sheets --agent <agent-name>
 ```
 
 Check the Google account on the consent screen before approving. Then inspect
-`uv run dapier connections show google-sheets` to verify which scopes the token
-actually received.
+the connection to verify which scopes the token actually received.
 
 ### Calendar, YouTube, and other accounts
 
@@ -140,11 +143,13 @@ actually received.
 
 ## Google OAuth publishing status
 
-At last verification, `dtcdev-click` was an External app in **Testing**. Google
-expires refresh tokens for Testing apps after seven days when consent requests
-scopes beyond basic identity; affected accounts must consent again weekly
-until the app leaves Testing. See Google's [audience and publishing status
-guide](https://support.google.com/cloud/answer/15549945?hl=en).
+On 2026-09-27, the project owner authorized and moved `dtcdev-click` from
+**Testing** to **In production**. Both Workspace accounts reconsented after
+publication so their tokens were issued under the production status. Google's
+OAuth documentation says refresh tokens issued while an External app is in
+Testing expire after seven days; production tokens generally avoid that limit,
+though they can still be revoked or expire after prolonged inactivity. See
+Google's [OAuth refresh-token documentation](https://developers.google.com/identity/protocols/oauth2).
 
 The following public URLs are implemented and saved in **Google Auth Platform
 → Branding**:
@@ -163,8 +168,13 @@ authenticated console, so use `/about` as the OAuth homepage. The domain
 directly without browser credentials. Deploying changes to them goes through
 the normal GitHub Actions deployment.
 
-No logo is required to publish. Uploading one starts an app verification
-requirement, so do not add one unless it is part of a planned verification.
+No logo was added. The app is **In production but unverified**: Google still
+shows the unverified-app warning, and the project reports a 100-user lifetime
+cap for unapproved sensitive or restricted scopes. `drive.readonly` is
+Restricted, so Google verification and possibly a security assessment may be
+needed for broader use. The project status change removes the Testing-mode
+refresh-token expiry for newly issued tokens; it does not remove the warning
+or the cap.
 
 ### Moving the project out of Testing
 
@@ -175,12 +185,12 @@ verification and a security assessment depending on app use. Unverified
 sensitive or restricted scopes can show users a warning and enforce a
 100-new-user cap. Test-user status does not remove those production limits.
 
-When the project owner has approved this project-wide change, open **Google
-Auth Platform → Audience → Publish app**, review the confirmation, publish,
-and verify Audience shows **In production**. Last checked, the project was
-still **Testing**. The request to publish was left pending final user
-confirmation, so no **Publish app** action was completed. Do not assume the
-change occurred just because the branding URLs are ready. See Google's
+The project-wide production change was completed on 2026-09-27: open **Google
+Auth Platform → Audience → Publish app**, review the warning that any Google
+Account can access the app, click **Confirm**, and verify Audience shows **In
+production**. This affects every OAuth client in `dtcdev-click`, including
+`DTC DEV Auth`. The app still needs Google verification; publishing is not the
+same as verification. See Google's
 [production readiness overview](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview)
 and [restricted-scope verification requirements](https://developers.google.com/identity/protocols/oauth2/restricted-scope-verification).
 
@@ -207,6 +217,21 @@ and [restricted-scope verification requirements](https://developers.google.com/i
 - When a previous scope-add operation appears unsaved, return to Data access
   and verify the persisted scope table before trying to add them again. The
   working save sequence was **Add to table → Update → Save**.
+- On Google's OAuth consent summary, the requested Drive, Docs, and Sheets
+  permission checkboxes were initially unchecked. Click **Select all** and
+  verify every requested permission is checked before **Continue**. Partial
+  consent returns Dapier to Connections with `oauth=missing_scopes`; retry the
+  consent and select all requested scopes.
+- Google shows **Advanced → Go to dtcdev.click (unsafe)** for this production
+  app until verification is complete. This is Google's unverified-app
+  warning, not a Dapier login page. Continue only for the approved Dapier
+  client and the intended account.
+- If `dapier connections connect` returns immediately for an already
+  connected connection, confirm the actual account and `granted_scopes`.
+  Complete the generated authorization URL in Chrome when the scopes still
+  need consent; status alone does not prove the updated grants were accepted.
+- Reauthorize existing accounts after switching from Testing to In production
+  so their refresh tokens are issued under the production status.
 
 For where to change default scopes in code and the common CLI workflow, use the
 [shared connector guide](README.md#where-scope-behavior-lives-in-the-repository).
