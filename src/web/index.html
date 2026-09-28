@@ -253,6 +253,17 @@
           <button class="button secondary" type="submit">Add sender</button>
         </form>
         <ul id="email-from-list" class="plain-list"></ul>
+        <div class="section-head">
+          <div class="section-head-text"><h3 class="sub-head">Agent tasks</h3><p class="sub">Jobs the <code>agent</code> action enqueued and <code>dapier worker</code> runs. <code>dapier agent-tasks list</code> shows the same list.</p></div>
+          <button id="agent-tasks-refresh" class="button secondary" type="button">Refresh</button>
+        </div>
+        <p id="agent-tasks-empty" class="sub">No tasks yet. An agent action enqueues one when its workflow runs.</p>
+        <div id="agent-tasks-wrap" class="table-wrap" hidden>
+          <table>
+            <thead><tr><th>Task</th><th>Workflow</th><th>Status</th><th>Error</th><th>Updated</th></tr></thead>
+            <tbody id="agent-tasks"></tbody>
+          </table>
+        </div>
       </section>
       <section class="view" data-page="schedules">
         <div class="section-head">

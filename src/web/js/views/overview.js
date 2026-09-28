@@ -8,7 +8,7 @@ import { renderConnections } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
-import { renderEmails, renderEmailFrom } from './emails.js';
+import { renderEmails, renderEmailFrom, renderAgentTasks } from './emails.js';
 import { renderRuns, openRun } from './runs.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
@@ -156,6 +156,7 @@ function render() {
   renderTokens(data.api_tokens || []);
   renderEmails(data.email_triggers);
   renderEmailFrom(data.email_from);
+  renderAgentTasks();
   renderRuns();
   renderInbox();
   renderSchedules();

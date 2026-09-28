@@ -528,6 +528,14 @@ def build_parser():
     webhooks_del.add_argument("name")
     webhooks_del.add_argument("--kind", default=None,
                               choices=["webhook", "telegram", "mailchimp", "youtube"])
+    agent_tasks_p = sub.add_parser(
+        "agent-tasks", help="Host jobs the agent action enqueued (run by `dapier worker`)")
+    agent_tasks_sub = agent_tasks_p.add_subparsers(dest="command", required=True)
+    agent_tasks_list = agent_tasks_sub.add_parser("list", help="List host agent tasks, newest first")
+    agent_tasks_list.add_argument("--limit", default=None,
+                                  help="How many to show (default 50, max 200)")
+    agent_tasks_list.add_argument("--status", default=None,
+                                  help="Only rows with this status: starting, started, ignored")
     sub.add_parser(
         "worker",
         help="Long-poll the host queue and run host jobs until interrupted.")
@@ -583,6 +591,10 @@ def main(argv=None):
             return cmd_emails(args, api_url, debug)
         if args.group == "webhooks":
             return cmd_hooks(args, api_url, debug)
+        if args.group == "agent-tasks":
+            return commands.agent_tasks_list(api_url, debug,
+                                             limit=getattr(args, "limit", None),
+                                             status=getattr(args, "status", None))
         if args.group == "worker":
             return commands.worker_run()
         if args.group == "catalog":

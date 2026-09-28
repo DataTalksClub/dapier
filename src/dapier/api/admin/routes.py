@@ -6,6 +6,7 @@ import boto3
 
 from ... import audit as audit_log
 from ... import error_digest
+from ... import host_tasks
 from ... import http
 from ...auth import api_tokens, authz, roles, session
 from ... import copilot
@@ -442,6 +443,18 @@ def email_from_remove(event, operator):
     except email_from.FromError as exc:
         return http._json_response(400, {"error": str(exc)})
     session._audit_event("email-from", "email-from", operator, outcome="removed")
+    return http._json_response(status, payload)
+
+
+def agent_tasks_list(event):
+    """Host tasks the agent action enqueued (status, error, timestamps).
+
+    Read-only: the session/role gate in the dispatcher covers it, and like
+    the other list reads the read itself is not audited.
+    """
+    query = event.get("queryStringParameters") or {}
+    status, payload = host_tasks.api_list(
+        limit=query.get("limit"), status=query.get("status"))
     return http._json_response(status, payload)
 
 

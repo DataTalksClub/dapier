@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit, copilot, error_digest
+from .. import audit, copilot, error_digest, host_tasks
 from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
@@ -491,6 +491,8 @@ def route(event, method, path):
         return operator_overview(event)
     if path == "/api/agent/runs" and method == "GET":
         return runs_api(event)
+    if path == "/api/agent/agent-tasks" and method == "GET":
+        return agent_tasks_api(event)
     if path == "/api/agent/runs/export" and method == "GET":
         return runs_export_api(event)
     if path == "/api/agent/runs/replay-failed" and method == "POST":
@@ -1260,6 +1262,24 @@ def runs_api(event, run_id=None):
         q=query.get("q") or None,
         next_token=query.get("next") or None,
     )
+    return _no_store(_json_response(status, payload))
+
+
+def agent_tasks_api(event):
+    """Operator-only host task list mirroring /api/admin/agent-tasks.
+
+    Same domain function (host_tasks.api_list) as the console route, so the
+    CLI and the console see the same rows: what the agent action enqueued,
+    what `dapier worker` did with it (status, session, error, timestamps).
+    Like the runs read it is not itself audited — require_operator records
+    the denials.
+    """
+    _, error = require_operator(event, "agent-tasks")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = host_tasks.api_list(
+        limit=query.get("limit"), status=query.get("status"))
     return _no_store(_json_response(status, payload))
 
 

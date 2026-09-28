@@ -1922,6 +1922,30 @@ def emails_from_remove(api_url, address, debug=False):
     return 0
 
 
+def agent_tasks_list(api_url, debug=False, limit=None, status=None):
+    """Host jobs the agent action enqueued, as `dapier worker` leaves them."""
+    params = []
+    if limit:
+        params.append(f"limit={quote(str(limit), safe='')}")
+    if status:
+        params.append(f"status={quote(status, safe='')}")
+    path = "/api/agent/agent-tasks" + ("?" + "&".join(params) if params else "")
+    data = api.call(api_url, "GET", path, debug=debug)
+    items = data.get("tasks") or []
+    if not items:
+        print("No host tasks yet. An agent action enqueues one when its workflow runs.")
+        return 0
+    print(f"{'STATUS':10} {'WORKFLOW':30} TASK ID")
+    for item in items:
+        print(f"{item.get('status', ''):10} {str(item.get('workflow') or ''):30} "
+              f"{item.get('task_id') or ''}")
+        if item.get("tag"):
+            print(f"           tag {item['tag']}")
+        if item.get("error"):
+            print(f"           error {item['error']}")
+    return 0
+
+
 def worker_run():
     """Long-poll the host queue. This command does not call the API."""
     from src.dapier.host_worker import serve
