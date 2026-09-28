@@ -7,6 +7,7 @@ import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
 import { showOAuthResult } from './views/connections.js';
 import './views/storage.js';
+import { fetchTemplates } from './views/templates.js';
 import { refreshAudit } from './views/audit.js';
 import { refreshUsers } from './views/users.js';
 import { renderTriggers } from './views/triggers.js';
@@ -305,6 +306,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (initialView === 'triggers') renderTriggers();
   if (initialView === 'audit') refreshAudit();
   if (initialView === 'users') refreshUsers();
+  if (initialView === 'templates') fetchTemplates();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

@@ -67,6 +67,7 @@
         <a class="nav-item" href="/inbox" data-view="inbox"><i data-lucide="inbox"></i><span>Trigger inbox</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
+        <a class="nav-item" href="/templates" data-view="templates"><i data-lucide="layout-template"></i><span>Templates</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
         <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
@@ -161,6 +162,19 @@
           <table>
             <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
             <tbody id="workflow-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" data-page="templates">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Templates</h2><p class="sub">Workflows published as reusable starting points. <strong>Use template</strong> forks one into a new workflow; the template stays in the gallery. Publish a workflow as a template from its row under <a class="view-link" href="/workflows" data-target="workflows">Workflows</a>.</p></div>
+        </div>
+        <div id="template-empty" class="empty-state" hidden><h3>No templates published yet</h3><p>Publish one of your workflows as a template from its row in the Workflows list — it appears here for one-click forking.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">Open workflows</a></div>
+        <div id="template-table-wrap" class="table-wrap">
+          <table>
+            <thead><tr><th>Template</th><th>Trigger</th><th>Steps</th><th>Source</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="template-table"></tbody>
           </table>
         </div>
       </section>
@@ -849,6 +863,23 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button id="workflow-folder-save" class="button primary" type="submit">Save folder</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="template-apply-dialog" aria-labelledby="template-apply-title">
+    <form id="template-apply-form" method="dialog">
+      <div class="dialog-head">
+        <h2 id="template-apply-title">Use template</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="sub" id="template-apply-blurb"></p>
+        <label>New workflow name<input id="template-apply-name" class="mono-input" type="text" placeholder="invoice-copy" autocomplete="off"><small class="field-hint">Optional — defaults to <code>&lt;template-id&gt;-copy</code>. The copy drops the template flag and its run state; the template itself stays in the gallery.</small></label>
+        <p id="template-apply-error" class="form-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button id="template-apply-save" class="button primary" type="submit">Use template</button>
       </div>
     </form>
   </dialog>

@@ -57,6 +57,10 @@ def _workflow_view(workflow, source, *, published):
         # for hand-written YAML that carries something else under ``folder``.
         "folder": str(workflow["folder"]).strip()
         if isinstance(workflow.get("folder"), str) else "",
+        # Offered in the Templates gallery when true (designer_store._summary
+        # semantics: only a bare True counts, so hand-written YAML carrying
+        # anything else reads as unpublished).
+        "template": workflow.get("template") is True,
     }
     if len(triggers) > 1:
         view["triggers"] = triggers

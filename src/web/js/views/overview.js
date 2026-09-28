@@ -223,6 +223,8 @@ export function renderWorkflows() {
         <button type="button" class="button secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
         <button type="button" class="button secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
         <button type="button" class="button secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
+        <button type="button" class="button secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
+        <button type="button" class="button secondary workflow-template" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-template="${workflow.template ? 'true' : 'false'}" ${sourceButtons} title="${workflow.template ? 'Remove from the Templates gallery' : 'Publish as a template — offer it under Templates'}">${workflow.template ? 'Unpublish' : 'Publish'}</button>
         <button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>
         <button type="button" class="button danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
       </td>
@@ -492,7 +494,7 @@ export async function restoreVersion(button) {
 }
 
 export function openRowFor(event) {
-  if (event.target.closest('.workflow-toggle, .workflow-tags, .workflow-folder, .workflow-delete')) return; // the button handles itself
+  if (event.target.closest('.workflow-toggle, .workflow-tags, .workflow-folder, .workflow-delete, .workflow-duplicate, .workflow-template')) return; // the button handles itself
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');
@@ -714,6 +716,54 @@ $('#workflow-folder-form').addEventListener('submit', async (event) => {
     error.hidden = false;
   } finally {
     save.disabled = false;
+  }
+});
+
+/* ---- Duplicate (POST /api/admin/designer/workflows/<file>/duplicate) ----
+   The same fork the CLI's `workflows duplicate` runs: a fresh id derived
+   from the name (<id>-copy by default), run state stripped. The copy is
+   saved live through the standard save path; the list refreshes to show it. */
+$('#workflow-table').addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-duplicate');
+  if (!button || button.disabled || !button.dataset.file) return;
+  button.disabled = true;
+  try {
+    const data = await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}/duplicate`, {
+      method: 'POST',
+      body: '{}',
+    });
+    const newId = String(data.file || '').replace(/\.yaml$/, '') || button.dataset.workflow;
+    notice(`Duplicated ${button.dataset.workflow} as ${newId}${data.published ? ' — live now' : ''}.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+    button.disabled = false;
+  }
+});
+
+/* ---- Template publish/unpublish (PUT /api/admin/designer/workflows/<file>/template) ----
+   The same flag `dapier templates publish|unpublish` writes: template:true
+   in the workflow YAML, so the definition is republished with cause
+   "template" and committed like any other change. Flagged workflows appear
+   in the Templates gallery. */
+$('#workflow-table').addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-template');
+  if (!button || button.disabled || !button.dataset.file) return;
+  const flag = button.dataset.template !== 'true';
+  button.disabled = true;
+  try {
+    const result = await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}/template`, {
+      method: 'PUT',
+      body: JSON.stringify({ template: flag }),
+    });
+    await refresh();
+    notice(result.git_sync_error
+      ? `${result.workflow_id || button.dataset.workflow} was ${flag ? 'published as a template' : 'removed from the template gallery'}, but Git sync failed: ${result.git_sync_error}`
+      : `${result.workflow_id || button.dataset.workflow} ${flag ? 'published as a template — find it under Templates' : 'removed from the template gallery'}.`,
+      !!result.git_sync_error);
+  } catch (error) {
+    notice(error.message, true);
+    button.disabled = false;
   }
 });
 

@@ -408,7 +408,7 @@ the discovery/replay/test work already underway.
 | Sub-zaps (call another workflow) | `run_workflow` step (`connectors/subworkflow.py`) | have |
 | Data stores (Zapier Storage API) | `storage_get/set/delete/find` + storage API + console view (`connectors/storage.py`, `api/storage.py`, `views/storage.js`) | have |
 | Outbound webhooks with signing/retry | HMAC signing + typed `HttpError` + per-step `autoretry` (`engine/actions/webhook.py`, `engine/logic.py`) | have |
-| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (designer), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
+| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (Templates view + the designer gallery; Workflows rows carry Duplicate and Publish/Unpublish template), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
 
 ## 2. Ranked gaps
 
@@ -1093,7 +1093,11 @@ Still open (ranked, from the same audit):
    `tests/test_designer.py` (store + admin routes), `tests/test_cli.py`
    (command surface). Cross-account transfer still needs the multi-user
    model (item 13); marketplace-style sharing beyond this deployment
-   remains future work.
+   remains future work. Console-native surface (2026-09-28): a Templates
+   nav view (`views/templates.js` — gallery, Use template fork dialog,
+   Unpublish), Duplicate and Publish/Unpublish-template buttons on the
+   Workflows rows (the overview payload rides the `template` flag), and
+   `tests/test_console_templates_gallery.py` pinning the wiring.
 15. **CLOSED (2026-09-28)** — Designer editor polish: undo/redo over a
    per-session draft timeline (`designer/src/history.ts`, pure module —
    500ms sliding coalescing per editing group, 50-entry cap, reset on
@@ -1148,7 +1152,7 @@ the discovery/replay/test work already underway.
 | Sub-zaps (call another workflow) | `run_workflow` step (`connectors/subworkflow.py`) | have |
 | Data stores (Zapier Storage API) | `storage_get/set/delete/find` + storage API + console view (`connectors/storage.py`, `api/storage.py`, `views/storage.js`) | have |
 | Outbound webhooks with signing/retry | HMAC signing + typed `HttpError` + per-step `autoretry` (`engine/actions/webhook.py`, `engine/logic.py`) | have |
-| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (designer), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
+| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (Templates view + the designer gallery; Workflows rows carry Duplicate and Publish/Unpublish template), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
 
 ## 2. Ranked gaps
 
@@ -1833,7 +1837,11 @@ Still open (ranked, from the same audit):
    `tests/test_designer.py` (store + admin routes), `tests/test_cli.py`
    (command surface). Cross-account transfer still needs the multi-user
    model (item 13); marketplace-style sharing beyond this deployment
-   remains future work.
+   remains future work. Console-native surface (2026-09-28): a Templates
+   nav view (`views/templates.js` — gallery, Use template fork dialog,
+   Unpublish), Duplicate and Publish/Unpublish-template buttons on the
+   Workflows rows (the overview payload rides the `template` flag), and
+   `tests/test_console_templates_gallery.py` pinning the wiring.
 15. **CLOSED (2026-09-28)** — Designer editor polish: undo/redo over a
    per-session draft timeline (`designer/src/history.ts`, pure module —
    500ms sliding coalescing per editing group, 50-entry cap, reset on
@@ -1888,7 +1896,7 @@ the discovery/replay/test work already underway.
 | Sub-zaps (call another workflow) | `run_workflow` step (`connectors/subworkflow.py`) | have |
 | Data stores (Zapier Storage API) | `storage_get/set/delete/find` + storage API + console view (`connectors/storage.py`, `api/storage.py`, `views/storage.js`) | have |
 | Outbound webhooks with signing/retry | HMAC signing + typed `HttpError` + per-step `autoretry` (`engine/actions/webhook.py`, `engine/logic.py`) | have |
-| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (designer), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
+| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (Templates view + the designer gallery; Workflows rows carry Duplicate and Publish/Unpublish template), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
 
 ## 2. Ranked gaps
 
@@ -2573,7 +2581,11 @@ Still open (ranked, from the same audit):
    `tests/test_designer.py` (store + admin routes), `tests/test_cli.py`
    (command surface). Cross-account transfer still needs the multi-user
    model (item 13); marketplace-style sharing beyond this deployment
-   remains future work.
+   remains future work. Console-native surface (2026-09-28): a Templates
+   nav view (`views/templates.js` — gallery, Use template fork dialog,
+   Unpublish), Duplicate and Publish/Unpublish-template buttons on the
+   Workflows rows (the overview payload rides the `template` flag), and
+   `tests/test_console_templates_gallery.py` pinning the wiring.
 15. **CLOSED (2026-09-28)** — Designer editor polish: undo/redo over a
    per-session draft timeline (`designer/src/history.ts`, pure module —
    500ms sliding coalescing per editing group, 50-entry cap, reset on
@@ -2628,7 +2640,7 @@ the discovery/replay/test work already underway.
 | Sub-zaps (call another workflow) | `run_workflow` step (`connectors/subworkflow.py`) | have |
 | Data stores (Zapier Storage API) | `storage_get/set/delete/find` + storage API + console view (`connectors/storage.py`, `api/storage.py`, `views/storage.js`) | have |
 | Outbound webhooks with signing/retry | HMAC signing + typed `HttpError` + per-step `autoretry` (`engine/actions/webhook.py`, `engine/logic.py`) | have |
-| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (designer), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
+| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (Templates view + the designer gallery; Workflows rows carry Duplicate and Publish/Unpublish template), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
 
 ## 2. Ranked gaps
 
@@ -3313,7 +3325,11 @@ Still open (ranked, from the same audit):
    `tests/test_designer.py` (store + admin routes), `tests/test_cli.py`
    (command surface). Cross-account transfer still needs the multi-user
    model (item 13); marketplace-style sharing beyond this deployment
-   remains future work.
+   remains future work. Console-native surface (2026-09-28): a Templates
+   nav view (`views/templates.js` — gallery, Use template fork dialog,
+   Unpublish), Duplicate and Publish/Unpublish-template buttons on the
+   Workflows rows (the overview payload rides the `template` flag), and
+   `tests/test_console_templates_gallery.py` pinning the wiring.
 15. **CLOSED (2026-09-28)** — Designer editor polish: undo/redo over a
    per-session draft timeline (`designer/src/history.ts`, pure module —
    500ms sliding coalescing per editing group, 50-entry cap, reset on
