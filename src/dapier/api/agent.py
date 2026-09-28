@@ -1883,7 +1883,9 @@ def start_connect(event, connection_id):
     if not redirect_uri:
         return _json_response(503, {"error": "OAuth callback URL is not configured"})
     try:
-        scopes = oauth_providers.normalize_scopes(connection["provider"], connection.get("scopes"))
+        from ..connectors.gmail import connection_grant_scopes
+
+        scopes = connection_grant_scopes(connection["provider"], connection.get("scopes"))
     except oauth_providers.ProviderError as exc:
         return _json_response(400, {"error": str(exc)})
     verifier = _b64encode(os.urandom(48))

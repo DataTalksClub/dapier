@@ -1487,3 +1487,14 @@ Phase 3 (owner-or-operator writes) remain not started.
   (`feat(agent-tasks): read surface for the host task rows`) —
   `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console
   Emails view.
+- Also closed: the Gmail live-use scopes backlog item — `GMAIL_SCOPES` is
+  now the single declaration the OAuth grant derives from
+  (`connectors.gmail.effective_gmail_scopes` + `connection_grant_scopes`):
+  a Google connection touching Gmail consents to and is verified against
+  the declared gmail.readonly + gmail.send, and the `GMAIL_SCOPES` env
+  (template param `GmailScopes`) extends the grant with live-use extras
+  (gmail.modify, gmail.settings, gmail.labels) without a code change.
+- Also closed: console connections import — the Connections view gains an
+  Import dialog posting to the operator `/api/admin/connections/import`
+  route, closing the import gap between the CLI/API and the console
+  (`feat(connections): console Import dialog`).

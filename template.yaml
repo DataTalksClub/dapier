@@ -58,6 +58,14 @@ Parameters:
     NoEcho: true
     Default: ''
     Description: Secret of the shared Google OAuth client
+  GmailScopes:
+    Type: String
+    Default: ''
+    Description: >
+      Extra Gmail OAuth scopes (GMAIL_SCOPES) added to the grant of any
+      Google connection that touches Gmail, comma- or whitespace-separated
+      full URLs or short names (gmail.modify); empty grants only the
+      connector's declared gmail.readonly and gmail.send
   DropboxOAuthClientId:
     Type: String
     Default: ''
@@ -159,6 +167,9 @@ Globals:
         AUTH_CALLBACK_URL: !Sub https://${DomainName}/auth/callback
         AUTH_LOGOUT_URL: !Sub https://${DomainName}/
         OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback
+        # Extra Gmail scopes (connectors.gmail GMAIL_SCOPES) beyond the
+        # declared gmail.readonly/gmail.send; empty keeps the declaration.
+        GMAIL_SCOPES: !Ref GmailScopes
         AUTH_ISSUER: !Ref AuthIssuer
         AUTH_JWKS_URL: !Ref AuthJwksUrl
         OPERATOR_EMAILS: !Ref OperatorEmails

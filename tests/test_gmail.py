@@ -679,3 +679,76 @@ def test_label_options_map_to_query_terms(monkeypatch):
         {"value": "label:Newsletters", "label": "Newsletters"},
         {"value": "label:INBOX", "label": "INBOX"},
     ]
+
+
+# --- the Gmail scope declaration -------------------------------------------------
+#
+# GMAIL_SCOPES is the one declaration of what the chip's calls answer to;
+# the OAuth flow derives a Gmail connection's grant from it
+# (connection_grant_scopes), and the GMAIL_SCOPES environment variable
+# extends the declaration with live-use extras at consent and verification
+# time.
+
+GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly"
+GMAIL_SEND = "https://www.googleapis.com/auth/gmail.send"
+
+
+def test_effective_gmail_scopes_without_env_is_the_declaration(monkeypatch):
+    monkeypatch.delenv("GMAIL_SCOPES", raising=False)
+    assert gmail.effective_gmail_scopes() == (GMAIL_READONLY, GMAIL_SEND)
+
+
+def test_effective_gmail_scopes_env_extends_the_declaration(monkeypatch):
+    monkeypatch.setenv("GMAIL_SCOPES",
+                       "https://www.googleapis.com/auth/gmail.modify")
+    assert gmail.effective_gmail_scopes() == (
+        GMAIL_READONLY, GMAIL_SEND,
+        "https://www.googleapis.com/auth/gmail.modify")
+
+
+def test_effective_gmail_scopes_parses_commas_whitespace_and_short_names(monkeypatch):
+    monkeypatch.setenv(
+        "GMAIL_SCOPES",
+        "gmail.modify, https://www.googleapis.com/auth/gmail.settings\n"
+        "\tgmail.labels gmail.delegates,gmail.filters")
+    assert gmail.effective_gmail_scopes() == (
+        GMAIL_READONLY, GMAIL_SEND,
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.settings",
+        "https://www.googleapis.com/auth/gmail.labels",
+        "https://www.googleapis.com/auth/gmail.delegates",
+        "https://www.googleapis.com/auth/gmail.filters")
+
+
+def test_effective_gmail_scopes_dedupes_and_keeps_the_declaration_first(monkeypatch):
+    monkeypatch.setenv("GMAIL_SCOPES",
+                       "gmail.send, " + GMAIL_SEND + ", gmail.modify, gmail.modify")
+    assert gmail.effective_gmail_scopes() == (
+        GMAIL_READONLY, GMAIL_SEND,
+        "https://www.googleapis.com/auth/gmail.modify")
+
+
+def test_grant_scopes_hold_a_gmail_connection_to_the_whole_declaration(monkeypatch):
+    monkeypatch.delenv("GMAIL_SCOPES", raising=False)
+    assert gmail.connection_grant_scopes("google", [GMAIL_READONLY]) == \
+        sorted(gmail.GMAIL_SCOPES)
+    assert gmail.connection_grant_scopes("google", [GMAIL_SEND, GMAIL_SEND]) == \
+        sorted(gmail.GMAIL_SCOPES)
+
+
+def test_grant_scopes_carry_env_extras_for_gmail_connections(monkeypatch):
+    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify, gmail.settings")
+    assert gmail.connection_grant_scopes("google", [GMAIL_SEND]) == sorted({
+        GMAIL_READONLY, GMAIL_SEND,
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.settings"})
+
+
+def test_grant_scopes_leave_non_gmail_connections_alone(monkeypatch):
+    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    calendar_scope = "https://www.googleapis.com/auth/calendar.readonly"
+    youtube_scope = "https://www.googleapis.com/auth/youtube.readonly"
+    assert gmail.connection_grant_scopes("google", [calendar_scope]) == \
+        [calendar_scope]
+    assert gmail.connection_grant_scopes("youtube", [youtube_scope]) == \
+        [youtube_scope]

@@ -74,7 +74,9 @@ def oauth_start(event, connection_id):
         return http._json_response(503, {"error": "OAuth callback URL is not configured"})
     provider_name = connection["provider"]
     try:
-        scopes = oauth_providers.normalize_scopes(provider_name, connection.get("scopes"))
+        from ..connectors.gmail import connection_grant_scopes
+
+        scopes = connection_grant_scopes(provider_name, connection.get("scopes"))
     except oauth_providers.ProviderError as exc:
         return http._json_response(400, {"error": str(exc)})
     try:
@@ -157,7 +159,17 @@ def oauth_callback(event):
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
         return _callback_result("exchange_failed", connection_id)
-    requested = set(connection.get("scopes") or [])
+    try:
+        from ..connectors.gmail import connection_grant_scopes
+
+        requested = set(connection_grant_scopes(
+            connection["provider"], connection.get("scopes")))
+    except (oauth_providers.ProviderError, oauth_providers.UnknownProviderError):
+        # Stored scopes are normalized at create/edit; an item carrying none
+        # (or a provider without an adapter, which cannot start this flow)
+        # verifies against its stored list, exactly as before the Gmail
+        # scope extension existed.
+        requested = set(connection.get("scopes") or [])
     granted_raw = token_data.get("scope")
     if granted_raw:
         granted = set(str(granted_raw).split())
