@@ -20,6 +20,14 @@
 - **G4** — task usage metering: worker rollup into TaskUsageTable (best-effort,
   completed steps only), `GET /api/{admin,agent}/usage?months=`, overview
   3-month block, `dapier usage`.
+- **G14** — task quota enforcement (the plan primitive): an account-wide
+  monthly task budget enforced at step admission — `usage.enforce` raises
+  `logic.QuotaExceeded` before a live action step runs and the step fails
+  through the ordinary error machinery (test runs exempt). Stored in
+  TaskUsageTable (`quota` config item + `_total` rollup row), uncapped
+  until set. `GET/PUT /api/{admin,agent}/quota` (PUT operator-gated,
+  audited), `dapier quota [set <n|off>]`, quota block on the usage
+  endpoints and the overview payload, console Usage-card limit editor.
 - **G5** — run filters `workflow_id|status|since` on `GET /api/{admin,agent}/runs`
   and `dapier runs list --workflow|--status|--since`.
 - **Dry-run** — `engine/dryrun.py` now derives supported types from the
@@ -1173,9 +1181,9 @@ Still open (ranked, from the same audit):
 
 Re-verified against committed HEAD (`6d330a7`): 103 registered actions,
 15 trigger chips, 11 poll sources, options discovery on every listing,
-find-or-create wherever a create exists. The round-6 deliberately-deferred
-list is all still open, confirmed in code: plan/quota enforcement (only
-`discovery.py` mentions quotas; usage is metered but uncapped), multi-user
+find-or-create wherever a create exists. Of the round-6 deliberately-deferred
+list, plan/quota enforcement has since closed (the account-wide monthly
+task budget, see G14) — still open, confirmed in code: multi-user
 beyond roles v1 (no invitations/shared workspaces), new app chips (zero
 `calendar` references in `src/` — Gmail and no AI/LLM provider;
 Google Calendar closed in round 28), Google Sheets `row.updated` (only `row.new` in the poll source),
@@ -1328,3 +1336,103 @@ inbox replay-bounce notes; closed in round 30). New findings this pass, ranked:
 
 Still open from the fresh audit: draft vs live (the publish moment) and
 designer list paging (a scale note, fine until the published store grows).
+
+## Round 9 (2026-09-28): what is still missing — quotas, drafts, paging, multi-user (designs)
+
+Full re-audit with subagents. Discover/test/replay remains closed on every
+palette connector; G1–G13 above are all shipped. Four gaps remain. Designs
+below are implementation-ready (file-level inventories were worked out in
+session; ask the audit trail for details).
+
+### G14. Task quotas (landed 2026-09-28: the account-wide monthly budget)
+
+Landed — simpler than the sketch below and truer to the Zapier primitive it
+mirrors: one **account-wide** monthly task budget, not per-workflow caps.
+Metering (G4) gained an account-wide `_total` row (`engine/usage.add_task`
+now ADDs both), and the quota lives in the same table as a `quota` config
+item (absent = uncapped; `0`/garbage rejected on purpose — clearing is
+spelled `off`). `usage.enforce` is the worker's gate: every live action step
+checks the month's total before dispatch (`worker._quota_pending`, wired
+into `_attempt_hooks` and the resume path — test runs enter through
+`engine.execute` without these hooks, so editor tests neither burn tasks
+nor hit the limit). A spent budget raises `logic.QuotaExceeded`, which
+`_run_step` routes through the ordinary action-error machinery: the step
+closes `failed` with a message naming the month and the fix, on_fail/
+on_error policies and the retry policy apply exactly as for a connector
+the plan disallows, and the failure notification fires once attempts are
+exhausted. Best-effort both ways: no usage table or a failed quota read
+opens the gate — usage must never break a run. Surfaces:
+`GET/PUT /api/{admin,agent}/quota` (PUT operator-gated, audited,
+`{"limit": 1000}` or `{"limit": "off"}`), `dapier quota [set <n|off>]`,
+`dapier usage` prints the budget line, the usage endpoints carry a `quota`
+block, the overview payload carries one, and the console Usage card shows
+used/limit with an inline limit editor. Tests: `tests/test_usage.py`
+(rollup, gate, engine routing, endpoints, CLI, overview). Not landed from
+the sketch: per-workflow `task_quota:` fields, quota-pause stamping and
+its email — an account-wide cap made them unnecessary; revisit only if
+per-workflow budgets are ever wanted.
+### G15. Draft vs live (design ready, not started)
+
+Today every designer save publishes instantly
+(`designer_store.api_save` → `published_workflows.publish` + git commit +
+revision). Design: save writes a draft — same table, `<id>#draft` item
+(`draft_of`, `workflow`, `base_revision`), one per workflow, LWW;
+`load_items` drops `draft_of` records so the engine and every list are
+draft-blind (single choke point: `matching.workflows` → `load_workflows` →
+`load_items`; stored trigger tables untouched). `POST …/{file}/publish`
+promotes the draft through the existing `api_save` (`cause="publish"`) —
+git, revision, YouTube reconcile for free — 409 `stale` when
+`base_revision` < live revision (toggle/rollback/auto-pause raced).
+`DELETE …/{file}/draft` discards. `GET …/{file}/draft/diff` reuses the
+`api_diff` shape. Draft-only workflows list as `published: false`, fire
+nothing; publish creates v1. Versions list gains a `draft` block. Toggle/
+tags/folder/rollback stay live verbs (they make the draft stale). Delete
+removes the draft. Migration: none (no `#draft` items exist; first save
+after ship drafts, live keeps running). Surfaces: 4 routes on admin+agent,
+CLI `workflows publish|discard|draft-diff` (`workflows save` now drafts),
+designer Save-draft + Publish/Discard buttons (`make designer-console`).
+Tests: `test_designer_drafts.py` + extensions.
+
+### G16. List paging — two real bugs, two UX gaps (design ready, not started)
+
+Runs and audit already page (`runs.api_list`, `audit._scan_window` — the
+reference pattern: opaque token, clamped limit, bounded scan window). Bugs
+first: **trigger stores hard-stop at `Limit=200`** (email `email_triggers.py:218`,
+hook `hook_triggers.py:478`, schedule `schedule_triggers.py:123`, poll
+`poll_triggers.py:242`) and the same `load_items` feeds
+`matching.all_workflows` — trigger #201 silently stops FIRING (correctness,
+not UI); replace with a full paged walk. **Inbox serves one 150-item page**
+(`inbox.py:210-222`) — add `next_token` (sort `(received_at, inbox_id)`) +
+console load-more + CLI `--limit/--next`. **Connections clip at 50** in the
+overview snapshot the console renders from (`records.py:274`, `overview.py:108`)
+— paged list + dedicated console fetch. **Grants clip at 100** (`authz.py:136`).
+Add `src/dapier/api/paging.py` (clamp/encode/decode/scan-window lifted from
+runs). Multi-user Phase 0: owner-filtered lists need stable paged orders, so
+this lands first.
+
+### G17. Multi-user (phased; start after G16)
+
+Single-tenant today: identities are DTC subjects everywhere (console OIDC
+cookie, `dap_` tokens, `dapd_` device sessions), roles v1 exists
+(`auth/roles.py`), grants gate machine use of connections, connections
+already stamp `owner_subject` (never read for access control), workflows
+carry only informational `published_by`. Engine matching is global by
+design. Full teams = re-architecture (per-tenant keys on ~17 tables,
+tenant-scoped matching, git-per-tenant) — not landable incrementally.
+Recommended: owner attribute + role-gated filtering. Phase 1: stamp `owner`
+on publish (preserve previous; duplicate/apply set caller; backfill from
+`published_by`). Phase 2: `visible_to()` domain helper applied to designer
+list, overview, runs, inbox, usage; engine untouched. Phase 3: owner-or-
+operator write checks for non-operators. Out of scope until an external
+(non-DTC) identity actually needs in.
+
+### Gate debts on the in-flight gmail/agent lane (verify at landing)
+
+- Console poll-dialog entry for `gmail.messages` (`src/web/index.html`
+  Source select + `CONNECTION_POLL_SOURCES` in `views/triggers.js`), then
+  remove the `CONSOLE_PENDING_SOURCES` carve-out (`tests/test_console_trigger_sources.py:26`).
+- `make designer-console` rebuild — the `agent` action is in
+  `designer/src/catalog.ts` but not the served `src/web/designer.js` bundle.
+- Host task rows are write-only after the lane removed
+  `/api/admin/agent-tasks` + `dapier agent-mail tasks` — restore an
+  equivalent read surface or state fire-and-forget explicitly in the PR.
