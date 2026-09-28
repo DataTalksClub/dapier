@@ -37,6 +37,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
       - uses: aws-actions/setup-sam@v2
       - uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
