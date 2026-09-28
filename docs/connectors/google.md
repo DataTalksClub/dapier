@@ -156,6 +156,36 @@ matched against the header row trimmed and case-insensitively; the match
 value, trimmed and case-sensitively. Both fields offer discovery pickers
 (spreadsheets, worksheets, header columns) on the connection.
 
+#### Drive actions
+
+The Drive actions run over any Google connection granted `drive.readonly` —
+except **Upload file**: Dapier connections request only the read-only Drive
+scope today, so an upload fails with the API's HTTP 403 until the project and
+connection carry a Drive write scope (the same approval flow as the YouTube
+upload caveat below). **Find file**
+(`drive_find_file`) returns the most recent file whose name contains (or,
+with Match *exact*, equals) the given name: `found`, `file.id`, `file.name`,
+and `count` land in the step output; a miss is `found: false`, not an error.
+**Upload file** (`drive_upload_file`) writes one file from `source_url`, a
+staged `source_s3: {bucket, key}` object, or inline `content`. **Read file**
+(`drive_read_file`) is the reverse direction: it downloads one file
+(`files.get` with `alt=media`) and stages the bytes in the artifacts bucket,
+so later steps move them on — the output
+`{filename, size, content_type, bucket, key, file_id, name}` feeds Amazon
+S3's `source_s3` (bucket/key take templates) or Slack's upload file
+(`slack_upload_file` with `source_s3`) directly. `file_id` renders from the
+event: chain `drive_find_file`'s `{steps.<id>.output.file.id}` or a
+file.created trigger's id. Google-native files (Docs, Sheets, Slides,
+Drawings) have no bytes to download; they export first through
+`files.export`, with **Export as** naming the target mime (documents and
+presentations default to PDF, spreadsheets to CSV, drawings to PNG).
+**Share file** (`drive_share_file`) creates a permission (role
+reader/commenter/writer for a user, group, domain, or anyone) and
+**Copy file** (`drive_copy_file`) duplicates a file. `drive_find_file`
+has no create-if-missing: a find that misses composes with
+`drive_upload_file` when a workflow wants find-or-upload, and creating an
+empty artifact to "find" is not find-or-create.
+
 ### Discovery resources
 
 Google connections list live resources over `dapier connections discover <connection>`
@@ -174,6 +204,95 @@ trimmed and each row keeps its spreadsheet row number).
   owns it and reconnect.
 - If the Google account has no usable refresh token yet, complete the consent
   flow once even if the client is already configured.
+
+## YouTube video push (WebSub)
+
+The `youtube` / `video.published` trigger fires from YouTube's PubSubHubbub
+push feed, delivered to `https://dapier.dtcdev.click/hooks/youtube`. Connecting
+the channel alone subscribes nothing: a channel is subscribed when a youtube
+workflow item names it.
+
+1. Connect the channel (OAuth, `youtube.readonly`) as described above.
+2. Create a workflow item with `connector: youtube`,
+   `event: video.published`, and a `channel_id` filter (for example
+   `channel_id: {equals: UC…}`). A renewal schedule runs every five days and
+   re-subscribes every channel named this way, passing the stored hub secret so
+   deliveries arrive signed (`X-Hub-Signature: sha1=…`) and Dapier verifies
+   them.
+3. To start watching before the next renewal run, subscribe the channel on the
+   hub directly:
+
+   ```sh
+   curl -d hub.mode=subscribe -d hub.verify=async \
+     -d hub.callback=https://dapier.dtcdev.click/hooks/youtube \
+     -d 'hub.topic=https://www.youtube.com/xml/feeds/videos.xml?channel_id=CHANNEL_ID' \
+     -d hub.secret=<webhook-secret> \
+     https://pubsubhubbub.appspot.com/subscribe
+   ```
+
+   `hub.secret` must be the same value stored in the `YouTubeWebhookSecret`
+   Secrets Manager secret (the `YOUTUBE_WEBHOOK_SECRET_ID` the endpoint
+   verifies deliveries against). Omit it only when no webhook secret is
+   configured — with a secret configured, unsigned deliveries are rejected
+   with 401.
+
+The hub verifies the callback with a GET `hub.challenge` request before
+confirming a subscription; Dapier answers it. Subscriptions lapse when not
+renewed, which is what the five-day schedule does. Pull a sample payload with
+`dapier triggers sample youtube` (the connected channel's newest upload, or a
+documented notification when none exists).
+
+## YouTube upload video
+
+The **Upload video** action (`youtube_upload_video`) posts one video to the
+connected channel through the Data API's multipart `videos.insert`. The bytes
+come from exactly one of `source_url` (a download URL), a staged
+`source_s3: {bucket, key}` object (e.g. `dropbox_read_file`'s output), or
+inline `content`. Metadata: `title` (required), optional `description`,
+`tags` (comma-separated), and `category_id` (a YouTube category id — 22 is
+People & Blogs; YouTube validates it). `privacy_status` defaults to
+**unlisted** (like Zapier's Upload Video); `public` and `private` are the
+other choices. Output: `{video_id, title, privacy_status, upload_status,
+url}`, with `url` the `https://www.youtube.com/watch?v=<id>` watch link.
+
+Scope caveat: **uploading needs the `youtube.upload` scope
+(`https://www.googleapis.com/auth/youtube.upload`), and Dapier connections
+request only `youtube.readonly` today.** A read-only token fails the upload
+with the API's HTTP 403. Enabling the action end to end means adding
+`youtube.upload` to the Google Cloud project's scope table (the project
+currently lists only `youtube.readonly`, and scope additions need the
+project owner's approval — see the governance note under *Current
+configuration*), adding the scope to the Dapier YouTube connection with
+`dapier connections scopes`, and reconnecting the channel so consent covers
+it.
+
+The upload stages the whole video in memory (the Lambda has no scratch
+disk), so sources should stay modest: Dapier rejects anything larger than
+100 MB with a clear error rather than exhausting the run.
+
+## YouTube playlists
+
+The **Create playlist** action (`youtube_create_playlist`) opens an empty
+playlist on the connected channel through the Data API's `playlists.insert`
+(`part=snippet,status`): `title` (required), optional `description`, and
+`privacy_status` — **private** by default (like Zapier's Create Playlist);
+`public` and `unlisted` are the other choices. Output: `{playlist_id, title,
+url}`, with `url` the `https://www.youtube.com/playlist?list=<id>` link; the
+id chains into Add to playlist.
+
+The **Remove from playlist** action (`youtube_remove_from_playlist`) takes
+one item back out through `playlistItems.delete`. It addresses the *playlist
+item*, not the video: the `playlist_item_id` comes from Add to playlist's
+output or a Find Playlist Videos listing. An item already gone (HTTP 404) is
+`{removed: false}`, not an error.
+
+Scope caveat: **both playlist actions need the `youtube.force-ssl` scope
+(`https://www.googleapis.com/auth/youtube.force-ssl`) — or full `youtube` —
+and Dapier connections request only `youtube.readonly` today** (the same
+table that gates `youtube.upload` above). A read-only token fails with the
+API's HTTP 403; enabling them end to end follows the same steps: add
+`youtube.force-ssl` to the project's scope table, add it to the Dapier
+YouTube connection with `dapier connections scopes`, and reconnect.
 
 ## Google OAuth publishing status
 

@@ -1,14 +1,20 @@
-"""Renew WebSub subscriptions for the channels workflow items watch.
+"""WebSub subscriptions for the channels workflow items watch.
+
+YouTube pushes new uploads over WebSub: the hub POSTs an Atom feed to
+/hooks/youtube, signed with the shared hub secret. A channel gets watched
+two ways: a designer save/toggle/delete syncs the hub right away
+(``reconcile``, called best-effort from the designer store), and this
+schedule re-subscribes everything the stored workflows watch, healing
+hub-side drift or a subscription lost while the callback was unreachable.
 
 There is no global channel list: each YouTube workflow item names its own
 channel(s) in the trigger filters — ``channel_id: {equals: ID}`` for one
-channel or ``channel_id: {in: [ID, ...]}`` for several. The renewal schedule
-subscribes exactly the channels the configured items name, so watching a
-channel means editing (or adding) a workflow item, and a channel nobody
+channel or ``channel_id: {in: [ID, ...]}`` for several. A channel nobody
 watches is simply not subscribed.
 """
 
 import json
+import logging
 import os
 import urllib.parse
 import urllib.request
@@ -17,16 +23,37 @@ import boto3
 
 from ... import engine
 
+logger = logging.getLogger(__name__)
+
 
 HUB_URL = "https://pubsubhubbub.appspot.com/subscribe"
+TIMEOUT = 15
 
 
-def channels_from_workflows(items):
-    """Channel IDs named by youtube triggers, deduplicated in first-seen order."""
+def topic_url(channel_id):
+    """The hub topic for a channel: its videos-only Atom feed."""
+    return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+
+
+def channels_of(workflow):
+    """Channel IDs one workflow watches (enabled youtube triggers only).
+
+    Reads every trigger spec — the single ``trigger`` (designer workflows)
+    and the ``triggers`` list (stored hook triggers merge into the engine in
+    the list form) — so the renewal schedule re-subscribes channels watched
+    by either kind.
+    """
+    if not workflow or not workflow.get("enabled", True):
+        return []
+    triggers = workflow.get("triggers")
+    if isinstance(triggers, list) and triggers:
+        specs = [trigger for trigger in triggers if isinstance(trigger, dict)]
+    else:
+        trigger = workflow.get("trigger")
+        specs = [trigger] if isinstance(trigger, dict) else []
     channels = []
-    for workflow in items:
-        trigger = workflow.get("trigger") or {}
-        if not workflow.get("enabled", True) or trigger.get("connector") != "youtube":
+    for trigger in specs:
+        if trigger.get("connector") != "youtube":
             continue
         rule = (trigger.get("filters") or {}).get("channel_id")
         if isinstance(rule, dict):
@@ -40,23 +67,131 @@ def channels_from_workflows(items):
     return channels
 
 
+def channels_from_workflows(items):
+    """Channel IDs named by youtube triggers, deduplicated in first-seen order."""
+    channels = []
+    for workflow in items:
+        for channel_id in channels_of(workflow):
+            if channel_id not in channels:
+                channels.append(channel_id)
+    return channels
+
+
+def _settings():
+    """(callback_url, hub secret); RuntimeError when the deployment runs
+    without the push path (the schedule no-ops for the same reason)."""
+    callback_url = os.environ.get("YOUTUBE_CALLBACK_URL", "").strip()
+    secret_id = os.environ.get("YOUTUBE_WEBHOOK_SECRET_ID", "").strip()
+    if not callback_url or not secret_id:
+        raise RuntimeError("YouTube webhook push is not configured")
+    secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+    return callback_url, secret
+
+
+def hub_request(mode, channel_id, *, callback_url, secret, timeout=TIMEOUT,
+                transport=None):
+    """POST one subscribe/unsubscribe request to the hub; returns the status.
+
+    ``transport`` is the injectable network seam
+    (``(method, url, *, headers, body, timeout) -> (status, raw)``) the
+    save-time path passes through; without it the request goes over urllib,
+    like the schedule's.
+    """
+    payload = urllib.parse.urlencode({
+        "hub.callback": callback_url,
+        "hub.topic": topic_url(channel_id),
+        "hub.mode": mode,
+        "hub.verify": "async",
+        "hub.secret": secret,
+    }).encode()
+    if transport is not None:
+        status, _raw = transport("POST", HUB_URL,
+                                 headers={"content-type": "application/x-www-form-urlencoded"},
+                                 body=payload, timeout=timeout)
+        if status >= 300:
+            # urllib raises HTTPError for these; the seam must fail the same
+            # way so callers see one failure shape.
+            raise RuntimeError(f"YouTube hub answered HTTP {status}")
+        return status
+    request = urllib.request.Request(HUB_URL, data=payload, method="POST")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status
+
+
+def subscribe_channel(channel_id, *, transport=None):
+    """Subscribe one channel right now — the save-time path behind the
+    schedule's cycle (a freshly saved youtube trigger must not wait days
+    for its first renewal). Returns the hub status; raises when the push
+    path is not configured or the hub call fails, so callers decide between
+    a save warning and a logged no-op."""
+    callback_url, secret = _settings()
+    return hub_request("subscribe", channel_id, callback_url=callback_url,
+                       secret=secret, transport=transport)
+
+
 def handler(_event, _context):
     channel_ids = channels_from_workflows(engine.all_workflows())
     if not channel_ids:
         return {"statusCode": 200, "body": json.dumps({"subscriptions": []})}
-    secret = boto3.client("secretsmanager").get_secret_value(
-        SecretId=os.environ["YOUTUBE_WEBHOOK_SECRET_ID"]
-    )["SecretString"]
+    callback_url, secret = _settings()
     results = []
     for channel_id in channel_ids:
-        payload = urllib.parse.urlencode({
-            "hub.callback": os.environ["YOUTUBE_CALLBACK_URL"],
-            "hub.topic": f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}",
-            "hub.mode": "subscribe",
-            "hub.verify": "async",
-            "hub.secret": secret,
-        }).encode()
-        request = urllib.request.Request(HUB_URL, data=payload, method="POST")
-        with urllib.request.urlopen(request, timeout=15) as response:
-            results.append({"channel_id": channel_id, "status": response.status})
+        status = hub_request("subscribe", channel_id, callback_url=callback_url, secret=secret)
+        results.append({"channel_id": channel_id, "status": status})
     return {"statusCode": 200, "body": json.dumps({"subscriptions": results})}
+
+
+def reconcile(previous_workflow, workflow):
+    """Sync the hub after a designer save/toggle/delete; best-effort.
+
+    Subscribes the channels the saved workflow newly watches and
+    unsubscribes the ones it stopped watching (or that vanish with it on
+    delete) — but only channels no other enabled workflow still names, and
+    only the delta: an unchanged channel list never rings the hub. A
+    deployment without the push path (no callback URL or secret id) is a
+    silent no-op, like the schedule. Returns warning strings for the save
+    response; never raises.
+    """
+    workflow_id = str((workflow or previous_workflow or {}).get("id") or "")
+    before = channels_from_workflows([previous_workflow] if previous_workflow else [])
+    after = channels_from_workflows([workflow] if workflow else [])
+    if before == after:
+        return []
+    try:
+        callback_url, secret = _settings()
+    except RuntimeError:
+        return []
+    except Exception as exc:
+        return [f"YouTube webhook sync failed: {exc}"]
+    try:
+        others = channels_from_workflows(
+            item for item in engine.all_workflows()
+            if str(item.get("id") or "") != workflow_id)
+    except Exception as exc:
+        # The live set only guards unsubscription from channels other
+        # workflows still watch. Unreadable, the unsubscribe half cannot be
+        # proven safe, so only the always-safe subscribe half runs — an
+        # orphaned subscription is inert (its notifications match no
+        # workflow) and the renewal schedule re-subscribes what a partial
+        # sync missed. Never the save's problem.
+        logger.warning("youtube reconcile: could not list live workflows (%s); "
+                       "skipping unsubscribe", exc)
+        others = None
+    warnings = []
+    for channel_id in after:
+        if channel_id in before or (others is not None and channel_id in others):
+            continue
+        try:
+            hub_request("subscribe", channel_id, callback_url=callback_url, secret=secret)
+        except Exception as exc:
+            warnings.append(f"YouTube subscribe for channel {channel_id} failed: {exc}")
+    if others is None:
+        return warnings
+    for channel_id in before:
+        if channel_id in after or channel_id in others:
+            continue
+        try:
+            hub_request("unsubscribe", channel_id, callback_url=callback_url, secret=secret)
+        except Exception as exc:
+            warnings.append(f"YouTube unsubscribe for channel {channel_id} failed: {exc}")
+    return warnings
