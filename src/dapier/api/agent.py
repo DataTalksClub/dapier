@@ -670,11 +670,36 @@ def _visibility(event, subject):
     require_operator decides its gate: an API token passes only as an
     operator, a DTC identity resolves through roles.effective_role —
     operator-or-admin sees everything, anyone else is owner-scoped to their
-    subject (auth.visibility). Read filtering only; writes stay Phase 3."""
+    subject (auth.visibility). Writes gate through the same scope
+    (_write_denied, Phase 3)."""
     if event.get("_api_token"):
         return visibility.Visibility(subject, is_operator=True)
     claims = event.get("_dtc_claims") or {}
     return visibility.for_session({"subject": subject, "sub": claims.get("email", "")})
+
+
+def _write_denied(event, subject, workflow_id, action):
+    """G17 Phase 3: the owner-or-operator write gate for the workflow-scoped
+    routes — a 403 response when a non-operator targets a workflow it does
+    not own (visibility.ensure_can_write holds the rule: a create stays
+    open, an ownerless stored item does not), else None. Same verdict as
+    require_operator/_visibility; denials are audited like role denials."""
+    denied = _visibility(event, subject).can_write(workflow_id)
+    if denied is None:
+        return None
+    audit.emit(str(workflow_id or "unknown"), action, subject,
+               outcome="denied-not-owner")
+    return _json_response(*denied)
+
+
+def _save_denied(event, subject, body):
+    """The save gate over every id a save body touches (the definition's id
+    plus a renameFrom target), in the gate's own order."""
+    for workflow_id in designer_store.save_gate_ids(body):
+        denied = _write_denied(event, subject, workflow_id, "workflow.save")
+        if denied is not None:
+            return denied
+    return None
 
 
 def designer_api(event, method, source=None):
@@ -694,6 +719,9 @@ def designer_api(event, method, source=None):
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
+        denied = _save_denied(event, subject, body)
+        if denied:
+            return denied
         status, payload = designer_store.api_save(body, operator=subject)
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
@@ -773,6 +801,10 @@ def designer_toggle_api(event, source):
     subject, error = require_operator(event, "workflow.toggle")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.toggle")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
     except (ValueError, json.JSONDecodeError) as exc:
@@ -833,6 +865,10 @@ def designer_template_flag_api(event, source):
     subject, error = require_operator(event, "workflow.template")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.template")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_template_flag(source, body, operator=subject)
@@ -850,6 +886,10 @@ def designer_delete_api(event, source):
     subject, error = require_operator(event, "workflow.delete")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.delete")
+    if denied:
+        return denied
     status, payload = designer_store.api_delete(source)
     audit.emit(str(source), "workflow.delete", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
@@ -862,6 +902,10 @@ def designer_tags_api(event, source):
     subject, error = require_operator(event, "workflow.tags")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.tags")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_tags(source, body, operator=subject)
@@ -879,6 +923,10 @@ def designer_folder_api(event, source):
     subject, error = require_operator(event, "workflow.folder")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.folder")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_folder(source, body, operator=subject)
@@ -894,13 +942,17 @@ def designer_bulk_api(event):
     (`dapier workflows on|off a.yaml b.yaml`, the console's selection bar).
 
     Each id toggles through the same api_toggle semantics and answers per id;
-    one audit row covers the batch, with the id list as the subject."""
+    one audit row covers the batch, with the id list as the subject. The G17
+    write gate rides along per id (api_bulk's ``visible``): a foreign id
+    fails alone, and the tag/search/all scopes only ever target what the
+    caller can see."""
     subject, error = require_operator(event, "workflow.bulk-toggle")
     if error:
         return error
     try:
         body = json.loads(event.get("body") or "{}")
-        status, payload = designer_store.api_bulk(body, operator=subject)
+        status, payload = designer_store.api_bulk(
+            body, operator=subject, visible=_visibility(event, subject))
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     ids = [str(item) for item in (body or {}).get("ids") or []] if isinstance(body, dict) else []
@@ -940,6 +992,10 @@ def designer_rollback_api(event, source):
     subject, error = require_operator(event, "workflow.rollback")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.rollback")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_rollback(source, body, operator=subject)
@@ -960,6 +1016,10 @@ def designer_publish_api(event, source):
     subject, error = require_operator(event, "workflow.publish")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.publish")
+    if denied:
+        return denied
     status, payload = designer_store.api_publish(source, operator=subject)
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.publish", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
@@ -972,6 +1032,10 @@ def designer_discard_api(event, source):
     subject, error = require_operator(event, "workflow.discard")
     if error:
         return error
+    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
+                           "workflow.discard")
+    if denied:
+        return denied
     status, payload = designer_store.api_discard(source, operator=subject)
     audit.emit(str(source), "workflow.discard", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
@@ -1006,6 +1070,13 @@ def designer_test_api(event, source):
     subject, error = require_operator(event, "workflow.test")
     if error:
         return error
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(event, subject,
+                               str(source).removesuffix(".yaml"), "workflow.test")
+        if denied:
+            return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_test_run(source, body, operator=subject)
@@ -1024,6 +1095,13 @@ def designer_test_step_api(event, source):
     subject, error = require_operator(event, "workflow.test")
     if error:
         return error
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(event, subject,
+                               str(source).removesuffix(".yaml"), "workflow.test")
+        if denied:
+            return denied
     try:
         body = json.loads(event.get("body") or "{}")
         status, payload = designer_store.api_test_step(source, body, operator=subject)
@@ -1522,9 +1600,12 @@ def storage_read_api(event, workflow_id):
 
 def storage_write_api(event, workflow_id):
     """Operator-only workflow storage write: ``{key, value, ttl_seconds}``."""
-    _, error = require_operator(event, "storage.write")
+    subject, error = require_operator(event, "storage.write")
     if error:
         return error
+    denied = _write_denied(event, subject, workflow_id, "storage.write")
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
     except ValueError:
@@ -1535,9 +1616,12 @@ def storage_write_api(event, workflow_id):
 
 def storage_delete_api(event, workflow_id):
     """Operator-only workflow storage delete: ``?key=``."""
-    _, error = require_operator(event, "storage.write")
+    subject, error = require_operator(event, "storage.write")
     if error:
         return error
+    denied = _write_denied(event, subject, workflow_id, "storage.write")
+    if denied:
+        return denied
     query = event.get("queryStringParameters") or {}
     status, payload = storage_api.delete(workflow_id, query.get("key"))
     return _no_store(_json_response(status, payload))

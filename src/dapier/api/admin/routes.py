@@ -196,8 +196,11 @@ def storage_read(event, workflow_id):
     return http._json_response(status, payload)
 
 
-def storage_write(event, workflow_id):
+def storage_write(event, workflow_id, visible=None, operator=None):
     """Store one workflow storage value: ``{key, value, ttl_seconds}``."""
+    denied = _write_denied(visible, workflow_id, "storage.write", operator)
+    if denied:
+        return denied
     try:
         body = json.loads(event.get("body") or "{}")
     except ValueError:
@@ -206,8 +209,11 @@ def storage_write(event, workflow_id):
     return http._json_response(status, payload)
 
 
-def storage_delete(event, workflow_id):
+def storage_delete(event, workflow_id, visible=None, operator=None):
     """Remove one workflow storage value: ``?key=``."""
+    denied = _write_denied(visible, workflow_id, "storage.write", operator)
+    if denied:
+        return denied
     query = event.get("queryStringParameters") or {}
     status, payload = storage_api.delete(workflow_id, query.get("key"))
     return http._json_response(status, payload)
@@ -473,6 +479,34 @@ def agent_tasks_list(event):
     return http._json_response(status, payload)
 
 
+def _write_denied(visible, workflow_id, action, operator):
+    """G17 Phase 3: the owner-or-operator write gate for the workflow-scoped
+    console routes — a 403 response when ``visible`` (the dispatcher's
+    session scope) targets a workflow it does not own, else ``None``.
+    ``visible`` is None for unrestricted callers (operator sessions resolve
+    to an unrestricted scope; legacy direct calls pass nothing);
+    visibility.ensure_can_write holds the rule, and denials are audited
+    like the role gates'."""
+    if visible is None:
+        return None
+    denied = visible.can_write(workflow_id)
+    if denied is None:
+        return None
+    session._audit_event(str(workflow_id or "unknown"), action,
+                         operator or "unknown", outcome="denied-not-owner")
+    return http._json_response(*denied)
+
+
+def _save_denied(visible, body, operator):
+    """The save gate over every id a save body touches (the definition's id
+    plus a renameFrom target)."""
+    for workflow_id in designer_store.save_gate_ids(body):
+        denied = _write_denied(visible, workflow_id, "workflow.save", operator)
+        if denied is not None:
+            return denied
+    return None
+
+
 def designer_list(event, visible=None):
     """The designer list, G17 read-filtered for non-operators (``visible``
     is built by the dispatcher from the session; None = unrestricted)."""
@@ -487,9 +521,12 @@ def designer_get(source):
     status, payload = designer_store.api_get(source)
     return http._json_response(status, payload)
 
-def save_designer_workflow(event, operator):
+def save_designer_workflow(event, operator, visible=None):
     try:
         body = http._request_json(event)
+        denied = _save_denied(visible, body, operator)
+        if denied:
+            return denied
         status, payload = designer_store.api_save(body, operator=operator)
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
@@ -515,7 +552,11 @@ def copilot_draft(event, operator):
     return http._json_response(status, payload)
 
 
-def toggle_designer_workflow(event, operator, source):
+def toggle_designer_workflow(event, operator, source, visible=None):
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.toggle", operator)
+    if denied:
+        return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_toggle(source, body, operator=operator)
@@ -552,8 +593,12 @@ def apply_designer_template(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def template_flag_designer_workflow(event, operator, source):
+def template_flag_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI publish/unpublish: toggle template flag."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.template", operator)
+    if denied:
+        return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_template_flag(source, body, operator=operator)
@@ -563,20 +608,28 @@ def template_flag_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def delete_designer_workflow(event, operator, source):
+def delete_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI delete: unpublish the live item (version
     records survive — history, not live state), then one atomic git
     tree-delete commit. Refused 409 while runs are parked on a delay, so a
     resume cannot dangle."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.delete", operator)
+    if denied:
+        return denied
     status, payload = designer_store.api_delete(source, operator=operator)
     session._audit_event(str(payload.get("file", source or "unknown")), "workflow.delete", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def tags_designer_workflow(event, operator, source):
+def tags_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI tags editor: replace a workflow's tag set
     (Zapier-style organization). Publishes cause "tags" and commits the
     updated YAML best-effort, like the toggle."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.tags", operator)
+    if denied:
+        return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_tags(source, body, operator=operator)
@@ -586,11 +639,15 @@ def tags_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def folder_designer_workflow(event, operator, source):
+def folder_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI folder editor: put a workflow in a
     Zapier-style folder (flat — at most one per workflow, an empty string
     clears it). Publishes cause "folder" and commits the updated YAML
     best-effort, like the toggle."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.folder", operator)
+    if denied:
+        return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_folder(source, body, operator=operator)
@@ -600,14 +657,16 @@ def folder_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def bulk_designer_workflow(event, operator):
+def bulk_designer_workflow(event, operator, visible=None):
     """Console bulk enable/disable: one call over the selection bar's ids.
 
     Each workflow toggles through the same api_toggle semantics and answers
-    per id; one audit row covers the batch, with the id list as the subject."""
+    per id; one audit row covers the batch, with the id list as the subject.
+    The G17 write gate rides along per id (api_bulk's ``visible``)."""
     try:
         body = http._request_json(event)
-        status, payload = designer_store.api_bulk(body, operator=operator)
+        status, payload = designer_store.api_bulk(body, operator=operator,
+                                                  visible=visible)
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     ids = [str(item) for item in (body or {}).get("ids") or []] if isinstance(body, dict) else []
@@ -618,8 +677,15 @@ def bulk_designer_workflow(event, operator):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def test_designer_workflow(event, operator, source=None):
+def test_designer_workflow(event, operator, source=None, visible=None):
     """Dry-run (or, on execute, really run) one workflow on a sample event."""
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                               "workflow.test", operator)
+        if denied:
+            return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_test_run(source, body, operator=operator)
@@ -630,12 +696,19 @@ def test_designer_workflow(event, operator, source=None):
     return http._json_response(status, payload)
 
 
-def test_designer_step(event, operator, source=None):
+def test_designer_step(event, operator, source=None, visible=None):
     """Console mirror of the per-step test (same domain module as the CLI).
 
     Zapier's "Test step": run one action against the sample event — for real
     with execute: true, side effects limited to that step. The workflow comes
     inline (the designer's unsaved draft) or from a saved file."""
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                               "workflow.test", operator)
+        if denied:
+            return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_test_step(source, body, operator=operator)
@@ -662,8 +735,12 @@ def diff_designer_workflow(event, source):
     return http._json_response(status, payload)
 
 
-def rollback_designer_workflow(event, operator, source):
+def rollback_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI rollback: republish an old version."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.rollback", operator)
+    if denied:
+        return denied
     try:
         body = http._request_json(event)
         status, payload = designer_store.api_rollback(source, body, operator=operator)
@@ -675,18 +752,26 @@ def rollback_designer_workflow(event, operator, source):
 
 # ---- Draft vs live (G15): a save drafts; publish/discard promote or throw ----
 
-def publish_designer_workflow(event, operator, source):
+def publish_designer_workflow(event, operator, source, visible=None):
     """Console mirror of `workflows publish`: promote the workflow's draft
     through the ordinary publish path (git, revision, YouTube reconcile).
     409 stale when the live definition moved past the draft's base."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.publish", operator)
+    if denied:
+        return denied
     status, payload = designer_store.api_publish(source, operator=operator)
     session._audit_event(str(payload.get("file", source or "unknown")), "workflow.publish", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def discard_designer_draft(event, operator, source):
+def discard_designer_draft(event, operator, source, visible=None):
     """Console mirror of `workflows discard`: throw the draft away; the live
     definition is untouched."""
+    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                           "workflow.discard", operator)
+    if denied:
+        return denied
     status, payload = designer_store.api_discard(source, operator=operator)
     session._audit_event(str(source), "workflow.discard", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))

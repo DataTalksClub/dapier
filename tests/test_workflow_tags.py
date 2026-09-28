@@ -405,7 +405,7 @@ def test_admin_tags_route_drives_the_store_and_audits(monkeypatch, operator_sess
 
 def test_admin_bulk_route_drives_the_store_and_audits(monkeypatch, operator_session):
     monkeypatch.setattr(designer_store, "api_bulk",
-                        lambda body, operator=None:
+                        lambda body, operator=None, visible=None:
                         (200, {"action": body.get("action"), "requested": 1, "ok": 1,
                                "results": [{"id": "test-flow.yaml", "ok": True}]}))
     audits = []
@@ -452,7 +452,7 @@ def test_agent_bulk_route_is_operator_gated_and_drives_the_store(monkeypatch, bu
     _agent_bearer(monkeypatch, operator=True)
     calls = []
     monkeypatch.setattr(designer_store, "api_bulk",
-                        lambda body, operator=None:
+                        lambda body, operator=None, visible=None:
                         calls.append((body, operator))
                         or (200, {"action": body["action"], "requested": 0, "ok": 0,
                                   "results": []}))

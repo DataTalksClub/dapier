@@ -1420,7 +1420,7 @@ Add `src/dapier/api/paging.py` (clamp/encode/decode/scan-window lifted from
 runs). Multi-user Phase 0: owner-filtered lists need stable paged orders, so
 this lands first.
 
-### G17. Multi-user (Phase 2 landed 2026-09-28: owner-scoped reads)
+### G17. Multi-user (landed in phases: owner stamp → owner-scoped reads → owner-or-operator writes)
 
 Single-tenant today: identities are DTC subjects everywhere (console OIDC
 cookie, `dap_` tokens, `dapd_` device sessions), roles v1 exists
@@ -1448,8 +1448,8 @@ through `api_save(live=True)` with the caller as operator, so the copy is
 owned by whoever made it; publishing a draft set by someone else attributes
 to the publisher, exactly like `published_by`. Surfaces are informational
 only — designer list rows and versions rows expose `owner` read-only; no
-access-control behavior changed, and Phase 3 (owner-or-operator writes)
-remains not started.
+access-control behavior changed in this phase (Phase 3 landed after
+Phase 2).
 
 Phase 2 landed as designed (`feat(auth): filter workflow reads by owner`):
 `auth/visibility.py` holds the rule — operators (the same
@@ -1463,6 +1463,20 @@ is nobody's row), and the usage rollup, on both the console and CLI
 surfaces through one optional `visible=` parameter; single-item reads,
 designer export, and every write are untouched (Phase 3), and the engine
 still reads the same draft-blind loader.
+
+Phase 3 landed as designed (`feat(auth): owner-or-operator write checks`):
+`visibility.ensure_can_write` (and `Visibility.can_write`) gates every
+workflow WRITE route on both surfaces — designer save (its body's
+definition id and any `renameFrom` target), delete, toggle, tags, folder,
+rollback, publish, discard, bulk per id (the tag/search/all scopes resolve
+through the same read filter), template flag, saved-workflow test/test-step,
+and workflow storage writes. Operators write anything; a non-operator
+writes only what it owns (live owner, drafts by `drafted_by`); an id
+nothing stored claims is a create and stays open — and, the deliberate
+asymmetry with reads, an item that exists with no owner stamp is DENIED
+for non-operators on writes, because on the write side a missing stamp
+must never open the door. Engine, triggers, worker, and machine-token
+paths stay grants-gated and untouched.
 
 ### Gate debts on the in-flight gmail/agent lane — verified closed 2026-09-28
 
@@ -1500,8 +1514,17 @@ still reads the same draft-blind loader.
   by owner`): `auth/visibility.py` (`visible_to`/`Visibility`) owner-scopes
   the designer list, overview, runs (+ CSV export), inbox, and usage reads
   on both surfaces — operators see everything, a subject its own workflows
-  (drafts by `drafted_by`), no-owner items visible to all; writes stay
-  Phase 3, not started.
+  (drafts by `drafted_by`), no-owner items visible to all; writes stayed
+  Phase 3, landed next.
+- **G17 multi-user Phase 3 — shipped** (`feat(auth): owner-or-operator
+  write checks`): `visibility.ensure_can_write` gates the workflow write
+  routes on both surfaces (save incl. renameFrom, delete, toggle, tags,
+  folder, bulk per id, rollback, publish, discard, template flag, keyed
+  test/test-step, storage writes) — operators write anything, a
+  non-operator only its own, unclaimed ids stay open for creates, and a
+  stored item with no owner stamp is denied for non-operators on writes
+  (the safe direction). G17 is landed in its three phases; full
+  teams/external identities remain out of scope as designed.
 - Also closed: the host-task read surface debt
   (`feat(agent-tasks): read surface for the host task rows`) —
   `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console

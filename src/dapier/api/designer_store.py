@@ -214,7 +214,8 @@ def api_list(q=None, tag=None, folder=None, visible=None):
     sees the workflows it owns — live rows by their owner, draft-only rows
     by their drafted_by — and unowned workflows stay visible to everyone. A
     hidden live item hides its draft pair too (one workflow, one
-    visibility); write checks remain Phase 3.
+    visibility); the write-side gate is visibility.ensure_can_write
+    (Phase 3), applied by the route layers.
     """
     summaries = {}
     drafts = {}
@@ -460,6 +461,33 @@ def api_export_all(now=None):
         "skipped": sorted(skipped),
         "b64": base64.b64encode(buffer.getvalue()).decode(),
     }
+
+
+def save_gate_ids(body):
+    """The workflow ids a save-request body would touch, for the G17
+    owner-or-operator write gate: the parsed ``yaml``'s id, plus the
+    ``renameFrom`` file's id when it names another workflow (renaming is a
+    write to the renamed workflow too — promoting the draft would unpublish
+    it). Best-effort: a body with no parseable id yields nothing to gate,
+    and api_save answers its own 400 for that."""
+    if not isinstance(body, dict):
+        return []
+    ids = []
+    yaml_text = body.get("yaml")
+    if isinstance(yaml_text, str):
+        try:
+            workflow = yaml.safe_load(yaml_text)
+        except yaml.YAMLError:
+            workflow = None
+        if isinstance(workflow, dict) and isinstance(workflow.get("id"), str) \
+                and workflow["id"].strip():
+            ids.append(workflow["id"].strip())
+    rename_from = body.get("renameFrom")
+    if isinstance(rename_from, str) and FILE_PATTERN.fullmatch(rename_from):
+        renamed = rename_from.removesuffix(".yaml")
+        if renamed and renamed not in ids:
+            ids.append(renamed)
+    return ids
 
 
 def api_save(body, operator=None, cause="save", message=None, live=False):
@@ -1009,7 +1037,7 @@ def api_folder(source, body, *, operator=None):
 MAX_BULK_IDS = 100
 
 
-def api_bulk(body, operator=None):
+def api_bulk(body, operator=None, visible=None):
     """Enable or disable several workflows in one call.
 
     Exactly one scope: ``ids`` (explicit file names — `workflows on|off
@@ -1021,6 +1049,12 @@ def api_bulk(body, operator=None):
     id without stopping the batch, and the response reports it. Returns 200
     with per-target results ``[{id, ok, error?}]``; the calling route writes
     the single audit row for the whole batch.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted) applies
+    the G17 write gate per target: the tag/search/all scopes resolve through
+    the same read filter as the list (a non-operator only ever targets what
+    it can see), and every target is owner-checked before its toggle — a
+    foreign id fails alone, like any other per-id error.
     """
     if not isinstance(body, dict):
         return 400, {"error": "request body must be an object"}
@@ -1054,7 +1088,7 @@ def api_bulk(body, operator=None):
     if ids is not None:
         targets = [(raw.strip(), raw.strip()) for raw in ids]
     else:
-        status, payload = api_list(q=search, tag=tag)
+        status, payload = api_list(q=search, tag=tag, visible=visible)
         if status != 200:
             return status, payload
         targets = [(row.get("source") or filename_for(row["id"]), row["id"])
@@ -1062,6 +1096,12 @@ def api_bulk(body, operator=None):
     enabled = action == "enable"
     results = []
     for source, label in targets:
+        denied = (visible.can_write(str(source).removesuffix(".yaml"))
+                  if visible is not None else None)
+        if denied is not None:
+            results.append({"id": label, "ok": False,
+                            "error": str(denied[1].get("error") or "denied")})
+            continue
         status, payload = api_toggle(source, {"enabled": enabled}, operator=operator)
         if status == 200:
             row = {

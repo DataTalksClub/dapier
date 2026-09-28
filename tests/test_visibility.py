@@ -3,14 +3,20 @@ surfaces it filters — designer list, overview, runs, inbox, usage.
 
 Rule under test: operators see everything; a subject sees the workflows it
 owns (draft-only rows by drafted_by); anything with no owner — including a
-row whose workflow no longer exists — stays visible to everyone. Read
-filtering only: the write paths are Phase 3 and untouched here.
+row whose workflow no longer exists — stays visible to everyone.
+
+G17 Phase 3: the same module's owner-or-operator WRITE gate
+(ensure_can_write) and the workflow write routes it guards. The rule is the
+same verdict with the safe direction on the defensive default: an id
+nothing stored claims is a create and stays open, but an item that exists
+with no owner stamp is DENIED for non-operators on writes.
 """
 import json
 import time
 
 import boto3
 import pytest
+import yaml
 
 from src.dapier.api import admin
 from src.dapier.api import agent as agent_api
@@ -541,3 +547,317 @@ def test_usage_route_filters_for_the_console_viewer(monkeypatch, published):
         cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
         "GET", "/api/admin/usage")["body"])
     assert [row["workflow_id"] for row in payload["usage"]] == ["mine"]
+
+
+# --- G17 Phase 3: the owner-or-operator write gate (helper unit tests) --------
+
+def workflow_dict(workflow_id):
+    return {"id": workflow_id, "enabled": True,
+            "trigger": {"connector": "email", "event": "message.received"},
+            "actions": [{"id": "a1", "type": "webhook",
+                         "url": "https://example.test/hook"}]}
+
+
+def save_body(workflow_id, **extra):
+    """The JSON body a save route takes: the workflow YAML, plus extras such
+    as renameFrom. Returns the dict — the response helpers encode it."""
+    body = {"yaml": yaml.safe_dump(workflow_dict(workflow_id))}
+    body.update(extra)
+    return body
+
+
+def test_write_gate_operator_writes_anything(published):
+    seed(published, workflow_item("w1", THEIRS))
+    assert visibility.ensure_can_write(MINE, "w1", is_operator=True) is None
+    assert visibility.ensure_can_write(MINE, "unclaimed", is_operator=True) is None
+    assert visibility.ensure_can_write("", "w1", is_operator=True) is None
+
+
+def test_write_gate_owner_writes_own_nonowner_denied(published):
+    seed(published, workflow_item("w1", MINE))
+    assert visibility.ensure_can_write(MINE, "w1", is_operator=False) is None
+    status, payload = visibility.ensure_can_write(THEIRS, "w1", is_operator=False)
+    assert status == 403
+    assert "another owner" in payload["error"]
+    # The denial never names the owner.
+    assert MINE not in payload["error"]
+
+
+def test_write_gate_ownerless_stored_item_denied_for_nonoperators(published):
+    # The deliberate write-side asymmetry: reads stay open on a missing
+    # stamp (defensive visibility), writes do not.
+    seed(published, workflow_item("pre-g17", ""))
+    assert visibility.ensure_can_write(MINE, "pre-g17", is_operator=False)[0] == 403
+
+
+def test_write_gate_unclaimed_id_is_a_create(published):
+    assert visibility.owner_for_write("brand-new") is None
+    assert visibility.ensure_can_write(MINE, "brand-new", is_operator=False) is None
+
+
+def test_write_gate_draft_only_owned_by_drafter(published):
+    seed(published, draft_item("d1", MINE))
+    assert visibility.ensure_can_write(MINE, "d1", is_operator=False) is None
+    assert visibility.ensure_can_write(THEIRS, "d1", is_operator=False)[0] == 403
+
+
+def test_write_gate_live_pair_answers_to_the_live_owner(published):
+    seed(published, workflow_item("w1", THEIRS))
+    published.items["w1#draft"] = draft_item("w1", MINE, live=True)
+    # Their live workflow with my draft on top: the live owner decides.
+    assert visibility.ensure_can_write(MINE, "w1", is_operator=False)[0] == 403
+
+
+def test_write_gate_store_failures_never_fake_a_denial(monkeypatch):
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
+
+    class Exploding:
+        def get_item(self, Key):
+            raise RuntimeError("dynamodb down")
+
+    monkeypatch.setattr(published_workflows, "get_table",
+                        lambda table_ref=None: Exploding())
+    # The write itself will surface the store problem; the gate must not.
+    assert visibility.ensure_can_write(MINE, "w1", is_operator=False) is None
+
+
+def test_write_gate_unconfigured_store_is_a_create(monkeypatch):
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    assert visibility.ensure_can_write(MINE, "w1", is_operator=False) is None
+
+
+def test_can_write_uses_the_scope(published):
+    seed(published, workflow_item("w1", THEIRS))
+    assert visibility.for_role(MINE, "admin").can_write("w1") is None
+    assert visibility.for_role(MINE, "operator").can_write("w1") is None
+    status, _ = visibility.for_role(MINE, "editor").can_write("w1")
+    assert status == 403
+
+
+# --- G17 Phase 3: the write routes (console) ----------------------------------
+
+def console_response(monkeypatch, method, path, body=None,
+                     sub="user@example.test", subject=MINE):
+    # The console-write test idiom (test_designer.py): the CSRF same-origin
+    # check is stubbed; the session cookie carries the role under test.
+    monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
+    event = cookie_event(session_token(monkeypatch, sub=sub, subject=subject),
+                         method=method, path=path)
+    if body is not None:
+        event["body"] = json.dumps(body)
+    return admin.route(event, method, path)
+
+
+def test_console_toggle_gate(monkeypatch, published):
+    operator_env(monkeypatch)
+    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
+    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS),
+         workflow_item("pre-g17", ""))
+
+    # Owner-editor: own workflow toggles.
+    assert console_response(monkeypatch, "PUT",
+                            "/api/admin/designer/workflows/mine.yaml",
+                            {"enabled": False})["statusCode"] == 200
+    # Foreign workflow: denied, untouched.
+    denied = console_response(monkeypatch, "PUT",
+                              "/api/admin/designer/workflows/theirs.yaml",
+                              {"enabled": False})
+    assert denied["statusCode"] == 403
+    assert "another owner" in json.loads(denied["body"])["error"]
+    assert published.items["theirs"]["workflow"]["enabled"] is True
+    # Ownerless stored item: denied on writes even though reads show it.
+    assert console_response(monkeypatch, "PUT",
+                            "/api/admin/designer/workflows/pre-g17.yaml",
+                            {"enabled": False})["statusCode"] == 403
+    # Operators unchanged: they still write anything.
+    assert console_response(monkeypatch, "PUT",
+                            "/api/admin/designer/workflows/theirs.yaml",
+                            {"enabled": False},
+                            sub="op@example.test", subject="subject-op"
+                            )["statusCode"] == 200
+
+
+def test_console_save_gate(monkeypatch, published):
+    operator_env(monkeypatch)
+    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
+    seed(published, workflow_item("theirs", THEIRS))
+
+    denied = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
+                              save_body("theirs"))
+    assert denied["statusCode"] == 403
+    assert "theirs#draft" not in published.items  # nothing was written
+    # A rename cannot smuggle a foreign workflow past the gate either.
+    denied = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
+                              save_body("fresh", renameFrom="theirs.yaml"))
+    assert denied["statusCode"] == 403
+    # Unclaimed id: the create stays open.
+    created = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
+                               save_body("fresh"))
+    assert created["statusCode"] == 200
+    assert json.loads(created["body"])["published"] is False
+
+
+def test_console_bulk_gate_is_per_id(monkeypatch, published):
+    operator_env(monkeypatch)
+    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
+    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
+    payload = json.loads(console_response(
+        monkeypatch, "POST", "/api/admin/designer/workflows/bulk",
+        {"action": "disable", "ids": ["mine.yaml", "theirs.yaml"]})["body"])
+    results = {row["id"]: row for row in payload["results"]}
+    assert results["mine.yaml"]["ok"] is True
+    assert results["theirs.yaml"]["ok"] is False
+    assert "another owner" in results["theirs.yaml"]["error"]
+    assert payload["ok"] == 1
+    assert published.items["theirs"]["workflow"]["enabled"] is True
+
+
+# --- G17 Phase 3: the write routes (CLI / agent API) --------------------------
+
+def agent_response(monkeypatch, method, path, body=None, sub="cli-owner"):
+    event = agent_event(method, path, sub)
+    if body is not None:
+        event["body"] = json.dumps(body)
+    return agent_api.route(event, method, path)
+
+
+def cli_editor(monkeypatch, published, *items):
+    roles_env(monkeypatch, [{"identity": "cli-owner", "role": "editor"}])
+    agent_identity(monkeypatch, "cli-owner")
+    seed(published, *items)
+
+
+def test_cli_save_nonowner_denied_create_allowed(monkeypatch, published):
+    cli_editor(monkeypatch, published,
+               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
+
+    created = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
+                             save_body("fresh"))
+    assert created["statusCode"] == 200
+    assert json.loads(created["body"])["published"] is False
+    own = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
+                         save_body("mine"))
+    assert own["statusCode"] == 200
+    denied = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
+                            save_body("theirs"))
+    assert denied["statusCode"] == 403
+    assert "theirs#draft" not in published.items
+
+
+def test_cli_source_write_routes_gate_nonowners(monkeypatch, published):
+    cli_editor(monkeypatch, published,
+               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
+    executions = DictTable(("execution_id",))
+    dynamo(monkeypatch, {"executions": executions})
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+
+    gated = [
+        ("PUT", "/api/agent/designer/workflows/theirs.yaml", {"enabled": False}),
+        ("DELETE", "/api/agent/designer/workflows/theirs.yaml", None),
+        ("PUT", "/api/agent/designer/workflows/theirs.yaml/tags", {"tags": ["x"]}),
+        ("PUT", "/api/agent/designer/workflows/theirs.yaml/folder", {"folder": "x"}),
+        ("POST", "/api/agent/designer/workflows/theirs.yaml/publish", None),
+        ("DELETE", "/api/agent/designer/workflows/theirs.yaml/draft", None),
+        ("POST", "/api/agent/designer/workflows/theirs.yaml/rollback", {"revision": 1}),
+        ("POST", "/api/agent/designer/workflows/theirs.yaml/test", {"event": {}}),
+        ("POST", "/api/agent/designer/workflows/theirs.yaml/test-step",
+         {"action_id": "a1", "event": {}}),
+        # (the template-flag PUT is operator-banded — roles.py's default —
+        # so a non-operator is denied by the role gate before ownership)
+        ("POST", "/api/agent/storage/theirs", {"key": "k", "value": "v"}),
+        ("DELETE", "/api/agent/storage/theirs", None),
+    ]
+    for method, path, body in gated:
+        response = agent_response(monkeypatch, method, path, body)
+        assert response["statusCode"] == 403, (method, path, response["body"])
+
+
+def test_cli_owner_writes_own_workflows(monkeypatch, published):
+    cli_editor(monkeypatch, published, workflow_item("mine", "cli-owner"))
+    published.items["mine#draft"] = draft_item("mine", "cli-owner", live=True)
+
+    assert agent_response(monkeypatch, "DELETE",
+                          "/api/agent/designer/workflows/mine.yaml/draft"
+                          )["statusCode"] == 200
+    assert agent_response(monkeypatch, "PUT",
+                          "/api/agent/designer/workflows/mine.yaml",
+                          {"enabled": False})["statusCode"] == 200
+    # The toggle above is now revision 2; a draft based on it publishes.
+    published.items["mine#draft"] = draft_item("mine", "cli-owner", live=True)
+    published.items["mine#draft"]["base_revision"] = 2
+    published_ok = agent_response(monkeypatch, "POST",
+                                  "/api/agent/designer/workflows/mine.yaml/publish")
+    assert published_ok["statusCode"] == 200
+    assert json.loads(published_ok["body"])["published"] is True
+
+
+def test_cli_bulk_gate_is_per_id(monkeypatch, published):
+    cli_editor(monkeypatch, published,
+               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
+    payload = json.loads(agent_response(
+        monkeypatch, "POST", "/api/agent/designer/workflows/bulk",
+        {"action": "disable", "ids": ["mine.yaml", "theirs.yaml"]})["body"])
+    results = {row["id"]: row for row in payload["results"]}
+    assert results["mine.yaml"]["ok"] is True
+    assert results["theirs.yaml"]["ok"] is False
+    assert "another owner" in results["theirs.yaml"]["error"]
+    assert published.items["theirs"]["workflow"]["enabled"] is True
+
+
+def test_cli_keyed_test_gated_inline_test_not(monkeypatch, published):
+    cli_editor(monkeypatch, published, workflow_item("theirs", "cli-other"))
+    # Keyed by a saved workflow: the gate applies.
+    keyed = agent_response(monkeypatch, "POST",
+                           "/api/agent/designer/workflows/theirs.yaml/test",
+                           {"event": {}})
+    assert keyed["statusCode"] == 403
+    # Inline (the designer's unsaved draft): not keyed by a stored row.
+    inline = agent_response(monkeypatch, "POST",
+                            "/api/agent/designer/workflows/test-step",
+                            {"action_id": "a1", "event": {},
+                             "workflow": workflow_dict("theirs")})
+    assert inline["statusCode"] != 403
+
+
+def test_cli_duplicate_is_a_create_not_an_ownership_check(monkeypatch, published):
+    # Duplicating forks into a NEW id (the domain 409s on a collision), so
+    # the write gate's create rule applies: nothing to deny for a non-owner.
+    cli_editor(monkeypatch, published, workflow_item("mine", "cli-owner"))
+    copied = agent_response(monkeypatch, "POST",
+                            "/api/agent/designer/workflows/mine.yaml/duplicate", {})
+    assert copied["statusCode"] == 200
+    assert json.loads(copied["body"])["file"] == "mine-copy.yaml"
+
+
+def test_cli_template_apply_creates_under_its_operator_band(monkeypatch, published):
+    # Template apply is operator-banded on both surfaces (roles.py's
+    # default), and its write target is a new id — the fork — so no
+    # ownership check applies; this proves the route still creates.
+    template = workflow_item("tpl", "cli-other")
+    template["workflow"]["template"] = True
+    roles_env(monkeypatch, [{"identity": "cli-op", "role": "operator"}])
+    agent_identity(monkeypatch, "cli-op")
+    seed(published, template)
+    applied = agent_response(monkeypatch, "POST",
+                             "/api/agent/designer/templates/tpl.yaml/apply", {},
+                             sub="cli-op")
+    assert applied["statusCode"] == 200
+    assert json.loads(applied["body"])["file"] == "tpl-copy.yaml"
+
+
+def test_cli_storage_gate(monkeypatch, published):
+    cli_editor(monkeypatch, published, workflow_item("theirs", "cli-other"))
+    dynamo(monkeypatch, {"workflow-state": DictTable(("scope", "key"))})
+    monkeypatch.setenv("STORAGE_TABLE", "workflow-state")
+
+    denied = agent_response(monkeypatch, "POST", "/api/agent/storage/theirs",
+                            {"key": "k", "value": "v"})
+    assert denied["statusCode"] == 403
+    # The owner may write their workflow's storage.
+    roles_env(monkeypatch, [{"identity": "cli-owner", "role": "editor"},
+                            {"identity": "cli-other", "role": "editor"}])
+    agent_identity(monkeypatch, "cli-other")
+    allowed = agent_response(monkeypatch, "POST", "/api/agent/storage/theirs",
+                             {"key": "k", "value": "v"}, sub="cli-other")
+    assert allowed["statusCode"] == 200
+    assert json.loads(allowed["body"])["workflow"] == "theirs"

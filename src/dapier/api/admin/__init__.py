@@ -10,11 +10,13 @@ from . import login, routes, users_routes  # noqa: F401 (used via module refs)
 
 
 def _read_scope(payload):
-    """G17 Phase 2 read filtering for the owned-workflow reads (designer
-    list, overview, runs, inbox, usage): the same effective-role verdict the
-    gate above just applied scopes them — operators (and admins) see
-    everything, everyone else is owner-scoped to their subject. Writes stay
-    Phase 3. Computed only on the routes that filter, not on every request."""
+    """G17 visibility for the owned-workflow surfaces, built from the same
+    effective-role verdict the gate above just applied: operators (and
+    admins) see everything and may write anything, everyone else is
+    owner-scoped to their subject. Phase 2 filters the reads (designer
+    list, overview, runs, inbox, usage) with it; Phase 3 gates the
+    workflow WRITE routes with it (the handlers call ensure_can_write).
+    Computed only on the routes that scope, not on every request."""
     return visibility.for_session(payload)
 
 
@@ -160,13 +162,15 @@ def route(event, method, path):
 
         return http._json_response(200, registry.catalog())
     if method == "PUT" and path == "/api/admin/designer/workflows":
-        return routes.save_designer_workflow(event, operator_subject)
+        return routes.save_designer_workflow(event, operator_subject,
+                                             visible=_read_scope(operator_payload))
     if method == "POST" and path == "/api/admin/designer/workflows/test":
         return routes.test_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test-step":
         return routes.test_designer_step(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/bulk":
-        return routes.bulk_designer_workflow(event, operator_subject)
+        return routes.bulk_designer_workflow(event, operator_subject,
+                                             visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/workflows/export-all":
         return routes.export_all_designer_workflows(event, operator_subject)
     if method == "GET" and path == "/api/admin/designer/export":
@@ -177,25 +181,31 @@ def route(event, method, path):
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1))
     if method == "PUT" and designer_match:
-        return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1))
+        return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1),
+                                               visible=_read_scope(operator_payload))
     if method == "DELETE" and designer_match:
-        return routes.delete_designer_workflow(event, operator_subject, designer_match.group(1))
+        return routes.delete_designer_workflow(event, operator_subject, designer_match.group(1),
+                                               visible=_read_scope(operator_payload))
     designer_tags_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/tags", path)
     if method == "PUT" and designer_tags_match:
-        return routes.tags_designer_workflow(event, operator_subject, designer_tags_match.group(1))
+        return routes.tags_designer_workflow(event, operator_subject, designer_tags_match.group(1),
+                                             visible=_read_scope(operator_payload))
     designer_folder_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/folder", path)
     if method == "PUT" and designer_folder_match:
-        return routes.folder_designer_workflow(event, operator_subject, designer_folder_match.group(1))
+        return routes.folder_designer_workflow(event, operator_subject, designer_folder_match.group(1),
+                                               visible=_read_scope(operator_payload))
     designer_test_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
     if method == "POST" and designer_test_match:
-        return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1))
+        return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1),
+                                             visible=_read_scope(operator_payload))
     designer_test_step_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test-step", path)
     if method == "POST" and designer_test_step_match:
-        return routes.test_designer_step(event, operator_subject, designer_test_step_match.group(1))
+        return routes.test_designer_step(event, operator_subject, designer_test_step_match.group(1),
+                                         visible=_read_scope(operator_payload))
     designer_duplicate_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
     if method == "POST" and designer_duplicate_match:
@@ -209,7 +219,8 @@ def route(event, method, path):
     designer_template_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/template", path)
     if method == "PUT" and designer_template_match:
-        return routes.template_flag_designer_workflow(event, operator_subject, designer_template_match.group(1))
+        return routes.template_flag_designer_workflow(event, operator_subject, designer_template_match.group(1),
+                                                      visible=_read_scope(operator_payload))
     designer_versions_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
@@ -221,18 +232,21 @@ def route(event, method, path):
     designer_rollback_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if method == "POST" and designer_rollback_match:
-        return routes.rollback_designer_workflow(event, operator_subject, designer_rollback_match.group(1))
+        return routes.rollback_designer_workflow(event, operator_subject, designer_rollback_match.group(1),
+                                                 visible=_read_scope(operator_payload))
     # Draft vs live (G15): a save drafts; these promote or throw the draft.
     designer_publish_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/publish", path)
     if method == "POST" and designer_publish_match:
-        return routes.publish_designer_workflow(event, operator_subject, designer_publish_match.group(1))
+        return routes.publish_designer_workflow(event, operator_subject, designer_publish_match.group(1),
+                                                visible=_read_scope(operator_payload))
     designer_draft_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft", path)
     if method == "GET" and designer_draft_match:
         return routes.draft_designer_workflow(designer_draft_match.group(1))
     if method == "DELETE" and designer_draft_match:
-        return routes.discard_designer_draft(event, operator_subject, designer_draft_match.group(1))
+        return routes.discard_designer_draft(event, operator_subject, designer_draft_match.group(1),
+                                             visible=_read_scope(operator_payload))
     designer_draft_diff_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft/diff", path)
     if method == "GET" and designer_draft_diff_match:
@@ -241,9 +255,13 @@ def route(event, method, path):
     if method == "GET" and storage_match:
         return routes.storage_read(event, unquote(storage_match.group(1)))
     if method == "POST" and storage_match:
-        return routes.storage_write(event, unquote(storage_match.group(1)))
+        return routes.storage_write(event, unquote(storage_match.group(1)),
+                                    visible=_read_scope(operator_payload),
+                                    operator=operator_subject)
     if method == "DELETE" and storage_match:
-        return routes.storage_delete(event, unquote(storage_match.group(1)))
+        return routes.storage_delete(event, unquote(storage_match.group(1)),
+                                     visible=_read_scope(operator_payload),
+                                     operator=operator_subject)
     if method == "GET" and path == "/api/admin/hook-triggers":
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":

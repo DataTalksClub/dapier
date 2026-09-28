@@ -182,7 +182,7 @@ def operator_session(monkeypatch):
 
 def test_admin_bulk_routes_to_the_store_and_audits_the_batch(monkeypatch, operator_session):
     seen = {}
-    monkeypatch.setattr(designer_store, "api_bulk", lambda body, operator=None:
+    monkeypatch.setattr(designer_store, "api_bulk", lambda body, operator=None, visible=None:
                         seen.update(body=body, operator=operator)
                         or (200, {"action": "disable", "ok": 1, "results": []}))
     audits = []
