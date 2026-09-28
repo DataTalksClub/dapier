@@ -634,47 +634,42 @@ flow: invoice-dataops
 
 
 class SharedFlowTests(unittest.TestCase):
-    """Named flows let several triggers share one action chain definition."""
+    """Managed workflows share one inline action chain across triggers."""
 
     def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.dir = Path(tmp.name)
-        (self.dir / "invoice-intake.yaml").write_text(FLOW_YAML)
-        env = patch.dict(os.environ, {"WORKFLOWS_DIR": str(self.dir)})
-        env.start()
-        self.addCleanup(env.stop)
+        self.workflow = {
+            "id": "invoice-email-intake", "enabled": True,
+            "triggers": [
+                {"connector": "email", "event": "message.received",
+                 "filters": {"route": {"equals": "invoice"}}},
+                {"connector": "email", "event": "message.received",
+                 "filters": {"route": {"equals": "invoices"}}},
+            ],
+            "actions": [{"id": "intake", "type": "webhook",
+                         "url": "https://example.test/intake"}],
+        }
 
     def test_flow_catalog_and_actions(self):
-        self.assertEqual([flow["name"] for flow in flow_catalog()], ["invoice-dataops"])
-        self.assertEqual(flow_actions("invoice-dataops")[0]["id"], "intake")
+        self.assertEqual(flow_catalog(), [])
+        self.assertIsNone(flow_actions("invoice-dataops"))
         self.assertIsNone(flow_actions("no-such-flow"))
 
     def test_all_workflows_resolves_the_flow_reference(self):
-        workflow = next(w for w in all_workflows() if w["id"] == "invoice-email-intake")
+        workflow = self.workflow
         self.assertEqual([action["type"] for action in workflow["actions"]], ["webhook"])
         self.assertEqual(len(workflow_triggers(workflow)), 2)
 
     def test_undefined_flow_fails_closed(self):
-        (self.dir / "broken.yaml").write_text(
-            "id: broken\n"
-            "trigger: {connector: email, event: message.received}\n"
-            "flow: missing\n")
-        matching._documents.cache_clear()
-        matching._workflows.cache_clear()
-        self.addCleanup(matching._documents.cache_clear)
-        self.addCleanup(matching._workflows.cache_clear)
-        ids = [workflow["id"] for workflow in all_workflows()]
-        self.assertNotIn("broken", ids)
-        self.assertIn("invoice-email-intake", ids)
+        self.assertIsNone(matching.resolve_workflow({"id": "broken", "flow": "missing"}))
 
     def test_common_actions_run_for_every_trigger(self):
         run_webhook = MagicMock(return_value={"status": 200})
-        with stubbed_action("webhook", run_webhook):
-            execute({"id": "e1", "connector": "email", "event": "message.received",
-                     "data": {"route": "invoice"}})
-            execute({"id": "e2", "connector": "email", "event": "message.received",
-                     "data": {"route": "invoices"}})
+        with patch("src.dapier.engine.all_workflows", lambda: [self.workflow]):
+            with stubbed_action("webhook", run_webhook):
+                execute({"id": "e1", "connector": "email", "event": "message.received",
+                         "data": {"route": "invoice"}})
+                execute({"id": "e2", "connector": "email", "event": "message.received",
+                         "data": {"route": "invoices"}})
         self.assertEqual(run_webhook.call_count, 2)
 
 

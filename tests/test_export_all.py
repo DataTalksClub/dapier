@@ -40,11 +40,14 @@ actions:
 
 @pytest.fixture
 def bundle_dir(tmp_path, monkeypatch):
-    """A WORKFLOWS_DIR with two valid workflow files; nothing published."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
-    (tmp_path / "invoice-alert.yaml").write_text(_workflow("invoice-alert"))
-    (tmp_path / "standup-digest.yaml").write_text(_workflow("standup-digest"))
+    """Two managed workflow definitions."""
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
+    items = [{"workflow": designer_store.parse_workflow(_workflow(name)),
+              "file": f"{name}.yaml"}
+             for name in ("invoice-alert", "standup-digest")]
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: items)
+    monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
+                        next((item for item in items if item["workflow"]["id"] == workflow_id), None))
     return tmp_path
 
 
@@ -63,9 +66,8 @@ def test_export_all_zips_one_canonical_yaml_per_workflow(bundle_dir):
                                      "workflows/invoice-alert.yaml",
                                      "workflows/standup-digest.yaml"]
         # The same canonical render api_get serves, so a re-save round-trips.
-        workflow = designer_store.bundled_yaml("standup-digest.yaml")
         assert bundle.read("workflows/standup-digest.yaml").decode() == \
-            designer_store.workflow_yaml_text(workflow)
+            designer_store.api_get("standup-digest.yaml")[1]["yaml"]
 
 
 def test_export_all_prefers_the_published_state(bundle_dir, monkeypatch):
@@ -81,7 +83,7 @@ def test_export_all_prefers_the_published_state(bundle_dir, monkeypatch):
     status, payload = designer_store.api_export_all()
 
     assert status == 200
-    assert payload["count"] == 2
+    assert payload["count"] == 1
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(payload["b64"]))) as bundle:
         entry = bundle.read("workflows/invoice-alert.yaml").decode()
     assert "live now" in entry
@@ -100,23 +102,20 @@ def test_export_all_skips_workflows_without_a_source_file(bundle_dir, monkeypatc
     status, payload = designer_store.api_export_all()
 
     assert status == 200
-    # The two bundled workflows plus the one publishable item; the two
-    # source-less items are skipped but do not fail the bundle.
-    assert payload["count"] == 3
+    # Source-less records are skipped without failing the export.
+    assert payload["count"] == 1
     assert payload["skipped"] == ["no-file", "odd"]
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(payload["b64"]))) as bundle:
-        assert bundle.namelist() == ["manifest.json",
-                                     "workflows/good-one.yaml",
-                                     "workflows/invoice-alert.yaml",
-                                     "workflows/standup-digest.yaml"]
+        assert bundle.namelist() == ["manifest.json", "workflows/good-one.yaml"]
 
 
 def test_export_all_refuses_more_than_the_cap(monkeypatch):
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
     monkeypatch.setattr(
-        designer_store, "_bundled_workflows",
-        lambda: [({"id": f"w{i:03d}"}, f"w{i:03d}.yaml")
-                 for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
+        published_workflows, "load_items",
+        lambda table_ref=None: [{"workflow": {"id": f"w{i:03d}"},
+                                 "file": f"w{i:03d}.yaml"}
+                                for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
 
     status, payload = designer_store.api_export_all()
 
@@ -207,11 +206,12 @@ def test_agent_export_all_route_requires_operator(bundle_dir, monkeypatch):
 
 
 def test_agent_export_all_route_refuses_over_the_cap(monkeypatch):
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
     monkeypatch.setattr(
-        designer_store, "_bundled_workflows",
-        lambda: [({"id": f"w{i:03d}"}, f"w{i:03d}.yaml")
-                 for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
+        published_workflows, "load_items",
+        lambda table_ref=None: [{"workflow": {"id": f"w{i:03d}"},
+                                 "file": f"w{i:03d}.yaml"}
+                                for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
     _configure_agent(monkeypatch)
 
     response = agent_api.route(_bearer_event(), "GET",

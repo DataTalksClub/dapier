@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from dataclasses import replace
 
 import pytest
-import yaml
 
 from conftest import stubbed_action
 
@@ -71,14 +70,8 @@ def published(monkeypatch):
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
-    """An empty deployed bundle; matching caches reset afterwards."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    """Managed workflow tests do not require a deployed file catalog."""
     yield tmp_path
-    from src.dapier.engine import matching
-
-    matching._documents.cache_clear()
-    matching._workflows.cache_clear()
-    matching._flows.cache_clear()
 
 
 def publish_workflow(table, workflow_id, actions, *, enabled=True,
@@ -95,18 +88,14 @@ def publish_workflow(table, workflow_id, actions, *, enabled=True,
 
 def run_parent(directory, actions, *, workflow_id="parent-wf",
                data=None):
-    """Bundle and fire a parent workflow whose trigger matches EVENT."""
-    bundle_workflow(directory, {
+    """Publish and fire a parent workflow whose trigger matches EVENT."""
+    published_workflows.publish({
         "id": workflow_id,
         "enabled": True,
         "trigger": {"connector": "youtube", "event": "video.published"},
         "actions": actions,
     })
     return fire_youtube_event(data)
-
-
-def bundle_workflow(directory, workflow):
-    (directory / f"{workflow['id']}.yaml").write_text(yaml.safe_dump(workflow))
 
 
 def fire_youtube_event(data=None):

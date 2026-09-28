@@ -95,7 +95,7 @@ function renderFlowChoices(selected) {
   const options = current.flows.map((flow) =>
     `<option value="${escapeHtml(flow.name)}">${escapeHtml(flow.name)}${flow.actions ? ` (${flow.actions} actions)` : ''}</option>`);
   if (selected && selected !== INLINE_ACTIONS && !current.flows.some((flow) => flow.name === selected)) {
-    // A flow removed from the bundled YAML since the schedule was saved —
+    // A retired shared flow may still be referenced by an unmigrated schedule.
     // keep it selectable so the binding survives an unrelated edit.
     options.push(`<option value="${escapeHtml(selected)}">${escapeHtml(selected)} (missing)</option>`);
   }

@@ -489,16 +489,18 @@ def test_credentials_set_is_write_only(monkeypatch):
 
 
 def test_overview_mirrors_console_payload(monkeypatch, tmp_path):
+    from src.dapier.triggers import published_workflows
     tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
                        connections={"youtube-personal": CONNECTION})
     tables["executions"] = Table()
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    (tmp_path / "demo.yaml").write_text(
-        "id: demo\n"
-        "trigger:\n"
-        "  type: webhook\n"
-    )
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: [{
+        "workflow_id": "demo", "file": "demo.yaml",
+        "workflow": {"id": "demo", "trigger": {"connector": "webhook",
+                                                "event": "request.received"},
+                     "actions": [{"type": "webhook", "url": "https://example.test"}]},
+    }])
 
     response = agent_api.route(event(), "GET", "/api/agent/overview")
     assert response["statusCode"] == 200
@@ -1361,4 +1363,3 @@ def test_runs_export_route_returns_csv(monkeypatch):
     assert body["count"] == 1
     assert body["filename"].startswith("dapier-runs-")
     assert "wf-1:evt-1" in body["csv"]
-

@@ -22,10 +22,10 @@ DOMAIN_ENV = "TRIGGER_EMAIL_DOMAIN"
 DEFAULT_DOMAIN = "dtcdev.click"
 
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$")
-# Only infrastructure addresses are reserved here. Routes claimed by bundled
-# YAML workflows are guarded separately: build_item refuses to shadow them
-# (yaml_email_routes), so a route becomes app-manageable as soon as the YAML
-# stops claiming it — no reserved-list change needed.
+# Only infrastructure addresses are reserved here. Routes claimed by managed
+# workflows are guarded separately: build_item refuses to shadow them
+# (yaml_email_routes), so a route becomes app-manageable as soon as the
+# workflow stops claiming it.
 RESERVED_NAMES = {
     "abuse", "admin", "api", "auth", "billing", "dmarc", "datamailer", "e2e",
     "hostmaster", "imap", "mail", "no-reply", "noreply", "pop", "postmaster",
@@ -78,9 +78,8 @@ def validate_actions(actions):
 def resolve_actions_flow(body):
     """Inline actions or a named shared flow — exactly one of the two.
 
-    A flow must exist in the bundled YAML at save time. The reference is
-    stored by name, so a later deploy that removes the flow fails the
-    trigger closed (it stops matching) instead of running an empty chain.
+    Shared flow references are retired. An unmigrated reference fails closed
+    until the one-time migration embeds its actions in the trigger.
     """
     flow = str(body.get("flow") or "").strip()
     actions = body.get("actions")
@@ -96,7 +95,7 @@ def resolve_actions_flow(body):
 
 
 def flow_catalog():
-    """The shared flows a trigger can bind to (from the bundled YAML)."""
+    """No shared flows are offered after the managed-store cutover."""
     from ..engine import matching
 
     return matching.flow_catalog()

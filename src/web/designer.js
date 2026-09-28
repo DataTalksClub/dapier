@@ -22259,7 +22259,7 @@
         resetHistory();
         setStatus({
           kind: "ok",
-          message: result.published === false ? `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}; changes go live after deployment.` : `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
+          message: `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
         });
         return true;
       } catch (error) {

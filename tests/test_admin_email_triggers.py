@@ -84,10 +84,13 @@ class AdminEmailTriggerRouteTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
         self.assertIn("reserved", json.loads(response["body"])["error"])
 
-    def test_route_claimed_by_yaml_is_rejected(self):
+    def test_route_claimed_by_managed_workflow_is_rejected(self):
         stub = StubTable()
+        claimed = {"trigger": {"connector": "email", "event": "message.received",
+                               "filters": {"route": {"equals": "invoice-attachment"}}}}
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub):
+                patch.object(email_triggers, "get_table", return_value=stub), \
+                patch("src.dapier.engine.workflows", return_value=[claimed]):
             response = routes.save_email_trigger(
                 request("PUT", dict(BODY, name="invoice-attachment")), "op")
         self.assertEqual(response["statusCode"], 400)

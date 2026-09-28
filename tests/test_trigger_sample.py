@@ -16,6 +16,7 @@ import pytest
 from src.dapier.api import admin
 from src.dapier.api import agent as agent_api
 from src.dapier.api import runs
+from src.dapier.api import designer_store
 from src.dapier.auth import session
 from src.dapier.triggers import published_workflows
 
@@ -84,6 +85,15 @@ def write_workflow(tmp_path):
     return tmp_path
 
 
+def managed_workflow(monkeypatch, yaml_text=WORKFLOW_YAML):
+    workflow = designer_store.parse_workflow(yaml_text)
+    item = {"workflow_id": workflow["id"], "file": f"{workflow['id']}.yaml",
+            "workflow": workflow}
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: [item])
+    return item
+
+
 # --- domain: newest run first, discovery only when nothing ran ---
 
 
@@ -108,8 +118,7 @@ def test_sample_returns_the_newest_run_recorded_input(monkeypatch):
 
 def test_sample_falls_back_to_the_connector_discovery_sample(monkeypatch, tmp_path):
     _tables_env(monkeypatch, [])
-    monkeypatch.setenv("WORKFLOWS_DIR", str(write_workflow(tmp_path)))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    managed_workflow(monkeypatch)
     status, payload = runs.api_trigger_sample("sample-flow")
     assert status == 200
     assert payload["source"] == "synthetic"
@@ -127,12 +136,11 @@ def test_sample_goes_live_through_the_workflows_bound_poll(monkeypatch, tmp_path
     even with a perfectly good bucket/sheet/channel to pull."""
     from src.dapier.triggers import poll_triggers
 
-    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML.replace(
+    workflow_yaml = WORKFLOW_YAML.replace(
         "connector: email\n  event: message.received",
-        "connector: s3\n  event: file.created"))
+        "connector: s3\n  event: file.created")
     _tables_env(monkeypatch, [])
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    managed_workflow(monkeypatch, workflow_yaml)
 
     stored = {"poll_id": "todo-bucket", "flow": "sample-flow", "source": "s3",
               "bucket": "backups", "actions": []}
@@ -166,8 +174,7 @@ def test_sample_ignores_a_bound_poll_serving_another_connector(monkeypatch, tmp_
     from src.dapier.triggers import poll_triggers
 
     _tables_env(monkeypatch, [])
-    monkeypatch.setenv("WORKFLOWS_DIR", str(write_workflow(tmp_path)))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    managed_workflow(monkeypatch)
     monkeypatch.setattr(poll_triggers, "load_items", lambda table_ref=None: [
         {"poll_id": "todo-bucket", "flow": "sample-flow", "source": "s3",
          "bucket": "backups", "actions": []}])
@@ -359,8 +366,7 @@ def test_admin_sample_serves_the_same_payload(monkeypatch):
 
 def test_admin_sample_discovery_fallback_needs_no_runs(monkeypatch, tmp_path):
     cookies = configure_admin(monkeypatch)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(write_workflow(tmp_path)))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    managed_workflow(monkeypatch)
     response = admin.route(
         admin_request("GET", "/api/admin/triggers/sample",
                       query={"workflow": "sample-flow"}, cookies=cookies),

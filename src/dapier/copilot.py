@@ -14,10 +14,8 @@ COPILOT_LLM_BASE_URL (default https://api.openai.com/v1), COPILOT_LLM_API_KEY
 (no default — unset means the copilot answers 503 with setup instructions),
 and COPILOT_LLM_MODEL (default gpt-4o-mini).
 
-The system prompt describes the exact workflow schema the engine reads
-(triggers, filters, action catalog, shared flows) with few-shot examples
-mined from the deployed workflows/*.yaml bundle, and demands a reply that is
-only a YAML document. The reply is parsed deterministically and validated
+The system prompt describes the workflow schema the engine reads and demands
+a reply that is only a YAML document. The reply is parsed deterministically and validated
 with the designer save path's own ``parse_workflow``, so what the caller
 sees in ``errors[]`` is exactly what a save would reject.
 """
@@ -27,9 +25,6 @@ import os
 import re
 import urllib.error
 import urllib.request
-from pathlib import Path
-
-import yaml
 
 from .api import designer_store
 
@@ -40,17 +35,6 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 LLM_TIMEOUT_SECONDS = 25
 MAX_PROMPT_CHARS = 4000
-
-# Few-shot demos: real workflows from the bundle, covering a YouTube trigger
-# with a Slack action, an email trigger with a Dropbox action, and a Dropbox
-# trigger with a DataOps chain. Loaded from the same directory the engine
-# reads, so the examples never drift from what actually runs.
-EXAMPLE_FILES = (
-    "youtube-slack.yaml",
-    "email-attachment-dataops.yaml",
-    "dropbox_on_upload.yaml",
-)
-
 
 class LlmError(Exception):
     """The copilot could not get a usable completion from the LLM."""
@@ -138,13 +122,9 @@ Schema (all validated server-side; the draft must satisfy all of it):
   - schedule / schedule.triggered
   filters: a mapping of event field -> exactly one rule:
   {equals: v} {in: [a, b]} {prefix: p} {suffix: s} {contains: c}
-- Exactly one of:
-  - actions: a non-empty list, or
-  - flow: the name of a shared flow (only for flows that already exist; when
-    in doubt use inline actions).
-- Never put both `actions` and `flow` on one workflow.
+- actions: a non-empty list.
 - Every action needs an `id` (unique in the workflow) and a `type`.
-- Write `actions` (or the `flows`/`flow` binding) before `trigger` in the
+- Write `actions` before `trigger` in the
   document; `id` and `enabled` come first.
 
 Action catalog (type: fields):
@@ -165,28 +145,8 @@ slug (e.g. connection_id: slack). Do not invent action types, connectors,
 or events that are not listed here."""
 
 
-def _workflows_root():
-    env = os.environ.get("WORKFLOWS_DIR")
-    if env:
-        return Path(env)
-    return Path(__file__).resolve().parents[2] / "workflows"
-
-
-def _examples():
-    """Few-shot YAML from the deployed bundle; missing files are skipped."""
-    blocks = []
-    for name in EXAMPLE_FILES:
-        try:
-            text = (_workflows_root() / name).read_text()
-            if isinstance(yaml.safe_load(text), dict):
-                blocks.append(f"Example — {name}:\n```yaml\n{text.strip()}\n```")
-        except (OSError, yaml.YAMLError):
-            continue
-    return blocks
-
-
 def system_prompt():
-    return "\n\n".join([_SCHEMA_INSTRUCTIONS, *_examples()])
+    return _SCHEMA_INSTRUCTIONS
 
 
 _FENCE_RE = re.compile(r"```(?:ya?ml)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)

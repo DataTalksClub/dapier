@@ -1264,7 +1264,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
-      const result = await api<{ commit: string | null; published?: boolean; html_url?: string }>(config, "/workflows", {
+      const result = await api<{ commit?: string | null; published?: boolean; git_sync_error?: string }>(config, "/workflows", {
         method: "PUT",
         body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
       });
@@ -1294,9 +1294,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       resetHistory();
       setStatus({
         kind: "ok",
-        message: result.published === false
-          ? `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}; changes go live after deployment.`
-          : `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
+        message: `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
+          + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
       });
       return true;
     } catch (error) {

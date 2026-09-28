@@ -86,7 +86,7 @@ def github_ready(monkeypatch):
     """Git sync pointed at a scripted GitHub; the token check bypassed."""
     monkeypatch.setenv(designer_store.REPO_URL_ENV, "https://github.com/owner/repo")
     monkeypatch.delenv(designer_store.BRANCH_ENV, raising=False)
-    monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
+    monkeypatch.setenv(designer_store.TOKEN_SECRET_ENV, "test-secret")
     monkeypatch.setattr(designer_store, "get_token", lambda: "test-token")
     calls = []
 
@@ -99,16 +99,16 @@ def github_ready(monkeypatch):
 
 
 @pytest.fixture
-def bundle(monkeypatch, tmp_path):
-    """A deployed bundle carrying exactly the source workflow."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
+def bundle(tmp_path, published):
+    """The source workflow in the managed store."""
+    published_workflows.publish(designer_store.parse_workflow(WORKFLOW_YAML))
     return tmp_path
 
 
 def committed_tree_yaml(github_calls):
     """The YAML the duplicate committed, parsed back."""
-    tree = github_calls[2][3]["tree"]
+    tree = next(payload["tree"] for method, path, _, payload in github_calls
+                if method == "POST" and path.endswith("/git/trees"))
     return tree, yaml.safe_load(tree[0]["content"])
 
 
@@ -132,8 +132,7 @@ def test_duplicate_copies_under_a_new_id_and_publishes(published, github_ready, 
     assert "test-flow-copy" in published.items
     assert published.items["test-flow-copy"]["workflow"]["id"] == "test-flow-copy"
     assert published.items["test-flow-copy"]["published_by"] == "op-1"
-    assert "test-flow" not in published.items
-    assert (bundle / "test-flow.yaml").read_text() == WORKFLOW_YAML
+    assert published.items["test-flow"]["workflow"] == designer_store.parse_workflow(WORKFLOW_YAML)
     assert github_ready[-1] == ("PATCH", "/repos/owner/repo/git/refs/heads/main", "test-token", {"sha": "commit456"})
 
 
@@ -147,7 +146,8 @@ def test_duplicate_accepts_an_explicit_name_and_slugifies_it(published, github_r
 
 
 def test_duplicate_strips_run_state_keys(published, github_ready, bundle):
-    (bundle / "test-flow.yaml").write_text(RUN_STATE_YAML)
+    published_workflows.publish(designer_store.parse_workflow(RUN_STATE_YAML),
+                                previous=published_workflows.get_item("test-flow"))
 
     status, _ = designer_store.api_duplicate("test-flow.yaml")
 
@@ -171,14 +171,14 @@ def test_duplicate_strips_run_state_keys(published, github_ready, bundle):
 def test_duplicate_name_collisions_return_409(published, github_ready, bundle,
                                               extra_file, extra_yaml, body):
     if extra_file:
-        (bundle / extra_file).write_text(extra_yaml)
+        published_workflows.publish(designer_store.parse_workflow(extra_yaml))
 
     status, payload = designer_store.api_duplicate("test-flow.yaml", body)
 
     assert status == 409
     assert "already exists" in payload["error"]
-    assert github_ready == []  # nothing was committed
-    assert published.items == {}  # nothing was published
+    assert not any(method == "POST" for method, _, _, _ in github_ready)
+    assert published.items["test-flow"]["workflow"]["id"] == "test-flow"
 
 
 def test_duplicate_missing_source_is_404(published, github_ready, bundle):
@@ -324,7 +324,7 @@ def test_agent_duplicate_end_to_end_publishes_the_copy(published, github_ready, 
     assert payload["published"] is True
     assert payload["duplicated_from"] == "test-flow.yaml"
     assert "test-flow-copy" in published.items
-    assert "test-flow" not in published.items
+    assert "test-flow" in published.items
 
 
 # ---- CLI ----
@@ -347,7 +347,7 @@ def test_cli_duplicate_calls_the_agent_endpoint(monkeypatch, capsys):
         "POST", "/api/agent/designer/workflows/test-flow.yaml/duplicate")
     assert seen["body"] == {"name": "My Copy"}
     out, _ = capsys.readouterr()
-    assert "Duplicated test-flow.yaml as my-copy.yaml (abc1234)" in out
+    assert "Duplicated test-flow.yaml as my-copy.yaml" in out
     assert "published it live" in out
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)

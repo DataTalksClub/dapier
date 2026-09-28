@@ -80,8 +80,8 @@ function syncHead(ref) {
   syncGithub(workflow ? workflow.source : null);
 }
 
-/* Swaps the h1 for an input; Enter or blur commits, Escape restores. The
-   commit only edits the designer's draft — it publishes via "Save to git". */
+/* Swaps the h1 for an input; Enter or blur accepts, Escape restores. The
+   edit only changes the designer's draft until the workflow is saved. */
 function startRename() {
   const title = $('#view-title');
   if (editing || state.view !== 'designer' || !meta?.editable) return;

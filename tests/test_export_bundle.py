@@ -40,12 +40,17 @@ actions:
 
 @pytest.fixture
 def bundle_dir(tmp_path, monkeypatch):
-    """A WORKFLOWS_DIR with two valid workflow files; nothing published."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
-    (tmp_path / "invoice-alert.yaml").write_text(_workflow("invoice-alert"))
-    (tmp_path / "standup-digest.yaml").write_text(
-        _workflow("standup-digest", "folder: Ops\ntags: [weekly, digest]\n"))
+    """Two managed workflow definitions."""
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
+    items = [{"workflow": designer_store.parse_workflow(text), "file": f"{name}.yaml"}
+             for name, text in (
+                 ("invoice-alert", _workflow("invoice-alert")),
+                 ("standup-digest", _workflow(
+                     "standup-digest", "folder: Ops\ntags: [weekly, digest]\n")),
+             )]
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: items)
+    monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
+                        next((item for item in items if item["workflow"]["id"] == workflow_id), None))
     return tmp_path
 
 

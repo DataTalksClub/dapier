@@ -319,7 +319,7 @@ def build_parser():
     wf_export_all_p.add_argument("-o", "--out", dest="out", default=None,
                                  help="Write the zip here (default: the server-suggested "
                                       "dapier-workflows-YYYYMMDD.zip)")
-    wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo and publish it live")
+    wf_save_p = wf_sub.add_parser("save", help="Publish a workflow YAML live (and sync to Git when configured)")
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")

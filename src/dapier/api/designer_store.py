@@ -196,7 +196,7 @@ def _published_by_file(source):
 
 
 def api_list(q=None, tag=None, folder=None):
-    """Bundled workflows with the live published state overlaid by id.
+    """Managed workflows in the live published store.
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
     here too — its published state is what actually runs. ``q`` filters
@@ -262,22 +262,22 @@ def api_export(tag=None, folder=None, now=None):
     payload (``b64``) and the callers decode it; the routes carry the
     ``content-disposition`` attachment header with the dated filename.
     """
-    bundled = {}
+    managed = {}
     versions = {}
     if published_workflows.configured():
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
-            bundled[workflow["id"]] = (workflow, item.get("file"))
+            managed[workflow["id"]] = (workflow, item.get("file"))
             versions[str(workflow["id"])] = int(item.get("revision") or 0)
-    if len(bundled) > MAX_EXPORT_WORKFLOWS:
-        return 400, {"error": f"Too many workflows to export ({len(bundled)}); "
+    if len(managed) > MAX_EXPORT_WORKFLOWS:
+        return 400, {"error": f"Too many workflows to export ({len(managed)}); "
                               f"the cap is {MAX_EXPORT_WORKFLOWS}."}
     wanted_tag = str(tag or "").strip().lower()
     wanted_folder = str(folder or "").strip().lower()
     skipped, entries, listed = [], {}, []
-    for workflow, source in sorted(bundled.values(),
+    for workflow, source in sorted(managed.values(),
                                    key=lambda pair: str(pair[0].get("id") or "")):
         name = source.strip() if isinstance(source, str) else ""
         if not FILE_PATTERN.fullmatch(name):
@@ -332,8 +332,7 @@ def workflow_yaml_text(workflow):
 
 
 def api_get(source):
-    """One workflow: the live published state first, then the bundle, then
-    committed git state (covering a save whose deploy has not finished).
+    """One workflow from the live published store.
 
     The payload carries ``yaml``, the canonical text rendered from the stored
     definition, so `workflows export` and the console's download round-trip
@@ -367,18 +366,18 @@ def api_export_all(now=None):
     sorted with a fixed timestamp, so the same set of workflows always
     bundles to the same bytes.
     """
-    bundled = {}
+    managed = {}
     if published_workflows.configured():
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
-            bundled[workflow["id"]] = (workflow, item.get("file"))
-    if len(bundled) > MAX_EXPORT_WORKFLOWS:
-        return 400, {"error": f"Too many workflows to export ({len(bundled)}); "
+            managed[workflow["id"]] = (workflow, item.get("file"))
+    if len(managed) > MAX_EXPORT_WORKFLOWS:
+        return 400, {"error": f"Too many workflows to export ({len(managed)}); "
                               f"the cap is {MAX_EXPORT_WORKFLOWS}."}
     skipped, entries, listed = [], {}, []
-    for workflow, source in bundled.values():
+    for workflow, source in managed.values():
         name = source.strip() if isinstance(source, str) else ""
         if not FILE_PATTERN.fullmatch(name):
             skipped.append(str(workflow.get("id") or "unknown"))
@@ -909,7 +908,7 @@ def slugify_id(text):
     """A workflow id from free text: lowercase, runs of characters outside
     the id alphabet (everything but alphanumerics and underscores) collapse
     to one hyphen, and the result fits ID_PATTERN (alnum first, 63 chars
-    max). Underscores survive — bundled ids like dropbox_on_upload use them.
+    max). Underscores survive ids like dropbox_on_upload.
     Empty when nothing usable survives."""
     slug = re.sub(r"[^a-z0-9_]+", "-", str(text).strip().lower())
     slug = re.sub(r"-+", "-", slug).strip("-")
@@ -977,10 +976,8 @@ def api_duplicate(source, body=None, operator=None):
 
 
 def api_templates():
-    """Browse the template gallery: summaries of every workflow flagged
-    ``template: true`` — the bundled starters plus anything an operator
-    published as a template (the published overlay wins per id, like
-    api_list). Templates are ordinary workflows: the flag only decides
+    """Browse the template gallery: summaries of managed workflows flagged
+    ``template: true``. Templates are ordinary workflows: the flag only decides
     whether they show up here."""
     templates = {}
     if published_workflows.configured():
@@ -1091,8 +1088,8 @@ def _workflow_under_test(source, body):
 
     The inline draft definition in the body (``workflow`` object or ``yaml``
     text — the point of the feature is testing what is about to be saved),
-    else the current file (published overlay / bundled YAML / committed git
-    state). Success carries ``{"workflow": ..., "label": ...}``; anything
+    else the current published definition. Success carries
+    ``{"workflow": ..., "label": ...}``; anything
     else is ``{"error": ...}``.
     """
     inline = body.get("workflow")

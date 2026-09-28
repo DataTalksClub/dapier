@@ -93,27 +93,17 @@ class WebhookSaveTests(unittest.TestCase):
         self.assertEqual(payload["dedupe_path"], "data.email")
         self.assertNotIn("warnings", payload)
 
-    def test_save_binds_a_shared_flow_without_inline_actions(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "flows.yaml").write_text(
-                "flows:\n  order-flow:\n    actions:\n      - {type: webhook, url: 'https://intake.test/x'}\n")
-            with patch.dict(os.environ, {"WORKFLOWS_DIR": tmp, "HOOK_TRIGGERS_TABLE": "hooks"}):
-                stub = StubTable()
-                _status, payload = hook_triggers.api_save(
-                    {"name": "orders", "flow": "order-flow"}, "op", table_ref=stub)
-                self.assertEqual(payload["flow"], "order-flow")
-                self.assertEqual(payload["actions"], [])
-
-                workflow = hook_triggers.load_workflows(table_ref=stub)[0]
-                self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
-                event = {"connector": "webhook", "event": "request.received", "data": {"hook": "orders"}}
-                self.assertTrue(matches(workflow, event))
-
-                with self.assertRaises(hook_triggers.TriggerError):
-                    hook_triggers.api_save(
-                        {"name": "orders2", "flow": "order-flow",
-                         "actions": [{"type": "webhook", "url": "https://x"}]},
-                        "op", table_ref=stub)
+    def test_save_uses_inline_actions_and_rejects_legacy_flow(self):
+        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
+            stub = StubTable()
+            actions = [{"type": "webhook", "url": "https://intake.test/x"}]
+            _status, payload = hook_triggers.api_save(
+                {"name": "orders", "actions": actions}, "op", table_ref=stub)
+            self.assertEqual(payload["flow"], "")
+            self.assertEqual(hook_triggers.load_workflows(table_ref=stub)[0]["actions"], actions)
+            with self.assertRaises(hook_triggers.TriggerError):
+                hook_triggers.api_save(
+                    {"name": "orders2", "flow": "order-flow"}, "op", table_ref=stub)
 
     def test_update_keeps_token_unless_rotated(self):
         stub = StubTable()

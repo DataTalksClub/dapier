@@ -76,8 +76,24 @@ def scan_all(table):
 
 def plan(workflows, flows, tables):
     published_table, _ = tables["workflows"]
-    existing = {item["workflow_id"] for item in scan_all(published_table)}
+    existing = {item["workflow_id"]: item for item in scan_all(published_table)
+                if not item.get("version_of")}
     missing = {key: value for key, value in workflows.items() if key not in existing}
+    published_updates = []
+    for workflow_id, item in existing.items():
+        workflow = item.get("workflow")
+        if not isinstance(workflow, dict):
+            continue
+        if workflow.get("flow") or workflow.get("flows"):
+            converted = copy.deepcopy(workflow)
+            if converted.get("flow"):
+                flow = converted.pop("flow")
+                if flow not in flows:
+                    raise ValueError(f"published workflow {workflow_id} references unknown flow {flow}")
+                converted["actions"] = copy.deepcopy(flows[flow])
+            converted.pop("flows", None)
+            converted = parse_workflow(workflow_yaml_text(converted))
+            published_updates.append((item, converted))
     trigger_updates = []
     for kind in ("email", "hook", "schedule", "poll"):
         table, key = tables[kind]
@@ -88,10 +104,10 @@ def plan(workflows, flows, tables):
             if flow not in flows:
                 raise ValueError(f"{kind} trigger {item[key]} references unknown flow {flow}")
             trigger_updates.append((kind, table, key, item, copy.deepcopy(flows[flow])))
-    return missing, trigger_updates
+    return missing, published_updates, trigger_updates
 
 
-def apply(missing, trigger_updates, tables):
+def apply(missing, published_updates, trigger_updates, tables):
     # The published records go first while the old bundle still runs. A
     # conditional put keeps a concurrently published edit from being replaced.
     table, _ = tables["workflows"]
@@ -100,6 +116,11 @@ def apply(missing, trigger_updates, tables):
                                            operator="migration", table_ref=table,
                                            only_if_absent=True)
         print(f"published {workflow_id} revision {item['revision']}")
+    for previous, workflow in published_updates:
+        item = published_workflows.publish(workflow, cause="legacy-migration",
+                                           operator="migration", previous=previous,
+                                           table_ref=table)
+        print(f"converted published {workflow['id']} revision {item['revision']}")
     # Materialize the effective actions without resetting trigger identity,
     # tokens, EventBridge rules, or creation metadata. The conditional check
     # refuses to clobber a trigger edited since the plan was read.
@@ -126,15 +147,18 @@ def main(argv=None):
     session = boto3.Session(region_name=args.region)
     tables = physical_tables(args.stack, session.client("cloudformation"),
                              session.resource("dynamodb"))
-    missing, updates = plan(workflows, flows, tables)
+    missing, published_updates, updates = plan(workflows, flows, tables)
     print(f"{len(workflows)} legacy workflows, {len(missing)} to publish, "
+          f"{len(published_updates)} published definitions to convert, "
           f"{len(updates)} flow-bound triggers to convert")
     for workflow_id in sorted(missing):
         print(f"  publish {workflow_id}")
+    for previous, _ in published_updates:
+        print(f"  convert published {previous['workflow_id']}")
     for kind, _, key, item, _ in updates:
         print(f"  materialize {kind} trigger {item[key]} ({item['flow']})")
     if args.apply:
-        apply(missing, updates, tables)
+        apply(missing, published_updates, updates, tables)
     else:
         print("Read-only plan. Pass --apply after reviewing it.")
     return 0

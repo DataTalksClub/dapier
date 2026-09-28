@@ -117,7 +117,10 @@ class TriggerApiTests(unittest.TestCase):
 
     def test_list_reports_triggers_domain_and_yaml_routes(self):
         stub = StubTable([email_triggers.build_item(self.body, "op")])
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}):
+        claimed = {"trigger": {"connector": "email", "event": "message.received",
+                               "filters": {"route": {"equals": "invoice-attachment"}}}}
+        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
+             patch("src.dapier.engine.workflows", return_value=[claimed]):
             status, payload = email_triggers.api_list(stub)
         self.assertEqual(status, 200)
         self.assertEqual(payload["domain"], "dtcdev.click")
@@ -155,12 +158,12 @@ class WorkflowMergeTests(unittest.TestCase):
     def test_disabled_triggers_do_not_run(self):
         self.assertEqual(email_triggers.load_workflows(table_ref=StubTable([dict(self.item, enabled=False)])), [])
 
-    def test_all_workflows_appends_triggers_to_yaml(self):
+    def test_all_workflows_includes_stored_triggers(self):
         stub = StubTable([dict(self.item)])
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
              patch("src.dapier.triggers.email_triggers.get_table", return_value=stub):
             merged = all_workflows()
-        self.assertGreater(len(merged), 1)
+        self.assertEqual(len(merged), 1)
         self.assertEqual(merged[-1]["id"], "email-trigger-income-2026-08")
 
 
@@ -168,27 +171,15 @@ FLOW_BODY = {"name": "invoice-copy", "flow": "invoice-dataops"}
 
 
 class FlowBindingTests(unittest.TestCase):
-    """A trigger can bind a named shared flow instead of inlining actions."""
+    """Stored triggers use inline actions after the migration."""
 
-    def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.dir = Path(tmp.name)
-        (self.dir / "flows.yaml").write_text(
-            "flows:\n"
-            "  invoice-dataops:\n"
-            "    description: common intake\n"
-            "    actions:\n"
-            "      - {type: webhook, url: 'https://intake.test/x'}\n")
-        env = patch.dict(os.environ, {"WORKFLOWS_DIR": str(self.dir)})
-        env.start()
-        self.addCleanup(env.stop)
-
-    def test_save_binds_the_flow_without_inline_actions(self):
+    def test_save_uses_inline_actions(self):
         stub = StubTable()
-        _status, payload = email_triggers.api_save(dict(FLOW_BODY), "op", table_ref=stub)
-        self.assertEqual(payload["flow"], "invoice-dataops")
-        self.assertEqual(payload["actions"], [])
+        body = {"name": "invoice-copy", "actions": [
+            {"type": "webhook", "url": "https://intake.test/x"}]}
+        _status, payload = email_triggers.api_save(body, "op", table_ref=stub)
+        self.assertEqual(payload["flow"], "")
+        self.assertEqual(payload["actions"], body["actions"])
 
         workflow = email_triggers.load_workflows(table_ref=stub)[0]
         self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
@@ -205,20 +196,14 @@ class FlowBindingTests(unittest.TestCase):
             email_triggers.build_item({"name": "invoice-x", "flow": "nope"}, "op")
         self.assertIn("no shared flow", str(missing.exception))
 
-    def test_list_reports_the_flow_catalog(self):
+    def test_list_has_no_shared_flow_catalog(self):
         stub = StubTable()
         _status, payload = email_triggers.api_list(table_ref=stub)
-        self.assertEqual([flow["name"] for flow in payload["flows"]], ["invoice-dataops"])
+        self.assertEqual(payload["flows"], [])
 
-    def test_flow_bound_trigger_fails_closed_when_the_flow_disappears(self):
-        stub = StubTable([email_triggers.build_item(dict(FLOW_BODY), "op")])
-        (self.dir / "flows.yaml").write_text("flows: {}\n")
-        from src.dapier.engine import matching
-
-        matching._documents.cache_clear()
-        matching._flows.cache_clear()
-        self.addCleanup(matching._documents.cache_clear)
-        self.addCleanup(matching._flows.cache_clear)
+    def test_unmigrated_flow_bound_trigger_fails_closed(self):
+        stub = StubTable([{"name": "invoice-copy", "flow": "invoice-dataops",
+                           "actions": [], "enabled": True}])
         self.assertEqual(email_triggers.load_workflows(table_ref=stub), [])
 
 

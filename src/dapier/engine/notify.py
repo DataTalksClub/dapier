@@ -1,6 +1,6 @@
 """Failure notifications: one email per failed run, on by default.
 
-A workflow's top-level ``notify:`` list of email addresses (bundled YAML or
+A workflow's top-level ``notify:`` list of email addresses (managed definition or
 a published designer workflow) picks its recipients. With no ``notify:``
 key the operator address (DAPIER_EMAIL_SENDER) is notified instead — error
 visibility is the default — and an explicit ``notify: []`` opts out.

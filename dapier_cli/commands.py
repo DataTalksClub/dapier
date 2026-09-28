@@ -478,9 +478,9 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
-        print(f"Designer saves commit straight to {target}.")
+        print(f"Workflow saves publish live and sync to {target}.")
     else:
-        print(f"Saves are disabled: git sync to {target} is not configured.")
+        print("Workflow saves publish live; Git sync is not configured.")
     return 0
 
 
@@ -596,10 +596,12 @@ def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
         body["renameFrom"] = rename_from
     data = api.call(api_url, "PUT", "/api/agent/designer/workflows", body, debug=debug)
     if data.get("published"):
-        print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}) and published it live.")
+        print(f"Published {data.get('file')} live."
+              + (f" Synced commit {str(data['commit'])[:7]}." if data.get("commit") else ""))
     else:
-        print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
-              "The deploy pipeline publishes it in a few minutes.")
+        print(f"Saved {data.get('file')}.")
+    if data.get("git_sync_error"):
+        print(f"Warning: Git sync failed ({data['git_sync_error']}).")
     for warning in data.get("warnings") or []:
         print(f"Warning: {warning}")
     return 0
@@ -673,21 +675,20 @@ def workflows_bulk_enabled(api_url, enabled, tag=None, all_workflows=False, debu
 
 def workflows_duplicate(api_url, file, name=None, debug=False):
     """Copy a saved workflow under a new id (the server slugifies `--name`,
-    default `<id>-copy`) through the same commit-and-publish path as a save."""
+    default `<id>-copy`) through the same publish path as a save."""
     body = {"name": name} if name else {}
     data = api.call(api_url, "POST", f"/api/agent/designer/workflows/{file}/duplicate",
                     body, debug=debug)
     new_file = data.get("file") or file
     if data.get("published"):
-        print(f"Duplicated {file} as {new_file} ({str(data.get('commit', ''))[:7]}) and published it live.")
+        print(f"Duplicated {file} as {new_file} and published it live.")
     else:
-        print(f"Duplicated {file} as {new_file} ({str(data.get('commit', ''))[:7]}). "
-              "The deploy pipeline publishes it in a few minutes.")
+        print(f"Duplicated {file} as {new_file}.")
     return 0
 
 
 def templates_list(api_url, as_json=False, debug=False):
-    """The template gallery: bundled starters plus operator-published ones."""
+    """The gallery of managed workflow templates."""
     data = api.call(api_url, "GET", "/api/agent/designer/templates", debug=debug)
     items = data.get("templates", [])
     if as_json:
@@ -707,17 +708,16 @@ def templates_list(api_url, as_json=False, debug=False):
 
 def templates_apply(api_url, file, name=None, debug=False):
     """Fork a template into a new workflow (the server slugifies `--name`,
-    default `<template-id>-copy`) through the same commit-and-publish path
+    default `<template-id>-copy`) through the same publish path
     as a save; the template stays in the gallery."""
     body = {"name": name} if name else {}
     data = api.call(api_url, "POST", f"/api/agent/designer/templates/{file}/apply",
                     body, debug=debug)
     new_file = data.get("file") or file
     if data.get("published"):
-        print(f"Applied {file} as {new_file} ({str(data.get('commit', ''))[:7]}) and published it live.")
+        print(f"Applied {file} as {new_file} and published it live.")
     else:
-        print(f"Applied {file} as {new_file} ({str(data.get('commit', ''))[:7]}). "
-              "The deploy pipeline publishes it in a few minutes.")
+        print(f"Applied {file} as {new_file}.")
     return 0
 
 
@@ -749,18 +749,15 @@ def workflows_versions(api_url, file, debug=False):
 
 
 def workflows_rollback(api_url, file, revision, debug=False):
-    """Restore an old version: re-committed through the save path so git and
-    the live engine agree, and recorded in the history as a rollback."""
+    """Restore an old version through the managed workflow save path."""
     body = {} if revision is None else {"revision": int(revision)}
     label = f"v{revision}" if revision is not None else "the previous version"
     data = api.call(api_url, "POST", f"/api/agent/designer/workflows/{file}/rollback",
                     body, debug=debug)
     if data.get("published"):
-        print(f"Rolled {file} back to {label} "
-              f"({str(data.get('commit', ''))[:7]}) and published it live.")
+        print(f"Rolled {file} back to {label} and published it live.")
     else:
-        print(f"Rolled {file} back to {label} "
-              f"({str(data.get('commit', ''))[:7]}). The deploy pipeline publishes it in a few minutes.")
+        print(f"Rolled {file} back to {label}.")
     return 0
 
 

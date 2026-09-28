@@ -121,7 +121,7 @@ def _oauth_client_status(provider):
     return oauth_clients.status(provider)
 
 def _email_triggers():
-    """Stored email triggers plus the routes bundled YAML still handles.
+    """Stored email triggers plus routes managed workflows handle.
 
     Best-effort: the console's startup fetch must survive a triggers-table
     problem, so a failure renders as an empty list rather than an error.

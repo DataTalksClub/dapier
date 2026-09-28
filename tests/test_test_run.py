@@ -10,6 +10,7 @@ from src.dapier.api import admin
 from src.dapier.api import agent as agent_api
 from src.dapier.api import designer_store
 from src.dapier.engine import dryrun
+from src.dapier.triggers import published_workflows
 
 
 WORKFLOW = {
@@ -108,12 +109,9 @@ def test_dry_run_flags_unsupported_actions_and_bad_templates(no_runners):
     assert "template error" in report["steps"][1]["error"]
 
 
-def test_dry_run_resolves_flow_bindings(tmp_path, monkeypatch, no_runners):
-    (tmp_path / "flows.yaml").write_text(
-        "flows:\n  shared-notify:\n    actions:\n      - {id: hook, type: webhook, url: 'https://x.test/{title}'}\n")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+def test_dry_run_uses_inline_actions(no_runners):
     workflow = {"id": "flow-user", "trigger": {"connector": "youtube", "event": "video.published"},
-                "flow": "shared-notify"}
+                "actions": [{"id": "hook", "type": "webhook", "url": "https://x.test/{title}"}]}
     report = dryrun.dry_run(workflow, SAMPLE)
     assert report["ok"] is True
     assert report["steps"][0]["rendered_input"]["url"] == "https://x.test/Dry-run demo"
@@ -195,9 +193,13 @@ def operator_session(monkeypatch):
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
-    (tmp_path / "notify-video.yaml").write_text(yaml.safe_dump(WORKFLOW))
+    item = {"workflow_id": "notify-video", "file": "notify-video.yaml",
+            "workflow": WORKFLOW, "revision": 1}
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: [item])
+    monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
+                        item if workflow_id == "notify-video" else None)
     return tmp_path
 
 

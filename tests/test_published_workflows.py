@@ -114,11 +114,20 @@ def test_save_publishes_live(github_ready, published):
     assert item["published_by"] == "op"
 
 
-def test_save_without_publish_table_still_commits(github_ready, monkeypatch):
+def test_save_requires_publish_table(github_ready, monkeypatch):
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
     status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML})
+    assert status == 503
+    assert "not configured" in payload["error"]
+
+
+def test_save_without_git_sync_publishes(published, monkeypatch):
+    monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
+    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML})
     assert status == 200
-    assert payload["published"] is False
+    assert payload["published"] is True
+    assert payload["revision"] == 1
+    assert "commit" not in payload
 
 
 def test_save_publish_failure_is_loud(github_ready, published, monkeypatch):
@@ -128,9 +137,8 @@ def test_save_publish_failure_is_loud(github_ready, published, monkeypatch):
     monkeypatch.setattr(published_workflows, "publish", boom)
     status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML})
     assert status == 502
-    assert payload["commit"] == "commit456"
     assert "dynamo down" in payload["error"]
-    assert payload["published"] is False
+    assert "test-flow" not in published.items
 
 
 def test_save_rename_unpublishes_the_old_id(github_ready, published):
@@ -200,7 +208,7 @@ def test_toggle_unknown_workflow_is_404(published, monkeypatch, tmp_path):
     assert status == 404
 
 
-def test_api_list_overlays_published_state(github_ready, published, monkeypatch, tmp_path):
+def test_api_list_uses_published_state(github_ready, published, monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "bundled-flow.yaml").write_text(
         "id: bundled-flow\nenabled: true\n"
@@ -214,7 +222,7 @@ def test_api_list_overlays_published_state(github_ready, published, monkeypatch,
     assert items["bundled-flow"]["published"] is True
     assert items["bundled-flow"]["enabled"] is False
     assert items["cloud-only"]["published"] is True
-    assert items["cloud-only"]["deployed"] is False
+    assert "deployed" not in items["cloud-only"]
 
 
 def test_api_get_prefers_the_published_state(published, monkeypatch, tmp_path):
@@ -228,7 +236,7 @@ def test_api_get_prefers_the_published_state(published, monkeypatch, tmp_path):
     assert payload["workflow"]["enabled"] is True
 
 
-def test_engine_merges_published_over_the_bundle(published, monkeypatch, tmp_path):
+def test_engine_reads_published_workflows(published, monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
     published_workflows.publish(seeded_workflow(enabled=False))
@@ -237,20 +245,14 @@ def test_engine_merges_published_over_the_bundle(published, monkeypatch, tmp_pat
     assert merged["test-flow"]["enabled"] is False
     event = {"connector": "email", "event": "message.received", "data": {}}
     assert matching.matches(merged["test-flow"], event) is False
-    matching._workflows.cache_clear()
-    matching._documents.cache_clear()
-    matching._flows.cache_clear()
 
 
-def test_engine_keeps_bundle_when_publish_table_absent(monkeypatch, tmp_path):
+def test_engine_has_no_workflows_when_publish_table_absent(monkeypatch, tmp_path):
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
     merged = {workflow["id"]: workflow for workflow in matching.all_workflows()}
-    assert merged["test-flow"]["enabled"] is True
-    matching._workflows.cache_clear()
-    matching._documents.cache_clear()
-    matching._flows.cache_clear()
+    assert merged == {}
 
 
 def test_cli_on_and_off_use_the_bulk_endpoint(monkeypatch, capsys):

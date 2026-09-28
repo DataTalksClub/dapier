@@ -2,7 +2,10 @@
 
 import json
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+import yaml
 
 from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import discovery as connections_discovery
@@ -235,10 +238,14 @@ class SlackTelegramFormatTests(unittest.TestCase):
 
 
 class TelegramToSlackFlowTests(unittest.TestCase):
-    """The bundled telegram-to-slack flow, end to end through the engine."""
+    """The migrated Telegram action chain runs from a managed hook."""
+
+    actions = yaml.safe_load((Path(__file__).resolve().parents[1] /
+                              "migrations/legacy-workflows/telegram-slack.yaml").read_text())[
+        "flows"]["telegram-to-slack"]["actions"]
 
     TRIGGER = {"hook_id": "automator-telegram", "kind": "telegram", "url": "u",
-               "token": "t", "flow": "telegram-to-slack", "actions": [],
+               "token": "t", "flow": "", "actions": actions,
                "connection_id": "tg-bot", "enabled": True}
 
     def stub_tables(self):
@@ -265,11 +272,8 @@ class TelegramToSlackFlowTests(unittest.TestCase):
             execute({"connector": "telegram", "event": "message.received", "data": data})
         return calls
 
-    def test_flow_is_in_the_bundled_catalog(self):
-        from src.dapier.engine import flow_catalog
-
-        names = [flow["name"] for flow in flow_catalog()]
-        self.assertIn("telegram-to-slack", names)
+    def test_migration_source_carries_the_action_chain(self):
+        self.assertEqual(self.TRIGGER["actions"], self.actions)
 
     def test_channel_post_routes_to_its_slack_channel(self):
         calls = self.run_event({"hook": "automator-telegram", "chat_id": -1001730331343,

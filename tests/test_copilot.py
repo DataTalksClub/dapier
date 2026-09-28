@@ -105,10 +105,10 @@ def test_agent_copilot_draft_happy_path(monkeypatch, agent_identity, never_saves
     assert payload["errors"] == []
     assert payload["workflow"]["id"] == "copilot-draft"
     assert payload["yaml"] == DRAFT_YAML
-    # The system prompt carried the schema and the bundled few-shot examples.
+    # The system prompt carries the managed workflow schema.
     system = calls[0][0]["content"]
     assert "id:" in system and "actions:" in system
-    assert "youtube-slack.yaml" in system
+    assert "- actions: a non-empty list" in system
 
 
 def test_agent_copilot_draft_unwraps_markdown_fences(monkeypatch, agent_identity, never_saves):
@@ -242,11 +242,11 @@ def test_extract_yaml_handles_fence_variants():
     assert copilot.extract_yaml("") == ""
 
 
-def test_system_prompt_includes_bundled_examples():
+def test_system_prompt_describes_inline_actions():
     prompt = copilot.system_prompt()
     assert "render_html_to_pdf" in prompt  # action catalog
-    for name in copilot.EXAMPLE_FILES:
-        assert name in prompt
+    assert "- actions: a non-empty list" in prompt
+    assert "shared flow" not in prompt
 
 
 def test_draft_workflow_rejects_overlong_prompt(monkeypatch):
@@ -351,7 +351,7 @@ def test_cli_workflows_draft_save_pipes_through_the_save_path(monkeypatch, capsy
         ("PUT", "/api/agent/designer/workflows"),
     ]
     out, _ = capsys.readouterr()
-    assert "Committed copilot-draft.yaml (abc1234) and published it live." in out
+    assert "Published copilot-draft.yaml live." in out
 
 
 def test_cli_workflows_draft_save_refused_when_invalid(monkeypatch, capsys):

@@ -158,15 +158,13 @@ def test_delete_refuses_while_runs_are_parked(
     assert github_ready == []  # nothing was committed
 
 
-def test_delete_of_an_unpublished_workflow_still_removes_the_file(
+def test_delete_of_an_unpublished_workflow_is_not_found(
         published, github_ready, bundle, delayed_gate):
     status, payload = designer_store.api_delete("test-flow.yaml")
 
-    assert status == 200
-    assert payload["was_published"] is False
-    assert payload["commit"] == "commit456"
-    assert [entry["path"] for entry in deleted_tree_entries(github_ready)] == [
-        "workflows/test-flow.yaml"]
+    assert status == 404
+    assert "no such workflow" in payload["error"]
+    assert github_ready == []
 
 
 def test_delete_is_a_404_once_the_file_is_gone_from_git(
@@ -741,4 +739,3 @@ def test_delete_accepts_a_disabled_workflow(git_state, published, empty_bundle,
     assert payload["was_published"] is True
     assert "test-flow" not in published.items
     assert "workflows/test-flow.yaml" not in git_state.files
-

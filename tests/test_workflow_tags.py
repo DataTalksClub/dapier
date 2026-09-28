@@ -78,7 +78,7 @@ def git_ready(monkeypatch):
     """Git sync pointed at a scripted GitHub; commits succeed silently."""
     monkeypatch.setenv(designer_store.REPO_URL_ENV, "https://github.com/owner/repo")
     monkeypatch.delenv(designer_store.BRANCH_ENV, raising=False)
-    monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
+    monkeypatch.setenv(designer_store.TOKEN_SECRET_ENV, "test-secret")
     monkeypatch.setattr(designer_store, "get_token", lambda: "test-token")
     monkeypatch.setattr(designer_store, "_github",
                         lambda method, path, token, payload=None: {
@@ -94,13 +94,12 @@ def git_ready(monkeypatch):
 
 
 @pytest.fixture
-def bundle(monkeypatch, tmp_path):
-    """A deployed bundle with two workflows: one tagged billing, one ops."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    (tmp_path / "test-flow.yaml").write_text(
-        WORKFLOW_YAML.replace("id: test-flow", "id: test-flow\ntags: [billing, invoices]"))
-    (tmp_path / "invoice-alert.yaml").write_text(
-        INVOICE_YAML.replace("id: invoice-alert", "id: invoice-alert\ntags: [OPS]"))
+def bundle(tmp_path, published):
+    """Two managed workflows: one tagged billing, one ops."""
+    published_workflows.publish(designer_store.parse_workflow(
+        WORKFLOW_YAML.replace("id: test-flow", "id: test-flow\ntags: [billing, invoices]")))
+    published_workflows.publish(designer_store.parse_workflow(
+        INVOICE_YAML.replace("id: invoice-alert", "id: invoice-alert\ntags: [OPS]")))
     return tmp_path
 
 
@@ -280,7 +279,7 @@ def test_api_bulk_tag_scope_toggles_every_tagged_workflow(published, git_ready, 
     assert payload["requested"] == 1
     assert payload["results"][0]["id"] == "test-flow"
     assert published_workflows.get_item("test-flow")["enabled"] is False
-    assert published_workflows.get_item("invoice-alert") is None  # untouched
+    assert published_workflows.get_item("invoice-alert")["enabled"] is True  # untouched
 
 
 def test_api_bulk_search_scope_uses_the_list_match(published, git_ready, bundle):

@@ -60,27 +60,16 @@ def test_parse_workflow_accepts_known_and_unknown_actions():
     assert [action["type"] for action in workflow["actions"]] == ["webhook", "mystery_action"]
 
 
-def test_bundle_default_resolves_to_the_repo_workflows(monkeypatch):
-    """The deployed Lambdas run without WORKFLOWS_DIR, so the default bundle
-    root must land on the repo's workflows/ like matching._root and
-    overview._workflows do. A wrong default empties the designer's list while
-    the console table still shows the workflows — opening one then falls back
-    to a blank new draft, so every flow renders the same seeded canvas."""
+def test_workflows_require_the_managed_store(monkeypatch):
+    """A checkout no longer supplies live workflow definitions."""
     from src.dapier.triggers import published_workflows
 
-    monkeypatch.delenv("WORKFLOWS_DIR", raising=False)
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
-    assert designer_store._bundle_root().is_dir()
-
     status, payload = designer_store.api_list()
     assert status == 200
-    ids = {item["id"] for item in payload["workflows"]}
-    assert "custom-demo" in ids  # workflows/example.yaml: file name differs from id
-
+    assert payload["workflows"] == []
     status, payload = designer_store.api_get("example.yaml")
-    assert status == 200
-    assert payload["workflow"]["id"] == "custom-demo"
-    assert payload["published"] is False
+    assert status == 404
 
 
 @pytest.mark.parametrize("yaml_text,fragment", [
@@ -123,21 +112,15 @@ def test_parse_workflow_accepts_a_code_action_with_source():
     assert "route" in action["code"]
 
 
-def test_parse_workflow_accepts_triggers_list_and_flow_reference(tmp_path, monkeypatch):
-    (tmp_path / "flows.yaml").write_text(
-        "flows:\n"
-        "  shared-intake:\n"
-        "    actions:\n"
-        "      - {type: webhook, url: 'https://intake.test/x'}\n")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+def test_parse_workflow_accepts_triggers_list_with_inline_actions():
     workflow = designer_store.parse_workflow(
         "id: multi\n"
         "triggers:\n"
         "  - {connector: email, event: message.received}\n"
         "  - {connector: dropbox, event: file.created}\n"
-        "flow: shared-intake\n")
+        "actions: [{type: webhook, url: 'https://intake.test/x'}]\n")
     assert [trigger["connector"] for trigger in workflow["triggers"]] == ["email", "dropbox"]
-    assert workflow["flow"] == "shared-intake"
+    assert workflow["actions"][0]["type"] == "webhook"
 
 
 @pytest.mark.parametrize("yaml_text,fragment", [
@@ -482,9 +465,19 @@ def test_designer_list_requires_session(monkeypatch):
     assert response["statusCode"] == 401
 
 
-def test_designer_list_reports_bundled_workflows_and_sync(monkeypatch, tmp_path, operator_session):
-    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+def _managed(monkeypatch, *yaml_texts):
+    workflows = [designer_store.parse_workflow(text) for text in yaml_texts]
+    items = [{"workflow_id": workflow["id"], "workflow": workflow,
+              "file": f"{workflow['id']}.yaml", "revision": 1}
+             for workflow in workflows]
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: items)
+    monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
+                        next((item for item in items if item["workflow_id"] == workflow_id), None))
+
+
+def test_designer_list_reports_managed_workflows_and_sync(monkeypatch, operator_session):
+    _managed(monkeypatch, WORKFLOW_YAML)
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
     monkeypatch.setenv(designer_store.REPO_URL_ENV, "https://github.com/owner/repo")
 
@@ -493,19 +486,18 @@ def test_designer_list_reports_bundled_workflows_and_sync(monkeypatch, tmp_path,
     )
     payload = json.loads(response["body"])
     assert response["statusCode"] == 200
-    assert [item["source"] for item in payload["workflows"]] == ["sample-flow.yaml"]
+    assert [item["source"] for item in payload["workflows"]] == ["test-flow.yaml"]
     assert payload["workflows"][0]["actionCount"] == 2
     assert payload["git_sync"] == {"configured": False, "repo": "owner/repo", "branch": "main"}
 
 
-def test_designer_get_serves_bundled_yaml_and_404(monkeypatch, tmp_path, operator_session):
-    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+def test_designer_get_serves_managed_yaml_and_404(monkeypatch, operator_session):
+    _managed(monkeypatch, WORKFLOW_YAML)
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
 
     found = admin.route(
-        admin_request("GET", "/api/admin/designer/workflows/sample-flow.yaml"),
-        "GET", "/api/admin/designer/workflows/sample-flow.yaml",
+        admin_request("GET", "/api/admin/designer/workflows/test-flow.yaml"),
+        "GET", "/api/admin/designer/workflows/test-flow.yaml",
     )
     assert found["statusCode"] == 200
     assert json.loads(found["body"])["workflow"]["id"] == "test-flow"
@@ -689,7 +681,7 @@ def test_cli_workflows_save_posts_yaml_with_rename(monkeypatch, tmp_path, capsys
     assert (seen["method"], seen["path"]) == ("PUT", "/api/agent/designer/workflows")
     assert seen["body"] == {"yaml": WORKFLOW_YAML, "renameFrom": "old.yaml"}
     out, _ = capsys.readouterr()
-    assert "Committed test-flow.yaml (abc1234)" in out
+    assert "Saved test-flow.yaml" in out
     assert cli_commands.workflows_save("https://api.example.test", str(tmp_path / "nope"), None) == 2
 
 
@@ -832,7 +824,7 @@ def test_cli_workflows_versions_and_rollback(monkeypatch, capsys):
     assert calls[-1] == ("POST", "/api/agent/designer/workflows/test-flow.yaml/rollback",
                          {"revision": 2})
     assert "Rolled test-flow.yaml back to v2" in out
-    assert "abc1234" in out
+    assert "published it live" in out
 
     # No revision named: the API restores the version before the live one.
     assert cli_commands.workflows_rollback("https://api.example.test", "test-flow.yaml", None) == 0
@@ -877,6 +869,7 @@ def history_store(monkeypatch):
 def git_sync(monkeypatch):
     """Git sync scripted end to end; every commit's message and YAML captured."""
     monkeypatch.setenv(designer_store.REPO_URL_ENV, "https://github.com/owner/repo")
+    monkeypatch.setenv(designer_store.TOKEN_SECRET_ENV, "test-secret")
     monkeypatch.delenv(designer_store.BRANCH_ENV, raising=False)
     monkeypatch.setattr(designer_store, "get_token", lambda: "test-token")
     commits = []
@@ -1020,11 +1013,9 @@ def test_agent_versions_and_rollback_round_trip_over_bearer(git_sync, history_st
 # ---- Export/import symmetry and server-side search ----
 
 def test_api_get_returns_canonical_reusable_yaml(monkeypatch, tmp_path):
-    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    _managed(monkeypatch, WORKFLOW_YAML)
 
-    status, payload = designer_store.api_get("sample-flow.yaml")
+    status, payload = designer_store.api_get("test-flow.yaml")
     assert status == 200
     yaml_text = payload["yaml"]
     assert "id: test-flow" in yaml_text
@@ -1035,12 +1026,10 @@ def test_api_get_returns_canonical_reusable_yaml(monkeypatch, tmp_path):
 
 
 def test_summary_carries_description_and_action_types(monkeypatch, tmp_path):
-    (tmp_path / "described.yaml").write_text(
+    _managed(monkeypatch,
         "id: described\ndescription: Ship the weekly digest\n"
         "trigger: {connector: email, event: message.received}\n"
         "actions: [{type: slack}, {type: webhook, url: 'https://x'}]\n")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
 
     _, payload = designer_store.api_list()
     row = payload["workflows"][0]
@@ -1049,16 +1038,13 @@ def test_summary_carries_description_and_action_types(monkeypatch, tmp_path):
 
 
 def test_api_list_search_filters_on_id_description_trigger_and_types(monkeypatch, tmp_path):
-    (tmp_path / "invoice-alert.yaml").write_text(
+    _managed(monkeypatch,
         "id: invoice-alert\ndescription: Alert on new invoices\n"
         "trigger: {connector: email, event: message.received}\n"
-        "actions: [{type: slack, channel: '#ops'}]\n")
-    (tmp_path / "nightly-backup.yaml").write_text(
+        "actions: [{type: slack, channel: '#ops'}]\n",
         "id: nightly-backup\ndescription: Copy files to S3\n"
         "trigger: {connector: schedule, event: tick}\n"
         "actions: [{type: dropbox_upload}]\n")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
 
     _, all_rows = designer_store.api_list()
     assert [row["id"] for row in all_rows["workflows"]] == ["invoice-alert", "nightly-backup"]

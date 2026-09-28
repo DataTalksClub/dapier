@@ -435,7 +435,7 @@ def duplicate_designer_workflow(event, operator, source):
     return http._json_response(status, payload)
 
 def templates_list(event):
-    """The template gallery: bundled starters plus operator-published ones."""
+    """The gallery of managed workflow templates."""
     status, payload = designer_store.api_templates()
     return http._json_response(status, payload)
 
@@ -797,5 +797,4 @@ def trigger_sample(event, operator):
         "triggers.sample", operator or "unknown",
         outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
-
 

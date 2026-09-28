@@ -49,15 +49,20 @@ def _workflow_yaml(workflow_id, *, enabled=True, tags=None, folder=None):
 
 @pytest.fixture
 def bundle_dir(tmp_path, monkeypatch):
-    """A WORKFLOWS_DIR with two workflow files (one tagged/foldered and off);
-    nothing published and no git sync."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    """Two managed workflows (one tagged/foldered and off)."""
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
-    (tmp_path / "invoice-alert.yaml").write_text(_workflow_yaml(
-        "invoice-alert", enabled=False, tags=["billing", "Finance"], folder="Money"))
-    (tmp_path / "standup-digest.yaml").write_text(_workflow_yaml(
-        "standup-digest", tags=["internal"]))
+    items = [
+        {"workflow": designer_store.parse_workflow(_workflow_yaml(
+            "invoice-alert", enabled=False, tags=["billing", "Finance"], folder="Money")),
+         "file": "invoice-alert.yaml", "revision": 1},
+        {"workflow": designer_store.parse_workflow(_workflow_yaml(
+            "standup-digest", tags=["internal"])),
+         "file": "standup-digest.yaml", "revision": 1},
+    ]
+    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: items)
+    monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
+                        next((item for item in items if item["workflow"]["id"] == workflow_id), None))
     return tmp_path
 
 
@@ -94,9 +99,9 @@ def test_export_manifest_lists_file_enabled_tags_folder_version(bundle_dir):
     assert manifest["skipped"] == []
     assert manifest["workflows"] == [
         {"file": "invoice-alert.yaml", "enabled": False,
-         "tags": ["billing", "Finance"], "folder": "Money", "version": 0},
+         "tags": ["billing", "Finance"], "folder": "Money", "version": 1},
         {"file": "standup-digest.yaml", "enabled": True,
-         "tags": ["internal"], "folder": "", "version": 0},
+         "tags": ["internal"], "folder": "", "version": 1},
     ]
 
 
@@ -120,10 +125,10 @@ def test_export_prefers_the_published_state_and_records_its_version(bundle_dir,
         entry = bundle.read("workflows/invoice-alert.yaml").decode()
         manifest = json.loads(bundle.read("manifest.json"))
     assert "test workflow" in entry  # the published description, not the bundle's
-    assert manifest["count"] == 2
+    assert manifest["count"] == 1
     rows = {row["file"]: row for row in manifest["workflows"]}
     assert rows["invoice-alert.yaml"]["version"] == 7
-    assert rows["standup-digest.yaml"]["version"] == 0
+    assert "standup-digest.yaml" not in rows
 
 
 def test_export_tag_filter_narrows_like_the_list(bundle_dir):
@@ -167,23 +172,20 @@ def test_export_skips_workflows_without_a_source_file(bundle_dir, monkeypatch):
     status, payload = designer_store.api_export()
 
     assert status == 200
-    # The two bundled workflows plus the one publishable item; the two
-    # source-less items are skipped but do not fail the bundle.
-    assert payload["count"] == 3
+    # The source-less items are skipped but do not fail the export.
+    assert payload["count"] == 1
     assert payload["skipped"] == ["no-file", "odd"]
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(payload["b64"]))) as bundle:
-        assert bundle.namelist() == ["manifest.json",
-                                     "workflows/good-one.yaml",
-                                     "workflows/invoice-alert.yaml",
-                                     "workflows/standup-digest.yaml"]
+        assert bundle.namelist() == ["manifest.json", "workflows/good-one.yaml"]
 
 
 def test_export_refuses_more_than_the_cap(monkeypatch):
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    monkeypatch.setenv(published_workflows.TABLE_ENV, "published")
     monkeypatch.setattr(
-        designer_store, "_bundled_workflows",
-        lambda: [({"id": f"w{i:03d}"}, f"w{i:03d}.yaml")
-                 for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
+        published_workflows, "load_items",
+        lambda table_ref=None: [{"workflow": {"id": f"w{i:03d}"},
+                                 "file": f"w{i:03d}.yaml"}
+                                for i in range(designer_store.MAX_EXPORT_WORKFLOWS + 1)])
 
     status, payload = designer_store.api_export()
 
