@@ -1315,8 +1315,13 @@ inbox replay-bounce notes; closed in round 30). New findings this pass, ranked:
   select, filters JSON for watchers; edit and toggle carry `event`
   because the save replaces the item), designer catalog rebuilt. Setup:
   point the SES configuration set's feedback destination at the intake
-  URL and set `SES_NOTIFICATION_TOPICS`. Tests:
-  `tests/test_ses_bounce_intake.py`, `tests/test_email_triggers.py`.
+  URL and set `SES_NOTIFICATION_TOPICS`. Completed the same day: every
+  workflow send now names the configuration set — `SES_CONFIGURATION_SET`
+  (the `SesConfigurationSet` deploy parameter) reaches both `send_email`
+  and `send_raw_email` as `ConfigurationSetName` (engine.actions.email),
+  which is the switch that makes SES report feedback at all; unset sends
+  untagged. Tests: `tests/test_ses_bounce_intake.py`,
+  `tests/test_email_triggers.py`.
 - **Doc hygiene** — this document's body had been re-appended whole four
   times plus a doubled fresh-audit tail; deduped to the newest revision
   (~2300 stale lines dropped).

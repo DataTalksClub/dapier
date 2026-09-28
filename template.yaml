@@ -115,6 +115,15 @@ Parameters:
       Comma-separated SNS TopicArns the SES feedback hook accepts
       (SES_NOTIFICATION_TOPICS allowlist); empty accepts any topic — set
       the configuration set's feedback destination topics in production
+  SesConfigurationSet:
+    Type: String
+    Default: ''
+    Description: >
+      SES configuration set attached to workflow email sends
+      (SES_CONFIGURATION_SET) — the switch that makes SES report bounce and
+      complaint feedback at all; create the set with an event destination
+      whose SNS topic subscribes https://<domain>/hooks/ses-notifications,
+      then list that topic in SesNotificationTopics. Empty sends untagged.
   BackupAlertEmail:
     Type: String
     Default: alexey.s.grigoriev@gmail.com
@@ -533,6 +542,10 @@ Resources:
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          # Configuration set attached to every workflow send
+          # (engine.actions.email) so SES reports bounce/complaint feedback
+          # into the ses-notifications hook; empty sends untagged.
+          SES_CONFIGURATION_SET: !Ref SesConfigurationSet
           TASK_USAGE_TABLE: !Ref TaskUsageTable
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable

@@ -7,10 +7,18 @@ Destination and Message as before, so existing workflows are untouched.
 switches to ``send_raw_email`` with a MIME message built by
 ``email.message.EmailMessage`` — text/HTML parts, the extra recipients, and
 one part per attachment with its guessed content type. The raw message
-always carries an explicit ``Message-ID``: the inbound side dedupes on it
-(see intake/email_ingress), and a message without one falls back to its
-storage key as the identity.
-"""
+    always carries an explicit ``Message-ID``: the inbound side dedupes on it
+    (see intake/email_ingress), and a message without one falls back to its
+    storage key as the identity.
+
+    A deployment that sets ``SES_CONFIGURATION_SET`` attaches that SES
+    configuration set to every send (simple and raw), which is what makes
+    bounce and complaint notifications flow at all — SES only reports
+    feedback for sends that name a configuration set (or an identity with
+    notification topics). The configuration set's feedback destination is
+    the deployment's ``/hooks/ses-notifications`` SNS hook
+    (triggers.intake.ses_notifications).
+    """
 import mimetypes
 import os
 import uuid
@@ -72,7 +80,9 @@ def run_email_send(action, event, *, ses=None, steps=None, transport=None):
         message = _raw_message(sender, addresses, cc, bcc, reply_to, subject,
                                text, html, attachments, trigger_domain(),
                                in_reply_to=in_reply_to, references=references)
-        response = ses.send_raw_email(RawMessage={"Data": message.as_bytes()})
+        raw_kwargs = _configuration_set_kwargs()
+        raw_kwargs["RawMessage"] = {"Data": message.as_bytes()}
+        response = ses.send_raw_email(**raw_kwargs)
     else:
         destination = {"ToAddresses": addresses}
         if cc:
@@ -86,6 +96,7 @@ def run_email_send(action, event, *, ses=None, steps=None, transport=None):
         }
         if reply_to:
             kwargs["ReplyToAddresses"] = reply_to
+        kwargs.update(_configuration_set_kwargs())
         response = ses.send_email(**kwargs)
     output = {"message_id": response.get("MessageId"), "to": addresses, "subject": subject}
     if cc:
@@ -105,6 +116,14 @@ def _body_parts(text, html):
     if html:
         body["Html"] = {"Data": html, "Charset": "utf-8"}
     return body
+
+
+def _configuration_set_kwargs():
+    """``ConfigurationSetName`` when the deployment names one — the switch
+    that makes SES report bounce/complaint feedback for sends (see the
+    module and run_email_send docstrings); empty means send untagged."""
+    config_set = (os.environ.get("SES_CONFIGURATION_SET") or "").strip()
+    return {"ConfigurationSetName": config_set} if config_set else {}
 
 
 def _addresses(value, event, steps):

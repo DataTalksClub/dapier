@@ -275,3 +275,72 @@ def test_template_wires_the_route_and_the_allowlist():
     assert "Path: /hooks/ses-notifications, Method: POST" in template
     assert "SES_NOTIFICATION_TOPICS: !Ref SesNotificationTopics" in template
     assert "SesNotificationTopics:\n    Type: String\n    Default: ''" in template
+    assert "SES_CONFIGURATION_SET: !Ref SesConfigurationSet" in template
+    assert "SesConfigurationSet:\n    Type: String\n    Default: ''" in template
+
+
+# --- sends carry the configuration set ----------------------------------------------
+
+# Without a configuration set on the send, SES never reports bounce or
+# complaint feedback — the hook above would only ever see what other senders
+# produce. Simple and raw sends both name the deployment's set when
+# SES_CONFIGURATION_SET is configured, and stay untagged when it isn't.
+
+def _send(monkeypatch, ses, action=None, config_set="cs-feedback"):
+    from src.dapier.engine.actions import email as email_action
+
+    if config_set is None:
+        monkeypatch.delenv("SES_CONFIGURATION_SET", raising=False)
+    else:
+        monkeypatch.setenv("SES_CONFIGURATION_SET", config_set)
+    return email_action.run_email_send(
+        {"type": "email_send", "to": "ops@example.com", "sender": "bot@x.test",
+         "subject": "s", "text": "hi", **(action or {})},
+        {"data": {}}, ses=ses)
+
+
+class StubSes:
+    def __init__(self):
+        self.sent = []
+        self.raw = []
+
+    def send_email(self, **kwargs):
+        self.sent.append(kwargs)
+        return {"MessageId": "mid-1"}
+
+    def send_raw_email(self, **kwargs):
+        self.raw.append(kwargs)
+        return {"MessageId": "raw-1"}
+
+
+def test_a_simple_send_names_the_configuration_set(monkeypatch):
+    ses = StubSes()
+
+    _send(monkeypatch, ses)
+
+    assert ses.sent[0]["ConfigurationSetName"] == "cs-feedback"
+
+
+def test_a_raw_send_names_the_configuration_set(monkeypatch):
+    ses = StubSes()
+
+    _send(monkeypatch, ses, action={"in_reply_to": "<m-4137@example.test>"})
+
+    assert ses.raw[0]["ConfigurationSetName"] == "cs-feedback"
+    assert not ses.sent
+
+
+def test_an_unset_configuration_set_sends_untagged(monkeypatch):
+    ses = StubSes()
+
+    _send(monkeypatch, ses, config_set=None)
+
+    assert "ConfigurationSetName" not in ses.sent[0]
+
+
+def test_a_blank_configuration_set_sends_untagged(monkeypatch):
+    ses = StubSes()
+
+    _send(monkeypatch, ses, config_set="   ")
+
+    assert "ConfigurationSetName" not in ses.sent[0]

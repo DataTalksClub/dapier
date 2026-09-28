@@ -320,7 +320,10 @@ feedback; an optional `filters` object scopes them (e.g.
 `{"bounce_type": {"equals": "Permanent"}}`; `route` filters are rejected
 because feedback carries no route). Feedback arrives through the
 `/hooks/ses-notifications` SNS endpoint: point the SES configuration set's
-feedback destination at `https://<domain>/hooks/ses-notifications`, and set
+feedback destination at `https://<domain>/hooks/ses-notifications`, set the
+`SesConfigurationSet` deployment parameter to that set's name — every
+workflow send carries it (`SES_CONFIGURATION_SET`), and SES only reports
+bounce/complaint feedback for sends that name a configuration set — and set
 the `SesNotificationTopics` deployment parameter (the
 `SES_NOTIFICATION_TOPICS` allowlist) to the topic ARNs SES publishes to —
 empty accepts any topic, which is fine for development but should be set in
