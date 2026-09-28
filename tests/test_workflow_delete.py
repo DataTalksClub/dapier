@@ -464,7 +464,7 @@ def empty_bundle(monkeypatch, tmp_path):
 
 def _save():
     assert designer_store.api_save(
-        {"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+        {"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
 
 
 def _tree_posts(git):
@@ -702,7 +702,7 @@ def test_version_history_survives_delete_and_the_endpoint_still_answers(
     200 for it instead of a 404-or-500."""
     _save()
     revised = WORKFLOW_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    assert designer_store.api_save({"yaml": revised}, operator="op-2")[0] == 200
+    assert designer_store.api_save({"yaml": revised}, operator="op-2", live=True)[0] == 200
     assert designer_store.api_delete("test-flow.yaml", operator="op-3")[0] == 200
 
     status, payload = designer_store.api_versions("test-flow.yaml")

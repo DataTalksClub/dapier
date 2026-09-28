@@ -341,7 +341,8 @@ def build_parser():
     wf_export_all_p.add_argument("-o", "--out", dest="out", default=None,
                                  help="Write the zip here (default: the server-suggested "
                                       "dapier-workflows-YYYYMMDD.zip)")
-    wf_save_p = wf_sub.add_parser("save", help="Publish a workflow YAML live (and sync to Git when configured)")
+    wf_save_p = wf_sub.add_parser("save", help="Save a workflow YAML as a draft "
+                                  "(nothing goes live; publish it with workflows publish)")
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
@@ -408,6 +409,18 @@ def build_parser():
     wf_rollback_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_rollback_p.add_argument("revision",
                                help="Version number to restore, as shown by workflows versions")
+    wf_publish_p = wf_sub.add_parser("publish",
+                                     help="Promote a workflow's saved draft live "
+                                          "(v1 for a draft-only workflow; 409 when stale)")
+    wf_publish_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_discard_p = wf_sub.add_parser("discard",
+                                     help="Throw a workflow's saved draft away (live untouched)")
+    wf_discard_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_discard_p.add_argument("--yes", action="store_true",
+                              help="Discard without a confirmation prompt")
+    wf_draft_diff_p = wf_sub.add_parser("draft-diff",
+                                        help="Unified diff of a workflow's draft against live")
+    wf_draft_diff_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     wf_sample_p = wf_sub.add_parser(
         "sample", help="Pull a sample of what a flow receives when it starts")
     wf_sample_p.add_argument("connector", nargs="?", default=None,
@@ -790,6 +803,12 @@ def cmd_workflows(args, api_url, debug):
                               args.to_revision, debug=debug)
     if args.command == "rollback":
         return commands.workflows_rollback(api_url, args.file, args.revision, debug=debug)
+    if args.command == "publish":
+        return commands.workflows_publish(api_url, args.file, debug=debug)
+    if args.command == "discard":
+        return commands.workflows_discard(api_url, args.file, assume_yes=args.yes, debug=debug)
+    if args.command == "draft-diff":
+        return commands.workflows_draft_diff(api_url, args.file, debug=debug)
     if args.command == "delete":
         return commands.workflows_delete(api_url, args.file, assume_yes=args.yes, debug=debug)
     if args.command == "tags":

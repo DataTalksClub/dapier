@@ -471,9 +471,12 @@ def _managed(monkeypatch, *yaml_texts):
               "file": f"{workflow['id']}.yaml", "revision": 1}
              for workflow in workflows]
     monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
-    monkeypatch.setattr(published_workflows, "load_items", lambda table_ref=None: items)
+    monkeypatch.setattr(published_workflows, "load_items",
+                        lambda table_ref=None, include_drafts=False: items)
     monkeypatch.setattr(published_workflows, "get_item", lambda workflow_id, table_ref=None:
                         next((item for item in items if item["workflow_id"] == workflow_id), None))
+    monkeypatch.setattr(published_workflows, "get_draft",
+                        lambda workflow_id, table_ref=None: None)
 
 
 def test_designer_list_reports_managed_workflows_and_sync(monkeypatch, operator_session):
@@ -886,9 +889,9 @@ def git_sync(monkeypatch):
 
 
 def test_two_saves_stamp_revisions_and_keep_history(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     revised = WORKFLOW_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    assert designer_store.api_save({"yaml": revised}, operator="op-2")[0] == 200
+    assert designer_store.api_save({"yaml": revised}, operator="op-2", live=True)[0] == 200
 
     live = published_workflows.get_item("test-flow")
     assert live["revision"] == 2
@@ -901,9 +904,9 @@ def test_two_saves_stamp_revisions_and_keep_history(git_sync, history_store):
 
 
 def test_versions_endpoint_lists_newest_first_and_flags_live(git_sync, history_store, operator_session):
-    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)
     revised = WORKFLOW_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    designer_store.api_save({"yaml": revised}, operator="op-2")
+    designer_store.api_save({"yaml": revised}, operator="op-2", live=True)
 
     response = admin.route(
         admin_request("GET", "/api/admin/designer/workflows/test-flow.yaml/versions"),
@@ -919,9 +922,9 @@ def test_versions_endpoint_lists_newest_first_and_flags_live(git_sync, history_s
 
 
 def test_rollback_round_trips_the_previous_yaml(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     revised = WORKFLOW_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    assert designer_store.api_save({"yaml": revised}, operator="op-2")[0] == 200
+    assert designer_store.api_save({"yaml": revised}, operator="op-2", live=True)[0] == 200
 
     status, payload = designer_store.api_rollback("test-flow.yaml", {}, operator="op-3")
     assert status == 200
@@ -942,7 +945,7 @@ def test_rollback_round_trips_the_previous_yaml(git_sync, history_store):
 
 
 def test_rollback_to_an_explicit_revision_restores_its_enabled_flag(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     assert designer_store.api_toggle("test-flow.yaml", {"enabled": False}, operator="op-2")[0] == 200
 
     status, _ = designer_store.api_rollback("test-flow.yaml", {"revision": 2}, operator="op-3")
@@ -958,7 +961,7 @@ def test_rollback_to_an_explicit_revision_restores_its_enabled_flag(git_sync, hi
 
 
 def test_rollback_error_paths(git_sync, history_store):
-    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)
     assert designer_store.api_rollback("test-flow.yaml", {})[0] == 409  # nothing before v1
     assert designer_store.api_rollback("test-flow.yaml", {"revision": 9})[0] == 404
     assert designer_store.api_rollback("test-flow.yaml", {"revision": "nope"})[0] == 400
@@ -975,7 +978,7 @@ def test_version_history_prunes_to_the_newest_versions(git_sync, history_store, 
     monkeypatch.setattr(published_workflows, "MAX_VERSIONS", 3)
     for index in range(5):
         assert designer_store.api_save(
-            {"yaml": WORKFLOW_YAML.replace("hook", f"hook{index}")}, operator="op")[0] == 200
+            {"yaml": WORKFLOW_YAML.replace("hook", f"hook{index}")}, operator="op", live=True)[0] == 200
 
     assert [v["revision"] for v in published_workflows.list_versions("test-flow")] == [5, 4, 3]
     assert "test-flow#v2" not in history_store.items
@@ -985,9 +988,9 @@ def test_version_history_prunes_to_the_newest_versions(git_sync, history_store, 
 
 
 def test_agent_versions_and_rollback_round_trip_over_bearer(git_sync, history_store, agent_identity):
-    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)
     revised = WORKFLOW_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    designer_store.api_save({"yaml": revised}, operator="op-2")
+    designer_store.api_save({"yaml": revised}, operator="op-2", live=True)
 
     listed = agent_api.route(
         agent_request("GET", "/api/agent/designer/workflows/test-flow.yaml/versions"),
@@ -1121,8 +1124,8 @@ def test_template_flag_normalizes_like_the_other_definition_keys():
 def test_gallery_lists_only_flagged_workflows_and_the_live_overlay_wins(
         git_sync, history_store, monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
-    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
+    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1", live=True)[0] == 200
 
     status, payload = designer_store.api_templates()
     assert status == 200
@@ -1141,7 +1144,7 @@ def test_gallery_lists_only_flagged_workflows_and_the_live_overlay_wins(
 def test_apply_template_forks_through_the_save_path_and_keeps_the_template(
         git_sync, history_store, monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1", live=True)[0] == 200
 
     status, payload = designer_store.api_apply_template(
         "template-starter.yaml", {"name": "My Starter Flow"}, operator="op-2")
@@ -1165,8 +1168,8 @@ def test_apply_template_forks_through_the_save_path_and_keeps_the_template(
 
 def test_apply_template_error_paths(git_sync, history_store, monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
-    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
+    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1", live=True)[0] == 200
 
     assert designer_store.api_apply_template("test-flow.yaml", {})[0] == 400  # not a template
     assert designer_store.api_apply_template("nope.yaml", {})[0] == 404
@@ -1185,7 +1188,7 @@ def test_apply_template_error_paths(git_sync, history_store, monkeypatch, tmp_pa
 
 
 def test_template_flag_publishes_with_history_and_commits(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
 
     status, payload = designer_store.api_template_flag(
         "test-flow.yaml", {"template": True}, operator="op-2")
@@ -1207,7 +1210,7 @@ def test_template_flag_publishes_with_history_and_commits(git_sync, history_stor
 
 
 def test_template_flag_error_paths(git_sync, history_store, monkeypatch):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     assert designer_store.api_template_flag("test-flow.yaml", {})[0] == 400
     assert designer_store.api_template_flag("test-flow.yaml", {"template": "yes"})[0] == 400
     assert designer_store.api_template_flag("nope.yaml", {"template": True})[0] == 404
@@ -1219,7 +1222,7 @@ def test_template_flag_error_paths(git_sync, history_store, monkeypatch):
 def test_admin_templates_routes_drive_the_store(git_sync, history_store, operator_session,
                                                 monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1", live=True)[0] == 200
 
     listed = admin.route(
         admin_request("GET", "/api/admin/designer/templates"),
@@ -1250,7 +1253,7 @@ def test_admin_templates_routes_drive_the_store(git_sync, history_store, operato
 def test_agent_templates_routes_drive_the_same_store(git_sync, history_store, agent_identity,
                                                      monkeypatch, tmp_path):
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": TEMPLATE_YAML}, operator="op-1", live=True)[0] == 200
 
     listed = agent_api.route(
         agent_request("GET", "/api/agent/designer/templates"),

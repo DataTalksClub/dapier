@@ -83,7 +83,7 @@ def git_sync(monkeypatch):
 def seed_published(history_store, git_sync, *workflow_ids):
     for workflow_id in workflow_ids:
         status, _ = designer_store.api_save(
-            {"yaml": WORKFLOW_YAML.format(id=workflow_id)}, operator="op-1")
+            {"yaml": WORKFLOW_YAML.format(id=workflow_id)}, operator="op-1", live=True)
         assert status == 200
 
 

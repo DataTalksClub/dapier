@@ -236,7 +236,7 @@ def test_api_tags_without_the_publish_table_is_503(monkeypatch, bundle):
 
 
 def test_api_tags_records_a_tags_cause_in_version_history(published, git_ready, bundle):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     assert designer_store.api_tags("test-flow.yaml", {"tags": ["billing"]}, operator="op-2")
 
     versions = published_workflows.list_versions("test-flow")

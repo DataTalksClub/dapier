@@ -89,9 +89,9 @@ def git_sync(monkeypatch):
 
 @pytest.fixture
 def two_revisions(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     assert designer_store.api_save(
-        {"yaml": revised(WORKFLOW_YAML, "https://example.test/hook2")}, operator="op-2")[0] == 200
+        {"yaml": revised(WORKFLOW_YAML, "https://example.test/hook2")}, operator="op-2", live=True)[0] == 200
 
 
 # ---- Domain ----
@@ -139,7 +139,7 @@ def test_api_diff_flags_identical_definitions(two_revisions):
 
 
 def test_api_diff_answers_for_a_deleted_workflow_by_id(git_sync, history_store):
-    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
+    assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1", live=True)[0] == 200
     # The version records outlive a delete of the live item.
     published_workflows.unpublish("test-flow")
     status, payload = designer_store.api_diff("test-flow.yaml", 1, 1)

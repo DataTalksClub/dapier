@@ -209,13 +209,30 @@ def api_list(q=None, tag=None, folder=None):
     (case-insensitive) — Zapier's folder view.
     """
     summaries = {}
+    drafts = {}
     if published_workflows.configured():
-        for item in published_workflows.load_items():
+        for item in published_workflows.load_items(include_drafts=True):
+            if item.get("draft_of"):
+                drafts[str(item["draft_of"])] = item
+                continue
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
             summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
             summaries[summary["id"]] = {**summary, "published": True}
+        # A workflow with a draft but nothing live still lists — Zapier shows
+        # the unpublished draft in the sidebar — flagged published: false so
+        # nobody mistakes it for running state. Drafts never fire: the engine
+        # reads the draft-blind loader.
+        for workflow_id, item in drafts.items():
+            workflow = item.get("workflow")
+            if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            if workflow_id in summaries:
+                summaries[workflow_id]["has_draft"] = True
+                continue
+            summary = _summary(workflow, item.get("file") or f"{workflow_id}.yaml")
+            summaries[str(workflow["id"])] = {**summary, "published": False}
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
     search = str(q or "").strip().lower()
     if search:
@@ -338,7 +355,10 @@ def api_get(source):
 
     The payload carries ``yaml``, the canonical text rendered from the stored
     definition, so `workflows export` and the console's download round-trip
-    through `workflows save` without re-rendering client-side.
+    through `workflows save` without re-rendering client-side. Draft state is
+    not served here (this is the live read — the toggle/tags/folder/delete
+    verbs resolve through it); the list rows carry ``has_draft`` /
+    ``published: false`` and the versions list carries the ``draft`` block.
     """
     item = _published_by_file(source)
     if item and isinstance(item.get("workflow"), dict):
@@ -416,8 +436,19 @@ def api_export_all(now=None):
     }
 
 
-def api_save(body, operator=None, cause="save", message=None):
-    """Validate and publish a workflow; sync a Git copy when configured."""
+def api_save(body, operator=None, cause="save", message=None, live=False):
+    """Validate a workflow and store it; a save drafts, a publish goes live.
+
+    The designer's save (the default) writes a *draft*: the parsed definition
+    lands as the workflow's ``<id>#draft`` item with the live revision it was
+    edited against — nothing publishes, no git commit, no YouTube reconcile,
+    so a draft-only workflow fires nothing and the live definition keeps
+    running. The publish route promotes the draft through this same function
+    with ``live=True`` (cause "publish"), which is also what rollback,
+    duplicate, and template-apply pass: those are live verbs and publish as
+    before — validated YAML into the published store, a version record, a
+    best-effort git commit, and the YouTube subscription reconcile.
+    """
     if not isinstance(body, dict):
         return 400, {"error": "request body must be an object"}
     yaml_text = body.get("yaml")
@@ -432,6 +463,24 @@ def api_save(body, operator=None, cause="save", message=None):
         workflow = parse_workflow(yaml_text)
     except WorkflowError as exc:
         return 400, {"error": str(exc)}
+    if not live:
+        previous = published_workflows.get_item(workflow["id"]) or {}
+        try:
+            published_workflows.save_draft(
+                workflow, base_revision=int(previous.get("revision") or 0),
+                operator=operator,
+                rename_from=rename_from if rename_from else None)
+        except Exception as exc:
+            return 502, {"error": f"draft save failed: {exc}"}
+        base_revision = int(previous.get("revision") or 0)
+        return 200, {
+            "file": f"{workflow['id']}.yaml",
+            "published": False,
+            "draft": {
+                "base_revision": base_revision,
+                "stale": False,
+            },
+        }
     try:
         previous = published_workflows.get_item(workflow["id"])
         item = published_workflows.publish(workflow, operator=operator,
@@ -453,6 +502,146 @@ def api_save(body, operator=None, cause="save", message=None):
         except (SyncConfigError, SyncError) as exc:
             result["git_sync_error"] = str(exc)
     return 200, result
+
+
+# The stale-draft guard: a draft records the live revision it was edited
+# against; when the live definition has moved past it (a toggle, tags/folder
+# edit, rollback, or an engine auto-pause raced the edit), promoting it would
+# clobber that change, so publish refuses until a fresh draft is saved.
+STALE_DRAFT = "stale"
+
+
+def _draft_view(draft, live_revision):
+    """The draft block clients see: base revision, staleness, when/who."""
+    base = int(draft.get("base_revision") or 0)
+    return {
+        "base_revision": base,
+        "stale": base < int(live_revision or 0),
+        "updated_at": draft.get("updated_at") or "",
+        "drafted_by": draft.get("drafted_by") or "",
+    }
+
+
+def api_publish(source, *, operator=None):
+    """Promote a workflow's draft to the live published store.
+
+    The promotion runs through the ordinary save path (api_save, live, cause
+    "publish"), so the git commit, the version record, and the YouTube
+    reconcile all behave exactly like a publish always has; a draft-only
+    workflow becomes v1. Refuses with 409 ``stale`` when the draft's
+    base_revision is behind the live revision — a toggle, rollback, or
+    auto-pause changed the live definition since the draft was saved — and
+    404 when there is no draft. The draft item is removed once it is live.
+    """
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    workflow_id = source.removesuffix(".yaml")
+    draft = published_workflows.get_draft(workflow_id)
+    if not draft or not isinstance(draft.get("workflow"), dict):
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
+    live_revision = int((published_workflows.get_item(workflow_id) or {})
+                        .get("revision") or 0)
+    base_revision = int(draft.get("base_revision") or 0)
+    if base_revision < live_revision:
+        return 409, {
+            "error": (f"the draft of {workflow_id} is stale: it is based on "
+                      f"v{base_revision} but v{live_revision} is live — "
+                      "save a fresh draft, then publish"),
+            "reason": STALE_DRAFT,
+            "base_revision": base_revision,
+            "revision": live_revision,
+        }
+    body = {"yaml": workflow_yaml_text(draft["workflow"])}
+    if draft.get("rename_from"):
+        body["renameFrom"] = str(draft["rename_from"])
+    status, payload = api_save(body, operator=operator, cause="publish",
+                               live=True)
+    if status == 200:
+        try:
+            published_workflows.delete_draft(workflow_id)
+        except Exception:
+            pass  # a leftover draft item is harmless; the live item decided
+        payload["published"] = True
+    return status, payload
+
+
+def api_discard(source, *, operator=None):
+    """Throw a workflow's draft away; the live definition is untouched."""
+    del operator  # recorded by the calling route
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    workflow_id = source.removesuffix(".yaml")
+    draft = published_workflows.get_draft(workflow_id)
+    if not draft:
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
+    try:
+        published_workflows.delete_draft(workflow_id)
+    except Exception as exc:
+        return 502, {"error": f"discard failed: {exc}"}
+    return 200, {"file": source, "workflow_id": workflow_id, "discarded": True}
+
+
+def api_draft(source):
+    """One workflow's draft (the designer's load path for a draft-only
+    workflow, and the "you have a draft" indicator): the drafted definition,
+    its canonical YAML, and the draft block. 404 when nothing is drafted."""
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    workflow_id = source.removesuffix(".yaml")
+    draft = published_workflows.get_draft(workflow_id)
+    if not draft or not isinstance(draft.get("workflow"), dict):
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
+    workflow = draft["workflow"]
+    live_revision = int((published_workflows.get_item(workflow_id) or {})
+                        .get("revision") or 0)
+    return 200, {
+        "workflow": workflow,
+        "published": False,
+        "yaml": workflow_yaml_text(workflow),
+        "draft": _draft_view(draft, live_revision),
+    }
+
+
+def api_draft_diff(source):
+    """Draft vs live in the api_diff shape: ``from`` is the live definition
+    (revision 0, empty YAML, when the workflow is draft-only — the diff shows
+    it all as new), ``to`` is the draft at revision ``"draft"``. ``same``
+    flags a draft identical to live (safe to publish; it refreshes nothing)."""
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    workflow_id = source.removesuffix(".yaml")
+    draft = published_workflows.get_draft(workflow_id)
+    if not draft or not isinstance(draft.get("workflow"), dict):
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
+    live = published_workflows.get_item(workflow_id) or {}
+    live_revision = int(live.get("revision") or 0)
+    live_workflow = live.get("workflow")
+    from_text = (workflow_yaml_text(live_workflow)
+                 if isinstance(live_workflow, dict) else "")
+    to_text = workflow_yaml_text(draft["workflow"])
+    diff = "".join(difflib.unified_diff(
+        from_text.splitlines(keepends=True), to_text.splitlines(keepends=True),
+        fromfile=f"{source} v{live_revision}" if live_revision
+        else f"{source} (nothing live)",
+        tofile=f"{source} draft",
+    ))
+    return 200, {
+        "file": source,
+        "workflow": workflow_id,
+        "from": {"revision": live_revision, "yaml": from_text},
+        "to": {"revision": "draft", "yaml": to_text},
+        "diff": diff[:MAX_DIFF_CHARS],
+        "same": from_text == to_text,
+        "truncated": len(diff) > MAX_DIFF_CHARS,
+    }
 
 
 def _sync_youtube(*, previous=None, workflow=None):
@@ -627,6 +816,10 @@ def api_delete(source, *, operator=None):
     if still_published:
         try:
             published_workflows.unpublish(workflow_id)
+            # The draft dies with the workflow — deleting the live definition
+            # and leaving an orphaned draft would resurrect confusion, not
+            # the workflow.
+            published_workflows.delete_draft(workflow_id)
         except Exception as exc:
             return 502, {"error": f"unpublish failed: {exc}"}
         warnings = _sync_youtube(previous=payload["workflow"], workflow=None)
@@ -900,12 +1093,22 @@ def api_versions(source):
         "enabled": bool(version.get("enabled", True)),
         "current": int(version.get("revision") or 0) == live_revision,
     } for version in published_workflows.list_versions(workflow_id)]
-    return 200, {
+    payload = {
         "workflow": workflow_id,
         "file": source,
         "revision": live_revision,
         "versions": versions,
     }
+    try:
+        draft = published_workflows.get_draft(workflow_id)
+    except Exception:  # noqa: BLE001 — the history list must not fail on a draft hiccup
+        draft = None
+    if draft and isinstance(draft.get("workflow"), dict):
+        # The unpublished edit sitting on top of the history: stale means the
+        # live definition moved past the draft's base (toggle/rollback/
+        # auto-pause raced), so publish would refuse it until a fresh save.
+        payload["draft"] = _draft_view(draft, live_revision)
+    return 200, payload
 
 
 # The unified diff body is capped so a pathological revision pair cannot
@@ -1003,11 +1206,14 @@ def api_rollback(source, body, operator=None):
     }
     restored["enabled"] = bool(version.get("enabled", True))
     yaml_text = workflow_yaml_text(restored)
+    # Rollback is a live verb: it publishes (and so stales any draft), it
+    # does not draft.
     return api_save(
         {"yaml": yaml_text},
         operator=operator,
         cause="rollback",
         message=f"designer: rollback workflow {workflow['id']} to v{revision}",
+        live=True,
     )
 
 
@@ -1084,8 +1290,10 @@ def api_duplicate(source, body=None, operator=None):
     copy = {key: value for key, value in workflow.items() if key not in RUN_STATE_KEYS}
     copy["id"] = new_id
     yaml_text = workflow_yaml_text(copy)
+    # Duplicating publishes the copy live — a copy nobody can see or run is
+    # not a duplicate; the original's drafts are untouched.
     status, payload = api_save(
-        {"yaml": yaml_text}, operator=operator,
+        {"yaml": yaml_text}, operator=operator, live=True,
         message=f"designer: duplicate workflow {workflow['id']} as {new_id}")
     payload["duplicated_from"] = source
     return status, payload
@@ -1144,8 +1352,10 @@ def api_apply_template(source, body=None, operator=None):
             if key not in RUN_STATE_KEYS and key != "template"}
     copy["id"] = new_id
     yaml_text = workflow_yaml_text(copy)
+    # Applying a template publishes the fork live, like duplicate — the
+    # template itself is untouched.
     status, payload = api_save(
-        {"yaml": yaml_text}, operator=operator,
+        {"yaml": yaml_text}, operator=operator, live=True,
         message=f"designer: apply template {template['id']} as {new_id}")
     payload["applied_from"] = source
     return status, payload

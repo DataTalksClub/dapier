@@ -35,7 +35,8 @@ The proposed shared-auth OAuth token factory and agent CLI are specified in
 ## Configure a workflow
 
 Save a workflow through the console or CLI (`dapier workflows save file.yaml`).
-The API publishes it to the managed store immediately. For example:
+The API stores it as a draft; `dapier workflows publish <file>` (or the
+designer's Publish button) promotes it to the managed store live. For example:
 
 ```yaml
 id: new-dropbox-pdf

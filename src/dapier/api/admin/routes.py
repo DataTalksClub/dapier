@@ -655,6 +655,35 @@ def rollback_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
+# ---- Draft vs live (G15): a save drafts; publish/discard promote or throw ----
+
+def publish_designer_workflow(event, operator, source):
+    """Console mirror of `workflows publish`: promote the workflow's draft
+    through the ordinary publish path (git, revision, YouTube reconcile).
+    409 stale when the live definition moved past the draft's base."""
+    status, payload = designer_store.api_publish(source, operator=operator)
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.publish", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def discard_designer_draft(event, operator, source):
+    """Console mirror of `workflows discard`: throw the draft away; the live
+    definition is untouched."""
+    status, payload = designer_store.api_discard(source, operator=operator)
+    session._audit_event(str(source), "workflow.discard", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def draft_designer_workflow(source):
+    """Console mirror of the draft read: one workflow's drafted definition."""
+    status, payload = designer_store.api_draft(source)
+    return http._json_response(status, payload)
+
+def draft_diff_designer_workflow(source):
+    """Console mirror of `workflows draft-diff`: draft vs live, api_diff shape."""
+    status, payload = designer_store.api_draft_diff(source)
+    return http._json_response(status, payload)
+
 def _hook_kind(event, body=None):
     """The hook trigger kind, from the query string or the request body."""
     query = event.get("queryStringParameters") or {}

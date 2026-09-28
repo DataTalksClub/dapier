@@ -480,6 +480,12 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
               "No workflows yet. Create one in the console or run `dapier workflows save`.")
     for item in items:
         state = "On" if item.get("enabled", True) else "Off"
+        if not item.get("published", True):
+            # Draft-only: saved in the designer but never published — it
+            # fires nothing until `workflows publish` promotes it.
+            state = "draft (never published)"
+        elif item.get("has_draft"):
+            state += " [draft]"
         if item.get("auto_paused"):
             # The engine paused it after consecutive failed runs; `workflows on`
             # is the resume verb (the enable toggle clears the pause).
@@ -609,7 +615,11 @@ def workflows_save(api_url, path, rename_from, debug=False):
 
 
 def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
-    """The `workflows save` wire call; also the --save tail of `workflows draft`."""
+    """The `workflows save` wire call; also the --save tail of `workflows draft`.
+
+    A save writes a draft (nothing goes live); the API answers published:
+    false with a draft block. Only a historical live-publish response
+    (published: true) prints the live message."""
     body = {"yaml": yaml_text}
     if rename_from:
         body["renameFrom"] = rename_from
@@ -618,7 +628,10 @@ def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
         print(f"Published {data.get('file')} live."
               + (f" Synced commit {str(data['commit'])[:7]}." if data.get("commit") else ""))
     else:
-        print(f"Saved {data.get('file')}.")
+        draft = data.get("draft") or {}
+        stale = " behind the live revision" if draft.get("stale") else ""
+        print(f"Saved {data.get('file')} as a draft{stale} — "
+              f"publish it with `dapier workflows publish {data.get('file')}`.")
     if data.get("git_sync_error"):
         print(f"Warning: Git sync failed ({data['git_sync_error']}).")
     for warning in data.get("warnings") or []:
@@ -754,6 +767,11 @@ def workflows_versions(api_url, file, debug=False):
     """Version history for one workflow: who published what, when, and why."""
     data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}/versions", debug=debug)
     print(f"{data.get('workflow') or file} is at revision {data.get('revision', '?')}.")
+    draft = data.get("draft")
+    if draft:
+        stale = " (stale — publish would refuse it; save a fresh draft)" if draft.get("stale") else ""
+        by = f" by {draft['drafted_by']}" if draft.get("drafted_by") else ""
+        print(f"draft: based on v{draft.get('base_revision', 0)}{by}{stale}")
     versions = data.get("versions") or []
     if not versions:
         print("No version history yet — versions are recorded from now on.")
@@ -777,6 +795,59 @@ def workflows_rollback(api_url, file, revision, debug=False):
         print(f"Rolled {file} back to {label} and published it live.")
     else:
         print(f"Rolled {file} back to {label}.")
+    return 0
+
+
+def workflows_publish(api_url, file, debug=False):
+    """Promote a workflow's saved draft live (the agent POST .../publish route):
+    the promotion runs through the ordinary publish path, so the git commit,
+    version record, and YouTube reconcile behave like any publish; a
+    draft-only workflow becomes v1. A stale draft (the live definition moved
+    past its base revision) is refused 409."""
+    data = api.call(api_url, "POST", f"/api/agent/designer/workflows/{file}/publish",
+                    {}, debug=debug)
+    revision = data.get("revision")
+    suffix = f" as v{revision}" if revision else ""
+    print(f"Published {data.get('file') or file}{suffix} — live now."
+          + (f" Synced commit {str(data['commit'])[:7]}." if data.get("commit") else ""))
+    for warning in data.get("warnings") or []:
+        print(f"Warning: {warning}")
+    if data.get("git_sync_error"):
+        print(f"Warning: Git sync failed ({data['git_sync_error']}).")
+    return 0
+
+
+def workflows_discard(api_url, file, assume_yes=False, debug=False):
+    """Throw a workflow's saved draft away (the agent DELETE .../draft route);
+    the live definition is untouched."""
+    if not assume_yes:
+        try:
+            answer = input(f"Discard the draft of {file}? The live workflow is "
+                           "untouched; the drafted edits are lost [y/N]: ")
+        except EOFError:
+            # No interactive stdin (scripts, CI): never guess on a destroy.
+            print("No terminal to confirm on; pass --yes to discard without a prompt.")
+            return 2
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
+    data = api.call(api_url, "DELETE", f"/api/agent/designer/workflows/{file}/draft",
+                    debug=debug)
+    print(f"Discarded the draft of {data.get('file') or file}; live is untouched.")
+    return 0
+
+
+def workflows_draft_diff(api_url, file, debug=False):
+    """Unified diff of a workflow's draft against live (the server builds it;
+    the raw text goes to stdout so it pipes into `less` or `patch`)."""
+    data = api.call(api_url, "GET",
+                    f"/api/agent/designer/workflows/{file}/draft/diff", debug=debug)
+    if data.get("same"):
+        print("The draft is identical to live.")
+        return 0
+    diff = data.get("diff") or ""
+    if diff:
+        print(diff, end="" if diff.endswith("\n") else "\n")
     return 0
 
 

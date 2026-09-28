@@ -88,6 +88,18 @@ export interface WorkflowSummary {
   template?: boolean;
   triggerCount?: number;
   tags?: string[];
+  /** false: a saved draft with nothing live (it fires nothing until publish). */
+  published?: boolean;
+  /** A drafted edit sits on top of the live definition (Publish/Discard). */
+  has_draft?: boolean;
+}
+
+/** The `draft` block the API attaches where a saved draft exists. */
+export interface DraftInfo {
+  base_revision: number;
+  stale: boolean;
+  updated_at?: string;
+  drafted_by?: string;
 }
 
 export interface GitStatus {

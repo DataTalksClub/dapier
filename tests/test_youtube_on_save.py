@@ -80,35 +80,35 @@ def hub(monkeypatch):
 
 
 def test_save_subscribes_the_channel(store, hub):
-    status, payload = designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    status, payload = designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     assert status == 200 and payload["published"] is True
     assert hub == [("subscribe", "UCabc123")]
     assert "warnings" not in payload
 
 
 def test_unchanged_resave_never_rings_the_hub(store, hub):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
     revised = YT_YAML.replace("https://example.test/hook", "https://example.test/hook2")
-    status, payload = designer_store.api_save({"yaml": revised}, operator="op-2")
+    status, payload = designer_store.api_save({"yaml": revised}, operator="op-2", live=True)
     assert status == 200 and payload["published"] is True
     assert hub == []
     assert "warnings" not in payload
 
 
 def test_channel_edit_swaps_the_subscription(store, hub):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
     other = YT_YAML.replace("UCabc123", "UCnext999")
-    status, _ = designer_store.api_save({"yaml": other}, operator="op-2")
+    status, _ = designer_store.api_save({"yaml": other}, operator="op-2", live=True)
     assert status == 200
     assert ("subscribe", "UCnext999") in hub
     assert ("unsubscribe", "UCabc123") in hub
 
 
 def test_rollback_resubscribes_the_restored_channels(store, hub):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
-    designer_store.api_save({"yaml": YT_YAML.replace("UCabc123", "UCnext999")}, operator="op-2")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
+    designer_store.api_save({"yaml": YT_YAML.replace("UCabc123", "UCnext999")}, operator="op-2", live=True)
     hub.clear()
     status, payload = designer_store.api_rollback("yt-flow.yaml", {"revision": 1}, operator="op-3")
     assert status == 200 and payload["published"] is True
@@ -117,7 +117,7 @@ def test_rollback_resubscribes_the_restored_channels(store, hub):
 
 
 def test_disabling_unsubscribes_and_reports_hub_failures(store, hub, monkeypatch):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
 
     def broken(mode, channel_id, **kwargs):
@@ -138,13 +138,13 @@ def test_disabling_unsubscribes_and_reports_hub_failures(store, hub, monkeypatch
 
 
 def test_deleting_unsubscribes_and_never_blocks_on_hub_failures(store, hub, monkeypatch):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
     status, payload = designer_store.api_delete("yt-flow.yaml", operator="op-2")
     assert status == 200 and payload["deleted"] is True
     assert hub == [("unsubscribe", "UCabc123")]
 
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
 
     def broken(mode, channel_id, **kwargs):
@@ -157,7 +157,7 @@ def test_deleting_unsubscribes_and_never_blocks_on_hub_failures(store, hub, monk
 
 
 def test_bulk_toggle_rows_carry_warnings(store, hub, monkeypatch):
-    designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     hub.clear()
 
     def broken(mode, channel_id, **kwargs):
@@ -179,7 +179,7 @@ def test_unconfigured_push_path_saves_silently(store, monkeypatch):
 
     monkeypatch.setattr(youtube_subscriptions, "_settings", unconfigured)
     monkeypatch.setattr(youtube_subscriptions, "hub_request", fail)
-    status, payload = designer_store.api_save({"yaml": YT_YAML}, operator="op-1")
+    status, payload = designer_store.api_save({"yaml": YT_YAML}, operator="op-1", live=True)
     assert status == 200 and payload["published"] is True
     assert "warnings" not in payload
 
@@ -188,7 +188,7 @@ def test_non_youtube_workflows_never_touch_the_hub(store, hub):
     yaml_text = YT_YAML.replace("connector: youtube", "connector: email").replace(
         "event: video.published", "event: message.received").replace(
         "    channel_id:\n      equals: UCabc123\n", "    route:\n      equals: yt-flow\n")
-    status, payload = designer_store.api_save({"yaml": yaml_text}, operator="op-1")
+    status, payload = designer_store.api_save({"yaml": yaml_text}, operator="op-1", live=True)
     assert status == 200
     assert hub == []
 

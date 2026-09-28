@@ -6,7 +6,7 @@ import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, on
 import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
-import type { ConnectionOption, DiagramShape, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import type { ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
@@ -685,6 +685,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [savedYaml, setSavedYaml] = useState("");
   /** The workflow as last loaded or saved; carries `flows:`/`flow:` through canvas saves. */
   const [base, setBase] = useState<Workflow | null>(null);
+  /** The saved server-side draft for the open workflow (G15): a save writes a
+      draft, Publish/Discard promote or throw it. Null = no draft known. */
+  const [draftInfo, setDraftInfo] = useState<DraftInfo | null>(null);
   const [testOpen, setTestOpen] = useState(false);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);
@@ -1125,8 +1128,19 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   async function openWorkflow(summary: WorkflowSummary) {
     try {
-      const data = await api<{ workflow: Workflow }>(config, `/workflows/${summary.source}`);
+      // A draft-only workflow (published: false) has no live item to GET —
+      // the draft read serves it. A live workflow with a draft also pulls the
+      // draft block so the Publish/Discard buttons know what they act on.
+      const draftOnly = summary.published === false;
+      const data = await api<{ workflow: Workflow; draft?: DraftInfo }>(
+        config, `/workflows/${summary.source}${draftOnly ? "/draft" : ""}`);
       const workflow = data.workflow;
+      let draft = data.draft ?? null;
+      if (!draftOnly && summary.has_draft && !draft) {
+        draft = await api<{ draft: DraftInfo }>(config, `/workflows/${summary.source}/draft`)
+          .then((payload) => payload.draft)
+          .catch(() => null);
+      }
       allowUnload.current = false;
       const shapes = shapesFromWorkflow(workflow);
       const yaml = workflowYaml(workflow);
@@ -1142,6 +1156,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setBase(workflow);
       setYamlText(yaml);
       setSavedYaml(yaml);
+      setDraftInfo(draft);
       setSelectedId(null);
       setStepTest({ nodeId: null, busy: false, result: null });
       setStepOutputs({});
@@ -1179,6 +1194,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setBase(null);
     setYamlText("");
     setSavedYaml("");
+    setDraftInfo(null);
     setSelectedId(null);
     setStepTest({ nodeId: null, busy: false, result: null });
     setStepOutputs({});
@@ -1265,7 +1281,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
-      const result = await api<{ commit?: string | null; published?: boolean; git_sync_error?: string }>(config, "/workflows", {
+      const result = await api<{ commit?: string | null; published?: boolean; revision?: number; draft?: DraftInfo; git_sync_error?: string }>(config, "/workflows", {
         method: "PUT",
         body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
       });
@@ -1274,6 +1290,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSavedId(workflow.id);
       setSavedEnabled(workflow.enabled !== false);
       setCanvasExtraDirty(false);
+      // A save drafts (G15): the response carries the draft block; publish
+      // responses (published: true, from the live verbs) carry no draft.
+      setDraftInfo(result.published === false ? (result.draft ?? { base_revision: 0, stale: false }) : null);
       if (view === "yaml") {
         setShapes(nextShapes);
         setSavedSnapshot(JSON.stringify(nextShapes));
@@ -1288,20 +1307,73 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       }
       setSummaries((current) => {
         const others = current.filter((entry) => entry.source !== sourceName && entry.source !== `${workflow.id}.yaml`);
-        return [...others, summarize(`${workflow.id}.yaml`, workflow)].sort((a, b) => a.source.localeCompare(b.source));
+        const entry = summarize(`${workflow.id}.yaml`, workflow);
+        // Reflect the draft state locally so the list badges stay honest
+        // without waiting for the next server refresh.
+        const previous = current.find((existing) => existing.source === `${workflow.id}.yaml`);
+        const published = result.published !== false ? true : previous?.published === true;
+        return [...others, {
+          ...entry,
+          published,
+          has_draft: result.published === false || previous?.has_draft === true || undefined,
+        }].sort((a, b) => a.source.localeCompare(b.source));
       });
       refreshGit();
       // A save is the new baseline: undo cannot reach past it.
       resetHistory();
       setStatus({
         kind: "ok",
-        message: `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
-          + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+        message: result.published === false
+          ? "Draft saved — nothing is live yet. Publish when it is ready."
+          : `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
+            + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
       });
       return true;
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
       return false;
+    }
+  }
+
+  /** Promotes the saved draft live (POST .../publish): the API runs the
+      ordinary publish path — git, version record, YouTube reconcile; a
+      draft-only workflow becomes v1. A stale draft (live moved past its
+      base) is refused; the API's message says so. */
+  async function publishDraft() {
+    if (!sourceName || !draftInfo) return;
+    if (dirty) {
+      setStatus({ kind: "error", message: "Save the draft before publishing it." });
+      return;
+    }
+    setStatus({ kind: "busy", message: "Publishing…" });
+    try {
+      const result = await api<{ file: string; revision?: number; commit?: string | null; git_sync_error?: string }>(
+        config, `/workflows/${encodeURIComponent(sourceName)}/publish`, { method: "POST", body: "{}" });
+      setDraftInfo(null);
+      await refreshList();
+      refreshGit();
+      setStatus({
+        kind: "ok",
+        message: `Published live${result.revision ? ` as v${result.revision}` : ""}.`
+          + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+      });
+    } catch (error) {
+      setStatus({ kind: "error", message: String(error) });
+    }
+  }
+
+  /** Throws the saved draft away (DELETE .../draft); live is untouched. */
+  async function discardDraft() {
+    if (!sourceName || !draftInfo) return;
+    if (!window.confirm("Discard the saved draft? The drafted edits are lost; the live workflow is untouched.")) return;
+    setStatus({ kind: "busy", message: "Discarding…" });
+    try {
+      await api(config, `/workflows/${encodeURIComponent(sourceName)}/draft`, { method: "DELETE" });
+      setDraftInfo(null);
+      await refreshList();
+      setStatus({ kind: "ok", message: "Draft discarded — live is untouched." });
+    } catch (error) {
+      setStatus({ kind: "error", message: String(error) });
     }
   }
 
@@ -1957,6 +2029,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
               </span>
               {!summary.enabled && <span className="workflow-disabled">Off</span>}
+              {summary.published === false && <span className="workflow-disabled">Draft</span>}
+              {summary.published !== false && summary.has_draft && <span className="workflow-disabled">Edited</span>}
             </button>
           ))}
           {summaries.length === 0 && <p className="inspector-hint">No workflows found.</p>}
@@ -2095,8 +2169,36 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span>Test run</span>
               </button>
             )}
+            {config.mode === "console" && (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={publishDraft}
+                disabled={status.kind === "busy" || !sourceName || !draftInfo || dirty}
+                title={!draftInfo
+                  ? "Save the workflow first — a save writes a draft"
+                  : dirty
+                    ? "Save the draft before publishing it"
+                    : draftInfo.stale
+                      ? `The live workflow moved past this draft (based on v${draftInfo.base_revision}) — publishing will refuse it until you save again`
+                      : `Publish the draft live (based on v${draftInfo.base_revision})`}
+              >
+                <span>Publish draft</span>
+              </button>
+            )}
+            {config.mode === "console" && draftInfo && (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={discardDraft}
+                disabled={status.kind === "busy"}
+                title="Throw the saved draft away — the live workflow is untouched"
+              >
+                <span>Discard draft</span>
+              </button>
+            )}
             <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
-              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save changes" : "Saved"}</span>
+              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? (draftInfo ? "Save draft" : "Save changes") : "Saved"}</span>
             </button>
           </div>
         </header>

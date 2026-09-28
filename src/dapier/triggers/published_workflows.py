@@ -12,6 +12,12 @@ table, ``version_of`` attribute set) — Zapier's version history: who published
 what, when, and why (save, toggle, rollback). The live item carries the
 monotonic ``revision``. Version records are filtered out of every engine/
 designer read and kept per workflow up to MAX_VERSIONS.
+
+A designer save writes a *draft*, not a publish: one ``<id>#draft`` item per
+workflow (``draft_of`` attribute set, carrying the drafted definition and the
+live ``base_revision`` it was edited against, last write wins). Drafts share
+the table but load_items drops them, so the engine and every list stay
+draft-blind — a draft-only workflow fires nothing until it is published.
 """
 
 import os
@@ -110,6 +116,51 @@ def version_key(workflow_id, revision):
     return f"{workflow_id}#v{revision}"
 
 
+def draft_key(workflow_id):
+    return f"{workflow_id}#draft"
+
+
+def save_draft(workflow, *, base_revision, operator=None, rename_from=None,
+               table_ref=None):
+    """Store (or overwrite — last write wins) one workflow's draft definition.
+
+    The draft is keyed ``<id>#draft`` and carries ``draft_of`` (the live id),
+    the drafted definition, and ``base_revision`` — the live revision the
+    edit was made against (0 when the workflow has never been published).
+    Publishing compares it against the live revision to refuse promoting a
+    draft that a toggle/rollback/auto-pause has raced past. ``rename_from``
+    records an id rename made while drafting (a draft save never unpublishes
+    the old id live — that happens when the draft is promoted).
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    item = {
+        "workflow_id": draft_key(workflow["id"]),
+        "draft_of": workflow["id"],
+        "file": f"{workflow['id']}.yaml",
+        "workflow": _scrub(workflow),
+        "enabled": bool(workflow.get("enabled", True)),
+        "base_revision": int(base_revision or 0),
+        "drafted_by": str(operator or ""),
+        "updated_at": now,
+    }
+    if rename_from and rename_from != item["file"]:
+        item["rename_from"] = rename_from
+    get_table(table_ref).put_item(Item=item)
+    return item
+
+
+def get_draft(workflow_id, table_ref=None):
+    """The workflow's draft item, or None when nothing is drafted."""
+    item = get_table(table_ref).get_item(
+        Key={"workflow_id": draft_key(workflow_id)},
+    ).get("Item")
+    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+
+
+def delete_draft(workflow_id, table_ref=None):
+    get_table(table_ref).delete_item(Key={"workflow_id": draft_key(workflow_id)})
+
+
 def _prune_versions(workflow_id, table):
     versions = list_versions(workflow_id, table_ref=table)
     for version in versions[MAX_VERSIONS:]:
@@ -139,12 +190,15 @@ def _scan_all(table):
             return items
 
 
-def load_items(table_ref=None):
-    # Version records share the table; only live items belong in the
-    # engine merge and the designer list.
+def load_items(table_ref=None, include_drafts=False):
+    # Version records and draft records share the table; only live items
+    # belong in the engine merge and the designer list — a draft must never
+    # fire or appear as live state. Callers that surface drafts (the list's
+    # draft-only rows, the draft endpoints) ask for them explicitly.
     items = [
         item for item in _scan_all(get_table(table_ref))
         if not item.get("version_of")
+        and (include_drafts or not item.get("draft_of"))
     ]
     return sorted(
         ({key: _decode_numbers(value) for key, value in item.items()} for item in items),

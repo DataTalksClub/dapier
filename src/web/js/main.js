@@ -104,7 +104,7 @@ $('#import-yaml-input').addEventListener('change', async (event) => {
       method: 'PUT',
       body: JSON.stringify({ yaml }),
     });
-    notice(`Imported ${data.file || file.name}${data.published ? ' — live now' : ' (the deploy pipeline publishes it in a few minutes)'}.`);
+    notice(`Imported ${data.file || file.name}${data.published ? ' — live now' : ' as a draft — publish it from the designer to go live'}.`);
     await refresh();
   } catch (error) {
     notice(error.message, true);

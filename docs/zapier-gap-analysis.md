@@ -1371,27 +1371,35 @@ used/limit with an inline limit editor. Tests: `tests/test_usage.py`
 the sketch: per-workflow `task_quota:` fields, quota-pause stamping and
 its email — an account-wide cap made them unnecessary; revisit only if
 per-workflow budgets are ever wanted.
-### G15. Draft vs live (design ready, not started)
+### G15. Draft vs live (landed 2026-09-28: saves draft, publish goes live)
 
-Today every designer save publishes instantly
-(`designer_store.api_save` → `published_workflows.publish` + git commit +
-revision). Design: save writes a draft — same table, `<id>#draft` item
-(`draft_of`, `workflow`, `base_revision`), one per workflow, LWW;
-`load_items` drops `draft_of` records so the engine and every list are
-draft-blind (single choke point: `matching.workflows` → `load_workflows` →
-`load_items`; stored trigger tables untouched). `POST …/{file}/publish`
-promotes the draft through the existing `api_save` (`cause="publish"`) —
-git, revision, YouTube reconcile for free — 409 `stale` when
-`base_revision` < live revision (toggle/rollback/auto-pause raced).
-`DELETE …/{file}/draft` discards. `GET …/{file}/draft/diff` reuses the
-`api_diff` shape. Draft-only workflows list as `published: false`, fire
-nothing; publish creates v1. Versions list gains a `draft` block. Toggle/
-tags/folder/rollback stay live verbs (they make the draft stale). Delete
-removes the draft. Migration: none (no `#draft` items exist; first save
-after ship drafts, live keeps running). Surfaces: 4 routes on admin+agent,
-CLI `workflows publish|discard|draft-diff` (`workflows save` now drafts),
-designer Save-draft + Publish/Discard buttons (`make designer-console`).
-Tests: `test_designer_drafts.py` + extensions.
+Landed as designed: a designer save (`designer_store.api_save`, the default)
+no longer publishes — it validates and writes one `<id>#draft` item in the
+published table (`draft_of`, `workflow`, `base_revision` = the live revision
+the edit was made against, plus `rename_from` when the id was renamed while
+drafting; last write wins). `published_workflows.load_items` drops
+`draft_of` records, so the engine (`matching.workflows` → `load_workflows`)
+and every list stay draft-blind and a draft-only workflow fires nothing;
+stored trigger tables are untouched. `POST …/{file}/publish` promotes the
+draft through the existing live save path (`cause="publish"` — git commit,
+version record, YouTube reconcile for free; v1 for draft-only), refusing 409
+`stale` when `base_revision` is behind the live revision (toggle/tags/
+folder/rollback/auto-pause raced; a fresh save re-bases it). `DELETE
+…/{file}/draft` discards, `GET …/{file}/draft` serves the drafted
+definition, and `GET …/{file}/draft/diff` reuses the `api_diff` shape
+(draft-only diffs against an empty live side). The list merges draft-only
+rows as `published: false` (plus `has_draft` on live rows), the versions
+list gains a `draft` block, and delete removes the draft with the workflow.
+Live verbs kept their path via `api_save(live=True)`: rollback, duplicate,
+and template-apply publish as before. Surfaces: the 4 routes on admin+agent
+(operator-gated; publish/discard editor band, draft reads viewer), CLI
+`workflows publish|discard|draft-diff` (`workflows save` now drafts and says
+so; `workflows versions` prints the draft block; `workflows list` shows
+draft rows), and the designer's Save-draft + Publish/Discard buttons with
+draft badges (`make designer-console` rebuilt). Tests:
+`tests/test_designer_drafts.py` plus save-now-drafts updates across the
+designer/published/YouTube/version suites. No migration: no `#draft` items
+existed; the first save after ship drafts while live keeps running.
 
 ### G16. List paging — two real bugs, two UX gaps (design ready, not started)
 
@@ -1450,10 +1458,10 @@ operator write checks for non-operators. Out of scope until an external
   contract (`fix(triggers): walk every scan page`,
   `feat(paging): inbox, connections, and grants lists page instead of
   clipping`). G17 Phase 0 done with it.
-- **G15 draft-vs-live — in flight** by a parallel lane following the design
-  above (`save_draft`/`load_items(include_drafts=False)`,
-  `api_save(live=...)`, publish/discard/draft-diff, viewer/editor role
-  mapping).
+- **G15 draft-vs-live — shipped**: landed per the design above
+  (`save_draft`/`load_items(include_drafts=False)`, `api_save(live=...)`,
+  publish/discard/draft/draft-diff, viewer/editor role mapping,
+  `tests/test_designer_drafts.py`).
 - **G17 multi-user** — phased recommendation stands (owner stamping →
   visible_to reads → owner-or-operator writes); start after G15 lands.
 - Also closed: the host-task read surface debt
@@ -1474,10 +1482,10 @@ operator write checks for non-operators. Out of scope until an external
   contract (`fix(triggers): walk every scan page`,
   `feat(paging): inbox, connections, and grants lists page instead of
   clipping`). G17 Phase 0 done with it.
-- **G15 draft-vs-live — in flight** by a parallel lane following the design
-  above (`save_draft`/`load_items(include_drafts=False)`,
-  `api_save(live=...)`, publish/discard/draft-diff, viewer/editor role
-  mapping).
+- **G15 draft-vs-live — shipped**: landed per the design above
+  (`save_draft`/`load_items(include_drafts=False)`, `api_save(live=...)`,
+  publish/discard/draft/draft-diff, viewer/editor role mapping,
+  `tests/test_designer_drafts.py`).
 - **G17 multi-user** — phased recommendation stands (owner stamping →
   visible_to reads → owner-or-operator writes); start after G15 lands.
 - Also closed: the host-task read surface debt

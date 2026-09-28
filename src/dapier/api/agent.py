@@ -604,6 +604,21 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if designer_rollback_match and method == "POST":
         return designer_rollback_api(event, designer_rollback_match.group(1))
+    # Draft vs live (G15): a save drafts; these promote or throw the draft.
+    designer_publish_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/publish", path)
+    if designer_publish_match and method == "POST":
+        return designer_publish_api(event, designer_publish_match.group(1))
+    designer_draft_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft", path)
+    if designer_draft_match and method == "GET":
+        return designer_draft_api(event, designer_draft_match.group(1))
+    if designer_draft_match and method == "DELETE":
+        return designer_discard_api(event, designer_draft_match.group(1))
+    designer_draft_diff_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft/diff", path)
+    if designer_draft_diff_match and method == "GET":
+        return designer_draft_diff_api(event, designer_draft_diff_match.group(1))
     storage_match = re.fullmatch(r"/api/agent/storage/([^/]+)", path)
     if storage_match and method == "GET":
         return storage_read_api(event, unquote(storage_match.group(1)))
@@ -919,6 +934,56 @@ def designer_rollback_api(event, source):
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.rollback", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+# ---- Draft vs live (G15): `workflows save` drafts; these promote or throw ----
+
+def designer_publish_api(event, source):
+    """Operator-only draft promotion: the draft goes live through the
+    ordinary publish path (git, revision, YouTube reconcile). 409 stale when
+    the live definition moved past the draft's base revision. Mirrors the
+    console's publish endpoint."""
+    subject, error = require_operator(event, "workflow.publish")
+    if error:
+        return error
+    status, payload = designer_store.api_publish(source, operator=subject)
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.publish", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_discard_api(event, source):
+    """Operator-only draft discard: throw the draft away, live untouched.
+    Mirrors the console's discard endpoint."""
+    subject, error = require_operator(event, "workflow.discard")
+    if error:
+        return error
+    status, payload = designer_store.api_discard(source, operator=subject)
+    audit.emit(str(source), "workflow.discard", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_draft_api(event, source):
+    """Operator-only draft read: the drafted definition and its base revision
+    (the CLI's `workflows show --draft` view of a draft-only workflow). Like
+    the versions read it is not itself audited — require_operator records
+    the denials."""
+    subject, error = require_operator(event, "workflow.versions")
+    if error:
+        return error
+    status, payload = designer_store.api_draft(source)
+    return _json_response(status, payload)
+
+
+def designer_draft_diff_api(event, source):
+    """Operator-only draft diff: draft vs live in the versions-diff shape.
+    Mirrors the console's draft-diff endpoint; not itself audited."""
+    subject, error = require_operator(event, "workflow.versions")
+    if error:
+        return error
+    status, payload = designer_store.api_draft_diff(source)
     return _json_response(status, payload)
 
 

@@ -121,8 +121,15 @@ def test_load_workflows_roundtrips_the_definition(published):
     assert published_workflows.load_workflows() == [seeded_workflow()]
 
 
-def test_save_publishes_live(github_ready, published):
+def test_save_drafts_and_the_live_publish_path_still_publishes(github_ready, published):
+    # G15: a plain save writes a draft and touches nothing live...
     status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op")
+    assert status == 200
+    assert payload["published"] is False
+    assert "test-flow" not in published.items
+    # ...while the live path (rollback/duplicate/publish promote) publishes.
+    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML},
+                                              operator="op", live=True)
     assert status == 200
     assert payload["published"] is True
     item = published.items["test-flow"]
@@ -139,7 +146,7 @@ def test_save_requires_publish_table(github_ready, monkeypatch):
 
 def test_save_without_git_sync_publishes(published, monkeypatch):
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)
-    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML})
+    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML}, live=True)
     assert status == 200
     assert payload["published"] is True
     assert payload["revision"] == 1
@@ -151,7 +158,7 @@ def test_save_publish_failure_is_loud(github_ready, published, monkeypatch):
         raise RuntimeError("dynamo down")
 
     monkeypatch.setattr(published_workflows, "publish", boom)
-    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML})
+    status, payload = designer_store.api_save({"yaml": WORKFLOW_YAML}, live=True)
     assert status == 502
     assert "dynamo down" in payload["error"]
     assert "test-flow" not in published.items
@@ -160,7 +167,8 @@ def test_save_publish_failure_is_loud(github_ready, published, monkeypatch):
 def test_save_rename_unpublishes_the_old_id(github_ready, published):
     published_workflows.publish(seeded_workflow(id="old-name"))
     status, payload = designer_store.api_save(
-        {"yaml": WORKFLOW_YAML, "renameFrom": "old-name.yaml"}, operator="op")
+        {"yaml": WORKFLOW_YAML, "renameFrom": "old-name.yaml"}, operator="op",
+        live=True)
     assert status == 200
     assert "test-flow" in published.items
     assert "old-name" not in published.items
@@ -388,7 +396,7 @@ def test_rollback_validates_input(published, github_ready):
     status, payload = designer_store.api_save(
         {"yaml": yaml.safe_dump(
             seeded_workflow(actions=[{"id": "a1", "type": "slack", "text": "hi"}]))},
-        operator="op-2")
+        operator="op-2", live=True)
     assert status == 200
     status, payload = designer_store.api_rollback("test-flow.yaml", {}, operator="op-3")
     assert status == 200 and payload["published"] is True

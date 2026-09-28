@@ -212,6 +212,21 @@ def route(event, method, path):
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if method == "POST" and designer_rollback_match:
         return routes.rollback_designer_workflow(event, operator_subject, designer_rollback_match.group(1))
+    # Draft vs live (G15): a save drafts; these promote or throw the draft.
+    designer_publish_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/publish", path)
+    if method == "POST" and designer_publish_match:
+        return routes.publish_designer_workflow(event, operator_subject, designer_publish_match.group(1))
+    designer_draft_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft", path)
+    if method == "GET" and designer_draft_match:
+        return routes.draft_designer_workflow(designer_draft_match.group(1))
+    if method == "DELETE" and designer_draft_match:
+        return routes.discard_designer_draft(event, operator_subject, designer_draft_match.group(1))
+    designer_draft_diff_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft/diff", path)
+    if method == "GET" and designer_draft_diff_match:
+        return routes.draft_diff_designer_workflow(designer_draft_diff_match.group(1))
     storage_match = re.fullmatch(r"/api/admin/storage/([^/]+)", path)
     if method == "GET" and storage_match:
         return routes.storage_read(event, unquote(storage_match.group(1)))
@@ -301,6 +316,10 @@ from .routes import (  # noqa: F401
     save_connection,
     save_credential,
     save_designer_workflow,
+    publish_designer_workflow,
+    discard_designer_draft,
+    draft_designer_workflow,
+    draft_diff_designer_workflow,
     storage_delete,
     storage_read,
     storage_write,

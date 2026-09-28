@@ -21967,6 +21967,7 @@
     const [yamlText, setYamlText] = reactExports.useState("");
     const [savedYaml, setSavedYaml] = reactExports.useState("");
     const [base, setBase] = reactExports.useState(null);
+    const [draftInfo, setDraftInfo] = reactExports.useState(null);
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
@@ -22316,8 +22317,16 @@
     }, [refreshGit, refreshList]);
     async function openWorkflow(summary) {
       try {
-        const data = await api(config, `/workflows/${summary.source}`);
+        const draftOnly = summary.published === false;
+        const data = await api(
+          config,
+          `/workflows/${summary.source}${draftOnly ? "/draft" : ""}`
+        );
         const workflow = data.workflow;
+        let draft = data.draft ?? null;
+        if (!draftOnly && summary.has_draft && !draft) {
+          draft = await api(config, `/workflows/${summary.source}/draft`).then((payload) => payload.draft).catch(() => null);
+        }
         allowUnload.current = false;
         const shapes2 = shapesFromWorkflow(workflow);
         const yaml2 = workflowYaml(workflow);
@@ -22333,6 +22342,7 @@
         setBase(workflow);
         setYamlText(yaml2);
         setSavedYaml(yaml2);
+        setDraftInfo(draft);
         setSelectedId(null);
         setStepTest({ nodeId: null, busy: false, result: null });
         setStepOutputs({});
@@ -22369,6 +22379,7 @@
       setBase(null);
       setYamlText("");
       setSavedYaml("");
+      setDraftInfo(null);
       setSelectedId(null);
       setStepTest({ nodeId: null, busy: false, result: null });
       setStepOutputs({});
@@ -22459,6 +22470,7 @@
         setSavedId(workflow.id);
         setSavedEnabled(workflow.enabled !== false);
         setCanvasExtraDirty(false);
+        setDraftInfo(result.published === false ? result.draft ?? { base_revision: 0, stale: false } : null);
         if (view === "yaml") {
           setShapes(nextShapes);
           setSavedSnapshot(JSON.stringify(nextShapes));
@@ -22472,19 +22484,63 @@
           history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
         }
         setSummaries((current) => {
-          const others = current.filter((entry) => entry.source !== sourceName && entry.source !== `${workflow.id}.yaml`);
-          return [...others, summarize(`${workflow.id}.yaml`, workflow)].sort((a, b) => a.source.localeCompare(b.source));
+          const others = current.filter((entry2) => entry2.source !== sourceName && entry2.source !== `${workflow.id}.yaml`);
+          const entry = summarize(`${workflow.id}.yaml`, workflow);
+          const previous = current.find((existing) => existing.source === `${workflow.id}.yaml`);
+          const published = result.published !== false ? true : previous?.published === true;
+          return [...others, {
+            ...entry,
+            published,
+            has_draft: result.published === false || previous?.has_draft === true || void 0
+          }].sort((a, b) => a.source.localeCompare(b.source));
         });
         refreshGit();
         resetHistory();
         setStatus({
           kind: "ok",
-          message: `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+          message: result.published === false ? "Draft saved — nothing is live yet. Publish when it is ready." : `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
         });
         return true;
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
         return false;
+      }
+    }
+    async function publishDraft() {
+      if (!sourceName || !draftInfo) return;
+      if (dirty) {
+        setStatus({ kind: "error", message: "Save the draft before publishing it." });
+        return;
+      }
+      setStatus({ kind: "busy", message: "Publishing…" });
+      try {
+        const result = await api(
+          config,
+          `/workflows/${encodeURIComponent(sourceName)}/publish`,
+          { method: "POST", body: "{}" }
+        );
+        setDraftInfo(null);
+        await refreshList();
+        refreshGit();
+        setStatus({
+          kind: "ok",
+          message: `Published live${result.revision ? ` as v${result.revision}` : ""}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function discardDraft() {
+      if (!sourceName || !draftInfo) return;
+      if (!window.confirm("Discard the saved draft? The drafted edits are lost; the live workflow is untouched.")) return;
+      setStatus({ kind: "busy", message: "Discarding…" });
+      try {
+        await api(config, `/workflows/${encodeURIComponent(sourceName)}/draft`, { method: "DELETE" });
+        setDraftInfo(null);
+        await refreshList();
+        setStatus({ kind: "ok", message: "Draft discarded — live is untouched." });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
       }
     }
     async function leaveAfterSave() {
@@ -23105,7 +23161,9 @@
                   " action",
                   summary.actionCount === 1 ? "" : "s"
                 ] }),
-                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Off" })
+                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Off" }),
+                summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Draft" }),
+                summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Edited" })
               ]
             },
             summary.source
@@ -23251,7 +23309,29 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? "Save changes" : "Saved" }) })
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "button secondary",
+                type: "button",
+                onClick: publishDraft,
+                disabled: status.kind === "busy" || !sourceName || !draftInfo || dirty,
+                title: !draftInfo ? "Save the workflow first — a save writes a draft" : dirty ? "Save the draft before publishing it" : draftInfo.stale ? `The live workflow moved past this draft (based on v${draftInfo.base_revision}) — publishing will refuse it until you save again` : `Publish the draft live (based on v${draftInfo.base_revision})`,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Publish draft" })
+              }
+            ),
+            config.mode === "console" && draftInfo && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "button secondary",
+                type: "button",
+                onClick: discardDraft,
+                disabled: status.kind === "busy",
+                title: "Throw the saved draft away — the live workflow is untouched",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" }) })
           ] })
         ] }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
