@@ -1436,3 +1436,27 @@ operator write checks for non-operators. Out of scope until an external
 - Host task rows are write-only after the lane removed
   `/api/admin/agent-tasks` + `dapier agent-mail tasks` — restore an
   equivalent read surface or state fire-and-forget explicitly in the PR.
+
+### Landing status (same day)
+
+- **G14 quotas — shipped** (`feat(quota): the monthly task budget`): landed
+  as an ACCOUNT-WIDE monthly cap (a `quota` config item + `_total` rollup
+  row) rather than the per-workflow `task_quota` field sketched above;
+  enforcement at step admission via `usage.enforce`, `QuotaExceeded` rides
+  the ordinary action-error machinery; `GET/PUT /api/{admin,agent}/quota`,
+  `dapier quota`, console Usage-card editor.
+- **G16 paging — shipped**: trigger stores walk every scan page (the
+  silent-#201 correctness bug), inbox/connections/grants use the runs-list
+  contract (`fix(triggers): walk every scan page`,
+  `feat(paging): inbox, connections, and grants lists page instead of
+  clipping`). G17 Phase 0 done with it.
+- **G15 draft-vs-live — in flight** by a parallel lane following the design
+  above (`save_draft`/`load_items(include_drafts=False)`,
+  `api_save(live=...)`, publish/discard/draft-diff, viewer/editor role
+  mapping).
+- **G17 multi-user** — phased recommendation stands (owner stamping →
+  visible_to reads → owner-or-operator writes); start after G15 lands.
+- Also closed: the host-task read surface debt
+  (`feat(agent-tasks): read surface for the host task rows`) —
+  `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console
+  Emails view.
