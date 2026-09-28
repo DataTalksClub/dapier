@@ -70,12 +70,33 @@ def _decode_numbers(value):
     return value
 
 
+def resolve_owner(item):
+    """The owner a reader sees: the stamped ``owner``, else the item's
+    informational ``published_by`` (every item predating G17 has one), else
+    "" — the Phase 1 backfill, applied on read so no migration is needed."""
+    return str(item.get("owner") or item.get("published_by") or "")
+
+
+def _decode_item(item):
+    """Decode one stored item for readers: Decimals to JSON-safe numbers and
+    ``owner`` resolved (see resolve_owner) — every live-item read answers
+    with an owner, backfilled from published_by when the stamp predates it."""
+    decoded = {key: _decode_numbers(value) for key, value in item.items()}
+    decoded["owner"] = resolve_owner(decoded)
+    return decoded
+
+
 def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=None,
             only_if_absent=False, expected_revision=None):
     """Store one parsed workflow definition; the engine reads it on the next event.
 
     Also appends a version record (the definition exactly as published, with
     its revision, operator, and cause) and prunes history beyond MAX_VERSIONS.
+    The item is stamped with ``owner`` — the publishing operator's subject,
+    preserved from the previous revision when the operator is unknown and
+    falling back to the previous item's ``published_by`` (G17 Phase 1:
+    informational for now; Phase 2 filters reads by it). Version records
+    carry the same owner for the same reason they carry published_by.
     """
     now = datetime.now(timezone.utc).isoformat()
     previous = previous or {}
@@ -86,6 +107,8 @@ def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=N
         "workflow": _scrub(workflow),
         "enabled": bool(workflow.get("enabled", True)),
         "published_by": str(operator or "") or previous.get("published_by") or "",
+        "owner": str(operator or "") or previous.get("owner")
+                 or previous.get("published_by") or "",
         "created_at": previous.get("created_at") or now,
         "updated_at": now,
         "revision": revision,
@@ -105,6 +128,7 @@ def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=N
         "workflow": item["workflow"],
         "enabled": item["enabled"],
         "published_by": str(operator or ""),
+        "owner": str(operator or ""),
         "published_at": now,
         "cause": cause,
     })
@@ -173,7 +197,7 @@ def unpublish(workflow_id, table_ref=None):
 
 def get_item(workflow_id, table_ref=None):
     item = get_table(table_ref).get_item(Key={"workflow_id": workflow_id}).get("Item")
-    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+    return _decode_item(item) if item else None
 
 
 def _scan_all(table):
@@ -201,7 +225,7 @@ def load_items(table_ref=None, include_drafts=False):
         and (include_drafts or not item.get("draft_of"))
     ]
     return sorted(
-        ({key: _decode_numbers(value) for key, value in item.items()} for item in items),
+        (_decode_item(item) for item in items),
         key=lambda item: item.get("workflow_id", ""),
     )
 

@@ -239,13 +239,14 @@ def test_api_list_uses_published_state(github_ready, published, monkeypatch, tmp
         "trigger:\n  connector: email\n  event: message.received\n"
         "actions:\n  - type: webhook\n    url: https://example.test/hook\n")
     published_workflows.publish(seeded_workflow(enabled=False, id="bundled-flow"))
-    published_workflows.publish(seeded_workflow(id="cloud-only"))
+    published_workflows.publish(seeded_workflow(id="cloud-only"), operator="op-7")
 
     status, payload = designer_store.api_list()
     items = {item["id"]: item for item in payload["workflows"]}
     assert items["bundled-flow"]["published"] is True
     assert items["bundled-flow"]["enabled"] is False
     assert items["cloud-only"]["published"] is True
+    assert items["cloud-only"]["owner"] == "op-7"  # informational list row
     assert "deployed" not in items["cloud-only"]
 
 
@@ -335,11 +336,39 @@ def test_publish_records_a_version_history(published):
     versions = published_workflows.list_versions("test-flow")
     assert [version["revision"] for version in versions] == [2, 1]
     assert [version["published_by"] for version in versions] == ["op-2", "op-1"]
+    assert [version["owner"] for version in versions] == ["op-2", "op-1"]
     assert versions[0]["workflow"]["actions"][0]["type"] == "slack"
     assert versions[0]["cause"] == "save"
     assert published_workflows.get_version("test-flow", 1)["published_by"] == "op-1"
     assert published_workflows.get_version("test-flow", 9) is None
     assert published_workflows.get_item("test-flow")["revision"] == 2
+    assert published_workflows.get_item("test-flow")["owner"] == "op-2"
+
+
+def test_publish_stamps_owner_and_preserves_it_without_an_operator(published):
+    item = published_workflows.publish(seeded_workflow(), operator="op-1")
+    assert item["owner"] == "op-1"
+    # G17 Phase 1: an operator-less publish (engine internals) keeps the
+    # previous owner; the version record still says who did this revision.
+    republished = published_workflows.publish(seeded_workflow(), previous=item)
+    assert republished["owner"] == "op-1"
+    assert published_workflows.get_version("test-flow", 2)["owner"] == ""
+    assert published_workflows.get_version("test-flow", 1)["owner"] == "op-1"
+
+
+def test_owner_backfills_from_published_by(published):
+    published_workflows.publish(seeded_workflow(), operator="legacy-op")
+    legacy = dict(published.items["test-flow"])
+    del legacy["owner"]  # an item stored before G17
+    # A publish without an operator copies the owner from published_by...
+    published_workflows.publish(seeded_workflow(), previous=legacy)
+    assert published_workflows.get_item("test-flow")["owner"] == "legacy-op"
+    # ...and every read of a still-unstamped item resolves it the same way,
+    # while the engine's view of the definition is untouched.
+    published.items["test-flow"].pop("owner")
+    assert published_workflows.get_item("test-flow")["owner"] == "legacy-op"
+    assert published_workflows.load_items()[0]["owner"] == "legacy-op"
+    assert published_workflows.load_workflows() == [seeded_workflow()]
 
 
 def test_version_records_stay_hidden_from_the_engine(published):
@@ -383,6 +412,7 @@ def test_versions_lists_the_live_revision(published, github_ready):
     assert payload["revision"] == 1
     assert len(payload["versions"]) == 1
     assert payload["versions"][0]["current"] is True
+    assert payload["versions"][0]["owner"] == "op-1"
 
 
 def test_rollback_validates_input(published, github_ready):

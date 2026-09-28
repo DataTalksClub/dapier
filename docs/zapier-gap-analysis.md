@@ -1418,7 +1418,7 @@ Add `src/dapier/api/paging.py` (clamp/encode/decode/scan-window lifted from
 runs). Multi-user Phase 0: owner-filtered lists need stable paged orders, so
 this lands first.
 
-### G17. Multi-user (phased; start after G16)
+### G17. Multi-user (Phase 1 landed 2026-09-28: owner stamping)
 
 Single-tenant today: identities are DTC subjects everywhere (console OIDC
 cookie, `dap_` tokens, `dapd_` device sessions), roles v1 exists
@@ -1433,6 +1433,21 @@ on publish (preserve previous; duplicate/apply set caller; backfill from
 list, overview, runs, inbox, usage; engine untouched. Phase 3: owner-or-
 operator write checks for non-operators. Out of scope until an external
 (non-DTC) identity actually needs in.
+
+Phase 1 landed as designed (`feat(designer): owner stamped on published
+workflows`): `publish()` stamps the publishing operator's subject as
+`owner` on the live item — preserved from the previous revision when the
+operator is unknown, falling back to the item's informational
+`published_by` — version records carry `owner` alongside `published_by`,
+and every live read resolves it (`get_item`/`load_items` decode backfills
+`owner` from `published_by`, so no migration is needed; the engine's
+definition view is untouched). Duplicate and template-apply already publish
+through `api_save(live=True)` with the caller as operator, so the copy is
+owned by whoever made it; publishing a draft set by someone else attributes
+to the publisher, exactly like `published_by`. Surfaces are informational
+only — designer list rows and versions rows expose `owner` read-only; no
+access-control behavior changed, and Phase 2 (`visible_to()` reads) and
+Phase 3 (owner-or-operator writes) remain not started.
 
 ### Gate debts on the in-flight gmail/agent lane — verified closed 2026-09-28
 
@@ -1462,8 +1477,12 @@ operator write checks for non-operators. Out of scope until an external
   (`save_draft`/`load_items(include_drafts=False)`, `api_save(live=...)`,
   publish/discard/draft/draft-diff, viewer/editor role mapping,
   `tests/test_designer_drafts.py`).
-- **G17 multi-user** — phased recommendation stands (owner stamping →
-  visible_to reads → owner-or-operator writes); start after G15 lands.
+- **G17 multi-user Phase 1 — shipped** (`feat(designer): owner stamped on
+  published workflows`): `publish()` stamps `owner` (preserve previous;
+  `published_by` backfilled on read, no migration), version records carry
+  it, duplicate/template-apply/draft-publish attribute to their caller;
+  Phase 2 (`visible_to` reads) and Phase 3 (owner-or-operator writes) not
+  started.
 - Also closed: the host-task read surface debt
   (`feat(agent-tasks): read surface for the host task rows`) —
   `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console

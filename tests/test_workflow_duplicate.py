@@ -132,6 +132,7 @@ def test_duplicate_copies_under_a_new_id_and_publishes(published, github_ready, 
     assert "test-flow-copy" in published.items
     assert published.items["test-flow-copy"]["workflow"]["id"] == "test-flow-copy"
     assert published.items["test-flow-copy"]["published_by"] == "op-1"
+    assert published.items["test-flow-copy"]["owner"] == "op-1"  # G17: the caller owns the copy
     assert published.items["test-flow"]["workflow"] == designer_store.parse_workflow(WORKFLOW_YAML)
     assert github_ready[-1] == ("PATCH", "/repos/owner/repo/git/refs/heads/main", "test-token", {"sha": "commit456"})
 

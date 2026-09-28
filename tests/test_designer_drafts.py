@@ -200,9 +200,12 @@ def test_publish_promotes_a_draft_only_workflow_as_v1(git_sync, store):
     live = published_workflows.get_item("test-flow")
     assert live["workflow"]["actions"][0]["url"] == "https://example.test/hook"
     assert live["published_by"] == "op-2"
+    # G17: the publisher owns the workflow, not the drafter (op-1).
+    assert live["owner"] == "op-2"
     versions = published_workflows.list_versions("test-flow")
     assert [v["revision"] for v in versions] == [1]
     assert versions[0]["cause"] == "publish"
+    assert versions[0]["owner"] == "op-2"
     assert git_sync[-1]["message"] == "designer: save workflow test-flow"
     # The draft is consumed.
     assert published_workflows.get_draft("test-flow") is None
@@ -219,6 +222,7 @@ def test_publish_promotes_a_revision_bump_and_clears_the_draft_block(git_sync, s
     assert payload["revision"] == 2
     live = published_workflows.get_item("test-flow")
     assert live["workflow"]["actions"][0]["url"] == "https://example.test/hook2"
+    assert live["owner"] == "op-2"  # G17: publishing operator, draft author too
     _, versions = designer_store.api_versions("test-flow.yaml")
     assert "draft" not in versions
 

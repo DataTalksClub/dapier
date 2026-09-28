@@ -219,7 +219,10 @@ def api_list(q=None, tag=None, folder=None):
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
             summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
-            summaries[summary["id"]] = {**summary, "published": True}
+            # Informational G17 owner (resolved on read; published_by before
+            # the stamp) — no access control rides on it until Phase 2.
+            summaries[summary["id"]] = {**summary, "published": True,
+                                        "owner": item.get("owner") or ""}
         # A workflow with a draft but nothing live still lists — Zapier shows
         # the unpublished draft in the sidebar — flagged published: false so
         # nobody mistakes it for running state. Drafts never fire: the engine
@@ -1088,6 +1091,7 @@ def api_versions(source):
     versions = [{
         "revision": int(version.get("revision") or 0),
         "published_by": version.get("published_by") or "",
+        "owner": published_workflows.resolve_owner(version),
         "published_at": version.get("published_at") or "",
         "cause": version.get("cause") or "save",
         "enabled": bool(version.get("enabled", True)),

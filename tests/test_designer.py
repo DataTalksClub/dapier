@@ -1155,6 +1155,7 @@ def test_apply_template_forks_through_the_save_path_and_keeps_the_template(
 
     live = published_workflows.get_item("my-starter-flow")
     assert live["workflow"]["id"] == "my-starter-flow"
+    assert live["owner"] == "op-2"  # G17: the applier owns the fork, not the template author
     assert "template" not in live["workflow"]  # the fork is a plain workflow
     assert git_sync[-1]["message"] == "designer: apply template template-starter as my-starter-flow"
 
