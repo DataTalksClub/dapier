@@ -1334,8 +1334,10 @@ inbox replay-bounce notes; closed in round 30). New findings this pass, ranked:
   times plus a doubled fresh-audit tail; deduped to the newest revision
   (~2300 stale lines dropped).
 
-Still open from the fresh audit: draft vs live (the publish moment) and
-designer list paging (a scale note, fine until the published store grows).
+Closed since that audit: draft vs live landed as round-9 G15 below, and
+the list-clipping half of G16 (inbox/connections/grants page now). The
+one paging shape still as-designed is the designer list's full scan of
+the published store — a scale note, fine until that store grows.
 
 ## Round 9 (2026-09-28): what is still missing — quotas, drafts, paging, multi-user (designs)
 
