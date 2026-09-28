@@ -18018,6 +18018,26 @@
       ]
     },
     {
+      type: "ai_complete",
+      label: "AI: complete",
+      icon: Sparkles,
+      description: "One chat completion against the copilot's OpenAI-compatible endpoint (COPILOT_LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+      fields: [
+        {
+          key: "prompt",
+          label: "Prompt",
+          type: "textarea",
+          required: true,
+          placeholder: "Summarize this message for the digest:\n{body}"
+        },
+        { key: "system", label: "System message", type: "textarea" },
+        { key: "json_mode", label: "JSON mode", type: "boolean", default: "false" },
+        { key: "temperature", label: "Temperature", type: "number" },
+        { key: "model", label: "Model" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
       type: "slack",
       label: "Slack",
       icon: SlackLogo,
@@ -20108,6 +20128,7 @@
     }
   ];
   const connectorCatalog = [
+    { name: "ai", label: "AI", logo: Sparkles, events: [] },
     { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
     { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },

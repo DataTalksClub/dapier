@@ -1,4 +1,4 @@
-import { Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
+import { Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -154,6 +154,21 @@ export const actionCatalog: ActionEntry[] = [
       { key: "headers", label: "Headers (YAML)", type: "textarea", placeholder: "accept: application/json\nx-trace: \"{trigger.id}\"" },
       { key: "body", label: "Body template", type: "textarea", placeholder: '{"subject": "{subject}"}' },
       { key: "content_type", label: "Content type", placeholder: "application/json" },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+    ]
+  },
+  {
+    type: "ai_complete",
+    label: "AI: complete",
+    icon: Sparkles,
+    description: "One chat completion against the copilot's OpenAI-compatible endpoint (COPILOT_LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+    fields: [
+      { key: "prompt", label: "Prompt", type: "textarea", required: true,
+        placeholder: "Summarize this message for the digest:\n{body}" },
+      { key: "system", label: "System message", type: "textarea" },
+      { key: "json_mode", label: "JSON mode", type: "boolean", default: "false" },
+      { key: "temperature", label: "Temperature", type: "number" },
+      { key: "model", label: "Model" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   },
@@ -1646,6 +1661,7 @@ export const actionCatalog: ActionEntry[] = [
 ];
 
 export const connectorCatalog: ConnectorEntry[] = [
+  { name: "ai", label: "AI", logo: Sparkles, events: [] },
   { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
   { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
   { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
