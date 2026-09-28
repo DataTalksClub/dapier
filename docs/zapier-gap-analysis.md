@@ -415,7 +415,7 @@ the discovery/replay/test work already underway.
 | Retry/backoff policy per action | workflow-level `retry` redrive + per-step `autoretry` with exponential backoff (`engine/worker.py`, `engine/logic.py`) | have |
 | Task history (runs, step I/O) | EXECUTIONS_TABLE + run grouping (`api/runs.py`) | have |
 | Replay a task | `api_replay` re-injects the envelope onto the queue (`api/runs.py:190`) | have |
-| Test before publish (dry-run/execute) | `engine/dryrun.py`, designer Test panel, `wf test` CLI | have (stale runner list, below) |
+| Test before publish (dry-run/execute) | `engine/dryrun.py`, designer Test panel, `wf test` CLI | have (registry-truth dry-run) |
 | Field mapping autofill from sample data | trigger-sample endpoint feeds the inspector and Test step (`api/runs.py` `api_trigger_sample`, `engine/dryrun.py` `test_step`) | have |
 | Workflow versioning / rollback | `#v<n>` version records in PUBLISHED_WORKFLOWS_TABLE (`triggers/published_workflows.py`); versions list + rollback on console, CLI, and API | have |
 | Find my zap (cross-workflow search) | `?q=` search over workflows and run content (`api/overview.py` `_workflow_matches`, `api/runs.py` `api_list`) | have |
@@ -596,16 +596,12 @@ telemetry and depth cap.
    `/usage` endpoints, `overview.py` block, and `dapier usage`. Tests:
    extend `tests/test_runs.py`, new `tests/test_usage.py`.
 
-2. **Registry-truth dry-run (bug fix riding G10, S).** `engine/dryrun.py:30-39`
-   still hardcodes the pre-registry 8 runner types, so a dry-run of any
-   `code`, `http_request`, `s3_upload`, or `sheets_append_row` step — 4 of the
-   12 registered actions — reports "unsupported action" for workflows that run
-   fine in production (`dryrun.py:143-145`). That poisons trust in the Test
-   panel the team is actively building. Build order: replace RUNNER_TYPES with
-   a lookup into `connectors.registry.ACTIONS` (registry never imports the
-   engine, so the import stays lazy/literal as it does in
-   `registry.validate_action_chain`); while there, apply the G10 field-type
-   checks. Tests: `tests/test_dryrun.py` cases for each of the 12 types.
+2. **Registry-truth dry-run (bug fix riding G10, S).** CLOSED (2026-09-28):
+   `engine/dryrun.py` derives the runnable set from `connectors.registry`
+   (`set(registry.ACTIONS) | set(registry.LOGIC)` — no hardcoded runner
+   list left), so every registered action dry-runs, with the G10 field-type
+   checks applied at save time. The "(stale runner list)" caveats elsewhere
+   in this doc predate the fix.
 
 3. **Sheets find-row with create-if-missing (G1, S/M).** The emblematic Zapier
    action, and the plumbing (transport injection, `steps` outputs, catalog
@@ -1179,16 +1175,19 @@ Still open (ranked, from the same audit):
 
 ### Fresh audit 2026-09-28 (post-round-24) — what a Zapier-eye still catches
 
-Re-verified against committed HEAD (`6d330a7`): 103 registered actions,
-15 trigger chips, 11 poll sources, options discovery on every listing,
+Re-verified against committed HEAD (`6d330a7`); the counts below were
+re-dumped 2026-09-28, latest (fresh-audit section in
+docs/connector-coverage-audit.md): **105 registered actions, 18 trigger
+chips, 16 poll sources**, options discovery on every listing,
 find-or-create wherever a create exists. Of the round-6 deliberately-deferred
 list, plan/quota enforcement has since closed (the account-wide monthly
 task budget, see G14) — still open, confirmed in code: multi-user
-beyond roles v1 (no invitations/shared workspaces), new app chips (zero
-`calendar` references in `src/` — Gmail and no AI/LLM provider;
-Google Calendar closed in round 28), Google Sheets `row.updated` (only `row.new` in the poll source),
-and an SES bounce/complaint trigger chip (no SES notification intake; only
-inbox replay-bounce notes; closed in round 30). New findings this pass, ranked:
+beyond roles v1 (no invitations/shared workspaces).
+Closed since that audit, confirmed in code: the new-app chips (Google
+Calendar round 28, AI round 29, Gmail), the SES bounce/complaint
+trigger chip and Google Sheets `row.updated` (both round 30), and the
+registry-truth dry-run (the hardcoded runner list is gone). New findings
+this pass, ranked:
 
 1. **Auto-disable on repeated failures (value H, effort M).** Zapier pauses
    a zap after consecutive errors and emails the owner; dapier has no trip
@@ -1403,7 +1402,7 @@ draft badges (`make designer-console` rebuilt). Tests:
 designer/published/YouTube/version suites. No migration: no `#draft` items
 existed; the first save after ship drafts while live keeps running.
 
-### G16. List paging — two real bugs, two UX gaps (design ready, not started)
+### G16. List paging — landed 2026-09-28 (see the shipped log below)
 
 Runs and audit already page (`runs.api_list`, `audit._scan_window` — the
 reference pattern: opaque token, clamped limit, bounded scan window). Bugs
@@ -1418,7 +1417,9 @@ overview snapshot the console renders from (`records.py:274`, `overview.py:108`)
 — paged list + dedicated console fetch. **Grants clip at 100** (`authz.py:136`).
 Add `src/dapier/api/paging.py` (clamp/encode/decode/scan-window lifted from
 runs). Multi-user Phase 0: owner-filtered lists need stable paged orders, so
-this lands first.
+this lands first. All of it shipped — trigger stores walk every scan page,
+inbox/connections/grants page on the runs-list contract (the "G16 paging —
+shipped" entry below).
 
 ### G17. Multi-user (landed in phases: owner stamp → owner-scoped reads → owner-or-operator writes)
 
@@ -1525,6 +1526,18 @@ paths stay grants-gated and untouched.
   stored item with no owner stamp is denied for non-operators on writes
   (the safe direction). G17 is landed in its three phases; full
   teams/external identities remain out of scope as designed.
+- **G17 Phase 2 follow-up — shipped** (`feat(auth): the per-item reads
+  take the same visible scope as the lists`): the reads Phase 2's list
+  filtering missed now scope on both surfaces — one run
+  (`runs.api_get`), the trigger sample (`runs.api_trigger_sample`), one
+  inbox event (`inbox.api_get`), the errors summary (`errors.api_summary`,
+  bounded flag still off the raw scan), a workflow's storage partition
+  (hidden reads like an empty one), and the designer per-file reads
+  (`api_get`, versions, diff, draft, draft-diff, both exports via a
+  `_read_denied` owner gate: live item, else the draft row; nothing stored
+  stays visible like every no-owner item). A hidden item answers exactly
+  like a missing one — 404/empty, never a distinct denial. Tests:
+  `tests/test_visibility_reads.py`.
 - Also closed: the host-task read surface debt
   (`feat(agent-tasks): read surface for the host task rows`) —
   `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console
