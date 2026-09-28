@@ -206,6 +206,25 @@ List what a stored poll watches with `dapier polls list` (the Watches column
 shows `zoom.recordings <for_email>`), and pull a sample payload with
 `dapier triggers sample zoom --event zoom-recordings`.
 
+## Archive recordings to S3
+
+Recording events and `zoom_find_recording` both carry the recording's
+`download_url`, and `s3_upload` fetches a `source_url` directly — so
+recording → archive needs no downloader step in between:
+
+1. Trigger on `zoom.recordings` (or the recording.completed webhook); the
+   event data carries `download_url` and `meeting_id`.
+2. Add an `s3_upload` step: `bucket` and `key` (for example
+   `zoom/{meeting_id}.mp4`), `source_url: {download_url}`, and
+   `source_connection_id: zoom` — the upload fetches the URL with the
+   zoom connection's OAuth token (refreshed automatically), which is what
+   Zoom's authenticated download links require. The AWS side rides the
+   shared `aws` credential via `credential_id`.
+
+`source_url` is templated like every field, so a `zoom_find_recording`
+step (by meeting id, topic, or latest) can feed the same upload for
+backfills of recordings that predate the trigger.
+
 ## Create meetings
 
 `zoom_create_meeting` (Zapier's "Create Meeting") creates one meeting on the
