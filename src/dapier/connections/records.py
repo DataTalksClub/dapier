@@ -13,6 +13,8 @@ DynamoDB metadata item only:
 - ``version`` (bumped on every metadata edit), timestamps
 """
 
+import base64
+import json
 import re
 from datetime import datetime, timezone
 
@@ -273,3 +275,83 @@ def put_connection(table, item):
 
 def list_connections(table, limit=50):
     return table.scan(Limit=limit).get("Items", [])
+
+
+# The paged list (api_list_connections). Connection metadata is small and
+# nothing may silently clip at a scan page (connection #51 used to be
+# unreachable through the overview's Limit=50 scan), so the list walks the
+# whole table — bounded like every other walk — and windows the sorted
+# result with an opaque token, the same contract as the runs list.
+CONNECTIONS_DEFAULT_LIMIT = 50
+CONNECTIONS_MAX_LIMIT = 200
+CONNECTIONS_SCAN_PAGE = 300
+CONNECTIONS_MAX_SCAN_PAGES = 100
+
+
+def _int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sort_key(item):
+    """Connection-id order, so paging is stable across calls."""
+    return str(item.get("connection_id") or "")
+
+
+def _encode_token(item):
+    """Opaque stateless page token: the last row's sort key."""
+    raw = json.dumps({"c": _sort_key(item)}, sort_keys=True).encode()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _decode_token(token):
+    """The connection id behind a page token, or None."""
+    text = str(token or "")
+    try:
+        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
+        return str(data.get("c") or "") or None
+    except (ValueError, TypeError):
+        return None
+
+
+def _scan_all(table):
+    """Every connection record, walking scan pages (bounded)."""
+    items = []
+    kwargs = {"Limit": CONNECTIONS_SCAN_PAGE}
+    for _ in range(CONNECTIONS_MAX_SCAN_PAGES):
+        page = table.scan(**kwargs)
+        items.extend(page.get("Items", []))
+        last = page.get("LastEvaluatedKey")
+        if not last:
+            break
+        kwargs["ExclusiveStartKey"] = last
+    return items
+
+
+def api_list_connections(table, limit=None, next_token=None):
+    """The paged connections list: ``(status, payload)``.
+
+    Rows sort by connection id; ``paging.next`` carries the last returned
+    row's sort key and the follow-up call passes it back as ``next_token``
+    to start strictly after that row. An unparseable token is a 400. The
+    shape is backward compatible — ``connections`` plus an additive
+    ``paging`` block, the same contract as the runs list.
+    """
+    limit = max(1, min(_int(limit) or CONNECTIONS_DEFAULT_LIMIT, CONNECTIONS_MAX_LIMIT))
+    token_key = _decode_token(next_token) if next_token else None
+    if next_token and token_key is None:
+        return 400, {"error": "Invalid page token"}
+    items = sorted(_scan_all(table), key=_sort_key)
+    if token_key is not None:
+        items = [item for item in items if _sort_key(item) > token_key]
+    page = items[:limit]
+    more = len(items) > limit
+    return 200, {
+        "connections": page,
+        "paging": {
+            "next": _encode_token(page[-1]) if more and page else None,
+            "limit": limit,
+        },
+    }

@@ -14,6 +14,8 @@ Two layers:
    identities are not enrolled yet (see docs).
 """
 
+import base64
+import json
 import os
 import re
 import time
@@ -133,14 +135,81 @@ def delete_grant(table, *, connection_id, grantee_id):
     table.delete_item(Key={"connection_id": connection_id, "grantee": grantee_id})
 
 
-def list_grants(table, connection_id=None, limit=100):
+def list_grants(table, connection_id=None, limit=None):
+    """The grant items, sorted by ``(connection_id, grantee)``.
+
+    A full walk: a single-page scan silently clipped at DynamoDB's page
+    limit, so grant #101 was unreachable. ``limit`` (legacy callers) slices
+    the sorted result; page tokens go through api_list_grants.
+    """
+    items = sorted(_scan_all_grants(table, connection_id), key=_grant_sort_key)
+    return items[:limit] if limit else items
+
+
+# The paged list (api_list_grants): the same opaque-token contract as the
+# runs list — sorted rows, a next token over the last row's sort key, a
+# clamped limit, and a 400 for an unparseable token.
+GRANTS_DEFAULT_LIMIT = 100
+GRANTS_MAX_LIMIT = 500
+GRANTS_SCAN_PAGE = 300
+GRANTS_MAX_SCAN_PAGES = 100
+
+
+def _int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _grant_sort_key(item):
+    """Stable (connection_id, grantee) order, so paging is deterministic."""
+    return (str(item.get("connection_id") or ""), str(item.get("grantee") or ""))
+
+
+def encode_paging_token(key):
+    """Opaque stateless page token: the last row's (connection_id, grantee)."""
+    raw = json.dumps({"c": key[0], "g": key[1]}, sort_keys=True).encode()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def decode_paging_token(token):
+    """The ``(connection_id, grantee)`` sort key behind a page token, or None."""
+    text = str(token or "")
+    try:
+        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
+        key = (str(data.get("c") or ""), str(data.get("g") or ""))
+    except (ValueError, TypeError):
+        return None
+    return key or None
+
+
+def _scan_all_grants(table, connection_id=None):
+    """Every grant (or one connection's), walking scan/query pages (bounded).
+
+    Grants are small rows and callers aggregate over the whole set (an
+    agent's connections, the console's list), so nothing may silently clip
+    at DynamoDB's page limit.
+    """
     if connection_id:
-        return table.query(
-            KeyConditionExpression="connection_id = :connection",
-            ExpressionAttributeValues={":connection": connection_id},
-            Limit=limit,
-        ).get("Items", [])
-    return table.scan(Limit=limit).get("Items", [])
+        kwargs = {
+            "KeyConditionExpression": "connection_id = :connection",
+            "ExpressionAttributeValues": {":connection": connection_id},
+        }
+        pull = table.query
+    else:
+        kwargs = {"Limit": GRANTS_SCAN_PAGE}
+        pull = table.scan
+    kwargs.setdefault("Limit", GRANTS_SCAN_PAGE)
+    items = []
+    for _ in range(GRANTS_MAX_SCAN_PAGES):
+        page = pull(**kwargs)
+        items.extend(page.get("Items", []))
+        last = page.get("LastEvaluatedKey")
+        if not last:
+            break
+        kwargs["ExclusiveStartKey"] = last
+    return items
 
 
 GRANT_PUBLIC_FIELDS = (
@@ -153,8 +222,30 @@ def public_grant(item):
     return {key: item.get(key) for key in GRANT_PUBLIC_FIELDS}
 
 
-def api_list_grants(table, connection_id=None):
-    return 200, {"grants": [public_grant(item) for item in list_grants(table, connection_id=connection_id)]}
+def api_list_grants(table, connection_id=None, limit=None, next_token=None):
+    """The list response: grants plus a ``paging`` block.
+
+    ``next`` carries the last returned row's sort key; the follow-up call
+    passes it back as ``next_token`` and the window starts strictly after
+    that row. The shape is backward compatible — ``grants`` is unchanged,
+    ``paging`` is additive.
+    """
+    limit = max(1, min(_int(limit) or GRANTS_DEFAULT_LIMIT, GRANTS_MAX_LIMIT))
+    token_key = decode_paging_token(next_token) if next_token else None
+    if next_token and token_key is None:
+        return 400, {"error": "Invalid page token"}
+    items = sorted(_scan_all_grants(table, connection_id), key=_grant_sort_key)
+    if token_key is not None:
+        items = [item for item in items if _grant_sort_key(item) > token_key]
+    page = items[:limit]
+    more = len(items) > limit
+    return 200, {
+        "grants": [public_grant(item) for item in page],
+        "paging": {
+            "next": encode_paging_token(_grant_sort_key(page[-1])) if more and page else None,
+            "limit": limit,
+        },
+    }
 
 
 def api_save_grant(table, body, *, operator, connections_table):

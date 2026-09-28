@@ -35,16 +35,26 @@ function renderRows() {
   $('#inbox-table').innerHTML = list.map(eventRow).join('');
   $('#inbox-empty').hidden = list.length > 0;
   $('#inbox-table-wrap').hidden = list.length === 0;
+  $('#inbox-load-more').hidden = !paging.nextToken;
   icons();
 }
 
-export async function fetchInbox() {
+/* Server-paged like the runs view: Load more appends the next page through
+   the API's paging token; a fresh fetch resets it. */
+const paging = { nextToken: null };
+
+export async function fetchInbox({ append = false } = {}) {
   if (fetching) return;
   fetching = true;
   try {
-    const data = await api('/api/admin/triggers/inbox?limit=25');
-    events = data.events || [];
+    const params = new URLSearchParams({ limit: '25' });
+    if (append && paging.nextToken) params.set('next', paging.nextToken);
+    const data = await api(`/api/admin/triggers/inbox?${params}`);
+    const fresh = data.events || [];
+    paging.nextToken = (data.paging || {}).next || null;
+    events = append && events ? [...events, ...fresh] : fresh;
   } catch (error) {
+    if (!append) paging.nextToken = null;
     notice(error.message, true);
   } finally {
     fetching = false;
@@ -118,6 +128,7 @@ async function replayEvent(inboxId) {
 document.addEventListener('click', (event) => {
   if (event.target.closest('.nav-item[data-view="inbox"]')) void fetchInbox();
 });
+$('#inbox-load-more').addEventListener('click', () => fetchInbox({ append: true }));
 $('#inbox-replay-button').addEventListener('click', (event) => {
   if (event.currentTarget.dataset.inbox) openReplayConfirm(event.currentTarget.dataset.inbox);
 });

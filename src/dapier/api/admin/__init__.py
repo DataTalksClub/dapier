@@ -92,6 +92,8 @@ def route(event, method, path):
         return routes.save_oauth_client(path.rsplit("/", 1)[1], event)
     if method == "PUT" and path == "/api/admin/connections":
         return routes.save_connection(event)
+    if method == "GET" and path == "/api/admin/connections":
+        return routes.list_connections(event)
     if method == "POST" and path == "/api/admin/connections/import":
         return routes.import_connection(event, operator_subject)
     discover_resource_match = re.fullmatch(
@@ -274,6 +276,7 @@ from .routes import (  # noqa: F401
     issue_connection_token,
     list_api_tokens,
     list_audit,
+    list_connections,
     list_email_triggers,
     export_audit,
     export_all_designer_workflows,

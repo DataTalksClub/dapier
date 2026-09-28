@@ -219,13 +219,42 @@ def issue_token(event):
     }))
 
 
+AGENT_LIST_DEFAULT_LIMIT = 100
+AGENT_LIST_MAX_LIMIT = 200
+
+
 def list_for_caller(event):
+    """The caller's connections (grant-filtered), or every connection for an
+    operator passing ``?all=true``.
+
+    Default (unchanged): the connections this identity holds grants for, one
+    row per grant. ``limit``/``next`` page that list — rows sort by
+    (connection_id, agent) and ``paging`` is additive, so the no-param
+    response shape is exactly as before. The grant scan is a full walk, so a
+    caller's later grants no longer clip at DynamoDB's page limit.
+
+    ``?all=true`` is the operator bulk list (``dapier connections list
+    --all``): every connection, paged over records.api_list_connections and
+    gated like the other operator-only reads.
+    """
     subject, error = authenticate(event)
     if error:
         return error
+    query = event.get("queryStringParameters") or {}
     connections_table, grants_table = _tables()
+    if str(query.get("all") or "").strip().lower() in ("1", "true", "yes"):
+        _, operator_error = require_operator(event, "connections.list")
+        if operator_error:
+            return operator_error
+        status, payload = connections.api_list_connections(
+            connections_table, limit=query.get("limit"),
+            next_token=query.get("next") or None,
+        )
+        if status == 200:
+            payload["connections"] = overview._connection_views(payload["connections"])
+        return _no_store(_json_response(status, payload))
     try:
-        items = grants_table.scan(Limit=200).get("Items", [])
+        items = authz.list_grants(grants_table)
     except Exception:
         items = []
     mine = [item for item in items if item.get("subject") == subject and not _grant_expired(item)]
@@ -240,7 +269,34 @@ def list_for_caller(event):
             "operations": item.get("operations", []),
         })
     views.sort(key=lambda view: (view["connection_id"], view.get("agent") or ""))
-    return _json_response(200, {"connections": views})
+    if query.get("limit") is None and not query.get("next"):
+        return _json_response(200, {"connections": views})
+    limit = max(1, min(
+        _int(query.get("limit")) or AGENT_LIST_DEFAULT_LIMIT, AGENT_LIST_MAX_LIMIT))
+    token_key = authz.decode_paging_token(query.get("next")) if query.get("next") else None
+    if query.get("next") and token_key is None:
+        return _json_response(400, {"error": "Invalid page token"})
+    def view_key(view):
+        return (view["connection_id"], view.get("agent") or "")
+    keyed = [(view_key(view), view) for view in views]
+    if token_key is not None:
+        keyed = [entry for entry in keyed if entry[0] > token_key]
+    page = [view for _, view in keyed[:limit]]
+    more = len(keyed) > limit
+    return _json_response(200, {
+        "connections": page,
+        "paging": {
+            "next": authz.encode_paging_token(keyed[limit - 1][0]) if more and page else None,
+            "limit": limit,
+        },
+    })
+
+
+def _int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _grant_expired(item):
@@ -274,7 +330,7 @@ def show_connection(event, connection_id):
         pairs = [(subject, agent)]
     else:
         try:
-            items = grants_table.scan(Limit=200).get("Items", [])
+            items = authz.list_grants(grants_table, connection_id=connection_id)
         except Exception:
             items = []
         pairs = [
@@ -1079,6 +1135,7 @@ def grants_api(event, method):
         query = event.get("queryStringParameters") or {}
         status, payload = authz.api_list_grants(
             authz.grants_table(), connection_id=query.get("connection_id") or None,
+            limit=query.get("limit"), next_token=query.get("next") or None,
         )
         return _json_response(status, payload)
     if method == "PUT":
@@ -1457,7 +1514,10 @@ def inbox_api(event, inbox_id=None):
         status, payload = inbox.api_get(inbox_id)
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
-    status, payload = inbox.api_list(query.get("connector"), query.get("limit", 25))
+    status, payload = inbox.api_list(
+        query.get("connector"), query.get("limit", 25),
+        next_token=query.get("next") or None,
+    )
     return _no_store(_json_response(status, payload))
 
 

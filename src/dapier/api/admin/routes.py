@@ -254,7 +254,10 @@ def replay_failed_runs(event, operator):
 def list_inbox(event):
     """Trigger inbox: every inbound event, matched or not."""
     query = event.get("queryStringParameters") or {}
-    status, payload = inbox.api_list(query.get("connector"), query.get("limit", 25))
+    status, payload = inbox.api_list(
+        query.get("connector"), query.get("limit", 25),
+        next_token=query.get("next") or None,
+    )
     return http._json_response(status, payload)
 
 
@@ -342,10 +345,27 @@ def save_connection(event):
     session._audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
     return http._json_response(200, item)
 
+def list_connections(event):
+    """The paged connections list (records.api_list_connections): every
+    connection, not just the overview snapshot's first scan page, with
+    ``limit``/``next`` paging behind the console's Load more and
+    `dapier connections list --all`. Rows carry the same public metadata
+    plus token health the overview's connections block renders."""
+    query = event.get("queryStringParameters") or {}
+    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+    status, payload = connection_model.api_list_connections(
+        connections_table, limit=query.get("limit"),
+        next_token=query.get("next") or None,
+    )
+    if status == 200:
+        payload["connections"] = overview._connection_views(payload["connections"])
+    return http._json_response(status, payload)
+
 def list_grants(event):
     query = event.get("queryStringParameters") or {}
     status, payload = authz.api_list_grants(
         authz.grants_table(), connection_id=query.get("connection_id") or None,
+        limit=query.get("limit"), next_token=query.get("next") or None,
     )
     return http._json_response(status, payload)
 

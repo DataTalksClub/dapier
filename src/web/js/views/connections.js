@@ -108,6 +108,64 @@ const needsAttention = (connection) => ['ready', 'expired', 'revoked'].includes(
 
 let addPickerOpen = false;
 
+/* Server-paged accounts table: the overview snapshot clips at its scan
+   limit, so once this page is open the view fetches /api/admin/connections
+   (the paged list the API owns) and Load more appends the next page through
+   the paging token — the same pattern as the runs view. Until the fetch
+   lands, the table shows the snapshot (state.data.connections); the
+   snapshot keeps feeding the header widgets either way. */
+const connectionsPage = { connections: null, nextToken: null, seq: 0 };
+
+function resetConnectionsPage() {
+  connectionsPage.connections = null;
+  connectionsPage.nextToken = null;
+  connectionsPage.seq += 1;
+}
+
+async function fetchConnectionsPage({ append = false } = {}) {
+  const seq = ++connectionsPage.seq;
+  const params = new URLSearchParams({ limit: '50' });
+  if (append && connectionsPage.nextToken) params.set('next', connectionsPage.nextToken);
+  try {
+    const data = await api(`/api/admin/connections?${params}`);
+    if (seq !== connectionsPage.seq) return; // a newer fetch superseded this one
+    const fresh = data.connections || [];
+    connectionsPage.nextToken = (data.paging || {}).next || null;
+    connectionsPage.connections = append && connectionsPage.connections
+      ? [...connectionsPage.connections, ...fresh] : fresh;
+  } catch (error) {
+    if (seq === connectionsPage.seq && !append) {
+      resetConnectionsPage(); // fall back to the snapshot until the next render
+    }
+    notice(error.message, true);
+    return;
+  }
+  renderConnections(connectionsPage.connections || []);
+}
+
+/* Created lazily beside the table (index.html has no static button for it —
+   only this view needs Load more). */
+function connectionsLoadMoreButton() {
+  const existing = $('#connections-load-more');
+  if (existing) return existing;
+  const button = document.createElement('button');
+  button.id = 'connections-load-more';
+  button.className = 'button secondary';
+  button.type = 'button';
+  button.hidden = true;
+  button.textContent = 'Load more';
+  $('#connection-table')?.closest('.table-wrap')?.after(button);
+  button.addEventListener('click', () => fetchConnectionsPage({ append: true }));
+  return button;
+}
+
+/* A snapshot refresh re-renders from the overview scan (clipped at 50);
+   reset the server-paged table first so the next render refetches it all. */
+async function refreshConnections() {
+  resetConnectionsPage();
+  await refresh();
+}
+
 const OAUTH_RESULTS = {
   access_denied: ['Access was not approved', 'Retry setup and approve the requested permissions.'],
   session_expired: ['Setup link expired', 'Start connection setup again from this page. Consent links can only be used once.'],
@@ -225,7 +283,7 @@ async function connectProvider(provider) {
     } else {
       notice('Connection created. Use Connect in the accounts table to finish setup.');
     }
-    await refresh();
+    await refreshConnections();
   } catch (error) {
     stopWatching();
     if (!popup.closed) popup.close();
@@ -237,7 +295,7 @@ function watchOAuthPopup(popup, connectionId) {
   const timer = setInterval(async () => {
     if (popup.closed) {
       clearInterval(timer);
-      await refresh();
+      await refreshConnections();
       const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
       if (connection?.status === 'connected') notice('Consent window closed. Current connection status refreshed.');
       else showOAuthResult('incomplete', connectionId);
@@ -250,7 +308,7 @@ function watchOAuthPopup(popup, connectionId) {
       if (popup.location.pathname === '/connections' && result) {
         clearInterval(timer);
         popup.close();
-        await refresh();
+        await refreshConnections();
         showOAuthResult(result, params.get('connection') || connectionId);
       }
     } catch (_) {
@@ -334,6 +392,13 @@ function openEditConnection(connectionId) {
 }
 
 function renderConnections(connections) {
+  /* Server-paged rows win once fetched; the argument (the overview snapshot)
+     is the fallback that keeps the view usable before and without them. */
+  const serverPaged = connectionsPage.connections !== null;
+  if (serverPaged) connections = connectionsPage.connections;
+  connections = connections || [];
+  if (!serverPaged && document.body.dataset.view === 'connections') fetchConnectionsPage();
+  connectionsLoadMoreButton().hidden = !(serverPaged && connectionsPage.nextToken);
   renderConnectCards(connections);
   const connected = connections.filter((connection) => effectiveStatus(connection) === 'connected').length;
   const attention = connections.filter(needsAttention).length;
@@ -448,7 +513,7 @@ $('#edit-connection-revoke').addEventListener('click', async (event) => {
     await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/tokens`, { method: 'DELETE' });
     $('#edit-connection-dialog').close();
     notice(`Access for ${connectionId} revoked in Dapier. Reconnect it to use the connection again.`);
-    await refresh();
+    await refreshConnections();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
   finally { button.disabled = false; button.textContent = $('#edit-connection-form').dataset.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens'; }
 });
@@ -1040,7 +1105,7 @@ $('#connection-form').addEventListener('submit', async (event) => {
     form.token.value = '';
     $('#connection-dialog').close();
     notice(provider === 'zoom' ? 'Zoom connection created. Add its callback URL in Zoom.' : `${meta.displayName} connected`);
-    await refresh();
+    await refreshConnections();
     if (provider === 'zoom') openEditConnection(id);
   } catch (error) { $('#connection-error').textContent = error.message; }
   finally { submit.disabled = false; submit.textContent = 'Create connection'; }
@@ -1080,7 +1145,7 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     form.signing_secret.value = '';
     $('#edit-connection-dialog').close();
     notice('Connection updated');
-    await refresh();
+    await refreshConnections();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
   finally { submit.disabled = false; submit.textContent = 'Save changes'; }
 });

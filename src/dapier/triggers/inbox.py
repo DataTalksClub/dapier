@@ -20,6 +20,7 @@ read/replay API raises :class:`InboxError` instead, so operators get a real
 message rather than an empty list.
 """
 
+import base64
 import json
 import logging
 import os
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 TABLE_ENV = "TRIGGER_INBOX_TABLE"
 RETENTION_DAYS = 30
 DEFAULT_LIMIT = 25
-MAX_LIMIT = 100
+MAX_LIMIT = 200
 
 # Stored event data is the trigger envelope, capped like the run-history
 # trigger input (engine.worker.TRIGGER_INPUT_LIMIT): high enough that an
@@ -207,19 +208,65 @@ def _view(item):
     return {key: _decode_numbers(item.get(key)) for key in keys}
 
 
-def api_list(connector=None, limit=DEFAULT_LIMIT, *, table_ref=None):
-    """Recent inbox events, newest first; ``connector`` filters when given."""
+def _sort_key(event):
+    """Newest-first ordering with an inbox-id tiebreak, so paging is stable."""
+    return (event.get("received_at") or "", event.get("inbox_id") or "")
+
+
+def _encode_token(event):
+    """Opaque stateless page token: the last row's sort key."""
+    raw = json.dumps({"r": event.get("received_at") or "",
+                      "i": event.get("inbox_id") or ""},
+                     sort_keys=True).encode()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _decode_token(token):
+    """The ``(received_at, inbox_id)`` sort key behind a page token, or None."""
+    text = str(token or "")
+    try:
+        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
+        key = (str(data.get("r") or ""), str(data.get("i") or ""))
+    except (ValueError, TypeError):
+        return None
+    return key if key != ("", "") else None
+
+
+def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None):
+    """Recent inbox events, newest first; ``connector`` filters when given.
+
+    ``paging.next`` carries the last returned row's sort key; the follow-up
+    call passes it back as ``next_token`` and the window starts strictly
+    after that row, so the connector filter and paging compose. The scanned
+    window stays bounded like every list call — events older than the window
+    age out of the list but stay reachable through api_get.
+    """
     try:
         limit = max(1, min(int(limit), MAX_LIMIT))
     except (TypeError, ValueError):
         limit = DEFAULT_LIMIT
+    token_key = _decode_token(next_token) if next_token else None
+    if next_token and token_key is None:
+        return 400, {"error": "Invalid page token"}
     items = (table_ref if table_ref is not None else _table()).scan(
         Limit=max(limit * 6, 150)).get("Items", [])
     events = [_view(item) for item in items]
     if connector:
         events = [event for event in events if event.get("connector") == connector]
-    events.sort(key=lambda event: event.get("received_at") or "", reverse=True)
-    return 200, {"events": events[:limit], "total": len(events)}
+    events.sort(key=_sort_key, reverse=True)
+    if token_key is not None:
+        events = [event for event in events if _sort_key(event) < token_key]
+    page = events[:limit]
+    more = len(events) > limit
+    return 200, {
+        "events": page,
+        "total": len(events),
+        "paging": {
+            "next": _encode_token(page[-1]) if more and page else None,
+            "limit": limit,
+            "filtered": bool(connector or next_token),
+        },
+    }
 
 
 def api_get(inbox_id, *, table_ref=None):

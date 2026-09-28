@@ -54,13 +54,28 @@ def print_connection(item):
         print(f"token_expires_at: {_local_expiry(item)}")
 
 
-def connections_list(api_url, debug=False):
-    data = api.call(api_url, "GET", "/api/agent/connections", debug=debug)
+def connections_list(api_url, debug=False, limit=None, next_token=None, list_all=False):
+    """`dapier connections list`: the caller's grant-filtered connections, or
+    every connection with --all (the API's operator mode). limit/--next page
+    either flavor through the API's paging token."""
+    params = {}
+    if limit:
+        params["limit"] = int(limit)
+    if next_token:
+        params["next"] = next_token
+    if list_all:
+        params["all"] = "true"
+    query = f"?{urlencode(params)}" if params else ""
+    data = api.call(api_url, "GET", f"/api/agent/connections{query}", debug=debug)
     items = data.get("connections", [])
     if not items:
-        print("No connection grants. Ask an operator for access.")
+        print("No connections yet." if list_all
+              else "No connection grants. Ask an operator for access.")
         return 0
     print_connections(items)
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
     return 0
 
 
@@ -1237,14 +1252,24 @@ def print_grants(items):
               f"{item.get('agent', ''):24} {operations:18} {expires}")
 
 
-def grants_list(api_url, connection_id=None, debug=False):
-    query = f"?{urlencode({'connection_id': connection_id})}" if connection_id else ""
+def grants_list(api_url, connection_id=None, debug=False, limit=None, next_token=None):
+    params = {}
+    if connection_id:
+        params["connection_id"] = connection_id
+    if limit:
+        params["limit"] = int(limit)
+    if next_token:
+        params["next"] = next_token
+    query = f"?{urlencode(params)}" if params else ""
     data = api.call(api_url, "GET", f"/api/agent/grants{query}", debug=debug)
     items = data.get("grants", [])
     if not items:
         print("No grants. Create one with `dapier grants save`.")
         return 0
     print_grants(items)
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
     return 0
 
 
@@ -1748,17 +1773,23 @@ def print_inbox(items):
               f"{item.get('status', ''):10} {received}")
 
 
-def inbox_list(api_url, connector=None, limit=25, debug=False):
-    query = f"limit={int(limit)}"
+def inbox_list(api_url, connector=None, limit=25, next_token=None, debug=False):
+    params = {"limit": int(limit)}
     if connector:
-        query += f"&connector={quote(connector, safe='')}"
-    data = api.call(api_url, "GET", f"/api/agent/triggers/inbox?{query}", debug=debug)
+        params["connector"] = connector
+    if next_token:
+        params["next"] = next_token
+    data = api.call(api_url, "GET",
+                    f"/api/agent/triggers/inbox?{urlencode(params)}", debug=debug)
     items = data.get("events", [])
     if not items:
         print("Inbox is empty. Every trigger event lands here once the worker picks it up — "
               "matched or not.")
         return 0
     print_inbox(items)
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
     return 0
 
 

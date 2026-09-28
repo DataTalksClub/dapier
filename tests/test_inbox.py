@@ -20,7 +20,8 @@ EVENT = {
 
 
 class FakeTable:
-    """put_item honours the dedupe condition; scan reads what was stored."""
+    """put_item honours the dedupe condition; scan reads what was stored,
+    honouring the page-size cap like the real bounded scan."""
 
     def __init__(self):
         self.items = {}
@@ -48,7 +49,9 @@ class FakeTable:
         return {"Item": dict(item)} if item else {}
 
     def scan(self, **kwargs):
-        return {"Items": [dict(item) for item in self.items.values()]}
+        items = [dict(item) for item in self.items.values()]
+        limit = kwargs.get("Limit")
+        return {"Items": items[:limit] if limit else items}
 
 
 class FakeQueue:
@@ -132,6 +135,115 @@ def test_api_list_sorts_newest_first_and_filters_by_connector(table):
 
     status, payload = inbox.api_list("telegram", table_ref=table)
     assert [event["inbox_id"] for event in payload["events"]] == ["evt-2"]
+
+
+def seed_event(table, inbox_id, received_at, connector="webhook"):
+    """A row with a controlled received_at, so paging order is deterministic."""
+    table.items[inbox_id] = {
+        "inbox_id": inbox_id,
+        "connector": connector,
+        "event": "hook",
+        "source": "github",
+        "received_at": received_at,
+        "status": inbox.UNMATCHED,
+        "matched": [],
+        "data": {},
+        "expires_at": 0,
+    }
+
+
+def test_api_list_pages_through_every_event_without_overlap(table):
+    """More events than one page: the token walks the whole set, and the
+    walk ends with paging.next None — nothing past the first page is lost."""
+    for index in range(60):
+        seed_event(table, f"evt-{index:03d}",
+                   f"2026-09-27T10:00:{index:02d}+00:00")
+
+    status, first = inbox.api_list(table_ref=table)
+    assert status == 200
+    assert len(first["events"]) == 25
+    assert first["total"] == 60
+    assert first["paging"]["limit"] == 25
+    assert first["paging"]["filtered"] is False
+
+    seen = [event["inbox_id"] for event in first["events"]]
+    token = first["paging"]["next"]
+    assert token
+    while token:
+        status, page = inbox.api_list(next_token=token, table_ref=table)
+        assert status == 200
+        seen.extend(event["inbox_id"] for event in page["events"])
+        token = page["paging"]["next"]
+
+    assert len(seen) == len(set(seen))  # pages never overlap
+    assert len(seen) == 60  # every seeded event is reachable
+    assert seen == sorted(seen, reverse=True)  # newest first across pages
+    assert token is None
+
+
+def test_api_list_filter_and_token_compose(table):
+    """The connector filter and the page token compose: continuation pages
+    keep the filter and start strictly after the previous page."""
+    for index in range(20):
+        connector = "webhook" if index % 2 else "telegram"
+        seed_event(table, f"evt-{index:03d}",
+                   f"2026-09-27T10:00:{index:02d}+00:00", connector=connector)
+
+    status, first = inbox.api_list("webhook", limit=4, table_ref=table)
+    assert status == 200
+    assert [event["connector"] for event in first["events"]] == ["webhook"] * 4
+    assert first["paging"]["filtered"] is True
+    token = first["paging"]["next"]
+    assert token
+
+    seen = [event["inbox_id"] for event in first["events"]]
+    while token:
+        status, page = inbox.api_list("webhook", limit=4, next_token=token,
+                                      table_ref=table)
+        assert status == 200
+        assert len(page["events"]) <= 4
+        assert all(event["connector"] == "webhook" for event in page["events"])
+        seen.extend(event["inbox_id"] for event in page["events"])
+        token = page["paging"]["next"]
+
+    assert len(seen) == len(set(seen)) == 10  # only the webhook events, once each
+
+
+def test_api_list_rejects_an_invalid_token(table):
+    status, payload = inbox.api_list(next_token="garbage", table_ref=table)
+    assert status == 400
+    assert payload == {"error": "Invalid page token"}
+
+
+def test_api_list_orders_received_at_ties_by_inbox_id(table):
+    """The inbox-id tiebreak makes same-second events order stably, which is
+    what the page token's strict-after comparison relies on."""
+    for inbox_id in ("evt-b", "evt-a", "evt-c"):
+        seed_event(table, inbox_id, "2026-09-27T10:00:00+00:00")
+    status, payload = inbox.api_list(table_ref=table)
+    assert [event["inbox_id"] for event in payload["events"]] == \
+        ["evt-c", "evt-b", "evt-a"]
+
+
+def test_api_list_pages_stop_at_the_bounded_window(table):
+    """The documented trade: the scan window stays bounded, so events older
+    than it age out of the list (each stays reachable through api_get). The
+    fake serves rows in insertion order, so the window holds the oldest 150
+    here and the walk never reads the remaining rows."""
+    for index in range(200):
+        seed_event(table, f"evt-{index:03d}",
+                   f"2026-09-27T10:{index // 60:02d}:{index % 60:02d}+00:00")
+
+    status, first = inbox.api_list(table_ref=table)
+    seen = [event["inbox_id"] for event in first["events"]]
+    token = first["paging"]["next"]
+    while token:
+        _, page = inbox.api_list(next_token=token, table_ref=table)
+        seen.extend(event["inbox_id"] for event in page["events"])
+        token = page["paging"]["next"]
+
+    assert len(seen) == 150  # the scan window, not the whole table
+    assert len(seen) == len(set(seen))
 
 
 def test_api_get_returns_the_stored_envelope(table):

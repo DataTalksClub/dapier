@@ -26,7 +26,13 @@ def build_parser():
 
     conn_p = sub.add_parser("connections", help="Named provider connections")
     conn_sub = conn_p.add_subparsers(dest="command", required=True)
-    conn_sub.add_parser("list", help="List connections granted to this identity")
+    conn_list_p = conn_sub.add_parser("list", help="List connections granted to this identity")
+    conn_list_p.add_argument("--limit", type=int, default=None,
+                             help="Page size (default: the API's)")
+    conn_list_p.add_argument("--next", dest="next_token",
+                             help="Page token from the previous call's `next page:` footer")
+    conn_list_p.add_argument("--all", action="store_true", dest="list_all",
+                             help="Operator: list every connection, not just your grants")
     show_p = conn_sub.add_parser("show", help="Show one connection (no secrets)")
     show_p.add_argument("connection_id")
     show_p.add_argument("--agent", default=None)
@@ -93,6 +99,10 @@ def build_parser():
     grants_sub = grants_p.add_subparsers(dest="command", required=True)
     grants_list_p = grants_sub.add_parser("list", help="List grants")
     grants_list_p.add_argument("--connection", default=None)
+    grants_list_p.add_argument("--limit", type=int, default=None,
+                               help="Page size (default: the API's)")
+    grants_list_p.add_argument("--next", dest="next_token",
+                               help="Page token from the previous call's `next page:` footer")
     grants_save_p = grants_sub.add_parser("save", help="Create or update a grant from a JSON file")
     grants_save_p.add_argument("file", help="Path to the grant JSON, or - for stdin")
     grants_del_p = grants_sub.add_parser("delete", help="Revoke one grant")
@@ -225,6 +235,8 @@ def build_parser():
     inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
     inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
     inbox_list_p.add_argument("--limit", type=int, default=25)
+    inbox_list_p.add_argument("--next", dest="next_token",
+                              help="Page token from the previous call's `next page:` footer")
     inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
     inbox_show_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
     inbox_replay_p = inbox_sub.add_parser("replay", help="Send an inbox event through the engine again (fresh event id)")
@@ -639,7 +651,9 @@ def cmd_auth(args, api_url):
 
 def cmd_connections(args, api_url, debug):
     if args.command == "list":
-        return commands.connections_list(api_url, debug)
+        return commands.connections_list(api_url, debug, limit=args.limit,
+                                         next_token=args.next_token,
+                                         list_all=args.list_all)
     if args.command == "show":
         return commands.connections_show(api_url, args.connection_id, args.agent, debug)
     if args.command == "connect":
@@ -862,7 +876,8 @@ def cmd_credentials(args, api_url, debug):
 
 def cmd_grants(args, api_url, debug):
     if args.command == "list":
-        return commands.grants_list(api_url, args.connection, debug)
+        return commands.grants_list(api_url, args.connection, debug,
+                                    limit=args.limit, next_token=args.next_token)
     if args.command == "save":
         return commands.grants_save(api_url, args.file, debug)
     if args.command == "delete":
@@ -926,7 +941,8 @@ def cmd_runs(args, api_url, debug):
 def cmd_inbox(args, api_url, debug):
     if args.command == "list":
         return commands.inbox_list(api_url, connector=args.connector,
-                                   limit=args.limit, debug=debug)
+                                   limit=args.limit, next_token=args.next_token,
+                                   debug=debug)
     if args.command == "show":
         return commands.inbox_show(api_url, args.inbox_id, debug)
     if args.command == "replay":

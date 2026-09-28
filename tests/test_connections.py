@@ -216,6 +216,78 @@ class FakeTable:
         return {"Items": list(self.items.values())[:Limit]}
 
 
+class PagedTable(FakeTable):
+    """DynamoDB-flavoured scan: honors Limit and ExclusiveStartKey and
+    reports LastEvaluatedKey while a further page remains."""
+
+    def scan(self, **kwargs):
+        ordered = [self.items[key] for key in sorted(self.items)]
+        start = kwargs.get("ExclusiveStartKey")
+        if start:
+            ordered = [item for item in ordered
+                       if item["connection_id"] > start["connection_id"]]
+        limit = kwargs.get("Limit")
+        page = ordered[:limit] if limit else ordered
+        result = {"Items": page}
+        if limit and len(ordered) > limit:
+            result["LastEvaluatedKey"] = {"connection_id": page[-1]["connection_id"]}
+        return result
+
+
+def _seed_connections(table, count, prefix="conn"):
+    for index in range(count):
+        table.put_item(Item=build_item(
+            validate_new_connection(body(
+                connection_id=f"{prefix}-{index:03d}", provider="slack", scopes=[])),
+            owner_subject="op",
+        ))
+
+
+def test_api_list_connections_reaches_past_50_across_pages():
+    table = PagedTable()
+    _seed_connections(table, 55)
+    status, first = connections.api_list_connections(table, limit=50)
+    assert status == 200
+    ids = [item["connection_id"] for item in first["connections"]]
+    assert len(ids) == 50 and ids == sorted(ids)
+    token = first["paging"]["next"]
+    assert token
+    assert first["paging"]["limit"] == 50
+    status, second = connections.api_list_connections(table, limit=50, next_token=token)
+    assert status == 200
+    rest = [item["connection_id"] for item in second["connections"]]
+    assert rest == ids[-5:] or rest == [f"conn-{index:03d}" for index in range(50, 55)]
+    assert second["paging"]["next"] is None
+
+
+def test_api_list_connections_token_round_trip_walks_everything():
+    table = PagedTable()
+    _seed_connections(table, 120)
+    seen, token = [], None
+    for _ in range(10):
+        status, payload = connections.api_list_connections(
+            table, limit=20, next_token=token)
+        assert status == 200
+        seen.extend(item["connection_id"] for item in payload["connections"])
+        token = payload["paging"]["next"]
+        if not token:
+            break
+    assert len(seen) == 120 and seen == sorted(seen) and token is None
+
+
+def test_api_list_connections_rejects_invalid_token():
+    status, payload = connections.api_list_connections(
+        PagedTable(), next_token="not-a-token!")
+    assert status == 400
+    assert "token" in payload["error"].lower()
+
+
+def test_legacy_list_connections_untouched():
+    table = FakeTable()
+    _seed_connections(table, 3)
+    assert len(connections.list_connections(table)) == 3
+
+
 def test_table_roundtrip():
     table = FakeTable()
     item = build_item(validate_new_connection(body()), owner_subject="s")
