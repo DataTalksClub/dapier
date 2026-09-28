@@ -1,16 +1,8 @@
-"""Designer save and test-run paths: validate workflow YAML, commit it to
-GitHub, publish it live, and dry-run it against a sample event.
+"""Designer paths: validate, publish, version, and test managed workflows.
 
-The console designer at /designer edits workflows/<id>.yaml in the dapier
-repo. Saves are validated server-side (structure only — action types beyond
-the catalog are legal and preserved verbatim) and committed with the GitHub
-git data API, so one save can create, update, and rename in a single commit
-on the configured branch. The commit is the version record; a successful save
-then publishes the parsed definition to PUBLISHED_WORKFLOWS_TABLE, which the
-engine merges over the deployed bundle — so a save runs on the next event
-without waiting for the deploy pipeline. The enable/disable toggle flips the
-published item the same way (live immediately) and commits the flipped YAML
-best-effort so the next deploy agrees with the live state.
+The console and CLI send YAML to the same API handlers. The published table is
+the runtime source of truth and holds version records. Git sync is optional:
+when configured, a save also commits a readable YAML copy to the repo.
 """
 
 import base64

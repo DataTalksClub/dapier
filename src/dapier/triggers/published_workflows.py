@@ -1,10 +1,8 @@
-"""Published workflows: the runtime store behind instant designer saves.
+"""Managed workflows: the runtime store behind instant designer saves.
 
-Saving a workflow commits its YAML to git (the version record) and puts the
-parsed definition into PUBLISHED_WORKFLOWS_TABLE. The engine merges published
-items over the deployed bundle by workflow id, so a save takes effect on the
-next event — no deploy. The enable/disable toggle updates the stored item the
-same way, then commits the flipped YAML so the next deploy cannot revert it.
+Saving a workflow puts its parsed definition into PUBLISHED_WORKFLOWS_TABLE;
+the next event reads it without a deploy. Git sync is an optional copy. The
+enable/disable toggle updates the same managed record.
 
 Items are keyed by workflow_id; a rename must unpublish the old id or the
 engine would run both the old and the new definition.
