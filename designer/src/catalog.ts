@@ -59,6 +59,8 @@ export interface CatalogField {
   default?: string;
   /** Nest under this object in the action YAML, e.g. group: "pdf" → action.pdf.page_format. */
   group?: string;
+  /** Maintainer documentation for the field's expected shape; the inspector does not render it. */
+  help?: string;
   /**
    * The connection record's provider this field must name (a `connection_id`
    * key). The inspector suggests the operator's connections of that provider
