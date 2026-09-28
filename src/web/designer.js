@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$D = [
+  const __iconNode$E = [
     ["path", { d: "M12 8V4H8", key: "hb8ula" }],
     ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
     ["path", { d: "M2 14h2", key: "vft8re" }],
@@ -14320,8 +14320,8 @@
     ["path", { d: "M15 13v2", key: "1xurst" }],
     ["path", { d: "M9 13v2", key: "rq6x2g" }]
   ];
-  const Bot = createLucideIcon("bot", __iconNode$D);
-  const __iconNode$C = [
+  const Bot = createLucideIcon("bot", __iconNode$E);
+  const __iconNode$D = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14334,61 +14334,61 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$C);
-  const __iconNode$B = [
+  const Braces = createLucideIcon("braces", __iconNode$D);
+  const __iconNode$C = [
     ["path", { d: "M8 2v4", key: "1cmpym" }],
     ["path", { d: "M16 2v4", key: "4m81vk" }],
     ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
     ["path", { d: "M3 10h18", key: "8toen8" }]
   ];
-  const Calendar = createLucideIcon("calendar", __iconNode$B);
-  const __iconNode$A = [
+  const Calendar = createLucideIcon("calendar", __iconNode$C);
+  const __iconNode$B = [
     ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
     ["path", { d: "M21 14H11", key: "1bme5i" }],
     ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
   ];
-  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$A);
-  const __iconNode$z = [
+  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$B);
+  const __iconNode$A = [
     ["path", { d: "M11 14h10", key: "1w8e9d" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
     ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
     ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
   ];
-  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$z);
-  const __iconNode$y = [
+  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$A);
+  const __iconNode$z = [
     ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
   ];
-  const Clock = createLucideIcon("clock", __iconNode$y);
-  const __iconNode$x = [
+  const Clock = createLucideIcon("clock", __iconNode$z);
+  const __iconNode$y = [
     ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
     ["path", { d: "m12 21 4-4", key: "1lfcce" }],
     ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
   ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$x);
-  const __iconNode$w = [
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$y);
+  const __iconNode$x = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$w);
-  const __iconNode$v = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$x);
+  const __iconNode$w = [
     ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
     ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
   ];
-  const Copy = createLucideIcon("copy", __iconNode$v);
-  const __iconNode$u = [
+  const Copy = createLucideIcon("copy", __iconNode$w);
+  const __iconNode$v = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$u);
-  const __iconNode$t = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$v);
+  const __iconNode$u = [
     [
       "path",
       {
@@ -14401,8 +14401,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$t);
-  const __iconNode$s = [
+  const FileText = createLucideIcon("file-text", __iconNode$u);
+  const __iconNode$t = [
     [
       "path",
       {
@@ -14413,8 +14413,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$s);
-  const __iconNode$r = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$t);
+  const __iconNode$s = [
     [
       "path",
       {
@@ -14423,8 +14423,8 @@
       }
     ]
   ];
-  const Folder = createLucideIcon("folder", __iconNode$r);
-  const __iconNode$q = [
+  const Folder = createLucideIcon("folder", __iconNode$s);
+  const __iconNode$r = [
     [
       "path",
       {
@@ -14433,21 +14433,21 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$q);
-  const __iconNode$p = [
+  const Funnel = createLucideIcon("funnel", __iconNode$r);
+  const __iconNode$q = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$p);
-  const __iconNode$o = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$q);
+  const __iconNode$p = [
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
     ["path", { d: "M2 12h20", key: "9i4pu4" }]
   ];
-  const Globe = createLucideIcon("globe", __iconNode$o);
-  const __iconNode$n = [
+  const Globe = createLucideIcon("globe", __iconNode$p);
+  const __iconNode$o = [
     ["path", { d: "M10 8h.01", key: "1r9ogq" }],
     ["path", { d: "M12 12h.01", key: "1mp3jc" }],
     ["path", { d: "M14 8h.01", key: "1primd" }],
@@ -14458,8 +14458,8 @@
     ["path", { d: "M8 12h.01", key: "czm47f" }],
     ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
   ];
-  const Keyboard = createLucideIcon("keyboard", __iconNode$n);
-  const __iconNode$m = [
+  const Keyboard = createLucideIcon("keyboard", __iconNode$o);
+  const __iconNode$n = [
     [
       "path",
       {
@@ -14482,8 +14482,8 @@
       }
     ]
   ];
-  const Layers = createLucideIcon("layers", __iconNode$m);
-  const __iconNode$l = [
+  const Layers = createLucideIcon("layers", __iconNode$n);
+  const __iconNode$m = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14496,32 +14496,32 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$l);
-  const __iconNode$k = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$m);
+  const __iconNode$l = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$k);
-  const __iconNode$j = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$j);
-  const __iconNode$i = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$l);
+  const __iconNode$k = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$k);
+  const __iconNode$j = [
     ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
     ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
   ];
-  const Mail = createLucideIcon("mail", __iconNode$i);
-  const __iconNode$h = [
+  const Mail = createLucideIcon("mail", __iconNode$j);
+  const __iconNode$i = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$h);
-  const __iconNode$g = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$g);
-  const __iconNode$f = [
+  const Maximize = createLucideIcon("maximize", __iconNode$i);
+  const __iconNode$h = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$h);
+  const __iconNode$g = [
     [
       "path",
       {
@@ -14530,8 +14530,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$f);
-  const __iconNode$e = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$g);
+  const __iconNode$f = [
     [
       "path",
       {
@@ -14540,19 +14540,25 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$e);
-  const __iconNode$d = [
+  const Play = createLucideIcon("play", __iconNode$f);
+  const __iconNode$e = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$d);
-  const __iconNode$c = [
+  const Plus = createLucideIcon("plus", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
     ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
     ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
     ["path", { d: "M8 16H3v5", key: "1cv678" }]
   ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$c);
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$d);
+  const __iconNode$c = [
+    ["path", { d: "M4 11a9 9 0 0 1 9 9", key: "pv89mb" }],
+    ["path", { d: "M4 4a16 16 0 0 1 16 16", key: "k0647b" }],
+    ["circle", { cx: "5", cy: "19", r: "1", key: "bfqh0e" }]
+  ];
+  const Rss = createLucideIcon("rss", __iconNode$c);
   const __iconNode$b = [
     [
       "path",
@@ -20170,13 +20176,14 @@
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
     { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
     { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
-    { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received"] },
+    { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received", "channel_post.received", "callback_query.received"] },
     { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
     { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
     { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
     { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
     { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
     { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "rss", label: "RSS", logo: Rss, events: ["item.new"] },
     { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
     { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
     { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },

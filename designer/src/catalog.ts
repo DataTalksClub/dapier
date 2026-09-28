@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
+import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -1696,13 +1696,14 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
   { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
-  { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received"] },
+  { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received", "channel_post.received", "callback_query.received"] },
   { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
   { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
   { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
   { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
+  { name: "rss", label: "RSS", logo: Rss, events: ["item.new"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
   { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },

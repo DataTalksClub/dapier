@@ -14,7 +14,14 @@ function sourceBanner(): Plugin {
     closeBundle() {
       for (const name of ["designer.js", "designer.css"]) {
         const target = new URL(`../src/web/${name}`, import.meta.url);
-        writeFileSync(target, banner + readFileSync(target, "utf8"));
+        let body = readFileSync(target, "utf8");
+        // Idempotent: vite may hand back a file that already carries the
+        // banner (an unchanged css asset is not always rewritten), and a
+        // rebuild would otherwise stack one more copy every time.
+        while (body.startsWith(banner)) {
+          body = body.slice(banner.length);
+        }
+        writeFileSync(target, banner + body);
       }
     },
   };
