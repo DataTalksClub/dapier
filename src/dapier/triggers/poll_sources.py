@@ -30,7 +30,7 @@ _BUILTIN_MODULES = ("..connectors.s3", "..connectors.sheets", "..connectors.driv
                     "..connectors.zoom", "..connectors.dropbox", "..connectors.youtube",
                     "..connectors.rss",
                     "..connectors.mailchimp", "..connectors.slack",
-                    "..connectors.calendar")
+                    "..connectors.calendar", "..connectors.gmail")
 _loaded = False
 
 

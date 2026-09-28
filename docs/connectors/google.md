@@ -207,13 +207,40 @@ has no create-if-missing: a find that misses composes with
 `drive_upload_file` when a workflow wants find-or-upload, and creating an
 empty artifact to "find" is not find-or-create.
 
+## Gmail
+
+The **Gmail** chip (`gmail`) reads and sends the connection's own mailbox over
+the shared Google connection. **New Email** (`gmail.messages` →
+`message.received`) is a poll source keyed on each message's `internalDate` —
+the Drive files watermark applied to mail: the first fire seeds the watermark
+and emits nothing (the mailbox is history, not news), later fires emit
+messages delivered strictly after it, oldest first, deduped by the seen
+store. An optional query scopes the watch — a `label:` term from the labels
+picker, or any Gmail search expression. One fire expands at most ~100
+message stubs (two pages of 50); mail beyond that budget waits for a quieter
+mailbox. **Send email** (`gmail_send`) posts raw MIME through
+`users.messages.send`; Gmail only delivers from the authenticated user (or a
+verified alias), so the sender is always the connection itself, resolved
+from `users/me/profile`.
+
+Scope caveat: the chip declares `gmail.readonly` (messages, labels) and
+`gmail.send` in `connectors/gmail.py` — both Google-**Restricted** scopes the
+project does not request yet. Enabling Gmail end to end follows the same
+steps as the YouTube upload scope below: enable the Gmail API in
+`dtcdev-click`, add both scopes to the project's scope table with the owner's
+approval, grant them to the Google connection with
+`dapier connections scopes <id> --scopes …`, and re-consent the account.
+Until a connection holds the scopes, its Gmail poll and send fail with the
+API's HTTP 403. The `labels` discovery resource needs only `gmail.readonly`.
+
 ### Discovery resources
 
 Google connections list live resources over `dapier connections discover <connection>`
 and the console/CLI pickers: `spreadsheets`, `files`, `folders` (Drive folders),
-`worksheets`, `columns`, and `rows` (the first rows of one worksheet, with
+`worksheets`, `columns`, `rows` (the first rows of one worksheet, with
 `spreadsheet_id` and optional `worksheet` params; trailing empty cells are
-trimmed and each row keeps its spreadsheet row number).
+trimmed and each row keeps its spreadsheet row number), and `labels` (the
+Gmail labels of the connection, behind the Gmail trigger's query picker).
 
 ### Calendar, YouTube, and other accounts
 

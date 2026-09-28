@@ -106,8 +106,9 @@ def run_fire(item, transport, *, cursors=None, fail_on=None):
 class TestRegistrationShape:
     def test_the_provider_sources_are_registered(self):
         assert poll_sources.source_names() == [
-            "dropbox.files", "google-calendar.events", "google-drive.deletions",
-            "google-drive.files", "google-drive.updates", "google-sheets.rows",
+            "dropbox.files", "gmail.messages", "google-calendar.events",
+            "google-drive.deletions", "google-drive.files",
+            "google-drive.updates", "google-sheets.rows",
             "google-sheets.updates", "mailchimp.members", "rss", "s3",
             "s3.deletions", "s3.updates", "slack.messages", "youtube.videos",
             "zoom.recordings"]
@@ -115,7 +116,8 @@ class TestRegistrationShape:
     def test_each_source_matches_its_palette_chip(self):
         from src.dapier.connectors import registry
 
-        for name in ("google-sheets.rows", "google-drive.files", "zoom.recordings"):
+        for name in ("gmail.messages", "google-sheets.rows",
+                     "google-drive.files", "zoom.recordings"):
             source = poll_sources.resolve(name)
             chip = registry.CONNECTORS[source.connector]
             assert source.event in chip.events

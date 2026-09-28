@@ -130,11 +130,12 @@ CONNECTION_TESTS: dict = {}
 
 
 # A connection's provider key and the discovery sources it can reach: one
-# Google OAuth connection (provider "google") backs both the Sheets and the
-# Drive resources. "s3"/"aws" name the stored AWS-keys credential, which has
-# no connection record but resolves the same bucket listing.
+# Google OAuth connection (provider "google") backs the Sheets, Drive,
+# Calendar and Gmail resources. "s3"/"aws" name the stored AWS-keys
+# credential, which has no connection record but resolves the same bucket
+# listing.
 PROVIDER_DISCOVERY_SOURCES = {
-    "google": ("google-sheets", "google-drive", "google-calendar"),
+    "google": ("google-sheets", "google-drive", "google-calendar", "gmail"),
     "youtube": ("youtube",),
     "zoom": ("zoom",),
     "slack": ("slack",),

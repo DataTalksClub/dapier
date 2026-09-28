@@ -4,7 +4,7 @@ Provider-specific setup and verified account details live in separate guides:
 
 | Provider | Guide | Connection examples | Authentication |
 |----------|-------|---------------------|----------------|
-| Google | [Google Calendar, YouTube, Drive, Docs, and Sheets](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
+| Google | [Google Calendar, YouTube, Drive, Docs, Sheets, and Gmail](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
 | YouTube | [YouTube](youtube.md) (setup in the Google guide) | `youtube` | OAuth on the shared Google client |
 | Dropbox | [Dropbox](dropbox.md) | `dropbox` | OAuth |
 | Slack | [Slack](slack.md) | `slack` | Pasted bot or user token |

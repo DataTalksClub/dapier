@@ -80,7 +80,7 @@ def test_catalog_lists_resources_with_params():
     assert view["connection"] == "sheets-team"
     assert [resource["name"] for resource in view["resources"]] == \
         ["spreadsheets", "files", "folders", "worksheets", "columns", "rows",
-         "calendars", "events"]
+         "calendars", "events", "labels"]
     worksheets = view["resources"][3]
     assert worksheets["params"][0] == {
         "name": "spreadsheet_id", "required": True,

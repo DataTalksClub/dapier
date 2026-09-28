@@ -36,6 +36,7 @@ GOOGLE_DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files"
 SHEETS_API_URL = "https://sheets.googleapis.com/v4/spreadsheets"
 CALENDAR_API_URL = "https://www.googleapis.com/calendar/v3"
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
+GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1"
 SPREADSHEET_MIME = "application/vnd.google-apps.spreadsheet"
 FOLDER_MIME = "application/vnd.google-apps.folder"
 SLACK_API_URL = "https://slack.com/api"
@@ -337,6 +338,23 @@ def _google_events(connection, token, params, limit, *, transport=None):
             break
         page_params = {**page_params, "pageToken": data["nextPageToken"]}
     return items[:limit]
+
+
+def _gmail_labels(connection, token, params, limit, *, transport=None):
+    """The mailbox's labels (Gmail's mailboxes), system and user — the
+    ``label:<name>`` terms a Gmail watch's query addresses."""
+    data = _request("GET", f"{GMAIL_API_URL}/users/me/labels", token, None,
+                    transport=transport)
+    return [
+        {
+            "id": label.get("id"),
+            "name": label.get("name") or label.get("id"),
+            "type": label.get("type"),
+            "messages_total": label.get("messagesTotal"),
+        }
+        for label in data.get("labels") or []
+        if isinstance(label, dict) and label.get("id")
+    ]
 
 
 # --- YouTube ---
@@ -720,6 +738,9 @@ CATALOG = {
                  _google_events,
                  (Param("calendar_id", True, "Calendar ID from the calendars list"),
                   Param("query", False, "Text to match against event fields"))),
+        Resource("labels", "Gmail labels",
+                 "Labels in the connection's Gmail, system and user",
+                 _gmail_labels),
     ],
     "youtube": [
         Resource("channel", "Channel", "The connected YouTube channel", _youtube_channel),

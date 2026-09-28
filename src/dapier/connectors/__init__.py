@@ -21,6 +21,7 @@ from . import (  # noqa: F401  (import = registration)
     dropbox,
     drive,
     email,
+    gmail,
     ingress,
     logic,
     mailchimp,
