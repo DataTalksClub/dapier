@@ -1,7 +1,7 @@
 /* Schedules view: cron/rate schedule triggers — the console face of the
    same /api/admin/schedule-triggers endpoints `dapier schedules` drives. */
 import { state } from '../state.js';
-import { $, notice } from '../ui.js';
+import { $, $$, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 
