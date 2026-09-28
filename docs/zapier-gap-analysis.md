@@ -1420,7 +1420,7 @@ Add `src/dapier/api/paging.py` (clamp/encode/decode/scan-window lifted from
 runs). Multi-user Phase 0: owner-filtered lists need stable paged orders, so
 this lands first.
 
-### G17. Multi-user (Phase 1 landed 2026-09-28: owner stamping)
+### G17. Multi-user (Phase 2 landed 2026-09-28: owner-scoped reads)
 
 Single-tenant today: identities are DTC subjects everywhere (console OIDC
 cookie, `dap_` tokens, `dapd_` device sessions), roles v1 exists
@@ -1448,8 +1448,21 @@ through `api_save(live=True)` with the caller as operator, so the copy is
 owned by whoever made it; publishing a draft set by someone else attributes
 to the publisher, exactly like `published_by`. Surfaces are informational
 only — designer list rows and versions rows expose `owner` read-only; no
-access-control behavior changed, and Phase 2 (`visible_to()` reads) and
-Phase 3 (owner-or-operator writes) remain not started.
+access-control behavior changed, and Phase 3 (owner-or-operator writes)
+remains not started.
+
+Phase 2 landed as designed (`feat(auth): filter workflow reads by owner`):
+`auth/visibility.py` holds the rule — operators (the same
+`roles.effective_role` verdict the gates use, so admin included) see
+everything, a subject sees what it owns (draft-only rows by `drafted_by`),
+and anything with no owner stays visible to everyone, which also keeps a
+deleted workflow's rows readable for the operators' audit duty. It filters
+the designer list, the overview's workflow/executions/runs/usage blocks,
+the runs list and its CSV export, the inbox list (an event nothing matched
+is nobody's row), and the usage rollup, on both the console and CLI
+surfaces through one optional `visible=` parameter; single-item reads,
+designer export, and every write are untouched (Phase 3), and the engine
+still reads the same draft-blind loader.
 
 ### Gate debts on the in-flight gmail/agent lane — verified closed 2026-09-28
 
@@ -1482,9 +1495,13 @@ Phase 3 (owner-or-operator writes) remain not started.
 - **G17 multi-user Phase 1 — shipped** (`feat(designer): owner stamped on
   published workflows`): `publish()` stamps `owner` (preserve previous;
   `published_by` backfilled on read, no migration), version records carry
-  it, duplicate/template-apply/draft-publish attribute to their caller;
-  Phase 2 (`visible_to` reads) and Phase 3 (owner-or-operator writes) not
-  started.
+  it, duplicate/template-apply/draft-publish attribute to their caller.
+- **G17 multi-user Phase 2 — shipped** (`feat(auth): filter workflow reads
+  by owner`): `auth/visibility.py` (`visible_to`/`Visibility`) owner-scopes
+  the designer list, overview, runs (+ CSV export), inbox, and usage reads
+  on both surfaces — operators see everything, a subject its own workflows
+  (drafts by `drafted_by`), no-owner items visible to all; writes stay
+  Phase 3, not started.
 - Also closed: the host-task read surface debt
   (`feat(agent-tasks): read surface for the host task rows`) —
   `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console
