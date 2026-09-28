@@ -20,7 +20,7 @@ from .credentials import (
     put_credential_if_version,
 )
 
-STATUS_REVOKED = records.STATUS_REVOKED
+STATUS_REVOKED = connections.STATUS_REVOKED
 
 
 class TokenError(Exception):
@@ -36,6 +36,15 @@ def _stored_tokens(record):
     if not isinstance(value, dict):
         return {}
     return value
+
+
+def stored_value(connection_id):
+    """The connection's stored credential value (tokens, expiry) for views.
+
+    List/show handlers read this to enrich ``public_view`` with token
+    health; the value itself never leaves the server.
+    """
+    return _stored_tokens(_record(connection_id))
 
 
 def _client_override(stored):
