@@ -152,6 +152,7 @@ function openHookDialog(hook) {
   const signed = Boolean(hook && hook.signed);
   form.secret.value = '';
   form.secret.placeholder = signed ? '(configured — leave empty to keep)' : 'shared secret';
+  form.signature_header.value = signed ? (hook.signature_header || '') : '';
   form.clear_secret.checked = false;
   $('#hook-clear-secret-field').hidden = !signed;
   $('#hook-secret-field').hidden = form.kind.value !== 'webhook';
@@ -231,6 +232,11 @@ $('#hook-form').addEventListener('submit', async (event) => {
         const secret = form.secret.value.trim();
         if (form.clear_secret.checked) body.secret = '';
         else if (secret) body.secret = secret; // omitted: keep the stored lock
+        // the header rides with the lock (blank = the x-dapier-signature
+        // default); a signed hook round-trips its stored name here
+        if (secret || form.clear_secret.checked || form.signature_header.value.trim()) {
+          body.signature_header = form.signature_header.value.trim().toLowerCase();
+        }
       }
       if (body.kind === 'mailchimp') body.list_id = form.list_id.value.trim();
       const response = { mode: form.response_mode.value };

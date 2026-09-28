@@ -322,6 +322,32 @@ one connection drives at most one trigger). Both are created and listed with
 `dapier hooks save|list|show|delete`, fire the same action catalog as email
 triggers, and are live immediately — no deploy.
 
+A webhook trigger created or updated with an optional `secret` (a plain JSON
+field, so `dapier hooks save webhook.json` passes it straight through;
+`"secret": ""` clears it, an edit that omits it keeps it) locks the URL
+behind a shared-secret HMAC check instead of the bearer token: callers must
+send `X-Dapier-Signature: sha256=<hex>` where `<hex>` is the lowercase
+HMAC-SHA256 of the **raw request body** (the exact bytes as received, before
+any parsing) keyed with the secret. A bare hex value without the `sha256=`
+prefix is accepted too. The comparison is constant-time, and the same header
+and scheme the outbound `webhook` action signs with, so one scheme serves
+both directions:
+
+```bash
+signature=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+curl -s -X POST "$URL" -H "content-type: application/json" \
+  -H "X-Dapier-Signature: sha256=$signature" -d "$BODY"
+```
+
+When a secret is set, a valid signature is sufficient on its own (the bearer
+token is not consulted), and the bearer token alone no longer admits a
+delivery: a missing header or a mismatched digest answers
+`401 {"error": "invalid signature"}` and nothing is queued or run. Trigger
+responses expose the lock as `"signed": true` (plus
+`"signature_header": "x-dapier-signature"`) and never echo the secret.
+Without a secret, behavior is unchanged: the bearer token gates the URL and
+any `X-Dapier-Signature` header is ignored.
+
 Schedule triggers are cron jobs: `dapier schedules save` takes a name, a
 `cron(...)` or `rate(...)` expression, and actions, and programmatically
 creates (or reprograms) an EventBridge rule `dapier-schedule-{name}`

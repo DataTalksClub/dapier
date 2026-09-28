@@ -15,11 +15,13 @@ BODY = b'{"id": "d-1", "ok": true}'
 
 
 def _row(hook_id="orders", kind="webhook", token="tok-123", secret=None,
-         enabled=True):
+         signature_header=None, enabled=True):
     item = {"hook_id": hook_id, "kind": kind, "url": f"u-{hook_id}",
             "token": token, "actions": [], "enabled": enabled, "dedupe_path": ""}
     if secret is not None:
         item["secret"] = secret
+    if signature_header is not None:
+        item["signature_header"] = signature_header
     return item
 
 
@@ -272,3 +274,81 @@ def test_signature_for_matches_stdlib_reference():
     expected = hmac.new(SECRET.encode(), BODY, hashlib.sha256).hexdigest()
     assert hook_triggers.signature_for(SECRET, BODY) == expected
     assert hook_triggers.verify_signature(SECRET, BODY, f"sha256={expected}")
+
+
+# --- the configurable signature header (the signature_header field) ---
+
+def test_save_stores_a_custom_header_and_the_view_resolves_it():
+    stub = StubTable()
+    status, payload = hook_triggers.api_save(
+        {"name": "orders", "secret": SECRET,
+         "signature_header": "X-Hub-Signature-256",
+         "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]},
+        "op", kind="webhook", table_ref=stub)
+    assert status == 200
+    assert payload["signature_header"] == "x-hub-signature-256"  # stored lowercase
+    assert _stored(stub)["signature_header"] == "x-hub-signature-256"
+
+
+def test_signature_header_defaults_when_unset():
+    stub = StubTable()
+    _status, payload = hook_triggers.api_save(
+        {"name": "orders", "secret": SECRET,
+         "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]},
+        "op", kind="webhook", table_ref=stub)
+    assert payload["signature_header"] == hook_triggers.SIGNATURE_HEADER
+    assert _stored(stub)["signature_header"] == ""
+
+
+def test_signature_header_survives_an_omitted_edit_and_resets_when_cleared():
+    stub = StubTable()
+    save = {"name": "orders", "secret": SECRET, "signature_header": "x-github-sig",
+            "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
+    hook_triggers.api_save(save, "op", kind="webhook", table_ref=stub)
+    # omitted on an edit keeps the stored name, like the secret itself
+    _status, kept = hook_triggers.api_save(
+        {"name": "orders", "description": "later",
+         "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]},
+        "op", kind="webhook", table_ref=stub)
+    assert kept["signature_header"] == "x-github-sig"
+    # an explicit empty value returns to the default
+    _status, reset = hook_triggers.api_save(
+        dict(save, signature_header=""), "op", kind="webhook", table_ref=stub)
+    assert reset["signature_header"] == hook_triggers.SIGNATURE_HEADER
+    assert _stored(stub)["signature_header"] == ""
+
+
+def test_signature_header_is_validated():
+    actions = [{"type": "webhook", "url": "https://hooks.test/x"}]
+    with pytest.raises(hook_triggers.TriggerError):
+        hook_triggers.build_item({"name": "orders", "signature_header": "not a header!",
+                                  "actions": actions}, "op", "webhook")
+    with pytest.raises(hook_triggers.TriggerError):
+        hook_triggers.build_item({"name": "orders", "signature_header": 7,
+                                  "actions": actions}, "op", "webhook")
+    # webhook-only, like the secret whose header it names
+    with pytest.raises(hook_triggers.TriggerError):
+        hook_triggers.build_item({"name": "orders", "signature_header": "x-sig",
+                                  "actions": []}, "op", "telegram")
+
+
+def test_intake_reads_the_stored_header_name(env):
+    env["stub"] = {"secret": SECRET, "signature_header": "x-hub-signature-256"}
+    headers = {"content-type": "application/json",
+               "x-hub-signature-256": f"sha256={_sig(SECRET, BODY)}"}
+    status, _payload = _post(BODY, headers)
+    assert status == 202
+    assert len(env["published"]) == 1
+    # the same digest under the default header name does not verify
+    env["published"].clear()
+    status, payload = _post(BODY, _auth_headers(BODY))
+    assert status == 401
+    assert payload == {"error": "invalid signature"}
+    assert env["published"] == []
+
+
+def test_an_empty_stored_header_falls_back_to_the_default(env):
+    env["stub"] = {"secret": SECRET, "signature_header": ""}
+    status, _payload = _post(BODY, _auth_headers(BODY))
+    assert status == 202
+    assert len(env["published"]) == 1

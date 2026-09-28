@@ -607,6 +607,7 @@
         </div>
         <div id="hook-secret-field">
           <label>Signature secret (optional)<input name="secret" class="mono-input" placeholder="shared secret" maxlength="512" autocomplete="off"><small class="field-hint">Webhook only. When set, callers sign the raw body — <code>x-dapier-signature: sha256=&lt;HMAC-SHA256 of the body&gt;</code> — and the bearer token alone is rejected with 401. Editing: leave empty to keep the stored secret.</small></label>
+          <label>Signature header<input name="signature_header" class="mono-input" placeholder="x-dapier-signature"><small class="field-hint">Optional: the header carrying the signature, for providers that sign in their own (e.g. <code>x-hub-signature-256</code>). Defaults to <code>x-dapier-signature</code>.</small></label>
           <label id="hook-clear-secret-field" hidden><input type="checkbox" name="clear_secret"> Remove the signature lock (callers go back to the bearer token)</label>
         </div>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
