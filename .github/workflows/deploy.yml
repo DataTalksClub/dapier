@@ -57,7 +57,5 @@ jobs:
             aws cloudformation continue-update-rollback --stack-name dapier
             aws cloudformation wait stack-update-complete --stack-name dapier
           fi
-      - name: Migrate legacy workflows before removing the file loader
-        run: uv run --with boto3 --with pyyaml python -m scripts.migrate_legacy_workflows --apply
       - run: scripts/deploy.sh
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
