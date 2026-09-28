@@ -540,21 +540,6 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
-    type: "gmail_send",
-    label: "Gmail: send email",
-    icon: Mail,
-    description: "Send an email from the connection's Gmail mailbox (users.messages.send). Gmail delivers only from the authenticated account, so there is no sender field. The body is the text body, the HTML body, or both.",
-    fields: [
-      { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
-      { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
-      { key: "subject", label: "Subject", placeholder: "{subject}" },
-      { key: "text", label: "Text body", type: "textarea" },
-      { key: "html", label: "HTML body", type: "textarea" },
-      { key: "cc", label: "Cc", placeholder: "comma-separated or {templated}" },
-      { key: "bcc", label: "Bcc", placeholder: "comma-separated or {templated}" }
-    ]
-  },
-  {
     type: "dataops",
     label: "DataOps intake",
     icon: DatabaseZap,
@@ -1699,7 +1684,6 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
-  { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
   { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
