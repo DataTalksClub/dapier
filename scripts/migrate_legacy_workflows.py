@@ -67,7 +67,7 @@ def scan_all(table):
     items, start = [], None
     while True:
         kwargs = {"ExclusiveStartKey": start} if start else {}
-        page = table.scan(**kwargs)
+        page = table.scan(ConsistentRead=True, **kwargs)
         items.extend(page.get("Items", []))
         start = page.get("LastEvaluatedKey")
         if not start:
@@ -81,7 +81,7 @@ def plan(workflows, flows, tables):
     missing = {key: value for key, value in workflows.items() if key not in existing}
     published_updates = []
     for workflow_id, item in existing.items():
-        workflow = item.get("workflow")
+        workflow = published_workflows._decode_numbers(item.get("workflow"))
         if not isinstance(workflow, dict):
             continue
         if workflow.get("flow") or workflow.get("flows"):
@@ -119,7 +119,8 @@ def apply(missing, published_updates, trigger_updates, tables):
     for previous, workflow in published_updates:
         item = published_workflows.publish(workflow, cause="legacy-migration",
                                            operator="migration", previous=previous,
-                                           table_ref=table)
+                                           table_ref=table,
+                                           expected_revision=previous.get("revision") or 0)
         print(f"converted published {workflow['id']} revision {item['revision']}")
     # Materialize the effective actions without resetting trigger identity,
     # tokens, EventBridge rules, or creation metadata. The conditional check
@@ -159,6 +160,10 @@ def main(argv=None):
         print(f"  materialize {kind} trigger {item[key]} ({item['flow']})")
     if args.apply:
         apply(missing, published_updates, updates, tables)
+        remaining, published_remaining, trigger_remaining = plan(workflows, flows, tables)
+        if remaining or published_remaining or trigger_remaining:
+            raise RuntimeError("migration verification failed: records still need conversion")
+        print("Migration verified: every workflow is managed and every trigger has inline actions.")
     else:
         print("Read-only plan. Pass --apply after reviewing it.")
     return 0

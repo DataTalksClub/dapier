@@ -65,7 +65,7 @@ def _decode_numbers(value):
 
 
 def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=None,
-            only_if_absent=False):
+            only_if_absent=False, expected_revision=None):
     """Store one parsed workflow definition; the engine reads it on the next event.
 
     Also appends a version record (the definition exactly as published, with
@@ -88,6 +88,9 @@ def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=N
     write = {"Item": item}
     if only_if_absent:
         write["ConditionExpression"] = "attribute_not_exists(workflow_id)"
+    elif expected_revision is not None:
+        write["ConditionExpression"] = "revision = :expected"
+        write["ExpressionAttributeValues"] = {":expected": int(expected_revision)}
     table.put_item(**write)
     table.put_item(Item={
         "workflow_id": version_key(workflow["id"], revision),
@@ -122,11 +125,25 @@ def get_item(workflow_id, table_ref=None):
     return {key: _decode_numbers(value) for key, value in item.items()} if item else None
 
 
+def _scan_all(table):
+    """Read every page; the managed table is the complete runtime catalog."""
+    items, start = [], None
+    while True:
+        kwargs = {"Limit": SCAN_LIMIT}
+        if start:
+            kwargs["ExclusiveStartKey"] = start
+        page = table.scan(**kwargs)
+        items.extend(page.get("Items", []))
+        start = page.get("LastEvaluatedKey")
+        if not start:
+            return items
+
+
 def load_items(table_ref=None):
     # Version records share the table; only live items belong in the
     # engine merge and the designer list.
     items = [
-        item for item in get_table(table_ref).scan(Limit=SCAN_LIMIT).get("Items", [])
+        item for item in _scan_all(get_table(table_ref))
         if not item.get("version_of")
     ]
     return sorted(
@@ -138,13 +155,11 @@ def load_items(table_ref=None):
 def list_versions(workflow_id, table_ref=None):
     """One workflow's version records, newest revision first.
 
-    The scan is bounded like load_items (Limit=SCAN_LIMIT): version history
-    is pruned per workflow to MAX_VERSIONS, so the newest revisions always
-    fit inside the window; an unbounded scan would read the whole table to
-    show at most those.
+    Version records share the table with live definitions, so all scan pages
+    must be read before filtering this workflow's history.
     """
     versions = [
-        item for item in get_table(table_ref).scan(Limit=SCAN_LIMIT).get("Items", [])
+        item for item in _scan_all(get_table(table_ref))
         if item.get("version_of") == workflow_id
     ]
     return sorted(

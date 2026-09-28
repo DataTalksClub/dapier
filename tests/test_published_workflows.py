@@ -54,6 +54,22 @@ class StubPublishedTable:
         return {"Items": list(self.items.values())}
 
 
+def test_catalog_reads_all_scan_pages():
+    class Pages:
+        def scan(self, **kwargs):
+            if kwargs.get("ExclusiveStartKey"):
+                return {"Items": [
+                    {"workflow_id": "second", "workflow": {"id": "second"}},
+                    {"workflow_id": "second#v1", "version_of": "second",
+                     "revision": 1}], "LastEvaluatedKey": None}
+            return {"Items": [{"workflow_id": "first", "workflow": {"id": "first"}}],
+                    "LastEvaluatedKey": {"workflow_id": "first"}}
+
+    assert [item["workflow_id"] for item in published_workflows.load_items(Pages())] == [
+        "first", "second"]
+    assert published_workflows.list_versions("second", Pages())[0]["revision"] == 1
+
+
 @pytest.fixture
 def published(monkeypatch):
     """The publish table configured and stubbed; the real one never touched."""
