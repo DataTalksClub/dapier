@@ -1434,40 +1434,16 @@ list, overview, runs, inbox, usage; engine untouched. Phase 3: owner-or-
 operator write checks for non-operators. Out of scope until an external
 (non-DTC) identity actually needs in.
 
-### Gate debts on the in-flight gmail/agent lane (verify at landing)
+### Gate debts on the in-flight gmail/agent lane — verified closed 2026-09-28
 
-- Console poll-dialog entry for `gmail.messages` (`src/web/index.html`
-  Source select + `CONNECTION_POLL_SOURCES` in `views/triggers.js`), then
-  remove the `CONSOLE_PENDING_SOURCES` carve-out (`tests/test_console_trigger_sources.py:26`).
-- `make designer-console` rebuild — the `agent` action is in
-  `designer/src/catalog.ts` but not the served `src/web/designer.js` bundle.
-- Host task rows are write-only after the lane removed
-  `/api/admin/agent-tasks` + `dapier agent-mail tasks` — restore an
-  equivalent read surface or state fire-and-forget explicitly in the PR.
-
-### Landing status (same day)
-
-- **G14 quotas — shipped** (`feat(quota): the monthly task budget`): landed
-  as an ACCOUNT-WIDE monthly cap (a `quota` config item + `_total` rollup
-  row) rather than the per-workflow `task_quota` field sketched above;
-  enforcement at step admission via `usage.enforce`, `QuotaExceeded` rides
-  the ordinary action-error machinery; `GET/PUT /api/{admin,agent}/quota`,
-  `dapier quota`, console Usage-card editor.
-- **G16 paging — shipped**: trigger stores walk every scan page (the
-  silent-#201 correctness bug), inbox/connections/grants use the runs-list
-  contract (`fix(triggers): walk every scan page`,
-  `feat(paging): inbox, connections, and grants lists page instead of
-  clipping`). G17 Phase 0 done with it.
-- **G15 draft-vs-live — shipped**: landed per the design above
-  (`save_draft`/`load_items(include_drafts=False)`, `api_save(live=...)`,
-  publish/discard/draft/draft-diff, viewer/editor role mapping,
-  `tests/test_designer_drafts.py`).
-- **G17 multi-user** — phased recommendation stands (owner stamping →
-  visible_to reads → owner-or-operator writes); start after G15 lands.
-- Also closed: the host-task read surface debt
-  (`feat(agent-tasks): read surface for the host task rows`) —
-  `GET /api/{admin,agent}/agent-tasks`, `dapier agent-tasks list`, console
-  Emails view.
+- Console poll-dialog entry for `gmail.messages`: shipped — `gmail.messages`
+  is in `CONNECTION_POLL_SOURCES` (`views/triggers.js:34`) and the
+  `CONSOLE_PENDING_SOURCES` carve-out is gone (no matches in the tree).
+- `make designer-console` rebuild: current — `src/web/designer.js` is newer
+  than every `designer/src/` source (rebuilt with the G15 landing).
+- Host task rows: closed — `GET /api/{admin,agent}/agent-tasks` +
+  `dapier agent-tasks list` + console Emails view
+  (`feat(agent-tasks): read surface for the host task rows`).
 
 ### Landing status (same day)
 
