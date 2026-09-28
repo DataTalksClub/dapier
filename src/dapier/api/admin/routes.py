@@ -64,6 +64,28 @@ def usage(event):
     return http._json_response(status, payload)
 
 
+def quota_get(event):
+    """The monthly task quota: limit, tasks used and left this month."""
+    status, payload = usage_rollup.api_quota_get()
+    return http._json_response(status, payload)
+
+
+def quota_save(event, operator):
+    """Store or clear the monthly task budget ({"limit": 1000} or
+    {"limit": "off"}), audited like every other settings write."""
+    try:
+        body = http._request_json(event)
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return http._json_response(400, {"error": "Invalid request"})
+    status, payload = usage_rollup.api_quota_set(body.get("limit"))
+    if status == 200:
+        session._audit_event("usage", "quota.set", operator or "unknown",
+                             outcome="ok")
+    return http._json_response(status, payload)
+
+
 def errors_summary(event):
     """Failed-run counts by workflow over the recent window (default 7 days)."""
     query = event.get("queryStringParameters") or {}

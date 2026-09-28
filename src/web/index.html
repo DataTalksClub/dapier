@@ -138,7 +138,7 @@
             <div id="overview-audit-empty" class="empty-state" hidden><h3>No audit entries</h3><p>Operator actions — connects, grants, token issues, workflow saves — appear here once recorded.</p></div>
           </section>
           <section>
-            <div class="section-head"><div><h2>Usage</h2><p class="sub">Completed action steps per workflow, this month and over the last 3 months.</p></div></div>
+            <div class="section-head"><div><h2>Usage</h2><p class="sub">Completed action steps per workflow, this month and over the last 3 months.</p><p class="sub" id="overview-quota-line" hidden></p></div><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="button secondary" type="submit">Set limit</button></form></div>
             <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
             <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
           </section>

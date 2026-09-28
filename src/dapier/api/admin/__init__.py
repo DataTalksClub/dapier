@@ -56,6 +56,10 @@ def route(event, method, path):
         return routes.replay_failed_runs(event, operator_subject)
     if method == "GET" and path == "/api/admin/usage":
         return routes.usage(event)
+    if method == "GET" and path == "/api/admin/quota":
+        return routes.quota_get(event)
+    if method == "PUT" and path == "/api/admin/quota":
+        return routes.quota_save(event, operator_subject)
     if method == "GET" and path == "/api/admin/errors/summary":
         return routes.errors_summary(event)
     if method == "POST" and path == "/api/admin/errors/digest":
