@@ -8,6 +8,9 @@ formatter calls:
     {trigger.subject | trim | upper}    the triggering event (data + envelope)
     {steps.render.output.s3.key}        an earlier action's captured output
     {steps.render.status}               that step's execution status
+    {steps.find.output.rows | sum:amount}
+                                        aggregate over a rendered list (also
+                                        min, max, avg; unique and sort reshape)
 
 The context mirrors what the run history records: every executed step
 contributes ``status`` and ``output`` under its action id. Missing paths
@@ -442,6 +445,101 @@ def _pluck(value, path):
     return str(found)
 
 
+def _json_list(value):
+    """The list a context value was JSON-stringified into, or None when the
+    value is not a list (a string the context rendered, a struct, ...)."""
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return None
+    return parsed if isinstance(parsed, list) else None
+
+
+def _is_number(value):
+    """A plain JSON number; bools are ints in Python but not in templates."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _format_number(number):
+    """number_format's rendering style for aggregate results: thousands
+    separators, decimals only when the value has them (3000 -> 3,000,
+    30.75 stays 30.75). Pipe ``round``/``number_format`` afterwards for a
+    fixed shape."""
+    if float(number).is_integer():
+        return f"{number:,.0f}"
+    return f"{number:,}"
+
+
+def _aggregate(reduce):
+    """Factory behind sum/min/max/avg: fold the numeric values found at a
+    dot path over a list of dicts (the list the context JSON-stringified).
+    Entries missing the path or carrying a non-number are skipped, and an
+    empty fold renders empty per the never-raise convention."""
+    def apply(value, path):
+        items = _json_list(value)
+        numbers = []
+        for item in items or []:
+            found = _resolve(item, str(path).strip())
+            if _is_number(found):
+                numbers.append(float(found))
+        if not numbers:
+            raise ValueError(f"no numeric values at '{path}' to aggregate over")
+        return _format_number(reduce(numbers))
+    return apply
+
+
+def _unique(value, path=None):
+    """Dedupe a JSON list preserving first-seen order — whole items, or the
+    values at a dot path when one is given (entries missing the path are
+    dropped). Renders as JSON, so ``join`` composes right after it."""
+    items = _json_list(value)
+    if items is None:
+        raise ValueError("unique needs a list to dedupe")
+    selected = items
+    if path is not None and str(path).strip():
+        selected = []
+        for item in items:
+            found = _resolve(item, str(path).strip())
+            if found is not None:
+                selected.append(found)
+    seen, deduped = set(), []
+    for item in selected:
+        key = json.dumps(item, sort_keys=True, default=str)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+    return _stringify(deduped)
+
+
+def _sort(value, path=None, order=None):
+    """Sort a JSON list — by the values at a dot path when one is given,
+    otherwise the items themselves — numerically when every value is a
+    number and plain string order otherwise (a missing path reads as an
+    empty string, so one item without the field degrades the whole sort to
+    string order). The sort is stable: equal keys keep their order."""
+    items = _json_list(value)
+    if items is None:
+        raise ValueError("sort needs a list to sort")
+    direction = str(order or "").strip().lower()
+    if path is not None and str(path).strip().lower() in ("asc", "desc") and not direction:
+        # ``sort:desc`` sorts the list itself in descending order; a field
+        # literally named asc/desc still works as ``sort:desc:asc``.
+        path, direction = None, str(path).strip().lower()
+    direction = direction or "asc"
+    if direction not in ("asc", "desc"):
+        raise ValueError(f"sort order must be asc or desc, got {direction!r}")
+    keyed = items
+    if path is not None and str(path).strip():
+        keyed = [_resolve(item, str(path).strip()) for item in items]
+    pairs = list(zip(keyed, items))
+    if all(_is_number(key) for key in keyed):
+        pairs.sort(key=lambda pair: pair[0], reverse=direction == "desc")
+    else:
+        pairs.sort(key=lambda pair: "" if pair[0] is None else str(pair[0]),
+                   reverse=direction == "desc")
+    return _stringify([item for _, item in pairs])
+
+
 def _math(operate):
     def apply(value, operand):
         result = operate(float(value), float(operand))
@@ -482,4 +580,10 @@ FORMATTERS = {
     "extract_url": (_extract_url, (0, 0), True),
     "extract_number": (_extract_number, (0, 0), True),
     "pluck": (_pluck, (1, 1), True),
+    "sum": (_aggregate(sum), (1, 1), True),
+    "min": (_aggregate(min), (1, 1), True),
+    "max": (_aggregate(max), (1, 1), True),
+    "avg": (_aggregate(lambda numbers: sum(numbers) / len(numbers)), (1, 1), True),
+    "unique": (_unique, (0, 1), True),
+    "sort": (_sort, (0, 2), True),
 }
