@@ -13,7 +13,7 @@ from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
 from . import storage as storage_api
-from ..auth import api_tokens, authz, device_sessions, roles, session
+from ..auth import api_tokens, authz, device_sessions, roles, session, visibility
 from ..auth.dtc_auth import verify_id_token
 from ..connections import credentials, importing
 from ..connections import records as connections
@@ -665,6 +665,18 @@ def require_operator(event, action):
     return None, _json_response(403, {"error": error_text})
 
 
+def _visibility(event, subject):
+    """The caller's G17 Phase 2 read scope, decided exactly as
+    require_operator decides its gate: an API token passes only as an
+    operator, a DTC identity resolves through roles.effective_role —
+    operator-or-admin sees everything, anyone else is owner-scoped to their
+    subject (auth.visibility). Read filtering only; writes stay Phase 3."""
+    if event.get("_api_token"):
+        return visibility.Visibility(subject, is_operator=True)
+    claims = event.get("_dtc_claims") or {}
+    return visibility.for_session({"subject": subject, "sub": claims.get("email", "")})
+
+
 def designer_api(event, method, source=None):
     """Operator-only workflow designer API over the CLI's bearer authentication."""
     subject, error = require_operator(event, "workflow.save")
@@ -677,7 +689,8 @@ def designer_api(event, method, source=None):
             query = event.get("queryStringParameters") or {}
             status, payload = designer_store.api_list(query.get("q") or None,
                                                       tag=query.get("tag") or None,
-                                                      folder=query.get("folder") or None)
+                                                      folder=query.get("folder") or None,
+                                                      visible=_visibility(event, subject))
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -1297,21 +1310,23 @@ def tokens_api(event, method):
 
 
 def operator_overview(event):
-    """Operator-only read view mirroring the console overview."""
-    _, error = require_operator(event, "overview")
+    """Operator-only read view mirroring the console overview (G17
+    read-filtered for non-operators like the console route)."""
+    subject, error = require_operator(event, "overview")
     if error:
         return error
-    return overview.overview(event)
+    return overview.overview(event, visible=_visibility(event, subject))
 
 
 def runs_api(event, run_id=None):
     """Operator-only run history mirroring the console Runs view.
 
     Without a run id: the recent-run list, one row per workflow handling of a
-    trigger event. With one: the run's step-by-step flow (status, input,
+    trigger event (G17 read-filtered for non-operators like the console
+    route). With one: the run's step-by-step flow (status, input,
     output, duration, error per step).
     """
-    _, error = require_operator(event, "runs")
+    subject, error = require_operator(event, "runs")
     if error:
         return error
     if run_id:
@@ -1326,6 +1341,7 @@ def runs_api(event, run_id=None):
         before=query.get("before") or None,
         q=query.get("q") or None,
         next_token=query.get("next") or None,
+        visible=_visibility(event, subject),
     )
     return _no_store(_json_response(status, payload))
 
@@ -1367,6 +1383,7 @@ def runs_export_api(event):
         since=query.get("since") or None,
         before=query.get("before") or None,
         q=query.get("q") or None,
+        visible=_visibility(event, subject),
     )
     if status == 200:
         audit.emit("runs", "runs.export", subject, outcome="ok")
@@ -1377,13 +1394,16 @@ def usage_api(event):
     """Operator-only task usage rollup: tasks per workflow per month.
 
     Carries the quota block alongside the rollup so one read shows both the
-    spend and the budget it counts against.
+    spend and the budget it counts against. The per-workflow rows are G17
+    read-filtered for non-operators like the console route; the quota block
+    is account-wide and untouched.
     """
-    _, error = require_operator(event, "usage")
+    subject, error = require_operator(event, "usage")
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = usage.api_usage(query.get("months", 12))
+    status, payload = usage.api_usage(query.get("months", 12),
+                                      visible=_visibility(event, subject))
     payload["quota"] = usage.quota_status()
     return _no_store(_json_response(status, payload))
 
@@ -1589,10 +1609,11 @@ def inbox_api(event, inbox_id=None):
     """Operator-only trigger inbox: every inbound event, matched or not.
 
     Without an id: recent events, filterable by connector — the row the run
-    history never shows for events no workflow claimed. With one: the stored
+    history never shows for events no workflow claimed (G17 read-filtered
+    for non-operators like the console route). With one: the stored
     envelope (data, matched workflows, status).
     """
-    _, error = require_operator(event, "triggers.inbox")
+    subject, error = require_operator(event, "triggers.inbox")
     if error:
         return error
     if inbox_id:
@@ -1602,6 +1623,7 @@ def inbox_api(event, inbox_id=None):
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
+        visible=_visibility(event, subject),
     )
     return _no_store(_json_response(status, payload))
 
