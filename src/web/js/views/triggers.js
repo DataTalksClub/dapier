@@ -14,14 +14,15 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
    validated server-side (headers, cursor, and the actions list). Provider
    sources (source: s3 | s3.updates | s3.deletions | google-sheets.rows |
    google-drive.files | google-drive.updates | google-drive.deletions |
+   google-calendar.events |
    zoom.recordings | dropbox.files | youtube.videos | mailchimp.members |
    slack.messages) take their target through these too: bucket/prefix,
    spreadsheet_id/worksheet, folder_id, for_email, path, channel_id,
-   list_id. */
+   list_id, calendar_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
   'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days', 'actions', 'flow',
   'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'for_email',
-  'path', 'channel_id', 'list_id'];
+  'path', 'channel_id', 'list_id', 'calendar_id'];
 
 /* Sources that poll a connected account and so require connection_id on
    save (the server validates too — this is the early, human-readable
@@ -29,6 +30,7 @@ const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mod
    instead, so they stay off this list. */
 const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-drive.files',
   'google-drive.updates', 'google-drive.deletions',
+  'google-calendar.events',
   'zoom.recordings', 'dropbox.files', 'youtube.videos', 'slack.messages'];
 
 let hooks = [];
@@ -68,7 +70,7 @@ function pollWatches(poll) {
       ? [poll.bucket, poll.prefix].filter(Boolean).join('/')
       : [poll.spreadsheet_id, poll.worksheet].filter(Boolean).join(' · ')
         || poll.folder_id || poll.for_email || poll.path
-        || poll.channel_id || poll.list_id || '';
+        || poll.channel_id || poll.list_id || poll.calendar_id || '';
     return `${poll.source} ${target}`.trim();
   }
   return `${poll.method || 'GET'} ${poll.url || ''}`;

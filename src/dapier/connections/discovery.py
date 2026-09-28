@@ -34,6 +34,7 @@ _MAX_PAGES = 5
 
 GOOGLE_DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files"
 SHEETS_API_URL = "https://sheets.googleapis.com/v4/spreadsheets"
+CALENDAR_API_URL = "https://www.googleapis.com/calendar/v3"
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 SPREADSHEET_MIME = "application/vnd.google-apps.spreadsheet"
 FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -267,6 +268,75 @@ def _google_rows(connection, token, params, limit, *, transport=None):
         if len(items) >= limit:
             break
     return items
+
+
+def _google_calendars(connection, token, params, limit, *, transport=None):
+    """The connection's calendar list, following nextPageToken like Drive."""
+    items = []
+    page_params = {"maxResults": min(limit, 250)}
+    for _page in range(_MAX_PAGES):
+        url = CALENDAR_API_URL + "/users/me/calendarList?" + urllib.parse.urlencode(page_params)
+        data = _request("GET", url, token, None, transport=transport)
+        found = [
+            {
+                "id": entry.get("id"),
+                "name": entry.get("summary"),
+                "timeZone": entry.get("timeZone"),
+                "primary": bool(entry.get("primary")),
+                "accessRole": entry.get("accessRole"),
+            }
+            for entry in data.get("items") or []
+            if isinstance(entry, dict) and entry.get("id")
+        ]
+        items.extend(found)
+        if not found or len(items) >= limit or not data.get("nextPageToken"):
+            break
+        page_params = {**page_params, "pageToken": data["nextPageToken"]}
+    return items[:limit]
+
+
+def _google_events(connection, token, params, limit, *, transport=None):
+    """Upcoming events in one calendar, expanded per occurrence.
+
+    singleEvents + orderBy=startTime lists the window's occurrences in
+    start order; the window opens a day back so events that just started
+    still show, and an optional ``query`` narrows by text match.
+    """
+    calendar_id = urllib.parse.quote(params["calendar_id"], safe="")
+    page_params = {
+        "singleEvents": "true",
+        "orderBy": "startTime",
+        "maxResults": min(limit, 250),
+        "timeMin": (datetime.now(timezone.utc) - timedelta(days=1))
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if params.get("query"):
+        page_params["q"] = params["query"]
+    items = []
+    for _page in range(_MAX_PAGES):
+        url = (f"{CALENDAR_API_URL}/calendars/{calendar_id}/events?"
+               + urllib.parse.urlencode(page_params))
+        data = _request("GET", url, token, None, transport=transport)
+        found = []
+        for entry in data.get("items") or []:
+            if not isinstance(entry, dict) or not entry.get("id"):
+                continue
+            start = entry.get("start") or {}
+            end = entry.get("end") or {}
+            found.append({
+                "id": entry.get("id"),
+                "name": entry.get("summary"),
+                "start": start.get("dateTime") or start.get("date"),
+                "end": end.get("dateTime") or end.get("date"),
+                "location": entry.get("location"),
+                "status": entry.get("status"),
+                "htmlLink": entry.get("htmlLink"),
+            })
+        items.extend(found)
+        if not found or len(items) >= limit or not data.get("nextPageToken"):
+            break
+        page_params = {**page_params, "pageToken": data["nextPageToken"]}
+    return items[:limit]
 
 
 # --- YouTube ---
@@ -642,6 +712,14 @@ CATALOG = {
                  _google_rows,
                  (Param("spreadsheet_id", True, "Spreadsheet ID from the spreadsheets list"),
                   Param("worksheet", False, "Worksheet name (default Sheet1)"))),
+        Resource("calendars", "Calendars",
+                 "Calendars the connection can see, including the primary",
+                 _google_calendars),
+        Resource("events", "Calendar events",
+                 "Upcoming events in one calendar, start order",
+                 _google_events,
+                 (Param("calendar_id", True, "Calendar ID from the calendars list"),
+                  Param("query", False, "Text to match against event fields"))),
     ],
     "youtube": [
         Resource("channel", "Channel", "The connected YouTube channel", _youtube_channel),

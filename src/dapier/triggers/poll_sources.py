@@ -29,7 +29,8 @@ SOURCES: dict = {}
 _BUILTIN_MODULES = ("..connectors.s3", "..connectors.sheets", "..connectors.drive",
                     "..connectors.zoom", "..connectors.dropbox", "..connectors.youtube",
                     "..connectors.rss",
-                    "..connectors.mailchimp", "..connectors.slack")
+                    "..connectors.mailchimp", "..connectors.slack",
+                    "..connectors.calendar")
 _loaded = False
 
 

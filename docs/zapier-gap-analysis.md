@@ -329,8 +329,8 @@ preventDefaults in canvas view. Presentational only (parity exception 5).
 
 Still open after round 6 (deliberately deferred): plan/quota *enforcement*
 on top of usage metering; multi-user workspaces (and with it template
-cross-account transfer); new app connectors beyond the current 14 chips
-(Gmail, Google Calendar, …); Google Sheets `row.updated` (needs snapshot
+cross-account transfer); new app connectors beyond the current chips
+(Gmail, an AI/LLM provider; Google Calendar closed in round 28); Google Sheets `row.updated` (needs snapshot
 diffing); an SES bounce/complaint trigger chip.
 
 ### Landed 2026-09-28 (round 7: test-trigger in the console, live workflow samples, thread/poll/participant staples)
@@ -3374,6 +3374,32 @@ Still open (ranked, from the same audit):
     find chat goes beyond it). The stale Telegram matrix rows (still
     listing only `message.received` + find chat) are corrected.
 
+### Landed 2026-09-28 (round 28: the Google Calendar connector)
+
+- **Google Calendar as a real app connector** — the first of the deferred
+  "new app chips" closed. Five actions over the Google connection:
+  `calendar_create_event` (detailed events: all-day dates or datetimes with
+  a timezone, description, location, attendees), `calendar_quick_add`
+  (one-liner via `events/quickAdd`), `calendar_find_events` (text query over
+  a time window with find-or-create semantics like `sheets_find_row`),
+  `calendar_update_event` (patches only the set fields) and
+  `calendar_delete_event` (`engine/actions/calendar.py`,
+  `connectors/calendar.py`). Discovery: `google-calendar.calendars` and
+  `google-calendar.events` in the google provider catalog back the
+  calendar pickers on every action field and the trigger config; the chip
+  (palette + designer `catalog.ts`, lucide Calendar) pulls samples
+  live/history/synthetic like the drive chip. Trigger: the
+  `google-calendar.events` poll source publishes `event.new` with the drive
+  files source's created-time watermark — first fire seeds and emits
+  nothing, later fires emit events created strictly after the cursor oldest
+  first, edits never pose as new events (a recurring series' occurrences
+  share the series' creation time). Console: Source select, Options key
+  (`calendar_id`), Watches target, connection-required early check, and the
+  connect card's scopes gained `calendar.readonly` (the listings need read).
+  Tests: `tests/test_calendar.py` (engine, discovery, poll fire end to end,
+  sample pull, registry/console wiring); the catalog-list and source-list
+  pins updated.
+
 ### Fresh audit 2026-09-28 (post-round-24) — what a Zapier-eye still catches
 
 Re-verified against committed HEAD (`6d330a7`): 103 registered actions,
@@ -3382,8 +3408,8 @@ find-or-create wherever a create exists. The round-6 deliberately-deferred
 list is all still open, confirmed in code: plan/quota enforcement (only
 `discovery.py` mentions quotas; usage is metered but uncapped), multi-user
 beyond roles v1 (no invitations/shared workspaces), new app chips (zero
-`calendar` references in `src/` — Google Calendar, Gmail, and no AI/LLM
-provider), Google Sheets `row.updated` (only `row.new` in the poll source),
+`calendar` references in `src/` — Gmail and no AI/LLM provider;
+Google Calendar closed in round 28), Google Sheets `row.updated` (only `row.new` in the poll source),
 and an SES bounce/complaint trigger chip (no SES notification intake; only
 inbox replay-bounce notes). New findings this pass, ranked:
 
@@ -3435,8 +3461,8 @@ find-or-create wherever a create exists. The round-6 deliberately-deferred
 list is all still open, confirmed in code: plan/quota enforcement (only
 `discovery.py` mentions quotas; usage is metered but uncapped), multi-user
 beyond roles v1 (no invitations/shared workspaces), new app chips (zero
-`calendar` references in `src/` — Google Calendar, Gmail, and no AI/LLM
-provider), Google Sheets `row.updated` (only `row.new` in the poll source),
+`calendar` references in `src/` — Gmail and no AI/LLM provider;
+Google Calendar closed in round 28), Google Sheets `row.updated` (only `row.new` in the poll source),
 and an SES bounce/complaint trigger chip (no SES notification intake; only
 inbox replay-bounce notes). New findings this pass, ranked:
 

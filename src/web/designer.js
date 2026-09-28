@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$B = [
+  const __iconNode$C = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14325,7 +14325,14 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$B);
+  const Braces = createLucideIcon("braces", __iconNode$C);
+  const __iconNode$B = [
+    ["path", { d: "M8 2v4", key: "1cmpym" }],
+    ["path", { d: "M16 2v4", key: "4m81vk" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
+    ["path", { d: "M3 10h18", key: "8toen8" }]
+  ];
+  const Calendar = createLucideIcon("calendar", __iconNode$B);
   const __iconNode$A = [
     ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
@@ -19175,6 +19182,159 @@
       ]
     },
     {
+      type: "calendar_create_event",
+      label: "Google Calendar",
+      icon: Calendar,
+      description: "Create an event in a calendar (Create Detailed Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "summary", label: "Title", placeholder: "Interview with {name}", required: true },
+        {
+          key: "start",
+          label: "Starts",
+          placeholder: "2026-10-01T09:00:00 or 2026-10-01",
+          required: true,
+          help: "ISO datetime, or a bare YYYY-MM-DD for an all-day event"
+        },
+        {
+          key: "end",
+          label: "Ends",
+          placeholder: "2026-10-01T10:00:00 or 2026-10-01",
+          required: true,
+          help: "Same shape as Starts — dates with dates, datetimes with datetimes"
+        },
+        {
+          key: "timezone",
+          label: "Time zone",
+          placeholder: "Europe/Berlin",
+          help: "IANA name for the datetimes; omitted means floating time"
+        },
+        { key: "description", label: "Description", type: "textarea", placeholder: "Notes, links, agendas" },
+        { key: "location", label: "Location", placeholder: "Room 4 / https://meet.test/x" },
+        {
+          key: "attendees",
+          label: "Attendees (JSON)",
+          type: "textarea",
+          placeholder: '["a@example.test", "b@example.test"]',
+          help: "JSON array of emails (or {email: …} objects), or a comma-separated list"
+        }
+      ]
+    },
+    {
+      type: "calendar_quick_add",
+      label: "Google Calendar (quick add)",
+      icon: Calendar,
+      description: "Create an event from one line of text (Quick Add Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "text", label: "Event text", placeholder: "Reviewer call tomorrow 10am", required: true }
+      ]
+    },
+    {
+      type: "calendar_find_events",
+      label: "Google Calendar (find event)",
+      icon: Calendar,
+      description: "Find events matching a text query, optionally create the first one when nothing matches (Find or Create Event). Output: {found, created, count, event, events}.",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        {
+          key: "query",
+          label: "Search text",
+          placeholder: "{name}",
+          help: "Free-text match across event fields; empty lists the window"
+        },
+        { key: "time_min", label: "From", placeholder: "2026-09-01T00:00:00Z", help: "Default: yesterday" },
+        { key: "time_max", label: "Until", placeholder: "2026-12-31T23:59:59Z", help: "Default: the end of the next quarter" },
+        {
+          key: "create_if_missing",
+          label: "Create if missing",
+          type: "boolean",
+          default: "false",
+          help: "Post the event from the fields below when nothing matches"
+        },
+        { key: "summary", label: "Create title", placeholder: "Sync with {name}", help: "Only used when Create if missing is on" },
+        { key: "start", label: "Create starts", placeholder: "2026-10-01T09:00:00", help: "Only used when Create if missing is on" },
+        { key: "end", label: "Create ends", placeholder: "2026-10-01T10:00:00", help: "Only used when Create if missing is on" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "description", label: "Create description", type: "textarea" },
+        { key: "location", label: "Create location" },
+        { key: "attendees", label: "Create attendees (JSON)", type: "textarea", placeholder: '["a@example.test"]' }
+      ]
+    },
+    {
+      type: "calendar_update_event",
+      label: "Google Calendar (update event)",
+      icon: Calendar,
+      description: "Patch the provided fields of one event (Update Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        {
+          key: "event_id",
+          label: "Event ID",
+          placeholder: "{steps.find.event.event_id}",
+          required: true,
+          help: "From find's output, the trigger payload's id, or the event's link tail"
+        },
+        { key: "summary", label: "Title" },
+        { key: "start", label: "Starts", placeholder: "2026-10-02T09:00:00" },
+        { key: "end", label: "Ends", placeholder: "2026-10-02T10:00:00" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "description", label: "Description", type: "textarea" },
+        { key: "location", label: "Location" },
+        {
+          key: "attendees",
+          label: "Attendees (JSON)",
+          type: "textarea",
+          help: "Replaces the attendee list; an empty list clears it only when sent as []"
+        }
+      ]
+    },
+    {
+      type: "calendar_delete_event",
+      label: "Google Calendar (delete event)",
+      icon: Calendar,
+      description: "Delete one event from a calendar (Delete Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "event_id", label: "Event ID", placeholder: "{steps.find.event.event_id}", required: true }
+      ]
+    },
+    {
       type: "sheets_append_row",
       label: "Google Sheets",
       icon: SheetsLogo,
@@ -19957,6 +20117,7 @@
     { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
     { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new"] },
     { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
     { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
     { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
     { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },

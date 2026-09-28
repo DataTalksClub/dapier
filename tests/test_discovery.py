@@ -79,7 +79,8 @@ def test_catalog_lists_resources_with_params():
     view = discovery.catalog_view(GOOGLE_CONNECTION)
     assert view["connection"] == "sheets-team"
     assert [resource["name"] for resource in view["resources"]] == \
-        ["spreadsheets", "files", "folders", "worksheets", "columns", "rows"]
+        ["spreadsheets", "files", "folders", "worksheets", "columns", "rows",
+         "calendars", "events"]
     worksheets = view["resources"][3]
     assert worksheets["params"][0] == {
         "name": "spreadsheet_id", "required": True,

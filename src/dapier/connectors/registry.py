@@ -134,7 +134,7 @@ CONNECTION_TESTS: dict = {}
 # Drive resources. "s3"/"aws" name the stored AWS-keys credential, which has
 # no connection record but resolves the same bucket listing.
 PROVIDER_DISCOVERY_SOURCES = {
-    "google": ("google-sheets", "google-drive"),
+    "google": ("google-sheets", "google-drive", "google-calendar"),
     "youtube": ("youtube",),
     "zoom": ("zoom",),
     "slack": ("slack",),

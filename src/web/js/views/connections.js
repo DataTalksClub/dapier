@@ -8,10 +8,10 @@ import { refresh } from './overview.js';
 const CONNECT_PROVIDERS = {
   google: {
     label: 'Google Calendar',
-    blurb: 'Free/busy lookups and owned-event edits for the scheduling flows.',
+    blurb: 'Calendar listings, event triggers, and owned-event edits for the scheduling flows.',
     connectionId: 'google-calendar',
     displayName: 'Google Calendar',
-    scopes: ['https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.events.owned', 'https://www.googleapis.com/auth/userinfo.email'],
+    scopes: ['https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.events.owned', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
   },
   youtube: {
     label: 'YouTube',
