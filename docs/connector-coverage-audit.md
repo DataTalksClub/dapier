@@ -192,8 +192,19 @@ Behavior / trigger gaps:
    fetch function on the `PollSource` contract. Value M each, effort S.
 5. Low priority: telegram distinct `channel_post`/`callback_query`;
    sheets `row.updated` (snapshot diff — the Sheets API has no row
-   timestamps); S3 `object.removed` is push-shaped, out of the poll
-   model, and Zapier doesn't offer it either — skip.
+   timestamps). CLOSED (2026-09-28, later): **S3 `file.updated`/
+   `file.deleted`** — the earlier "push-shaped, skip" call was wrong on
+   both counts: Zapier's S3 trigger has no update/delete pair either, but the
+   poll seam never needed a feed. `s3.updates`/`s3.deletions` diff
+   consecutive ListObjectsV2 listings — the drive changes-sources' pattern
+   with the previous listing parked in the cursor (etag|size|last_modified
+   fingerprints; new keys stay the created source's; deletion events carry
+   the key alone). A changed prefix, a capped listing on a deletions watch,
+   or an unreadable snapshot re-seeds without firing — false deletions are
+   worse than late ones. The S3 chip's sample pull answers per event
+   (updates poll live = the bucket's newest object as an update envelope;
+   deletions has no live answer and falls to history/synthetic). Tests:
+   `tests/test_trigger_variety_s3.py`.
 
 Action breadth (each = register + runner + designer mirror; the
 per-provider transport plumbing all exists):

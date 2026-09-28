@@ -16,10 +16,12 @@ from src.dapier.triggers import poll_sources
 WEB = Path(__file__).resolve().parents[1] / "src" / "web"
 
 # Sources that must stay OUT of the connection-requiring list the console
-# validates against: credential-backed ones (s3 the shared aws keys,
-# mailchimp.members the shared mailchimp key or a named credential) and
-# rss, which polls a public feed URL and needs no auth at all.
-CREDENTIAL_SOURCES = {"s3", "mailchimp.members", "rss"}
+# validates against: credential-backed ones (the three s3 sources share the
+# stored aws keys, mailchimp.members the shared mailchimp key or a named
+# credential) and rss, which polls a public feed URL and needs no auth at
+# all.
+CREDENTIAL_SOURCES = {"s3", "s3.updates", "s3.deletions",
+                      "mailchimp.members", "rss"}
 
 
 def _select_sources():

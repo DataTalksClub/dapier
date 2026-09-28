@@ -42,7 +42,7 @@ Discovery works on either pseudo connection:
 bucket's keys, up to 100, optional `prefix` param — pass the bucket as
 `--param bucket=<name>`).
 
-## Triggers: the `s3 file.created` poll source
+## Triggers: file events from a bucket (`s3`, `s3.updates`, `s3.deletions`)
 
 New files surface through a poll trigger with source `s3` — Dapier lists
 the bucket on the schedule machinery, no S3 event notifications to
@@ -63,9 +63,34 @@ configure:
 to the shared `aws` keys. Each fire lists the bucket (following continuation
 pages up to 1,000 keys) and objects with a `last_modified` strictly newer
 than the stored watermark fire as `s3` / `file.created` events carrying
-`{key, size, last_modified, etag}`. The first fire only seeds the watermark
-— a new trigger must not fire on the bucket's whole history — and the
-composite `last_modified|key` id keeps same-second uploads distinct.
+`{bucket, key, size, last_modified, etag}`. The first fire only seeds the
+watermark — a new trigger must not fire on the bucket's whole history — and
+the composite `last_modified|key` id keeps same-second uploads distinct.
+
+### Updated and deleted files: the `s3.updates` / `s3.deletions` sources
+
+S3 has no change feed to subscribe to, so two sibling sources diff
+consecutive listings on the same machinery — the previous listing rides in
+the stored cursor, the same slot drive's changes-page token occupies, with
+the same save shape (`bucket` required, `prefix` and `credential_id`
+optional):
+
+- `s3.updates` fires `file.updated` when a listed key comes back with a
+  changed fingerprint (etag, size or last_modified — an overwrite moves at
+  least one), carrying `{bucket, key, size, last_modified, etag}`. A
+  brand-new key is the created source's news, never double-fired here.
+- `s3.deletions` fires `file.deleted` when a previously-listed key is gone
+  from the listing; the event carries only `{bucket, key}` — the object's
+  facts went with it.
+
+Each source keeps its own trigger, cursor and seen-set, so all three walk
+the bucket independently, and the first fire of each only seeds. Three
+situations re-seed and emit nothing instead of diffing: a changed `prefix`
+(the old keys were a different watch), a capped listing on a deletions
+watch (keys beyond the 1,000-key cap are unlisted, not absent — absence
+proves nothing), and an unreadable snapshot. False deletions are worse
+than late ones; the cost is that buckets larger than the cap cannot track
+deletions (updates still fire from the listed page).
 
 ## Actions
 
@@ -100,8 +125,10 @@ disk), so keep sources modest.
 - Target keys are normalized per path segment (safe filenames); read,
   presign, and delete address the key exactly as rendered — no
   normalization.
-- The first fire of an `s3` poll never emits: it only seeds the watermark.
-  Push the trigger schedule tighter than your patience while testing.
-- The generic HTTP poll trigger and the `s3` source are different `source`
+- The first fire of any `s3`-family poll never emits: the watermark/snapshot
+  seeds only. Push the trigger schedule tighter than your patience while
+  testing.
+- The generic HTTP poll trigger and the `s3` sources are different `source`
   values on the same poll-trigger machinery; a bucket watch needs
-  `source: "s3"`, not a `url`.
+  `source: "s3"` (new), `"s3.updates"` (changed) or `"s3.deletions"`
+  (removed), not a `url`.

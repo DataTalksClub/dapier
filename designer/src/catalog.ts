@@ -1563,7 +1563,7 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
   { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
-  { name: "s3", label: "S3", logo: S3Logo, events: ["file.created"] },
+  { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
   { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },

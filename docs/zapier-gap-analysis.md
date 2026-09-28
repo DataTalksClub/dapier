@@ -253,6 +253,14 @@ source fails the save with the valid choices. Tests:
 Composite ids (`last_modified|key`) keep same-second objects distinct;
 first fire seeds the cursor without emitting, later fires get new objects
 only, oldest first. Tests: `tests/test_s3_trigger.py`.
+- **`s3.updates` / `s3.deletions` (`file.updated` / `file.deleted`)** —
+consecutive-listing diff, the previous listing parked in the cursor
+(etag|size|last_modified fingerprints): a re-listed key with a changed
+fingerprint is an update, a snapshot key gone from the listing is a
+deletion (the event carries the key alone). New keys stay the created
+source's; a changed prefix, a capped listing on a deletions watch, or an
+unreadable snapshot re-seeds without firing. Tests:
+`tests/test_trigger_variety_s3.py`.
 - **`google-sheets.rows` (`row.new`)** — values.get through the connection's
 refreshed OAuth token (spreadsheet_id + optional worksheet required). Row
 numbers are ids; the known polling caveat (deleted rows shift numbering)

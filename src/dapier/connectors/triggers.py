@@ -45,7 +45,9 @@ connector(Connector(name="google-sheets", label="Google Sheets", events=("row.ne
 connector(Connector(name="google-drive", label="Google Drive",
                     events=("file.created", "file.updated", "file.deleted"),
                     icon="folder"))
-connector(Connector(name="s3", label="S3", events=("file.created",), icon="database"))
+connector(Connector(name="s3", label="S3",
+                    events=("file.created", "file.updated", "file.deleted"),
+                    icon="database"))
 connector(Connector(name="rss", label="RSS", events=("item.new",), icon="rss"))
 connector(Connector(name="renderer", label="Renderer", events=("job.completed",), icon="file-text"))
 connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))

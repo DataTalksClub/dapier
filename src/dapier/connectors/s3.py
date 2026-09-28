@@ -1,7 +1,9 @@
 """Amazon S3 connector: upload files to and find objects in a bucket with
 stored AWS keys, plus bucket/object discovery, the stored-keys health
-check, the "new file in bucket" poll source, and the trigger chip's sample
-pull."""
+check, the new/updated/deleted-file poll sources, and the trigger chip's
+sample pull."""
+import json
+
 from ..engine.actions.s3 import (
     DEFAULT_CREDENTIAL_ID,
     run_s3_delete_object,
@@ -292,6 +294,7 @@ from .trigger_discovery import (
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     TriggerDiscovery,
+    per_event_sample_fetch,
     register_trigger_discovery,
 )
 
@@ -333,7 +336,7 @@ register_trigger_discovery(TriggerDiscovery(
     fetch=_fetch_object_options))
 
 
-# --- poll source: "New File in S3 bucket" on the poll-trigger schedule ------
+# --- poll sources: file events on the poll-trigger schedule -----------------
 #
 # The generic poll trigger fetches JSON over HTTP; ListObjectsV2 answers in
 # XML. The ``s3`` source swaps the fetcher (``triggers.poll_sources``) and
@@ -342,8 +345,28 @@ register_trigger_discovery(TriggerDiscovery(
 # watermark become ``s3``/``file.created`` events, and the first fire seeds
 # the watermark without emitting — a new trigger must not fire on the
 # bucket's whole history.
+#
+# Updated and deleted files have no feed to subscribe to (S3 notifications
+# need a bucket configuration the operator may not control), so two sibling
+# sources diff consecutive listings, the drive changes-sources' pattern
+# with the listing in place of the feed: ``s3.updates`` publishes
+# ``file.updated`` for a key re-listed with a changed marker (etag, size or
+# last_modified), ``s3.deletions`` publishes ``file.deleted`` for a
+# previously-listed key gone from the current listing. The diff state rides
+# in the cursor — a JSON snapshot of the last listing, the same string slot
+# the changes feed's page token occupies on drive — and every ambiguous
+# listing re-seeds instead of firing: the first fire (no baseline yet), a
+# changed ``prefix`` (the old keys are not comparable), a capped listing
+# (keys beyond the cap are unlisted, not absent) and a foreign cursor all
+# seed the snapshot and emit nothing. False deletions are worse than late
+# ones. Each source keeps its own trigger, cursor and seen-set, so all
+# three walk the bucket independently.
 
 S3_POLL_MAX_KEYS = 1000
+
+# The snapshot shape's version: a foreign or older-shape cursor re-seeds
+# rather than diffing against an unreadable baseline.
+S3_SNAPSHOT_VERSION = 1
 
 
 def _s3_poll_validate(body):
@@ -445,7 +468,10 @@ def _s3_poll_fetch(item, cursor=None):
     newer = sorted(
         (obj for obj in objects if obj["last_modified"] > str(cursor)),
         key=lambda obj: (obj["last_modified"], obj["key"]))
-    return newer, (newer[-1]["last_modified"] if newer else str(cursor))
+    # The bucket rides on each item: the chip's documented sample carries
+    # it, so a template copied from the sample must render on a real fire.
+    return [dict(obj, bucket=bucket) for obj in newer], \
+        (newer[-1]["last_modified"] if newer else str(cursor))
 
 
 def _s3_poll_view(item):
@@ -458,11 +484,119 @@ register_source(PollSource(
     validate=_s3_poll_validate, fetch=_s3_poll_fetch, view=_s3_poll_view))
 
 
+def _s3_fingerprint(obj):
+    """The changed marker one listing entry carries: etag, size and
+    last_modified — an overwrite moves at least the etag, a metadata touch
+    at least the timestamp."""
+    return f"{obj.get('etag')}|{obj.get('size')}|{obj.get('last_modified')}"
+
+
+def _s3_snapshot(objects, prefix, truncated):
+    """The listing state parked as an updates/deletions cursor: a compact
+    JSON map of key → fingerprint plus the prefix and the truncation flag
+    it was taken under. The cursor machinery stores one string, so the
+    diff baseline rides in it the way drive's changes cursor rides a page
+    token; at the S3_POLL_MAX_KEYS cap the row stays far under DynamoDB's
+    item limit."""
+    return json.dumps({
+        "v": S3_SNAPSHOT_VERSION,
+        "prefix": prefix,
+        "truncated": truncated,
+        "keys": {obj["key"]: _s3_fingerprint(obj) for obj in objects},
+    }, separators=(",", ":"))
+
+
+def _s3_parse_snapshot(cursor):
+    """The previous listing snapshot, or None when the cursor is foreign —
+    not JSON, another shape or version. None means re-seed: a baseline
+    that cannot be read must never be diffed against."""
+    try:
+        snapshot = json.loads(str(cursor))
+    except ValueError:
+        return None
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("v") != S3_SNAPSHOT_VERSION
+            or not isinstance(snapshot.get("keys"), dict)):
+        return None
+    return snapshot
+
+
+def _s3_diff_fetch(item, cursor, *, deletions, name):
+    """One diff page as ``(items, next_cursor)`` for the sibling sources.
+
+    Lists the bucket once through the same ``_s3_poll_objects`` the created
+    source uses and compares it with the snapshot parked as the cursor.
+    Updates: a key listed before AND now, with a changed fingerprint, in
+    ``(last_modified, key)`` order — brand-new keys stay the created
+    source's news, never double-fired here. Deletions: a previously-listed
+    key absent now, in key order; the item is the identity alone
+    (``{id, key}`` — the object's facts went with it) and its id is the
+    key, so the seen-set recognizes a refetched page's same removal.
+
+    Every ambiguous listing re-seeds and emits nothing: no cursor (first
+    fire — the bucket's current state is history, not news), an unreadable
+    or older-shape snapshot, a stored ``prefix`` that differs from the
+    snapshot's (the old keys were a different watch), and — deletions only
+    — a capped listing on either side, where absence proves nothing.
+    Raises ``RuntimeError`` on a failed fetch, like every poll source.
+    """
+    bucket = str(item.get("bucket") or "").strip()
+    if not bucket:
+        raise RuntimeError(f"poll source '{name}' needs a stored bucket")
+    prefix = str(item.get("prefix") or "").strip()
+    try:
+        objects = _s3_poll_objects(_s3_poll_client(item), bucket, prefix)
+    except Exception as exc:
+        raise RuntimeError(f"s3 list failed for bucket '{bucket}': "
+                           f"{str(exc) or type(exc).__name__}") from exc
+    truncated = len(objects) >= S3_POLL_MAX_KEYS
+    snapshot = _s3_snapshot(objects, prefix, truncated)
+    if cursor is None:
+        return [], snapshot
+    previous = _s3_parse_snapshot(cursor)
+    if previous is None or str(previous.get("prefix") or "") != prefix:
+        return [], snapshot
+    if deletions:
+        if previous.get("truncated") or truncated:
+            return [], snapshot
+        listed = {obj["key"] for obj in objects}
+        gone = [{"id": key, "key": key} for key in sorted(previous["keys"])
+                if key not in listed]
+        return gone, snapshot
+    changed = [obj for obj in objects
+               if obj["key"] in previous["keys"]
+               and previous["keys"][obj["key"]] != _s3_fingerprint(obj)]
+    changed.sort(key=lambda obj: (obj["last_modified"], obj["key"]))
+    # bucket rides along like the created source's items — the chip's
+    # documented file.updated sample carries it, so a template copied from
+    # the sample renders on a real fire.
+    return [dict(obj, bucket=bucket) for obj in changed], snapshot
+
+
+def _s3_updates_fetch(item, cursor=None):
+    return _s3_diff_fetch(item, cursor, deletions=False, name="s3.updates")
+
+
+def _s3_deletions_fetch(item, cursor=None):
+    return _s3_diff_fetch(item, cursor, deletions=True, name="s3.deletions")
+
+
+register_source(PollSource(
+    name="s3.updates", connector="s3", event="file.updated", label="S3 updates",
+    validate=_s3_poll_validate, fetch=_s3_updates_fetch, view=_s3_poll_view))
+
+register_source(PollSource(
+    name="s3.deletions", connector="s3", event="file.deleted",
+    label="S3 deletions",
+    validate=_s3_poll_validate, fetch=_s3_deletions_fetch, view=_s3_poll_view))
+
+
 def _stored_s3_poll(name):
-    """The stored poll trigger named by ``event`` when it watches S3, or
-    None. A missing selector, unconfigured poll triggers, an unknown name
-    and a non-s3 source (the generic poll connector owns those) all fold
-    together: the caller only distinguishes live-vs-fallback."""
+    """The stored poll trigger named by ``event`` when it watches an s3
+    source (s3/s3.updates/s3.deletions), or None. A missing selector,
+    unconfigured poll triggers, an unknown name and a non-s3 source (the
+    generic poll connector owns those) all fold together: the caller only
+    distinguishes live-vs-fallback."""
     from ..triggers import poll_triggers
 
     if not name:
@@ -471,10 +605,18 @@ def _stored_s3_poll(name):
         item = poll_triggers.get_item(name)
     except poll_triggers.TriggerError:
         return None
-    if not item or str(item.get("source") or "") != "s3":
+    if not item or str(item.get("source") or "") not in _S3_SOURCE_EVENTS:
         return None
     return item
 
+
+# The event each s3 poll source publishes — the live sample's ask maps the
+# stored poll onto it, and the fallback chain keys on it.
+_S3_SOURCE_EVENTS = {
+    "s3": "file.created",
+    "s3.updates": "file.updated",
+    "s3.deletions": "file.deleted",
+}
 
 _S3_SYNTHETIC_OBJECT = {
     "bucket": "dapier-renders",
@@ -484,49 +626,92 @@ _S3_SYNTHETIC_OBJECT = {
     "etag": "\"9b2cf535f27731c974343645a3985328\"",
 }
 
+# file.updated: the same object facts, a rewritten body's changed etag and
+# size, the later last_modified.
+_S3_SYNTHETIC_UPDATED = {
+    "bucket": "dapier-renders",
+    "key": "invoices/4137.pdf",
+    "size": 84620,
+    "last_modified": "2026-09-28T09:31:44+00:00",
+    "etag": "\"3f5a8c2e91d4b7601a2c3d4e5f607182\"",
+}
+
+# file.deleted: only the identity of the key that disappeared — the same
+# shape the deletions source publishes (the object's facts went with it).
+_S3_SYNTHETIC_DELETED = {
+    "id": "invoices/4137.pdf",
+    "key": "invoices/4137.pdf",
+}
+
+_PER_EVENT_S3_SAMPLE = per_event_sample_fetch("s3", "file.created", {
+    "file.created": _S3_SYNTHETIC_OBJECT,
+    "file.updated": _S3_SYNTHETIC_UPDATED,
+    "file.deleted": _S3_SYNTHETIC_DELETED,
+})
+
 
 def _fetch_s3_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
-    """The S3 chip's sample pull: the newest object a stored s3 poll would
-    fire next (``source: "live"``), else the newest recorded s3 run
-    (``"history"``), else a documented example (``"synthetic"``).
+    """The S3 chip's sample pull: the newest item a stored s3 poll watches
+    right now (``source: "live"``), else the newest recorded s3 run carrying
+    the asked event (``"history"``), else a documented example
+    (``"synthetic"``).
 
-    ``event`` names the stored poll trigger; only ``source: "s3"`` polls
-    qualify. The live pull runs the poll's own fetch once against the
-    "everything" cursor ``""`` — every object's ``last_modified`` compares
-    strictly newer, so the bucket's newest object comes back; no stored
-    cursor is read or advanced (the sheets sample's ``"0"``, s3-shaped). A
-    live fetch that cannot run — no stored AWS credential, the bucket
-    unreachable, or the bucket empty — falls through to the
-    recorded/documented sample instead of failing: a sample pull shows the
-    payload shape, it never raises (see the audit note in
+    ``event`` names the stored poll trigger; any ``s3``-family source
+    qualifies (poll ids cannot contain dots, so a per-event ask never
+    matches a poll). The live pull runs the created source's own fetch once
+    against the "everything" cursor ``""`` — every object's
+    ``last_modified`` compares strictly newer, so the bucket's newest
+    object comes back; no stored cursor is read or advanced. An updates
+    poll answers live with its bucket's newest object wrapped in the
+    envelope an updated fire would carry (a pull shows the payload shape,
+    it cannot conjure a real edit); a deletions poll has no live answer —
+    an absent object cannot be listed — and falls through. A live fetch
+    that cannot run — no stored AWS credential, the bucket unreachable, or
+    the bucket empty — falls through too, instead of failing: a sample pull
+    shows the payload shape, it never raises (see the audit note in
     docs/connector-coverage-audit.md about bare deploys).
+
+    The fallbacks key on the ask (the poll's event, or a dotted event name
+    for a per-event ask): a ``file.deleted`` ask is never answered with a
+    ``file.created`` run or example, and an unknown event lands on the
+    classic new-file sample.
     """
     from ..triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_s3_poll(name)
-    if item is not None:
+    source = str((item or {}).get("source") or "")
+    wanted_event = _S3_SOURCE_EVENTS.get(source)
+    if wanted_event is None and "." in name:
+        wanted_event = name  # a dotted ask names an event, not a poll
+    envelope = None
+    if item is not None and source == "s3":
         try:
             items = poll_triggers.fetch_page(item, cursor="")
             raw = next((entry for entry in items if entry is not None), None)
             envelope = poll_triggers.event_for(item, raw) if raw is not None else None
         except Exception:
             envelope = None
-        if envelope is not None:
-            return {
-                "sample": trigger_discovery.as_sample(envelope),
-                "source": "live",
-                "connection_id": item.get("connection_id") or None,
-            }
-    found = trigger_discovery.history_sample("s3")
-    if found is not None:
-        return {"sample": found, "source": "history", "connection_id": connection_id}
-    return {
-        "sample": trigger_discovery.synthetic_sample(
-            "s3", "file.created", dict(_S3_SYNTHETIC_OBJECT)),
-        "source": "synthetic",
-        "connection_id": connection_id,
-    }
+    elif item is not None and source == "s3.updates":
+        try:
+            objects = _s3_poll_objects(
+                _s3_poll_client(item), str(item.get("bucket") or ""),
+                str(item.get("prefix") or ""))
+            newest = max(objects, key=lambda obj: (obj["last_modified"],
+                                                   obj["key"])) \
+                if objects else None
+            envelope = poll_triggers.event_for(item, newest) \
+                if newest is not None else None
+        except Exception:
+            envelope = None
+    if envelope is not None:
+        return {
+            "sample": trigger_discovery.as_sample(envelope),
+            "source": "live",
+            "connection_id": item.get("connection_id") or None,
+        }
+    return _PER_EVENT_S3_SAMPLE(event=wanted_event,
+                                connection_id=connection_id, limit=limit)
 
 
 register_trigger_discovery(TriggerDiscovery(

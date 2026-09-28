@@ -12,11 +12,12 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
 ], null, 2);
 /* Optional poll extras beyond the form fields; merged into the PUT body and
    validated server-side (headers, cursor, and the actions list). Provider
-   sources (source: s3 | google-sheets.rows | google-drive.files |
-   google-drive.updates | google-drive.deletions | zoom.recordings |
-   dropbox.files | youtube.videos | mailchimp.members | slack.messages) take
-   their target through these too: bucket/prefix, spreadsheet_id/worksheet,
-   folder_id, for_email, path, channel_id, list_id. */
+   sources (source: s3 | s3.updates | s3.deletions | google-sheets.rows |
+   google-drive.files | google-drive.updates | google-drive.deletions |
+   zoom.recordings | dropbox.files | youtube.videos | mailchimp.members |
+   slack.messages) take their target through these too: bucket/prefix,
+   spreadsheet_id/worksheet, folder_id, for_email, path, channel_id,
+   list_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
   'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days', 'actions', 'flow',
   'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'for_email',
