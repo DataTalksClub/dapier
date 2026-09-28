@@ -232,7 +232,8 @@ def _decode_token(token):
     return key if key != ("", "") else None
 
 
-def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None):
+def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None,
+             visible=None):
     """Recent inbox events, newest first; ``connector`` filters when given.
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
@@ -240,6 +241,11 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     after that row, so the connector filter and paging compose. The scanned
     window stays bounded like every list call — events older than the window
     age out of the list but stay reachable through api_get.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted)
+    read-filters the list, G17 Phase 2: a non-operator keeps the events that
+    matched at least one workflow it owns. An event nothing matched is
+    nobody's row — visible to everyone, like every no-owner item.
     """
     try:
         limit = max(1, min(int(limit), MAX_LIMIT))
@@ -248,11 +254,14 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
+    owners = _visible_owners(visible)
     items = (table_ref if table_ref is not None else _table()).scan(
         Limit=max(limit * 6, 150)).get("Items", [])
     events = [_view(item) for item in items]
     if connector:
         events = [event for event in events if event.get("connector") == connector]
+    if visible is not None:
+        events = [event for event in events if _visible_event(event, visible, owners)]
     events.sort(key=_sort_key, reverse=True)
     if token_key is not None:
         events = [event for event in events if _sort_key(event) < token_key]
@@ -267,6 +276,26 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
             "filtered": bool(connector or next_token),
         },
     }
+
+
+def _visible_owners(visible):
+    """The workflow-owner map a filtered inbox call resolves matches against
+    — skipped entirely for an unrestricted (operator) caller."""
+    from ..auth import visibility
+
+    if visible is None or visible.is_operator:
+        return {}
+    return visibility.workflow_owners()
+
+
+def _visible_event(event, visible, owners):
+    """The G17 rule for one inbox row: visible when it matched a workflow
+    the caller may see, and when it matched nothing at all (no owner — the
+    defensive rule that never hides an unclaimed event)."""
+    matched = event.get("matched") or []
+    if not matched:
+        return True
+    return any(visible.workflow_visible(m, owners) for m in matched)
 
 
 def api_get(inbox_id, *, table_ref=None):

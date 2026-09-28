@@ -230,7 +230,7 @@ def _overview(monkeypatch, connections, credential_items):
     monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
-    monkeypatch.setattr(overview_api, "_workflows", lambda: [])
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: [])
     monkeypatch.setattr(overview_api, "_scan",
                         lambda *args, **kwargs: connections if args and args[0] == "connections" else [])
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])

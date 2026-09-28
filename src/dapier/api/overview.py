@@ -3,7 +3,7 @@ import os
 
 import boto3
 
-from ..auth import api_tokens
+from ..auth import api_tokens, visibility
 from .. import http
 from ..triggers import email_from, email_triggers, published_workflows
 from ..engine import usage
@@ -17,7 +17,7 @@ from ..connections.credentials import (
 from ..connections.providers import oauth_clients
 
 
-def _workflows():
+def _workflows(visible=None, owners=None):
     from ..triggers import failure_counts
 
     counts = failure_counts.all_counts()
@@ -26,6 +26,9 @@ def _workflows():
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            if visible is not None and not visible.owner_visible(
+                    visibility.owner_of_item(item)):
                 continue
             result[str(workflow["id"])] = _workflow_view(
                 workflow, item.get("file"), published=True,
@@ -163,11 +166,19 @@ def _email_from():
         return []
 
 
-def _usage():
-    """The 3-month usage block; empty when the rollup table is not wired."""
+def _usage(visible=None, owners=None):
+    """The 3-month usage block; empty when the rollup table is not wired.
+
+    ``visible`` read-filters the per-workflow rows like the usage endpoint
+    (the account-wide quota block below is not workflow-owned and stays
+    whole for everyone)."""
     if not os.environ.get("TASK_USAGE_TABLE"):
         return []
-    return usage.api_usage(3)[1].get("usage", [])
+    rows = usage.api_usage(3)[1].get("usage", [])
+    if visible is not None:
+        rows = [row for row in rows
+                if visible.workflow_visible(row.get("workflow_id"), owners or {})]
+    return rows
 
 
 def _quota():
@@ -177,16 +188,24 @@ def _quota():
     return usage.quota_status()
 
 
-def overview(event=None):
+def overview(event=None, visible=None):
     """The operator overview. ``?q=`` filters the workflows list (same match
     text as the designer list: id, description, trigger, action types, tags,
     folder), ``?tag=`` narrows to workflows carrying that tag, and
     ``?folder=`` narrows to workflows sitting in that folder (both
     case-insensitive). ``workflow_tags`` and ``workflow_folders`` aggregate
     the distinct tags and folders in use (computed before both filters), the
-    lists the console's filter dropdowns offer."""
+    lists the console's filter dropdowns offer.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted) applies
+    the G17 Phase 2 read filter to every workflow-tied block: the workflow
+    list (owner on the item), the executions and runs blocks and the usage
+    rows (owner resolved from the published store via workflow_id; a row
+    whose workflow is gone stays visible). Connections, credentials, tokens,
+    and the trigger registries are not workflow-owned and are untouched."""
     query = (event or {}).get("queryStringParameters") or {}
-    workflows = _workflows()
+    owners = _visible_owners(visible)
+    workflows = _workflows(visible, owners)
     workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
     workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
                                if str(view.get("folder") or "").strip()})
@@ -204,7 +223,9 @@ def overview(event=None):
     # Newest first by the moment each step actually started — execution_id
     # is ``workflow:action:event``, so its string order is not chronological.
     executions = sorted(
-        _scan(os.environ["EXECUTIONS_TABLE"]),
+        (item for item in _scan(os.environ["EXECUTIONS_TABLE"])
+         if visible is None or visible.workflow_visible(
+             item.get("workflow_id"), owners)),
         key=lambda item: (str(item.get("started_at") or ""),
                           str(item.get("execution_id") or "")),
         reverse=True,
@@ -218,8 +239,8 @@ def overview(event=None):
         "workflow_folders": workflow_folders,
         "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
-        "runs": runs.recent(25),
-        "usage": _usage(),
+        "runs": runs.recent(25, visible=visible),
+        "usage": _usage(visible, owners),
         "quota": _quota(),
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
@@ -228,3 +249,13 @@ def overview(event=None):
         "email_triggers": _email_triggers(),
         "email_from": _email_from(),
     })
+
+
+def _visible_owners(visible):
+    """The workflow-owner map the overview's workflow_id-keyed blocks
+    (executions, usage) resolve rows against — skipped entirely for an
+    unrestricted (operator) caller. The runs block resolves its own inside
+    runs.api_list."""
+    if visible is None or visible.is_operator:
+        return {}
+    return visibility.workflow_owners()

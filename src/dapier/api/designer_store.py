@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 import yaml
 
+from ..auth import visibility
 from ..triggers import failure_counts, published_workflows
 
 DEFAULT_REPO_URL = "https://github.com/DataTalksClub/dapier"
@@ -197,7 +198,7 @@ def _published_by_file(source):
     return published_workflows.get_item(source.removesuffix(".yaml"))
 
 
-def api_list(q=None, tag=None, folder=None):
+def api_list(q=None, tag=None, folder=None, visible=None):
     """Managed workflows in the live published store.
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
@@ -207,10 +208,18 @@ def api_list(q=None, tag=None, folder=None):
     workflows carrying exactly that tag (case-insensitive) — Zapier's tag
     view. ``folder`` narrows to workflows sitting in exactly that folder
     (case-insensitive) — Zapier's folder view.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted — the
+    bulk-toggle scope) read-filters the list, G17 Phase 2: a non-operator
+    sees the workflows it owns — live rows by their owner, draft-only rows
+    by their drafted_by — and unowned workflows stay visible to everyone. A
+    hidden live item hides its draft pair too (one workflow, one
+    visibility); write checks remain Phase 3.
     """
     summaries = {}
     drafts = {}
     if published_workflows.configured():
+        hidden = set()
         for item in published_workflows.load_items(include_drafts=True):
             if item.get("draft_of"):
                 drafts[str(item["draft_of"])] = item
@@ -218,9 +227,15 @@ def api_list(q=None, tag=None, folder=None):
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
+            if visible is not None and not visible.owner_visible(
+                    visibility.owner_of_item(item)):
+                # Not this caller's workflow — remember the id so its draft
+                # pair (collected below) dies with the row.
+                hidden.add(str(workflow["id"]))
+                continue
             summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
             # Informational G17 owner (resolved on read; published_by before
-            # the stamp) — no access control rides on it until Phase 2.
+            # the stamp) — Phase 2 read-filters this list by it.
             summaries[summary["id"]] = {**summary, "published": True,
                                         "owner": item.get("owner") or ""}
         # A workflow with a draft but nothing live still lists — Zapier shows
@@ -231,11 +246,19 @@ def api_list(q=None, tag=None, folder=None):
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
+            if workflow_id in hidden:
+                continue
+            if visible is not None and not visible.owner_visible(
+                    visibility.owner_of_item(item)):
+                continue
             if workflow_id in summaries:
                 summaries[workflow_id]["has_draft"] = True
                 continue
             summary = _summary(workflow, item.get("file") or f"{workflow_id}.yaml")
-            summaries[str(workflow["id"])] = {**summary, "published": False}
+            # Draft-only rows are owned by their drafted_by (visibility.
+            # owner_of_item) — exposed informationally like the live rows.
+            summaries[str(workflow["id"])] = {**summary, "published": False,
+                                              "owner": visibility.owner_of_item(item)}
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
     search = str(q or "").strip().lower()
     if search:

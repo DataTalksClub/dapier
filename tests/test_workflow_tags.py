@@ -155,7 +155,7 @@ def test_designer_list_route_passes_tag_to_the_store(monkeypatch, operator_sessi
                                                      agent_operator):
     seen = {}
     monkeypatch.setattr(designer_store, "api_list",
-                        lambda q=None, tag=None, folder=None:
+                        lambda q=None, tag=None, folder=None, visible=None:
                         seen.update(q=q, tag=tag) or (200, {"workflows": [], "git_sync": {}}))
     event = admin_request("GET", "/api/admin/designer/workflows")
     event["queryStringParameters"] = {"tag": "billing"}
@@ -498,7 +498,7 @@ def test_overview_tag_filter_and_aggregate(monkeypatch):
          "triggerCount": 1, "actions": [{"type": "dropbox_upload"}], "published": False,
          "tags": ["ops"]},
     ]
-    monkeypatch.setattr(overview_api, "_workflows", lambda: views)
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: views)
     monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [])
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")

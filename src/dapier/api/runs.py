@@ -358,7 +358,8 @@ def _search_blob(run_id, items):
     return json.dumps(parts, default=str).lower()
 
 
-def recent(limit=25, workflow_id=None, status=None, since=None, before=None):
+def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
+           visible=None):
     """The most recent runs, newest first, optionally filtered.
 
     A bounded scan groups into runs; runs older than the scan window age
@@ -366,15 +367,16 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None):
     bookkeeping items (written by the worker's notification path) never
     group into the list. Filters narrow the scanned window client-side,
     like the grouping itself — a filter matching only runs older than the
-    window returns nothing.
+    window returns nothing. ``visible`` (G17 auth.visibility, None =
+    unrestricted) drops the runs of workflows the caller may not see.
     """
     status_code, payload = api_list(limit, workflow_id=workflow_id, status=status,
-                                    since=since, before=before)
+                                    since=since, before=before, visible=visible)
     return payload["runs"] if status_code == 200 else []
 
 
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
-             q=None, next_token=None):
+             q=None, next_token=None, visible=None):
     """The list response: runs plus a ``paging`` block.
 
     ``next`` carries the last returned row's sort key; the follow-up call
@@ -384,17 +386,27 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     (input, output, error) and ids, so "which run carried order #1234"
     answers from history. The shape is backward compatible — ``runs`` is
     unchanged, ``paging`` is additive.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted)
+    read-filters the list, G17 Phase 2: a non-operator keeps only the runs
+    of workflows it owns; a run whose workflow no longer exists resolves to
+    no owner and stays visible (the audit duty), as does any run when the
+    owner stamp is missing.
     """
     limit = max(1, min(_int(limit) or DEFAULT_LIMIT, MAX_LIMIT))
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
     query = str(q or "").strip().lower()
+    owners = _visible_owners(visible)
     grouped = _grouped(_scan_items(limit))
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     runs = [run for run in runs
             if _wanted(run, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
+    if visible is not None:
+        runs = [run for run in runs
+                if visible.workflow_visible(run.get("workflow_id"), owners)]
     if query:
         runs = [run for run in runs
                 if query in _search_blob(run["run_id"], grouped[run["run_id"]])]
@@ -412,6 +424,16 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
                              or query or next_token),
         },
     }
+
+
+def _visible_owners(visible):
+    """The workflow-owner map a filtered runs call resolves rows against —
+    skipped entirely for an unrestricted (operator) caller."""
+    from ..auth import visibility
+
+    if visible is None or visible.is_operator:
+        return {}
+    return visibility.workflow_owners()
 
 
 def runs_to_csv(rows):
@@ -434,23 +456,29 @@ def runs_to_csv(rows):
 
 
 def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
-               since=None, before=None, q=None, now=None):
+               since=None, before=None, q=None, now=None, visible=None):
     """The filtered run history as CSV: ``(status, payload)``.
 
     Same filters as api_list (including content search), newest first,
     capped at ``max_rows`` rows (``truncated`` flags the clip). Returns
     ``{filename, count, truncated, csv}`` — the caller decides delivery
     (CLI file write, console download), like the audit trail's export.
+    ``visible`` applies the same G17 read filter as the list, so the CSV
+    cannot see past it.
     """
     try:
         max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
     except (TypeError, ValueError):
         max_rows = EXPORT_DEFAULT_ROWS
+    owners = _visible_owners(visible)
     grouped = _grouped(_export_window(max_rows))
     rows = [run_summary(run_id, group) for run_id, group in grouped.items()]
     rows = [row for row in rows
             if _wanted(row, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
+    if visible is not None:
+        rows = [row for row in rows
+                if visible.workflow_visible(row.get("workflow_id"), owners)]
     query = str(q or "").strip().lower()
     if query:
         rows = [row for row in rows

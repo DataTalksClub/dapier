@@ -339,7 +339,7 @@ def test_agent_and_admin_lists_forward_the_folder_filter(monkeypatch):
     agent_configure(monkeypatch)
     seen = {}
     monkeypatch.setattr(store, "api_list",
-                        lambda q=None, tag=None, folder=None:
+                        lambda q=None, tag=None, folder=None, visible=None:
                         seen.setdefault("folders", []).append(folder)
                         or (200, {"workflows": [], "git_sync": {}}))
     agent_api.route(agent_event(query={"folder": "Billing"}), "GET",
@@ -413,7 +413,7 @@ def test_overview_surfaces_folder_and_filters_by_it(monkeypatch):
          "triggerCount": 1, "actions": [{"type": "dropbox_upload"}], "published": False,
          "folder": ""},
     ]
-    monkeypatch.setattr(overview_api, "_workflows", lambda: views)
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: views)
     monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [])
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")

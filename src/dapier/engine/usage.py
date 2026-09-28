@@ -54,8 +54,16 @@ def add_task(workflow_id, now=None):
         )
 
 
-def api_usage(months=12, now=None):
-    """Per-workflow-per-month task counts for the last ``months`` months."""
+def api_usage(months=12, now=None, visible=None):
+    """Per-workflow-per-month task counts for the last ``months`` months.
+
+    ``visible`` (an auth.visibility.Visibility, None = unrestricted)
+    read-filters the rollup, G17 Phase 2: a non-operator keeps the rows of
+    workflows it owns; a row whose workflow no longer exists resolves to no
+    owner and stays visible. The account-wide ``_total`` row is excluded
+    here either way (it is not a workflow), and the quota block is
+    account-wide by design — no per-owner cut.
+    """
     from boto3.dynamodb.conditions import Key
 
     try:
@@ -64,6 +72,7 @@ def api_usage(months=12, now=None):
         months = 12
     now = now or datetime.now(timezone.utc)
     year, month = now.year, now.month
+    owners = _visible_owners(visible)
     usage = []
     for _ in range(months):
         items = _table().query(
@@ -80,9 +89,23 @@ def api_usage(months=12, now=None):
         month -= 1
         if month == 0:
             month, year = 12, year - 1
+    if visible is not None:
+        usage = [row for row in usage
+                 if visible.workflow_visible(row["workflow_id"], owners)]
     usage.sort(key=lambda row: (str(row["month"]), str(row["workflow_id"])),
                reverse=True)
     return 200, {"usage": usage}
+
+
+def _visible_owners(visible):
+    """The workflow-owner map a filtered usage read resolves rows against —
+    skipped entirely for an unrestricted (operator) caller. Read filtering
+    only: the metering and quota paths above never filter."""
+    from ..auth import visibility
+
+    if visible is None or visible.is_operator:
+        return {}
+    return visibility.workflow_owners()
 
 
 def quota_status(now=None):

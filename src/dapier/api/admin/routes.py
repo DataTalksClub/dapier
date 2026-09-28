@@ -20,8 +20,11 @@ from .. import designer_store, discovery as discovery_api, errors as errors_api,
 from .. import storage as storage_api
 
 
-def list_runs(event):
-    """Recent runs, one row per workflow handling of a trigger event."""
+def list_runs(event, visible=None):
+    """Recent runs, one row per workflow handling of a trigger event.
+
+    ``visible`` (G17 auth.visibility, built by the dispatcher from the
+    session) read-filters the list for non-operators."""
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(
         query.get("limit", 25),
@@ -31,17 +34,20 @@ def list_runs(event):
         before=query.get("before") or None,
         q=query.get("q") or None,
         next_token=query.get("next") or None,
+        visible=visible,
     )
     return http._json_response(status, payload)
 
 
-def export_runs(event, operator):
+def export_runs(event, operator, visible=None):
     """Run history as CSV (runs.api_export): the list's filters, one
     bounded export.
 
     The response carries {filename, count, truncated, csv}; the console
     turns it into a download and the CLI writes the file. The export is
     audited like the audit CSV export: bulk reads leave a mark in the trail.
+    ``visible`` applies the G17 read filter exactly as the list does, so
+    the CSV cannot see past it.
     """
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_export(
@@ -51,6 +57,7 @@ def export_runs(event, operator):
         since=query.get("since") or None,
         before=query.get("before") or None,
         q=query.get("q") or None,
+        visible=visible,
     )
     if status == 200:
         session._audit_event("runs", "runs.export", operator or "unknown",
@@ -58,10 +65,13 @@ def export_runs(event, operator):
     return http._json_response(status, payload)
 
 
-def usage(event):
-    """Task usage rollup: tasks per workflow per month, latest months first."""
+def usage(event, visible=None):
+    """Task usage rollup: tasks per workflow per month, latest months first.
+
+    ``visible`` (G17 auth.visibility) read-filters the per-workflow rows for
+    non-operators; the quota endpoint (account-wide) is separate."""
     query = event.get("queryStringParameters") or {}
-    status, payload = usage_rollup.api_usage(query.get("months", 12))
+    status, payload = usage_rollup.api_usage(query.get("months", 12), visible=visible)
     return http._json_response(status, payload)
 
 
@@ -252,12 +262,17 @@ def replay_failed_runs(event, operator):
     return http._json_response(status, payload)
 
 
-def list_inbox(event):
-    """Trigger inbox: every inbound event, matched or not."""
+def list_inbox(event, visible=None):
+    """Trigger inbox: every inbound event, matched or not.
+
+    ``visible`` (G17 auth.visibility) read-filters the list for
+    non-operators: events that matched at least one workflow they own;
+    unmatched events stay visible to everyone."""
     query = event.get("queryStringParameters") or {}
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
+        visible=visible,
     )
     return http._json_response(status, payload)
 
@@ -458,11 +473,14 @@ def agent_tasks_list(event):
     return http._json_response(status, payload)
 
 
-def designer_list(event):
+def designer_list(event, visible=None):
+    """The designer list, G17 read-filtered for non-operators (``visible``
+    is built by the dispatcher from the session; None = unrestricted)."""
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_list(query.get("q") or None,
                                               tag=query.get("tag") or None,
-                                              folder=query.get("folder") or None)
+                                              folder=query.get("folder") or None,
+                                              visible=visible)
     return http._json_response(status, payload)
 
 def designer_get(source):

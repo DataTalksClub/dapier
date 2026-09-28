@@ -993,7 +993,7 @@ def test_overview_q_filters_the_workflow_list(monkeypatch):
          "trigger": {"connector": "schedule", "event": "tick"},
          "triggerCount": 1, "actions": [{"type": "dropbox_upload"}], "published": False},
     ]
-    monkeypatch.setattr(overview_api, "_workflows", lambda: views)
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: views)
     monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [])
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
@@ -1042,7 +1042,7 @@ def test_overview_connections_carry_token_health(monkeypatch):
             return creds
 
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
-    monkeypatch.setattr(overview_api, "_workflows", lambda: [])
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: [])
     monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [connection])
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
@@ -1075,7 +1075,7 @@ def test_overview_executions_are_newest_first_by_started_at(monkeypatch):
     def fake_scan(table_name, limit=50):
         return executions if table_name == "executions" else []
 
-    monkeypatch.setattr(overview_api, "_workflows", lambda: [])
+    monkeypatch.setattr(overview_api, "_workflows", lambda *args, **kwargs: [])
     monkeypatch.setattr(overview_api, "_scan", fake_scan)
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")

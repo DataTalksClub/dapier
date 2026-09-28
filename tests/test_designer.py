@@ -577,7 +577,7 @@ def agent_identity(monkeypatch):
 
 def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_identity):
     monkeypatch.setattr(designer_store, "api_list",
-                        lambda q=None, tag=None, folder=None:
+                        lambda q=None, tag=None, folder=None, visible=None:
                         (200, {"workflows": [], "git_sync": {}}))
     listed = agent_api.route(
         agent_request("GET", "/api/agent/designer/workflows"), "GET", "/api/agent/designer/workflows",
@@ -1067,7 +1067,7 @@ def test_api_list_search_filters_on_id_description_trigger_and_types(monkeypatch
 def test_designer_list_passes_the_search_to_the_store(monkeypatch, operator_session):
     seen = {}
     monkeypatch.setattr(designer_store, "api_list",
-                        lambda q=None, tag=None, folder=None:
+                        lambda q=None, tag=None, folder=None, visible=None:
                         seen.update(q=q, tag=tag)
                         or (200, {"workflows": [], "git_sync": {}}))
     event = admin_request("GET", "/api/admin/designer/workflows")
@@ -1084,7 +1084,7 @@ def test_designer_list_passes_the_search_to_the_store(monkeypatch, operator_sess
 def test_agent_designer_list_passes_the_search_to_the_store(monkeypatch, agent_identity):
     seen = {}
     monkeypatch.setattr(designer_store, "api_list",
-                        lambda q=None, tag=None, folder=None:
+                        lambda q=None, tag=None, folder=None, visible=None:
                         seen.update(q=q, tag=tag)
                         or (200, {"workflows": [], "git_sync": {}}))
     event = agent_request("GET", "/api/agent/designer/workflows")

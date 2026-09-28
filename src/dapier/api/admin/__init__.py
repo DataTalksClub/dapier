@@ -3,10 +3,19 @@ import re
 from urllib.parse import unquote
 
 from ... import http
-from ...auth import authz, roles, session
+from ...auth import authz, roles, session, visibility
 from ...connections import oauth_flow
 from .. import agent, overview
 from . import login, routes, users_routes  # noqa: F401 (used via module refs)
+
+
+def _read_scope(payload):
+    """G17 Phase 2 read filtering for the owned-workflow reads (designer
+    list, overview, runs, inbox, usage): the same effective-role verdict the
+    gate above just applied scopes them — operators (and admins) see
+    everything, everyone else is owner-scoped to their subject. Writes stay
+    Phase 3. Computed only on the routes that filter, not on every request."""
+    return visibility.for_session(payload)
 
 
 def route(event, method, path):
@@ -43,19 +52,20 @@ def route(event, method, path):
         return operator_error
     operator_subject = session.subject_fallback(operator_payload)
     if method == "GET" and path == "/api/admin/overview":
-        return overview.overview(event)
+        return overview.overview(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/audit/export":
         return routes.export_audit(event, operator_subject)
     if method == "GET" and path == "/api/admin/audit":
         return routes.list_audit(event)
     if method == "GET" and path == "/api/admin/runs":
-        return routes.list_runs(event)
+        return routes.list_runs(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/runs/export":
-        return routes.export_runs(event, operator_subject)
+        return routes.export_runs(event, operator_subject,
+                                  visible=_read_scope(operator_payload))
     if method == "POST" and path == "/api/admin/runs/replay-failed":
         return routes.replay_failed_runs(event, operator_subject)
     if method == "GET" and path == "/api/admin/usage":
-        return routes.usage(event)
+        return routes.usage(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/quota":
         return routes.quota_get(event)
     if method == "PUT" and path == "/api/admin/quota":
@@ -75,7 +85,7 @@ def route(event, method, path):
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)))
     if method == "GET" and path == "/api/admin/triggers/inbox":
-        return routes.list_inbox(event)
+        return routes.list_inbox(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/triggers/sample":
         return routes.trigger_sample(event, operator_subject)
     inbox_replay_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)/replay", path)
@@ -144,7 +154,7 @@ def route(event, method, path):
     if method == "GET" and path == "/api/admin/agent-tasks":
         return routes.agent_tasks_list(event)
     if method == "GET" and path == "/api/admin/designer/workflows":
-        return routes.designer_list(event)
+        return routes.designer_list(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/catalog":
         from ...connectors import registry
 
