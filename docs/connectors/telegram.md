@@ -78,13 +78,23 @@ Lifecycle rules worth knowing:
 
 ### Events
 
-One stored trigger matches two events, so a workflow can select by event
+One stored trigger matches three events, so a workflow can select by event
 name instead of poking at the raw update:
 
 | Event | Fires on | Envelope `data` fields |
 | --- | --- | --- |
 | `message.received` | `message` / `edited_message` updates | `hook`, `update_id`, `message_id`, `text` (or a media caption), `entities`, `is_channel_post`, `chat_id`, `chat`, `from`, `update` |
 | `channel_post.received` | `channel_post` / `edited_channel_post` (announcement channels; no `from` — an `author_signature` instead) | same fields |
+| `callback_query.received` | a user taps an inline-keyboard button | `hook`, `update_id`, `id` (callback id), `data` (the button's `callback_data`, e.g. `join:september`), `from` (the tapper), `inline_message_id` (keyboards on inline-mode messages only), plus the originating message's `message_id`, `text`, `chat_id`, `chat` when present |
+
+Button taps need the bot to be subscribed to them: new trigger
+registrations include `callback_query` in `set_webhook`'s
+`allowed_updates`; an existing Telegram trigger must be re-saved once to
+re-register. A sample pull,
+`dapier triggers sample --connector telegram --event callback_query.received`,
+returns the documented tap. Creating the buttons themselves still means
+sending a `reply_markup` inline keyboard through the API — the send actions
+have no `reply_markup` field yet.
 
 ## Discovery and the getUpdates conflict
 
