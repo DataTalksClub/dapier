@@ -6,6 +6,9 @@ shared provider layer (``connections.discovery``) — the same code the
 /api/*/connections/.../discover endpoints serve — so the catalog metadata
 and the live listings can never drift apart.
 """
+import hashlib
+import json
+
 from ..connections import discovery as provider
 from ..engine.actions.sheets import (
     run_sheets_add_worksheet,
@@ -440,17 +443,30 @@ register_trigger_discovery(TriggerDiscovery(
     fetch=_fetch_row_options))
 
 
-# --- poll source: "New Spreadsheet Row" on the poll-trigger schedule --------
+# --- poll sources: "New Spreadsheet Row" / "New or Updated Row" on the ------
+# poll-trigger schedule
 #
 # values.get is JSON, so the generic poll trigger can already read it — but
 # rows come back as bare arrays with no ids: nothing to watermark or dedupe
-# on. The ``google-sheets.rows`` source owns the transform (the header row
-# becomes each item's column names, and the spreadsheet row number is the
-# item id) and the seeding rule, and publishes ``google-sheets``/``row.new``
-# events so workflows match the palette chip while staying scoped through
-# the poll-name filter.
+# on. Two sources own the transform (the header row becomes each item's
+# column names, the spreadsheet row number the item id) and the seeding
+# rule, and publish ``google-sheets``/``row.new`` and ``google-sheets``/
+# ``row.updated`` events so workflows match the palette chip while staying
+# scoped through the poll-name filter.
+#
+# ``row.new`` watermarks the row number: rows are append-mostly, so
+# "numbered past the cursor" is the news. ``row.updated`` has no feed to
+# subscribe to — the values API exposes no per-row modified time — so it
+# diffs consecutive listings the way s3.updates reads etags: the cursor
+# carries a JSON snapshot of row number → content digest, and a row listed
+# before AND now with a changed digest fires. Each source keeps its own
+# poll trigger, cursor and seen-set, so both watch the sheet independently.
 
 SHEETS_POLL_ROWS = 1000
+
+# The snapshot shape's version: a foreign or older-shape cursor re-seeds
+# rather than diffing against an unreadable baseline.
+SHEETS_SNAPSHOT_VERSION = 1
 
 
 def _sheets_poll_validate(body):
@@ -477,17 +493,53 @@ def _sheets_poll_validate(body):
     }
 
 
+def _sheets_poll_rows(item, *, name, transport=None):
+    """The worksheet's data rows for one poll, as ``{"row": <number>,
+    "columns": {header: cell}}`` — the shared listing behind both sheets
+    sources, fetched through the shared provider helper (``_google_rows``)
+    with the bearer token from ``poll_triggers._bearer_token`` so the
+    connection's OAuth token is refreshed exactly like the classic fetch.
+
+    Row 1 is the header and never fires; its cells name each row's columns
+    (missing cells read as "", headerless columns are dropped, empty rows
+    are skipped). Raises ``RuntimeError`` on a failed fetch, like every
+    poll source.
+    """
+    from ..triggers import poll_triggers
+
+    if not str(item.get("connection_id") or "").strip():
+        raise RuntimeError(f"poll source '{name}' needs connection_id: "
+                           "the Google connection to poll as")
+    spreadsheet_id = str(item.get("spreadsheet_id") or "").strip()
+    if not spreadsheet_id:
+        raise RuntimeError(f"poll source '{name}' needs a stored spreadsheet_id")
+    params = {"spreadsheet_id": spreadsheet_id,
+              "worksheet": str(item.get("worksheet") or "").strip() or "Sheet1"}
+    try:
+        rows = provider._google_rows({}, poll_triggers._bearer_token(item["connection_id"]),
+                                     params, SHEETS_POLL_ROWS, transport=transport)
+    except provider.DiscoveryError as exc:
+        raise RuntimeError(f"sheets poll failed: {exc}") from None
+    header = [str(cell).strip() for cell in (rows[0]["values"] if rows else [])]
+    entries = []
+    for row in rows:
+        number = row.get("row")
+        values = row.get("values") or []
+        if not number or number == 1 or not values:
+            continue
+        columns = {label: (values[index] if index < len(values) else "")
+                   for index, label in enumerate(header) if label}
+        entries.append({"row": number, "columns": columns})
+    return entries
+
+
 def _sheets_poll_fetch(item, cursor=None, *, transport=None):
     """One poll page as ``(items, next_cursor)`` for ``triggers.poll_sources``.
 
-    Polls values.get through the shared provider helper (``_google_rows``),
-    with the bearer token from ``poll_triggers._bearer_token`` so the
-    connection's OAuth token is refreshed exactly like the classic fetch.
-    Row 1 is the header and never fires; its cells name each item's columns
-    (missing cells read as "", headerless columns are dropped). Every other
-    row becomes ``{"row": <spreadsheet row number>, "id": <same>,
-    <header>: <cell>, ...}`` — the number under both keys, so it feeds
-    sheets_update_row directly and doubles as the event id.
+    Lists the worksheet through ``_sheets_poll_rows``; every row becomes
+    ``{"row": <spreadsheet row number>, "id": <same>, <header>: <cell>, ...}``
+    — the number under both keys, so it feeds sheets_update_row directly and
+    doubles as the event id.
 
     Seeding: with no stored cursor (first fire) the worksheet's last row
     number (1 on an empty sheet) parks as the watermark and nothing is
@@ -503,31 +555,9 @@ def _sheets_poll_fetch(item, cursor=None, *, transport=None):
     known polling caveat Zapier's New Spreadsheet Row shares. Raises
     ``RuntimeError`` on a failed fetch, like every poll source.
     """
-    from ..triggers import poll_triggers
-
-    if not str(item.get("connection_id") or "").strip():
-        raise RuntimeError("poll source 'google-sheets.rows' needs connection_id: "
-                           "the Google connection to poll as")
-    spreadsheet_id = str(item.get("spreadsheet_id") or "").strip()
-    if not spreadsheet_id:
-        raise RuntimeError("poll source 'google-sheets.rows' needs a stored spreadsheet_id")
-    params = {"spreadsheet_id": spreadsheet_id,
-              "worksheet": str(item.get("worksheet") or "").strip() or "Sheet1"}
-    try:
-        rows = provider._google_rows({}, poll_triggers._bearer_token(item["connection_id"]),
-                                     params, SHEETS_POLL_ROWS, transport=transport)
-    except provider.DiscoveryError as exc:
-        raise RuntimeError(f"sheets poll failed: {exc}") from None
-    header = [str(cell).strip() for cell in (rows[0]["values"] if rows else [])]
-    items = []
-    for row in rows:
-        number = row.get("row")
-        values = row.get("values") or []
-        if not number or number == 1 or not values:
-            continue
-        columns = {name: (values[index] if index < len(values) else "")
-                   for index, name in enumerate(header) if name}
-        items.append({"row": number, "id": str(number), **columns})
+    items = [{"row": entry["row"], "id": str(entry["row"]), **entry["columns"]}
+             for entry in _sheets_poll_rows(item, name="google-sheets.rows",
+                                            transport=transport)]
     if cursor is None:
         # First fire: seed the watermark at the worksheet's current depth
         # (row 1 on an empty/header-only sheet) without emitting anything.
@@ -541,6 +571,99 @@ def _sheets_poll_fetch(item, cursor=None, *, transport=None):
     return fresh, str(fresh[-1]["row"]) if fresh else str(boundary)
 
 
+def _sheets_row_digest(entry):
+    """The changed marker one worksheet row carries: a digest of its cells.
+    The values API exposes no per-row modified time, so an edit is a changed
+    digest — s3.updates' etag in its place."""
+    payload = json.dumps(entry["columns"], sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _sheets_snapshot(entries, item):
+    """The worksheet state parked as an updates cursor: a compact JSON map
+    of row number → content digest under the watch it was taken under. The
+    cursor machinery stores one string, so the diff baseline rides in it the
+    way drive's changes cursor rides a page token; at the SHEETS_POLL_ROWS
+    cap the row stays far under DynamoDB's item limit."""
+    return json.dumps({
+        "v": SHEETS_SNAPSHOT_VERSION,
+        "spreadsheet_id": str(item.get("spreadsheet_id") or ""),
+        "worksheet": str(item.get("worksheet") or ""),
+        "rows": {str(entry["row"]): _sheets_row_digest(entry) for entry in entries},
+    }, separators=(",", ":"))
+
+
+def _sheets_parse_snapshot(cursor):
+    """The previous snapshot, or None when the cursor is foreign — not JSON,
+    another shape or version. None means re-seed: a baseline that cannot be
+    read must never be diffed against."""
+    try:
+        snapshot = json.loads(str(cursor))
+    except ValueError:
+        return None
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("v") != SHEETS_SNAPSHOT_VERSION
+            or not isinstance(snapshot.get("rows"), dict)):
+        return None
+    return snapshot
+
+
+def _sheets_row_updated_validate(body):
+    """The rows source's body rules, but the fetch spec's ``id_path`` is
+    ``id``: an updated row keeps its spreadsheet row number, so the
+    seen-set needs the digest-carrying id to tell a re-edit from an
+    already-seen fire."""
+    spec = _sheets_poll_validate(body)
+    spec["id_path"] = "id"
+    return spec
+
+
+def _sheets_row_updated_fetch(item, cursor=None, *, transport=None):
+    """One diff page as ``(items, next_cursor)`` for the updates source.
+
+    Lists the worksheet through the same ``_sheets_poll_rows`` the rows
+    source uses and diffs it against the snapshot parked as the cursor. A
+    row listed before AND now with a changed digest fires — oldest row
+    first, carrying the row's current cells (same shape as a row.new item,
+    with ``id`` = ``<row>:<digest>`` so the seen-set recognizes a re-edit).
+    Brand-new rows stay the rows source's news and never double-fire here;
+    a renumbered row's cells moved with it, so inserting or deleting rows
+    can fire the rows under the change — the same position-keyed caveat
+    row.new carries.
+
+    Seeding mirrors the rows source: the first fire parks the worksheet's
+    current digests and emits nothing. Every ambiguous state re-seeds and
+    emits nothing too — a foreign or older-shape cursor, and a stored
+    spreadsheet/worksheet that differs from the snapshot's (the old digests
+    watched a different sheet). ``fire`` parks the fresh snapshot only once
+    the page drains, so a diff bigger than ``max_items`` refetches and the
+    seen-set recognizes what already ran. Raises ``RuntimeError`` on a
+    failed fetch, like every poll source.
+    """
+    entries = _sheets_poll_rows(item, name="google-sheets.updates",
+                                transport=transport)
+    snapshot = _sheets_snapshot(entries, item)
+    if cursor is None:
+        return [], snapshot
+    previous = _sheets_parse_snapshot(cursor)
+    watched = previous is not None and all(
+        str(previous.get(key) or "") == str(item.get(key) or "")
+        for key in ("spreadsheet_id", "worksheet"))
+    if not watched:
+        return [], snapshot
+    rows = previous["rows"]
+    changed = []
+    for entry in entries:
+        digest = _sheets_row_digest(entry)
+        old = rows.get(str(entry["row"]))
+        if old is not None and old != digest:
+            changed.append((entry, digest))
+    changed.sort(key=lambda pair: pair[0]["row"])
+    items = [{"row": entry["row"], "id": f"{entry['row']}:{digest[:16]}",
+              **entry["columns"]} for entry, digest in changed]
+    return items, snapshot
+
+
 def _sheets_poll_view(item):
     """The provider params ``public_view`` shows beside ``source``."""
     return {"spreadsheet_id": item.get("spreadsheet_id"),
@@ -552,14 +675,27 @@ register_source(PollSource(
     label="Google Sheets", validate=_sheets_poll_validate,
     fetch=_sheets_poll_fetch, view=_sheets_poll_view))
 
+register_source(PollSource(
+    name="google-sheets.updates", connector="google-sheets", event="row.updated",
+    label="Google Sheets updates", validate=_sheets_row_updated_validate,
+    fetch=_sheets_row_updated_fetch, view=_sheets_poll_view))
+
+
+# The event each sheets poll source publishes — the live sample's ask maps
+# the stored poll onto it, and the synthetic fallback picks its payload by it.
+_SHEETS_SOURCE_EVENTS = {
+    "google-sheets.rows": "row.new",
+    "google-sheets.updates": "row.updated",
+}
+
 
 def _stored_sheets_poll(name):
-    """The stored poll trigger named by ``event`` when it watches Sheets, or
-    None. A missing selector, unconfigured poll triggers, an unknown name
-    and a non-sheets source (the generic poll connector owns those) fold
-    together: the caller only distinguishes live-vs-fallback, so any
-    storage hiccup folds too — sampling never raises for want of
-    infrastructure (see docs/connector-coverage-audit.md)."""
+    """The stored poll trigger named by ``event`` when it watches a Sheets
+    source (rows/updates), or None. A missing selector, unconfigured poll
+    triggers, an unknown name and a non-sheets source (the generic poll
+    connector owns those) fold together: the caller only distinguishes
+    live-vs-fallback, so any storage hiccup folds too — sampling never
+    raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
     from ..triggers import poll_triggers
 
     if not name:
@@ -568,7 +704,7 @@ def _stored_sheets_poll(name):
         item = poll_triggers.get_item(name)
     except Exception:
         return None
-    if not item or str(item.get("source") or "") != "google-sheets.rows":
+    if not item or str(item.get("source") or "") not in _SHEETS_SOURCE_EVENTS:
         return None
     return item
 
@@ -581,28 +717,52 @@ _SHEETS_SYNTHETIC_ROW = {
     "Amount": "180.00",
 }
 
+# row.updated: the same invoice row, an edited Amount and the digest-carrying
+# id the updates source emits (``<row>:<digest of the row's cells>``).
+_SHEETS_SYNTHETIC_UPDATED_ROW = {
+    "row": 4,
+    "id": "4:3f5a8c2e91d4b760",
+    "Date": "2026-09-28",
+    "Invoice": "INV-2026-0042",
+    "Amount": "220.00",
+}
+
 
 def _fetch_sheets_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
-    """The Sheets chip's sample pull: the newest row a stored sheets poll
+    """The Sheets chip's sample pull: the newest item a stored sheets poll
     watches right now (``source: "live"``), else the newest recorded
-    google-sheets run (``"history"``), else a documented invoice row
-    (``"synthetic"``).
+    google-sheets run carrying the asked event (``"history"``), else a
+    documented example (``"synthetic"``).
 
-    ``event`` names the stored poll trigger; only ``google-sheets.rows``
-    polls qualify. The live pull runs the poll's own fetch once against the
-    "everything" cursor ``0`` — no stored cursor is read or advanced — and
-    wraps its newest row in the envelope a real fire would publish. A live
-    fetch that cannot run — no connection, an unreachable spreadsheet —
-    falls through to the recorded/documented sample instead of failing: a
-    sample pull shows the payload shape, it never raises.
+    ``event`` names the stored poll trigger; either sheets source qualifies.
+    The live pull runs the poll's own fetch once — the rows source against
+    the "everything" cursor ``0``, the updates source against the trigger's
+    parked snapshot (read, never advanced) — and wraps its newest item in
+    the envelope a real fire would publish. A live fetch that cannot run —
+    no connection, an unreachable spreadsheet — falls through to the
+    recorded/documented sample instead of failing: a sample pull shows the
+    payload shape, it never raises. The fallbacks key on the poll's event
+    (a ``row.updated`` ask is never answered with a ``row.new`` run or
+    example); a bare chip ask without a poll stays on the classic new-row
+    sample.
     """
     from ..triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_sheets_poll(name)
+    wanted_event = _SHEETS_SOURCE_EVENTS.get(str((item or {}).get("source") or ""))
+    if wanted_event is None and "." in name:
+        wanted_event = name  # a dotted ask names an event, not a poll
     if item is not None:
         try:
-            items, _next_cursor = _sheets_poll_fetch(item, "0")
+            if str(item.get("source") or "") == "google-sheets.updates":
+                try:
+                    seed = poll_triggers.get_cursor(item.get("poll_id"))
+                except Exception:
+                    seed = None
+                items, _next_cursor = _sheets_row_updated_fetch(item, seed)
+            else:
+                items, _next_cursor = _sheets_poll_fetch(item, "0")
             envelope = (poll_triggers.event_for(item, items[-1])
                         if items else None)
         except Exception:
@@ -613,12 +773,16 @@ def _fetch_sheets_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
                 "source": "live",
                 "connection_id": item.get("connection_id") or None,
             }
-    found = trigger_discovery.history_sample("google-sheets")
+    found = trigger_discovery.history_sample("google-sheets", event=wanted_event)
     if found is not None:
         return {"sample": found, "source": "history", "connection_id": connection_id}
+    if wanted_event == "row.updated":
+        synthetic_event, synthetic_data = "row.updated", dict(_SHEETS_SYNTHETIC_UPDATED_ROW)
+    else:
+        synthetic_event, synthetic_data = "row.new", dict(_SHEETS_SYNTHETIC_ROW)
     return {
         "sample": trigger_discovery.synthetic_sample(
-            "google-sheets", "row.new", dict(_SHEETS_SYNTHETIC_ROW)),
+            "google-sheets", synthetic_event, dict(synthetic_data)),
         "source": "synthetic",
         "connection_id": connection_id,
     }

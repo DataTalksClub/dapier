@@ -108,8 +108,9 @@ class TestRegistrationShape:
         assert poll_sources.source_names() == [
             "dropbox.files", "google-calendar.events", "google-drive.deletions",
             "google-drive.files", "google-drive.updates", "google-sheets.rows",
-            "mailchimp.members", "rss", "s3", "s3.deletions", "s3.updates",
-            "slack.messages", "youtube.videos", "zoom.recordings"]
+            "google-sheets.updates", "mailchimp.members", "rss", "s3",
+            "s3.deletions", "s3.updates", "slack.messages", "youtube.videos",
+            "zoom.recordings"]
 
     def test_each_source_matches_its_palette_chip(self):
         from src.dapier.connectors import registry

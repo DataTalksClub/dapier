@@ -41,7 +41,7 @@ connector(Connector(name="mailchimp", label="Mailchimp",
 # events, scoped per trigger through the poll-name filter. The zoom chip
 # above joins them on recording.completed: the zoom.recordings poll source
 # (connectors/zoom.py) publishes it on a schedule, no Zoom app required.
-connector(Connector(name="google-sheets", label="Google Sheets", events=("row.new",), icon="table"))
+connector(Connector(name="google-sheets", label="Google Sheets", events=("row.new", "row.updated"), icon="table"))
 connector(Connector(name="google-drive", label="Google Drive",
                     events=("file.created", "file.updated", "file.deleted"),
                     icon="folder"))

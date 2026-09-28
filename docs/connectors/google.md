@@ -156,6 +156,27 @@ matched against the header row trimmed and case-insensitively; the match
 value, trimmed and case-sensitively. Both fields offer discovery pickers
 (spreadsheets, worksheets, header columns) on the connection.
 
+#### Sheets poll triggers
+
+The `google-sheets` chip is also a real trigger: two poll sources run on a
+schedule and publish the chip's events, each scoped per trigger through its
+poll-name filter. **New Spreadsheet Row** (`google-sheets.rows` →
+`row.new`) watermarks the spreadsheet row number — rows are append-mostly,
+so rows numbered past the cursor are the news. **New or Updated Spreadsheet
+Row** (`google-sheets.updates` → `row.updated`) is a snapshot diff: the
+Sheets values API exposes no per-row modified time, so the trigger's cursor
+carries a JSON snapshot of row number → content digest, and a row that was
+listed before and now hashes differently fires once with its current cells
+— the same shape as a `row.new` item, with `id` = `<row>:<digest>` so a
+re-edit publishes as fresh news while an already-run edit stays silent.
+Both sources share the row.new options (spreadsheet, worksheet,
+connection), seed silently on the first fire — enabling a trigger must not
+fire the sheet's existing rows — and never fire for creations
+(`row.new`'s news) or deletions. The row number is a position: inserting or
+deleting rows renumbers the rows below, so a moved row can fire (or be
+masked) — the same polling caveat both sources (and Zapier's Sheets
+triggers) share.
+
 #### Drive actions
 
 The Drive actions run over any Google connection granted `drive.readonly` —

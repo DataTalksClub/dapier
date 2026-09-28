@@ -1669,7 +1669,7 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
   { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received"] },
   { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
-  { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new"] },
+  { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
   { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },

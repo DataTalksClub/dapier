@@ -13,6 +13,7 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
 /* Optional poll extras beyond the form fields; merged into the PUT body and
    validated server-side (headers, cursor, and the actions list). Provider
    sources (source: s3 | s3.updates | s3.deletions | google-sheets.rows |
+   google-sheets.updates |
    google-drive.files | google-drive.updates | google-drive.deletions |
    google-calendar.events |
    zoom.recordings | dropbox.files | youtube.videos | mailchimp.members |
@@ -28,8 +29,8 @@ const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mod
    save (the server validates too — this is the early, human-readable
    check). s3 and mailchimp.members authenticate through stored credentials
    instead, so they stay off this list. */
-const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-drive.files',
-  'google-drive.updates', 'google-drive.deletions',
+const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
+  'google-drive.files', 'google-drive.updates', 'google-drive.deletions',
   'google-calendar.events',
   'zoom.recordings', 'dropbox.files', 'youtube.videos', 'slack.messages'];
 

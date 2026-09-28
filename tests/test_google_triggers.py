@@ -1,15 +1,15 @@
-"""The Google trigger chips as real poll sources: google-sheets.rows and
-google-drive.files.
+"""The Google trigger chips as real poll sources: google-sheets.rows,
+google-sheets.updates and google-drive.files.
 
-Zapier's "New Spreadsheet Row" / "New File in Folder": a stored poll trigger
-with the chip's source reads the provider on its schedule (OAuth token
-refreshed through poll_triggers._bearer_token) and publishes the chip's
-connector/event, scoped per trigger through the poll-name filter. Covered
-here: save-time validation, the seeded first fire (enabling must not fire
-everything already there), strictly-new subsequent fetches, end-to-end
-fires on fake tables, and the chips' sample pulls (live / history /
-synthetic). Transport is stubbed at the shared provider seam, the same way
-tests/test_trigger_samples.py stubs Google listings.
+Zapier's "New Spreadsheet Row" / "New or Updated Row" / "New File in
+Folder": a stored poll trigger with the chip's source reads the provider on
+its schedule (OAuth token refreshed through poll_triggers._bearer_token) and
+publishes the chip's connector/event, scoped per trigger through the
+poll-name filter. Covered here: save-time validation, the seeded first fire
+(enabling must not fire everything already there), strictly-new subsequent
+fetches, end-to-end fires on fake tables, and the chips' sample pulls (live
+/ history / synthetic). Transport is stubbed at the shared provider seam,
+the same way tests/test_trigger_samples.py stubs Google listings.
 """
 import json
 from datetime import datetime, timezone
@@ -291,6 +291,141 @@ def test_sheets_failed_fetch_raises_runtimeerror(google_transport):
         sheets._sheets_poll_fetch(item, "2")
 
 
+# --- sheets updates fetch: a seeded diff over the worksheet's cells -----------------
+
+
+def updates_body(**overrides):
+    body = sheets_body(source="google-sheets.updates")
+    body["name"] = "invoices-edits"
+    body.update(overrides)
+    return body
+
+
+def test_updates_source_registers_for_the_row_updated_event():
+    source = poll_sources.SOURCES["google-sheets.updates"]
+
+    assert (source.connector, source.event) == ("google-sheets", "row.updated")
+    assert set(poll_sources.source_names()) >= {"google-sheets.rows",
+                                                "google-sheets.updates"}
+
+
+def test_updates_save_stores_the_rows_spec_with_a_digest_id_path():
+    item = stored(updates_body())
+
+    assert item["source"] == "google-sheets.updates"
+    assert item["spreadsheet_id"] == "ss-4137"
+    assert item["worksheet"] == "Invoices"
+    assert item["connection_id"] == "google"
+    assert item["cursor_mode"] == "next_cursor"
+    # an updated row keeps its row number, so the seen-set must key on the
+    # digest-carrying id, not the row number
+    assert item["id_path"] == "id"
+    assert item["url"] == ""
+
+
+@pytest.mark.parametrize("missing", ["spreadsheet_id", "connection_id"])
+def test_updates_save_requires_its_params(missing):
+    with pytest.raises(TriggerError, match=missing):
+        stored(updates_body(**{missing: ""}))
+
+
+def test_updates_first_fetch_seeds_the_snapshot_without_emitting(google_transport):
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"])))
+    item = stored(updates_body())
+
+    items, next_cursor = sheets._sheets_row_updated_fetch(item, None)
+
+    assert items == []
+    snapshot = json.loads(next_cursor)
+    assert snapshot["v"] == 1
+    assert sorted(snapshot["rows"]) == ["2", "3"]
+
+
+def test_updates_fetch_emits_an_edited_row_once(google_transport):
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"])))
+    item = stored(updates_body())
+
+    _items, seed = sheets._sheets_row_updated_fetch(item, None)
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "99.00"])))
+
+    items, next_cursor = sheets._sheets_row_updated_fetch(item, seed)
+
+    assert len(items) == 1
+    edited = items[0]
+    assert edited["row"] == 3
+    assert edited["id"].startswith("3:")  # the digest-carrying event id
+    assert edited["Invoice"] == "INV-2"
+    assert edited["Amount"] == "99.00"
+    assert json.loads(next_cursor)["rows"]["3"] != json.loads(seed)["rows"]["3"]
+
+    # the edit is news exactly once: the parked snapshot recognizes it
+    again, _cursor = sheets._sheets_row_updated_fetch(item, next_cursor)
+    assert again == []
+
+
+def test_updates_fetch_skips_new_and_unchanged_rows(google_transport):
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"])))
+    item = stored(updates_body())
+
+    _items, seed = sheets._sheets_row_updated_fetch(item, None)
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"],
+        ["2026-09-29", "INV-4", "36.00"])))  # a brand-new row only
+
+    items, next_cursor = sheets._sheets_row_updated_fetch(item, seed)
+
+    assert items == []  # creations are row.new's news, not double-fired here
+    assert json.loads(next_cursor)["rows"] == {
+        "2": json.loads(seed)["rows"]["2"],
+        "3": json.loads(seed)["rows"]["3"],
+        "4": json.loads(next_cursor)["rows"]["4"],
+    }
+
+
+def test_updates_foreign_cursor_reseeds_without_emitting(google_transport):
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"])))
+    item = stored(updates_body())
+
+    items, next_cursor = sheets._sheets_row_updated_fetch(item, "3")
+
+    assert items == []  # a rows-source cursor is no diff baseline
+    assert json.loads(next_cursor)["rows"]
+
+
+def test_updates_fetch_reseeds_when_the_watch_moves(google_transport):
+    google_transport(Transport(sheet_values(["2026-09-26", "INV-1", "9.00"])))
+    item = stored(updates_body())
+
+    _items, seed = sheets._sheets_row_updated_fetch(item, None)
+    google_transport(Transport(sheet_values(["2026-09-26", "INV-1", "9.00"])))
+    moved = stored(updates_body(worksheet="Archive"))
+    items, next_cursor = sheets._sheets_row_updated_fetch(moved, seed)
+
+    assert items == []
+    assert json.loads(next_cursor)["worksheet"] == "Archive"
+
+
+def test_updates_failed_fetch_raises_runtimeerror(google_transport):
+    google_transport(Transport({"error": "boom"}, status=500))
+    item = stored(updates_body())
+
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        sheets._sheets_row_updated_fetch(item, json.dumps(
+            {"v": 1, "spreadsheet_id": "ss-4137", "worksheet": "Invoices",
+             "rows": {"2": "x"}}))
+
+
 # --- drive fetch: seed at now, then strictly-newer files ---------------------------
 
 
@@ -410,6 +545,63 @@ def test_sheets_fire_seeds_then_emits_only_the_new_row():
     assert poll_triggers.get_cursor("invoices-rows", table=cursors) == "3"
 
 
+def test_updates_fire_seeds_then_emits_only_the_edited_row():
+    polls, cursors = saved_trigger(updates_body())
+
+    result, fired = run_fire("invoices-edits", polls, cursors, sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"]))
+    assert result == {"poll": "invoices-edits", "fired": 0}
+    seed = poll_triggers.get_cursor("invoices-edits", table=cursors)
+    assert sorted(json.loads(seed)["rows"]) == ["2", "3"]  # the snapshot, not a row number
+
+    result, fired = run_fire("invoices-edits", polls, cursors, sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "42.00"]))
+
+    assert result == {"poll": "invoices-edits", "fired": 1}
+    event = fired[0]
+    assert event["connector"] == "google-sheets"
+    assert event["event"] == "row.updated"
+    assert event["data"]["poll"] == "invoices-edits"
+    assert event["data"]["row"] == 3
+    assert event["data"]["Invoice"] == "INV-2"
+    assert event["data"]["Amount"] == "42.00"
+    assert event["data"]["item_id"].startswith("3:")
+
+    # the same sheet again: the edit is not news twice
+    result, fired = run_fire("invoices-edits", polls, cursors, sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "42.00"]))
+    assert result == {"poll": "invoices-edits", "fired": 0}
+
+
+def test_rows_and_updates_cursors_stay_independent():
+    polls, cursors, events = FakePollTable(), FakeCursorTable(), FakeEvents()
+    for body in (sheets_body(), updates_body()):
+        poll_triggers.api_save(body, "op@example.test", table_ref=polls,
+                               cursor_table_ref=cursors, events_client=events,
+                               target_arn="arn:worker")
+    page = sheet_values(["2026-09-26", "INV-1", "9.00"],
+                        ["2026-09-27", "INV-2", "18.00"])
+    run_fire("invoices-rows", polls, cursors, page)
+    run_fire("invoices-edits", polls, cursors, page)  # both seed quietly
+
+    # one edit: the updates trigger fires, the rows trigger stays quiet —
+    # each walked its own cursor under its own poll name
+    edited = sheet_values(["2026-09-26", "INV-1", "9.00"],
+                          ["2026-09-27", "INV-2", "77.00"])
+    rows_result, rows_fired = run_fire("invoices-rows", polls, cursors, edited)
+    updates_result, updates_fired = run_fire("invoices-edits", polls, cursors, edited)
+
+    assert rows_result["fired"] == 0 and rows_fired == []
+    assert poll_triggers.get_cursor("invoices-rows", table=cursors) == "3"  # still the row-number watermark
+    assert updates_result["fired"] == 1
+    assert updates_fired[0]["event"] == "row.updated"
+    assert sorted(json.loads(
+        poll_triggers.get_cursor("invoices-edits", table=cursors))["rows"]) == ["2", "3"]
+
+
 def test_drive_fire_seeds_then_emits_only_the_new_file():
     polls, cursors = saved_trigger(drive_body())
 
@@ -475,6 +667,41 @@ def test_sheets_sample_pulls_the_polls_newest_row_live(monkeypatch, google_trans
     assert payload["sample"]["data"]["Invoice"] == "INV-2"  # the newest row
     assert payload["sample"]["data"]["poll"] == "invoices-rows"
     assert payload["connection_id"] == "google"
+
+
+def test_updates_sample_pulls_the_polls_newest_edit_live(monkeypatch, google_transport,
+                                                         no_history):
+    item = stored(updates_body())
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "18.00"])))
+    _items, snapshot = sheets._sheets_row_updated_fetch(item, None)
+    monkeypatch.setattr(poll_triggers, "get_cursor", lambda name, table=None: snapshot)
+    google_transport(Transport(sheet_values(
+        ["2026-09-26", "INV-1", "9.00"],
+        ["2026-09-27", "INV-2", "99.00"])))
+    monkeypatch.setattr(poll_triggers, "get_item",
+                        lambda name, table_ref=None: item)
+
+    status, payload = discover(connector="google-sheets", event="invoices-edits")
+
+    assert status == 200, payload
+    assert payload["source"] == "live"
+    assert payload["sample"]["event"] == "row.updated"
+    assert payload["sample"]["data"]["Amount"] == "99.00"  # the edited cell
+    assert payload["connection_id"] == "google"
+
+
+def test_updates_sample_without_a_poll_is_synthetic(monkeypatch, no_history):
+    monkeypatch.setattr(poll_triggers, "get_item",
+                        lambda name, table_ref=None: None)
+
+    status, payload = discover(connector="google-sheets", event="row.updated")
+
+    assert status == 200, payload
+    assert payload["source"] == "synthetic"
+    assert payload["sample"]["event"] == "row.updated"
+    assert payload["sample"]["data"]["Amount"] == "220.00"  # the edited invoice
 
 
 def test_drive_sample_pulls_the_folders_newest_file_live(monkeypatch, google_transport,
