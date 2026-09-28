@@ -3349,3 +3349,109 @@ Still open (ranked, from the same audit):
     and Telegram's catalog is fully covered too (send/photo/document/poll;
     find chat goes beyond it). The stale Telegram matrix rows (still
     listing only `message.received` + find chat) are corrected.
+
+### Fresh audit 2026-09-28 (post-round-24) — what a Zapier-eye still catches
+
+Re-verified against committed HEAD (`6d330a7`): 103 registered actions,
+15 trigger chips, 11 poll sources, options discovery on every listing,
+find-or-create wherever a create exists. The round-6 deliberately-deferred
+list is all still open, confirmed in code: plan/quota enforcement (only
+`discovery.py` mentions quotas; usage is metered but uncapped), multi-user
+beyond roles v1 (no invitations/shared workspaces), new app chips (zero
+`calendar` references in `src/` — Google Calendar, Gmail, and no AI/LLM
+provider), Google Sheets `row.updated` (only `row.new` in the poll source),
+and an SES bounce/complaint trigger chip (no SES notification intake; only
+inbox replay-bounce notes). New findings this pass, ranked:
+
+1. **Auto-disable on repeated failures (value H, effort M).** Zapier pauses
+   a zap after consecutive errors and emails the owner; dapier has no trip
+   wire (no auto-pause/consecutive-failure logic anywhere in `engine/` or
+   `triggers/`). A workflow whose OAuth died (`health: expired` is shown but
+   nothing pauses it) or whose endpoint 404s burns tasks and failure emails
+   forever. Sketch: a consecutive-failure counter per workflow (the cursors
+   or usage table), reset on success; at N failures flip an `auto_paused`
+   flag the matcher honors, notify the operator with the last error, and
+   surface `auto_paused` on summaries with a resume verb on all three
+   surfaces.
+2. **An AI action (value H, effort S).** Zapier's most-used new apps are AI
+   ones; dapier already ships an OpenAI-compatible LLM client
+   (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
+   but nothing a workflow can call. An `ai_complete` connector action
+   (templated prompt + input → text, optional JSON mode) behind the same
+   env config closes the biggest per-app gap with no new infra.
+3. **Draft vs live (value M, effort M/L).** Every save publishes instantly;
+   versions and rollback soften it, but there is no draft state and no
+   publish moment. Zapier's editor loop is draft-then-publish — a draft
+   overlay on saves (publish button validates, versions, and flips the
+   published item) would match the mental model.
+4. **Version diff (value M, effort S).** Versions list + rollback exist; no
+   diff between two revisions — a YAML diff endpoint (plus a console dialog)
+   is the missing half of rollback confidence.
+5. **List-aggregation formatters (value M, effort S).** `sum|min|max|avg|
+   unique|sort` over a rendered list: `for_each` iterates and digest
+   batches, but templates cannot aggregate
+   (`{steps.find.output.rows|sum:amount}` today renders empty).
+6. **Queue-age alarm (value M, effort S).** The five alarms cover
+   DLQs/worker/backup; nothing watches `ApproximateAgeOfOldestMessage`/
+   `QueueDepth` on the event queue, so a wedged-but-not-erroring backlog
+   pages no one.
+7. **Optional inbound webhook signature check (value L/M, effort S).**
+   Custom hook intake verifies nothing beyond the URL; an optional
+   shared-secret HMAC header check (WebSub intake already verifies) lets
+   wary providers lock their target.
+8. **Designer list paging (scale note).** `designer_store.api_list` scans
+   the whole published store each call; fine at current scale, keyset
+   paging when the store grows.
+
+### Fresh audit 2026-09-28 (post-round-24) — what a Zapier-eye still catches
+
+Re-verified against committed HEAD (`6d330a7`): 103 registered actions,
+15 trigger chips, 11 poll sources, options discovery on every listing,
+find-or-create wherever a create exists. The round-6 deliberately-deferred
+list is all still open, confirmed in code: plan/quota enforcement (only
+`discovery.py` mentions quotas; usage is metered but uncapped), multi-user
+beyond roles v1 (no invitations/shared workspaces), new app chips (zero
+`calendar` references in `src/` — Google Calendar, Gmail, and no AI/LLM
+provider), Google Sheets `row.updated` (only `row.new` in the poll source),
+and an SES bounce/complaint trigger chip (no SES notification intake; only
+inbox replay-bounce notes). New findings this pass, ranked:
+
+1. **Auto-disable on repeated failures (value H, effort M).** Zapier pauses
+   a zap after consecutive errors and emails the owner; dapier has no trip
+   wire (no auto-pause/consecutive-failure logic anywhere in `engine/` or
+   `triggers/`). A workflow whose OAuth died (`health: expired` is shown but
+   nothing pauses it) or whose endpoint 404s burns tasks and failure emails
+   forever. Sketch: a consecutive-failure counter per workflow (the cursors
+   or usage table), reset on success; at N failures flip an `auto_paused`
+   flag the matcher honors, notify the operator with the last error, and
+   surface `auto_paused` on summaries with a resume verb on all three
+   surfaces.
+2. **An AI action (value H, effort S).** Zapier's most-used new apps are AI
+   ones; dapier already ships an OpenAI-compatible LLM client
+   (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
+   but nothing a workflow can call. An `ai_complete` connector action
+   (templated prompt + input → text, optional JSON mode) behind the same
+   env config closes the biggest per-app gap with no new infra.
+3. **Draft vs live (value M, effort M/L).** Every save publishes instantly;
+   versions and rollback soften it, but there is no draft state and no
+   publish moment. Zapier's editor loop is draft-then-publish — a draft
+   overlay on saves (publish button validates, versions, and flips the
+   published item) would match the mental model.
+4. **Version diff (value M, effort S).** Versions list + rollback exist; no
+   diff between two revisions — a YAML diff endpoint (plus a console dialog)
+   is the missing half of rollback confidence.
+5. **List-aggregation formatters (value M, effort S).** `sum|min|max|avg|
+   unique|sort` over a rendered list: `for_each` iterates and digest
+   batches, but templates cannot aggregate
+   (`{steps.find.output.rows|sum:amount}` today renders empty).
+6. **Queue-age alarm (value M, effort S).** The five alarms cover
+   DLQs/worker/backup; nothing watches `ApproximateAgeOfOldestMessage`/
+   `QueueDepth` on the event queue, so a wedged-but-not-erroring backlog
+   pages no one.
+7. **Optional inbound webhook signature check (value L/M, effort S).**
+   Custom hook intake verifies nothing beyond the URL; an optional
+   shared-secret HMAC header check (WebSub intake already verifies) lets
+   wary providers lock their target.
+8. **Designer list paging (scale note).** `designer_store.api_list` scans
+   the whole published store each call; fine at current scale, keyset
+   paging when the store grows.
