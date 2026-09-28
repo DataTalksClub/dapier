@@ -7,6 +7,13 @@ works without per-address provisioning: SES accepts the whole trigger domain
 The worker merges stored triggers with the YAML workflows on every
 invocation, so a created trigger is live without a deploy. Only reserved
 names run actions; anything else at the domain matches no workflow.
+
+Besides the reserved address, a trigger can watch SES feedback: events
+``bounce.received`` and ``complaint.received`` fire from the SNS intake
+(triggers.intake.ses_notifications) for every address at the domain, so
+watchers reserve nothing — the name is identity only, no yaml-route shadow
+check applies, and the stored ``filters`` (default match-all) are handed to
+the engine verbatim.
 """
 
 import logging
@@ -32,6 +39,14 @@ RESERVED_NAMES = {
     "relay", "root", "security", "smtp", "support", "webmaster", "webmail",
     "www",
 }
+
+# The events a stored trigger can watch. message.received keeps the
+# reserved-address behavior; the SES feedback watchers fire from the SNS
+# intake for the whole domain, no address needed (see module docstring).
+ADDRESS_EVENT = "message.received"
+BOUNCE_EVENT = "bounce.received"
+COMPLAINT_EVENT = "complaint.received"
+EVENTS = (ADDRESS_EVENT, BOUNCE_EVENT, COMPLAINT_EVENT)
 
 # Required and optional keys per action type live in the connector registry
 # (src/dapier/connectors/registry.py); ACTION_SPECS reads them from there.
@@ -118,13 +133,31 @@ def yaml_email_routes():
 
 def build_item(body, operator):
     name = validate_name(body.get("name"))
+    event = str(body.get("event") or ADDRESS_EVENT).strip()
+    if event not in EVENTS:
+        raise TriggerError(f"unknown email trigger event '{event}'; known: {', '.join(EVENTS)}")
     actions, flow = resolve_actions_flow(body)
-    if name in yaml_email_routes():
-        raise TriggerError(f"the route '{name}' is already handled by a YAML workflow")
+    if event == ADDRESS_EVENT:
+        # Only address triggers claim a route; watchers match SES feedback
+        # for the whole domain and never shadow a YAML workflow's address.
+        if name in yaml_email_routes():
+            raise TriggerError(f"the route '{name}' is already handled by a YAML workflow")
+        address, filters = address_for(name), None
+    else:
+        # A route filter can never match a bounce/complaint (their data has
+        # no route), so storing one would silently dead the trigger.
+        filters = body.get("filters")
+        if filters is None:
+            filters = {}
+        if not isinstance(filters, dict):
+            raise TriggerError("filters must be an object")
+        if "route" in filters:
+            raise TriggerError("watchers match SES feedback, not addresses: filters cannot use 'route'")
+        address = ""
     now = datetime.now(timezone.utc).isoformat()
-    return {
+    item = {
         "name": name,
-        "address": address_for(name),
+        "address": address,
         "description": str(body.get("description") or "")[:200],
         "actions": actions or [],
         "flow": flow,
@@ -133,6 +166,12 @@ def build_item(body, operator):
         "created_at": now,
         "updated_at": now,
     }
+    # Legacy (event-absent) items stay byte-identical: the default event and
+    # the watcher-only fields are stored only when a watcher is defined.
+    if event != ADDRESS_EVENT:
+        item["event"] = event
+        item["filters"] = filters
+    return item
 
 
 def get_table(table_ref=None):
@@ -182,8 +221,12 @@ def workflow_for(item):
         "enabled": True,
         "trigger": {
             "connector": "email",
-            "event": "message.received",
-            "filters": {"route": {"equals": item["name"]}},
+            "event": str(item.get("event") or ADDRESS_EVENT),
+            # Watchers keep their stored filters (default match-all);
+            # address triggers scope to the reserved route as before.
+            "filters": ({"route": {"equals": item["name"]}}
+                        if not item.get("event") or item["event"] == ADDRESS_EVENT
+                        else dict(item.get("filters") or {})),
         },
         "actions": actions,
     }
@@ -198,10 +241,14 @@ def load_workflows(table_ref=None):
 
 
 def public_view(item):
-    return {key: item.get(key) for key in (
+    view = {key: item.get(key) for key in (
         "name", "address", "description", "actions", "flow", "enabled",
         "created_by", "created_at", "updated_at",
     )}
+    view["event"] = item.get("event") or ADDRESS_EVENT
+    if item.get("event") and item["event"] != ADDRESS_EVENT:
+        view["filters"] = item.get("filters") or {}
+    return view
 
 
 def api_list(table_ref=None):

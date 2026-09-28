@@ -574,6 +574,11 @@ def handler(event, _context):
         challenge = query.get("challenge") or query.get("hub.challenge")
         return _response(200 if challenge else 400, challenge or "missing challenge", "text/plain")
 
+    if method == "GET" and path == "/hooks/ses-notifications":
+        # SNS never GETs this URL; a plain introspection for operators.
+        return _response(200, {"hook": "ses-notifications", "method": "POST",
+                               "accepts": "SNS envelope (SubscriptionConfirmation | Notification)"})
+
     body = _body(event)
     if path == "/hooks/dropbox":
         if not _verify_dropbox(event, body):
@@ -587,6 +592,11 @@ def handler(event, _context):
         if not _verify_youtube(event, body):
             return _response(401, {"error": "invalid signature"})
         _youtube(body)
+    elif path == "/hooks/ses-notifications":
+        from ..triggers.intake import ses_notifications
+
+        status, payload = ses_notifications.handle(body, publish=_publish)
+        return _response(status, payload)
     elif path.startswith("/hooks/zoom/"):
         from ..triggers.intake import zoom_webhooks
 

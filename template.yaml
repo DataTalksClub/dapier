@@ -108,6 +108,13 @@ Parameters:
     Description: >
       Datamailer client API key; empty disables the backup failure email
       (the CloudWatch alarm still covers failures)
+  SesNotificationTopics:
+    Type: String
+    Default: ''
+    Description: >
+      Comma-separated SNS TopicArns the SES feedback hook accepts
+      (SES_NOTIFICATION_TOPICS allowlist); empty accepts any topic — set
+      the configuration set's feedback destination topics in production
   BackupAlertEmail:
     Type: String
     Default: alexey.s.grigoriev@gmail.com
@@ -271,6 +278,9 @@ Resources:
           # The save path subscribes/unsubscribes WebSub topics on designer
           # saves, toggles, and deletes (designer_store._sync_youtube).
           YOUTUBE_CALLBACK_URL: !Sub https://${DomainName}/hooks/youtube
+          # TopicArn allowlist for the SES feedback hook
+          # (triggers.intake.ses_notifications); empty accepts any topic.
+          SES_NOTIFICATION_TOPICS: !Ref SesNotificationTopics
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           COPILOT_LLM_BASE_URL: !Ref CopilotLlmBaseUrl
@@ -403,6 +413,12 @@ Resources:
         YouTubePost:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /hooks/youtube, Method: POST}
+        SesNotificationsGet:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /hooks/ses-notifications, Method: GET}
+        SesNotificationsPost:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /hooks/ses-notifications, Method: POST}
         ZoomRecordingHook:
           Type: HttpApi
           Properties:

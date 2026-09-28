@@ -189,7 +189,10 @@ def test_custom_chip_samples_name_events_that_actually_fire(monkeypatch):
 
 
 def test_history_sample_wins_over_synthetic(monkeypatch):
-    monkeypatch.setattr(trigger_discovery, "history_sample", lambda connector: {
+    # the event kwarg: email's sample is per-event, so history is queried
+    # with the wanted event (bounce.received history never answers a
+    # message.received ask — see test_history_sample... breadth coverage)
+    monkeypatch.setattr(trigger_discovery, "history_sample", lambda connector, event=None: {
         "connector": "email", "event": "message.received",
         "data": {"subject": "Real one"}, "id": "run-1",
         "source": "todo@dtcdev.click", "occurred_at": "2026-09-26T03:00:00Z"})

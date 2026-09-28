@@ -47,13 +47,12 @@ register(Action(
 ))
 
 
-# --- trigger discovery: the newest recorded message, else a realistic sample ---
+# --- trigger discovery: a documented sample per event ----------------------------
 
 from . import trigger_discovery
 from .trigger_discovery import (
-    DEFAULT_LIMIT,
     TriggerDiscovery,
-    history_or_synthetic_fetch,
+    per_event_sample_fetch,
     register_trigger_discovery,
 )
 
@@ -77,7 +76,36 @@ _EMAIL_SYNTHETIC_DATA = {
     "raw_mime": {"bucket": "dapier-mail-inbound", "key": "raw/discover-sample"},
 }
 
+# The SES feedback the SNS intake publishes (triggers.intake.ses_notifications)
+# for bounce and complaint watchers: flattened feedback + mail-envelope fields,
+# exactly what a real delivery carries (fields a stored watcher filters on).
+_BOUNCE_SYNTHETIC_DATA = {
+    "feedback_type": "bounce",
+    "bounce_type": "Permanent",
+    "bounce_subtype": "General",
+    "bounced_recipients": ["gone@example.test"],
+    "feedback_id": "01000000-discover-feedback-0000000000",
+    "message_id": "<discover-00000000@dtcdev.click>",
+    "timestamp": "2026-09-27T10:16:00Z",
+    "source": "billing@example.test",
+    "destination": ["gone@example.test"],
+}
+
+_COMPLAINT_SYNTHETIC_DATA = {
+    "feedback_type": "complaint",
+    "complained_recipients": ["annoyed@example.test"],
+    "feedback_id": "01000000-discover-feedback-0000000001",
+    "message_id": "<discover-00000000@dtcdev.click>",
+    "timestamp": "2026-09-27T10:17:00Z",
+    "source": "billing@example.test",
+    "destination": ["annoyed@example.test"],
+}
+
 
 register_trigger_discovery(TriggerDiscovery(
     connector="email", label="Email", kind="sample", resource="",
-    fetch=history_or_synthetic_fetch("email", "message.received", _EMAIL_SYNTHETIC_DATA)))
+    fetch=per_event_sample_fetch("email", "message.received", {
+        "message.received": _EMAIL_SYNTHETIC_DATA,
+        "bounce.received": _BOUNCE_SYNTHETIC_DATA,
+        "complaint.received": _COMPLAINT_SYNTHETIC_DATA,
+    })))

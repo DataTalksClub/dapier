@@ -169,6 +169,114 @@ class WorkflowMergeTests(unittest.TestCase):
 
 FLOW_BODY = {"name": "invoice-copy", "flow": "invoice-dataops"}
 
+WATCHER_BODY = {"name": "bounce-alert", "event": "bounce.received",
+                "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
+
+
+class WatcherEventTests(unittest.TestCase):
+    """SES feedback watchers: bounce/complaint events need no address — the
+    name is identity only, and the engine matches on the event (optionally
+    scoped by the stored filters), never on a reserved route."""
+
+    def test_watcher_needs_no_address_and_skips_the_route_check(self):
+        with patch("src.dapier.triggers.email_triggers.yaml_email_routes",
+                   return_value={"bounce-alert"}):
+            item = email_triggers.build_item(dict(WATCHER_BODY), "op")
+        self.assertEqual(item["address"], "")
+        self.assertEqual(item["event"], "bounce.received")
+        self.assertEqual(item["filters"], {})
+
+    def test_address_trigger_still_shadows_yaml_routes(self):
+        with patch("src.dapier.triggers.email_triggers.yaml_email_routes",
+                   return_value={"bounce-alert"}):
+            with self.assertRaises(email_triggers.TriggerError) as ctx:
+                email_triggers.build_item(
+                    {"name": "bounce-alert",
+                     "actions": WATCHER_BODY["actions"]}, "op")
+        self.assertIn("YAML workflow", str(ctx.exception))
+
+    def test_unknown_event_is_rejected(self):
+        with self.assertRaises(email_triggers.TriggerError) as ctx:
+            email_triggers.build_item(dict(WATCHER_BODY, event="open.tracked"), "op")
+        self.assertIn("unknown email trigger event", str(ctx.exception))
+
+    def test_watcher_filters_stored_verbatim(self):
+        item = email_triggers.build_item(
+            dict(WATCHER_BODY, filters={"bounce_type": {"equals": "Permanent"}}), "op")
+        self.assertEqual(item["filters"], {"bounce_type": {"equals": "Permanent"}})
+
+    def test_watcher_rejects_route_filters_and_non_dict_filters(self):
+        with self.assertRaises(email_triggers.TriggerError) as route:
+            email_triggers.build_item(
+                dict(WATCHER_BODY, filters={"route": {"equals": "x"}}), "op")
+        self.assertIn("route", str(route.exception))
+        with self.assertRaises(email_triggers.TriggerError) as shape:
+            email_triggers.build_item(dict(WATCHER_BODY, filters="gone"), "op")
+        self.assertIn("object", str(shape.exception))
+
+    def test_event_absent_keeps_the_legacy_item(self):
+        item = email_triggers.build_item(
+            {"name": "income", "actions": WATCHER_BODY["actions"]}, "op")
+        self.assertNotIn("event", item)
+        self.assertNotIn("filters", item)
+        self.assertEqual(item["address"], "income@dtcdev.click")
+
+    def test_explicit_message_received_keeps_the_address(self):
+        item = email_triggers.build_item(
+            dict(WATCHER_BODY, name="income", event="message.received"), "op")
+        self.assertNotIn("event", item)
+        self.assertEqual(item["address"], "income@dtcdev.click")
+
+    def test_workflow_for_watcher_emits_stored_event_and_match_all(self):
+        item = email_triggers.build_item(dict(WATCHER_BODY), "op")
+        workflow = email_triggers.workflow_for(item)
+        self.assertEqual(workflow["trigger"], {
+            "connector": "email", "event": "bounce.received", "filters": {}})
+        bounce = {"connector": "email", "event": "bounce.received",
+                  "data": {"bounce_type": "Permanent", "source": "billing@example.test"}}
+        self.assertTrue(matches(workflow, bounce))
+        self.assertFalse(matches(workflow, {"connector": "email",
+                                            "event": "message.received",
+                                            "data": {"route": "bounce-alert"}}))
+        self.assertFalse(matches(workflow, {"connector": "email",
+                                            "event": "complaint.received",
+                                            "data": {}}))
+
+    def test_workflow_for_watcher_applies_stored_filters(self):
+        item = email_triggers.build_item(
+            dict(WATCHER_BODY, filters={"bounce_type": {"equals": "Permanent"}}), "op")
+        workflow = email_triggers.workflow_for(item)
+        self.assertEqual(workflow["trigger"]["filters"],
+                         {"bounce_type": {"equals": "Permanent"}})
+        self.assertTrue(matches(workflow, {"connector": "email",
+                                           "event": "bounce.received",
+                                           "data": {"bounce_type": "Permanent"}}))
+        self.assertFalse(matches(workflow, {"connector": "email",
+                                            "event": "bounce.received",
+                                            "data": {"bounce_type": "Transient"}}))
+
+    def test_public_view_shows_the_event(self):
+        watcher = email_triggers.build_item(dict(WATCHER_BODY), "op")
+        self.assertEqual(email_triggers.public_view(watcher)["event"], "bounce.received")
+        legacy = email_triggers.build_item(
+            {"name": "income", "actions": WATCHER_BODY["actions"]}, "op")
+        self.assertEqual(email_triggers.public_view(legacy)["event"], "message.received")
+
+    def test_api_save_rejects_unknown_events_and_persists_watchers(self):
+        stub = StubTable()
+        with self.assertRaises(email_triggers.TriggerError):
+            email_triggers.api_save(dict(WATCHER_BODY, event="nope"), "op", table_ref=stub)
+        status, payload = email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["event"], "bounce.received")
+        stored = stub.items["bounce-alert"]
+        self.assertEqual(stored["event"], "bounce.received")
+        self.assertEqual(stored["filters"], {})
+        workflow = email_triggers.load_workflows(table_ref=stub)[0]
+        self.assertEqual(workflow["trigger"]["event"], "bounce.received")
+
+
+
 
 class FlowBindingTests(unittest.TestCase):
     """Stored triggers use inline actions after the migration."""

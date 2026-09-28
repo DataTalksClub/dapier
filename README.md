@@ -312,6 +312,20 @@ domain) to one or more comma-separated `to` addresses. Some
 local parts are reserved (`invoice`, `no-reply`, ...), and routes already
 claimed by YAML workflows cannot be shadowed.
 
+Besides messages, an email trigger can watch SES feedback: `"event":
+"bounce.received"` or `"complaint.received"` fires when SES reports a bounce
+or a complaint for any address at the trigger domain. Watchers need no
+reserved address — the name is identity only — and match the whole domain's
+feedback; an optional `filters` object scopes them (e.g.
+`{"bounce_type": {"equals": "Permanent"}}`; `route` filters are rejected
+because feedback carries no route). Feedback arrives through the
+`/hooks/ses-notifications` SNS endpoint: point the SES configuration set's
+feedback destination at `https://<domain>/hooks/ses-notifications`, and set
+the `SesNotificationTopics` deployment parameter (the
+`SES_NOTIFICATION_TOPICS` allowlist) to the topic ARNs SES publishes to —
+empty accepts any topic, which is fine for development but should be set in
+production.
+
 ### Webhook, Telegram, and schedule triggers
 
 Webhook and Telegram triggers work like email triggers but are invoked over
