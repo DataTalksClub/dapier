@@ -14,6 +14,10 @@ at-most-once per run: a conditional put of a ``failure-notice`` item into
 the executions table claims the send, so redeliveries of the failed record
 never re-notify. Notice items carry their own run id (``<run>#notice``) so
 run history never groups them into the real run.
+
+The auto-pause trip wire (engine.worker) sends its own notice through the
+same path once the streak pauses a workflow — :func:`notify_auto_pause`,
+same recipients, its own claim kind.
 """
 import os
 import time
@@ -75,7 +79,7 @@ def _ingress_subject(event):
     return None
 
 
-def _claim_notice(subject, run_id, event, error):
+def _claim_notice(subject, run_id, event, error, kind="failure-notice"):
     """Claim the one notification for this run; False when already claimed."""
     import boto3
     from botocore.exceptions import ClientError
@@ -84,9 +88,9 @@ def _claim_notice(subject, run_id, event, error):
     try:
         boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(
             Item={
-                "execution_id": f"{subject}:failure-notice:{event.get('id', '')}",
+                "execution_id": f"{subject}:{kind}:{event.get('id', '')}",
                 "run_id": f"{run_id}#notice",
-                "kind": "failure-notice",
+                "kind": kind,
                 "workflow_id": subject,
                 "status": "notified",
                 "error": str(error)[:500],
@@ -100,6 +104,25 @@ def _claim_notice(subject, run_id, event, error):
             return False
         raise
     return True
+
+
+def _send(subject, run_id, addresses, lines, *, ses=None):
+    """One SES send with the notice house style; returns the send summary."""
+    if ses is None:
+        ses = _ses()
+    from ..triggers.email_triggers import trigger_domain
+
+    sender = os.environ.get("DAPIER_EMAIL_SENDER") or f"no-reply@{trigger_domain()}"
+    response = ses.send_email(
+        Source=sender,
+        Destination={"ToAddresses": addresses},
+        Message={
+            "Subject": {"Data": lines["subject"], "Charset": "utf-8"},
+            "Body": {"Text": {"Data": "\n".join(lines["body"]) + "\n",
+                              "Charset": "utf-8"}},
+        },
+    )
+    return {"to": addresses, "run_id": run_id, "message_id": response.get("MessageId")}
 
 
 def notify_failure(exc, event, *, ses=None):
@@ -129,26 +152,57 @@ def notify_failure(exc, event, *, ses=None):
     run_id = f"{subject}:{event.get('id', '')}"
     if not _claim_notice(subject, run_id, event, exc):
         return None
-    if ses is None:
-        ses = _ses()
-    from ..triggers.email_triggers import trigger_domain
-
-    sender = os.environ.get("DAPIER_EMAIL_SENDER") or f"no-reply@{trigger_domain()}"
     error = str(exc) or exc.__class__.__name__
-    response = ses.send_email(
-        Source=sender,
-        Destination={"ToAddresses": addresses},
-        Message={
-            "Subject": {"Data": f"[dapier] Run failed: {subject}", "Charset": "utf-8"},
-            "Body": {"Text": {"Data": "\n".join([
-                "A dapier run failed.",
-                "",
-                f"workflow: {subject}",
-                f"run: {run_id}",
-                f"trigger: {event.get('connector')} / {event.get('event')}",
-                "",
-                f"failing step error: {error}",
-            ]) + "\n", "Charset": "utf-8"}},
-        },
-    )
-    return {"to": addresses, "run_id": run_id, "message_id": response.get("MessageId")}
+    return _send(subject, run_id, addresses, {
+        "subject": f"[dapier] Run failed: {subject}",
+        "body": [
+            "A dapier run failed.",
+            "",
+            f"workflow: {subject}",
+            f"run: {run_id}",
+            f"trigger: {event.get('connector')} / {event.get('event')}",
+            "",
+            f"failing step error: {error}",
+        ],
+    }, ses=ses)
+
+
+def notify_auto_pause(exc, event, *, ses=None):
+    """Email the owner that the workflow was paused after repeated failures.
+
+    The worker calls this right after the failure notice, and only when the
+    failure actually tripped the auto-pause (engine.worker._auto_pause_on_failure
+    flipped the ``auto_paused`` flag on the stored definition) — so the
+    announcement goes out once per pause, not per past-threshold failure.
+    Same recipients as the failure notice (the workflow's ``notify`` list,
+    operator by default), its own claim kind so a redelivery can never
+    re-announce. None when there is no workflow behind the failure.
+    """
+    if not isinstance(event, dict):
+        return None
+    workflow_id = getattr(exc, "dapier_workflow", None)
+    if not workflow_id:
+        return None
+    addresses = notify_addresses(workflow_id)
+    if not addresses:
+        return None
+    run_id = f"{workflow_id}:{event.get('id', '')}"
+    if not _claim_notice(workflow_id, run_id, event, exc, kind="auto-pause-notice"):
+        return None
+    error = str(exc) or exc.__class__.__name__
+    return _send(workflow_id, run_id, addresses, {
+        "subject": f"[dapier] Workflow auto-paused: {workflow_id}",
+        "body": [
+            "A dapier workflow was paused after repeated failures.",
+            "",
+            f"workflow: {workflow_id}",
+            f"run: {run_id}",
+            f"trigger: {event.get('connector')} / {event.get('event')}",
+            "",
+            f"failing step error: {error}",
+            "",
+            "The workflow is paused and will not run again until it is "
+            "re-enabled (CLI: `dapier workflows on <file>.yaml`, or the "
+            "console toggle). Re-enabling clears the pause.",
+        ],
+    }, ses=ses)

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from ..triggers import published_workflows
+from ..triggers import failure_counts, published_workflows
 
 DEFAULT_REPO_URL = "https://github.com/DataTalksClub/dapier"
 REPO_URL_ENV = "WORKFLOWS_REPO_URL"
@@ -53,6 +53,12 @@ MAX_TAG_LENGTH = 64
 # Zapier-style workflow folders: flat, unlike tags — a workflow sits in at
 # most one folder (or none), and a folder is a name, never a path.
 MAX_FOLDER_LENGTH = MAX_TAG_LENGTH
+
+# Zapier-style auto-pause: the engine pauses a workflow after this many
+# consecutive failed runs (the worker counts them; the YAML key
+# ``auto_pause_after:`` overrides the default). The flag lives on the stored
+# definition like ``enabled`` does, so it travels with every engine read.
+AUTO_PAUSE_KEYS = ("auto_paused", "auto_paused_at", "auto_paused_reason")
 
 
 def _validate_tags(tags):
@@ -178,6 +184,9 @@ def _summary(workflow, source):
         # Offered in the templates gallery when true; set through
         # api_template_flag. Defensive: hand-written YAML can carry anything.
         "template": workflow.get("template") is True,
+        # Paused by the engine after consecutive failed runs (cleared by
+        # re-enabling — the resume verb); engine-stamped runtime state.
+        "auto_paused": workflow.get("auto_paused") is True,
     }
 
 
@@ -463,6 +472,10 @@ def api_toggle(source, body, operator=None):
     The published store is updated first — the toggle runs on the next event —
     and the git commit follows best-effort so the next deploy agrees. A git
     failure is reported in the payload but does not undo the live toggle.
+
+    Enabling is also the resume verb for the auto-pause trip wire: the
+    ``auto_paused`` flag comes off the definition and the failure streak
+    resets, so a workflow the engine paused runs again on the next event.
     """
     if not isinstance(body, dict) or not isinstance(body.get("enabled"), bool):
         return 400, {"error": 'body must be {"enabled": true|false}'}
@@ -474,6 +487,11 @@ def api_toggle(source, body, operator=None):
     if status != 200:
         return status, payload
     workflow = {**payload["workflow"], "enabled": body["enabled"]}
+    if body["enabled"]:
+        _clear_auto_pause(workflow)
+        # The streak that tripped the pause must not trip it again on the
+        # first failure after resuming; the reset is best-effort.
+        failure_counts.reset(str(workflow["id"]))
     try:
         previous = published_workflows.get_item(workflow["id"])
         published_workflows.publish(workflow, operator=operator, previous=previous, cause="toggle")
@@ -496,6 +514,50 @@ def api_toggle(source, body, operator=None):
     except (SyncConfigError, SyncError) as exc:
         result["git_sync_error"] = str(exc)
     return 200, result
+
+
+def _clear_auto_pause(workflow):
+    """Drop the auto-pause bookkeeping keys from a definition — the resume
+    half of the trip wire: re-enabling is resuming."""
+    for key in AUTO_PAUSE_KEYS:
+        workflow.pop(key, None)
+    return workflow
+
+
+def api_auto_pause(workflow_id, *, error="", operator=None):
+    """Pause a workflow the engine gave up on (Zapier-style auto-disable).
+
+    Called by the worker (engine.worker._auto_pause_on_failure) when a
+    workflow's consecutive-failure streak trips: the live definition gains
+    ``auto_paused`` plus the moment and the last error — the same keys the
+    matcher refuses the way it refuses ``enabled: false`` — and the item is
+    re-published (a version record with cause "auto-pause", like a toggle).
+    Returns the published item, or None when there is nothing to pause: the
+    store is unconfigured, the id is not a managed workflow (a stored
+    trigger's synthetic definition lives in its own table), or the flag is
+    already set — the pause is stamped once, not re-stamped on every
+    past-threshold failure. Runtime state, not an operator edit: no git
+    commit — the re-enable toggle (api_toggle) is what writes YAML again,
+    and its commit carries the cleared keys.
+    """
+    if not published_workflows.configured():
+        return None
+    item = published_workflows.get_item(str(workflow_id))
+    workflow = (item or {}).get("workflow")
+    if not isinstance(workflow, dict) or not workflow.get("id"):
+        return None
+    if workflow.get("auto_paused") is True:
+        return None
+    paused = {**workflow,
+              "auto_paused": True,
+              "auto_paused_at": datetime.now(timezone.utc).isoformat(),
+              "auto_paused_reason": str(error or "")[:500]}
+    try:
+        return published_workflows.publish(
+            paused, operator=str(operator or "auto-pause"),
+            previous=item, cause="auto-pause")
+    except Exception:
+        return None
 
 
 def api_delete(source, *, operator=None):
@@ -951,8 +1013,11 @@ def api_rollback(source, body, operator=None):
 
 # Per-run bookkeeping a stored workflow could carry; a copy starts fresh.
 # Everything else — including action step ids — is part of the definition and
-# is copied verbatim.
-RUN_STATE_KEYS = ("run_state", "last_run", "last_run_at", "run_count", "stats")
+# is copied verbatim. The auto-pause keys are runtime state the engine stamps
+# (and the enable toggle clears), so a duplicate or rollback never inherits
+# a pause.
+RUN_STATE_KEYS = ("run_state", "last_run", "last_run_at", "run_count", "stats",
+                  *AUTO_PAUSE_KEYS)
 
 
 def slugify_id(text):
@@ -1303,6 +1368,25 @@ def parse_workflow(yaml_text):
             workflow["folder"] = cleaned
         else:
             workflow.pop("folder", None)
+
+    # The auto-pause threshold is optional: a positive integer count of
+    # consecutive failed runs, or false/0 to switch the trip wire off
+    # (normalized to false — dropping the key would mean "the default").
+    # True means the default, so the key is dropped. Like tags/folder, the
+    # same rules the engine applies at run time apply here at save time.
+    auto_pause_after = workflow.get("auto_pause_after")
+    if auto_pause_after is not None:
+        if auto_pause_after is True:
+            workflow.pop("auto_pause_after", None)
+        elif auto_pause_after is False or auto_pause_after == 0:
+            workflow["auto_pause_after"] = False
+        elif isinstance(auto_pause_after, int) and not isinstance(auto_pause_after, bool) \
+                and auto_pause_after > 0:
+            pass
+        else:
+            raise WorkflowError(
+                "auto_pause_after must be a positive number of consecutive "
+                "failed runs, or false to switch the auto-pause off")
 
     # The template flag is boolean; anything falsy or malformed means "not a
     # template", so the key is dropped rather than stored as-is.

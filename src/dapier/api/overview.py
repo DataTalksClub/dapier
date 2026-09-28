@@ -18,6 +18,9 @@ from ..connections.providers import oauth_clients
 
 
 def _workflows():
+    from ..triggers import failure_counts
+
+    counts = failure_counts.all_counts()
     result = {}
     if published_workflows.configured():
         for item in published_workflows.load_items():
@@ -25,14 +28,18 @@ def _workflows():
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
             result[str(workflow["id"])] = _workflow_view(
-                workflow, item.get("file"), published=True)
+                workflow, item.get("file"), published=True,
+                failures=counts.get(str(workflow["id"]), 0))
     return sorted(result.values(), key=lambda workflow: str(workflow["id"]))
 
 
-def _workflow_view(workflow, source, *, published):
+def _workflow_view(workflow, source, *, published, failures=0):
     """One overview row; the primary trigger stays in ``trigger`` for the
     console, with ``triggerCount`` covering multi-trigger workflows and
-    ``actions`` showing the resolved chain of a flow-bound workflow."""
+    ``actions`` showing the resolved chain of a flow-bound workflow. The
+    auto-pause fields are engine-stamped runtime state (designer_store.
+    api_auto_pause sets them; re-enabling clears them) and ``failures`` is
+    the live consecutive-failure count behind them."""
     from ..engine import matching
 
     triggers = matching.workflow_triggers(workflow)
@@ -61,6 +68,13 @@ def _workflow_view(workflow, source, *, published):
         # semantics: only a bare True counts, so hand-written YAML carrying
         # anything else reads as unpublished).
         "template": workflow.get("template") is True,
+        # Zapier-style trip wire: paused by the engine after consecutive
+        # failed runs, with the moment and the last error; re-enabling is
+        # the resume verb. ``failures`` is the live streak count.
+        "auto_paused": workflow.get("auto_paused") is True,
+        "auto_paused_at": str(workflow.get("auto_paused_at") or ""),
+        "auto_paused_reason": str(workflow.get("auto_paused_reason") or ""),
+        "failures": int(failures or 0),
     }
     if len(triggers) > 1:
         view["triggers"] = triggers

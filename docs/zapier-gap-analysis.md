@@ -3422,7 +3422,19 @@ inbox replay-bounce notes). New findings this pass, ranked:
    or usage table), reset on success; at N failures flip an `auto_paused`
    flag the matcher honors, notify the operator with the last error, and
    surface `auto_paused` on summaries with a resume verb on all three
-   surfaces.
+   surfaces. Landed (2026-09-28, round 29): the counter lives in the cursors
+   table (`triggers/failure_counts.py`, `fails#<workflow_id>` rows, one
+   atomic conditional increment — a redelivered failed record never counts
+   twice); the worker (engine.worker) counts a finalized failed run and at
+   the definition's `auto_pause_after:` threshold (default 5, `0`/`false`
+   off) stamps `auto_paused` onto the stored definition
+   (designer_store.api_auto_pause, cause "auto-pause"); the matcher refuses
+   a paused workflow like a disabled one, a parked run's continuation is
+   cancelled, and the owner's failure email announces the pause (the same
+   once-per-run claim). Re-enabling is the resume verb (`dapier workflows
+   on`, the console toggle — the same api_toggle clears the flag and zeroes
+   the streak); the flag and the live streak ride the overview and designer
+   summaries. Tests: `tests/test_auto_pause.py`.
 2. **An AI action (value H, effort S).** Zapier's most-used new apps are AI
    ones; dapier already ships an OpenAI-compatible LLM client
    (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
@@ -3475,7 +3487,19 @@ inbox replay-bounce notes). New findings this pass, ranked:
    or usage table), reset on success; at N failures flip an `auto_paused`
    flag the matcher honors, notify the operator with the last error, and
    surface `auto_paused` on summaries with a resume verb on all three
-   surfaces.
+   surfaces. Landed (2026-09-28, round 29): the counter lives in the cursors
+   table (`triggers/failure_counts.py`, `fails#<workflow_id>` rows, one
+   atomic conditional increment — a redelivered failed record never counts
+   twice); the worker (engine.worker) counts a finalized failed run and at
+   the definition's `auto_pause_after:` threshold (default 5, `0`/`false`
+   off) stamps `auto_paused` onto the stored definition
+   (designer_store.api_auto_pause, cause "auto-pause"); the matcher refuses
+   a paused workflow like a disabled one, a parked run's continuation is
+   cancelled, and the owner's failure email announces the pause (the same
+   once-per-run claim). Re-enabling is the resume verb (`dapier workflows
+   on`, the console toggle — the same api_toggle clears the flag and zeroes
+   the streak); the flag and the live streak ride the overview and designer
+   summaries. Tests: `tests/test_auto_pause.py`.
 2. **An AI action (value H, effort S).** Zapier's most-used new apps are AI
    ones; dapier already ships an OpenAI-compatible LLM client
    (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)

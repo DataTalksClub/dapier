@@ -11,7 +11,7 @@ export function statusLine(status, labels) {
   const value = String(status || 'unknown');
   const kind = ['completed', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'ready'].includes(value) ? 'run'
-    : ['failed', 'error', 'missing', 'expired'].includes(value) ? 'err'
+    : ['failed', 'error', 'missing', 'expired', 'auto-paused'].includes(value) ? 'err'
     : 'off';
   const text = (labels || {})[value] || value;
   return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;

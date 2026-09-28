@@ -7,11 +7,11 @@ import uuid
 from datetime import datetime, timezone
 
 from ..connectors.ingress import normalize_event
-from ..triggers import inbox
+from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
 from .logic import RunSuspended, resume_chain, run_chain
 from .matching import all_workflows, matches
-from .notify import notify_failure
+from .notify import notify_auto_pause, notify_failure
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,29 @@ RETRY_DEFAULTS = {"attempts": 1, "backoff_seconds": 60}
 # connector runner; their failures are configuration problems a repeat cannot
 # fix, so they fall through to the failure path at once.
 LOGIC_STEP_TYPES = frozenset({"filter", "condition", "delay", "paths", "for_each"})
+
+# Zapier-style auto-pause: after this many consecutive failed runs the
+# workflow is paused (``auto_paused`` on the stored definition; matching
+# refuses it like a disabled one) until an operator re-enables it. The YAML
+# key ``auto_pause_after:`` overrides the count; ``0``/``false`` switches the
+# trip wire off.
+AUTO_PAUSE_DEFAULT = 5
+
+
+def auto_pause_threshold(workflow):
+    """The workflow's consecutive-failure trip wire: how many failed runs in
+    a row pause it. The default AUTO_PAUSE_DEFAULT unless the definition's
+    ``auto_pause_after:`` says otherwise; ``0``/``false`` disables (None)."""
+    value = (workflow or {}).get("auto_pause_after")
+    if value is None or value is True:
+        return AUTO_PAUSE_DEFAULT
+    if value is False:
+        return None
+    try:
+        threshold = int(value)
+    except (TypeError, ValueError):
+        return AUTO_PAUSE_DEFAULT
+    return threshold if threshold > 0 else None
 
 
 def retry_policy(workflow):
@@ -283,6 +306,11 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
                 susp.workflow_id = workflow["id"]
                 susp.event = event
                 suspended.append(susp)
+            else:
+                # A completed run is a success (a filter stop counts too):
+                # the consecutive-failure streak that trips the auto-pause
+                # starts over. Best-effort — never a run's problem.
+                failure_counts.reset(workflow["id"])
     if suspended:
         # The handler parks the one raised suspension and completes the
         # record — which would strand every other workflow this event
@@ -493,9 +521,10 @@ def _resume_run(resume, *, queue=None):
     nothing runs early. Once the moment has passed, the run still answers to
     the workflow's current state — the fresh-event path re-matches on every
     delivery, so the parked continuation checks here instead: a workflow
-    that was unpublished, disabled, or deleted cancels the parked steps and
-    the envelope is consumed (no replay, no redrive), as does a run an
-    operator cancelled in the meantime. Otherwise the paused steps close out
+    that was unpublished, disabled, auto-paused, or deleted cancels the
+    parked steps and the envelope is consumed (no replay, no redrive), as
+    does a run an operator cancelled in the meantime. Otherwise the paused
+    steps close out
     ``completed`` (the pause is over) and the captured segments replay
     through the same conditional-write step leases as a fresh run, so
     redeliveries of the continuation stay safe; a further delay in the
@@ -524,10 +553,13 @@ def _resume_run(resume, *, queue=None):
               if action_id]
     workflow = next((candidate for candidate in all_workflows()
                      if candidate.get("id") == workflow_id), None)
-    if workflow is None or not workflow.get("enabled", True):
+    if workflow is None or not workflow.get("enabled", True) or workflow.get("auto_paused"):
+        # Gone, disabled, or auto-paused while this run was parked: the
+        # continuation must not run (a parked run succeeding past the pause
+        # would read as the workflow still working).
         for action_id in paused:
             _cancel_paused_step(workflow_id, action_id, event)
-        logger.info("suspended run dropped: workflow is gone or disabled",
+        logger.info("suspended run dropped: workflow is gone, disabled or auto-paused",
                     extra={"run_id": resume.get("run_id"), "workflow_id": workflow_id})
         return None
     if _pause_cancelled(workflow_id, event,
@@ -551,7 +583,7 @@ def _resume_run(resume, *, queue=None):
                      action_type=reused.get("action_type"),
                      output=reused.get("output"))
     try:
-        return resume_chain(
+        result = resume_chain(
             workflow_id, resume.get("segments") or [], event, _run_connector,
             before_action=_is_pending, after_action=_mark_completed,
             on_action_error=_release_action,
@@ -563,6 +595,10 @@ def _resume_run(resume, *, queue=None):
         susp.workflow_id = workflow_id
         susp.event = event
         raise
+    # The resumed run completed — a success for the streak counter, same as
+    # a fresh run (engine.execute's reset).
+    failure_counts.reset(workflow_id)
+    return result
 
 
 def _schedule_event(payload):
@@ -682,6 +718,60 @@ def _annotate_retry(workflow_id, action_id, event, attempt):
     )
 
 
+def _failed_event_id(payload):
+    """The event id a failed record was working on, for the failure counter's
+    redelivery guard: a plain trigger event's id, or the id inside a parked
+    run's continuation envelope (whose body is not itself an event)."""
+    if not isinstance(payload, dict):
+        return None
+    if isinstance(payload.get(RESUME_KEY), dict):
+        return (payload[RESUME_KEY].get("event") or {}).get("id")
+    return payload.get("id")
+
+
+def _auto_pause_on_failure(exc, payload):
+    """Count a finalized failed run; pause the workflow when the streak trips.
+
+    Runs where the failure path runs — retries exhausted, the record about to
+    fail and its failure notice about to go out. The counter (triggers.
+    failure_counts, the cursors table) counts once per failed event — the
+    redeliveries of the failed record never count — and at the workflow's
+    ``auto_pause_after`` threshold the stored definition gains ``auto_paused``
+    (api.designer_store.api_auto_pause), which the matcher refuses like a
+    disabled workflow. True when this failure did the pausing, so the caller
+    sends the auto-pause notice (notify.notify_auto_pause) after the failure
+    email. Everything here is best-effort bookkeeping: an unconfigured
+    counter, a workflow that only exists as a stored trigger (nothing to
+    pause), or a publish hiccup must never turn a failed run into a broken
+    failure path.
+    """
+    workflow_id = getattr(exc, "dapier_workflow", None)
+    if not workflow_id:
+        return False
+    try:
+        workflow = next((item for item in all_workflows()
+                         if item.get("id") == workflow_id), None)
+        if workflow is None:
+            return False
+        threshold = auto_pause_threshold(workflow)
+        if threshold is None:
+            return False
+        from ..api import designer_store
+
+        error = str(exc) or exc.__class__.__name__
+        count, tripped = failure_counts.record_failure(
+            workflow_id, error,
+            event_id=_failed_event_id(payload), threshold=threshold)
+        if not tripped:
+            return False
+        logger.info("auto-pausing workflow after %d consecutive failed runs",
+                    count, extra={"workflow_id": workflow_id})
+        return designer_store.api_auto_pause(workflow_id, error=error) is not None
+    except Exception:
+        logger.info("auto-pause bookkeeping failed", exc_info=True)
+        return False
+
+
 def handler(event, _context):
     if isinstance(event, dict) and event.get("trigger") == "poll" and event.get("poll_id"):
         # EventBridge invokes the function directly (dapier-poll-* rules):
@@ -713,6 +803,8 @@ def handler(event, _context):
             logger.exception("schedule trigger failed", extra={"schedule_id": event.get("schedule_id")})
             if not _schedule_retry(exc, normalized, 0):
                 notify_failure(exc, normalized)
+                if _auto_pause_on_failure(exc, normalized):
+                    notify_auto_pause(exc, normalized)
                 raise
         return {"executed": event["schedule_id"]}
     failures = []
@@ -768,6 +860,8 @@ def handler(event, _context):
                 continue
             inbox.complete(inbox_id, None, error=exc)
             notify_failure(exc, payload)
+            if _auto_pause_on_failure(exc, payload):
+                notify_auto_pause(exc, payload)
             failures.append({"itemIdentifier": record.get("messageId")})
         else:
             inbox.complete(inbox_id, matched)

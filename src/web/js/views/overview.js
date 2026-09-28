@@ -42,11 +42,22 @@ function workflowActionText(action) {
   return ACTION_TEXT[action.type] || String(action.type || 'Action').replace(/[_\.]/g, ' ');
 }
 
+/* The State cell: auto-paused outranks the on/off toggle — the workflow is
+   On but the engine stopped it after consecutive failed runs (the API's
+   auto_paused fields; re-enabling is the resume verb). */
+function workflowState(workflow) {
+  if (workflow.auto_paused) {
+    const failures = Number(workflow.failures || 0);
+    return statusLine('auto-paused', { 'auto-paused': `Auto-paused (${failures} failed run${failures === 1 ? '' : 's'})` });
+  }
+  return statusLine(workflow.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' });
+}
+
 function workflowRow(workflow) {
   return `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
     <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
-    <td data-label="State">${statusLine(workflow.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' })}</td>
+    <td data-label="State">${workflowState(workflow)}</td>
   </tr>`;
 }
 
@@ -73,8 +84,9 @@ export function openWorkflow(id) {
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `
     <div class="detail-summary">
-      ${statusLine(workflow.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' })}
+      ${workflowState(workflow)}
       ${workflow.source ? `<code>workflows/${escapeHtml(workflow.source)}</code>` : ''}
+      ${workflow.auto_paused ? `<p class="sub">Paused by the engine after ${escapeHtml(String(workflow.failures || 0))} failed run(s) ${escapeHtml(formatTimestamp(workflow.auto_paused_at) || '')} — last error: ${escapeHtml(workflow.auto_paused_reason || 'unknown')}. Turn the workflow off and on again (or Resume) to clear it.</p>` : ''}
     </div>
     <section class="detail-block">
       <h3>Trigger${many ? 's' : ''}</h3>
@@ -216,7 +228,7 @@ export function renderWorkflows() {
       <td data-label="When">${escapeHtml(workflowTriggerText(workflow))}</td>
       <td data-label="Do"><span class="workflow-action-chain">${actions || '—'}</span></td>
       <td data-label="Recent run">${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No recent runs</span>'}</td>
-      <td data-label="State">${statusLine(workflow.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' })}</td>
+      <td data-label="State">${workflowState(workflow)}</td>
       <td class="action-cell workflow-actions" data-label="Manage">
         ${edit}
         <button type="button" class="button secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
@@ -225,7 +237,9 @@ export function renderWorkflows() {
         <button type="button" class="button secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
         <button type="button" class="button secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
         <button type="button" class="button secondary workflow-template" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-template="${workflow.template ? 'true' : 'false'}" ${sourceButtons} title="${workflow.template ? 'Remove from the Templates gallery' : 'Publish as a template — offer it under Templates'}">${workflow.template ? 'Unpublish' : 'Publish'}</button>
-        <button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>
+        ${workflow.auto_paused
+          ? `<button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
+          : `<button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>`}
         <button type="button" class="button danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
       </td>
     </tr>`;
@@ -287,8 +301,10 @@ function renderBulkBar(shown) {
 
 function renderAttention(data) {
   const failed = (data.runs || []).filter((run) => ['failed', 'error'].includes(run.status));
+  const paused = (data.workflows || []).filter((workflow) => workflow.auto_paused);
   const connections = data.connections.filter((connection) => connection.status !== 'connected' || connection.health === 'expired');
   const items = [];
+  if (paused.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${paused.length} workflow${paused.length === 1 ? ' was' : 's were'} auto-paused after failed runs</strong><span>Inspect failures, then resume from Workflows →</span></a>`);
   if (failed.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${failed.length} failed ${failed.length === 1 ? 'run' : 'runs'} in recent history</strong><span>Inspect failures →</span></a>`);
   if (connections.length) items.push(`<a class="attention-item view-link" href="/connections" data-target="connections" data-connection-status="attention"><strong>${connections.length} ${connections.length === 1 ? 'account needs' : 'accounts need'} attention</strong><span>Complete setup or reconnect →</span></a>`);
   $('#overview-attention').innerHTML = items.length
@@ -844,3 +860,27 @@ if (exportAllButton) exportAllButton.addEventListener('click', async () => {
     exportAllButton.disabled = false;
   }
 });
+
+/* Resume: the auto-pause's undo. PUTs the workflow resource with
+   enabled:true — the exact call the console's Turn on and `dapier workflows
+   on` make (designer_store.api_toggle on enable clears the auto_paused flag
+   and zeroes the failure streak), so there is no second route to keep in
+   sync. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-resume');
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  try {
+    await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: true }),
+    });
+    await refresh();
+    notice('Workflow resumed — the auto-pause is cleared.');
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+

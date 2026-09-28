@@ -141,8 +141,11 @@ def _matches_filter(value, rule):
     }[operator](expected) for operator, expected in rule.items())
 
 def matches(workflow, event):
-    """True when any of the workflow's triggers matches the event."""
-    if not workflow.get("enabled", True):
+    """True when any of the workflow's triggers matches the event. A disabled
+    workflow never matches, and neither does an auto-paused one — the engine
+    paused it after consecutive failed runs (the ``auto_paused`` flag on the
+    stored definition, set by engine.worker, cleared by re-enabling)."""
+    if not workflow.get("enabled", True) or workflow.get("auto_paused"):
         return False
     data = event.get("data", {})
     for trigger in workflow_triggers(workflow):

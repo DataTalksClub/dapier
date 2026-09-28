@@ -465,6 +465,10 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
               "No workflows yet. Create one in the console or run `dapier workflows save`.")
     for item in items:
         state = "On" if item.get("enabled", True) else "Off"
+        if item.get("auto_paused"):
+            # The engine paused it after consecutive failed runs; `workflows on`
+            # is the resume verb (the enable toggle clears the pause).
+            state += " (auto-paused)"
         trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
         extra = (item.get("triggerCount") or 1) - 1
         if extra > 0:
@@ -1434,6 +1438,8 @@ def print_overview(data):
     print(f"\nWORKFLOWS ({on}/{len(workflows)} On)")
     for item in workflows:
         state = "On" if item.get("enabled", True) else "Off"
+        if item.get("auto_paused"):
+            state += " (auto-paused)"
         print(f"  {item.get('id', ''):32} {state}")
     print("\nCONNECTIONS")
     for item in data.get("connections") or []:
