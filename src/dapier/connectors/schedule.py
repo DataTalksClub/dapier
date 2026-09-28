@@ -41,3 +41,32 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
 register_trigger_discovery(TriggerDiscovery(
     connector="schedule", label="Schedule", kind="sample", resource="",
     fetch=_fetch_sample))
+
+
+def _fetch_trigger_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
+    """The stored schedules, as options for the sample's event field.
+
+    The operator picks the schedule whose id lands in the sample data
+    instead of typing its name. No connection is involved, and an empty or
+    unconfigured store is a fine empty list, never an error.
+    """
+    from ..triggers import schedule_triggers
+
+    try:
+        items = schedule_triggers.load_items()
+    except Exception:  # store unconfigured (bare test/edge deploys): nothing to pick
+        return {"options": [], "connection_id": None}
+    options = []
+    for item in items:
+        name = item.get("schedule_id")
+        if not name:
+            continue
+        expression = str(item.get("expression") or "").strip()
+        options.append({"value": name,
+                        "label": f"{name} ({expression})" if expression else name})
+    return {"options": options[:limit], "connection_id": None}
+
+
+register_trigger_discovery(TriggerDiscovery(
+    connector="schedule", label="Schedule", kind="options", resource="schedule.triggers",
+    fetch=_fetch_trigger_options))

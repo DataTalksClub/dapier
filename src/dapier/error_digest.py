@@ -35,6 +35,15 @@ def render(summary):
     plural = "" if total == 1 else "s"
     subject = f"dapier error digest: {total} failed run{plural} (last {window})"
     lines = [f"Failed runs by workflow over the last {window}: {total} total.", ""]
+    if summary.get("bounded"):
+        # The summary hit its scan cap: the total covers only the newest
+        # ``cap`` failed runs, so the digest must not read as the full count.
+        cap = int(summary.get("cap") or 0)
+        lines.append(
+            f"Note: only the most recent {cap} failed runs are counted; "
+            "older failures in this window are not included."
+        )
+        lines.append("")
     for row in summary.get("workflows") or []:
         workflow_id = row.get("workflow_id") or "unknown"
         lines.append(f"{workflow_id}: {row.get('failed_runs', 0)} failed")

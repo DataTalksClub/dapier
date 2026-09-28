@@ -37,11 +37,35 @@ def test_every_trigger_chip_has_a_sample():
     cat = trigger_discovery.trigger_discovery_catalog()
     for connector in ("email", "webhook", "telegram", "dropbox", "dataops",
                       "renderer", "schedule", "youtube", "zoom", "poll", "custom",
-                      "slack"):
+                      "slack", "mailchimp"):
         assert connector in cat["sample"], connector
     for connector in ("dropbox", "s3", "slack", "telegram", "zoom",
-                      "google-sheets", "google-drive"):
+                      "google-sheets", "google-drive", "mailchimp", "youtube"):
         assert connector in cat["options"], connector
+
+
+def test_every_sample_connector_is_a_palette_chip():
+    """A connector the palette can't offer is undiscoverable in the designer.
+
+    Every entry of the discovery-sample catalog must have a trigger chip in
+    GET /api/catalog, and each chip's declared events must include the event
+    its sample publishes (telegram's hook delivers message.received).
+    """
+    from src.dapier.connectors import registry
+
+    cat = trigger_discovery.trigger_discovery_catalog()
+    chips = {entry["name"]: entry for entry in registry.catalog()["connectors"]}
+    # dataops is action-side intake, not a user-selectable source; the
+    # webhook ingress kind surfaces in the palette as the Custom chip.
+    internal = {"dataops"}
+    aliases = {"webhook": "custom"}
+    for connector in cat["sample"]:
+        chip = aliases.get(connector, connector)
+        if chip not in internal:
+            assert chip in chips, connector
+    assert chips["telegram"]["events"] == ["message.received", "channel_post.received"]
+    assert chips["telegram"]["label"] == "Telegram"
+    assert chips["custom"]["events"] == []
 
 
 def _sample(connector, **kwargs):
@@ -66,11 +90,31 @@ def test_renderer_sample_carries_the_renderer_contract():
     assert data["output"]["bucket"] and data["output"]["key"]
 
 
+def test_email_sample_publishes_the_decoded_body():
+    """New workflows template against what a delivery carries: the decoded
+    text/html bodies the intake publishes, not just headers and pointers."""
+    sample = _sample("email")["sample"]
+    assert sample["event"] == "message.received"
+    assert sample["data"]["text"]
+    assert sample["data"]["html"]
+
+
 def test_youtube_sample_carries_the_pubsub_entry():
     sample = _sample("youtube")["sample"]
     assert sample["event"] == "video.published"
     assert sample["data"]["video_id"]
     assert sample["data"]["url"].startswith("https://www.youtube.com/watch?v=")
+
+
+def test_mailchimp_sample_picks_the_webhook_type_payload():
+    sample = _sample("mailchimp", event="upemail")["sample"]
+    assert sample["event"] == "upemail"
+    assert sample["data"]["type"] == "upemail"
+    assert sample["data"]["data"]["new_email"]
+    # an unknown type falls back to the default payload (subscribe)
+    fallback = _sample("mailchimp", event="bogus")["sample"]
+    assert fallback["event"] == "subscribe"
+    assert fallback["data"]["data"]["email"]
 
 
 def test_zoom_sample_is_metadata_only():
@@ -82,8 +126,66 @@ def test_zoom_sample_is_metadata_only():
 
 def test_custom_sample_is_a_placeholder_to_paste_over():
     sample = _sample("custom")["sample"]
-    assert sample["event"] == "occurred"
+    assert sample["event"] == "received"
     assert "Replace this object" in json.dumps(sample["data"])
+
+
+def _hook_stub(hook_id="orders", kind="webhook", token="tok-123", enabled=True):
+    item = {"hook_id": hook_id, "kind": kind, "url": f"u-{hook_id}", "token": token,
+            "actions": [], "enabled": enabled}
+    return type("T", (), {
+        "scan": lambda self, Limit=200: {"Items": [dict(item)]},
+        "get_item": lambda self, Key: {"Item": dict(item)} if Key["hook_id"] == hook_id else {},
+        "put_item": lambda self, Item: None,
+        "delete_item": lambda self, Key: None,
+    })()
+
+
+def _post(path, body=b'{"hello":"world"}', headers=None):
+    from src.dapier.api import router as ingress
+
+    return ingress.handler({
+        "requestContext": {"http": {"method": "POST", "path": path}},
+        "headers": headers or {},
+        "body": body.decode(),
+    }, None)
+
+
+def test_custom_chip_samples_name_events_that_actually_fire(monkeypatch):
+    """The Custom chip's samples must name the events its fire paths publish.
+
+    A filter copied from a pulled sample goes into a stored workflow verbatim,
+    and matching is exact on connector+event — a sample naming an event no
+    fire path publishes builds filters that never match. Both backings of the
+    chip are covered: the custom ingress (/hooks/custom/{source}) and the
+    webhook trigger kind (/hooks/webhook/{name}, aliased to the chip).
+    """
+    from src.dapier.api import router as ingress
+
+    sent = []
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
+    monkeypatch.setattr(ingress.queue, "send_message", lambda **kwargs: sent.append(kwargs))
+
+    # Fire path 1: the custom ingress publishes custom/received.
+    response = _post("/hooks/custom/checkout", body=b'{"ok": true}')
+    assert response["statusCode"] == 202
+    fired = json.loads(sent[-1]["MessageBody"])
+    custom_sample = _sample("custom")["sample"]
+    assert custom_sample["connector"] == fired["connector"]
+    assert custom_sample["event"] == fired["event"]
+
+    # Fire path 2: the webhook trigger kind publishes webhook/request.received.
+    monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
+    monkeypatch.setattr(
+        "src.dapier.triggers.hook_triggers.get_table",
+        lambda *a, **k: _hook_stub())
+    response = _post("/hooks/webhook/orders",
+                     headers={"authorization": "Bearer tok-123"})
+    assert response["statusCode"] == 202
+    fired = json.loads(sent[-1]["MessageBody"])
+    webhook_sample = _sample("webhook")["sample"]
+    assert webhook_sample["connector"] == fired["connector"]
+    assert webhook_sample["event"] == fired["event"]
 
 
 def test_history_sample_wins_over_synthetic(monkeypatch):
@@ -103,13 +205,77 @@ def test_unknown_connector_is_404_naming_the_discoverable_ones():
     assert "email" in payload["error"]
 
 
+# --- domain: telegram pulls a live update, else the standard chain ----------
+
+
+def test_telegram_sample_without_a_connection_synthesizes(monkeypatch):
+    """No connected bot: the documented example, shaped exactly like a real
+    delivery (hook_triggers.update_data) — never a bare 404."""
+    monkeypatch.delenv("CONNECTIONS_TABLE", raising=False)
+    payload = _sample("telegram")
+    assert payload["source"] == "synthetic"
+    assert payload["sample"]["event"] == "message.received"
+    data = payload["sample"]["data"]
+    assert data["hook"] == "discover"
+    assert data["text"] and data["chat_id"]
+    assert data["update"]["message"]["text"] == data["text"]
+
+
+def test_telegram_sample_falls_back_when_getUpdates_is_rejected(monkeypatch):
+    """A webhook-mode bot (the normal dapier telegram state) rejects
+    getUpdates with Telegram's conflict message; the chain still answers
+    with a sample instead of 502ing."""
+    from src.dapier.connections.providers import telegram_api
+
+    def conflict(method, name, params, transport=None):
+        raise telegram_api.TelegramApiError(
+            "Conflict: terminated by other getUpdates request")
+
+    monkeypatch.setattr(telegram_api, "call", conflict)
+    monkeypatch.setattr(
+        "src.dapier.connections.credentials.get_credential",
+        lambda credential_id: {"token": "12:ABC"})
+    configure_connections(monkeypatch, {
+        "tg": {"connection_id": "tg", "provider": "telegram", "status": "connected",
+               "credential_id": "oauth#tg"}})
+    payload = _sample("telegram")
+    assert payload["source"] == "synthetic"
+    assert payload["sample"]["event"] == "message.received"
+
+
 # --- domain: poll pulls a live list item ---
 
 
-def test_poll_without_a_name_and_without_history_is_404(monkeypatch):
-    status, payload = trigger_discovery.api_discover({"connector": "poll"})
+def test_poll_without_a_name_and_without_history_synthesizes():
+    """The chip-level ask follows the standard chain: nothing live (no name
+    selects a trigger) and nothing recorded lands on the documented example,
+    like every other chip — never a bare 404."""
+    payload = _sample("poll")
+    assert payload["source"] == "synthetic"
+    assert payload["sample"]["event"] == "item.new"
+    assert payload["sample"]["data"]["poll"] == "discover"
+    assert payload["sample"]["data"]["item_id"]
+
+
+def test_poll_sample_for_an_unknown_name_is_404():
+    """A named ask that names nothing stays a precise 404 — a fabricated
+    sample would silently hide the typo."""
+    status, payload = trigger_discovery.api_discover(
+        {"connector": "poll", "event": "blog"})
     assert status == 404
-    assert "event" in payload["error"]
+    assert "no stored poll trigger named 'blog'" in payload["error"]
+
+
+def test_poll_with_a_name_and_an_empty_listing_falls_through(monkeypatch):
+    from src.dapier.triggers import poll_triggers
+
+    monkeypatch.setattr(poll_triggers, "get_item",
+                        lambda name, table_ref=None: {"poll_id": name})
+    monkeypatch.setattr(poll_triggers, "fetch_page",
+                        lambda item, cursor=None, transport=None: [])
+    payload = _sample("poll", event="blog")
+    assert payload["source"] == "synthetic"
+    assert payload["sample"]["data"]["poll"] == "blog"
 
 
 def test_poll_pulls_the_first_listed_item_live(monkeypatch):
@@ -260,6 +426,27 @@ def test_s3_object_options_pass_the_bucket_through(monkeypatch):
     assert payload["options"] == [
         {"value": "reports/2026/report.pdf", "label": "reports/2026/report.pdf"}]
     assert fake.calls == [{"Bucket": "backups", "MaxKeys": 100}]
+
+
+def test_mailchimp_audience_options_fall_back_to_the_shared_credential(monkeypatch):
+    """mailchimp is a key credential with often no connection record: the
+    pseudo-account fallback still lists audiences from the stored key."""
+    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+
+    monkeypatch.setattr(
+        "src.dapier.connections.credentials.get_credential",
+        lambda credential_id: {"apiKey": "key-us21", "server": "us21"})
+    monkeypatch.setattr(
+        mailchimp_actions, "mailchimp_request",
+        lambda method, url, api_key, transport=None: (
+            200, {"lists": [{"id": "abc123", "name": "Digest",
+                             "stats": {"member_count": 42}}]}))
+    configure_connections(monkeypatch, {})
+    status, payload = trigger_discovery.api_discover(
+        {"connector": "mailchimp", "kind": "options",
+         "resource": "mailchimp.audiences"})
+    assert status == 200, payload
+    assert payload["options"] == [{"value": "abc123", "label": "Digest (42 members)"}]
 
 
 # --- agent API: the CLI's surface ---

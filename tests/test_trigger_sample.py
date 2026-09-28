@@ -119,6 +119,64 @@ def test_sample_falls_back_to_the_connector_discovery_sample(monkeypatch, tmp_pa
     assert isinstance(payload["data"], dict) and payload["data"]
 
 
+def test_sample_goes_live_through_the_workflows_bound_poll(monkeypatch, tmp_path):
+    """A workflow driven by a stored poll trigger (its ``flow:`` key) gets
+    its no-runs sample live off the real source: the connector's live
+    branch keys on the poll NAME, which the workflow's event name can never
+    supply — the sample used to fall through to the documented example
+    even with a perfectly good bucket/sheet/channel to pull."""
+    from src.dapier.triggers import poll_triggers
+
+    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML.replace(
+        "connector: email\n  event: message.received",
+        "connector: s3\n  event: file.created"))
+    _tables_env(monkeypatch, [])
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+
+    stored = {"poll_id": "todo-bucket", "flow": "sample-flow", "source": "s3",
+              "bucket": "backups", "actions": []}
+    monkeypatch.setattr(poll_triggers, "load_items", lambda table_ref=None: [stored])
+    monkeypatch.setattr(poll_triggers, "get_item",
+                        lambda name, table_ref=None: stored if name == "todo-bucket" else None)
+    monkeypatch.setattr(poll_triggers, "fetch_page",
+                        lambda item, cursor=None, transport=None: [
+                            {"bucket": "backups", "key": "a.pdf", "size": 1,
+                             "last_modified": "2026-09-28T09:00:00+00:00"}])
+    monkeypatch.setattr(
+        poll_triggers, "event_for",
+        lambda item, raw: {"schema_version": "1.0", "id": "evt-x",
+                           "correlation_id": "evt-x", "connector": "s3",
+                           "event": "file.created", "source": item["poll_id"],
+                           "occurred_at": raw["last_modified"],
+                           "data": dict(raw, poll=item["poll_id"])})
+    status, payload = runs.api_trigger_sample("sample-flow")
+    assert status == 200, payload
+    assert payload["source"] == "live"
+    assert payload["event"] == "file.created"
+    assert payload["data"]["key"] == "a.pdf"
+    assert payload["data"]["poll"] == "todo-bucket"
+
+
+def test_sample_ignores_a_bound_poll_serving_another_connector(monkeypatch, tmp_path):
+    """The bound poll must serve the workflow's own connector: an s3 poll
+    bound to the email workflow is someone else's trigger — the sample
+    falls through to the email chip's documented example, never the other
+    source's live data."""
+    from src.dapier.triggers import poll_triggers
+
+    _tables_env(monkeypatch, [])
+    monkeypatch.setenv("WORKFLOWS_DIR", str(write_workflow(tmp_path)))
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+    monkeypatch.setattr(poll_triggers, "load_items", lambda table_ref=None: [
+        {"poll_id": "todo-bucket", "flow": "sample-flow", "source": "s3",
+         "bucket": "backups", "actions": []}])
+    status, payload = runs.api_trigger_sample("sample-flow")
+    assert status == 200
+    assert payload["source"] == "synthetic"
+    assert payload["connector"] == "email"
+
+
 def test_sample_is_404_when_no_runs_and_no_workflow(monkeypatch, tmp_path):
     _tables_env(monkeypatch, [])
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))

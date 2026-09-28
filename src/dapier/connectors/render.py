@@ -12,7 +12,8 @@ register(Action(
     fields=(
         {"key": "input_field", "label": "Input field", "placeholder": "html"},
         {"key": "output_key", "label": "Output key", "placeholder": "rendered/{event_id}.pdf"},
-        {"key": "output_bucket", "label": "Output bucket"},
+        {"key": "output_bucket", "label": "Output bucket",
+         "discover": {"resource": "s3.buckets"}},
         {"key": "output_bucket_env", "label": "Output bucket env", "placeholder": "RENDER_ARTIFACTS_BUCKET"},
         {"key": "page_format", "label": "PDF page format", "group": "pdf", "default": "A4"},
         {"key": "print_background", "label": "Print background", "group": "pdf", "type": "boolean", "default": "true"},

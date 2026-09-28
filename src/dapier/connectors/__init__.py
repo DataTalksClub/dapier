@@ -12,6 +12,7 @@ specs.
 from . import registry, trigger_discovery  # noqa: F401
 from . import (  # noqa: F401  (import = registration)
     code,
+    csv,
     dataops,
     digest,
     dropbox,
@@ -22,6 +23,7 @@ from . import (  # noqa: F401  (import = registration)
     mailchimp,
     poll,
     render,
+    rss,
     s3,
     schedule,
     sheets,

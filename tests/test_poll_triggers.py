@@ -82,7 +82,8 @@ class FireWatermarkTests(unittest.TestCase):
 
         with patch.object(poll_triggers, "get_item", return_value=poll_item()), \
              patch.object(poll_triggers, "get_cursor", return_value=cursor), \
-             patch.object(poll_triggers, "fetch_page", return_value=list(items)), \
+             patch.object(poll_triggers, "fetch_page_response",
+                          return_value=(list(items), None)), \
              patch.object(poll_triggers, "put_cursor",
                           side_effect=lambda name, value, table=None: stored.append(value)), \
              patch("src.dapier.engine.execute", side_effect=fake_execute):
@@ -112,13 +113,159 @@ class FireWatermarkTests(unittest.TestCase):
     def test_items_without_a_watermark_are_skipped(self):
         with patch.object(poll_triggers, "get_item", return_value=poll_item()), \
              patch.object(poll_triggers, "get_cursor", return_value=None), \
-             patch.object(poll_triggers, "fetch_page",
-                          return_value=[{"name": "no timestamp here"}]), \
+             patch.object(poll_triggers, "fetch_page_response",
+                          return_value=([{"name": "no timestamp here"}], None)), \
              patch("src.dapier.engine.execute") as execute:
             result = poll_triggers.fire("drive-mailchimp-s3")
 
         self.assertEqual(result["fired"], 0)
         execute.assert_not_called()
+
+
+def next_cursor_item(**overrides):
+    item = poll_item()
+    item.update({"poll_id": "inbox-watch", "cursor_mode": "next_cursor",
+                 "id_path": "", "cursor_path": "meta.next", "cursor_query": "page"})
+    item.update(overrides)
+    return item
+
+
+class NextCursorTests(unittest.TestCase):
+    """fire() in next_cursor mode: the provider's continuation cursor is what
+    gets stored and passed back — never an item id — and the page refetches
+    until every item on it ran."""
+
+    def run_fire(self, *, stored_cursor, pages, cursor_table=None, fail_on=None):
+        """Fire once against ``pages[0]``; ``pages`` maps the incoming cursor
+        to ``(items, next_cursor)``. Returns (result, fired, stored, calls)."""
+        fired_events = []
+        stored = []
+        calls = []
+        cursors_table = cursor_table or FakeCursorTable()
+
+        def fake_execute(event, **_kwargs):
+            if fail_on is not None and event["data"]["item_id"] == fail_on:
+                raise RuntimeError("downstream exploded")
+            fired_events.append(event["data"]["item_id"])
+
+        def fake_fetch(item, cursor=None, transport=None):
+            calls.append(cursor)
+            return pages[cursor]
+
+        with patch.object(poll_triggers, "get_item", return_value=next_cursor_item()), \
+             patch.object(poll_triggers, "get_cursor", return_value=stored_cursor), \
+             patch.object(poll_triggers, "fetch_page_response", side_effect=fake_fetch), \
+             patch.object(poll_triggers, "cursor_table", return_value=cursors_table), \
+             patch.object(poll_triggers, "put_cursor",
+                          side_effect=lambda name, value, table=None: stored.append(value)), \
+             patch("src.dapier.engine.execute", side_effect=fake_execute), \
+             patch("src.dapier.engine.notify.notify_failure"):
+            result = poll_triggers.fire("inbox-watch", cursor_table_ref=cursors_table)
+
+        return result, fired_events, stored, calls
+
+    def test_page_uses_the_stored_cursor_and_parks_the_next_one(self):
+        page_one = (page("2026-09-26T21:00:00.000Z", "2026-09-26T22:00:00.000Z"), "page-2")
+
+        result, fired, stored, calls = self.run_fire(
+            stored_cursor="page-1", pages={None: ([], None), "page-1": page_one})
+
+        self.assertEqual(calls, ["page-1"])  # the provider cursor, not an item id
+        self.assertEqual(result, {"poll": "inbox-watch", "fired": 2})
+        self.assertEqual(fired, ["file-0", "file-1"])  # ids from data["id"], not str(dict)
+        self.assertEqual(stored, ["page-2"])  # the continuation cursor parked
+
+    def test_item_ids_never_become_the_cursor(self):
+        page_one = ([{"id": "row-1"}, {"id": "row-2"}], None)
+
+        result, _fired, stored, _calls = self.run_fire(
+            stored_cursor=None, pages={None: page_one})
+
+        self.assertEqual(result["fired"], 2)
+        self.assertEqual(stored, [])  # no continuation in the response, nothing parked
+
+    def test_page_larger_than_max_items_refetches_until_drained(self):
+        items = [{"id": f"row-{index}"} for index in range(3)]
+
+        with patch.object(poll_triggers, "get_item",
+                          return_value=next_cursor_item(max_items=2)), \
+             patch.object(poll_triggers, "get_cursor", return_value=None), \
+             patch.object(poll_triggers, "fetch_page_response",
+                          return_value=(list(items), "page-2")), \
+             patch.object(poll_triggers, "put_cursor") as put_cursor, \
+             patch("src.dapier.engine.execute"):
+            cursors = FakeCursorTable()
+            result = poll_triggers.fire("inbox-watch", cursor_table_ref=cursors)
+
+        self.assertEqual(result["fired"], 2)
+        put_cursor.assert_not_called()  # the page is not drained; it refetches
+
+    def test_failed_item_keeps_the_page_for_a_retry(self):
+        page_one = ([{"id": "row-1"}, {"id": "row-2"}], "page-2")
+
+        result, fired, stored, _calls = self.run_fire(
+            stored_cursor=None, pages={None: page_one}, fail_on="row-2")
+
+        self.assertEqual(fired, ["row-1"])
+        self.assertEqual(stored, [])  # the continuation cursor waits for a clean page
+        self.assertEqual(result["fired"], 1)
+
+    def test_fully_seen_page_still_parks_the_continuation(self):
+        # The first fire published both items; the provider repeats the page.
+        cursors = FakeCursorTable()
+        result, fired, stored, _calls = self.run_fire(
+            stored_cursor=None,
+            pages={None: ([{"id": "row-1"}, {"id": "row-2"}], "page-2")},
+            cursor_table=cursors)
+        self.assertEqual(result["fired"], 2)
+
+        repeat, fired_again, stored_again, calls = self.run_fire(
+            stored_cursor=None,
+            pages={None: ([{"id": "row-1"}, {"id": "row-2"}], "page-2")},
+            cursor_table=cursors)
+
+        self.assertEqual(fired_again, [])  # the seen-set absorbs the recycled page
+        self.assertEqual(repeat, {"poll": "inbox-watch", "fired": 0, "skipped_seen": 2})
+        self.assertEqual(stored_again, ["page-2"])  # ...and the page still advances
+        self.assertEqual(calls, [None])
+
+
+class FetchResponseTests(unittest.TestCase):
+    """fetch_page_response: the list_path selection plus cursor_path."""
+
+    def test_extracts_items_and_the_continuation_cursor(self):
+        item = next_cursor_item(list_path="data.items")
+        transport = lambda *args, **kwargs: (  # noqa: E731
+            200, b'{"data": {"items": [{"id": 1}]}, "meta": {"next": "abc"}}')
+
+        items, next_cursor = poll_triggers.fetch_page_response(item, transport=transport)
+
+        self.assertEqual(items, [{"id": 1}])
+        self.assertEqual(next_cursor, "abc")
+
+    def test_the_stored_cursor_rides_the_query_parameter(self):
+        item = next_cursor_item(list_path="items")
+        seen_urls = []
+
+        def transport(method, url, **_kwargs):
+            seen_urls.append(url)
+            return 200, b'{"items": [], "meta": {"next": null}}'
+
+        items, next_cursor = poll_triggers.fetch_page_response(
+            item, cursor="abc", transport=transport)
+
+        self.assertEqual(seen_urls, ["https://example.test/list?page=abc"])
+        self.assertEqual(items, [])
+        self.assertEqual(next_cursor, None)  # a null cursor parks nothing
+
+    def test_fetch_page_stays_a_list_for_discovery(self):
+        item = next_cursor_item(list_path="items")
+        transport = lambda *args, **kwargs: (  # noqa: E731
+            200, b'{"items": [{"id": 1}], "meta": {"next": "z"}}')
+
+        items = poll_triggers.fetch_page(item, transport=transport)
+
+        self.assertEqual(items, [{"id": 1}])
 
 
 class FakePollTable:
@@ -141,19 +288,26 @@ class FakePollTable:
 
 
 class FakeCursorTable:
-    """DynamoDB stand-in keyed by cursor_id."""
+    """DynamoDB stand-in keyed by cursor_id (poll cursors) or scope_id
+    (the seen store's per-trigger sets, triggers.seen)."""
 
     def __init__(self):
         self.items = {}
 
+    @staticmethod
+    def _partition(key_or_item):
+        return (key_or_item.get("cursor_id")
+                if "cursor_id" in key_or_item else key_or_item.get("scope_id"))
+
     def get_item(self, Key):
-        return {"Item": dict(self.items[Key["cursor_id"]])} if Key["cursor_id"] in self.items else {}
+        item = self.items.get(self._partition(Key))
+        return {"Item": dict(item)} if item else {}
 
     def put_item(self, Item):
-        self.items[Item["cursor_id"]] = dict(Item)
+        self.items[self._partition(Item)] = dict(Item)
 
     def delete_item(self, Key):
-        self.items.pop(Key["cursor_id"], None)
+        self.items.pop(self._partition(Key), None)
 
 
 class FakeEvents:

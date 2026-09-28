@@ -4,6 +4,7 @@ import json
 import hashlib
 import hmac
 import os
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -29,7 +30,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/users", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 
@@ -74,6 +75,7 @@ def _static(path):
         "/assets/js/views/emails.js": ("js/views/emails.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/schedules.js": ("js/views/schedules.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/users.js": ("js/views/users.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/storage.js": ("js/views/storage.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/audit.js": ("js/views/audit.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/triggers.js": ("js/views/triggers.js", "text/javascript; charset=utf-8"),
@@ -275,6 +277,73 @@ def _webhook_payload(body, content_type):
     return {"raw": text}
 
 
+def _claim_delivery(item, payload):
+    """Claim the delivery's stable event id when the trigger dedupes;
+    returns ``(event_id, fresh)``.
+
+    Telegram triggers dedupe by default: every update carries a monotonic
+    ``update_id`` — the provider's own delivery identity — so a Telegram
+    retry of the same update cannot run the workflow twice. Webhook
+    triggers opt in with ``dedupe_path``. With no path, no value at it, or
+    a seen store that is not configured, dedupe does not apply:
+    ``(None, True)`` and the publish keeps a fresh uuid, exactly as before.
+    When the id was already claimed (a provider retry of the same
+    delivery), ``fresh`` is False and the caller answers 202 without
+    publishing, so the workflow runs once.
+    """
+    from ..triggers import hook_triggers, seen
+
+    path = str(item.get("dedupe_path") or "").strip()
+    if not path and item.get("kind") == "telegram":
+        path = "update_id"
+    value = hook_triggers.dedupe_value(payload, path) if path and isinstance(payload, dict) else None
+    if value is None or str(value) == "":
+        return None, True
+    event_id = hook_triggers.dedupe_event_id(item["hook_id"], value)
+    try:
+        return event_id, seen.claim(f"hook#{item['hook_id']}", event_id)
+    except Exception:
+        # A store outage must never drop a delivery: publish anyway. The
+        # stable id still dedupes downstream — run grouping and step leases
+        # key on the event id, so a re-delivery finds completed steps.
+        return event_id, True
+
+
+def _release_delivery(item, event_id):
+    """Undo a claim whose publish failed, so the provider's retry delivers."""
+    if event_id:
+        from ..triggers import seen
+
+        seen.forget(f"hook#{item['hook_id']}", event_id)
+
+
+def _challenge_value(payload, query):
+    """The caller's verification challenge: query `challenge`/`hub.challenge`
+    first, falling back to the body's `challenge` (Slack's url_verification)."""
+    value = query.get("challenge") or query.get("hub.challenge")
+    if not value and isinstance(payload, dict):
+        value = payload.get("challenge")
+    return str(value) if value is not None else ""
+
+
+def _render_response_template(template, event, steps):
+    """Render a sync response template with the action template vocabulary:
+    string leaves expand against the event and the recorded steps; dicts,
+    lists, numbers and booleans keep their JSON shape."""
+    def walk(value):
+        if isinstance(value, str):
+            from ..engine.actions.templating import render
+
+            return render(value, event, steps)
+        if isinstance(value, dict):
+            return {key: walk(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [walk(item) for item in value]
+        return value
+
+    return walk(template)
+
+
 def _webhook_hook(event, name, body, query):
     from ..triggers import hook_triggers
 
@@ -285,13 +354,152 @@ def _webhook_hook(event, name, body, query):
     if not supplied or not hmac.compare_digest(supplied, item.get("token") or ""):
         return _response(401, {"error": "invalid token"})
     content_type = _header(event, "content-type").split(";")[0].strip().lower()
-    _publish("webhook", hook_triggers.WEBHOOK_EVENT, {
+    payload = _webhook_payload(body, content_type)
+    mode = ((item.get("response") or {}).get("mode")) or "ack"
+    if mode == "challenge":
+        # A verification handshake: answer it, run nothing.
+        challenge = _challenge_value(payload, query)
+        return _response(200 if challenge else 400, challenge or "missing challenge",
+                         "text/plain")
+    if mode != "sync":
+        event_id, fresh = _claim_delivery(item, payload)
+        if not fresh:
+            return _response(202, {"accepted": True, "duplicate": True, "event_id": event_id})
+        try:
+            _publish("webhook", hook_triggers.WEBHOOK_EVENT, {
+                "hook": item["hook_id"],
+                "body": payload,
+                "query": query,
+                "content_type": content_type,
+            }, source=item["hook_id"], event_id=event_id)
+        except Exception:
+            _release_delivery(item, event_id)
+            raise
+        return _response(202, {"accepted": True})
+    return _sync_webhook_run(item, payload, query, content_type)
+
+
+def _sync_webhook_run(item, payload, query, content_type):
+    """Run the matched workflow inline and answer with the outcome (the
+    trigger's ``response.mode: sync``). The production path — step leases,
+    run history, task usage, failure notify, workflow-level retry — without
+    the queue hop: ``worker.execute`` with the worker's own attempt hooks is
+    exactly what a delivered event would get, just inside this invocation.
+
+    Exactly-once: the delivery either runs here or is enqueued, never both.
+    A fallback enqueues under the same event id the inline run used, so the
+    step leases it already wrote dedupe the worker's replay (completed steps
+    skip; only the un-run tail executes there). Sync is attempted only when
+    exactly one workflow matches — zero or several fall back to the queue
+    path (202), whose behavior stays deterministic. The run gets a
+    wall-clock budget (``response.budget_seconds``, default 10 s, cap 25 s)
+    checked before each step — never mid-step, so a side-effecting action is
+    not killed partway; on overrun the remaining steps are skipped in place
+    (no side effects, no leases) and the worker finishes the run out of
+    band. A failed run is the documented 500: the delivery is released so a
+    provider retry re-executes it, and the failure notifies like the worker
+    path would.
+    """
+    from ..engine import matching, worker
+    from ..triggers import hook_triggers
+
+    event_id, fresh = _claim_delivery(item, payload)
+    if not fresh:
+        return _response(200, {"ok": True, "duplicate": True, "event_id": event_id})
+    delivery_id = event_id or uuid.uuid4().hex
+    data = {
         "hook": item["hook_id"],
-        "body": _webhook_payload(body, content_type),
+        "body": payload,
         "query": query,
         "content_type": content_type,
-    }, source=item["hook_id"])
-    return _response(202, {"accepted": True})
+    }
+    event = {
+        "schema_version": "1.0",
+        "id": delivery_id,
+        "correlation_id": delivery_id,
+        "connector": "webhook",
+        "event": hook_triggers.WEBHOOK_EVENT,
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "source": item["hook_id"],
+        "data": data,
+    }
+
+    def fallback(reason):
+        """Hand the delivery to the queue path: publish under the same event
+        id (leases dedupe whatever the inline run finished) and answer 202.
+        A failed publish releases the claim so the provider's retry delivers,
+        exactly like the ack path."""
+        try:
+            _publish("webhook", hook_triggers.WEBHOOK_EVENT, data,
+                     source=item["hook_id"], event_id=delivery_id)
+        except Exception:
+            _release_delivery(item, delivery_id)
+            raise
+        return _response(202, {"accepted": True, "mode": "async", "reason": reason})
+
+    # Sync is a single-workflow contract: with zero or several matches the
+    # async path keeps its deterministic behavior instead of guessing whose
+    # outcome to answer.
+    try:
+        candidates = [workflow for workflow in matching.all_workflows()
+                      if matching.matches(workflow, event)]
+    except Exception:
+        return fallback("match_error")
+    if len(candidates) != 1:
+        return fallback("no_match" if not candidates else "multiple_matches")
+
+    steps = {}
+    prod_hooks = worker._attempt_hooks(0)
+    deadline = time.monotonic() + hook_triggers.response_budget(item)
+    over_budget = {"flag": False}
+
+    def before_action(workflow_id, action_id, event, action_type=None):
+        if time.monotonic() >= deadline:
+            # Budget checked between steps, never mid-step: the step is
+            # skipped without a lease or a side effect, the chain drains, and
+            # the fallback below hands the un-run tail to the worker.
+            over_budget["flag"] = True
+            return False
+        return prod_hooks["before_action"](workflow_id, action_id, event, action_type)
+
+    def after_action(workflow_id, action_id, event, output=None, duration_ms=None,
+                     status="completed"):
+        prod_hooks["after_action"](workflow_id, action_id, event, output=output,
+                                   duration_ms=duration_ms, status=status)
+        entry = steps.setdefault(str(action_id), {})
+        entry.update({"status": status, "output": output or {}})
+
+    def on_action_error(workflow_id, action_id, event, exc, duration_ms=None):
+        prod_hooks["on_action_error"](workflow_id, action_id, event, exc,
+                                      duration_ms=duration_ms)
+        steps.setdefault(str(action_id), {}).update(
+            {"error": str(exc) or exc.__class__.__name__})
+
+    try:
+        matched = worker.execute(event, before_action=before_action,
+                                 after_action=after_action,
+                                 on_action_error=on_action_error)
+    except worker.RunSuspended as susp:
+        # A delay past the inline cap: park the continuation exactly as the
+        # worker handler would and tell the caller the outcome is async.
+        worker._park_suspension(susp)
+        return _response(202, {"ok": True, "suspended": True,
+                               "resume_at": (susp.output or {}).get("resume_at"),
+                               "event_id": delivery_id})
+    except Exception as exc:
+        # A failed inline run releases the delivery so a provider retry
+        # re-executes it, and notifies like the worker path would.
+        _release_delivery(item, delivery_id)
+        worker.notify_failure(exc, event)
+        return _response(500, {"ok": False, "error": str(exc) or exc.__class__.__name__,
+                               "event_id": delivery_id})
+    if over_budget["flag"]:
+        return fallback("budget")
+    workflow_id = matched[0] if matched else f"webhook-trigger-{item['hook_id']}"
+    response = {"ok": True, "workflow": workflow_id, "steps": steps, "event_id": delivery_id}
+    template = (item.get("response") or {}).get("template")
+    body = _render_response_template(template, event, steps) if template is not None else response
+    return _response(hook_triggers.response_status(item), body)
 
 
 def _telegram_hook(event, name, body):
@@ -309,10 +517,20 @@ def _telegram_hook(event, name, body):
         return _response(400, {"error": "invalid json"})
     if not isinstance(update, dict):
         return _response(400, {"error": "invalid update"})
-    # The data shape lives in hook_triggers so live discovery publishes the
-    # exact same shape a real delivery does.
-    _publish("telegram", hook_triggers.TELEGRAM_EVENT,
-             hook_triggers.update_data(update, item["hook_id"]), source=item["hook_id"])
+    event_id, fresh = _claim_delivery(item, update)
+    if not fresh:
+        return _response(200, {"accepted": True, "duplicate": True, "event_id": event_id})
+    # The data shape — and the event name a delivery publishes as (channel
+    # announcements are their own channel_post.received event) — lives in
+    # hook_triggers so live discovery publishes the exact same shape a real
+    # delivery does.
+    try:
+        _publish("telegram", hook_triggers.telegram_event_for(update),
+                 hook_triggers.update_data(update, item["hook_id"]),
+                 source=item["hook_id"], event_id=event_id)
+    except Exception:
+        _release_delivery(item, event_id)
+        raise
     return _response(200, {"accepted": True})
 
 
@@ -383,6 +601,40 @@ def handler(event, _context):
             connection_id, event.get("headers"), body,
             connections_table=table, publish=_publish,
         )
+        return _response(status, payload)
+    elif path.startswith("/hooks/mailchimp/"):
+        from ..triggers.intake import mailchimp_webhooks
+
+        name = path.removeprefix("/hooks/mailchimp/").strip("/").lower()
+        if not name or "/" in name:
+            return _response(404, {"error": "not found"})
+        if len(body) > MAX_HOOK_BODY_BYTES:
+            return _response(413, {"error": "body too large"})
+        # The stored hook trigger gates the URL (enable/disable, the same
+        # `hooks` CRUD every surface already has); no bearer check — Mailchimp
+        # sends no auth headers, the unguessable name is the credential.
+        item = _hook_item(name)
+        if not item or item.get("kind") != "mailchimp":
+            return _response(404, {"error": "unknown hook"})
+        # Delivery dedupe like the webhook kind: Mailchimp retries on non-2xx,
+        # and a trigger with a dedupe_path (a real delivery's top-level
+        # ``fired_at`` is the natural one) answers a re-POST of the same
+        # delivery 202 without publishing twice.
+        event_id, fresh = _claim_delivery(item, mailchimp_webhooks.parse_form(body))
+        if not fresh:
+            return _response(202, {"accepted": True, "duplicate": True, "event_id": event_id})
+
+        def _publish_claimed(connector, event_type, data, source=None):
+            _publish(connector, event_type, data, source=source, event_id=event_id)
+
+        try:
+            status, payload = mailchimp_webhooks.handle(body, hook=name,
+                                                        publish=_publish_claimed)
+        except Exception:
+            _release_delivery(item, event_id)
+            raise
+        if status >= 300:
+            _release_delivery(item, event_id)
         return _response(status, payload)
     elif path.startswith("/hooks/webhook/") or path.startswith("/hooks/telegram/"):
         prefix = "/hooks/webhook/" if path.startswith("/hooks/webhook/") else "/hooks/telegram/"

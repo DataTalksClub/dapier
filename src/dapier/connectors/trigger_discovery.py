@@ -4,7 +4,12 @@ Zapier's "pull in sample data" moment, per trigger connector: the designer
 and the CLI ask one endpoint for a realistic event a workflow would receive
 (``kind="sample"``), or for a field's option list so the operator does not
 type channel ids and bucket names by hand (``kind="options"``, e.g.
-``resource="slack.channels"``).
+``resource="slack.channels"``). Options listings that need an argument (a
+bucket, a spreadsheet id, a search query) take it through the request's
+``event`` field — the slot samples already use: :func:`listing_params`
+splits it into the underlying registry listing's params in order (the whole
+value for one-param listings, "/"-separated for multi-param ones), and a
+missing required value is 404, never a fabricated listing.
 
 Three sample sources, reported in the response's ``source``:
 
@@ -249,6 +254,11 @@ def connected_connection(provider, connection_id=None):
         return connection
     import boto3
 
+    # No connections store configured (bare test/edge deploys) means nothing
+    # live to discover, like api.discovery._load — fall through, never fail.
+    if not os.environ.get("CONNECTIONS_TABLE"):
+        raise DiscoveryNotFound(
+            f"no connected {provider} connection to discover from; connect one first")
     table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
     for connection in connections.list_connections(table):
         if (connection.get("provider") == provider
@@ -306,6 +316,36 @@ def _options_connection(provider, connection_id, *, credential_fallback=None):
         }
     raise DiscoveryNotFound(
         f"no connected {provider} connection to discover from; connect one first")
+
+
+def listing_params(event, keys):
+    """The registry-listing params carried in the ``event`` slot.
+
+    A TriggerDiscovery fetch has no params field of its own, so the values a
+    listing requires ride in ``event`` — the same slot the CLI's ``--event``
+    and the API body's ``event`` already fill (the s3.objects bucket was the
+    first user of the convention). ``keys`` names the listing's params in
+    order: with one key the whole ``event`` is the value (paths and queries
+    keep their "/"); with several, ``event`` splits on "/" positionally and
+    an omitted tail keeps the provider's default (google-sheets rows:
+    ``<spreadsheet_id>/<worksheet>``). A missing first value raises
+    :class:`DiscoveryNotFound` — a typo stays a 404, not an empty listing.
+    """
+    raw = str(event or "").strip()
+    parts = ([raw] if len(keys) == 1
+             else [part.strip() for part in raw.split("/", len(keys) - 1)])
+    params = {}
+    for index, key in enumerate(keys):
+        value = parts[index] if index < len(parts) else ""
+        if not value:
+            if index == 0:
+                raise DiscoveryNotFound(
+                    f"{key} is required: pass it as 'event'"
+                    + (f" ({'/'.join(keys)}, parts separated by '/')"
+                       if len(keys) > 1 else ""))
+            continue
+        params[key] = value
+    return params
 
 
 def options_from_registry(resource, connection_id, limit, *, provider=None,

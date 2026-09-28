@@ -1,6 +1,7 @@
 """Step-to-step data mapping and formatters: the execution context, the
 template renderer, and the save-time template validation."""
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -185,12 +186,108 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(self.render_one("{v | number_format}", "lots"), "")
 
 
+class FormatterEdgeTests(unittest.TestCase):
+    """The formatter edges: timezone-aware date_format, relative time_until,
+    and number_format's currency mode — each error-tolerant like the rest."""
+
+    def render_one(self, template, value):
+        return render(template, {"data": {"v": value}})
+
+    def test_date_format_renders_in_an_iana_zone(self):
+        self.assertEqual(
+            self.render_one("{v | date_format:%Y-%m-%d %H:%M@Europe/Berlin}",
+                            "2026-09-24T15:00:00+00:00"),
+            "2026-09-24 17:00",
+        )
+
+    def test_date_format_zone_keeps_the_colon_in_the_format_spec(self):
+        self.assertEqual(
+            self.render_one("{v | date_format:%H:%M@Europe/Berlin}",
+                            "2026-09-24T15:05:00+00:00"),
+            "17:05",
+        )
+
+    def test_date_format_zone_reads_a_naive_value_as_utc(self):
+        self.assertEqual(
+            self.render_one("{v | date_format:%H:%M@America/New_York}",
+                            "2026-09-24T15:05:00"),
+            "11:05",
+        )
+
+    def test_date_format_unknown_zone_renders_empty_not_a_crash(self):
+        self.assertEqual(
+            self.render_one("{v | date_format:%Y@Mars/Olympus}", "2026-09-24T15:00:00Z"), "")
+
+    def test_time_until_future_renders_in_the_unit(self):
+        self.assertEqual(
+            self.render_one("{v | time_until}",
+                            (datetime.now(timezone.utc) + timedelta(hours=3)).isoformat()),
+            "in 3h")
+
+    def test_time_until_past_renders_ago(self):
+        self.assertEqual(
+            self.render_one("{v | time_until}",
+                            (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()),
+            "5m ago")
+
+    def test_time_until_picks_the_largest_unit(self):
+        self.assertEqual(
+            self.render_one("{v | time_until}",
+                            (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()),
+            "in 2d")
+
+    def test_time_until_within_a_minute_is_just_now(self):
+        self.assertEqual(
+            self.render_one("{v | time_until}",
+                            (datetime.now(timezone.utc) + timedelta(seconds=10)).isoformat()),
+            "just now")
+
+    def test_time_until_reads_a_trailing_z_and_a_naive_value_as_utc(self):
+        zulu = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=2)
+        self.assertEqual(self.render_one("{v | time_until}", zulu.strftime("%Y-%m-%dT%H:%M:%SZ")),
+                         "in 2d")
+        naive = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+        self.assertEqual(self.render_one("{v | time_until}", naive.isoformat()), "just now")
+
+    def test_time_until_unparseable_value_renders_empty(self):
+        self.assertEqual(self.render_one("{v | time_until}", "not a date"), "")
+
+    def test_number_format_currency_prefixes_the_symbol(self):
+        self.assertEqual(self.render_one("{v | number_format:currency:EUR}", "1234.56"), "€1,234.56")
+        self.assertEqual(self.render_one("{v | number_format:currency:USD}", "1234.56"), "$1,234.56")
+        self.assertEqual(self.render_one("{v | number_format:currency:GBP}", "1234.56"), "£1,234.56")
+
+    def test_number_format_unknown_currency_falls_back_to_the_code(self):
+        self.assertEqual(self.render_one("{v | number_format:currency:JPY}", "1234.56"),
+                         "1,234.56 JPY")
+
+    def test_number_format_currency_decimal_override(self):
+        self.assertEqual(self.render_one("{v | number_format:currency:USD:0}", "1234.56"),
+                         "$1,235")
+
+    def test_number_format_currency_without_a_code_renders_empty(self):
+        self.assertEqual(self.render_one("{v | number_format:currency}", "1234.56"), "")
+
+    def test_new_grammars_pass_save_time_validation(self):
+        validate_template("{v | date_format:%H:%M@Europe/Berlin} {w | time_until} "
+                          "{n | number_format:currency:EUR:2} {m | number_format:2}")
+
+    def test_currency_mode_without_a_code_fails_save_time_validation(self):
+        with pytest.raises(TemplateError):
+            validate_template("{n | number_format:currency}")
+
+    def test_number_format_currency_on_non_numeric_renders_empty(self):
+        self.assertEqual(self.render_one("{v | number_format:currency:EUR}", "lots"), "")
+
+
 class ValidateTests(unittest.TestCase):
     def test_accepts_known_formatters_and_plain_templates(self):
         for template in ["plain text", "{a}", "{a.b.0.c}", "{a | trim | upper}",
                          "{a | slice:-5:}", "{a | round:2}", "{a | format:.2f}",
                          "{a | regex_extract:(\\d+):end}", "{a | date_offset:-2h}",
-                         "{a | default:x}", "{a | number_format:2}", "{a | number_format}"]:
+                         "{a | default:x}", "{a | number_format:2}", "{a | number_format}",
+                         "{a | date_format:%Y-%m-%d %H:%M@Europe/Berlin}", "{a | time_until}",
+                         "{a | number_format:currency:EUR}", "{a | number_format:currency:USD:0}"]:
             validate_template(template)  # must not raise
 
     def test_rejects_unknown_formatter(self):
@@ -203,7 +300,7 @@ class ValidateTests(unittest.TestCase):
 
     def test_rejects_wrong_argument_counts(self):
         for template in ["{a | trim:1}", "{a | replace:x}", "{a | slice}", "{a | upper:x}",
-                         "{a | default}", "{a | number_format:1:2}"]:
+                         "{a | default}", "{a | number_format:1:2}", "{a | number_format:currency}"]:
             with pytest.raises(TemplateError):
                 validate_template(template)
 

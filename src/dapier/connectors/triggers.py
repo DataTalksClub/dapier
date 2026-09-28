@@ -4,20 +4,49 @@ These feed the designer's Triggers group and the event suggestions per
 connector. Ingress normalization for the sources dapier itself receives
 lives in ``connectors.ingress``.
 
-The connectors without a module of their own (renderer, custom, youtube)
-register their trigger sample discoveries here, next to the chip that
-offers them; zoom samples in its connector module (one documented payload
-per declared event), and schedule and poll in connectors.schedule /
-connectors.poll — a schedule fire is synthesized and a poll fire has a
-live fetch path, so each owns its sample.
+The connectors without a module of their own (renderer, custom) register
+their trigger sample discoveries here, next to the chip that offers them;
+connectors with a module sample in their own module — zoom one documented
+payload per declared event, slack and youtube a live fetch with the
+history/synthetic fallback, mailchimp one payload per Mailchimp webhook
+type — and schedule and poll in connectors.schedule / connectors.poll — a
+schedule fire is synthesized and a poll fire has a live fetch path, so
+each owns its sample.
 """
 from .registry import Connector, connector
 
 connector(Connector(name="email", label="Email", events=("message.received",), icon="mail"))
 connector(Connector(name="youtube", label="YouTube", events=("video.published",), icon="youtube"))
 connector(Connector(name="dropbox", label="Dropbox", events=("file.created", "file.updated", "file.deleted"), icon="dropbox"))
-connector(Connector(name="zoom", label="Zoom", events=("recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended"), icon="video"))
-connector(Connector(name="slack", label="Slack", events=("message.received",), icon="slack"))
+connector(Connector(name="zoom", label="Zoom",
+                    events=("recording.completed", "recording.transcript_completed",
+                            "meeting.started", "meeting.ended",
+                            "meeting.registration_created",
+                            "webinar.started", "webinar.ended",
+                            "webinar.registration_created"),
+                    icon="video"))
+connector(Connector(name="slack", label="Slack",
+                    events=("message.received", "app.mention",
+                            "reaction.added", "member.joined"),
+                    icon="slack"))
+connector(Connector(name="telegram", label="Telegram",
+                    events=("message.received", "channel_post.received"),
+                    icon="send"))
+connector(Connector(name="mailchimp", label="Mailchimp",
+                    events=("subscribe", "unsubscribe", "profile", "upemail",
+                            "cleaned", "campaign", "member.new"),
+                    icon="mail"))
+# Provider chips whose fires come from poll sources (triggers/poll_sources):
+# a stored poll trigger with a non-http source publishes these connectors'
+# events, scoped per trigger through the poll-name filter. The zoom chip
+# above joins them on recording.completed: the zoom.recordings poll source
+# (connectors/zoom.py) publishes it on a schedule, no Zoom app required.
+connector(Connector(name="google-sheets", label="Google Sheets", events=("row.new",), icon="table"))
+connector(Connector(name="google-drive", label="Google Drive",
+                    events=("file.created", "file.updated", "file.deleted"),
+                    icon="folder"))
+connector(Connector(name="s3", label="S3", events=("file.created",), icon="database"))
+connector(Connector(name="rss", label="RSS", events=("item.new",), icon="rss"))
 connector(Connector(name="renderer", label="Renderer", events=("job.completed",), icon="file-text"))
 connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))
 connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw"))
@@ -50,20 +79,12 @@ register_trigger_discovery(TriggerDiscovery(
     connector="renderer", label="Renderer", kind="sample", resource="",
     fetch=history_or_synthetic_fetch("renderer", "job.completed", _RENDERER_SYNTHETIC_DATA)))
 
-# The YouTube PubSubHubbub notification (see api.router._youtube).
-register_trigger_discovery(TriggerDiscovery(
-    connector="youtube", label="YouTube", kind="sample", resource="",
-    fetch=history_or_synthetic_fetch("youtube", "video.published", {
-        "video_id": "dQw4w9WgXcQ",
-        "channel_id": "UCbW5IB0F8d1MpdW2AhifDzw",
-        "title": "Deploying dapier: a walkthrough",
-        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    })))
-
 # The Custom chip is freeform: a placeholder the author pastes over, like
-# Zapier's "copy in sample data".
+# Zapier's "copy in sample data". The event name is the one the /hooks/custom
+# ingress actually publishes (api.router: connector "custom", event
+# "received"), so a filter copied from the sample matches a real delivery.
 register_trigger_discovery(TriggerDiscovery(
     connector="custom", label="Custom", kind="sample", resource="",
-    fetch=history_or_synthetic_fetch("custom", "occurred", {
+    fetch=history_or_synthetic_fetch("custom", "received", {
         "note": "Replace this object with your own sample payload",
     })))

@@ -20,8 +20,12 @@ import json
 import logging
 import operator
 import re
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
+
+from .. import logic
 
 
 logger = logging.getLogger(__name__)
@@ -97,6 +101,17 @@ def validate_template(template):
                     f"unknown formatter '{name}' in token {{{token}}} "
                     f"(known formatters: {', '.join(sorted(FORMATTERS))})")
             low, high = entry[1]
+            if name == "number_format":
+                # Two grammars: plain decimals (one argument) vs the
+                # currency form currency:CODE[:decimals] (two or three).
+                if args and args[0].strip() == "currency":
+                    low, high = 2, 3
+                else:
+                    low, high = 0, 1
+            elif name == "switch":
+                # Pair-wise a:b mappings, plus an optional odd trailing
+                # default: every count from two arguments up is a grammar.
+                low, high = 2, max(2, len(args))
             if not low <= len(args) <= high:
                 wanted = str(low) if low == high else f"{low}-{high}"
                 raise TemplateError(
@@ -239,9 +254,29 @@ def _default(value, fallback):
     return value if value.strip() else fallback
 
 
-def _number_format(value, decimals="0"):
-    """Thousands separators with a fixed number of decimal places."""
-    return f"{float(value):,.{int(decimals)}f}"
+# Symbol table for the common currencies; anything else falls back to a
+# suffixed code ("1,234.56 JPY") rather than guessing a glyph.
+_CURRENCY_SYMBOLS = {"EUR": "€", "USD": "$", "GBP": "£"}
+
+
+def _number_format(value, *args):
+    """Thousands separators with a fixed number of decimal places, or a
+    currency rendering: ``number_format[:decimals]`` keeps the plain form,
+    ``number_format:currency:CODE[:decimals]`` prefixes the symbol
+    (``number_format:currency:EUR`` -> ``€1,234.56``)."""
+    if args and str(args[0]).strip() == "currency":
+        if len(args) < 2 or not str(args[1]).strip():
+            raise ValueError("currency mode needs a code: number_format:currency:EUR")
+        decimals = int(args[2]) if len(args) > 2 and str(args[2]).strip() else 2
+        code = str(args[1]).strip().upper()
+        amount = f"{float(value):,.{decimals}f}"
+        symbol = _CURRENCY_SYMBOLS.get(code)
+        return f"{symbol}{amount}" if symbol else f"{amount} {code}"
+    if len(args) > 1:
+        raise ValueError("plain number_format takes one decimals argument "
+                         "(currency mode is number_format:currency:CODE)")
+    decimals = int(args[0]) if args else 0
+    return f"{float(value):,.{decimals}f}"
 
 
 def _parse_datetime(value):
@@ -256,7 +291,46 @@ def _parse_datetime(value):
 
 
 def _date_format(value, spec):
-    return _parse_datetime(value).strftime(spec)
+    """strftime rendering, optionally in an IANA timezone: the argument is
+    the raw format spec (colons stay, e.g. ``%H:%M``), and a trailing
+    ``@<zone>`` converts before formatting —
+    ``date_format:%Y-%m-%d %H:%M@Europe/Berlin``. A value without its own
+    offset reads as UTC (the same rule logic.parse_moment applies); an
+    unknown zone raises, which renders empty per the never-raise convention."""
+    fmt, marker, zone = str(spec).partition("@")
+    moment = _parse_datetime(value)
+    if marker:
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        moment = moment.astimezone(ZoneInfo(zone.strip()))
+    return moment.strftime(fmt)
+
+
+def _time_until(value):
+    """Relative time from now until the parsed moment: ``in 3h`` for the
+    future, ``5m ago`` for the past, ``just now`` inside a minute; the
+    largest unit wins (w, d, h, m — the offset units, rounded to nearest).
+    Parses like the runs API's moment rule (logic.parse_moment): ISO 8601
+    (date-only, trailing Z, missing offset read as UTC) or bare epoch
+    seconds; anything else renders empty per the never-raise convention."""
+    epoch = logic.parse_moment(value)
+    if epoch is None and str(value or "").strip().isdigit():
+        # Epoch seconds ("1780010400"); ISO wins for date-shaped digit runs
+        # ("20260924" is the compact date, not an August-1970 timestamp).
+        epoch = datetime.fromtimestamp(
+            int(str(value).strip()), tz=timezone.utc).timestamp()
+    if epoch is None:
+        raise ValueError(f"not a datetime, e.g. 2026-10-01T09:00:00Z, got {value!r}")
+    seconds = epoch - time.time()
+    if abs(seconds) < 60:
+        return "just now"
+    count, unit = 0, "m"
+    for unit_seconds, name in ((_OFFSET_UNITS["w"], "w"), (_OFFSET_UNITS["d"], "d"),
+                               (_OFFSET_UNITS["h"], "h"), (_OFFSET_UNITS["m"], "m")):
+        if abs(seconds) >= unit_seconds:
+            count, unit = int(abs(seconds) / unit_seconds + 0.5), name
+            break
+    return f"{count}{unit} ago" if seconds < 0 else f"in {count}{unit}"
 
 
 def _date_offset(value, spec):
@@ -316,6 +390,58 @@ def _slugify(value):
     return re.sub(r"[\s_-]+", "-", re.sub(r"[^a-z0-9\s_-]", "", value.lower())).strip("-")
 
 
+_EXTRACT_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# URLs stop at whitespace and the quote/bracket characters that wrap them in
+# markup, so an href="..." or <https://…> wrapper does not ride along.
+_EXTRACT_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+_EXTRACT_NUMBER_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
+
+
+def _switch(value, *args):
+    """Value mapping: ``switch:a:b:c:d`` maps a→b and c→d; an odd trailing
+    argument is the default when nothing matches; no match and no default
+    renders empty. Any argument count of two or more is a legal grammar —
+    validate_template special-cases the bounds."""
+    for source, target in zip(args[::2], args[1::2]):
+        if value == source:
+            return target
+    return args[-1] if len(args) % 2 else ""
+
+
+def _extract_email(value):
+    match = _EXTRACT_EMAIL_RE.search(value)
+    return match.group(0) if match else ""
+
+
+def _extract_url(value):
+    match = _EXTRACT_URL_RE.search(value)
+    if not match:
+        return ""
+    # Prose punctuation after the URL is a sentence's, not the link's.
+    return match.group(0).rstrip(".,;:!?")
+
+
+def _extract_number(value):
+    match = _EXTRACT_NUMBER_RE.search(value)
+    return match.group(0) if match else ""
+
+
+def _pluck(value, path):
+    """Read one dotted path out of a JSON string (numeric segments index
+    lists, like template paths): scalars render as strings and containers
+    as compact JSON; a parse failure or a miss renders empty."""
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return ""
+    found = _resolve(parsed, str(path).strip())
+    if found is None:
+        return ""
+    if isinstance(found, (dict, list)):
+        return json.dumps(found, separators=(",", ":"))
+    return str(found)
+
+
 def _math(operate):
     def apply(value, operand):
         result = operate(float(value), float(operand))
@@ -339,9 +465,10 @@ FORMATTERS = {
     "round": (_round, (0, 1), True),
     "format": (_format, (1, 1), False),
     "default": (_default, (1, 1), False),
-    "number_format": (_number_format, (0, 1), True),
+    "number_format": (_number_format, (0, 3), True),
     "date_format": (_date_format, (1, 1), False),
     "date_offset": (_date_offset, (1, 1), False),
+    "time_until": (_time_until, (0, 0), True),
     "urlencode": (_urlencode, (0, 0), True),
     "length": (_length, (0, 0), True),
     "truncate": (_truncate, (1, 2), True),
@@ -350,4 +477,9 @@ FORMATTERS = {
     "subtract": (_math(operator.sub), (1, 1), True),
     "multiply": (_math(operator.mul), (1, 1), True),
     "divide": (_math(operator.truediv), (1, 1), True),
+    "switch": (_switch, (2, 2**31), True),
+    "extract_email": (_extract_email, (0, 0), True),
+    "extract_url": (_extract_url, (0, 0), True),
+    "extract_number": (_extract_number, (0, 0), True),
+    "pluck": (_pluck, (1, 1), True),
 }

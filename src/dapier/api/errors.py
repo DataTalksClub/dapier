@@ -44,9 +44,16 @@ def api_summary(days=DEFAULT_DAYS, now=None):
         counts.values(),
         key=lambda row: (-row["failed_runs"], row["workflow_id"]),
     )
-    return 200, {
+    payload = {
         "window_days": days,
         "since": since,
         "total_failed_runs": sum(row["failed_runs"] for row in workflows),
         "workflows": workflows,
     }
+    if len(failed) >= runs.MAX_LIMIT:
+        # The scan window filled up: more failures than the cap allows may
+        # exist in the window, so consumers must not read the total as the
+        # day's true count. The digest renders the caveat from these fields.
+        payload["bounded"] = True
+        payload["cap"] = runs.MAX_LIMIT
+    return 200, payload

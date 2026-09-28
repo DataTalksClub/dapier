@@ -1,10 +1,18 @@
 """Webhook connector: signed outbound POSTs and the generic HTTP request."""
 import base64
-import json
+import urllib.error
+import urllib.request
 
 from ..engine.actions import base
 from ..engine.actions.templating import render
-from ..engine.actions.webhook import run_webhook
+from ..engine.actions.webhook import (
+    HttpError,
+    lowercase_headers,
+    request_output,
+    retry_after_seconds,
+    run_webhook,
+    transport_response,
+)
 from .registry import Action, register
 
 HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
@@ -45,7 +53,9 @@ def run_http_request(action, event, *, steps=None, transport=None):
     header or the query string.
 
     The parsed JSON response body (or a text preview) lands in the step
-    output, so later steps can template ``{steps.<id>.output.body.<path>}``.
+    output, so later steps can template ``{steps.<id>.output.body.<path>}``;
+    the response headers ride along lowercased in ``response_headers`` when
+    the transport surfaced them (see ``request_output``).
     """
     method = str(action.get("method") or "GET").upper()
     if method not in HTTP_METHODS:
@@ -69,12 +79,36 @@ def run_http_request(action, event, *, steps=None, transport=None):
         body = render(action["body"], event, steps).encode()
     timeout = action.get("timeout_seconds", 15)
     if transport is not None:
-        status, raw = transport(method, url, headers=headers, body=body, timeout=timeout)
+        status, raw, response_headers = transport_response(
+            transport(method, url, headers=headers, body=body, timeout=timeout))
     else:
-        status, raw = base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
+        try:
+            status, raw, response_headers = _default_transport(
+                method, url, headers=headers, body=body, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            # The default (urllib) transport raises for HTTP 4xx/5xx before
+            # the status check below can see it; raise the same typed error
+            # the injected-transport path raises, Retry-After included.
+            raise HttpError(
+                f"http_request returned HTTP {exc.code}",
+                status=exc.code,
+                retry_after=retry_after_seconds(exc.headers),
+            ) from exc
     if status >= 300:
-        raise RuntimeError(f"http_request returned HTTP {status}")
-    return {"status": status, "body": _decode_body(raw)}
+        raise HttpError(f"http_request returned HTTP {status}", status=status)
+    return request_output(status, raw, response_headers)
+
+
+def _default_transport(method, url, *, headers, body, timeout=15):
+    """The urllib fallback, returning the response headers too.
+
+    The request is exactly base._default_transport's — http_request just
+    needs the response headers as well, and that seam returns only
+    ``(status, raw)``. HTTP errors propagate for run_http_request to type.
+    """
+    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status, response.read(), lowercase_headers(response)
 
 
 def _apply_auth(auth_type, action, url, event, steps, headers):
@@ -112,22 +146,15 @@ def _apply_auth(auth_type, action, url, event, steps, headers):
     return url
 
 
-def _decode_body(raw, limit=4000):
-    try:
-        text = raw.decode()
-    except (AttributeError, UnicodeDecodeError):
-        return str(raw)[:limit]
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return text[:limit]
-
-
 register(Action(
     type="http_request",
     label="HTTP request",
     icon="globe",
-    description="Call any API: templated URL, headers and body; basic, bearer or API-key auth",
+    description=("Call any API: templated URL, headers and body; basic, "
+                 "bearer or API-key auth. Output: {status, body, "
+                 "response_headers} — body is parsed JSON or a text preview, "
+                 "response_headers the response's headers lowercased when "
+                 "the transport surfaced them."),
     run=lambda action, event, workflow_id, steps=None: run_http_request(action, event, steps=steps),
     required=frozenset({"url"}),
     optional=frozenset({"method", "headers", "body", "content_type", "connection_id",

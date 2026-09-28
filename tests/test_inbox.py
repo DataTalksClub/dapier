@@ -168,6 +168,26 @@ def test_api_replay_rejects_truncated_data(table):
     assert status == 409
 
 
+def test_record_stores_20kb_data_and_replays_it(table, monkeypatch):
+    """The stored-data cap matches the raised run-history trigger input, so
+    an ordinary large webhook event stays whole in the inbox and replays."""
+    big = {"body": "x" * 20_000}
+    assert inbox.record({**EVENT, "data": big}, table_ref=table) == "evt-1"
+    assert table.items["evt-1"]["data"] == big
+
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://queue")
+    status, _payload = inbox.api_replay("evt-1", queue=FakeQueue(), table_ref=table)
+    assert status == 202
+
+
+def test_record_previews_data_past_the_replay_cap(table):
+    inbox.record({**EVENT, "data": {"body": "x" * (inbox.DATA_LIMIT + 1)}},
+                 table_ref=table)
+    stored = table.items["evt-1"]["data"]
+    assert stored["truncated"] is True
+    assert len(stored["preview"]) == inbox.DATA_LIMIT
+
+
 def test_api_replay_404_for_unknown_events(table):
     status, payload = inbox.api_replay("missing", queue=FakeQueue(), table_ref=table)
     assert status == 404

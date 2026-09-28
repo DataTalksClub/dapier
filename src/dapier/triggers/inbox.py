@@ -33,6 +33,13 @@ RETENTION_DAYS = 30
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 100
 
+# Stored event data is the trigger envelope, capped like the run-history
+# trigger input (engine.worker.TRIGGER_INPUT_LIMIT): high enough that an
+# ordinary webhook or email event replays, low enough that the item stays
+# far below the DynamoDB 400 KB limit. Oversize-still data keeps the
+# explicit replay refusal.
+DATA_LIMIT = 65_000
+
 # A row the worker has not closed out yet; the run is in flight or the
 # worker died mid-run (the retry heals the row via complete()).
 RECEIVED = "received"
@@ -107,7 +114,7 @@ def record(event, *, table_ref=None):
         "occurred_at": event.get("occurred_at"),
         "received_at": _now_iso(),
         "status": RECEIVED,
-        "data": _trim(event.get("data") or {}),
+        "data": _trim(event.get("data") or {}, limit=DATA_LIMIT),
         "matched": [],
         "expires_at": now + RETENTION_DAYS * 86400,
     }
