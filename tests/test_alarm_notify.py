@@ -28,6 +28,19 @@ class SummarizeTests(unittest.TestCase):
         self.assertEqual(subject, "[dapier] alarm: unknown-alarm")
         self.assertIn("plain garbage", body)
 
+    def test_event_queue_alarms_summarize_like_the_others(self):
+        import json
+
+        for alarm in ("EventQueueAgeAlarm", "EventQueueDepthAlarm"):
+            message = json.dumps({
+                "AlarmName": alarm,
+                "NewStateReason": f"Threshold Crossed: 1 datapoint [{alarm}]",
+            })
+            body, subject = alarm_notify._summarize(sns_event(message), "op@example.com")
+            self.assertEqual(subject, f"[dapier] alarm: {alarm}")
+            self.assertIn(f"alarm: {alarm}", body)
+            self.assertIn("Threshold Crossed", body)
+
     def test_several_records_collapse_into_one_subject(self):
         event = {"Records": [{"Sns": {"Message": "a"}}, {"Sns": {"Message": "b"}}]}
         body, subject = alarm_notify._summarize(event, "op@example.com")

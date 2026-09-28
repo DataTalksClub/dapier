@@ -23,7 +23,11 @@ stored in DynamoDB. DynamoDB's default AWS-owned encryption protects records at
 rest, while narrowly scoped IAM policies control application access. Generated
 infrastructure secrets such as session signing and webhook verification values
 remain in Secrets Manager. SQS provides retries and dead-letter queues; CloudWatch
-alarms track worker failures and visible DLQ messages.
+alarms track worker failures and visible DLQ messages, and a queue-age alarm pages
+when the event queue's oldest message is at least 900 seconds old (a full redrive
+cycle of 5 receives at 180s visibility) while a depth alarm pages when its visible
+backlog tops 100 messages — both catch a wedged-but-not-erroring consumer the DLQ
+alarms never see.
 
 The proposed shared-auth OAuth token factory and agent CLI are specified in
 [docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md).
