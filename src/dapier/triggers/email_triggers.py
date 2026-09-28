@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 TABLE_ENV = "EMAIL_TRIGGERS_TABLE"
 DOMAIN_ENV = "TRIGGER_EMAIL_DOMAIN"
 DEFAULT_DOMAIN = "dtcdev.click"
+# DynamoDB scan page size, not a cutoff: load_items walks pages to exhaustion.
+SCAN_LIMIT = 200
 
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$")
 # Only infrastructure addresses are reserved here. Routes claimed by managed
@@ -215,10 +217,26 @@ def _decode_numbers(value):
     return value
 
 
+def _scan_all(table):
+    """Read every scan page: a single Limit=200 scan silently dropped
+    trigger #201 and beyond — it would stop firing with no error anywhere.
+    Same walk as published_workflows._scan_all (the managed-store loader)."""
+    items, start = [], None
+    while True:
+        kwargs = {"Limit": SCAN_LIMIT}
+        if start:
+            kwargs["ExclusiveStartKey"] = start
+        page = table.scan(**kwargs)
+        items.extend(page.get("Items", []))
+        start = page.get("LastEvaluatedKey")
+        if not start:
+            return items
+
+
 def load_items(table_ref=None):
-    items = get_table(table_ref).scan(Limit=200).get("Items", [])
     return sorted(
-        ({key: _decode_numbers(value) for key, value in item.items()} for item in items),
+        ({key: _decode_numbers(value) for key, value in item.items()}
+         for item in _scan_all(get_table(table_ref))),
         key=lambda item: item.get("name", ""),
     )
 
