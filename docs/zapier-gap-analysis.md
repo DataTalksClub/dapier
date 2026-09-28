@@ -331,7 +331,7 @@ Still open after round 6 (deliberately deferred): plan/quota *enforcement*
 on top of usage metering; multi-user workspaces (and with it template
 cross-account transfer); new app connectors beyond the current chips
 (Gmail, an AI/LLM provider; Google Calendar closed in round 28); Google Sheets `row.updated` (needs snapshot
-diffing); an SES bounce/complaint trigger chip.
+diffing; closed in round 30); an SES bounce/complaint trigger chip.
 
 ### Landed 2026-09-28 (round 7: test-trigger in the console, live workflow samples, thread/poll/participant staples)
 
@@ -1227,15 +1227,26 @@ inbox replay-bounce notes). New findings this pass, ranked:
    published item) would match the mental model.
 4. **Version diff (value M, effort S).** Versions list + rollback exist; no
    diff between two revisions — a YAML diff endpoint (plus a console dialog)
-   is the missing half of rollback confidence.
+   is the missing half of rollback confidence. Landed (2026-09-28, round 29):
+   a unified YAML diff between two published versions on all three surfaces
+   (console dialog, `dapier workflows diff`, `/api/{admin,agent}` endpoint).
 5. **List-aggregation formatters (value M, effort S).** `sum|min|max|avg|
    unique|sort` over a rendered list: `for_each` iterates and digest
    batches, but templates cannot aggregate
-   (`{steps.find.output.rows|sum:amount}` today renders empty).
+   (`{steps.find.output.rows|sum:amount}` today renders empty). Landed
+   (2026-09-28, round 29): aggregate formatters over rendered lists in the
+   template engine.
 6. **Queue-age alarm (value M, effort S).** The five alarms cover
    DLQs/worker/backup; nothing watches `ApproximateAgeOfOldestMessage`/
    `QueueDepth` on the event queue, so a wedged-but-not-erroring backlog
-   pages no one.
+   pages no one. Landed (2026-09-28, round 30): `EventQueueAgeAlarm`
+   (oldest message ≥ 900 s — a full redrive cycle of 5 receives at 180 s
+   visibility, so past it with a quiet DLQ the consumer is wedged without
+   erroring) and `EventQueueDepthAlarm` (≥ 100 visible messages over a
+   5-minute period — a persistent backlog, not a one-minute burst), both
+   to `AlarmTopic`, `notBreaching` on empty like the rest;
+   `alarm_notify.py` needed no change (its summarizer is generic). Tests:
+   `tests/test_template_alarms.py`, `tests/test_alarm_notify.py`.
 7. **Optional inbound webhook signature check (value L/M, effort S).**
    Custom hook intake verifies nothing beyond the URL; an optional
    shared-secret HMAC header check (WebSub intake already verifies) lets
@@ -1257,3 +1268,79 @@ inbox replay-bounce notes). New findings this pass, ranked:
 8. **Designer list paging (scale note).** `designer_store.api_list` scans
    the whole published store each call; fine at current scale, keyset
    paging when the store grows.
+
+### Landed 2026-09-28 (round 30: queue alarms, configurable signature headers, Sheets row.updated)
+
+- **Event-queue alarms** — `EventQueueAgeAlarm` and `EventQueueDepthAlarm`
+  watch the SQS queue the API enqueues runs onto and the worker drains,
+  closing the wedged-but-not-erroring blind spot (a stuck consumer never
+  reaches the DLQ where the existing alarms live). Age ≥ 900 s is a full
+  redrive cycle (5 receives × 180 s visibility); depth ≥ 100 visible over
+  a 5-minute period so a one-minute inbound burst doesn't page. Both notify
+  `AlarmTopic`; `alarm_notify.py` is unchanged (generic summarizer).
+  Tests: `tests/test_template_alarms.py`, `tests/test_alarm_notify.py`.
+- **Per-hook signature header** — completing the round-30 webhook
+  signature lock: `signature_header` (header-name-validated, lowercased,
+  webhook-only) lets a provider that signs in its own header (e.g.
+  `x-hub-signature-256`) lock its target; intake verifies against the
+  stored name instead of assuming `x-dapier-signature`. Console hook
+  dialog gained the field (prefilled when signed, blank = the default);
+  the name rides the shared hook-save API, so all three surfaces set it.
+  Tests: `tests/test_hook_signature.py`.
+- **Google Sheets `row.updated`** — Zapier's "New or Updated Spreadsheet
+  Row", the last round-6 deferral on the Sheets chip: a second poll source
+  (`google-sheets.updates`) diffs consecutive listings — the values API
+  exposes no per-row modified time, so the cursor carries a
+  row → content-digest snapshot; the first fire seeds and emits nothing,
+  an edited row fires once with its latest cells (`id` =
+  `<row>:<digest>`, so the seen-set recognizes a re-edit), brand-new rows
+  stay `row.new`'s news, deleted rows never fire, and `row.new`/`row.updated`
+  cursors are independent per trigger. Console Source select +
+  `CONNECTION_POLL_SOURCES` + designer catalogs (bundle rebuilt from
+  source). Tests: `tests/test_sheets_row_updated.py`,
+  `tests/test_google_triggers.py`, `tests/test_poll_presets.py`,
+  `tests/test_console_trigger_sources.py`.
+- **Doc hygiene** — this document's body had been re-appended whole four
+  times plus a doubled fresh-audit tail; deduped to the newest revision
+  (~2300 stale lines dropped).
+
+Still open from the fresh audit: draft vs live (the publish moment) and
+designer list paging (a scale note, fine until the published store grows).
+
+### Landed 2026-09-28 (round 30: queue alarms, configurable signature headers, Sheets row.updated)
+
+- **Event-queue alarms** — `EventQueueAgeAlarm` and `EventQueueDepthAlarm`
+  watch the SQS queue the API enqueues runs onto and the worker drains,
+  closing the wedged-but-not-erroring blind spot (a stuck consumer never
+  reaches the DLQ where the existing alarms live). Age ≥ 900 s is a full
+  redrive cycle (5 receives × 180 s visibility); depth ≥ 100 visible over
+  a 5-minute period so a one-minute inbound burst doesn't page. Both notify
+  `AlarmTopic`; `alarm_notify.py` is unchanged (generic summarizer).
+  Tests: `tests/test_template_alarms.py`, `tests/test_alarm_notify.py`.
+- **Per-hook signature header** — completing the round-30 webhook
+  signature lock: `signature_header` (header-name-validated, lowercased,
+  webhook-only) lets a provider that signs in its own header (e.g.
+  `x-hub-signature-256`) lock its target; intake verifies against the
+  stored name instead of assuming `x-dapier-signature`. Console hook
+  dialog gained the field (prefilled when signed, blank = the default);
+  the name rides the shared hook-save API, so all three surfaces set it.
+  Tests: `tests/test_hook_signature.py`.
+- **Google Sheets `row.updated`** — Zapier's "New or Updated Spreadsheet
+  Row", the last round-6 deferral on the Sheets chip: a second poll source
+  (`google-sheets.updates`) diffs consecutive listings — the values API
+  exposes no per-row modified time, so the cursor carries a
+  row → content-digest snapshot; the first fire seeds and emits nothing,
+  an edited row fires once with its latest cells (`id` =
+  `<row>:<digest>`, so the seen-set recognizes a re-edit), brand-new rows
+  stay `row.new`'s news, deleted rows never fire, and `row.new`/`row.updated`
+  cursors are independent per trigger. Console Source select +
+  `CONNECTION_POLL_SOURCES` + designer catalogs (bundle rebuilt from
+  source). Tests: `tests/test_sheets_row_updated.py`,
+  `tests/test_google_triggers.py`, `tests/test_poll_presets.py`,
+  `tests/test_console_trigger_sources.py`.
+- **Doc hygiene** — this document's body had been re-appended whole four
+  times plus a doubled fresh-audit tail; deduped to the newest revision
+  (~2300 stale lines dropped).
+
+Still open from the fresh audit: draft vs live (the publish moment) and
+designer list paging (a scale note, fine until the published store grows).
