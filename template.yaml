@@ -298,6 +298,9 @@ Resources:
         ConsoleWorkflows:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /workflows, Method: GET}
+        ConsoleTemplates:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /templates, Method: GET}
         # Workflow deep links (/workflows/<id>) serve the console shell; the
         # client router resolves the workflow.
         ConsoleWorkflowDetail:
