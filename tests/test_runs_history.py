@@ -284,6 +284,24 @@ def test_agent_runs_route_still_requires_operator(monkeypatch):
     assert listed["statusCode"] == 403
 
 
+def test_agent_runs_route_forwards_content_search(monkeypatch):
+    stamps = _spread(2)
+    _configure_agent(monkeypatch, [
+        _run("wf-1", "evt-0", started=stamps[0]),
+        _run("wf-2", "evt-1", started=stamps[1]),
+    ])
+
+    listed = agent_api.route(
+        _bearer_event({"q": "wf-2:evt-1"}),
+        "GET", "/api/agent/runs",
+    )
+
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert [run["run_id"] for run in body["runs"]] == ["wf-2:evt-1"]
+    assert body["paging"]["filtered"] is True
+
+
 # --- admin route -----------------------------------------------------------
 
 
@@ -352,6 +370,23 @@ def test_admin_runs_route_rejects_a_bad_token(monkeypatch):
     assert listed["statusCode"] == 400
 
 
+def test_admin_runs_route_forwards_content_search(monkeypatch):
+    stamps = _spread(2)
+    cookies = _configure_admin(monkeypatch, [
+        _run("wf-1", "evt-0", started=stamps[0]),
+        _run("wf-2", "evt-1", started=stamps[1]),
+    ])
+
+    listed = admin.route(
+        _admin_request("GET", "/api/admin/runs", query={"q": "wf-1:evt-0"}, cookies=cookies),
+        "GET", "/api/admin/runs",
+    )
+
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert [run["run_id"] for run in body["runs"]] == ["wf-1:evt-0"]
+
+
 # --- CLI -------------------------------------------------------------------
 
 
@@ -370,11 +405,12 @@ def test_cli_forwards_all_filter_flags(isolated_home, monkeypatch):
     calls = _stub_api(monkeypatch, {"runs": []})
 
     rc = main.main(["runs", "list", "--workflow", "wf-1", "--status", "problems",
-                    "--since", "2026-09-01", "--before", "2026-09-30", "--limit", "5"])
+                    "--since", "2026-09-01", "--before", "2026-09-30",
+                    "--search", "order-1234", "--limit", "5"])
 
     assert rc == 0
     assert calls == [("GET", "/api/agent/runs?limit=5&workflow_id=wf-1&status=problems"
-                              "&since=2026-09-01&before=2026-09-30")]
+                              "&since=2026-09-01&before=2026-09-30&q=order-1234")]
 
 
 def test_cli_prints_next_page_footer_only_when_paging(isolated_home, monkeypatch, capsys):

@@ -15,6 +15,8 @@ recorded step input/output/error inside the same bounded scan window the
 list already walks.
 """
 import base64
+import csv
+import io
 import json
 import os
 import time
@@ -22,7 +24,7 @@ import uuid
 from datetime import datetime, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 
 GSI_NAME = "runs-by-run-id"
@@ -36,6 +38,18 @@ STEP_FIELDS = (
 
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 200
+
+# The bounded CSV export: the list's filters, one call, capped rows — the
+# same caps as the audit trail's export.
+EXPORT_DEFAULT_ROWS = 1000
+EXPORT_MAX_ROWS = 5000
+
+# One row per run; the fields of run_summary, in CSV order.
+CSV_COLUMNS = (
+    "run_id", "workflow_id", "connector", "event_type", "status",
+    "had_skipped", "steps", "attempts", "failed_step", "delayed_until",
+    "started_at", "finished_at", "duration_ms", "error",
+)
 
 # The bulk replay-failed cap: one call re-runs at most the latest 50 failed
 # runs of the workflow, so a poison workflow cannot fan out unbounded work.
@@ -52,6 +66,46 @@ STATUS_ALIASES = {
 # DynamoDB can't filter grouped runs server-side, so the list walks scan
 # pages (never a whole table): page size and page count are both bounded.
 MAX_SCAN_PAGES = 10
+
+# The delayed-run gate on workflow delete walks more pages than a list (a
+# parked run can sit up to 90 days back), but still never reads the whole
+# ledger: 60 pages of 300 covers the freshest ~18k executions, far past any
+# delay young enough to still be parked (the ledger's TTL is 90 days).
+MAX_DELAYED_SCAN_PAGES = 60
+
+
+def delayed_runs(workflow_id, limit=25):
+    """One workflow's runs with steps still parked on a delay, oldest first.
+
+    The gate behind workflow delete: a deleted workflow's parked continuation
+    would resume into a definition that no longer exists, so a delete refuses
+    while any run is parked (the operator cancels or waits them out). A
+    server-side filter on ``workflow_id`` + ``status`` keeps the walk cheap;
+    each hit reports the wake-up moment the queue recorded.
+    """
+    table = _table()
+    found = {}
+    kwargs = {
+        "Limit": 300,
+        "FilterExpression": Attr("workflow_id").eq(workflow_id) & Attr("status").eq("delayed"),
+    }
+    for _ in range(MAX_DELAYED_SCAN_PAGES):
+        page = table.scan(**kwargs)
+        for item in page.get("Items", []):
+            run_id = run_id_of(item)
+            if not run_id or run_id in found:
+                continue
+            found[run_id] = {
+                "run_id": run_id,
+                "delayed_until": (item.get("output") or {}).get("resume_at"),
+            }
+            if len(found) >= limit:
+                return sorted(found.values(), key=lambda run: run["run_id"])
+        last = page.get("LastEvaluatedKey")
+        if not last:
+            break
+        kwargs["ExclusiveStartKey"] = last
+    return sorted(found.values(), key=lambda run: run["run_id"])
 
 # Content search serializes each step's recorded data into a match blob;
 # this cap keeps one oversized (or truncated-preview) step from dominating
@@ -249,6 +303,28 @@ def _scan_items(limit):
     return items
 
 
+def _export_window(max_rows):
+    """The scanned window for an export: paged scan pulls sized so the row
+    cap is plausibly covered.
+
+    Executions group into runs (a run is usually several steps), so the
+    execution budget is twice the row cap. The walk still stops at the
+    table's end, and a filtered export may clip early — the same
+    bounded-window trade the list makes.
+    """
+    table = _table()
+    items = []
+    kwargs = {"Limit": 600}
+    for _ in range(max(MAX_SCAN_PAGES, -(-max_rows * 2 // 600) + 1)):
+        page = table.scan(**kwargs)
+        items.extend(page.get("Items", []))
+        last = page.get("LastEvaluatedKey")
+        if not last:
+            break
+        kwargs["ExclusiveStartKey"] = last
+    return items
+
+
 def _grouped(items):
     """The scan window's executions keyed by run, in recorded order."""
     grouped = {}
@@ -338,6 +414,60 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     }
 
 
+def runs_to_csv(rows):
+    """The run rows as CSV text: one header row, one row per run."""
+    def cell(value):
+        if value is None:
+            return ""
+        if value is True:
+            return "true"
+        if value is False:
+            return "false"
+        return str(value)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(CSV_COLUMNS)
+    for row in rows:
+        writer.writerow([cell(row.get(column)) for column in CSV_COLUMNS])
+    return buffer.getvalue()
+
+
+def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
+               since=None, before=None, q=None, now=None):
+    """The filtered run history as CSV: ``(status, payload)``.
+
+    Same filters as api_list (including content search), newest first,
+    capped at ``max_rows`` rows (``truncated`` flags the clip). Returns
+    ``{filename, count, truncated, csv}`` — the caller decides delivery
+    (CLI file write, console download), like the audit trail's export.
+    """
+    try:
+        max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
+    except (TypeError, ValueError):
+        max_rows = EXPORT_DEFAULT_ROWS
+    grouped = _grouped(_export_window(max_rows))
+    rows = [run_summary(run_id, group) for run_id, group in grouped.items()]
+    rows = [row for row in rows
+            if _wanted(row, workflow_id=workflow_id, status=status,
+                       since=since, before=before)]
+    query = str(q or "").strip().lower()
+    if query:
+        rows = [row for row in rows
+                if query in _search_blob(row["run_id"], grouped[row["run_id"]])]
+    rows.sort(key=_sort_key, reverse=True)
+    truncated = len(rows) > max_rows
+    page = rows[:max_rows]
+    stamp = datetime.fromtimestamp(int(now if now is not None else time.time()),
+                                   timezone.utc)
+    return 200, {
+        "filename": f"dapier-runs-{stamp:%Y%m%d-%H%M%S}.csv",
+        "count": len(page),
+        "truncated": truncated,
+        "csv": runs_to_csv(page),
+    }
+
+
 def api_get(run_id):
     run_id = str(run_id or "").strip()
     if not run_id:
@@ -417,6 +547,28 @@ def _workflows_now():
     return all_workflows()
 
 
+def _known_step(actions, steps, from_step):
+    """Whether ``from_step`` names a real step: recorded in the run, or
+    nested anywhere in the workflow's current definition (a branch body, a
+    loop body, an error branch)."""
+    if any(step.get("action_id") == from_step for step in steps):
+        return True
+
+    def walk(chain):
+        for action in chain or []:
+            if not isinstance(action, dict):
+                continue
+            if str(action.get("id") or "") == from_step:
+                return True
+            for value in action.values():
+                if isinstance(value, list) and walk(
+                        [item for item in value if isinstance(item, dict)]):
+                    return True
+        return False
+
+    return walk(actions)
+
+
 def _resume_from_step(run_id, run, steps, from_step, event):
     """The worker resume envelope that re-runs a run from one step on.
 
@@ -446,25 +598,37 @@ def _resume_from_step(run_id, run, steps, from_step, event):
     position = next((index for index, action in enumerate(actions)
                      if str(action.get("id") or index) == from_step), None)
     if position is None:
+        # An id known to the run (or nested in the definition) can name a
+        # real step that cannot start a chain — a conflict, not a miss. An
+        # id unknown to both is simply not there: 404.
+        if not _known_step(actions, steps, from_step):
+            return None, (404, {"error": f"Step '{from_step}' is unknown to run "
+                                         f"'{run_id}' and workflow '{workflow_id}'"})
         return None, (409, {"error": f"Step '{from_step}' is not a top-level step of "
                                      f"workflow '{workflow_id}'; only top-level "
                                      "steps can start a replay"})
     # Seed every step recorded before the chosen one started (the rerun
     # re-executes the chosen step and everything after); a chosen step the
     # original run never reached seeds everything, the rerun starts fresh
-    # there.
+    # there. The same steps ride along as ``reused_steps`` so the resume
+    # records them in the rerun's history — they did not run again, the
+    # rerun picked up their recorded outputs.
     chosen = next((step for step in steps if step.get("action_id") == from_step), None)
     moment = str(chosen.get("started_at") or "") if chosen else ""
     step_outputs = {}
+    reused_steps = []
     for step in steps:
         action_id = str(step.get("action_id") or "")
         if not action_id or (moment and str(step.get("started_at") or "") >= moment):
             continue
-        entry = {"status": step.get("status") or "completed",
-                 "output": step.get("output") if isinstance(step.get("output"), dict) else {}}
+        output = step.get("output") if isinstance(step.get("output"), dict) else {}
+        entry = {"status": step.get("status") or "completed", "output": output}
         if step.get("error"):
             entry["error"] = step.get("error")
         step_outputs[action_id] = entry
+        reused_steps.append({"action_id": action_id,
+                             "action_type": step.get("action_type"),
+                             "output": output})
     return {
         "workflow_id": workflow_id,
         "event": event,
@@ -473,6 +637,7 @@ def _resume_from_step(run_id, run, steps, from_step, event):
         "paused_ids": [],
         "segments": [{"steps": actions[position:], "prefix": "", "scope": None}],
         "step_outputs": step_outputs,
+        "reused_steps": reused_steps,
         "run_id": f"{workflow_id}:{event['id']}",
     }, None
 
@@ -623,6 +788,36 @@ def api_replay_failed(workflow_id, *, queue=None):
     }
 
 
+def _workflow_poll_name(workflow_id, connector):
+    """The stored poll trigger bound to this workflow (its ``flow:`` key)
+    that serves the workflow's own connector — the name the connector's
+    live sample branch keys on (every provider sample fetch treats
+    ``event`` as the stored poll name). Generic HTTP polls qualify only
+    for the generic ``poll`` connector. None when the workflow has no
+    matching stored poll, so the sample falls through to
+    history/synthetic unchanged."""
+    from ..triggers import poll_sources, poll_triggers
+
+    try:
+        items = poll_triggers.load_items()
+    except Exception:
+        return None
+    for item in items or []:
+        if str(item.get("flow") or "").strip() != workflow_id:
+            continue
+        try:
+            source = poll_sources.stored_source(item)
+        except Exception:
+            source = None
+        if source is None:
+            if connector == "poll":
+                return str(item.get("poll_id") or "")
+            continue
+        if source.connector == connector:
+            return str(item.get("poll_id") or "")
+    return None
+
+
 def api_trigger_sample(workflow_id):
     """The trigger input an author can fill ``{trigger.*}`` templates from.
 
@@ -632,8 +827,11 @@ def api_trigger_sample(workflow_id):
     example. With no runs at all, the fall back is the trigger-discovery
     sample for the workflow's own connector (live fetch, then the newest
     recorded run of that connector, then a documented example), so a
-    never-run workflow still gets realistic shapes. Neither source applies
-    — unknown workflow, or a connector nothing can sample — is a 404.
+    never-run workflow still gets realistic shapes. A workflow driven by a
+    stored poll trigger names that poll to the live branch, so the sample
+    comes off the real bucket/sheet/channel rather than the documented
+    example. Neither source applies — unknown workflow, or a connector
+    nothing can sample — is a 404.
 
     Behind ``GET /api/admin|agent/triggers/sample?workflow=<id>``.
     """
@@ -669,8 +867,10 @@ def api_trigger_sample(workflow_id):
     from ..connectors import trigger_discovery
 
     try:
-        discovered = trigger_discovery.discover(connector, kind="sample",
-                                                event=trigger.get("event") or None)
+        discovered = trigger_discovery.discover(
+            connector, kind="sample",
+            event=_workflow_poll_name(workflow_id, connector)
+            or trigger.get("event") or None)
     except trigger_discovery.DiscoveryNotFound as exc:
         return 404, {"error": str(exc)}
     except trigger_discovery.DiscoveryUpstream as exc:

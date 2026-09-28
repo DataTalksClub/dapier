@@ -66,7 +66,8 @@ def _decode_numbers(value):
     return value
 
 
-def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=None):
+def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=None,
+            only_if_absent=False):
     """Store one parsed workflow definition; the engine reads it on the next event.
 
     Also appends a version record (the definition exactly as published, with
@@ -86,7 +87,10 @@ def publish(workflow, *, operator=None, previous=None, cause="save", table_ref=N
         "revision": revision,
     }
     table = get_table(table_ref)
-    table.put_item(Item=item)
+    write = {"Item": item}
+    if only_if_absent:
+        write["ConditionExpression"] = "attribute_not_exists(workflow_id)"
+    table.put_item(**write)
     table.put_item(Item={
         "workflow_id": version_key(workflow["id"], revision),
         "version_of": workflow["id"],
@@ -134,9 +138,15 @@ def load_items(table_ref=None):
 
 
 def list_versions(workflow_id, table_ref=None):
-    """One workflow's version records, newest revision first."""
+    """One workflow's version records, newest revision first.
+
+    The scan is bounded like load_items (Limit=SCAN_LIMIT): version history
+    is pruned per workflow to MAX_VERSIONS, so the newest revisions always
+    fit inside the window; an unbounded scan would read the whole table to
+    show at most those.
+    """
     versions = [
-        item for item in get_table(table_ref).scan().get("Items", [])
+        item for item in get_table(table_ref).scan(Limit=SCAN_LIMIT).get("Items", [])
         if item.get("version_of") == workflow_id
     ]
     return sorted(

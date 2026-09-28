@@ -1,32 +1,24 @@
 """The operator overview: workflows, executions, connections, credentials."""
 import os
-from pathlib import Path
 
 import boto3
-import yaml
 
 from ..auth import api_tokens
 from .. import http
 from ..triggers import email_triggers, published_workflows
 from ..engine import usage
 from . import runs
-from ..connections.credentials import CREDENTIAL_SPECS, credential_status
+from ..connections import records as connection_records
+from ..connections.credentials import (
+    CREDENTIAL_SPECS,
+    credential_status,
+    get_credential_record,
+)
 from ..connections.providers import oauth_clients
 
 
 def _workflows():
-    from ..engine import matching
-
-    root = Path(os.environ.get("WORKFLOWS_DIR", Path(__file__).resolve().parents[3] / "workflows"))
     result = {}
-    for path in sorted(root.glob("*.yaml")):
-        workflow = yaml.safe_load(path.read_text())
-        if not isinstance(workflow, dict) or not workflow.get("id") \
-                or not matching.workflow_triggers(workflow):
-            continue  # not a workflow (e.g. a flows-only file)
-        result[str(workflow["id"])] = _workflow_view(workflow, path.name, published=False)
-    # Published overrides (designer saves) are the live state; show them even
-    # when the deploy pipeline has not picked them up yet.
     if published_workflows.configured():
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
@@ -55,6 +47,16 @@ def _workflow_view(workflow, source, *, published):
         "source": source,
         "actions": _action_views(resolved.get("actions")),
         "published": published,
+        # Zapier-style labels (designer_store._tags_of semantics): [] for
+        # hand-written YAML that carries something else under ``tags``.
+        "tags": [
+            str(tag).strip() for tag in (workflow.get("tags") or [])
+            if isinstance(tag, str) and str(tag).strip()
+        ] if isinstance(workflow.get("tags"), list) else [],
+        # Zapier-style flat folder (designer_store._folder_of semantics): ""
+        # for hand-written YAML that carries something else under ``folder``.
+        "folder": str(workflow["folder"]).strip()
+        if isinstance(workflow.get("folder"), str) else "",
     }
     if len(triggers) > 1:
         view["triggers"] = triggers
@@ -63,12 +65,14 @@ def _workflow_view(workflow, source, *, published):
 
 def _workflow_matches(view, query):
     """Case-insensitive ?q= match: workflow id, description, the trigger's
-    connector and event, and the action step types."""
+    connector and event, the action step types, the tags, and the folder."""
     text = " ".join(
         [str(view.get("id") or ""), str(view.get("description") or ""),
          str((view.get("trigger") or {}).get("connector") or ""),
          str((view.get("trigger") or {}).get("event") or "")]
         + [str(action.get("type") or "") for action in view.get("actions") or []]
+        + [str(tag) for tag in view.get("tags") or []]
+        + [str(view.get("folder") or "")]
     )
     return query in text.lower()
 
@@ -90,6 +94,28 @@ def _scan(table_name, limit=50):
 def _credential_status(provider):
     spec = CREDENTIAL_SPECS[provider]
     return {"provider": provider, **credential_status(spec["credential_id"])}
+
+
+def _connection_views(items):
+    """Connections as ``public_view`` metadata plus token health.
+
+    The console flags connections whose stored token is past its expiry
+    ("needs reconnection"), so each row carries ``health`` and
+    ``token_expires_at`` — read from the credentials store, never the
+    secrets themselves. A store hiccup degrades to the status-only view
+    rather than blocking the console.
+    """
+    views = []
+    for item in items:
+        try:
+            record = get_credential_record(
+                connection_records.credential_id_for(item.get("connection_id")))
+            value = record.get("value")
+            stored = value if isinstance(value, dict) else {}
+        except Exception:  # noqa: BLE001 — health is best-effort, never block the console
+            stored = {}
+        views.append(connection_records.public_view(item, stored))
+    return views
 
 def _oauth_client_status(provider):
     return oauth_clients.status(provider)
@@ -120,22 +146,43 @@ def _usage():
 
 def overview(event=None):
     """The operator overview. ``?q=`` filters the workflows list (same match
-    text as the designer list: id, description, trigger, action types)."""
+    text as the designer list: id, description, trigger, action types, tags,
+    folder), ``?tag=`` narrows to workflows carrying that tag, and
+    ``?folder=`` narrows to workflows sitting in that folder (both
+    case-insensitive). ``workflow_tags`` and ``workflow_folders`` aggregate
+    the distinct tags and folders in use (computed before both filters), the
+    lists the console's filter dropdowns offer."""
     query = (event or {}).get("queryStringParameters") or {}
     workflows = _workflows()
+    workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
+    workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
+                               if str(view.get("folder") or "").strip()})
     search = str(query.get("q") or "").strip().lower()
     if search:
         workflows = [view for view in workflows if _workflow_matches(view, search)]
+    tag = str(query.get("tag") or "").strip().lower()
+    if tag:
+        workflows = [view for view in workflows
+                     if tag in {str(existing).lower() for existing in view.get("tags") or []}]
+    folder = str(query.get("folder") or "").strip().lower()
+    if folder:
+        workflows = [view for view in workflows
+                     if str(view.get("folder") or "").strip().lower() == folder]
+    # Newest first by the moment each step actually started — execution_id
+    # is ``workflow:action:event``, so its string order is not chronological.
     executions = sorted(
         _scan(os.environ["EXECUTIONS_TABLE"]),
-        key=lambda item: item.get("execution_id", ""),
+        key=lambda item: (str(item.get("started_at") or ""),
+                          str(item.get("execution_id") or "")),
         reverse=True,
     )
-    connections = _scan(os.environ["CONNECTIONS_TABLE"])
+    connections = _connection_views(_scan(os.environ["CONNECTIONS_TABLE"]))
     return http._json_response(200, {
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),
         "workflows": workflows,
+        "workflow_tags": workflow_tags,
+        "workflow_folders": workflow_folders,
         "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
         "runs": runs.recent(25),

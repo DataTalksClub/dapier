@@ -253,21 +253,24 @@ def test_engine_keeps_bundle_when_publish_table_absent(monkeypatch, tmp_path):
     matching._flows.cache_clear()
 
 
-def test_cli_on_and_off_put_the_toggle(monkeypatch, capsys):
+def test_cli_on_and_off_use_the_bulk_endpoint(monkeypatch, capsys):
     from dapier_cli import commands as cli_commands
 
     calls = []
 
     def fake_call(api_url, method, path, body=None, debug=False):
         calls.append((method, path, body))
-        return {"file": "test-flow.yaml", "enabled": body["enabled"],
-                "published": True, "commit": "commit456"}
+        return {"results": [{"file": "test-flow.yaml", "ok": True,
+                             "enabled": body["action"] == "enable",
+                             "commit": "commit456"}]}
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
     assert cli_commands.workflows_set_enabled("https://api.test", "test-flow.yaml", True) == 0
     assert cli_commands.workflows_set_enabled("https://api.test", "test-flow.yaml", False) == 0
-    assert calls[0] == ("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": True})
-    assert calls[1] == ("PUT", "/api/agent/designer/workflows/test-flow.yaml", {"enabled": False})
+    assert calls[0] == ("POST", "/api/agent/designer/workflows/bulk",
+                        {"ids": ["test-flow.yaml"], "action": "enable"})
+    assert calls[1] == ("POST", "/api/agent/designer/workflows/bulk",
+                        {"ids": ["test-flow.yaml"], "action": "disable"})
     out = capsys.readouterr().out
     assert "test-flow.yaml is On" in out and "test-flow.yaml is Off" in out
 
@@ -275,22 +278,24 @@ def test_cli_on_and_off_put_the_toggle(monkeypatch, capsys):
     parser = build_parser()
     for command in ("on", "off", "enable", "disable"):
         args = parser.parse_args(["workflows", command, "test-flow.yaml"])
-        assert (args.group, args.command, args.file) == ("workflows", command, "test-flow.yaml")
+        assert (args.group, args.command, args.file) == ("workflows", command, ["test-flow.yaml"])
         assert cmd_workflows(args, "https://api.test", False) == 0
-    assert [body["enabled"] for _, _, body in calls[2:]] == [True, False, True, False]
+    assert [body["action"] for _, _, body in calls[2:]] == [
+        "enable", "disable", "enable", "disable"]
 
 
-def test_cli_enable_reports_git_failure_as_a_warning(monkeypatch, capsys):
+def test_cli_bulk_reports_per_workflow_failures(monkeypatch, capsys):
     from dapier_cli import commands as cli_commands
 
     monkeypatch.setattr(
         cli_commands.api, "call",
         lambda api_url, method, path, body=None, debug=False: {
-            "file": "test-flow.yaml", "enabled": False, "published": True,
-            "git_sync_error": "github refused",
-        })
-    assert cli_commands.workflows_set_enabled("https://api.test", "test-flow.yaml", False) == 0
-    assert "may revert this toggle" in capsys.readouterr().out
+            "results": [
+                {"file": "went.yaml", "ok": True},
+                {"file": "stuck.yaml", "ok": False, "error": "still parked on a delay"},
+            ]})
+    assert cli_commands.workflows_set_enabled("https://api.test", "stuck.yaml", False) == 0
+    assert "stuck.yaml: still parked on a delay" in capsys.readouterr().out
 
 
 # ---- Version history and rollback ----
@@ -378,3 +383,32 @@ def test_versions_and_rollback_unconfigured_are_503(monkeypatch):
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
     assert designer_store.api_versions("test-flow.yaml")[0] == 503
     assert designer_store.api_rollback("test-flow.yaml", {"revision": 1})[0] == 503
+
+
+def test_list_versions_caps_the_scan_and_keeps_newest_first(published, monkeypatch):
+    """The version scan is bounded like load_items (Limit=SCAN_LIMIT): the
+    newest revisions within the window come back, sorted desc, and the live
+    items sharing the table are filtered out."""
+    class RecordingTable:
+        def __init__(self, items):
+            self.items = items
+            self.scan_limits = []
+
+        def scan(self, **kwargs):
+            self.scan_limits.append(kwargs.get("Limit"))
+            return {"Items": list(self.items)}
+
+    items = [
+        {"workflow_id": f"test-flow#v{rev}", "version_of": "test-flow",
+         "revision": rev, "published_at": f"2026-09-0{rev}T00:00:00+00:00"}
+        # Out of order on purpose: the sort, not the scan order, decides.
+        for rev in (3, 1, 4, 2)
+    ]
+    items.append({"workflow_id": "other-flow", "revision": 9})  # live item, not a version
+    table = RecordingTable(items)
+    monkeypatch.setattr(published_workflows, "get_table", lambda table_ref=None: table)
+
+    versions = published_workflows.list_versions("test-flow", table_ref=table)
+
+    assert table.scan_limits == [published_workflows.SCAN_LIMIT]
+    assert [version["revision"] for version in versions] == [4, 3, 2, 1]

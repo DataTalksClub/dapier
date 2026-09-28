@@ -14,12 +14,14 @@ best-effort so the next deploy agrees with the live state.
 """
 
 import base64
+import io
 import json
 import os
 import re
 import urllib.error
 import urllib.request
-from pathlib import Path
+import zipfile
+from datetime import datetime, timezone
 
 import yaml
 
@@ -49,6 +51,54 @@ FILTER_OPERATORS = (
     "does_not_contain", "gt", "gte", "lt", "lte", "exists", "empty",
 )
 DELAY_TEMPLATE = re.compile(r"^\{[^{}]+\}$")
+
+# Zapier-style workflow tags: a handful of short labels a workflow carries in
+# its YAML, edited through the tags endpoint and used to filter the lists.
+MAX_TAGS = 20
+MAX_TAG_LENGTH = 64
+
+# Zapier-style workflow folders: flat, unlike tags — a workflow sits in at
+# most one folder (or none), and a folder is a name, never a path.
+MAX_FOLDER_LENGTH = MAX_TAG_LENGTH
+
+
+def _validate_tags(tags):
+    """Clean a tags list or raise WorkflowError: strings only, trimmed,
+    non-empty, deduped case-insensitively (first spelling wins), bounded in
+    count and length. Shared by YAML parsing (a hand-written ``tags:``) and
+    the tags endpoint."""
+    if not isinstance(tags, list):
+        raise WorkflowError("tags must be a list of strings")
+    if len(tags) > MAX_TAGS:
+        raise WorkflowError(f"a workflow carries at most {MAX_TAGS} tags")
+    clean = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            raise WorkflowError("tags must be a list of strings")
+        text = tag.strip()
+        if not text:
+            raise WorkflowError("tags must be non-empty strings")
+        if len(text) > MAX_TAG_LENGTH:
+            raise WorkflowError(f"each tag may be at most {MAX_TAG_LENGTH} characters")
+        if text.lower() not in {existing.lower() for existing in clean}:
+            clean.append(text)
+    return clean
+
+
+def _validate_folder(folder):
+    """A folder value as it should be stored, or raise WorkflowError: a
+    string, stripped, at most MAX_FOLDER_LENGTH characters, and never a
+    path — Zapier folders are flat (a workflow sits in at most one), so
+    ``/`` and ``\\`` cannot appear. Empty means "no folder". Shared by YAML
+    parsing (a hand-written ``folder:``) and the folder endpoint."""
+    if not isinstance(folder, str):
+        raise WorkflowError("folder must be a string")
+    text = folder.strip()
+    if "/" in text or "\\" in text:
+        raise WorkflowError("folder cannot contain / or \\ — folders are flat, not paths")
+    if len(text) > MAX_FOLDER_LENGTH:
+        raise WorkflowError(f"folder may be at most {MAX_FOLDER_LENGTH} characters")
+    return text
 
 
 class WorkflowError(ValueError):
@@ -87,28 +137,24 @@ def sync_status():
     }
 
 
-def _bundle_root():
-    # Same default as matching._root and overview._workflows: the repo's
-    # workflows/ two levels above src/ (parents[3] of this file) — the parent-
-    # parent default used to point at src/dapier/workflows, which never exists,
-    # so the designer's workflow list lost every bundled workflow and the
-    # console opened the same seeded draft for all of them.
-    return Path(os.environ.get("WORKFLOWS_DIR", Path(__file__).resolve().parents[3] / "workflows"))
+def _tags_of(workflow):
+    """A workflow's tags as a clean list, defensively: hand-written YAML can
+    carry anything under ``tags`` — a string, a list with blanks — and the
+    list views must degrade to [] rather than fail the whole page. The strict
+    validation lives where tags are written (parse_workflow, api_tags)."""
+    tags = workflow.get("tags") if isinstance(workflow, dict) else None
+    if not isinstance(tags, list):
+        return []
+    return [str(tag).strip() for tag in tags if isinstance(tag, str) and str(tag).strip()]
 
 
-def _bundled_workflows():
-    """(workflow, filename) pairs this deployment's bundle carries (deploy-time git state)."""
-    from ..engine import matching
-
-    result = []
-    for path in sorted(_bundle_root().glob("*.yaml")):
-        try:
-            workflow = yaml.safe_load(path.read_text())
-        except yaml.YAMLError:
-            continue
-        if isinstance(workflow, dict) and "id" in workflow and matching.workflow_triggers(workflow):
-            result.append((workflow, path.name))
-    return result
+def _folder_of(workflow):
+    """A workflow's folder as a clean string ("" when none), defensively:
+    hand-written YAML can carry anything under ``folder`` and the list views
+    must degrade rather than fail the whole page. Strict validation lives
+    where the folder is written (parse_workflow, api_folder)."""
+    folder = workflow.get("folder") if isinstance(workflow, dict) else None
+    return folder.strip() if isinstance(folder, str) else ""
 
 
 def _summary(workflow, source):
@@ -132,25 +178,14 @@ def _summary(workflow, source):
         # Step types (flow-resolved) for the list's ?q= search and clients.
         "actionTypes": [str(action.get("type") or "") for action in (actions or [])
                         if isinstance(action, dict)],
+        # Zapier-style organization labels; set through api_tags.
+        "tags": _tags_of(workflow),
+        # Zapier-style flat folder ("" when none); set through api_folder.
+        "folder": _folder_of(workflow),
+        # Offered in the templates gallery when true; set through
+        # api_template_flag. Defensive: hand-written YAML can carry anything.
+        "template": workflow.get("template") is True,
     }
-
-
-def bundled_summaries():
-    """Summaries of the bundled workflows (deploy-time git state)."""
-    return [_summary(workflow, source) for workflow, source in _bundled_workflows()]
-
-
-def bundled_yaml(source):
-    """Raw parsed YAML of one bundled workflow, or None if not deployed."""
-    if not FILE_PATTERN.fullmatch(source or ""):
-        return None
-    path = _bundle_root() / source
-    if not path.exists():
-        return None
-    try:
-        return yaml.safe_load(path.read_text())
-    except yaml.YAMLError:
-        return None
 
 
 def _published_by_file(source):
@@ -160,26 +195,24 @@ def _published_by_file(source):
     return published_workflows.get_item(source.removesuffix(".yaml"))
 
 
-def api_list(q=None):
+def api_list(q=None, tag=None, folder=None):
     """Bundled workflows with the live published state overlaid by id.
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
     here too — its published state is what actually runs. ``q`` filters
     case-insensitively over each row's id, description, trigger connector
-    and event, and action step types.
+    and event, action step types, tags, and folder. ``tag`` narrows to
+    workflows carrying exactly that tag (case-insensitive) — Zapier's tag
+    view. ``folder`` narrows to workflows sitting in exactly that folder
+    (case-insensitive) — Zapier's folder view.
     """
-    summaries = {
-        summary["id"]: {**summary, "published": False}
-        for summary in bundled_summaries()
-    }
+    summaries = {}
     if published_workflows.configured():
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
             summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
-            if summary["id"] not in summaries:
-                summary["deployed"] = False
             summaries[summary["id"]] = {**summary, "published": True}
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
     search = str(q or "").strip().lower()
@@ -189,9 +222,106 @@ def api_list(q=None):
             if search in " ".join(
                 [summary["id"], summary.get("description") or "",
                  summary.get("connector") or "", summary.get("event") or "",
-                 *(summary.get("actionTypes") or [])]).lower()
+                 *(summary.get("actionTypes") or []),
+                 *(summary.get("tags") or []),
+                 summary.get("folder") or ""]).lower()
         ]
+    wanted_tag = str(tag or "").strip().lower()
+    if wanted_tag:
+        ordered = [summary for summary in ordered
+                   if wanted_tag in {existing.lower() for existing in summary.get("tags") or []}]
+    wanted_folder = str(folder or "").strip().lower()
+    if wanted_folder:
+        ordered = [summary for summary in ordered
+                   if str(summary.get("folder") or "").strip().lower() == wanted_folder]
     return 200, {"workflows": ordered, **sync_status()}
+
+
+def api_export(tag=None, folder=None, now=None):
+    """Every workflow's canonical YAML as one zip bundle: ``(status, payload)``.
+
+    The one-shot bundle behind `workflows export --all` and the console's
+    Export-all button: one ``workflows/<file>.yaml`` entry per workflow named
+    by its source file — the same canonical bytes api_get renders, so every
+    entry re-saves through `workflows save` byte-identical — plus a
+    ``manifest.json`` listing each workflow's file name, enabled state, tags,
+    folder, and latest published version (0 when never published). Bundle and
+    published store merge exactly like api_list, with the published state
+    winning by id, so a save the deploy pipeline has not picked up yet
+    exports too. ``tag``/``folder`` narrow the bundle exactly like the list
+    (case-insensitive, the same semantics); the default is everything.
+
+    The zip is built in memory (io.BytesIO + zipfile — no /tmp writes, this
+    runs in Lambda) with fixed entry timestamps, so the same set of workflows
+    always bundles to the same bytes; ``now`` (epoch seconds) only stamps the
+    suggested filename (``dapier-workflows-YYYYMMDD.zip``) and the manifest's
+    ``exported_at``. Workflows without a usable source file are skipped and
+    reported (``skipped``) rather than failing the bundle, and deployments
+    over MAX_EXPORT_WORKFLOWS workflows are refused to keep responses sane.
+    The API has no binary channel, so the archive travels base64 in the JSON
+    payload (``b64``) and the callers decode it; the routes carry the
+    ``content-disposition`` attachment header with the dated filename.
+    """
+    bundled = {}
+    versions = {}
+    if published_workflows.configured():
+        for item in published_workflows.load_items():
+            workflow = item.get("workflow")
+            if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            bundled[workflow["id"]] = (workflow, item.get("file"))
+            versions[str(workflow["id"])] = int(item.get("revision") or 0)
+    if len(bundled) > MAX_EXPORT_WORKFLOWS:
+        return 400, {"error": f"Too many workflows to export ({len(bundled)}); "
+                              f"the cap is {MAX_EXPORT_WORKFLOWS}."}
+    wanted_tag = str(tag or "").strip().lower()
+    wanted_folder = str(folder or "").strip().lower()
+    skipped, entries, listed = [], {}, []
+    for workflow, source in sorted(bundled.values(),
+                                   key=lambda pair: str(pair[0].get("id") or "")):
+        name = source.strip() if isinstance(source, str) else ""
+        if not FILE_PATTERN.fullmatch(name):
+            skipped.append(str(workflow.get("id") or "unknown"))
+            continue
+        tags = _tags_of(workflow)
+        workflow_folder = _folder_of(workflow)
+        if wanted_tag and wanted_tag not in {existing.lower() for existing in tags}:
+            continue
+        if wanted_folder and workflow_folder.strip().lower() != wanted_folder:
+            continue
+        try:
+            entries[f"workflows/{name}"] = workflow_yaml_text(workflow)
+        except (yaml.YAMLError, ValueError):
+            skipped.append(str(workflow.get("id") or name))
+            continue
+        listed.append({"file": name,
+                       "enabled": bool(workflow.get("enabled", True)),
+                       "tags": tags,
+                       "folder": workflow_folder,
+                       "version": versions.get(str(workflow.get("id") or name), 0)})
+    stamp = (datetime.now(timezone.utc) if now is None
+             else datetime.fromtimestamp(int(now), timezone.utc))
+    manifest = {
+        "exported_at": stamp.isoformat(),
+        "count": len(entries),
+        "skipped": sorted(skipped),
+        "workflows": sorted(listed, key=lambda row: row["file"]),
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
+        for arcname in ["manifest.json", *sorted(entries)]:
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            if arcname == "manifest.json":
+                bundle.writestr(info, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            else:
+                bundle.writestr(info, entries[arcname])
+    return 200, {
+        "filename": f"dapier-workflows-{stamp:%Y%m%d}.zip",
+        "count": len(entries),
+        "skipped": sorted(skipped),
+        "b64": base64.b64encode(buffer.getvalue()).decode(),
+    }
 
 
 def workflow_yaml_text(workflow):
@@ -213,65 +343,126 @@ def api_get(source):
     if item and isinstance(item.get("workflow"), dict):
         return 200, {"workflow": item["workflow"], "published": True,
                      "yaml": workflow_yaml_text(item["workflow"])}
-    workflow = bundled_yaml(source)
-    if workflow is None:
+    return 404, {"error": f"no such workflow: {source}"}
+
+
+MAX_EXPORT_WORKFLOWS = 500
+
+
+def api_export_all(now=None):
+    """Every workflow's canonical YAML as one zip: ``(status, payload)``.
+
+    The same canonical bytes api_get renders, one ``workflows/<file>.yaml``
+    entry per workflow; bundle and published merge like api_list with the
+    published state winning by id, so a save the deploy pipeline has not
+    picked up yet exports too. Workflows without a usable source file are
+    skipped and reported (``skipped``) rather than failing the bundle. The
+    zip ships base64 in the JSON body — the API has no binary channel — and
+    the callers decode it (the CLI writes the file, the console downloads
+    it). A ``manifest.json`` entry describes the bundle (exported_at ISO,
+    count, per-workflow id/source/folder/tags) so the archive is readable
+    without unzipping every file; it carries no connections, tokens, or other
+    secrets — workflow YAML only. Refuses deployments with more than
+    MAX_EXPORT_WORKFLOWS workflows to keep Lambda responses sane. Entries are
+    sorted with a fixed timestamp, so the same set of workflows always
+    bundles to the same bytes.
+    """
+    bundled = {}
+    if published_workflows.configured():
+        for item in published_workflows.load_items():
+            workflow = item.get("workflow")
+            if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            bundled[workflow["id"]] = (workflow, item.get("file"))
+    if len(bundled) > MAX_EXPORT_WORKFLOWS:
+        return 400, {"error": f"Too many workflows to export ({len(bundled)}); "
+                              f"the cap is {MAX_EXPORT_WORKFLOWS}."}
+    skipped, entries, listed = [], {}, []
+    for workflow, source in bundled.values():
+        name = source.strip() if isinstance(source, str) else ""
+        if not FILE_PATTERN.fullmatch(name):
+            skipped.append(str(workflow.get("id") or "unknown"))
+            continue
         try:
-            workflow = fetch_workflow(source)
-        except KeyError:
-            return 404, {"error": f"no such workflow: {source}"}
-        except SyncConfigError:
-            # Nowhere else it could live: not deployed and no git to look in.
-            return 404, {"error": f"no such workflow: {source}"}
-        except (SyncError, WorkflowError) as exc:
-            return 502, {"error": f"git fetch failed: {exc}"}
-    return 200, {"workflow": workflow, "published": False,
-                 "yaml": workflow_yaml_text(workflow)}
+            entries.setdefault(f"workflows/{name}", workflow_yaml_text(workflow))
+        except (yaml.YAMLError, ValueError):
+            skipped.append(str(workflow.get("id") or name))
+            continue
+        listed.append({"id": str(workflow.get("id") or name), "source": name,
+                       "folder": _folder_of(workflow), "tags": _tags_of(workflow)})
+    stamp = (datetime.now(timezone.utc) if now is None
+             else datetime.fromtimestamp(int(now), timezone.utc))
+    manifest = {
+        "exported_at": stamp.isoformat(),
+        "count": len(entries),
+        "skipped": sorted(skipped),
+        "workflows": sorted(listed, key=lambda row: row["id"]),
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
+        for arcname in ["manifest.json", *sorted(entries)]:
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            if arcname == "manifest.json":
+                bundle.writestr(info, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            else:
+                bundle.writestr(info, entries[arcname])
+    return 200, {
+        "filename": f"dapier-workflows-{stamp:%Y%m%d}.zip",
+        "count": len(entries),
+        "skipped": sorted(skipped),
+        "b64": base64.b64encode(buffer.getvalue()).decode(),
+    }
 
 
 def api_save(body, operator=None, cause="save", message=None):
-    """Validate and commit a workflow definition, then publish it live.
-
-    Returns (status, payload). ``published`` in the payload says whether the
-    definition is already running; a publish failure after a successful commit
-    is a loud 502 (the commit sha is included), and retrying the save is safe.
-    ``cause`` labels the version record (save or rollback); ``message``
-    overrides the git commit subject.
-    """
+    """Validate and publish a workflow; sync a Git copy when configured."""
     if not isinstance(body, dict):
         return 400, {"error": "request body must be an object"}
     yaml_text = body.get("yaml")
     rename_from = body.get("renameFrom")
     if rename_from is not None and not isinstance(rename_from, str):
         return 400, {"error": "renameFrom must be a file name"}
+    if rename_from and not FILE_PATTERN.fullmatch(rename_from):
+        return 400, {"error": f"invalid workflow file name: {rename_from!r}"}
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
     try:
         workflow = parse_workflow(yaml_text)
-        result = commit_workflow(
-            yaml_text,
-            rename_from=rename_from,
-            message=message or f"designer: save workflow {workflow['id']}",
-        )
     except WorkflowError as exc:
         return 400, {"error": str(exc)}
-    except SyncConfigError as exc:
-        return 503, {"error": str(exc)}
-    except SyncError as exc:
-        return 502, {"error": str(exc)}
-    return _publish_committed(workflow, result, rename_from=rename_from, operator=operator, cause=cause)
-
-
-def _publish_committed(workflow, result, *, rename_from=None, operator=None, cause="save"):
-    """Publish the just-committed definition; also drop a renamed-away id."""
-    if not published_workflows.configured():
-        return 200, {**result, "published": False}
     try:
         previous = published_workflows.get_item(workflow["id"])
-        published_workflows.publish(workflow, operator=operator, previous=previous, cause=cause)
-        if rename_from and rename_from != result["file"]:
+        item = published_workflows.publish(workflow, operator=operator,
+                                           previous=previous, cause=cause)
+        if rename_from and rename_from != f"{workflow['id']}.yaml":
             published_workflows.unpublish(rename_from.removesuffix(".yaml"))
     except Exception as exc:
-        return 502, {"error": f"committed to git but not live: {exc}",
-                     "file": result["file"], "commit": result["commit"], "published": False}
-    return 200, {**result, "published": True}
+        return 502, {"error": f"publish failed: {exc}"}
+    result = {"file": f"{workflow['id']}.yaml", "published": True,
+              "revision": item["revision"]}
+    warnings = _sync_youtube(previous=(previous or {}).get("workflow"), workflow=workflow)
+    if warnings:
+        result["warnings"] = warnings
+    if os.environ.get(TOKEN_SECRET_ENV):
+        try:
+            result.update(commit_workflow(
+                yaml_text, rename_from=rename_from,
+                message=message or f"designer: save workflow {workflow['id']}"))
+        except (SyncConfigError, SyncError) as exc:
+            result["git_sync_error"] = str(exc)
+    return 200, result
+
+
+def _sync_youtube(*, previous=None, workflow=None):
+    """Best-effort YouTube WebSub sync after a live definition change: a save
+    subscribes newly watched channels, a disable/delete unsubscribes orphaned
+    ones (youtube_subscriptions.reconcile). Reconcile never raises and returns
+    warning strings for the response payload — a hub outage must not block a
+    save, and the renewal schedule re-subscribes what a failed call missed."""
+    from ..triggers.intake import youtube_subscriptions
+
+    return youtube_subscriptions.reconcile(previous, workflow)
 
 
 def api_toggle(source, body, operator=None):
@@ -301,6 +492,9 @@ def api_toggle(source, body, operator=None):
         "enabled": body["enabled"],
         "published": True,
     }
+    warnings = _sync_youtube(previous=(previous or {}).get("workflow"), workflow=workflow)
+    if warnings:
+        result["warnings"] = warnings
     try:
         committed = commit_workflow(
             workflow_yaml_text(workflow),
@@ -312,13 +506,124 @@ def api_toggle(source, body, operator=None):
     return 200, result
 
 
-def api_versions(source):
-    """Version history for one workflow, newest revision first.
+def api_delete(source, *, operator=None):
+    """Delete a workflow everywhere it lives: the live published item goes
+    first (the engine stops matching it on the next event), then one atomic
+    git tree-delete commit removes workflows/<file> so the next deploy cannot
+    resurrect it. Run history is untouched — past runs stay readable, and
+    Zapier-style, deleting stops the automation rather than erasing the
+    audit trail.
 
-    Every save, toggle, and rollback publishes a version record; this lists
-    them with who published each one, when, and why, and flags the live
-    revision as ``current``.
+    The ``#v<n>`` version records are kept: they are history, not live
+    state, and the versions endpoint keeps answering for a deleted id
+    (nothing flagged current) the way past runs do.
+
+    Refuses with 409 while any run of the workflow is still parked on a
+    delay: the queue would resume its continuation into a definition that no
+    longer exists. The refusal names the blocking run ids. Cancel (or wait
+    out) the parked runs first. A workflow that does not exist — including
+    one already deleted, deploy lag or not — is a 404, so a delete is safe
+    to call twice. A git failure after a successful unpublish reports
+    ``git_sync_error`` but still counts as deleted live — the same contract
+    as the toggle.
+
+    Derived state: the published item plus, for YouTube push triggers, the
+    WebSub subscriptions of the channels only this workflow watched — those
+    are unsubscribed best-effort here (a hub failure comes back as
+    ``warnings``, never blocks the delete) and the renewal schedule
+    reconciles anything missed. EventBridge rules (`dapier-schedule-*`,
+    `dapier-poll-*`) belong to the standalone stored schedule/poll triggers
+    (their own synthetic workflow ids), not to workflow YAML triggers, so
+    there is nothing else to clean up.
     """
+    del operator  # recorded by the calling route
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    status, payload = api_get(source)
+    if status != 200:
+        return status, payload
+    workflow = payload["workflow"]
+    workflow_id = str(workflow["id"])
+    still_published = bool(published_workflows.configured()
+                           and published_workflows.get_item(workflow_id))
+    if not still_published and os.environ.get(TOKEN_SECRET_ENV):
+        # Not live: the file must still be committed in git, or there is
+        # nothing left to delete — a copy only the deploy-time bundle still
+        # carries is gone from every managed surface. This is what keeps a
+        # second delete a 404 even before the next deploy drops the bundle
+        # copy (the same lookup api_get's last resort uses).
+        try:
+            fetch_workflow(source)
+        except KeyError:
+            return 404, {"error": f"no such workflow: {source}"}
+        except SyncError as exc:
+            return 502, {"error": f"git fetch failed: {exc}"}
+    from . import runs
+
+    parked = runs.delayed_runs(workflow_id)
+    if parked:
+        run_ids = ", ".join(str(run.get("run_id") or "?") for run in parked)
+        return 409, {
+            "error": (f"workflow {workflow_id} still has {len(parked)} parked run(s) "
+                      f"on a delay ({run_ids}) — cancel or wait them out before deleting"),
+            "delayed_runs": parked,
+        }
+    was_published = payload.get("published", False)
+    warnings = []
+    if still_published:
+        try:
+            published_workflows.unpublish(workflow_id)
+        except Exception as exc:
+            return 502, {"error": f"unpublish failed: {exc}"}
+        warnings = _sync_youtube(previous=payload["workflow"], workflow=None)
+    result = {
+        "file": source,
+        "workflow_id": workflow_id,
+        "deleted": True,
+        "published": False,
+        "was_published": was_published,
+    }
+    if warnings:
+        result["warnings"] = warnings
+    try:
+        committed = commit_delete(source,
+                                  message=f"designer: delete workflow {workflow_id}")
+        result["commit"] = committed["commit"]
+        result["html_url"] = committed.get("html_url")
+    except (SyncConfigError, SyncError) as exc:
+        result["git_sync_error"] = str(exc)
+    return 200, result
+
+
+def api_tags(source, body, *, operator=None):
+    """Edit a workflow's tags (Zapier-style organization labels).
+
+    Body ``{"tags": ["a", "b"]}`` replaces the whole set (an empty list or
+    ``--clear`` clears it); ``{"add": [...], "remove": [...]}`` merges —
+    removals apply first and win, matching case-insensitively. Tags are
+    stored lowercase, deduped, and bounded like any hand-written ``tags:``
+    list (parse_workflow enforces the same rules, so a hand edit cannot
+    smuggle in what the endpoint would reject). Tags live in the workflow
+    YAML, so they survive deploys and travel with save/export/duplicate/
+    rollback like any other definition key. Writing them re-publishes the
+    definition (cause "tags" in the version history) and commits the updated
+    YAML best-effort, exactly like the enable/disable toggle.
+    """
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    replace = body.get("tags")
+    adds = body.get("add")
+    removes = body.get("remove")
+    if replace is None and adds is None and removes is None:
+        return 400, {"error": 'body must be {"tags": [...]} to replace the set '
+                              'or {"add": [...], "remove": [...]} to edit it'}
+    if replace is not None and (adds is not None or removes is not None):
+        return 400, {"error": "send tags to replace the set, or add/remove to edit it — not both"}
+    for name, value in (("tags", replace), ("add", adds), ("remove", removes)):
+        if value is None:
+            continue
+        if not isinstance(value, list) or not all(isinstance(entry, str) for entry in value):
+            return 400, {"error": f"{name} must be a list of strings"}
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
@@ -327,7 +632,211 @@ def api_versions(source):
     if status != 200:
         return status, payload
     workflow = payload["workflow"]
-    live = published_workflows.get_item(workflow["id"]) or {}
+    if replace is not None:
+        merged = replace
+    else:
+        dropped = {tag.strip().lower() for tag in removes or [] if tag.strip()}
+        merged = [tag for tag in _tags_of(workflow) if tag.lower() not in dropped]
+        merged.extend(adds or [])
+    try:
+        tags = sorted({tag.lower() for tag in _validate_tags(merged)})
+    except WorkflowError as exc:
+        return 400, {"error": str(exc)}
+    if tags:
+        workflow["tags"] = tags
+    else:
+        workflow.pop("tags", None)
+    try:
+        previous = published_workflows.get_item(workflow["id"])
+        published = published_workflows.publish(workflow, operator=operator,
+                                                previous=previous, cause="tags")
+    except Exception as exc:
+        return 502, {"error": f"publish failed: {exc}"}
+    result = {
+        "file": source,
+        "workflow_id": str(workflow["id"]),
+        "tags": tags,
+        "revision": int(published.get("revision") or 0),
+        "published": True,
+    }
+    try:
+        committed = commit_workflow(
+            workflow_yaml_text(workflow),
+            message=f"designer: tag workflow {workflow['id']}",
+        )
+        result["commit"] = committed["commit"]
+    except (SyncConfigError, SyncError) as exc:
+        result["git_sync_error"] = str(exc)
+    return 200, result
+
+
+def api_folder(source, body, *, operator=None):
+    """Put a workflow in a Zapier-style folder (flat organization, unlike
+    tags: at most one folder per workflow, or none).
+
+    Body ``{"folder": "Name"}`` sets or moves the workflow; ``{"folder": ""}``
+    clears it. The value is validated like any hand-written ``folder:`` key
+    (parse_workflow enforces the same rules, so a hand edit cannot smuggle in
+    what the endpoint would reject): a stripped string, at most
+    MAX_FOLDER_LENGTH characters, never containing ``/`` or ``\\`` — a folder
+    is a name, not a path. The folder lives in the workflow YAML, so it
+    survives deploys and travels with save/export/duplicate/rollback like any
+    other definition key. Writing it re-publishes the definition (cause
+    "folder" in the version history) and commits the updated YAML
+    best-effort, exactly like the tags and enable/disable editors.
+    """
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    if "folder" not in body:
+        return 400, {"error": 'body must be {"folder": "..."} — an empty string clears the folder'}
+    try:
+        folder = _validate_folder(body.get("folder"))
+    except WorkflowError as exc:
+        return 400, {"error": str(exc)}
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    status, payload = api_get(source)
+    if status != 200:
+        return status, payload
+    workflow = payload["workflow"]
+    if folder:
+        workflow["folder"] = folder
+    else:
+        workflow.pop("folder", None)
+    try:
+        previous = published_workflows.get_item(workflow["id"])
+        published = published_workflows.publish(workflow, operator=operator,
+                                                previous=previous, cause="folder")
+    except Exception as exc:
+        return 502, {"error": f"publish failed: {exc}"}
+    result = {
+        "file": source,
+        "workflow_id": str(workflow["id"]),
+        "folder": folder,
+        "revision": int(published.get("revision") or 0),
+        "published": True,
+    }
+    try:
+        committed = commit_workflow(
+            workflow_yaml_text(workflow),
+            message=(f"designer: move workflow {workflow['id']} to folder {folder!r}"
+                     if folder else
+                     f"designer: move workflow {workflow['id']} out of its folder"),
+        )
+        result["commit"] = committed["commit"]
+    except (SyncConfigError, SyncError) as exc:
+        result["git_sync_error"] = str(exc)
+    return 200, result
+
+
+# The bulk enable/disable cap: one call answers for at most this many
+# workflows, so a runaway client cannot enqueue an unbounded toggle batch.
+MAX_BULK_IDS = 100
+
+
+def api_bulk(body, operator=None):
+    """Enable or disable several workflows in one call.
+
+    Exactly one scope: ``ids`` (explicit file names — `workflows on|off
+    a.yaml b.yaml`, the console's shown-rows bulk buttons), ``tag`` (every
+    workflow carrying it), ``search`` (the list's ?q= text), or ``all: true``
+    (`workflows enable --all`). Each target goes through the same api_toggle
+    semantics — live immediately, committed YAML best-effort — and answers on
+    its own: an unknown file, an invalid name, or a publish hiccup fails that
+    id without stopping the batch, and the response reports it. Returns 200
+    with per-target results ``[{id, ok, error?}]``; the calling route writes
+    the single audit row for the whole batch.
+    """
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    ids = body.get("ids")
+    tag = body.get("tag")
+    search = body.get("search")
+    all_workflows = body.get("all", False)
+    action = body.get("action")
+    if action not in ("enable", "disable"):
+        return 400, {"error": 'body must include "action": "enable" or "disable"'}
+    if ids is not None and (not isinstance(ids, list) or not ids
+                            or not all(isinstance(item, str) and item.strip() for item in ids)):
+        return 400, {"error": '"ids" must be a non-empty list of workflow file names'}
+    if tag is not None and not isinstance(tag, str):
+        return 400, {"error": '"tag" must be a string'}
+    if search is not None and not isinstance(search, str):
+        return 400, {"error": '"search" must be a string'}
+    if not isinstance(all_workflows, bool):
+        return 400, {"error": '"all" must be a boolean'}
+    scopes = [name for name, value in (("ids", ids), ("tag", tag), ("search", search)) if value]
+    if len(scopes) + (1 if all_workflows else 0) > 1:
+        return 400, {"error": "scope the bulk toggle one way: ids, tag, search, or all: true"}
+    if not scopes and not all_workflows:
+        return 400, {"error": "scope the bulk toggle: ids, tag, search, or all: true"}
+    if ids is not None and len(ids) > MAX_BULK_IDS:
+        return 400, {"error": f"at most {MAX_BULK_IDS} workflows per bulk call"}
+    scope = ("ids" if ids is not None
+             else f"tag:{tag.strip()}" if tag is not None
+             else f"search:{search.strip()}" if search is not None
+             else "all")
+    if ids is not None:
+        targets = [(raw.strip(), raw.strip()) for raw in ids]
+    else:
+        status, payload = api_list(q=search, tag=tag)
+        if status != 200:
+            return status, payload
+        targets = [(row.get("source") or filename_for(row["id"]), row["id"])
+                   for row in payload["workflows"]]
+    enabled = action == "enable"
+    results = []
+    for source, label in targets:
+        status, payload = api_toggle(source, {"enabled": enabled}, operator=operator)
+        if status == 200:
+            row = {
+                "id": label,
+                "ok": True,
+                "file": payload.get("file") or source,
+                "enabled": bool(payload.get("enabled", enabled)),
+                "commit": payload.get("commit"),
+            }
+            if payload.get("warnings"):
+                row["warnings"] = payload["warnings"]
+            results.append(row)
+        else:
+            results.append({
+                "id": label,
+                "ok": False,
+                "error": str(payload.get("error") or f"toggle returned {status}"),
+            })
+    return 200, {
+        "action": action,
+        "scope": scope,
+        "requested": len(results),
+        "ok": sum(1 for result in results if result["ok"]),
+        "results": results,
+    }
+
+
+def api_versions(source):
+    """Version history for one workflow, newest revision first.
+
+    Every save, toggle, and rollback publishes a version record; this lists
+    them with who published each one, when, and why, and flags the live
+    revision as ``current``. A deleted workflow's history survives the
+    delete (the records outlive the YAML and the live item), so the list
+    still answers for the id — nothing flagged current, revision 0.
+    """
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    status, payload = api_get(source)
+    if status == 200:
+        workflow_id = str(payload["workflow"]["id"])
+    elif status == 404:
+        workflow_id = source.removesuffix(".yaml")
+    else:
+        return status, payload
+    live = published_workflows.get_item(workflow_id) or {}
     live_revision = int(live.get("revision") or 0)
     versions = [{
         "revision": int(version.get("revision") or 0),
@@ -336,9 +845,9 @@ def api_versions(source):
         "cause": version.get("cause") or "save",
         "enabled": bool(version.get("enabled", True)),
         "current": int(version.get("revision") or 0) == live_revision,
-    } for version in published_workflows.list_versions(workflow["id"])]
+    } for version in published_workflows.list_versions(workflow_id)]
     return 200, {
-        "workflow": workflow["id"],
+        "workflow": workflow_id,
         "file": source,
         "revision": live_revision,
         "versions": versions,
@@ -414,8 +923,6 @@ def _workflow_exists(workflow_id, filename):
     deploy has not finished). A git probe failure cannot be answered, so it
     does not count as existing — the commit that follows reports its own
     errors."""
-    if bundled_yaml(filename) is not None:
-        return True
     if published_workflows.configured() and published_workflows.get_item(workflow_id):
         return True
     if os.environ.get(TOKEN_SECRET_ENV):
@@ -462,20 +969,117 @@ def api_duplicate(source, body=None, operator=None):
     copy = {key: value for key, value in workflow.items() if key not in RUN_STATE_KEYS}
     copy["id"] = new_id
     yaml_text = workflow_yaml_text(copy)
-    try:
-        result = commit_workflow(
-            yaml_text,
-            message=f"designer: duplicate workflow {workflow['id']} as {new_id}",
-        )
-    except WorkflowError as exc:
-        return 400, {"error": str(exc)}
-    except SyncConfigError as exc:
-        return 503, {"error": str(exc)}
-    except SyncError as exc:
-        return 502, {"error": str(exc)}
-    status, payload = _publish_committed(copy, result, operator=operator)
+    status, payload = api_save(
+        {"yaml": yaml_text}, operator=operator,
+        message=f"designer: duplicate workflow {workflow['id']} as {new_id}")
     payload["duplicated_from"] = source
     return status, payload
+
+
+def api_templates():
+    """Browse the template gallery: summaries of every workflow flagged
+    ``template: true`` — the bundled starters plus anything an operator
+    published as a template (the published overlay wins per id, like
+    api_list). Templates are ordinary workflows: the flag only decides
+    whether they show up here."""
+    templates = {}
+    if published_workflows.configured():
+        for item in published_workflows.load_items():
+            workflow = item.get("workflow")
+            if not isinstance(workflow, dict) or not workflow.get("id"):
+                continue
+            if workflow.get("template") is True:
+                source = item.get("file") or f"{workflow['id']}.yaml"
+                templates[str(workflow["id"])] = _summary(workflow, source)
+    ordered = sorted(templates.values(), key=lambda summary: summary["id"])
+    return 200, {"templates": ordered}
+
+
+def api_apply_template(source, body=None, operator=None):
+    """Fork a template into a new workflow: load the flagged workflow, rename
+    the id, strip the flag and run-state bookkeeping, and save through the
+    same commit-and-publish path api_save uses. The template itself — its
+    file, id, flag, and published item — is left untouched, so it stays in
+    the gallery for the next apply.
+
+    ``body`` optionally carries ``{"name": "..."}``; without it the copy is
+    named ``<template-id>-copy``. Returns api_save's response shape plus
+    ``applied_from``.
+    """
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    if body is None:
+        body = {}
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    new_name = body.get("name")
+    if new_name is not None and (not isinstance(new_name, str) or not new_name.strip()):
+        return 400, {"error": "name must be a non-empty string"}
+    status, payload = api_get(source)
+    if status != 200:
+        return status, payload
+    template = payload["workflow"]
+    if template.get("template") is not True:
+        return 400, {"error": f"workflow '{template['id']}' is not a template"}
+    base_name = new_name.strip() if new_name else f"{template['id']}-copy"
+    new_id = slugify_id(base_name)
+    if not new_id:
+        return 400, {"error": f"cannot derive a workflow id from {base_name!r}"}
+    if new_id == str(template["id"]) or _workflow_exists(new_id, filename_for(new_id)):
+        return 409, {"error": f"a workflow named '{new_id}' already exists"}
+    copy = {key: value for key, value in template.items()
+            if key not in RUN_STATE_KEYS and key != "template"}
+    copy["id"] = new_id
+    yaml_text = workflow_yaml_text(copy)
+    status, payload = api_save(
+        {"yaml": yaml_text}, operator=operator,
+        message=f"designer: apply template {template['id']} as {new_id}")
+    payload["applied_from"] = source
+    return status, payload
+
+
+def api_template_flag(source, body, *, operator=None):
+    """Publish or unpublish a workflow as a template (``template: true`` in
+    its YAML, so the flag travels with save/export/duplicate like any other
+    definition key). Body ``{"template": true|false}``; writing it
+    re-publishes the definition (cause "template" in the version history) and
+    commits the updated YAML best-effort, exactly like the tags endpoint."""
+    if not isinstance(body, dict) or not isinstance(body.get("template"), bool):
+        return 400, {"error": 'body must be {"template": true|false}'}
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    status, payload = api_get(source)
+    if status != 200:
+        return status, payload
+    workflow = payload["workflow"]
+    flag = body["template"]
+    if flag:
+        workflow["template"] = True
+    else:
+        workflow.pop("template", None)
+    try:
+        previous = published_workflows.get_item(workflow["id"])
+        published_workflows.publish(workflow, operator=operator,
+                                    previous=previous, cause="template")
+    except Exception as exc:
+        return 502, {"error": f"publish failed: {exc}"}
+    result = {
+        "file": source,
+        "workflow_id": str(workflow["id"]),
+        "template": flag,
+        "published": True,
+    }
+    try:
+        committed = commit_workflow(
+            workflow_yaml_text(workflow),
+            message=f"designer: {'publish' if flag else 'unpublish'} template {workflow['id']}",
+        )
+        result["commit"] = committed["commit"]
+    except (SyncConfigError, SyncError) as exc:
+        result["git_sync_error"] = str(exc)
+    return 200, result
 
 
 def filename_for(workflow_id):
@@ -637,6 +1241,25 @@ def parse_workflow(yaml_text):
     if not isinstance(workflow_id, str) or not ID_PATTERN.fullmatch(workflow_id.strip()):
         raise WorkflowError("workflow needs an id: letters, digits, hyphens or underscores (max 63 chars)")
     workflow_id = workflow_id.strip()
+
+    tags = workflow.get("tags")
+    if tags is not None:
+        _validate_tags(tags)
+
+    # A flat Zapier-style folder is optional; an empty one is no folder, so
+    # the key is dropped rather than stored as "".
+    folder = workflow.get("folder")
+    if folder is not None:
+        cleaned = _validate_folder(folder)
+        if cleaned:
+            workflow["folder"] = cleaned
+        else:
+            workflow.pop("folder", None)
+
+    # The template flag is boolean; anything falsy or malformed means "not a
+    # template", so the key is dropped rather than stored as-is.
+    if workflow.get("template") is not True:
+        workflow.pop("template", None)
 
     triggers = workflow.get("triggers")
     trigger = workflow.get("trigger")
@@ -951,6 +1574,36 @@ def commit_workflow(yaml_text, *, message, rename_from=None, token=None):
     return {
         "file": filename,
         "removed": rename_from if rename_from is not None and rename_from != filename else None,
+        "commit": commit["sha"],
+        "html_url": commit.get("html_url"),
+    }
+
+
+def commit_delete(filename, *, message, token=None):
+    """Remove workflows/<filename> from the repo in one atomic commit.
+
+    The delete is expressed as a tree entry with ``sha: null`` against the
+    current base tree (the same mechanism commit_workflow uses for the
+    rename-away half of a save), so the file cannot partially vanish.
+    """
+    if not FILE_PATTERN.fullmatch(filename):
+        raise WorkflowError(f"invalid workflow file name: {filename!r}")
+    token = token if token is not None else get_token()
+    slug = repo_slug()
+    ref = _github("GET", f"/repos/{slug}/git/ref/heads/{branch()}", token)
+    base_commit = ref["object"]["sha"]
+    base = _github("GET", f"/repos/{slug}/git/commits/{base_commit}", token)
+    new_tree = _github(
+        "POST", f"/repos/{slug}/git/trees", token,
+        payload={"base_tree": base["tree"]["sha"], "tree": [_tree_entry_delete(filename)]},
+    )
+    commit = _github(
+        "POST", f"/repos/{slug}/git/commits", token,
+        payload={"message": message, "tree": new_tree["sha"], "parents": [base_commit]},
+    )
+    _github("PATCH", f"/repos/{slug}/git/refs/heads/{branch()}", token, payload={"sha": commit["sha"]})
+    return {
+        "file": filename,
         "commit": commit["sha"],
         "html_url": commit.get("html_url"),
     }

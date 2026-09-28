@@ -232,6 +232,87 @@ def test_save_slack_connection_requires_token_without_stored_secret(monkeypatch)
     assert records == []
 
 
+def _connected_slack_table(records, connection_id="slack"):
+    """A connections table already holding one connected slack item."""
+    previous = {
+        "connection_id": connection_id,
+        "provider": "slack",
+        "credential_id": f"oauth#{connection_id}",
+        "status": "connected",
+        "verified_account_id": "T012345",
+        "version": 1,
+    }
+
+    class Table:
+        def put_item(self, **kwargs):
+            records.append(kwargs["Item"])
+
+        def get_item(self, **kwargs):
+            return {"Item": dict(previous)}
+
+    class Dynamo:
+        def Table(self, _name):
+            return Table()
+
+    return Dynamo()
+
+
+def test_save_slack_connection_edit_without_new_token_reuses_the_stored_one(monkeypatch):
+    records = []
+    credentials = []
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(boto3, "resource", lambda service: _connected_slack_table(records))
+    monkeypatch.setattr(slack_tokens, "verify_account", lambda token: ("T012345", "DataTalks"))
+    stored = {"oauth#slack": {"token": "xoxb-" + "a" * 30}}
+    monkeypatch.setattr(credentials_module, "get_credential", lambda credential_id: stored[credential_id])
+    monkeypatch.setattr(credentials_module, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "slack",
+        "provider": "slack",
+        "display_name": "DataTalks Slack (renamed)",
+    }))
+
+    assert response["statusCode"] == 200
+    # No token in the body: the stored credential's token is re-verified and
+    # re-stored, and the edit goes through as a normal connected update.
+    assert credentials == [("oauth#slack", {"token": "xoxb-" + "a" * 30}, {"provider": "slack"})]
+    assert records[0]["status"] == "connected"
+    assert records[0]["verified_account_id"] == "T012345"
+    assert records[0]["display_name"] == "DataTalks Slack (renamed)"
+    assert records[0]["version"] == 3  # build_item + mark_connected each bump
+    assert "xoxb-" not in response["body"]
+
+
+def test_save_slack_connection_edit_with_new_token_replaces_the_stored_one(monkeypatch):
+    records = []
+    credentials = []
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(boto3, "resource", lambda service: _connected_slack_table(records))
+    monkeypatch.setattr(slack_tokens, "verify_account", lambda token: ("T012345", "DataTalks"))
+
+    def absent(credential_id):
+        raise KeyError(credential_id)
+
+    monkeypatch.setattr(credentials_module, "get_credential", absent)
+    monkeypatch.setattr(credentials_module, "put_credential", lambda credential_id, value, **kwargs: credentials.append((credential_id, value, kwargs)))
+    new_token = "xoxb-" + "f" * 30
+
+    response = admin.save_connection(request("PUT", "/api/admin/connections", {
+        "connection_id": "slack",
+        "provider": "slack",
+        "token": new_token,
+    }))
+
+    assert response["statusCode"] == 200
+    # A body token wins over the store — get_credential raising proves the
+    # stored value was never consulted for the token.
+    assert credentials == [("oauth#slack", {"token": new_token}, {"provider": "slack"})]
+    assert records[0]["status"] == "connected"
+    assert records[0]["version"] == 3
+    assert new_token not in response["body"]
+
+
 def test_save_slack_connection_rejects_token_slack_rejects(monkeypatch):
     records = []
     _fake_connections_table(monkeypatch, records)
@@ -550,28 +631,51 @@ def test_admin_run_detail_unknown_run_is_404(monkeypatch):
     assert detail["statusCode"] == 404
 
 
-def _configure_runs(monkeypatch, items):
-    """Operator session plus a fake executions table for the runs routes."""
-    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
-    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
-                            "exp": int(time.time()) + 600})
+def test_admin_runs_export_route_returns_csv_and_leaves_a_mark(monkeypatch):
+    steps = [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    }]
+    audit_written = []
 
     class RunsTable:
         def scan(self, **kwargs):
-            return {"Items": items}
+            return {"Items": steps}
 
         def query(self, **kwargs):
-            values = list((kwargs.get("ExpressionAttributeValues") or {}).values())
-            wanted = values[0] if values else None
-            return {"Items": [item for item in items if item.get("run_id") == wanted]}
+            return {"Items": []}
+
+    class AuditTable:
+        def put_item(self, **kwargs):
+            audit_written.append(kwargs["Item"])
 
     class Dynamo:
-        def Table(self, _name):
-            return RunsTable()
+        def Table(self, name):
+            return RunsTable() if name == "executions" else AuditTable()
 
+    monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                            "exp": int(time.time()) + 600})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("AUDIT_TABLE", "audit")
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
-    return [f"dapier_session={cookie}"]
+    cookies = [f"dapier_session={cookie}"]
+
+    exported = admin.route(
+        operator_request("GET", "/api/admin/runs/export", cookies=cookies),
+        "GET", "/api/admin/runs/export",
+    )
+
+    assert exported["statusCode"] == 200
+    body = json.loads(exported["body"])
+    assert body["count"] == 1
+    assert body["filename"].startswith("dapier-runs-")
+    assert body["csv"].startswith("run_id,workflow_id,")
+    # The export itself is audited: bulk reads of run history leave a mark.
+    assert [item["action"] for item in audit_written] == ["runs.export"]
 
 
 def _configure_replay_queue(monkeypatch):
@@ -624,17 +728,45 @@ def test_admin_run_replay_requires_authentication(monkeypatch):
     assert replayed["statusCode"] == 401
 
 
-def _configure_replay_queue(monkeypatch):
-    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
-    calls = []
+def test_admin_run_replay_from_step_passes_the_step(monkeypatch):
+    cookies = _configure_runs(monkeypatch, [
+        {"execution_id": "wf-1:fetch:evt-1", "run_id": "wf-1:evt-1",
+         "workflow_id": "wf-1", "action_id": "fetch", "action_type": "webhook",
+         "connector": "email", "event_type": "message.received", "status": "completed",
+         "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+         "input": {"subject": "invoice"}, "output": {"rows": 3}},
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+         "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+         "connector": "email", "event_type": "message.received", "status": "failed",
+         "started_at": "2026-09-25T10:00:01+00:00", "finished_at": "2026-09-25T10:00:02+00:00",
+         "error": "webhook returned HTTP 500", "input": {"subject": "invoice"}},
+    ])
+    calls = _configure_replay_queue(monkeypatch)
+    monkeypatch.setattr(admin.routes.runs, "_workflows_now", lambda: [{
+        "id": "wf-1", "enabled": True,
+        "actions": [{"id": "fetch", "type": "webhook"},
+                    {"id": "post", "type": "webhook"}],
+    }])
+    audited = []
+    monkeypatch.setattr(admin.routes.session, "_audit_event",
+                        lambda *a, **k: audited.append((a, k)))
 
-    class Queue:
-        def send_message(self, **kwargs):
-            calls.append(kwargs)
-            return {"MessageId": "sqsm-1"}
+    replayed = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/replay",
+                         body={"from_step": "post"}, cookies=cookies),
+        "POST", "/api/admin/runs/wf-1%3Aevt-1/replay",
+    )
 
-    monkeypatch.setattr(admin.routes.runs, "_queue", lambda: Queue())
-    return calls
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["from_step"] == "post"
+    assert body["run_id"].startswith("wf-1:replay-")
+    resume = json.loads(calls[0]["MessageBody"])["dapier_resume"]
+    assert [step["id"] for step in resume["segments"][0]["steps"]] == ["post"]
+    assert resume["step_outputs"]["fetch"]["output"] == {"rows": 3}
+    assert [action for actions, _ in audited for action in actions] == [
+        "wf-1:evt-1", "runs.replay-from-step", "op-sub"]
 
 
 def test_admin_errors_summary_route(monkeypatch):
@@ -880,5 +1012,87 @@ def test_overview_q_filters_the_workflow_list(monkeypatch):
     assert [workflow["id"] for workflow in payload["workflows"]] == ["invoice-alert"]
     unfiltered = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
     assert [workflow["id"] for workflow in unfiltered["workflows"]] == ["invoice-alert", "nightly-backup"]
+
+
+def test_overview_connections_carry_token_health(monkeypatch):
+    connection = {"connection_id": "youtube-personal", "provider": "youtube",
+                  "display_name": "Personal YouTube", "status": "connected"}
+
+    class Table:
+        def __init__(self):
+            self.items = {}
+
+        def get_item(self, **kwargs):
+            item = self.items.get(kwargs["Key"]["credential_id"])
+            return {"Item": dict(item)} if item else {}
+
+        def put_item(self, **kwargs):
+            self.items[kwargs["Item"]["credential_id"]] = kwargs["Item"]
+
+    creds = Table()
+    creds.put_item(Item={
+        "credential_id": "oauth#youtube-personal", "provider": "google", "version": 1,
+        "value": {"access_token": "at", "refresh_token": "rt", "expires_at": 1_000},
+    })
+
+    import boto3
+
+    class Dynamo:
+        def Table(self, name):
+            return creds
+
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    monkeypatch.setattr(overview_api, "_workflows", lambda: [])
+    monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [connection])
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setattr(overview_api, "_credential_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
+    monkeypatch.setattr(overview_api, "_email_triggers",
+                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+    monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
+
+    payload = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
+    row = payload["connections"][0]
+    assert row["status"] == "connected"
+    assert row["health"] == "expired"
+    assert row["token_expires_at"]
+
+
+def test_overview_executions_are_newest_first_by_started_at(monkeypatch):
+    """The executions block sorts by the step's started_at, not the
+    execution_id string: ids are ``workflow:action:event``, so string order
+    is not chronological (here the oldest event carries the largest id)."""
+    executions = [
+        {"execution_id": "wf:act:evt-9", "started_at": "2026-09-26T09:00:00+00:00"},
+        {"execution_id": "wf:act:evt-1", "started_at": "2026-09-28T12:00:00+00:00"},
+        {"execution_id": "wf:act:evt-5", "started_at": "2026-09-27T10:00:00+00:00"},
+    ]
+
+    def fake_scan(table_name, limit=50):
+        return executions if table_name == "executions" else []
+
+    monkeypatch.setattr(overview_api, "_workflows", lambda: [])
+    monkeypatch.setattr(overview_api, "_scan", fake_scan)
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(overview_api, "_credential_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
+    monkeypatch.setattr(overview_api, "_email_triggers",
+                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+    monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
+
+    payload = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
+
+    assert [item["execution_id"] for item in payload["executions"]] == [
+        "wf:act:evt-1",  # 09-28, newest
+        "wf:act:evt-5",  # 09-27
+        "wf:act:evt-9",  # 09-26, oldest — but string-desc would put it first
+    ]
 
 

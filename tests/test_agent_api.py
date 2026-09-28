@@ -1,4 +1,5 @@
 import json
+import time
 
 from src.dapier.api import agent as agent_api
 from src.dapier.connections import tokens
@@ -261,6 +262,32 @@ def test_list_and_show_require_grants(monkeypatch):
     assert agent_api.route(event(), "GET", "/api/agent/connections")["statusCode"] == 200
     assert json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])["connections"] == []
     assert agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["statusCode"] == 404
+
+
+def test_connection_health_flags_expired_tokens(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"},
+                       connections={"youtube-personal": CONNECTION},
+                       grants={("youtube-personal", "subject-1#buildcamp-uploader"): GRANT})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    tables["credentials"].put_item(Item={
+        "credential_id": "oauth#youtube-personal", "provider": "google", "version": 1,
+        "value": {"access_token": "at", "refresh_token": "rt", "expires_at": 1_000},
+    })
+
+    listed = json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])["connections"]
+    assert listed[0]["health"] == "expired"
+    assert listed[0]["token_expires_at"]
+
+    shown = json.loads(agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["body"])
+    assert shown["health"] == "expired"
+
+    tables["credentials"].put_item(Item={
+        "credential_id": "oauth#youtube-personal", "provider": "google", "version": 2,
+        "value": {"access_token": "at", "refresh_token": "rt",
+                  "expires_at": int(time.time()) + 3600},
+    })
+    fresh = json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])["connections"]
+    assert fresh[0]["health"] == "ok"
 
 
 def test_update_connection_scopes_preserves_existing_connection(monkeypatch):
@@ -872,55 +899,67 @@ def test_runs_replay_over_bearer_reinjects_the_original_event(monkeypatch):
     assert missing["statusCode"] == 404
 
 
-def _configure_replay_queue(monkeypatch):
-    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
-    calls = []
-
-    class Queue:
-        def send_message(self, **kwargs):
-            calls.append(kwargs)
-            return {"MessageId": "sqsm-1"}
-
-    monkeypatch.setattr(agent_api.runs, "_queue", lambda: Queue())
-    return calls
-
-
-def test_runs_replay_over_bearer_requires_operator(monkeypatch):
-    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+def test_runs_replay_from_step_over_bearer(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
     monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
-    _configure_runs_table(monkeypatch, [])
+    _configure_runs_table(monkeypatch, [
+        {"execution_id": "wf-1:fetch:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "fetch", "connector": "email", "event_type": "message.received",
+         "status": "completed", "started_at": "2026-09-25T10:00:00+00:00",
+         "finished_at": "2026-09-25T10:00:01+00:00", "input": {"route": "invoice"},
+         "output": {"rows": 3}},
+        {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+         "action_id": "post", "connector": "email", "event_type": "message.received",
+         "status": "failed", "started_at": "2026-09-25T10:00:01+00:00",
+         "finished_at": "2026-09-25T10:00:02+00:00", "input": {"route": "invoice"},
+         "error": "boom"},
+    ])
+    calls = _configure_replay_queue(monkeypatch)
+    monkeypatch.setattr(agent_api.runs, "_workflows_now", lambda: [{
+        "id": "wf-1", "enabled": True,
+        "actions": [{"id": "fetch", "type": "webhook"},
+                    {"id": "post", "type": "webhook"}],
+    }])
 
-    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/replay")
+    replayed = agent_api.route(event(body={"from_step": "post"}),
+                               "POST", "/api/agent/runs/wf-1%3Aevt-1/replay")
 
-    assert replayed["statusCode"] == 403
+    assert replayed["statusCode"] == 202
+    body = json.loads(replayed["body"])
+    assert body["accepted"] is True
+    assert body["from_step"] == "post"
+    assert body["run_id"].startswith("wf-1:replay-")
+    resume = json.loads(calls[0]["MessageBody"])["dapier_resume"]
+    assert [step["id"] for step in resume["segments"][0]["steps"]] == ["post"]
+    assert resume["event"]["correlation_id"] == "evt-1"
+    assert resume["step_outputs"]["fetch"]["output"] == {"rows": 3}
+
+    # a step the workflow does not have cannot start a replay
+    refused = agent_api.route(event(body={"from_step": "nope"}),
+                              "POST", "/api/agent/runs/wf-1%3Aevt-1/replay")
+    assert refused["statusCode"] == 404
 
 
-def test_runs_replay_over_bearer_reinjects_the_original_event(monkeypatch):
+def test_runs_list_over_bearer_content_search(monkeypatch):
     configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
     monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
     _configure_runs_table(monkeypatch, [
         {"execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
          "action_id": "post", "connector": "email", "event_type": "message.received",
-         "status": "failed", "started_at": "2026-09-25T10:00:00+00:00",
-         "finished_at": "2026-09-25T10:00:01+00:00", "input": {"route": "invoice"}},
+         "status": "completed", "started_at": "2026-09-25T10:00:00+00:00",
+         "input": {"subject": "invoice"}, "output": {"permalink": "order-1234"}},
+        {"execution_id": "wf-2:post:evt-2", "run_id": "wf-2:evt-2", "workflow_id": "wf-2",
+         "action_id": "post", "connector": "email", "event_type": "message.received",
+         "status": "completed", "started_at": "2026-09-26T10:00:00+00:00",
+         "input": {"subject": "hello"}, "output": {"status": 200}},
     ])
-    calls = _configure_replay_queue(monkeypatch)
 
-    replayed = agent_api.route(event(), "POST", "/api/agent/runs/wf-1%3Aevt-1/replay")
+    listed = agent_api.route(event(query={"q": "order-1234"}), "GET", "/api/agent/runs")
 
-    assert replayed["statusCode"] == 202
-    body = json.loads(replayed["body"])
-    assert body["accepted"] is True
-    assert body["replayed_from"] == "wf-1:evt-1"
-    assert body["run_id"].startswith("wf-1:replay-")
-    envelope = json.loads(calls[0]["MessageBody"])
-    assert envelope["id"].startswith("replay-")
-    assert envelope["correlation_id"] == "evt-1"
-    assert envelope["connector"] == "email"
-    assert envelope["data"] == {"route": "invoice"}
-
-    missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/replay")
-    assert missing["statusCode"] == 404
+    assert listed["statusCode"] == 200
+    body = json.loads(listed["body"])
+    assert [run["run_id"] for run in body["runs"]] == ["wf-1:evt-1"]
+    assert body["paging"]["filtered"] is True
 
 
 def test_poll_triggers_over_bearer_requires_operator(monkeypatch):
@@ -1292,3 +1331,34 @@ def test_audit_endpoint_without_the_table_is_an_empty_trail(monkeypatch):
 
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["events"] == []
+
+
+def test_runs_export_route_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+
+    exported = agent_api.route(event(), "GET", "/api/agent/runs/export")
+
+    assert exported["statusCode"] == 403
+
+
+def test_runs_export_route_returns_csv(monkeypatch):
+    _operator(monkeypatch)
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+    _configure_runs_table(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    }])
+
+    exported = agent_api.route(event(query={"max_rows": "10", "workflow": "wf-1"}),
+                               "GET", "/api/agent/runs/export")
+
+    assert exported["statusCode"] == 200
+    body = json.loads(exported["body"])
+    assert body["count"] == 1
+    assert body["filename"].startswith("dapier-runs-")
+    assert "wf-1:evt-1" in body["csv"]
+

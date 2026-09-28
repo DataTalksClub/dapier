@@ -3,10 +3,10 @@ import re
 from urllib.parse import unquote
 
 from ... import http
-from ...auth import authz, session
+from ...auth import authz, roles, session
 from ...connections import oauth_flow
 from .. import agent, overview
-from . import login, routes  # noqa: F401 (used via module refs)
+from . import login, routes, users_routes  # noqa: F401 (used via module refs)
 
 
 def route(event, method, path):
@@ -29,10 +29,16 @@ def route(event, method, path):
         return http._json_response(200, {
             "username": payload.get("sub"),
             "operator": authz.is_operator(payload),
+            "role": roles.effective_role(payload),
         })
     if not session._csrf_ok(event, method):
         return http._json_response(403, {"error": "Cross-site request rejected"})
-    operator_payload, operator_error = session.require_operator(event)
+    # Roles v1: the least privilege band this route accepts (viewer reads,
+    # editor workflow-editing, operator everything else, admin user
+    # management). With no stored role assignments this answers "admin" for
+    # every route — the historical gate, unchanged.
+    operator_payload, operator_error = session.require_role(
+        event, roles.minimum_for_route(method, path))
     if operator_error:
         return operator_error
     operator_subject = session.subject_fallback(operator_payload)
@@ -44,6 +50,8 @@ def route(event, method, path):
         return routes.list_audit(event)
     if method == "GET" and path == "/api/admin/runs":
         return routes.list_runs(event)
+    if method == "GET" and path == "/api/admin/runs/export":
+        return routes.export_runs(event, operator_subject)
     if method == "POST" and path == "/api/admin/runs/replay-failed":
         return routes.replay_failed_runs(event, operator_subject)
     if method == "GET" and path == "/api/admin/usage":
@@ -101,6 +109,14 @@ def route(event, method, path):
         return routes.save_grant(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/grants":
         return routes.delete_grant(event, operator_subject)
+    if method == "GET" and path == "/api/admin/users":
+        return users_routes.list_users(event)
+    if method == "POST" and path == "/api/admin/users":
+        return users_routes.set_user_role(event, operator_subject)
+    user_match = re.fullmatch(r"/api/admin/users/([^/]+)", path)
+    if method == "DELETE" and user_match:
+        return users_routes.remove_user(event, unquote(user_match.group(1)),
+                                        operator_subject)
     if method == "GET" and path == "/api/admin/tokens":
         return routes.list_api_tokens(event)
     if method == "PUT" and path == "/api/admin/tokens":
@@ -125,6 +141,12 @@ def route(event, method, path):
         return routes.test_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test-step":
         return routes.test_designer_step(event, operator_subject)
+    if method == "POST" and path == "/api/admin/designer/workflows/bulk":
+        return routes.bulk_designer_workflow(event, operator_subject)
+    if method == "GET" and path == "/api/admin/designer/workflows/export-all":
+        return routes.export_all_designer_workflows(event, operator_subject)
+    if method == "GET" and path == "/api/admin/designer/export":
+        return routes.export_designer_workflows(event, operator_subject)
     if method == "POST" and path == "/api/admin/copilot/draft":
         return routes.copilot_draft(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
@@ -132,6 +154,16 @@ def route(event, method, path):
         return routes.designer_get(designer_match.group(1))
     if method == "PUT" and designer_match:
         return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1))
+    if method == "DELETE" and designer_match:
+        return routes.delete_designer_workflow(event, operator_subject, designer_match.group(1))
+    designer_tags_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/tags", path)
+    if method == "PUT" and designer_tags_match:
+        return routes.tags_designer_workflow(event, operator_subject, designer_tags_match.group(1))
+    designer_folder_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/folder", path)
+    if method == "PUT" and designer_folder_match:
+        return routes.folder_designer_workflow(event, operator_subject, designer_folder_match.group(1))
     designer_test_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
     if method == "POST" and designer_test_match:
@@ -144,6 +176,16 @@ def route(event, method, path):
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
     if method == "POST" and designer_duplicate_match:
         return routes.duplicate_designer_workflow(event, operator_subject, designer_duplicate_match.group(1))
+    if method == "GET" and path == "/api/admin/designer/templates":
+        return routes.templates_list(event)
+    designer_template_apply_match = re.fullmatch(
+        r"/api/admin/designer/templates/([a-z0-9][a-z0-9._-]*\.yaml)/apply", path)
+    if method == "POST" and designer_template_apply_match:
+        return routes.apply_designer_template(event, operator_subject, designer_template_apply_match.group(1))
+    designer_template_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/template", path)
+    if method == "PUT" and designer_template_match:
+        return routes.template_flag_designer_workflow(event, operator_subject, designer_template_match.group(1))
     designer_versions_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
@@ -201,8 +243,15 @@ from .routes import (  # noqa: F401
     delete_schedule_trigger,
     designer_get,
     designer_list,
+    delete_designer_workflow,
+    bulk_designer_workflow,
+    tags_designer_workflow,
+    folder_designer_workflow,
     discover_connection,
     duplicate_designer_workflow,
+    apply_designer_template,
+    template_flag_designer_workflow,
+    templates_list,
     errors_summary,
     send_error_digest,
     get_inbox_event,
@@ -213,6 +262,9 @@ from .routes import (  # noqa: F401
     list_audit,
     list_email_triggers,
     export_audit,
+    export_all_designer_workflows,
+    export_designer_workflows,
+    export_runs,
     list_grants,
     list_hook_triggers,
     list_inbox,
@@ -251,6 +303,7 @@ from ...connections.oauth_flow import (  # noqa: F401
     oauth_callback_url,
     oauth_start,
 )
+from .users_routes import list_users, remove_user, set_user_role  # noqa: F401
 from ...auth.session import (  # noqa: F401
     SESSION_COOKIE,
     SESSION_TTL_SECONDS,

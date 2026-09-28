@@ -7,12 +7,12 @@ import boto3
 from ... import audit as audit_log
 from ... import error_digest
 from ... import http
-from ...auth import api_tokens, authz, session
+from ...auth import api_tokens, authz, roles, session
 from ... import copilot
 from ...connections import credentials, importing, zoom
 from ...connectors import trigger_discovery
 from ...connections import records as connection_model
-from ...connections.providers import oauth_clients, slack_tokens, telegram_api
+from ...connections.providers import oauth_clients
 from ...triggers import email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
 from ...engine import usage as usage_rollup
 from .. import designer_store, discovery as discovery_api, errors as errors_api, overview, runs
@@ -31,6 +31,29 @@ def list_runs(event):
         q=query.get("q") or None,
         next_token=query.get("next") or None,
     )
+    return http._json_response(status, payload)
+
+
+def export_runs(event, operator):
+    """Run history as CSV (runs.api_export): the list's filters, one
+    bounded export.
+
+    The response carries {filename, count, truncated, csv}; the console
+    turns it into a download and the CLI writes the file. The export is
+    audited like the audit CSV export: bulk reads leave a mark in the trail.
+    """
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_export(
+        max_rows=query.get("max_rows"),
+        workflow_id=query.get("workflow_id") or query.get("workflow") or None,
+        status=query.get("status") or None,
+        since=query.get("since") or None,
+        before=query.get("before") or None,
+        q=query.get("q") or None,
+    )
+    if status == 200:
+        session._audit_event("runs", "runs.export", operator or "unknown",
+                             outcome="ok")
     return http._json_response(status, payload)
 
 
@@ -89,6 +112,42 @@ def export_audit(event, operator):
     if status == 200:
         session._audit_event("audit-log", "audit.export", operator or "unknown",
                              outcome="ok")
+    return http._json_response(status, payload)
+
+
+def export_all_designer_workflows(event, operator):
+    """Every workflow's canonical YAML as one zip (designer_store.api_export_all).
+
+    Same domain function the agent route serves the CLI; the response carries
+    {filename, count, skipped, b64} — the console decodes the base64 zip into
+    a download. The bulk export is audited like the audit CSV export: bulk
+    reads leave a mark in the trail.
+    """
+    status, payload = designer_store.api_export_all()
+    if status == 200:
+        session._audit_event("workflows", "workflow.export-all", operator or "unknown",
+                             outcome="ok")
+    return http._json_response(status, payload)
+
+
+def export_designer_workflows(event, operator):
+    """Every workflow's canonical YAML as one zip (designer_store.api_export),
+    optionally narrowed with ``?tag=`` / ``?folder=`` like the designer list.
+
+    Same domain function the agent route serves `workflows export --all`; the
+    response carries {filename, count, skipped, b64} and an attachment
+    content-disposition carrying the dated filename — the console decodes the
+    base64 zip into that download. The bulk export is audited like the audit
+    CSV export: bulk reads leave a mark in the trail.
+    """
+    query = event.get("queryStringParameters") or {}
+    status, payload = designer_store.api_export(tag=query.get("tag"),
+                                                folder=query.get("folder"))
+    if status == 200:
+        session._audit_event("workflows", "workflow.export", operator or "unknown",
+                             outcome="ok")
+        return http._json_response(status, payload, headers={
+            "content-disposition": f'attachment; filename="{payload["filename"]}"'})
     return http._json_response(status, payload)
 
 
@@ -242,7 +301,11 @@ def save_connection(event):
                              outcome="ok" if status == 200 else "error")
         return http._json_response(status, payload)
     if fields["provider"] in connection_model.TOKEN_PROVIDERS:
-        return _save_token_connection(fields, body, previous, operator, connections_table)
+        status, payload = importing.save_token_connection(
+            body, operator_subject=operator, connections_table=connections_table,
+            audit_event=session._audit_event, action=audit_log.CONNECT,
+            reuse_stored_token=True)
+        return http._json_response(status, payload)
 
     try:
         item = connection_model.build_item(
@@ -256,56 +319,6 @@ def save_connection(event):
     connection_model.put_connection(connections_table, item)
     session._audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
     return http._json_response(200, item)
-
-def _save_token_connection(fields, body, previous, operator, connections_table):
-    """Create/update a connection that authenticates with a pasted token.
-
-    The token is verified against the provider before anything is stored;
-    an edit without a new token re-verifies and keeps the stored one.
-    """
-    try:
-        token = body.get("token") or credentials.get_credential(
-            connection_model.credential_id_for(fields["connection_id"]),
-        ).get("token")
-    except KeyError:
-        token = None
-    if not token:
-        hint = ("A Slack bot (xoxb-) or user (xoxp-) token is required"
-                if fields["provider"] == "slack"
-                else "A Telegram bot token from @BotFather is required")
-        return http._json_response(400, {"error": hint})
-    try:
-        account_id, account_title = importing.verify_token_provider(fields["provider"], token)
-    except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError) as exc:
-        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
-                     outcome="error", error=str(exc))
-        return http._json_response(400, {"error": str(exc)})
-    try:
-        item = connection_model.build_item(fields, owner_subject=operator, previous=previous)
-        connection_model.check_binding(item, account_id)
-        item = connection_model.mark_connected(
-            item, verified_account_id=account_id, account_title=account_title,
-            granted_scopes=fields["scopes"], connected_by=operator,
-        )
-    except connection_model.BindingError as exc:
-        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
-                     outcome="denied-account-mismatch", error=str(exc))
-        return http._json_response(409, {"error": str(exc)})
-    except connection_model.ConnectionError as exc:
-        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
-                     outcome="error", error=str(exc))
-        return http._json_response(400, {"error": str(exc)})
-    try:
-        secret_value = importing.token_secret_value(
-            fields["provider"], token, body, item["credential_id"])
-    except ValueError as exc:
-        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
-                     outcome="error", error=str(exc))
-        return http._json_response(400, {"error": str(exc)})
-    credentials.put_credential(item["credential_id"], secret_value, provider=fields["provider"])
-    connection_model.put_connection(connections_table, item)
-    session._audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
-    return http._json_response(200, connection_model.public_view(item))
 
 def list_grants(event):
     query = event.get("queryStringParameters") or {}
@@ -363,7 +376,9 @@ def delete_email_trigger(event, operator):
 
 def designer_list(event):
     query = event.get("queryStringParameters") or {}
-    status, payload = designer_store.api_list(query.get("q") or None)
+    status, payload = designer_store.api_list(query.get("q") or None,
+                                              tag=query.get("tag") or None,
+                                              folder=query.get("folder") or None)
     return http._json_response(status, payload)
 
 def designer_get(source):
@@ -416,6 +431,88 @@ def duplicate_designer_workflow(event, operator, source):
     except (ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     session._audit_event(str(payload.get("file", source or "unknown")), "workflow.duplicate", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def templates_list(event):
+    """The template gallery: bundled starters plus operator-published ones."""
+    status, payload = designer_store.api_templates()
+    return http._json_response(status, payload)
+
+def apply_designer_template(event, operator, source):
+    """Console mirror of the CLI apply: fork a template into a new workflow."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_apply_template(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.template.apply", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def template_flag_designer_workflow(event, operator, source):
+    """Console mirror of the CLI publish/unpublish: toggle template flag."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_template_flag(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(source), "workflow.template", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def delete_designer_workflow(event, operator, source):
+    """Console mirror of the CLI delete: unpublish the live item (version
+    records survive — history, not live state), then one atomic git
+    tree-delete commit. Refused 409 while runs are parked on a delay, so a
+    resume cannot dangle."""
+    status, payload = designer_store.api_delete(source, operator=operator)
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.delete", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def tags_designer_workflow(event, operator, source):
+    """Console mirror of the CLI tags editor: replace a workflow's tag set
+    (Zapier-style organization). Publishes cause "tags" and commits the
+    updated YAML best-effort, like the toggle."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_tags(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.tags", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def folder_designer_workflow(event, operator, source):
+    """Console mirror of the CLI folder editor: put a workflow in a
+    Zapier-style folder (flat — at most one per workflow, an empty string
+    clears it). Publishes cause "folder" and commits the updated YAML
+    best-effort, like the toggle."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_folder(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.folder", operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+def bulk_designer_workflow(event, operator):
+    """Console bulk enable/disable: one call over the selection bar's ids.
+
+    Each workflow toggles through the same api_toggle semantics and answers
+    per id; one audit row covers the batch, with the id list as the subject."""
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_bulk(body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    ids = [str(item) for item in (body or {}).get("ids") or []] if isinstance(body, dict) else []
+    subject = ", ".join(ids)
+    if len(subject) > 400:
+        subject = subject[:400] + f" … (+{len(ids)} total)"
+    session._audit_event(subject or "bulk", "workflow.bulk-toggle", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 

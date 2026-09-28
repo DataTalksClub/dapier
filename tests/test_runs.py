@@ -1,5 +1,6 @@
 """Run history: grouping executions into runs and the per-step flow."""
 import json
+import time
 
 import boto3
 import pytest
@@ -245,6 +246,22 @@ def test_api_replay_refuses_truncated_event_data(monkeypatch):
     assert "too large" in payload["error"]
 
 
+def test_api_replay_reinjects_a_20kb_webhook_event(monkeypatch):
+    """A 20 KB hook body runs fine at intake, so it must replay too: the
+    trigger input is captured at the raised replay cap, not the step-output
+    cap that used to truncate it into a permanent refusal."""
+    big = {"body": "x" * 20_000}
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1", input_data=big),
+    ])
+    queue = _configure_queue(monkeypatch)
+
+    status, payload = runs.api_replay("wf-1:evt-1")
+
+    assert status == 202
+    assert json.loads(queue.messages[0]["MessageBody"])["data"] == big
+
+
 def test_recent_hides_failure_notice_items(monkeypatch):
     notice = _step("wf-1", "failure-notice", "evt-1", status="notified",
                    run_id="wf-1:evt-1#notice", started="2026-09-25T10:00:05+00:00")
@@ -316,6 +333,185 @@ def test_api_list_combines_filters(monkeypatch):
     _, payload = runs.api_list(workflow_id="wf-1", status="failed",
                                since="2026-09-26T00:00:00+00:00")
     assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-2"]
+
+
+def test_api_list_content_search_matches_recorded_data(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", started="2026-09-25T10:00:00+00:00",
+              input_data={"text": "standup notes"},
+              output={"thread_ts": "1727260000.1", "permalink": "https://x.invalid/inv-42"}),
+        _step("wf-1", "post", "evt-2", started="2026-09-26T10:00:00+00:00",
+              input_data={"text": "lunch order"}),
+    ])
+
+    status, payload = runs.api_list(q="INV-42")
+    assert status == 200
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-1:evt-1"]
+    assert payload["paging"]["filtered"] is True
+
+    status, payload = runs.api_list(q="no-such-needle")
+    assert status == 200
+    assert payload["runs"] == []
+
+
+def test_api_list_content_search_matches_run_ids_and_ignores_blank(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1"),
+        _step("wf-2", "post", "evt-2"),
+    ])
+
+    _, payload = runs.api_list(q="wf-2:evt-2")
+    assert [run["run_id"] for run in payload["runs"]] == ["wf-2:evt-2"]
+
+    _, payload = runs.api_list(q="   ")
+    assert len(payload["runs"]) == 2
+    assert payload["paging"]["filtered"] is False
+
+
+def test_api_replay_from_step_builds_the_resume_envelope(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "fetch", "evt-1", started="2026-09-25T10:00:00+00:00",
+              finished="2026-09-25T10:00:01+00:00", run_id="wf-1:evt-1", connector="email",
+              input_data={"route": "invoice"}, output={"rows": 3}),
+        _step("wf-1", "post", "evt-1", started="2026-09-25T10:00:01+00:00",
+              finished="2026-09-25T10:00:02+00:00", run_id="wf-1:evt-1", status="failed",
+              error="boom", action_type="webhook"),
+    ])
+    queue = _configure_queue(monkeypatch)
+    monkeypatch.setattr(runs, "_workflows_now", lambda: [{
+        "id": "wf-1", "enabled": True,
+        "actions": [{"id": "fetch", "type": "webhook"},
+                    {"id": "post", "type": "webhook"},
+                    {"id": "notify", "type": "slack"}],
+    }])
+
+    status, payload = runs.api_replay("wf-1:evt-1", from_step="post")
+
+    assert status == 202
+    assert payload["accepted"] is True
+    assert payload["from_step"] == "post"
+    assert payload["replayed_from"] == "wf-1:evt-1"
+    assert payload["run_id"].startswith("wf-1:replay-")
+    resume = json.loads(queue.messages[0]["MessageBody"])["dapier_resume"]
+    assert resume["workflow_id"] == "wf-1"
+    assert resume["event"]["id"].startswith("replay-")  # a fresh run in history
+    assert resume["event"]["correlation_id"] == "evt-1"  # tied to the original
+    assert resume["event"]["data"] == {"route": "invoice"}
+    assert [step["id"] for step in resume["segments"][0]["steps"]] == ["post", "notify"]
+    # everything recorded before the chosen step seeds the rerun; the chosen
+    # step and beyond re-execute
+    assert resume["step_outputs"] == {"fetch": {"status": "completed", "output": {"rows": 3}}}
+    assert resume["paused_ids"] == []
+    assert resume["resume_at"] <= time.time()  # the worker runs it on arrival
+
+
+def test_api_replay_from_step_never_reached_seeds_everything(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "fetch", "evt-1", started="2026-09-25T10:00:00+00:00",
+              finished="2026-09-25T10:00:01+00:00", run_id="wf-1:evt-1", connector="email",
+              input_data={"route": "invoice"}, output={"rows": 3}),
+    ])
+    queue = _configure_queue(monkeypatch)
+    monkeypatch.setattr(runs, "_workflows_now", lambda: [{
+        "id": "wf-1", "enabled": True,
+        "actions": [{"id": "fetch", "type": "webhook"},
+                    {"id": "notify", "type": "slack"}],
+    }])
+
+    status, payload = runs.api_replay("wf-1:evt-1", from_step="notify")
+
+    assert status == 202
+    resume = json.loads(queue.messages[0]["MessageBody"])["dapier_resume"]
+    assert [step["id"] for step in resume["segments"][0]["steps"]] == ["notify"]
+    assert set(resume["step_outputs"]) == {"fetch"}
+
+
+def test_api_replay_from_step_refuses_gone_disabled_and_foreign_steps(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", run_id="wf-1:evt-1", connector="email",
+              input_data={"route": "invoice"}),
+    ])
+    _configure_queue(monkeypatch)
+    actions = [{"id": "post", "type": "webhook"}]
+
+    monkeypatch.setattr(runs, "_workflows_now", lambda: [])
+    status, payload = runs.api_replay("wf-1:evt-1", from_step="post")
+    assert status == 404
+    assert "no longer exists" in payload["error"]
+
+    monkeypatch.setattr(runs, "_workflows_now",
+                        lambda: [{"id": "wf-1", "enabled": False, "actions": actions}])
+    status, payload = runs.api_replay("wf-1:evt-1", from_step="post")
+    assert status == 409
+    assert "disabled" in payload["error"]
+
+    monkeypatch.setattr(runs, "_workflows_now",
+                        lambda: [{"id": "wf-1", "enabled": True,
+                                  "actions": [{"id": "other", "type": "webhook"}]}])
+    status, payload = runs.api_replay("wf-1:evt-1", from_step="post")
+    assert status == 409
+    assert "not a top-level step" in payload["error"]
+
+
+# --- CSV export ---------------------------------------------------------------
+
+
+def test_api_export_returns_the_newest_runs_as_csv(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-a", "post", "evt-1"),
+        _step("wf-b", "post", "evt-2", status="failed", error="Slack said no",
+              started="2026-09-25T11:00:00+00:00", finished="2026-09-25T11:00:02+00:00",
+              duration=1200),
+    ])
+
+    status, payload = runs.api_export(now=1758868800)
+
+    assert status == 200
+    assert payload["count"] == 2
+    assert payload["truncated"] is False
+    assert payload["filename"].startswith("dapier-runs-")
+    lines = payload["csv"].splitlines()
+    assert lines[0] == ",".join(runs.CSV_COLUMNS)
+    # Newest first; booleans read true/false, missing fields read "".
+    assert lines[1] == ("wf-b:evt-2,wf-b,email,message.received,failed,false,1,,post,,"
+                        "2026-09-25T11:00:00+00:00,2026-09-25T11:00:02+00:00,1200,"
+                        "Slack said no")
+
+
+def test_api_export_applies_the_list_filters_and_flags_truncation(monkeypatch):
+    _configure(monkeypatch, [
+        _step("wf-a", "post", "evt-1"),
+        _step("wf-b", "post", "evt-2"),
+        _step("wf-c", "post", "evt-3", input_data={"subject": "invoice-7"}),
+    ])
+
+    _, payload = runs.api_export(workflow_id="wf-b")
+    assert payload["count"] == 1
+    assert "wf-b:evt-2" in payload["csv"]
+
+    _, payload = runs.api_export(status="success")
+    assert payload["count"] == 3
+
+    # Content search matches what the list's q matches: recorded step data.
+    _, payload = runs.api_export(q="invoice-7")
+    assert payload["count"] == 1
+    assert "wf-c:evt-3" in payload["csv"]
+
+    _, payload = runs.api_export(max_rows=2)
+    assert payload["count"] == 2
+    assert payload["truncated"] is True
+
+
+def test_api_export_clamps_max_rows(monkeypatch):
+    _configure(monkeypatch, [_step("wf-a", "post", "evt-1")])
+
+    _, payload = runs.api_export(max_rows="not-a-number")
+    assert payload["count"] == 1
+
+    _, payload = runs.api_export(max_rows=10 ** 9)
+    assert payload["count"] == 1
+    assert payload["truncated"] is False
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

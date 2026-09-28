@@ -13,7 +13,7 @@ from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
 from . import storage as storage_api
-from ..auth import api_tokens, authz, device_sessions, session
+from ..auth import api_tokens, authz, device_sessions, roles, session
 from ..auth.dtc_auth import verify_id_token
 from ..connections import credentials, importing
 from ..connections import records as connections
@@ -235,7 +235,7 @@ def list_for_caller(event):
         if not connection:
             continue
         views.append({
-            **connections.public_view(connection),
+            **connections.public_view(connection, tokens.stored_value(item["connection_id"])),
             "agent": item.get("agent"),
             "operations": item.get("operations", []),
         })
@@ -263,8 +263,9 @@ def show_connection(event, connection_id):
     connection = connections.get_connection(connections_table, connection_id)
     if not connection:
         return _json_response(404, {"error": "Connection not found"})
+    stored = tokens.stored_value(connection_id)
     if _is_operator(event, subject):
-        return _json_response(200, connections.public_view(connection))
+        return _json_response(200, connections.public_view(connection, stored))
     if agent:
         try:
             authz.validate_agent(agent)
@@ -289,7 +290,7 @@ def show_connection(event, connection_id):
     )
     if not allowed:
         return _json_response(404, {"error": "Connection not found"})
-    return _json_response(200, connections.public_view(connection))
+    return _json_response(200, connections.public_view(connection, stored))
 
 
 def create_connection(event):
@@ -424,12 +425,16 @@ def route(event, method, path):
         return poll_triggers_api(event, method)
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
         return grants_api(event, method)
+    if path == "/api/agent/users" and method in ("GET", "POST", "DELETE"):
+        return users_api(event, method)
     if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):
         return tokens_api(event, method)
     if path == "/api/agent/overview" and method == "GET":
         return operator_overview(event)
     if path == "/api/agent/runs" and method == "GET":
         return runs_api(event)
+    if path == "/api/agent/runs/export" and method == "GET":
+        return runs_export_api(event)
     if path == "/api/agent/runs/replay-failed" and method == "POST":
         return runs_replay_failed_api(event)
     if path == "/api/agent/usage" and method == "GET":
@@ -440,6 +445,8 @@ def route(event, method, path):
         return audit_api(event)
     if path == "/api/agent/errors/summary" and method == "GET":
         return errors_summary_api(event)
+    if path == "/api/agent/errors/digest" and method == "POST":
+        return errors_digest_api(event)
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
     if runs_match and method == "GET":
         return runs_api(event, run_id=unquote(runs_match.group(1)))
@@ -476,6 +483,12 @@ def route(event, method, path):
         return designer_test_api(event, None)
     if path == "/api/agent/designer/workflows/test-step" and method == "POST":
         return designer_test_step_api(event, None)
+    if path == "/api/agent/designer/workflows/bulk" and method == "POST":
+        return designer_bulk_api(event)
+    if path == "/api/agent/designer/workflows/export-all" and method == "GET":
+        return designer_export_all_api(event)
+    if path == "/api/agent/designer/export" and method == "GET":
+        return designer_export_api(event)
     if path == "/api/agent/discover" and method == "POST":
         return discover_samples_api(event)
     if path == "/api/agent/copilot/draft" and method == "POST":
@@ -485,6 +498,16 @@ def route(event, method, path):
         return designer_api(event, method, source=designer_match.group(1))
     if designer_match and method == "PUT":
         return designer_toggle_api(event, designer_match.group(1))
+    if designer_match and method == "DELETE":
+        return designer_delete_api(event, designer_match.group(1))
+    designer_tags_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/tags", path)
+    if designer_tags_match and method == "PUT":
+        return designer_tags_api(event, designer_tags_match.group(1))
+    designer_folder_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/folder", path)
+    if designer_folder_match and method == "PUT":
+        return designer_folder_api(event, designer_folder_match.group(1))
     designer_test_match = re.fullmatch(
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
     if designer_test_match and method == "POST":
@@ -497,6 +520,16 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
     if designer_duplicate_match and method == "POST":
         return designer_duplicate_api(event, designer_duplicate_match.group(1))
+    if path == "/api/agent/designer/templates" and method == "GET":
+        return designer_templates_api(event)
+    designer_template_apply_match = re.fullmatch(
+        r"/api/agent/designer/templates/([a-z0-9][a-z0-9._-]*\.yaml)/apply", path)
+    if designer_template_apply_match and method == "POST":
+        return designer_template_apply_api(event, designer_template_apply_match.group(1))
+    designer_template_flag_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/template", path)
+    if designer_template_flag_match and method == "PUT":
+        return designer_template_flag_api(event, designer_template_flag_match.group(1))
     designer_versions_match = re.fullmatch(
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if designer_versions_match and method == "GET":
@@ -516,18 +549,39 @@ def route(event, method, path):
 
 
 def require_operator(event, action):
-    """Authenticate the bearer identity and require the operator allowlist.
+    """Authenticate the bearer identity and require the effective role.
 
     Returns ``(subject, None)`` or ``(None, error_response)``. ``action`` is
-    the audit action recorded on a denial. API tokens never qualify.
+    the audit action recorded on a denial — and, since roles v1, also picks
+    the least role this action accepts: a stored assignment (roles.py) can
+    widen a non-operator DTC identity into the read-only/workflow-editing
+    bands, narrow an allowlisted operator to viewer, or disable an account
+    entirely. With no stored row the operator allowlist decides exactly as
+    before. API tokens never qualify for any role.
     """
     subject, error = authenticate(event)
     if error:
         return None, error
-    if not _is_operator(event, subject):
+    if event.get("_api_token"):
+        if _is_operator(event, subject):
+            return subject, None
         audit.emit("unknown", action, subject, outcome="denied-not-operator")
         return None, _json_response(403, {"error": "Operator authorization required"})
-    return subject, None
+    minimum = roles.minimum_for_action(action)
+    claims = event.get("_dtc_claims") or {}
+    payload = {"subject": subject, "sub": claims.get("email", "")}
+    effective = roles.effective_role(payload)
+    if roles.satisfies(effective, minimum):
+        return subject, None
+    if effective == "disabled":
+        audit.emit("unknown", action, subject, outcome="denied-disabled")
+        return None, _json_response(403, {"error": "This account is disabled"})
+    audit.emit("unknown", action, subject,
+               outcome="denied-not-operator" if not effective
+               else "denied-insufficient-role")
+    error_text = ("Operator authorization required" if not effective
+                  else f"This action needs the '{minimum}' role")
+    return None, _json_response(403, {"error": error_text})
 
 
 def designer_api(event, method, source=None):
@@ -540,7 +594,9 @@ def designer_api(event, method, source=None):
             status, payload = designer_store.api_get(source)
         else:
             query = event.get("queryStringParameters") or {}
-            status, payload = designer_store.api_list(query.get("q") or None)
+            status, payload = designer_store.api_list(query.get("q") or None,
+                                                      tag=query.get("tag") or None,
+                                                      folder=query.get("folder") or None)
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -550,6 +606,49 @@ def designer_api(event, method, source=None):
     audit.emit(str(payload.get("file", "unknown")), "workflow.save", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
+
+
+def designer_export_all_api(event):
+    """Operator-only export-all: every workflow's canonical YAML as one zip.
+
+    Same domain function as /api/admin/designer/workflows/export-all — the
+    zip is built once server-side and ships base64 in the JSON body, so the
+    CLI never assembles or renders YAML itself. The export itself is audited,
+    mirroring the audit CSV export: bulk reads leave a mark in the trail;
+    denials are recorded by require_operator.
+    """
+    subject, error = require_operator(event, "workflow.export-all")
+    if error:
+        return error
+    status, payload = designer_store.api_export_all()
+    if status == 200:
+        audit.emit("workflows", "workflow.export-all", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
+def designer_export_api(event):
+    """Operator-only workflow bundle: every workflow's canonical YAML as one
+    zip, narrowed by the optional ``?tag=`` / ``?folder=`` (the designer
+    list's filters). `workflows export --all` drives this.
+
+    Same domain function as /api/admin/designer/export — the zip (one
+    canonical YAML per workflow plus a manifest.json) is built once
+    server-side and ships base64 in the JSON body with the attachment
+    content-disposition naming it, so the CLI only decodes and writes. The
+    export itself is audited, mirroring the audit CSV export: bulk reads
+    leave a mark in the trail; denials are recorded by require_operator.
+    """
+    subject, error = require_operator(event, "workflow.export")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = designer_store.api_export(tag=query.get("tag"),
+                                                folder=query.get("folder"))
+    if status == 200:
+        audit.emit("workflows", "workflow.export", subject, outcome="ok")
+        return _no_store(_json_response(status, payload, headers={
+            "content-disposition": f'attachment; filename="{payload["filename"]}"'}))
+    return _no_store(_json_response(status, payload))
 
 
 def copilot_draft_api(event):
@@ -605,6 +704,118 @@ def designer_duplicate_api(event, source):
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.duplicate", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
+
+
+def designer_templates_api(event):
+    """Operator-only template gallery: workflows flagged template:true.
+    Mirrors the console's templates endpoint."""
+    subject, error = require_operator(event, "workflow.template")
+    if error:
+        return error
+    status, payload = designer_store.api_templates()
+    return _json_response(status, payload)
+
+
+def designer_template_apply_api(event, source):
+    """Operator-only template apply: fork a template into a new workflow
+    through the same commit-and-publish path as a save; the template itself
+    is untouched. Mirrors the console's apply endpoint."""
+    subject, error = require_operator(event, "workflow.template")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_apply_template(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.template.apply", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_template_flag_api(event, source):
+    """Operator-only template publish/unpublish: toggle the template flag.
+    Mirrors the console's template-flag endpoint."""
+    subject, error = require_operator(event, "workflow.template")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_template_flag(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(source), "workflow.template", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_delete_api(event, source):
+    """Operator-only workflow delete: unpublish live, then remove the YAML
+    from the repo in one git commit. Refused while runs of the workflow are
+    parked on a delay. Mirrors the console's delete endpoint."""
+    subject, error = require_operator(event, "workflow.delete")
+    if error:
+        return error
+    status, payload = designer_store.api_delete(source)
+    audit.emit(str(source), "workflow.delete", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_tags_api(event, source):
+    """Operator-only tags editor: replace a workflow's tag set (Zapier-style
+    organization). Mirrors the console's tags endpoint."""
+    subject, error = require_operator(event, "workflow.tags")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_tags(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.tags", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_folder_api(event, source):
+    """Operator-only folder editor: put a workflow in a Zapier-style folder
+    (flat — at most one per workflow, an empty string clears it). Mirrors the
+    console's folder endpoint."""
+    subject, error = require_operator(event, "workflow.folder")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_folder(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.folder", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_bulk_api(event):
+    """Operator-only bulk enable/disable over several workflows at once
+    (`dapier workflows on|off a.yaml b.yaml`, the console's selection bar).
+
+    Each id toggles through the same api_toggle semantics and answers per id;
+    one audit row covers the batch, with the id list as the subject."""
+    subject, error = require_operator(event, "workflow.bulk-toggle")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_bulk(body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    ids = [str(item) for item in (body or {}).get("ids") or []] if isinstance(body, dict) else []
+    batch = ", ".join(ids)
+    if len(batch) > 400:
+        batch = batch[:400] + f" … (+{len(ids)} total)"
+    audit.emit(batch or "bulk", "workflow.bulk-toggle", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _no_store(_json_response(status, payload))
 
 
 def designer_versions_api(event, source):
@@ -855,6 +1066,38 @@ def grants_api(event, method):
     return _json_response(status, payload)
 
 
+def users_api(event, method):
+    """Admin-only user management over the CLI's bearer authentication.
+
+    Mirrors the console's /api/admin/users endpoints on top of the shared
+    role store in auth.roles: list users (GET), assign a role (POST body
+    ``{subject, role, display_name?, disabled?}``), remove one (DELETE
+    ``?subject=``). The operator gate keeps API tokens out; the admin
+    minimum then reserves the store to admins — with an empty store the
+    allowlist operators are the bootstrap admins (roles.py). Audit rows
+    (``users.set-role`` / ``users.remove``) are written by the shared
+    domain functions, so both surfaces record every mutation.
+    """
+    subject, error = require_operator(event, "users")
+    if error:
+        return error
+    if method == "GET":
+        status, payload = roles.api_list_users()
+        return _json_response(status, payload)
+    if method == "POST":
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except (ValueError, AttributeError, json.JSONDecodeError):
+            return _json_response(400, {"error": "Invalid request"})
+        if not isinstance(body, dict):
+            return _json_response(400, {"error": "Invalid request"})
+        status, payload = roles.api_set_role(body, operator=subject)
+        return _json_response(status, payload)
+    query = event.get("queryStringParameters") or {}
+    status, payload = roles.api_remove_role(query.get("subject"), operator=subject)
+    return _json_response(status, payload)
+
+
 def tokens_api(event, method):
     """Operator-only API-token management over the CLI's bearer authentication.
 
@@ -922,6 +1165,31 @@ def runs_api(event, run_id=None):
     return _no_store(_json_response(status, payload))
 
 
+def runs_export_api(event):
+    """Operator-only run history CSV export (runs.api_export): the list's
+    filters, one bounded export served as {filename, count, truncated, csv}.
+
+    Mirrors the audit CSV export: the export itself is audited (runs.export),
+    so bulk reads of run history leave a mark in the trail; denials are
+    recorded by require_operator.
+    """
+    subject, error = require_operator(event, "runs.export")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = runs.api_export(
+        max_rows=query.get("max_rows"),
+        workflow_id=query.get("workflow_id") or query.get("workflow") or None,
+        status=query.get("status") or None,
+        since=query.get("since") or None,
+        before=query.get("before") or None,
+        q=query.get("q") or None,
+    )
+    if status == 200:
+        audit.emit("runs", "runs.export", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
 def usage_api(event):
     """Operator-only task usage rollup: tasks per workflow per month."""
     _, error = require_operator(event, "usage")
@@ -944,6 +1212,22 @@ def errors_summary_api(event):
     query = event.get("queryStringParameters") or {}
     status, payload = errors_api.api_summary(query.get("days", 7))
     return _no_store(_json_response(status, payload))
+
+
+def errors_digest_api(event):
+    """Operator-only send-now for the daily error digest.
+
+    Same domain function the scheduled ErrorDigestFunction Lambda runs
+    (error_digest.send); the response reports what was sent, or
+    ``skipped`` when nothing failed in the window — no noise email.
+    """
+    subject, error = require_operator(event, "errors.send-digest")
+    if error:
+        return error
+    payload = error_digest.send()
+    if payload.get("sent"):
+        audit.emit("errors", "errors.send-digest", subject, outcome="ok")
+    return _no_store(_json_response(200, payload))
 
 
 def audit_api(event):
@@ -1034,7 +1318,7 @@ def runs_replay_api(event, run_id):
     the recorded outputs before that step seed the rerun, so a long chain
     is retried at the step that failed.
     """
-    subject, error = require_operator(event, "runs")
+    subject, error = require_operator(event, "runs.replay")
     if error:
         return error
     try:
@@ -1057,7 +1341,7 @@ def runs_cancel_api(event, run_id):
     worker finds the pause cancelled and consumes it — the remaining actions
     never fire.
     """
-    subject, error = require_operator(event, "runs")
+    subject, error = require_operator(event, "runs.cancel")
     if error:
         return error
     status, payload = runs.api_cancel(run_id)
@@ -1073,7 +1357,7 @@ def runs_replay_failed_api(event):
     runs of the workflow named in the body; runs without recorded event data
     are skipped with a reason.
     """
-    subject, error = require_operator(event, "runs")
+    subject, error = require_operator(event, "runs.replay-failed")
     if error:
         return error
     try:
@@ -1113,7 +1397,7 @@ def inbox_replay_api(event, inbox_id):
     the "test this trigger" button for events that arrived before their
     workflow existed.
     """
-    subject, error = require_operator(event, "triggers.inbox")
+    subject, error = require_operator(event, "triggers.inbox-replay")
     if error:
         return error
     status, payload = inbox.api_replay(inbox_id)
