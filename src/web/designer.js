@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$v = [
+  const __iconNode$B = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14325,33 +14325,54 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$v);
-  const __iconNode$u = [
+  const Braces = createLucideIcon("braces", __iconNode$B);
+  const __iconNode$A = [
+    ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
+    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
+    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
+    ["path", { d: "M21 14H11", key: "1bme5i" }],
+    ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
+  ];
+  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$A);
+  const __iconNode$z = [
+    ["path", { d: "M11 14h10", key: "1w8e9d" }],
+    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
+    ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
+    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
+    ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
+  ];
+  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$z);
+  const __iconNode$y = [
     ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
   ];
-  const Clock = createLucideIcon("clock", __iconNode$u);
-  const __iconNode$t = [
+  const Clock = createLucideIcon("clock", __iconNode$y);
+  const __iconNode$x = [
     ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
     ["path", { d: "m12 21 4-4", key: "1lfcce" }],
     ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
   ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$t);
-  const __iconNode$s = [
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$x);
+  const __iconNode$w = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$s);
-  const __iconNode$r = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$w);
+  const __iconNode$v = [
+    ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
+    ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
+  ];
+  const Copy = createLucideIcon("copy", __iconNode$v);
+  const __iconNode$u = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$r);
-  const __iconNode$q = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$u);
+  const __iconNode$t = [
     [
       "path",
       {
@@ -14364,8 +14385,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$q);
-  const __iconNode$p = [
+  const FileText = createLucideIcon("file-text", __iconNode$t);
+  const __iconNode$s = [
     [
       "path",
       {
@@ -14376,8 +14397,18 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$p);
-  const __iconNode$o = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$s);
+  const __iconNode$r = [
+    [
+      "path",
+      {
+        d: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z",
+        key: "1kt360"
+      }
+    ]
+  ];
+  const Folder = createLucideIcon("folder", __iconNode$r);
+  const __iconNode$q = [
     [
       "path",
       {
@@ -14386,21 +14417,33 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$o);
-  const __iconNode$n = [
+  const Funnel = createLucideIcon("funnel", __iconNode$q);
+  const __iconNode$p = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$n);
-  const __iconNode$m = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$p);
+  const __iconNode$o = [
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
     ["path", { d: "M2 12h20", key: "9i4pu4" }]
   ];
-  const Globe = createLucideIcon("globe", __iconNode$m);
-  const __iconNode$l = [
+  const Globe = createLucideIcon("globe", __iconNode$o);
+  const __iconNode$n = [
+    ["path", { d: "M10 8h.01", key: "1r9ogq" }],
+    ["path", { d: "M12 12h.01", key: "1mp3jc" }],
+    ["path", { d: "M14 8h.01", key: "1primd" }],
+    ["path", { d: "M16 12h.01", key: "1l6xoz" }],
+    ["path", { d: "M18 8h.01", key: "emo2bl" }],
+    ["path", { d: "M6 8h.01", key: "x9i8wu" }],
+    ["path", { d: "M7 16h10", key: "wp8him" }],
+    ["path", { d: "M8 12h.01", key: "czm47f" }],
+    ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
+  ];
+  const Keyboard = createLucideIcon("keyboard", __iconNode$n);
+  const __iconNode$m = [
     [
       "path",
       {
@@ -14423,8 +14466,8 @@
       }
     ]
   ];
-  const Layers = createLucideIcon("layers", __iconNode$l);
-  const __iconNode$k = [
+  const Layers = createLucideIcon("layers", __iconNode$m);
+  const __iconNode$l = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14437,32 +14480,32 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$k);
-  const __iconNode$j = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$l);
+  const __iconNode$k = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$j);
-  const __iconNode$i = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$i);
-  const __iconNode$h = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$k);
+  const __iconNode$j = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$j);
+  const __iconNode$i = [
     ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
     ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
   ];
-  const Mail = createLucideIcon("mail", __iconNode$h);
-  const __iconNode$g = [
+  const Mail = createLucideIcon("mail", __iconNode$i);
+  const __iconNode$h = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$g);
-  const __iconNode$f = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$f);
-  const __iconNode$e = [
+  const Maximize = createLucideIcon("maximize", __iconNode$h);
+  const __iconNode$g = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$g);
+  const __iconNode$f = [
     [
       "path",
       {
@@ -14471,8 +14514,8 @@
       }
     ]
   ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$e);
-  const __iconNode$d = [
+  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$f);
+  const __iconNode$e = [
     [
       "path",
       {
@@ -14481,20 +14524,20 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$d);
-  const __iconNode$c = [
+  const Play = createLucideIcon("play", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$c);
-  const __iconNode$b = [
+  const Plus = createLucideIcon("plus", __iconNode$d);
+  const __iconNode$c = [
     ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
     ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
     ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
     ["path", { d: "M8 16H3v5", key: "1cv678" }]
   ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$b);
-  const __iconNode$a = [
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$c);
+  const __iconNode$b = [
     [
       "path",
       {
@@ -14504,8 +14547,8 @@
     ],
     ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
   ];
-  const Send = createLucideIcon("send", __iconNode$a);
-  const __iconNode$9 = [
+  const Send = createLucideIcon("send", __iconNode$b);
+  const __iconNode$a = [
     [
       "path",
       {
@@ -14517,8 +14560,8 @@
     ["path", { d: "M22 4h-4", key: "gwowj6" }],
     ["circle", { cx: "4", cy: "20", r: "2", key: "6kqj1y" }]
   ];
-  const Sparkles = createLucideIcon("sparkles", __iconNode$9);
-  const __iconNode$8 = [
+  const Sparkles = createLucideIcon("sparkles", __iconNode$a);
+  const __iconNode$9 = [
     [
       "path",
       {
@@ -14528,7 +14571,14 @@
     ],
     ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
   ];
-  const StickyNote = createLucideIcon("sticky-note", __iconNode$8);
+  const StickyNote = createLucideIcon("sticky-note", __iconNode$9);
+  const __iconNode$8 = [
+    ["path", { d: "M12 3v18", key: "108xh3" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", key: "afitv7" }],
+    ["path", { d: "M3 9h18", key: "1pudct" }],
+    ["path", { d: "M3 15h18", key: "5xshup" }]
+  ];
+  const Table = createLucideIcon("table", __iconNode$8);
   const __iconNode$7 = [
     ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
     ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
@@ -17817,6 +17867,12 @@
       fill: "#0061FF"
     }
   ]);
+  const TelegramLogo = brandMark("Telegram", [
+    {
+      d: "M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z",
+      fill: "#26A5E4"
+    }
+  ]);
   function SheetsLogo({ size = 16, className, x, y }) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "svg",
@@ -17924,6 +17980,7 @@
       type: "webhook",
       label: "Webhook",
       icon: Webhook,
+      description: "POST the event — or a templated JSON payload — to any URL, optionally HMAC-signed with a stored secret. The receiver's response body lands in the step output (parsed JSON, or a text preview) for later steps.",
       fields: [
         { key: "url", label: "URL", required: true },
         { key: "payload", label: "Payload (JSON, templated)", type: "textarea", placeholder: '{"id": "{trigger.id}"}' },
@@ -17957,6 +18014,7 @@
       type: "slack",
       label: "Slack",
       icon: SlackLogo,
+      description: "Post a templated message to a Slack channel through a stored credential or Slack connection. Output: {ok, channel, ts}.",
       fields: [
         { key: "credential_id", label: "Credential ID" },
         { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
@@ -17968,6 +18026,12 @@
           discover: { resource: "channels" }
         },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — replies into that thread",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
         { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
         { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
@@ -17999,11 +18063,217 @@
       type: "slack_find",
       label: "Slack: find user or channel",
       icon: SlackLogo,
-      description: "Look up one workspace user (by email) or channel (by name). Output: {found, user} or {found, channel}.",
+      description: "Look up one workspace user (by email) or channel (by name). Output: {found, user} or {found, channel}. With Create if missing on, a missed channel is created (created: true).",
       fields: [
-        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
         { key: "find", label: "Find", type: "select", options: ["user", "channel"], default: "user" },
         { key: "query", label: "Query", placeholder: "person@example.com or #channel", required: true },
+        {
+          key: "create_if_missing",
+          label: "Create if missing",
+          type: "boolean",
+          default: "false",
+          placeholder: "channels only: create the channel when none matches"
+        },
+        {
+          key: "is_private",
+          label: "Private channel",
+          type: "boolean",
+          default: "false",
+          placeholder: "only used when Create if missing is on"
+        },
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_update_message",
+      label: "Slack: update message",
+      icon: SlackLogo,
+      description: "Edit one already-posted message (chat.update). A slack trigger envelope carries {channel_id} and {ts}. Output: {ok, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "ts",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (updated by the workflow)" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_add_reaction",
+      label: "Slack: add reaction",
+      icon: SlackLogo,
+      description: "React to one message (reactions.add). already_reacted counts as success so a retried run stays green. Output: {ok, reaction, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "timestamp",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "reaction", label: "Reaction", required: true, placeholder: "tada" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_schedule_message",
+      label: "Slack: send scheduled message",
+      icon: SlackLogo,
+      description: "Sends one templated message for later (chat.scheduleMessage). Post at takes an ISO 8601 datetime — a missing offset reads as UTC — or epoch seconds. Output: {ok, channel, scheduled_message_id, ts, post_at}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or #channel", discover: { resource: "channels" } },
+        { key: "text", label: "Text template", type: "textarea", required: true, placeholder: "{title}\n{url}" },
+        { key: "post_at", label: "Post at", required: true, placeholder: "2026-10-02T09:00:00Z" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — schedules the reply into one thread",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
+        { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_add_reminder",
+      label: "Slack: add reminder",
+      icon: SlackLogo,
+      description: "Sets one reminder (reminders.add). Time takes Slack's natural-language times — in 20 minutes, tomorrow 9am — or epoch seconds; empty = Slack's default (20 minutes). Output: {ok, reminder: {id, time, text}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "text", label: "Reminder text", type: "textarea", required: true, placeholder: "Rotate the {customer} API key" },
+        { key: "time", label: "When", placeholder: "in 20 minutes / tomorrow 9am / 1759400000" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_dm",
+      label: "Slack: send direct message",
+      icon: SlackLogo,
+      description: "Open (or reuse) the DM channel with one user and post the templated text into it (conversations.open + chat.postMessage). Chain find user by email to target the person an event names. Output: {ok, user, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{steps.find.output.user.id}", discover: { resource: "users", value: "{id}" } },
+        { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
+        { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
+        { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_create_channel",
+      label: "Slack: create channel",
+      icon: SlackLogo,
+      description: "Create one channel (conversations.create); the name is normalized to what Slack accepts (lowercase, spaces to hyphens, illegal characters dropped). An existing name is an error. Output: {ok, channel: {id, name, is_private}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "name", label: "Channel name", required: true, placeholder: "alerts-{customer}" },
+        { key: "is_private", label: "Private channel", type: "boolean", default: "false" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_set_topic",
+      label: "Slack: set channel topic",
+      icon: SlackLogo,
+      description: "Set one channel's topic (conversations.setTopic). A slack trigger envelope carries {channel_id}. Output: {ok, channel, topic}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        { key: "topic", label: "Topic", type: "textarea", required: true },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_set_purpose",
+      label: "Slack: set channel purpose",
+      icon: SlackLogo,
+      description: "Set one channel's purpose (conversations.setPurpose). A slack trigger envelope carries {channel_id}. Output: {ok, channel, purpose}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        { key: "purpose", label: "Purpose", type: "textarea", required: true },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_invite_to_channel",
+      label: "Slack: invite users to channel",
+      icon: SlackLogo,
+      description: "Invite one or more workspace users into a channel (conversations.invite). Slack's already_in_channel is absorbed as invited: false so a retried run stays green. Output: {invited, channel, users}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or #channel", discover: { resource: "channels" } },
+        {
+          key: "users",
+          label: "Users",
+          required: true,
+          placeholder: "{steps.find.output.user.id} (comma-separated ids)",
+          discover: { resource: "users" }
+        },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_pin_message",
+      label: "Slack: pin message",
+      icon: SlackLogo,
+      description: "Pin one message to its channel (pins.add). A slack trigger envelope carries {channel_id} and {ts}. Output: {pinned, channel, timestamp}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "timestamp",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_find_message",
+      label: "Slack: find message",
+      icon: SlackLogo,
+      description: "Search workspace messages (search.messages; the token needs the search:read scope). Output: {found, messages: [{ts, channel_id, channel_name, user, text, permalink}], count} — a miss is not an error.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "query", label: "Query", required: true, placeholder: "deploy postmortem" },
+        { key: "count", label: "Max results", type: "number", placeholder: "20" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_upload_file",
+      label: "Slack: upload file",
+      icon: SlackLogo,
+      description: "Send one file to a channel (files.uploadV2). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content — dropbox/drive read file chain here. Output: {ok, channel, file: {id, name, title, permalink}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or C01ABC2DEF", discover: { resource: "channels" } },
+        { key: "filename", label: "File name", required: true, placeholder: "report.pdf" },
+        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        { key: "title", label: "Title", placeholder: "shown in Slack (defaults to the file name)" },
+        { key: "initial_comment", label: "Comment", type: "textarea", placeholder: "posted with the file" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — replies to that message instead of posting top-level",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "content_type", label: "Content type", placeholder: "guessed from the file name" },
         { key: "credential_id", label: "Credential ID" }
       ]
     },
@@ -18041,21 +18311,160 @@
       ]
     },
     {
+      type: "telegram_send_document",
+      label: "Telegram send document",
+      icon: Send,
+      description: "Send a file to a chat (Bot API sendDocument). Media comes from exactly one of source_url or a staged source_s3 {bucket, key} object; the filename defaults to the URL's or key's file name.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.pdf" },
+        { key: "filename", label: "Filename override" },
+        { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_send_photo",
+      label: "Telegram send photo",
+      icon: Send,
+      description: "Send a photo to a chat (Bot API sendPhoto). Media comes from exactly one of source_url or a staged source_s3 {bucket, key} object; Bot API photos must be JPEG/PNG/GIF/WEBP under 10 MB.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.png" },
+        { key: "filename", label: "Filename override" },
+        { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_send_poll",
+      label: "Telegram send poll",
+      icon: Send,
+      description: "Send a poll to a chat (Bot API sendPoll). Options holds one option per line — 2 to 10 after trimming empty lines; chat_id falls back to the triggering chat like the other sends. Output: {message_id, chat_id, poll: {id, question}}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "question", label: "Question", required: true, placeholder: "Ship on Friday?" },
+        { key: "options", label: "Options", type: "textarea", required: true, placeholder: "Yes\nNo\nNeeds another week" },
+        { key: "anonymous", label: "Anonymous voting", type: "boolean", default: "true" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_edit_message",
+      label: "Telegram edit message",
+      icon: Send,
+      description: "Edit one already-posted message's text (Bot API editMessageText). chat_id falls back to the triggering chat like the other telegram actions; message_id comes from the trigger or an earlier step. Output: {message_id, chat_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "message_id", label: "Message ID", required: true, placeholder: "{message_id}" },
+        { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (edited by the workflow)" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_pin_message",
+      label: "Telegram pin message",
+      icon: Send,
+      description: "Pin one message in a chat (Bot API pinChatMessage). chat_id falls back to the triggering chat; disable_notification pins silently. Output: {pinned, chat_id, message_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "message_id", label: "Message ID", required: true, placeholder: "{message_id}" },
+        { key: "disable_notification", label: "Pin silently", type: "boolean", default: "false" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_ban_member",
+      label: "Telegram ban member",
+      icon: Send,
+      description: "Ban one member from a chat (Bot API banChatMember). chat_id falls back to the triggering chat; user_id renders from the event. Optional until_date bans until an epoch timestamp (empty means forever). Output: {banned, chat_id, user_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{user_id}" },
+        { key: "until_date", label: "Banned until", placeholder: "1798761600 (epoch seconds; empty = forever)" }
+      ]
+    },
+    {
+      type: "telegram_unban_member",
+      label: "Telegram unban member",
+      icon: Send,
+      description: "Unban one member of a chat (Bot API unbanChatMember). chat_id falls back to the triggering chat; user_id renders from the event. Output: {unbanned, chat_id, user_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{user_id}" }
+      ]
+    },
+    {
       type: "email_send",
       label: "Send email",
       icon: Mail,
+      description: "Send an email through SES. The sender defaults to the workflow's sender; the body is the text body, the HTML body, or both. Any attachment — or a threading header (In-Reply-To / References) — switches the send to raw MIME.",
       fields: [
         { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
         { key: "subject", label: "Subject", placeholder: "{subject}" },
         { key: "text", label: "Text body", type: "textarea" },
         { key: "html", label: "HTML body", type: "textarea" },
-        { key: "sender", label: "Sender", placeholder: "defaults to the workflow sender" }
+        { key: "sender", label: "Sender", placeholder: "defaults to the workflow sender" },
+        { key: "cc", label: "Cc", placeholder: "comma-separated or {templated}" },
+        { key: "bcc", label: "Bcc", placeholder: "comma-separated or {templated}" },
+        { key: "reply_to", label: "Reply-To", placeholder: "replies@example.com" },
+        { key: "in_reply_to", label: "In-Reply-To", placeholder: "{trigger.message_id}" },
+        { key: "references", label: "References", placeholder: "{trigger.message_id} — the thread's chain" },
+        {
+          key: "attachments",
+          label: "Attachments (YAML)",
+          type: "textarea",
+          placeholder: '- filename: report.pdf\n  source_url: "{link}"'
+        }
       ]
     },
     {
       type: "dataops",
       label: "DataOps intake",
       icon: DatabaseZap,
+      description: "Push the event into a DataOps intake (url_env or url): attachments and rendered PDFs — or a Dropbox file event's bytes — are staged with sha256 checksums and referenced by s3:// URI.",
       fields: [
         { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
         { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
@@ -18069,6 +18478,7 @@
       type: "dropbox_upload",
       label: "Dropbox upload",
       icon: DropboxLogo,
+      description: "Upload the email's stored attachments — or a rendered output file — into a folder in the connection's Dropbox. Output: {uploaded: [paths]}.",
       fields: [
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
@@ -18076,6 +18486,7 @@
           key: "folder",
           label: "Folder",
           placeholder: "/Invoices",
+          required: true,
           discover: { resource: "folders", value: "{path}" }
         },
         { key: "filename", label: "Filename override" }
@@ -18085,6 +18496,7 @@
       type: "dropbox_delete",
       label: "Dropbox delete",
       icon: DropboxLogo,
+      description: "Delete one file from the connection's Dropbox, defaulting to the triggering event's path — run it after intake succeeds. Output: {deleted: path}.",
       fields: [
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         {
@@ -18117,6 +18529,82 @@
           discover: { resource: "folders", value: "{path}" }
         },
         { key: "create_if_missing", label: "Create folder if missing", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "dropbox_read_file",
+      label: "Dropbox: read file",
+      icon: DropboxLogo,
+      description: "Download a file from the connection's Dropbox and stage it for later steps. Pair with Amazon S3 (source_s3) to move the bytes into a bucket.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_get_temp_link",
+      label: "Dropbox: get temporary link",
+      icon: DropboxLogo,
+      description: "Mint a direct download link for one file (valid a few hours). Chain it before Amazon S3 and pass {steps.<id>.output.link} as source_url to pull Dropbox bytes into the pipeline.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_create_folder",
+      label: "Dropbox: create folder",
+      icon: DropboxLogo,
+      description: "Create one folder (files/create_folder_v2). The path is the full destination and renders from the event; an existing folder is an error. Output: {folder, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        { key: "path", label: "Folder path", placeholder: "/Invoices/{month}", required: true }
+      ]
+    },
+    {
+      type: "dropbox_move",
+      label: "Dropbox: move file",
+      icon: DropboxLogo,
+      description: "Move (or rename) one file or folder (files/move_v2) — a move within the same folder under a new name renames. autorename appends a suffix instead of erroring on an existing destination. Output: {moved, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "from_path",
+          label: "From path",
+          required: true,
+          placeholder: "{path} from a dropbox trigger",
+          discover: { resource: "files", value: "{path}" }
+        },
+        { key: "to_path", label: "To path", required: true, placeholder: "/Archive/{filename}" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "dropbox_copy",
+      label: "Dropbox: copy file",
+      icon: DropboxLogo,
+      description: "Copy one file or folder to a new path (files/copy_v2). autorename appends a suffix instead of erroring on an existing destination. Output: {copied, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "from_path",
+          label: "From path",
+          required: true,
+          placeholder: "{path} from a dropbox trigger",
+          discover: { resource: "files", value: "{path}" }
+        },
+        { key: "to_path", label: "To path", required: true, placeholder: "/Archive/{filename}" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "false" }
       ]
     },
     {
@@ -18154,7 +18642,7 @@
       type: "s3_find",
       label: "S3: find object",
       icon: S3Logo,
-      description: "Find the first object matching a name pattern in a bucket (Find Object)",
+      description: "Find the first object matching a name pattern in a bucket (Find Object). A truncated listing rides out in next_token — feed it back on a repeated run to continue.",
       fields: [
         { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
         {
@@ -18171,14 +18659,120 @@
           placeholder: "reports/2026/",
           discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } }
         },
-        { key: "match", label: "Match", type: "select", options: ["exact", "prefix", "suffix", "contains"], default: "exact" }
+        { key: "match", label: "Match", type: "select", options: ["exact", "prefix", "suffix", "contains"], default: "exact" },
+        { key: "next_token", label: "Next token", placeholder: "{previous.next_token} — continues a truncated listing" }
+      ]
+    },
+    {
+      type: "s3_list_objects",
+      label: "S3: list objects",
+      icon: S3Logo,
+      description: "List a bucket's objects under a prefix (ListObjectsV2; List Files). Output: {bucket, prefix, items, count, truncated, next_token} — each item is {key, size, last_modified}; keys arrive alphabetically, capped at Max items (default 20, up to 100). Feed next_token back in to keep walking a truncated listing.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "prefix",
+          label: "Key prefix",
+          placeholder: "reports/2026/",
+          discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } }
+        },
+        {
+          key: "max_items",
+          label: "Max items",
+          type: "number",
+          default: "20",
+          placeholder: "listing bound — capped at 100"
+        },
+        { key: "next_token", label: "Continuation token", placeholder: "{previous.next_token} — walks past the cap" }
+      ]
+    },
+    {
+      type: "s3_read_object",
+      label: "S3: read object",
+      icon: S3Logo,
+      description: "Download one object and stage the bytes for the steps that follow (GetObject). The key defaults to the event's object key. Output: {filename, size, content_type, bucket, key, source_bucket, source_key} — pair with a step whose source_s3 takes templates to move the bytes elsewhere.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "defaults to the event's object key",
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        }
+      ]
+    },
+    {
+      type: "s3_presign_url",
+      label: "S3: presigned URL",
+      icon: S3Logo,
+      description: "Mint a short-lived presigned download URL for one object (presigned GET; one hour by default, up to seven days). Output: {link, bucket, key, expires_in} — feed link into a follow-up step's source_url to hand a private object to another pipeline. Computed, never sent.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "reports/2026/report.pdf",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        },
+        {
+          key: "expires_in",
+          label: "Expires in (s)",
+          type: "number",
+          default: "3600",
+          placeholder: "seconds — one hour by default, capped at 604800 (SigV4's seven days)"
+        }
+      ]
+    },
+    {
+      type: "s3_delete_object",
+      label: "S3: delete object",
+      icon: S3Logo,
+      description: "Delete one object from a bucket (DeleteObject). S3 deletes are idempotent — removing an absent key succeeds. Output: {deleted, bucket, key}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "tmp/{name}.pdf",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        }
       ]
     },
     {
       type: "mailchimp_find_member",
       label: "Mailchimp: find member",
       icon: MailLogo,
-      description: "Find one audience member by email. Output: {found, member}; a miss is {found: false, member: null}.",
+      description: "Find one audience member by email. Output: {found, member}; a miss is {found: false, member: null} — or, with Create if missing on, the member is created and the output reports created: true.",
       fields: [
         { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
         {
@@ -18193,6 +18787,20 @@
           placeholder: "{sender}",
           required: true,
           discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        },
+        { key: "create_if_missing", label: "Create if missing", type: "boolean", default: "false" },
+        {
+          key: "status",
+          label: "Status if new",
+          type: "select",
+          options: ["subscribed", "pending", "unsubscribed", "cleaned"],
+          default: "subscribed",
+          placeholder: "only used when Create if missing is on"
+        },
+        {
+          key: "merge_fields",
+          label: "Merge fields (JSON)",
+          placeholder: '{"FNAME": "{name}"} — only used when Create if missing is on'
         }
       ]
     },
@@ -18227,6 +18835,74 @@
       ]
     },
     {
+      type: "mailchimp_remove_member",
+      label: "Mailchimp: remove member",
+      icon: MailLogo,
+      description: "Permanently remove one audience member by email. A missing email is not an error: the output is {removed: false} — guard with find member when the difference matters.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        }
+      ]
+    },
+    {
+      type: "mailchimp_unsubscribe_member",
+      label: "Mailchimp: unsubscribe member",
+      icon: MailLogo,
+      description: "Unsubscribe one audience member by email — reversible: the member stays on the audience with status unsubscribed, unlike the permanent remove. A missing email is not an error: the output is {unsubscribed: false}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        }
+      ]
+    },
+    {
+      type: "mailchimp_tag_member",
+      label: "Mailchimp: tag member",
+      icon: MailLogo,
+      description: "Add or remove one tag on an audience member: Add applies the tag, Remove sets it inactive. The member must exist — upsert it first when unsure.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        },
+        { key: "tag", label: "Tag", placeholder: "digest-readers", required: true },
+        { key: "tag_action", label: "Operation", type: "select", options: ["add", "remove"], default: "add" }
+      ]
+    },
+    {
       type: "drive_find_file",
       label: "Drive: find file",
       icon: FileText,
@@ -18250,6 +18926,138 @@
       ]
     },
     {
+      type: "drive_read_file",
+      label: "Drive: read file",
+      icon: FileText,
+      description: "Download a Drive file and stage it for later steps (Read File); Google-native docs export first (export_as). Pair with Amazon S3 (source_s3) or Slack's upload file to move the bytes on.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "export_as", label: "Export as", placeholder: "application/pdf — for Google-native files" }
+      ]
+    },
+    {
+      type: "drive_upload_file",
+      label: "Upload file",
+      icon: FileText,
+      description: "Upload one file into the connection's Drive (Upload File). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content. Output: {file_id, name, mime_type, size, webViewLink}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "name", label: "File name", placeholder: "report.pdf", required: true },
+        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        {
+          key: "folder_id",
+          label: "Folder ID",
+          placeholder: "uploads into one folder (defaults to the root)",
+          discover: { resource: "folders" }
+        },
+        { key: "content_type", label: "Content type", placeholder: "application/octet-stream" }
+      ]
+    },
+    {
+      type: "drive_copy_file",
+      label: "Drive: copy file",
+      icon: FileText,
+      description: `Copy one Drive file (Drive v3 files.copy); the optional name names the copy, else Drive's "Copy of …". Output: {file_id, name, mime_type, size, webViewLink} — the upload's keys, so the file steps chain.`,
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "name", label: "Copy name", placeholder: `defaults to Drive's "Copy of <original name>"` }
+      ]
+    },
+    {
+      type: "drive_share_file",
+      label: "Drive: share file",
+      icon: FileText,
+      description: "Share one Drive file by creating a permission (Drive v3 permissions.create). Role is reader/commenter/writer; Share with picks user, group, domain, or anyone — a user or group grant needs the grantee's email address. Output: {shared, file_id, permission_id, role, type}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "role", label: "Role", type: "select", options: ["reader", "commenter", "writer"], default: "reader" },
+        { key: "share_type", label: "Share with", type: "select", options: ["user", "group", "domain", "anyone"], default: "user" },
+        { key: "email_address", label: "Email address", placeholder: "the user or group to grant — required for those share types" }
+      ]
+    },
+    {
+      type: "drive_delete_file",
+      label: "Drive: delete file",
+      icon: FileText,
+      description: "Delete one Drive file (Zapier's Delete File). The default moves the file to the trash (Drive v3 files.update with trashed: true) — recoverable from Drive's trash; Delete permanently calls files.delete instead, which destroys the file outright. Output: {trashed, permanent, file_id, name}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        {
+          key: "permanent",
+          label: "Delete permanently",
+          type: "boolean",
+          default: "false",
+          placeholder: "off: trash (recoverable) — on: files.delete destroys it"
+        }
+      ]
+    },
+    {
+      type: "drive_move_file",
+      label: "Drive: move file",
+      icon: FileText,
+      description: "Move one Drive file between folders (Drive v3 files.update with addParents/removeParents; Zapier's Move File). At least one of Add to folder / Remove from folder is required; adding keeps the file's other parents. Output: {moved: true, file_id, name, parents} — the resulting parents.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        {
+          key: "add_parent",
+          label: "Add to folder",
+          discover: { resource: "folders" }
+        },
+        {
+          key: "remove_parent",
+          label: "Remove from folder",
+          discover: { resource: "folders" }
+        }
+      ]
+    },
+    {
+      type: "drive_create_folder",
+      label: "Drive: create folder",
+      icon: FileText,
+      description: "Create one Drive folder (Drive v3 files.create with the folder mimeType). The optional parent folder places it, else it lands at the Drive root. Output: {folder_id, name, url} — file uploads into it via Upload file's folder_id.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "name", label: "Folder name", placeholder: "Invoices 2026", required: true },
+        {
+          key: "parent_folder_id",
+          label: "Parent folder ID",
+          placeholder: "creates inside one folder (defaults to the Drive root)",
+          discover: { resource: "folders" }
+        }
+      ]
+    },
+    {
       type: "youtube_find_video",
       label: "YouTube: find video",
       icon: YouTubeLogo,
@@ -18267,6 +19075,103 @@
       fields: [
         { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
         { key: "playlist_id", label: "Playlist ID", discover: { resource: "playlists" } }
+      ]
+    },
+    {
+      type: "youtube_upload_video",
+      label: "Upload video",
+      icon: YouTubeLogo,
+      description: "Upload one video to the connection's YouTube channel (Upload Video). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content; bytes stage in memory, so keep sources modest (~100 MB ceiling). Output: {video_id, title, privacy_status, upload_status, url}. Needs the youtube.upload OAuth scope.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "title", label: "Title", placeholder: "Deploying dapier: a walkthrough", required: true },
+        { key: "source_url", label: "Source URL", placeholder: "https://example.test/talk.mp4" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        { key: "description", label: "Description", placeholder: "shown under the video — templated" },
+        { key: "tags", label: "Tags", placeholder: "comma-separated, e.g. devops, kubernetes" },
+        { key: "category_id", label: "Category ID", placeholder: "YouTube category id, e.g. 22 (People & Blogs)" },
+        { key: "privacy_status", label: "Privacy", type: "select", options: ["public", "unlisted", "private"], default: "unlisted" }
+      ]
+    },
+    {
+      type: "youtube_add_to_playlist",
+      label: "YouTube: add to playlist",
+      icon: YouTubeLogo,
+      description: "Add one video to a playlist the connection can edit (playlistItems.insert; Add Video to Playlist). Output: {playlist_id, video_id, playlist_item_id, title, position}. A video already in the playlist is YouTube's videoAlreadyInPlaylist error, not a silent duplicate.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "playlist_id",
+          label: "Playlist ID",
+          required: true,
+          discover: { resource: "playlists" }
+        },
+        {
+          key: "video_id",
+          label: "Video ID",
+          required: true,
+          placeholder: "{trigger.video_id} from a youtube trigger, or a found video's id",
+          discover: { resource: "videos" }
+        }
+      ]
+    },
+    {
+      type: "youtube_update_video",
+      label: "YouTube: update video",
+      icon: YouTubeLogo,
+      description: "Update one video's title and description (videos.update, part=snippet; Update Video). YouTube replaces the whole snippet on update, so pass category_id when the video's category matters. Output: {updated, video_id, title, description, category_id}.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "video_id",
+          label: "Video ID",
+          required: true,
+          placeholder: "{trigger.video_id} from a youtube trigger",
+          discover: { resource: "videos" }
+        },
+        {
+          key: "title",
+          label: "Title",
+          required: true,
+          placeholder: "the video's new title — YouTube replaces the whole snippet part"
+        },
+        {
+          key: "description",
+          label: "Description",
+          placeholder: "takes templates — left out, YouTube clears it"
+        },
+        {
+          key: "category_id",
+          label: "Category ID",
+          placeholder: "e.g. 22 (People & Blogs) — pass it when the video's category matters, or the update clears it"
+        }
+      ]
+    },
+    {
+      type: "youtube_remove_from_playlist",
+      label: "YouTube: remove from playlist",
+      icon: YouTubeLogo,
+      description: "Remove one item from a playlist the connection can edit (playlistItems.delete; Remove Video from Playlist). An item already gone is {removed: false}, not an error. Output: {removed, playlist_item_id}. Needs the youtube.force-ssl scope.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "playlist_item_id",
+          label: "Playlist item ID",
+          required: true,
+          placeholder: "{steps.add.output.playlist_item_id} — youtube_add_to_playlist's output, or an item id from a Find Playlist Videos listing"
+        }
+      ]
+    },
+    {
+      type: "youtube_create_playlist",
+      label: "YouTube: create playlist",
+      icon: YouTubeLogo,
+      description: "Create an empty playlist on the connection's channel (playlists.insert, part=snippet,status; Create Playlist). Output: {playlist_id, title, url} — the id chains into Add to Playlist.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "title", label: "Title", placeholder: "Deploying dapier: full episodes", required: true },
+        { key: "description", label: "Description", placeholder: "shown on the playlist page — templated" },
+        { key: "privacy_status", label: "Privacy", type: "select", options: ["private", "public", "unlisted"], default: "private" }
       ]
     },
     {
@@ -18409,10 +19314,128 @@
       ]
     },
     {
+      type: "sheets_delete_row",
+      label: "Google Sheets (delete row)",
+      icon: SheetsLogo,
+      description: "Delete one worksheet row, shifting the rows under it up (Delete Spreadsheet Row via batchUpdate). Pairs with sheets_lookup_row's row output.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "row",
+          label: "Row number",
+          type: "number",
+          required: true,
+          placeholder: "{steps.lookup.output.row}",
+          discover: { resource: "rows", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{row}" }
+        }
+      ]
+    },
+    {
+      type: "sheets_clear_values",
+      label: "Google Sheets (clear values)",
+      icon: SheetsLogo,
+      description: "Clear a worksheet or A1 range (Clear Spreadsheet Values via values:clear) — cell contents go, formatting and the rows themselves stay. Output: {cleared_range, spreadsheet_id}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        { key: "range", label: "Range (A1)", placeholder: "todo!A2:Z100 — a bare range is qualified with the worksheet name" }
+      ]
+    },
+    {
+      type: "sheets_create_spreadsheet",
+      label: "Google Sheets (create spreadsheet)",
+      icon: SheetsLogo,
+      description: "Create an empty spreadsheet (Create Spreadsheet). Output: {spreadsheet_id, url, worksheet}, plus headers_applied when a header row was written — reference {steps.<id>.output.spreadsheet_id} in a follow-up append step.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "title", label: "Spreadsheet title", placeholder: "Weekly sync {date}", required: true },
+        {
+          key: "headers",
+          label: "Header row (JSON)",
+          type: "textarea",
+          placeholder: '["Date", "Task", "Status"]'
+        }
+      ]
+    },
+    {
+      type: "sheets_add_worksheet",
+      label: "Google Sheets (add worksheet)",
+      icon: SheetsLogo,
+      description: "Add one worksheet to a spreadsheet (Create Worksheet via batchUpdate addSheet). Output: {sheet_id, title, row_count, column_count, spreadsheet_id} — the title chains into the values actions' Worksheet fields. A tab with the same title is Sheets' 400.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        { key: "title", label: "Worksheet title", placeholder: "Archive {date}", required: true },
+        { key: "row_count", label: "Rows", type: "number", default: "1000" },
+        { key: "column_count", label: "Columns", type: "number", default: "26" }
+      ]
+    },
+    {
+      type: "sheets_create_column",
+      label: "Google Sheets (create column)",
+      icon: SheetsLogo,
+      description: "Append one header cell to the worksheet's header row (Create Spreadsheet Column) — the first free column, or the existing one when the name is already there. Output: {spreadsheet_id, worksheet, column, position, cell, created}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "column",
+          label: "Column name (header)",
+          placeholder: "Status",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{name}" }
+        }
+      ]
+    },
+    {
       type: "zoom_find_meeting",
       label: "Zoom find meeting",
       icon: Video,
-      description: "Find a Zoom meeting by id, or by topic among upcoming meetings",
+      description: "Find a Zoom meeting by id, or by topic in the scope window (upcoming by default, past with scope: past). With create-if-missing, an upcoming topic miss creates the meeting from the shared create fields (Zapier's Find or Create).",
       fields: [
         { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
         {
@@ -18421,7 +19444,19 @@
           discover: { resource: "meetings" }
         },
         { key: "topic", label: "Topic", placeholder: "used when no meeting id is given" },
-        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" },
+        { key: "scope", label: "Scope", type: "select", options: ["upcoming", "past"], default: "upcoming" },
+        { key: "create_if_missing", label: "Create on topic miss", type: "boolean", default: "false" },
+        { key: "start_time", label: "Start time (for create)", placeholder: "{trigger.start} — ISO 8601" },
+        { key: "duration", label: "Duration (min, for create)", type: "number" },
+        { key: "timezone", label: "Timezone (for create)", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda (for create)" },
+        {
+          key: "settings",
+          label: "Settings (JSON, for create)",
+          type: "textarea",
+          placeholder: '{"waiting_room": false}'
+        }
       ]
     },
     {
@@ -18441,13 +19476,245 @@
       ]
     },
     {
+      type: "zoom_delete_recording",
+      label: "Zoom: delete recording",
+      icon: Video,
+      description: "Delete one meeting's cloud recording (DELETE /meetings/{id}/recordings; Delete Recording). Action picks how: trash (the default) is recoverable from Zoom's trash, permanent destroys the recording and its files. Output: {deleted: true, meeting_id, action}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "recordings" }
+        },
+        { key: "action", label: "Action", type: "select", options: ["trash", "permanent"], default: "trash" }
+      ]
+    },
+    {
+      type: "zoom_create_meeting",
+      label: "Zoom: create meeting",
+      icon: Video,
+      description: "Create a Zoom meeting — scheduled when a start time is given, instant otherwise (Create Meeting). Output: {created, scheduled, meeting: {id, topic, join_url, start_url, passcode, ...}}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "topic", label: "Topic", required: true },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — instant meeting when empty" },
+        { key: "duration", label: "Duration (minutes)", type: "number", default: "60" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"join_before_host": true}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_update_meeting",
+      label: "Zoom: update meeting",
+      icon: Video,
+      description: "Update one Zoom meeting's schedule or metadata — only the fields set are sent, the rest of the meeting stays untouched (PATCH /meetings/{id}). Output: {updated, meeting_id, updated_fields}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "meetings" }
+        },
+        { key: "topic", label: "Topic", placeholder: "the meeting's new title; left out, Zoom keeps the old one" },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — the reschedule field" },
+        { key: "duration", label: "Duration (minutes)", type: "number" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"join_before_host": true}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_add_registrant",
+      label: "Zoom: add registrant",
+      icon: Video,
+      description: "Register one person for a meeting that requires registration and get their personalized join link (POST /meetings/{id}/registrants). Output: {registered, meeting_id, registrant_id, join_url} — join_url is unique per registrant, the thing an invite email templates.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "meetings" }
+        },
+        { key: "email", label: "Email", required: true, placeholder: "{trigger.email}" },
+        { key: "first_name", label: "First name" },
+        { key: "last_name", label: "Last name" }
+      ]
+    },
+    {
+      type: "zoom_list_past_participants",
+      label: "Zoom: list past meeting participants",
+      icon: Video,
+      description: "List who attended one past Zoom meeting (GET /past_meetings/{id}/participants) — name, email and join/leave times per attendee, up to 300 across three pages. Output: {participants, count, meeting_id}; pair with the meeting.ended trigger.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "past_meetings" }
+        }
+      ]
+    },
+    {
+      type: "zoom_delete_meeting",
+      label: "Zoom: delete meeting",
+      icon: Video,
+      description: "Delete one Zoom meeting (DELETE /meetings/{id}). A recurring meeting's whole series goes away unless occurrence_id scopes the delete to one occurrence. Output: {deleted, meeting_id}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "past_meetings" }
+        },
+        {
+          key: "occurrence_id",
+          label: "Occurrence ID",
+          placeholder: "recurring meetings only: deletes just this occurrence — left out, the whole series is deleted"
+        }
+      ]
+    },
+    {
+      type: "zoom_create_webinar",
+      label: "Zoom: create webinar",
+      icon: Video,
+      description: "Create a Zoom webinar — scheduled when a start time is given, recurring with no fixed time otherwise (Create Webinar). Output: {created, scheduled, webinar: {id, topic, join_url, start_url, passcode, ...}}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "topic", label: "Topic", required: true },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — recurring with no fixed time when empty" },
+        { key: "duration", label: "Duration (minutes)", type: "number", default: "60" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"approval_type": 2}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_update_webinar",
+      label: "Zoom: update webinar",
+      icon: Video,
+      description: "Update one Zoom webinar's schedule or metadata — only the fields set are sent, the rest of the webinar stays untouched (PATCH /webinars/{id}). Output: {updated, webinar_id, updated_fields}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        { key: "topic", label: "Topic", placeholder: "the webinar's new title; left out, Zoom keeps the old one" },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — the reschedule field" },
+        { key: "duration", label: "Duration (minutes)", type: "number" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"approval_type": 2}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_find_webinar",
+      label: "Zoom: find webinar",
+      icon: Video,
+      description: "Find a Zoom webinar by id, or by topic in the scope window (upcoming by default, past with scope: past). Output: {found, webinar: {id, topic, start_time, join_url, duration}} — a miss is found: false, not an error.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          discover: { resource: "webinars" }
+        },
+        { key: "topic", label: "Topic", placeholder: "used when no webinar id is given" },
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" },
+        { key: "scope", label: "Scope", type: "select", options: ["upcoming", "past"], default: "upcoming" }
+      ]
+    },
+    {
+      type: "zoom_add_webinar_registrant",
+      label: "Zoom: add webinar registrant",
+      icon: Video,
+      description: "Register one person for a webinar that requires registration and get their personalized join link (POST /webinars/{id}/registrants). Output: {registered, webinar_id, registrant_id, join_url} — join_url is unique per registrant, the thing an invite email templates.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        { key: "email", label: "Email", required: true, placeholder: "{trigger.email}" },
+        { key: "first_name", label: "First name" },
+        { key: "last_name", label: "Last name" }
+      ]
+    },
+    {
+      type: "zoom_delete_webinar",
+      label: "Zoom: delete webinar",
+      icon: Video,
+      description: "Delete one Zoom webinar (DELETE /webinars/{id}). A recurring webinar's whole series goes away unless occurrence_id scopes the delete to one occurrence. Output: {deleted, webinar_id}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        {
+          key: "occurrence_id",
+          label: "Occurrence ID",
+          placeholder: "recurring webinars only: deletes just this occurrence — left out, the whole series is deleted"
+        }
+      ]
+    },
+    {
+      type: "zoom_list_past_webinar_participants",
+      label: "Zoom: list past webinar participants",
+      icon: Video,
+      description: "List who attended one past Zoom webinar (GET /past_webinars/{id}/participants) — name, email and join/leave times per attendee, up to 300 across three pages. Output: {participants, count, webinar_id}; pair with the webinar.ended trigger.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        }
+      ]
+    },
+    {
       type: "render_html_to_pdf",
       label: "Render PDF",
       icon: FileText,
+      description: "Queue an html-renderer job: the input field's stored email body becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
       fields: [
         { key: "input_field", label: "Input field", placeholder: "html" },
         { key: "output_key", label: "Output key", placeholder: "rendered/{event_id}.pdf" },
-        { key: "output_bucket", label: "Output bucket" },
+        { key: "output_bucket", label: "Output bucket", discover: { resource: "buckets", account: "aws" } },
         { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
         { key: "page_format", label: "PDF page format", group: "pdf", default: "A4" },
         { key: "print_background", label: "Print background", group: "pdf", type: "boolean", default: "true" }
@@ -18635,14 +19902,62 @@
         { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
         { key: "reset", label: "Clear after reading", type: "boolean", default: "true" }
       ]
+    },
+    {
+      type: "csv_parse",
+      label: "CSV: parse",
+      icon: Table,
+      description: "Parse CSV text into rows for the steps that follow. Content comes from exactly one of content (inline CSV text) or source_s3 {bucket, key} (a staged object — an email attachment, a render output, s3_read_object). Output: {headers, rows, count} — rows are dicts keyed by the header row (header_row on, the default) or plain lists; values stay strings.",
+      fields: [
+        {
+          key: "content",
+          label: "CSV content",
+          type: "textarea",
+          placeholder: "name,amount\n{subject},{amount}"
+        },
+        {
+          key: "source_s3",
+          label: "Staged file (S3)",
+          placeholder: "{bucket: …, key: …}"
+        },
+        { key: "delimiter", label: "Delimiter", placeholder: ", (default)" },
+        { key: "header_row", label: "First row is headers", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "csv_format",
+      label: "CSV: format",
+      icon: Table,
+      description: "Serialize rows into CSV text (save this output with an s3_upload's content, an email body, …). Rows is a template-rendered JSON array of dicts or of arrays; headers sets the column order (default: the first dict row's keys, insertion order). Output: {csv, count}.",
+      fields: [
+        {
+          key: "rows",
+          label: "Rows",
+          type: "textarea",
+          required: true,
+          placeholder: '[{"name": "{subject}", "amount": "{amount}"}]'
+        },
+        {
+          key: "headers",
+          label: "Headers",
+          type: "textarea",
+          placeholder: '["name", "amount"]'
+        },
+        { key: "delimiter", label: "Delimiter", placeholder: ", (default)" }
+      ]
     }
   ];
   const connectorCatalog = [
     { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
     { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
-    { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended"] },
-    { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received"] },
+    { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
+    { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
+    { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received"] },
+    { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
+    { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new"] },
+    { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "s3", label: "S3", logo: S3Logo, events: ["file.created"] },
     { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
     { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
     { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
@@ -19043,8 +20358,14 @@
   function WorkflowBoard({
     shapes,
     setShapes,
+    editShapes,
+    commitDrag,
     selectedId,
     setSelectedId,
+    canPasteStep,
+    onDuplicateStep,
+    onCopyStep,
+    onPasteStep,
     sessionControls
   }) {
     const [tool, setTool] = reactExports.useState("select");
@@ -19060,8 +20381,6 @@
     const [canvasViewBox, setCanvasViewBox] = reactExports.useState({ width: 0, height: 0 });
     const [zoom, setZoom] = reactExports.useState(1);
     const [pan, setPan] = reactExports.useState({ x: 0, y: 0 });
-    const [undoStack, setUndoStack] = reactExports.useState([]);
-    const [redoStack, setRedoStack] = reactExports.useState([]);
     const svgRef = reactExports.useRef(null);
     const editorRef = reactExports.useRef(null);
     const dragSnapshotRef = reactExports.useRef(null);
@@ -19112,15 +20431,8 @@
       if (!matrix) return shapeLabelSize;
       return Math.max(11, Math.round(shapeLabelSize * Math.abs(matrix.d) * 10) / 10);
     }
-    function rememberHistory(previousShapes) {
-      setUndoStack((currentStack) => [...currentStack.slice(-49), previousShapes]);
-      setRedoStack([]);
-    }
     function commitShapes(updater) {
-      const nextShapes = updater(shapes);
-      if (nextShapes === shapes) return;
-      rememberHistory(shapes);
-      setShapes(nextShapes);
+      editShapes(updater);
     }
     function addShape(point, kind) {
       if (kind === "note") {
@@ -19297,7 +20609,7 @@
         return;
       }
       if (didDragRef.current && dragSnapshotRef.current) {
-        rememberHistory(dragSnapshotRef.current);
+        commitDrag(dragSnapshotRef.current);
       }
       setPanStart(null);
       dragSnapshotRef.current = null;
@@ -19379,24 +20691,6 @@
       if (!selectedId) return;
       commitShapes((currentShapes) => currentShapes.filter((shape) => shape.id !== selectedId && shape.sourceId !== selectedId && shape.targetId !== selectedId));
       setSelectedId(null);
-      setContextMenu(null);
-    }
-    function undo() {
-      const previousShapes = undoStack.at(-1);
-      if (!previousShapes) return;
-      setUndoStack((currentStack) => currentStack.slice(0, -1));
-      setRedoStack((currentStack) => [...currentStack.slice(-49), shapes]);
-      setShapes(previousShapes);
-      if (selectedId && !previousShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
-      setContextMenu(null);
-    }
-    function redo() {
-      const nextShapes = redoStack.at(-1);
-      if (!nextShapes) return;
-      setRedoStack((currentStack) => currentStack.slice(0, -1));
-      setUndoStack((currentStack) => [...currentStack.slice(-49), shapes]);
-      setShapes(nextShapes);
-      if (selectedId && !nextShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
       setContextMenu(null);
     }
     function clearShapes() {
@@ -19483,18 +20777,6 @@
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
           return;
         }
-        if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
-          event.preventDefault();
-          deleteSelected();
-        }
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
-          event.preventDefault();
-          undo();
-        }
-        if ((event.metaKey || event.ctrlKey) && (event.key.toLowerCase() === "y" || event.shiftKey && event.key.toLowerCase() === "z")) {
-          event.preventDefault();
-          redo();
-        }
         if (event.key === "Escape") {
           setContextMenu(null);
           cancelEditing();
@@ -19515,6 +20797,11 @@
       editorRef.current?.focus();
       editorRef.current?.select();
     }, [editingId]);
+    reactExports.useEffect(() => {
+      if (contextMenu?.shapeId && !shapes.some((shape) => shape.id === contextMenu.shapeId)) {
+        setContextMenu(null);
+      }
+    });
     reactExports.useEffect(() => {
       const currentSvg = svgRef.current;
       if (!currentSvg) return;
@@ -19587,13 +20874,7 @@
             notePalette.map(renderChip)
           ] })
         ] }),
-        sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({
-          canRedo: redoStack.length > 0,
-          canUndo: undoStack.length > 0,
-          clearCanvas: clearShapes,
-          redo,
-          undo
-        }) })
+        sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({ clearCanvas: clearShapes }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-zoom-controls", "aria-label": "Canvas zoom controls", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 18 }) }),
@@ -19803,6 +21084,29 @@
           "Add note"
         ] }),
         contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            onDuplicateStep(contextMenu.shapeId);
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16 }),
+            "Duplicate"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            onCopyStep(contextMenu.shapeId);
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16 }),
+            "Copy step"
+          ] })
+        ] }),
+        canPasteStep && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+          onPasteStep({ x: contextMenu.point.x + 24, y: contextMenu.point.y + 24 });
+          setContextMenu(null);
+        }, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardPaste, { size: 16 }),
+          "Paste step"
+        ] }),
+        contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-label", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(ListRestart, { size: 14 }),
             "Change action type"
@@ -19832,7 +21136,75 @@
     ] });
   }
   const localConfig = { apiBase: "/api", mode: "local" };
+  const COALESCE_MS = 500;
+  function initHistory() {
+    return { past: [], future: [] };
+  }
+  function pushHistory(state, snapshot, options = {}) {
+    const now = options.now ?? Date.now();
+    const top = state.past[state.past.length - 1];
+    if (options.key && top && top.key === options.key && now - top.at <= COALESCE_MS) {
+      return { past: [...state.past.slice(0, -1), { ...top, at: now }], future: [] };
+    }
+    return {
+      past: [...state.past.slice(-49), { snapshot, at: now, key: options.key }],
+      future: []
+    };
+  }
+  function undoHistory(state, present) {
+    const top = state.past[state.past.length - 1];
+    if (!top) return null;
+    const past = state.past.slice(0, -1);
+    if (past.length) past[past.length - 1] = { ...past[past.length - 1], key: void 0 };
+    return {
+      state: {
+        past,
+        future: [...state.future.slice(-49), { snapshot: present, at: Date.now() }]
+      },
+      snapshot: top.snapshot
+    };
+  }
+  function redoHistory(state, present) {
+    const top = state.future[state.future.length - 1];
+    if (!top) return null;
+    return {
+      state: {
+        past: [...state.past.slice(-49), { snapshot: present, at: Date.now() }],
+        future: state.future.slice(0, -1)
+      },
+      snapshot: top.snapshot
+    };
+  }
   const EMPTY_SHAPES = [];
+  const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
+  function readStepClipboard() {
+    try {
+      const text = window.localStorage.getItem(STEP_CLIPBOARD_KEY);
+      if (!text) return null;
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+  function writeStepClipboard(step) {
+    try {
+      window.localStorage.setItem(STEP_CLIPBOARD_KEY, JSON.stringify(step));
+    } catch {
+    }
+  }
+  const MOD_KEY = /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘" : "Ctrl";
+  const SHORTCUTS = [
+    { keys: [`${MOD_KEY} Z`], description: "Undo" },
+    { keys: [`${MOD_KEY} ⇧ Z`, "Ctrl Y"], description: "Redo" },
+    { keys: [`${MOD_KEY} D`], description: "Duplicate the selected step" },
+    { keys: [`${MOD_KEY} C`], description: "Copy the selected step for pasting into any workflow" },
+    { keys: [`${MOD_KEY} V`], description: "Paste a copied step as a new node" },
+    { keys: ["Delete", "Backspace"], description: "Delete the selected shape (undoable)" },
+    { keys: ["?"], description: "Show this cheat sheet" },
+    { keys: ["Esc"], description: "Close menus and dialogs" }
+  ];
   const CONNECTION_STATUS_LABELS = {
     connected: "connected",
     ready: "setup incomplete",
@@ -20195,6 +21567,83 @@
       }
     ) });
   }
+  function TemplatesGallery({ config, onApply, onClose }) {
+    const [templates, setTemplates] = reactExports.useState(null);
+    const [error, setError] = reactExports.useState("");
+    reactExports.useEffect(() => {
+      let cancelled = false;
+      api(config, "/templates").then((data) => {
+        if (!cancelled) setTemplates(data.templates);
+      }).catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [config]);
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "templates-gallery-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "templates-gallery-title", children: "Start from a template" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Applying forks a template into a new workflow that starts Off — wire up your connections, then switch it on. The template stays in the gallery." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "picker-list", children: [
+            (templates ?? []).map((template) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: template.id }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: template.description || `${template.connector}/${template.event}` })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "template-chips", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  title: `Apply ${template.id}`,
+                  onClick: () => onApply(template),
+                  children: [
+                    connectorLabel(template.connector),
+                    "/",
+                    template.event,
+                    " · ",
+                    template.actionCount,
+                    " action",
+                    template.actionCount === 1 ? "" : "s",
+                    " — Apply"
+                  ]
+                }
+              ) })
+            ] }, template.source)),
+            templates && templates.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+              "No templates yet — publish one with “Publish as template” or",
+              " ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "dapier templates publish" }),
+              "."
+            ] }),
+            !templates && !error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Loading…" }),
+            error && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+              "Could not load templates: ",
+              error
+            ] })
+          ] })
+        ]
+      }
+    ) });
+  }
   function CopilotDraftDialog({ config, onLoad, onClose }) {
     const [prompt, setPrompt] = reactExports.useState("");
     const [busy, setBusy] = reactExports.useState(false);
@@ -20313,10 +21762,185 @@
     const [triggerSample, setTriggerSample] = reactExports.useState(null);
     const [copilotOpen, setCopilotOpen] = reactExports.useState(false);
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
+    const [templatesOpen, setTemplatesOpen] = reactExports.useState(false);
+    const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
+    const [clipboardHasStep, setClipboardHasStep] = reactExports.useState(() => readStepClipboard() !== null);
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
       [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
     );
+    const [editHistory, setEditHistory] = reactExports.useState(initHistory);
+    const canUndo = editHistory.past.length > 0;
+    const canRedo = editHistory.future.length > 0;
+    const draftRef = reactExports.useRef({ shapes: EMPTY_SHAPES, workflowId: "new-workflow", enabled: true });
+    draftRef.current = { shapes, workflowId, enabled };
+    function commitEdit(previous, coalesceKey) {
+      setEditHistory((current) => pushHistory(current, previous, coalesceKey ? { key: coalesceKey } : {}));
+    }
+    function editShapes(updater, coalesceKey) {
+      const current = draftRef.current;
+      const nextShapes = updater(current.shapes);
+      if (nextShapes === current.shapes) return;
+      commitEdit(current, coalesceKey);
+      setShapes(nextShapes);
+    }
+    function commitDrag(preDragShapes) {
+      if (preDragShapes === draftRef.current.shapes) return;
+      commitEdit({ ...draftRef.current, shapes: preDragShapes });
+    }
+    function applySnapshot(snapshot) {
+      setShapes(snapshot.shapes);
+      setWorkflowId(snapshot.workflowId);
+      setEnabled(snapshot.enabled);
+      setSelectedId((current) => snapshot.shapes.some((shape) => shape.id === current) ? current : null);
+    }
+    function undo() {
+      const step = undoHistory(editHistory, draftRef.current);
+      if (!step) return;
+      applySnapshot(step.snapshot);
+      setEditHistory(step.state);
+    }
+    function redo() {
+      const step = redoHistory(editHistory, draftRef.current);
+      if (!step) return;
+      applySnapshot(step.snapshot);
+      setEditHistory(step.state);
+    }
+    function resetHistory() {
+      setEditHistory(initHistory());
+    }
+    function renameWorkflow(id) {
+      commitEdit(draftRef.current, "workflow-id");
+      setWorkflowId(id);
+    }
+    function toggleEnabled(next) {
+      commitEdit(draftRef.current);
+      setEnabled(next);
+    }
+    function deleteSelectedShape() {
+      const id = selectedId;
+      if (!id) return;
+      commitEdit(draftRef.current);
+      setShapes((current) => current.filter((shape) => shape.id !== id && shape.sourceId !== id && shape.targetId !== id));
+      setSelectedId(null);
+    }
+    function duplicateStep(id) {
+      const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+      if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+      const data = shape.data;
+      const label = `${shape.label ?? actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Step"} (copy)`;
+      const copy = {
+        ...shape,
+        id: crypto.randomUUID(),
+        x: shape.x + 36,
+        y: shape.y + 36,
+        label,
+        data: {
+          ...data,
+          fields: { ...data.fields, id: data.fields?.id ? `${data.fields.id.trim()}-copy` : "" },
+          ...data.filters ? { filters: data.filters.map((rule) => ({ ...rule })) } : {},
+          ...data.raw ? { raw: { ...data.raw } } : {}
+        }
+      };
+      commitEdit(draftRef.current);
+      setShapes((current) => {
+        const at = current.findIndex((entry) => entry.id === id);
+        if (at < 0) return [...current, copy];
+        const next = [...current];
+        next.splice(at + 1, 0, copy);
+        return next;
+      });
+      setSelectedId(copy.id);
+      setStatus({ kind: "ok", message: `Step duplicated as "${label}".` });
+    }
+    function copyStep(id) {
+      const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+      if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+      const data = shape.data;
+      writeStepClipboard({
+        actionType: data.actionType,
+        fields: { ...data.fields ?? {} },
+        ...data.raw ? { raw: { ...data.raw } } : {},
+        label: shape.label
+      });
+      setClipboardHasStep(true);
+      setStatus({ kind: "ok", message: "Step copied — open another workflow and press Ctrl/Cmd+V or right-click → Paste step." });
+    }
+    function pasteStep(at) {
+      const step = readStepClipboard();
+      if (!step || view !== "canvas") return;
+      const anchor = at ?? (selected ? { x: selected.x + 36, y: selected.y + 36 } : { x: 420, y: 260 });
+      const type2 = step.actionType ?? "webhook";
+      const label = step.label ?? actionMeta(type2)?.label ?? type2;
+      const next = {
+        id: crypto.randomUUID(),
+        type: "node",
+        x: anchor.x,
+        y: anchor.y,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        label,
+        data: {
+          nodeKind: "action",
+          actionType: type2,
+          fields: { ...step.fields ?? {} },
+          ...step.raw ? { raw: step.raw } : {}
+        }
+      };
+      commitEdit(draftRef.current);
+      setShapes((current) => [...current, next]);
+      setSelectedId(next.id);
+      setStatus({ kind: "ok", message: `Step pasted as "${label}" — connect it, review its settings, then save.` });
+    }
+    reactExports.useEffect(() => {
+      function onKeyDown(event) {
+        if (event.key === "Escape") {
+          if (shortcutsOpen) {
+            event.preventDefault();
+            setShortcutsOpen(false);
+          }
+          return;
+        }
+        if (leaveOpen || copilotOpen || stepsPickerOpen || templatesOpen || shortcutsOpen) return;
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+        if (target instanceof HTMLElement && target.isContentEditable) return;
+        if (event.metaKey || event.ctrlKey) {
+          if (view !== "canvas") return;
+          const key = event.key.toLowerCase();
+          if (key === "z") {
+            event.preventDefault();
+            if (event.shiftKey) redo();
+            else undo();
+          } else if (key === "y") {
+            event.preventDefault();
+            redo();
+          } else if (key === "v" && readStepClipboard()) {
+            event.preventDefault();
+            pasteStep();
+          } else if (key === "d") {
+            event.preventDefault();
+            if (selectedId) duplicateStep(selectedId);
+          } else if (key === "c" && selectedId) {
+            event.preventDefault();
+            copyStep(selectedId);
+          }
+          return;
+        }
+        if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
+          if (view !== "canvas") return;
+          event.preventDefault();
+          deleteSelectedShape();
+          return;
+        }
+        if (event.key === "?") {
+          event.preventDefault();
+          setShortcutsOpen(true);
+        }
+      }
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    });
     reactExports.useEffect(() => {
       setInvalidRawDrafts((current) => {
         const retained = Object.fromEntries(Object.entries(current).filter(([id]) => shapes.some((shape) => shape.id === id && shape.type === "node" && shape.data?.nodeKind === "action" && !actionCatalog.some((action) => action.type === shape.data?.actionType))));
@@ -20408,7 +22032,7 @@
           setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit id: in the YAML." });
           return;
         }
-        setWorkflowId(id);
+        renameWorkflow(id);
       };
       window.addEventListener("message", onMessage);
       return () => window.removeEventListener("message", onMessage);
@@ -20492,6 +22116,7 @@
         setSelectedId(null);
         setStepTest({ nodeId: null, busy: false, result: null });
         setStepOutputs({});
+        resetHistory();
         setStatus({ kind: "idle", message: "" });
         if (config.mode === "console" && !config.embedded) {
           history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
@@ -20527,6 +22152,7 @@
       setSelectedId(null);
       setStepTest({ nodeId: null, busy: false, result: null });
       setStepOutputs({});
+      resetHistory();
       setStatus({ kind: "idle", message: "" });
     }
     function parseYamlText(text) {
@@ -20563,12 +22189,15 @@
       } else {
         const parsed = parseYamlText(yamlText);
         if (!parsed) return;
-        const shapes2 = shapesFromWorkflow(parsed);
-        setShapes(shapes2);
+        const nextShapes = shapesFromWorkflow(parsed);
+        const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
+        const nextEnabled = parsed.enabled !== false;
+        commitEdit({ shapes, workflowId, enabled });
+        setShapes(nextShapes);
         setCanvasExtraDirty(yamlText !== savedYaml);
         setBase(parsed);
-        if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
-        setEnabled(parsed.enabled !== false);
+        setWorkflowId(nextId);
+        setEnabled(nextEnabled);
         setSelectedId(null);
       }
       setTestOpen(false);
@@ -20627,6 +22256,7 @@
           return [...others, summarize(`${workflow.id}.yaml`, workflow)].sort((a, b) => a.source.localeCompare(b.source));
         });
         refreshGit();
+        resetHistory();
         setStatus({
           kind: "ok",
           message: result.published === false ? `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}; changes go live after deployment.` : `Saved. Workflow is ${workflow.enabled === false ? "Off" : "On"}.`
@@ -20654,9 +22284,12 @@
       if (!parsed) return;
       allowUnload.current = false;
       const nextShapes = shapesFromWorkflow(parsed);
+      const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
+      const nextEnabled = parsed.enabled !== false;
+      resetHistory();
       setShapes(nextShapes);
-      if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
-      setEnabled(parsed.enabled !== false);
+      setWorkflowId(nextId);
+      setEnabled(nextEnabled);
       setCanvasExtraDirty(false);
       setInvalidRawDrafts({});
       setBase(parsed);
@@ -20686,6 +22319,52 @@
         setStatus({
           kind: "ok",
           message: result.published === false ? `Duplicated as ${result.file}; goes live after deployment.` : `Duplicated as ${result.file}.`
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function applyTemplate2(summary) {
+      const name = window.prompt(`New workflow name (blank for the suggested name):`, `${summary.id}-copy`);
+      if (name === null) return;
+      setStatus({ kind: "busy", message: "Applying template…" });
+      try {
+        const result = await api(
+          config,
+          `/templates/${encodeURIComponent(summary.source)}/apply`,
+          {
+            method: "POST",
+            body: JSON.stringify(name.trim() ? { name: name.trim() } : {})
+          }
+        );
+        const workflows = await refreshList();
+        refreshGit();
+        const created = workflows.find((entry) => entry.source === result.file);
+        if (created) await openWorkflow(created);
+        setStatus({
+          kind: "ok",
+          message: result.published === false ? `Created ${result.file} from the template; it goes live after deployment.` : `Created ${result.file} from the template. It starts Off — wire it up, then switch it On.`
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function toggleTemplateFlag() {
+      if (!sourceName) return;
+      const next = base?.template !== true;
+      setStatus({ kind: "busy", message: next ? "Publishing as template…" : "Removing from templates…" });
+      try {
+        await api(config, `/workflows/${encodeURIComponent(sourceName)}/template`, {
+          method: "PUT",
+          body: JSON.stringify({ template: next })
+        });
+        const data = await api(config, `/workflows/${encodeURIComponent(sourceName)}`);
+        setBase(data.workflow);
+        await refreshList();
+        refreshGit();
+        setStatus({
+          kind: "ok",
+          message: next ? `Offered as a template (${workflowId}).` : `Removed from the template gallery (${workflowId}).`
         });
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
@@ -20840,12 +22519,12 @@
     }
     function updateSelected(mutate) {
       if (!selectedId) return;
-      setShapes((current) => current.map((shape) => {
+      editShapes((current) => current.map((shape) => {
         if (shape.id !== selectedId || !shape.data) return shape;
         const data = mutate(shape.data);
         const label = data.nodeKind === "trigger" ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}` : shape.label;
         return { ...shape, data, label };
-      }));
+      }), `node:${selectedId}`);
     }
     const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
@@ -21259,7 +22938,7 @@
                 placeholder: "workflow-id",
                 disabled: view === "yaml",
                 title: view === "yaml" ? "Edit the id in the YAML view" : void 0,
-                onChange: (event) => setWorkflowId(event.target.value)
+                onChange: (event) => renameWorkflow(event.target.value)
               }
             ),
             view === "canvas" && triggerNodes.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Add a trigger node to save." })
@@ -21277,7 +22956,7 @@
                       type: "checkbox",
                       checked: enabled,
                       disabled: view === "yaml",
-                      onChange: (event) => setEnabled(event.target.checked),
+                      onChange: (event) => toggleEnabled(event.target.checked),
                       "aria-label": "Workflow state after saving"
                     }
                   ),
@@ -21304,6 +22983,27 @@
                 disabled: status.kind === "busy" || !sourceName,
                 title: !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "button secondary",
+                type: "button",
+                onClick: toggleTemplateFlag,
+                disabled: status.kind === "busy" || !sourceName,
+                title: !sourceName ? "Save the workflow first — the flag rides the saved YAML" : base?.template ? "Remove this workflow from the template gallery" : "Offer this workflow in the template gallery",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: base?.template ? "Unpublish template" : "Publish as template" })
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "button secondary",
+                type: "button",
+                onClick: () => setTemplatesOpen(true),
+                title: "Start from a workflow template",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Templates" })
               }
             ),
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -21358,11 +23058,18 @@
             {
               shapes,
               setShapes,
+              editShapes,
+              commitDrag,
               selectedId,
               setSelectedId,
+              canPasteStep: clipboardHasStep,
+              onDuplicateStep: duplicateStep,
+              onCopyStep: copyStep,
+              onPasteStep: pasteStep,
               sessionControls: (actions) => /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !actions.canUndo, onClick: actions.undo, title: "Undo", type: "button", children: "↺" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !actions.canRedo, onClick: actions.redo, title: "Redo", type: "button", children: "↻" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: "↺" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: "↻" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 18 }) }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: "✕" })
               ] })
             }
@@ -21460,6 +23167,20 @@
                 shape.id
               ))
             ] }),
+            selected?.type === "node" && selected.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button secondary", type: "button", onClick: () => copyStep(selected.id), title: "Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copy step" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", onClick: deleteSelectedShape, title: "Delete this step (Delete)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Delete" })
+              ] })
+            ] }),
             selectedInspector(),
             selected?.type === "arrow" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Connector. Drag an endpoint handle to reattach it; Delete removes it." })
           ] })
@@ -21486,6 +23207,17 @@
           onClose: () => setStepsPickerOpen(false)
         }
       ),
+      templatesOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        TemplatesGallery,
+        {
+          config,
+          onApply: (template) => {
+            setTemplatesOpen(false);
+            void applyTemplate2(template);
+          },
+          onClose: () => setTemplatesOpen(false)
+        }
+      ),
       copilotOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
         CopilotDraftDialog,
         {
@@ -21493,7 +23225,25 @@
           onLoad: loadCopilotDraft,
           onClose: () => setCopilotOpen(false)
         }
-      )
+      ),
+      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: () => setShortcutsOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "section",
+        {
+          className: "picker-panel shortcuts-panel",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": "shortcuts-title",
+          onClick: (event) => event.stopPropagation(),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "shortcuts-title", children: "Keyboard shortcuts" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shortcut-list", children: SHORTCUTS.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "shortcut-row", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-keys", children: shortcut.keys.map((key) => /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: key }, key)) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-desc", children: shortcut.description })
+            ] }, shortcut.description)) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Double-click a node to rename it; drag from a handle to connect steps." })
+          ]
+        }
+      ) })
     ] });
   }
   function applyStoredTheme() {

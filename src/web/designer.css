@@ -1400,3 +1400,52 @@ textarea:focus {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Step toolbar: Duplicate / Copy step / Delete for the selected action,
+   above the inspector groups; same button-row idiom as the test panel. */
+.inspector-toolbar {
+  border-bottom: 1px solid var(--section-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+/* "?" cheat sheet: the picker dialog idiom over a keys/description list. */
+.shortcut-list {
+  border-top: 1px solid var(--section-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.shortcut-row {
+  align-items: center;
+  border-bottom: 1px solid var(--section-border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 7px 6px;
+}
+
+.shortcut-keys {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.shortcut-keys kbd {
+  background: var(--muted-bg-hover);
+  border: 1px solid var(--section-border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.shortcut-desc {
+  color: var(--text-soft);
+  font-size: 12.5px;
+  text-align: right;
+}

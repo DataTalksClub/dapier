@@ -11,9 +11,24 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
   { type: 'webhook', url: 'https://example.test/hook' },
 ], null, 2);
 /* Optional poll extras beyond the form fields; merged into the PUT body and
-   validated server-side (headers, cursor, and the actions list). */
+   validated server-side (headers, cursor, and the actions list). Provider
+   sources (source: s3 | google-sheets.rows | google-drive.files |
+   google-drive.updates | google-drive.deletions | zoom.recordings |
+   dropbox.files | youtube.videos | mailchimp.members | slack.messages) take
+   their target through these too: bucket/prefix, spreadsheet_id/worksheet,
+   folder_id, for_email, path, channel_id, list_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
-  'cursor_path', 'cursor_query', 'max_items', 'actions', 'flow'];
+  'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days', 'actions', 'flow',
+  'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'for_email',
+  'path', 'channel_id', 'list_id'];
+
+/* Sources that poll a connected account and so require connection_id on
+   save (the server validates too — this is the early, human-readable
+   check). s3 and mailchimp.members authenticate through stored credentials
+   instead, so they stay off this list. */
+const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-drive.files',
+  'google-drive.updates', 'google-drive.deletions',
+  'zoom.recordings', 'dropbox.files', 'youtube.videos', 'slack.messages'];
 
 let hooks = [];
 let polls = [];
@@ -46,14 +61,27 @@ function hookRow(hook) {
     </tr>`;
 }
 
+function pollWatches(poll) {
+  if (poll.source && poll.source !== 'http') {
+    const target = poll.bucket
+      ? [poll.bucket, poll.prefix].filter(Boolean).join('/')
+      : [poll.spreadsheet_id, poll.worksheet].filter(Boolean).join(' · ')
+        || poll.folder_id || poll.for_email || poll.path
+        || poll.channel_id || poll.list_id || '';
+    return `${poll.source} ${target}`.trim();
+  }
+  return `${poll.method || 'GET'} ${poll.url || ''}`;
+}
+
 function pollRow(poll) {
   return `<tr>
       <td class="cell-title"><span class="cell-name mono">${escapeHtml(poll.poll_id)}</span><span class="cell-sub">${escapeHtml(poll.description || '')}</span></td>
-      <td class="mono muted-cell" data-label="Watches">${escapeHtml(`${poll.method || 'GET'} ${poll.url || ''}`)}</td>
+      <td class="mono muted-cell" data-label="Watches">${escapeHtml(pollWatches(poll))}</td>
       <td class="mono muted-cell" data-label="Schedule">${escapeHtml(poll.expression || '')}</td>
       <td class="mono muted-cell" data-label="Runs">${escapeHtml(actionSummary(poll))}</td>
       <td data-label="Status">${statusLine(poll.enabled ? 'enabled' : 'disabled')}</td>
       <td class="action-cell">
+        <button class="button secondary trigger-sample" data-name="${escapeHtml(poll.poll_id)}" type="button">Sample</button>
         <button class="button secondary trigger-edit" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Edit</button>
         <button class="button secondary trigger-delete" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Delete</button>
       </td>
@@ -104,13 +132,24 @@ function openHookDialog(hook) {
   form.kind.value = hook ? (hook.kind || 'webhook') : 'webhook';
   form.kind.disabled = Boolean(hook); // a kind change would orphan the URL
   form.connection_id.value = hook ? (hook.connection_id || '') : '';
+  form.list_id.value = hook ? (hook.list_id || '') : '';
   form.description.value = hook ? (hook.description || '') : '';
+  form.dedupe_path.value = hook ? (hook.dedupe_path || '') : '';
+  const response = hook ? (hook.response || {}) : {};
+  form.response_mode.value = response.mode || 'ack';
+  form.response_template.value = response.template !== undefined
+    ? JSON.stringify(response.template, null, 2)
+    : '';
+  $('#hook-response-field').hidden = form.kind.value === 'telegram';
+  $('#hook-response-template-field').hidden =
+    form.kind.value === 'telegram' || form.response_mode.value !== 'sync';
   form.enabled.checked = hook ? Boolean(hook.enabled) : true;
   form.actions.value = hook && hook.actions
     ? JSON.stringify(hook.actions, null, 2)
     : HOOK_ACTIONS_TEMPLATE;
   form.actions.disabled = Boolean(hook && hook.flow);
   $('#hook-connection-field').hidden = form.kind.value !== 'telegram';
+  $('#hook-list-field').hidden = form.kind.value !== 'mailchimp';
   $('#hook-dialog').showModal();
   if (!hook) form.name.focus();
 }
@@ -132,6 +171,7 @@ function openPollDialog(poll) {
   form.name.value = poll ? poll.poll_id : '';
   form.name.disabled = Boolean(poll); // the name is the EventBridge rule's suffix
   form.expression.value = poll ? (poll.expression || '') : '';
+  form.source.value = poll && poll.source && poll.source !== 'http' ? poll.source : '';
   form.url.value = poll ? (poll.url || '') : '';
   form.method.value = poll ? (poll.method || 'GET') : 'GET';
   form.connection_id.value = poll ? (poll.connection_id || '') : '';
@@ -147,6 +187,12 @@ $('#new-poll').addEventListener('click', () => openPollDialog(null));
 
 $('#hook-form').elements.kind.addEventListener('change', (event) => {
   $('#hook-connection-field').hidden = event.currentTarget.value !== 'telegram';
+  $('#hook-list-field').hidden = event.currentTarget.value !== 'mailchimp';
+  $('#hook-response-field').hidden = event.currentTarget.value === 'telegram';
+});
+
+$('#hook-form').elements.response_mode.addEventListener('change', (event) => {
+  $('#hook-response-template-field').hidden = event.currentTarget.value !== 'sync';
 });
 
 $('#hook-form').addEventListener('submit', async (event) => {
@@ -162,9 +208,19 @@ $('#hook-form').addEventListener('submit', async (event) => {
       kind: form.kind.value,
       name: form.name.value.trim(),
       description: form.description.value.trim(),
+      dedupe_path: form.dedupe_path.value.trim(),
       enabled: form.enabled.checked,
     };
-    if (body.kind === 'telegram') body.connection_id = form.connection_id.value.trim();
+    if (body.kind === 'telegram') {
+      body.connection_id = form.connection_id.value.trim();
+    } else {
+      if (body.kind === 'mailchimp') body.list_id = form.list_id.value.trim();
+      const response = { mode: form.response_mode.value };
+      if (response.mode === 'sync' && form.response_template.value.trim()) {
+        try { response.template = JSON.parse(form.response_template.value); } catch (_) { throw new Error('Response template must be valid JSON'); }
+      }
+      body.response = response;
+    }
     if (editingHook && editingHook.flow) {
       body.flow = editingHook.flow;
     } else {
@@ -173,9 +229,11 @@ $('#hook-form').addEventListener('submit', async (event) => {
       if (!Array.isArray(actions)) throw new Error('Actions must be a JSON list');
       body.actions = actions;
     }
-    await api('/api/admin/hook-triggers', { method: 'PUT', body: JSON.stringify(body) });
+    const saved = await api('/api/admin/hook-triggers', { method: 'PUT', body: JSON.stringify(body) });
     $('#hook-dialog').close();
-    notice(`Saved hook ${body.name}. It is live immediately.`);
+    const warnings = saved.warnings || [];
+    notice(`Saved hook ${body.name}. It is live immediately.`
+      + (warnings.length ? ` Mailchimp warning: ${warnings.join(' ')}` : ''));
     await fetchTriggers();
   } catch (error) {
     $('#hook-error').textContent = error.message;
@@ -192,15 +250,25 @@ $('#poll-form').addEventListener('submit', async (event) => {
   submit.disabled = true;
   $('#poll-error').textContent = '';
   try {
+    const source = form.source.value;
+    /* rss polls a public feed URL like the HTTP source — no connection, the
+       URL field carries the target. Other provider sources blank it and take
+       their params through Options. */
+    const urlSource = !source || source === 'rss';
+    if (urlSource && !form.url.value.trim()) throw new Error('URL is required for the HTTP and RSS sources');
+    if (CONNECTION_POLL_SOURCES.includes(source) && !form.connection_id.value.trim()) {
+      throw new Error(`${source} needs a connection (the connected account to poll)`);
+    }
     const body = {
       name: form.name.value.trim(),
       expression: form.expression.value.trim(),
-      url: form.url.value.trim(),
+      url: urlSource ? form.url.value.trim() : '',
       method: form.method.value,
       connection_id: form.connection_id.value.trim(),
       description: form.description.value.trim(),
       enabled: form.enabled.checked,
     };
+    if (source) body.source = source;
     if (form.options.value.trim()) {
       let options;
       try { options = JSON.parse(form.options.value); } catch (_) { throw new Error('Options must be valid JSON'); }
@@ -218,6 +286,33 @@ $('#poll-form').addEventListener('submit', async (event) => {
   }
 });
 
+/* Zapier's "Test trigger": pull one sample event the poll would publish —
+   live from the provider when it can, else the newest recorded run, else a
+   documented example. Goes through POST /api/admin/discover with the
+   generic poll connector, whose fetch runs the stored poll's own page
+   fetch (HTTP or provider source) without advancing its cursor. */
+async function pullSample(pollId) {
+  const dialog = $('#poll-sample-dialog');
+  $('#poll-sample-title').textContent = `Sample — ${pollId}`;
+  $('#poll-sample-meta').textContent = 'Pulling…';
+  $('#poll-sample-data').textContent = '';
+  dialog.showModal();
+  try {
+    const result = await api('/api/admin/discover', {
+      method: 'POST',
+      body: JSON.stringify({ connector: 'poll', event: pollId }),
+    });
+    const sample = result.sample || {};
+    $('#poll-sample-meta').textContent =
+      `${result.connector || 'poll'} · ${sample.event || ''} · ${result.source || 'sample'}`
+      + (sample.occurred_at ? ` · ${sample.occurred_at}` : '');
+    $('#poll-sample-data').textContent = JSON.stringify(sample.data ?? sample, null, 2);
+  } catch (error) {
+    $('#poll-sample-meta').textContent = '';
+    $('#poll-sample-data').textContent = error.message;
+  }
+}
+
 function confirmDelete(title, message) {
   const dialog = $('#trigger-confirm-dialog');
   $('#trigger-confirm-title').textContent = title;
@@ -234,6 +329,8 @@ document.addEventListener('click', async (event) => {
     else openPollDialog(findPoll(edit.dataset.name));
     return;
   }
+  const sample = event.target.closest('.trigger-sample');
+  if (sample && !sample.disabled) void pullSample(sample.dataset.name);
   const button = event.target.closest('.trigger-delete');
   if (!button || button.disabled) return;
   const isHook = button.dataset.kind === 'hook';
@@ -243,7 +340,9 @@ document.addEventListener('click', async (event) => {
   const message = isHook
     ? (item.kind === 'telegram'
       ? 'The bot stops forwarding updates and the trigger is removed.'
-      : 'Callers using the hook URL are rejected and the token stops working.')
+      : item.kind === 'mailchimp'
+        ? 'Its webhook subscription is removed from the Mailchimp audience and the trigger is deleted.'
+        : 'Callers using the hook URL are rejected and the token stops working.')
     : 'Its EventBridge rule is removed and the API is no longer polled.';
   if (!await confirmDelete(`Delete ${isHook ? `${item.kind || 'hook'} hook` : 'poll trigger'} ${name}?`, message)) return;
   button.disabled = true;

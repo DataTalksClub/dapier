@@ -9,7 +9,7 @@ export function escapeHtml(value) {
 
 export function statusLine(status, labels) {
   const value = String(status || 'unknown');
-  const kind = ['completed', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
+  const kind = ['completed', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'ready'].includes(value) ? 'run'
     : ['failed', 'error', 'missing', 'expired'].includes(value) ? 'err'
     : 'off';

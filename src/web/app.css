@@ -170,6 +170,23 @@ code { font-family: var(--mono); font-size: .92em; background: var(--code-bg); p
 .button.danger { border-color: var(--red-line); color: var(--red); background: transparent; }
 .button.danger:hover { border-color: var(--red); background: var(--red-soft); }
 
+/* Zapier-style organization tags on the workflow list. */
+.tag-chip { display: inline-block; padding: 1px 8px; margin-right: 4px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--wash); color: var(--ink-soft); font-size: 11px; line-height: 1.6; white-space: nowrap; }
+.cell-tags { margin-top: 4px; }
+/* The workflow's folder chip: styled like a tag chip, dashed border so the
+   flat folder reads as a container rather than another label. */
+.folder-chip { border-style: dashed; font-weight: 600; }
+
+/* Bulk selection: a checkbox column plus the bar that enables/disables the
+   selection in one call. */
+.select-col { width: 34px; text-align: center; }
+.select-col input[type="checkbox"] { vertical-align: middle; cursor: pointer; }
+td.select-col { padding-top: 10px; }
+.bulk-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--wash); }
+.bulk-bar[hidden] { display: none; }
+.bulk-bar .button { height: 32px; font-size: 12.5px; }
+.bulk-bar .field-hint { margin-right: auto; }
+
 /* A workflow's definition, recent outcome, and on/off control stay distinct. */
 .workflow-explainer { max-width: 74ch; margin: 12px 0 18px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 .workflow-explainer strong { color: var(--ink); }
@@ -636,6 +653,12 @@ dialog form { display: contents; }
   background: var(--line-strong);
 }
 .flow-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.flow-head .run-replay-from-step {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
 .flow-icon {
   width: 26px;
   height: 26px;

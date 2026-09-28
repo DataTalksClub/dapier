@@ -72,6 +72,9 @@ export interface Workflow {
   actions?: Array<Record<string, unknown>>;
   flow?: string;
   flows?: Record<string, FlowSpec>;
+  /** Offered in the template gallery when true (template flag route). */
+  template?: boolean;
+  description?: string;
 }
 
 export interface WorkflowSummary {
@@ -81,6 +84,10 @@ export interface WorkflowSummary {
   connector: string;
   event: string;
   actionCount: number;
+  description?: string;
+  template?: boolean;
+  triggerCount?: number;
+  tags?: string[];
 }
 
 export interface GitStatus {

@@ -75,6 +75,18 @@ def test_every_registry_hint_reaches_the_designer():
     assert not missing, f"registry hints missing from catalog.ts: {sorted(missing)}"
 
 
+def designer_action_types():
+    """Action ``type`` values parsed from catalog.ts."""
+    content = CATALOG_TS.read_text()
+    return {match.group(1) for match in ACTION_RE.finditer(content)
+            if match.group(1) not in FIELD_TYPES}
+
+
+def test_every_registry_action_reaches_the_designer():
+    missing = set(registry.ACTIONS) - designer_action_types()
+    assert not missing, f"registry actions missing from catalog.ts: {sorted(missing)}"
+
+
 def test_hinted_resources_are_registered_discoveries():
     unknown = {resource for _, _, resource in designer_hints()} - registered_names()
     assert not unknown, f"hints naming unregistered resources: {sorted(unknown)}"

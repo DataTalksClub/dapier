@@ -1,4 +1,7 @@
 import {
+  ClipboardCopy,
+  ClipboardPaste,
+  Copy,
   Maximize,
   Minus,
   MousePointer2,
@@ -17,21 +20,34 @@ import type { ActionType, DiagramShape, Point, Tool } from "../types";
 interface WorkflowBoardProps {
   shapes: DiagramShape[];
   setShapes: Dispatch<SetStateAction<DiagramShape[]>>;
+  /** History-tracked edit: App records the previous editor state, applies the
+      updater, and lands the result. Live drag movement bypasses this (plain
+      setShapes) so one drag is one undo step, not one per pointer event. */
+  editShapes: (updater: (currentShapes: DiagramShape[]) => DiagramShape[]) => void;
+  /** Stamps a finished drag into history: the moves themselves already landed
+      through setShapes while dragging, so undo needs the pre-drag snapshot. */
+  commitDrag: (preDragShapes: DiagramShape[]) => void;
   selectedId: string | null;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
-  sessionControls?: (actions: {
-    canRedo: boolean;
-    canUndo: boolean;
-    clearCanvas: () => void;
-    redo: () => void;
-    undo: () => void;
-  }) => ReactNode;
+  /** A step sits on App's cross-workflow clipboard, so Paste step can appear. */
+  canPasteStep: boolean;
+  /** Step actions, implemented in App so inspector and board share them. */
+  onDuplicateStep: (id: string) => void;
+  onCopyStep: (id: string) => void;
+  onPasteStep: (point: Point) => void;
+  sessionControls?: (actions: { clearCanvas: () => void }) => ReactNode;
 }
 export function WorkflowBoard({
   shapes,
   setShapes,
+  editShapes,
+  commitDrag,
   selectedId,
   setSelectedId,
+  canPasteStep,
+  onDuplicateStep,
+  onCopyStep,
+  onPasteStep,
   sessionControls
 }: WorkflowBoardProps) {
   const [tool, setTool] = useState<Tool>("select");
@@ -47,8 +63,6 @@ export function WorkflowBoard({
   const [canvasViewBox, setCanvasViewBox] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
-  const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
-  const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editorRef = useRef<HTMLInputElement | null>(null);
   const dragSnapshotRef = useRef<DiagramShape[] | null>(null);
@@ -106,16 +120,10 @@ export function WorkflowBoard({
     return Math.max(11, Math.round(shapeLabelSize * Math.abs(matrix.d) * 10) / 10);
   }
 
-  function rememberHistory(previousShapes: DiagramShape[]) {
-    setUndoStack((currentStack) => [...currentStack.slice(-49), previousShapes]);
-    setRedoStack([]);
-  }
-
+  /** Discrete canvas ops (add, connect, delete, rename, reattach) go through
+      App's history so board and inspector edits share one undo timeline. */
   function commitShapes(updater: (currentShapes: DiagramShape[]) => DiagramShape[]) {
-    const nextShapes = updater(shapes);
-    if (nextShapes === shapes) return;
-    rememberHistory(shapes);
-    setShapes(nextShapes);
+    editShapes(updater);
   }
 
   function addShape(point: Point, kind: PaletteKind) {
@@ -302,7 +310,7 @@ export function WorkflowBoard({
       return;
     }
     if (didDragRef.current && dragSnapshotRef.current) {
-      rememberHistory(dragSnapshotRef.current);
+      commitDrag(dragSnapshotRef.current);
     }
     setPanStart(null);
     dragSnapshotRef.current = null;
@@ -397,26 +405,6 @@ export function WorkflowBoard({
       shape.id !== selectedId && shape.sourceId !== selectedId && shape.targetId !== selectedId
     )));
     setSelectedId(null);
-    setContextMenu(null);
-  }
-
-  function undo() {
-    const previousShapes = undoStack.at(-1);
-    if (!previousShapes) return;
-    setUndoStack((currentStack) => currentStack.slice(0, -1));
-    setRedoStack((currentStack) => [...currentStack.slice(-49), shapes]);
-    setShapes(previousShapes);
-    if (selectedId && !previousShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
-    setContextMenu(null);
-  }
-
-  function redo() {
-    const nextShapes = redoStack.at(-1);
-    if (!nextShapes) return;
-    setRedoStack((currentStack) => currentStack.slice(0, -1));
-    setUndoStack((currentStack) => [...currentStack.slice(-49), shapes]);
-    setShapes(nextShapes);
-    if (selectedId && !nextShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
     setContextMenu(null);
   }
 
@@ -515,18 +503,8 @@ export function WorkflowBoard({
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
         return;
       }
-      if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
-        event.preventDefault();
-        deleteSelected();
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
-        event.preventDefault();
-        undo();
-      }
-      if ((event.metaKey || event.ctrlKey) && (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"))) {
-        event.preventDefault();
-        redo();
-      }
+      // Delete/Backspace and Ctrl+Z/Ctrl+Y live in App's editor-wide handler;
+      // this one only closes the board's own surfaces.
       if (event.key === "Escape") {
         setContextMenu(null);
         cancelEditing();
@@ -550,6 +528,14 @@ export function WorkflowBoard({
     editorRef.current?.focus();
     editorRef.current?.select();
   }, [editingId]);
+
+  // Delete/undo in App can remove the shape a context menu points at; drop
+  // the menu instead of leaving actions that would act on nothing.
+  useEffect(() => {
+    if (contextMenu?.shapeId && !shapes.some((shape) => shape.id === contextMenu.shapeId)) {
+      setContextMenu(null);
+    }
+  });
 
   useEffect(() => {
     const currentSvg = svgRef.current;
@@ -636,13 +622,7 @@ export function WorkflowBoard({
         </div>
         {sessionControls && (
           <div className="canvas-session-controls">
-            {sessionControls({
-              canRedo: redoStack.length > 0,
-              canUndo: undoStack.length > 0,
-              clearCanvas: clearShapes,
-              redo,
-              undo
-            })}
+            {sessionControls({ clearCanvas: clearShapes })}
           </div>
         )}
       </div>
@@ -835,6 +815,24 @@ export function WorkflowBoard({
             <StickyNote size={16} />
             Add note
           </button>
+          {contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && (
+            <div className="context-menu-group">
+              <button onClick={() => { onDuplicateStep(contextMenu.shapeId!); setContextMenu(null); }} type="button">
+                <Copy size={16} />
+                Duplicate
+              </button>
+              <button onClick={() => { onCopyStep(contextMenu.shapeId!); setContextMenu(null); }} type="button">
+                <ClipboardCopy size={16} />
+                Copy step
+              </button>
+            </div>
+          )}
+          {canPasteStep && (
+            <button onClick={() => { onPasteStep({ x: contextMenu.point.x + 24, y: contextMenu.point.y + 24 }); setContextMenu(null); }} type="button">
+              <ClipboardPaste size={16} />
+              Paste step
+            </button>
+          )}
           {contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && (
             <div className="context-menu-group">
               <div className="context-menu-label">

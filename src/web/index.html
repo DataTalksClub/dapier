@@ -74,6 +74,7 @@
         <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
+        <a class="nav-item" href="/users" data-view="users"><i data-lucide="users"></i><span>Users</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
       </nav>
@@ -126,7 +127,7 @@
             <div id="overview-workflows-empty" class="empty-state" hidden><h3>No workflows on</h3><p>Create a workflow or turn an existing one on to start automating.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
           </section>
           <section>
-            <div class="section-head"><div><h2>Failed runs</h2><p class="sub">By workflow over the last 7 days.</p></div><a class="text-link view-link" href="/runs" data-target="runs" data-run-status="problems">Run history<i data-lucide="arrow-right"></i></a></div>
+            <div class="section-head"><div><h2>Failed runs</h2><p class="sub">By workflow over the last 7 days.</p></div><button id="overview-errors-send-digest" class="button secondary" type="button">Send digest now</button><a class="text-link view-link" href="/runs" data-target="runs" data-run-status="problems">Run history<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
             <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
           </section>
@@ -148,15 +149,17 @@
           <div class="section-head-text"><h2>Your workflows</h2><p class="sub">See what starts each workflow and what it does. Turn it on or off here; open it to edit or test it.</p></div>
           <button id="import-yaml" class="button secondary" type="button">Import YAML</button>
           <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
+          <button id="export-all-yaml" class="button secondary" type="button">Export all</button>
           <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
         </div>
         <p class="workflow-explainer"><strong>On</strong> means new triggers can run the workflow. <strong>Off</strong> stops new triggers. Changes to the on/off state take effect immediately.</p>
-        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name, trigger, or action"></label><label>Show<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
+        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name, trigger, or action"></label><label>Show<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label>Tag<select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label>Folder<select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
+        <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="button secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="button secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="button secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="button secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
-            <thead><tr><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
+            <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
         </div>
@@ -295,6 +298,19 @@
           </table>
         </div>
       </section>
+      <section class="view" data-page="users">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Users</h2><p class="sub">Who may use the console, and at which role. <strong>Admin</strong> manages users; <strong>operator</strong> is the full console minus user management; <strong>editor</strong> also edits and tests workflows; <strong>viewer</strong> is read-only. Until a user appears here, the deployment's operator allowlist (<code>OPERATOR_EMAILS</code>/<code>OPERATOR_SUBJECTS</code>) decides; a stored role narrows or widens that fallback. Removing the last admin is refused. <code>dapier users</code> reaches the same store.</p></div>
+          <button id="new-user" class="button primary" type="button">Set role</button>
+        </div>
+        <div id="user-empty" class="empty-state" hidden><h3>No users in the roles store</h3><p>Access falls back to the operator allowlist. Assign the first role to start managing users here — with an empty store, today's operators can grant the first admin.</p></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Subject</th><th>Role</th><th>Display name</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="user-table"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="view" data-page="storage">
         <div class="section-head">
           <div class="section-head-text"><h2>Data store</h2><p class="sub">Each workflow's key-value state — what its <code>storage_set</code>/<code>storage_get</code> steps remember across runs (dedupe flags, counters, last-seen cursors). <code>dapier storage</code> reaches the same values.</p></div>
@@ -325,7 +341,7 @@
         <div class="section-head">
           <div class="section-head-text"><h2>Recent runs</h2><p class="sub">Open a run to trace its steps and errors. Records are kept for 90 days.</p></div>
         </div>
-        <div class="run-filters"><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span><button id="runs-replay-failed" class="button secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button></div>
+        <div class="run-filters"><label>Search<input id="runs-search-filter" type="search" placeholder="Text in a run's data, or its id&hellip;"></label><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span><button id="runs-replay-failed" class="button secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="button secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
@@ -351,6 +367,43 @@
     </main>
   </div>
 
+  <dialog id="user-role-dialog" aria-labelledby="user-role-title">
+    <form id="user-role-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="user-role-title">Set role</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <label>Subject<input name="subject" class="mono-input" placeholder="user@datatalks.club or DTC subject" required><small class="field-hint">The DTC subject or email the role binds to. Fixed after the first save — remove the user to change it.</small></label>
+        <label>Role<select name="role">
+          <option value="viewer">viewer — read-only console</option>
+          <option value="editor">editor — also edit and test workflows</option>
+          <option value="operator">operator — full console minus user management</option>
+          <option value="admin">admin — also manages users</option>
+        </select></label>
+        <label>Display name<input name="display_name" placeholder="Optional, shown in this table" maxlength="200"></label>
+        <label><input type="checkbox" name="disabled"> Disabled — denied everywhere</label>
+        <p id="user-role-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Save role</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="user-confirm-dialog" aria-labelledby="user-confirm-title" aria-describedby="user-confirm-message">
+    <form method="dialog">
+      <div class="dialog-head">
+        <h2 id="user-confirm-title"></h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body"><p id="user-confirm-message"></p></div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" value="confirm" type="submit">Remove</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="credential-dialog" aria-labelledby="credential-title">
     <form id="credential-form" method="dialog">
       <div class="dialog-head">
@@ -529,9 +582,15 @@
       </div>
       <div class="dialog-body">
         <label>Name<input name="name" class="mono-input" placeholder="orders" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. Fixed after creation — it is the last segment of the hook URL.</small></label>
-        <label>Kind<select name="kind"><option value="webhook">Webhook</option><option value="telegram">Telegram</option></select><small class="field-hint">Telegram forwards bot messages to the trigger; webhook callers POST to its URL.</small></label>
+        <label>Kind<select name="kind"><option value="webhook">Webhook</option><option value="telegram">Telegram</option><option value="mailchimp">Mailchimp</option></select><small class="field-hint">Telegram forwards bot messages to the trigger; Mailchimp posts its webhook types; webhook callers POST to its URL.</small></label>
         <label id="hook-connection-field" hidden>Telegram bot connection<input name="connection_id" class="mono-input" placeholder="telegram-bot" required><small class="field-hint">The connection whose bot receives messages; its webhook registration is managed for you.</small></label>
+        <label id="hook-list-field" hidden>Mailchimp audience ID<input name="list_id" class="mono-input" placeholder="abc123" required><small class="field-hint">The audience to watch (find it with <code>dapier connections discover mailchimp</code>); its webhook registration is managed for you. All webhook types are subscribed.</small></label>
         <label>Description<input name="description" placeholder="What happens when it fires" maxlength="200"></label>
+        <label>Dedupe path<input name="dedupe_path" class="mono-input" placeholder="data.delivery_id"><small class="field-hint">Optional: dot-path to a stable delivery id in the payload, so a provider retry of the same delivery fires once.</small></label>
+        <div id="hook-response-field">
+          <label>Response<select name="response_mode"><option value="ack">Ack (queue, answer 202)</option><option value="challenge">Challenge (verification handshake)</option><option value="sync">Sync (run inline, answer the outcome)</option></select><small class="field-hint">Webhook only. Sync answers with the run's outcome — a template if given, else <code>{"ok", "workflow", "steps"}</code> — and must finish inside ~30&nbsp;s.</small></label>
+          <label id="hook-response-template-field" hidden>Response template (JSON)<textarea name="response_template" rows="6" class="mono-input" placeholder='{"challenge": "{trigger.body.challenge}"}'></textarea><small class="field-hint">Optional, sync mode: any JSON value; string parts render like actions (<code>{trigger.body.*}</code>, <code>{steps.&lt;id&gt;.output.*}</code>).</small></label>
+        </div>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
         <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input" required></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
         <p id="hook-error" class="form-error" role="alert"></p>
@@ -551,12 +610,13 @@
       <div class="dialog-body">
         <label>Name<input name="name" class="mono-input" placeholder="inbox-watch" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. Fixed after creation — it names the EventBridge rule.</small></label>
         <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(15 minutes)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> or <code>rate(&lt;number&gt; minutes|hours|days)</code>, like schedules.</small></label>
-        <label>URL<input name="url" type="url" class="mono-input" placeholder="https://api.example.test/items" required></label>
+        <label>Source<select name="source"><option value="">HTTP URL</option><option value="rss">RSS feed</option><option value="s3">S3 bucket</option><option value="google-sheets.rows">Google Sheets rows</option><option value="google-drive.files">Google Drive files</option><option value="google-drive.updates">Google Drive updates</option><option value="google-drive.deletions">Google Drive deletions</option><option value="zoom.recordings">Zoom recordings</option><option value="dropbox.files">Dropbox files</option><option value="youtube.videos">YouTube videos</option><option value="mailchimp.members">Mailchimp members</option><option value="slack.messages">Slack messages</option></select><small class="field-hint">What gets polled. Provider sources fetch through a stored connection or credential (new objects / rows / files / recordings / members / messages only); the URL and Method apply to the HTTP and RSS sources.</small></label>
+        <label>URL<input name="url" type="url" class="mono-input" placeholder="https://api.example.test/items"><small class="field-hint">HTTP and RSS sources only (for RSS, the feed URL). Other provider sources take their target (bucket, spreadsheet, folder, path, channel) through Options.</small></label>
         <label>Method<select name="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label>
         <label>Connection<input name="connection_id" class="mono-input" placeholder="(none)"><small class="field-hint">Optional: a connected account whose credentials authenticate the request.</small></label>
         <label>Description<input name="description" placeholder="What it watches and why" maxlength="200"></label>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
-        <label>Options (JSON)<textarea name="options" rows="6" class="mono-input"></textarea><small class="field-hint">Optional extras: <code>{"headers": {…}, "body": …, "list_path": "data.items", "id_path": "id", "cursor_mode": "watermark", "max_items": 25, "actions": […]}</code>. Server-validated.</small></label>
+        <label>Options (JSON)<textarea name="options" rows="6" class="mono-input"></textarea><small class="field-hint">Optional extras: <code>{"headers": {…}, "body": …, "list_path": "data.items", "id_path": "id", "cursor_mode": "watermark", "max_items": 25, "dedupe_ttl_days": 7, "actions": […]}</code>; for <code>s3</code>: <code>{"bucket": "…", "prefix": "…"}</code>, for Sheets/Drive: <code>{"spreadsheet_id": "…"}</code> / <code>{"folder_id": "…"}</code>, for Zoom: <code>{"for_email": "me"}</code>, for Dropbox/YouTube: <code>{"path": "/Invoices"}</code> / <code>{"channel_id": "UC…"}</code>, for Mailchimp/Slack: <code>{"list_id": "…"}</code> / <code>{"channel_id": "C…"}</code>. Server-validated.</small></label>
         <p id="poll-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
@@ -564,6 +624,18 @@
         <button class="button primary" type="submit">Save</button>
       </div>
     </form>
+  </dialog>
+  <dialog id="poll-sample-dialog" aria-label="Trigger sample">
+    <div class="dialog-head">
+      <h2 id="poll-sample-title">Trigger sample</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p id="poll-sample-meta" class="sub mono"></p>
+      <pre id="poll-sample-data" class="mono break-all" style="max-height:50vh;overflow:auto"></pre>
+      <p class="field-hint">The newest event the poll would publish — pulled live from the provider when it can, else the newest recorded run, else a documented example. This is the shape <code>{trigger.*}</code> templates read.</p>
+    </div>
+    <div class="dialog-actions"><button class="button primary dialog-close" type="button">Close</button></div>
   </dialog>
   <dialog id="trigger-confirm-dialog" aria-label="Delete trigger">
     <form method="dialog" autocomplete="off">
@@ -615,6 +687,20 @@
           <label>Signing secret<input name="signing_secret" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="the app's Signing Secret (fa…)"><small class="field-hint">Required for events — Slack signs every delivery with it. Leave blank to keep the stored value. Bot posts never fire the trigger, so a workflow posting into the channel it listens on cannot loop.</small></label>
           <p class="field-hint">Use the <code>slack / message.received</code> trigger in a workflow; filter on <code>channel_id</code> or <code>type</code> (e.g. <code>app_mention</code>).</p>
         </section>
+        <section id="edit-youtube-setup" class="detail-block" hidden>
+          <h3>YouTube video push</h3>
+          <p>New uploads arrive as PubSubHubbub (WebSub) pushes to this callback URL:</p>
+          <code id="edit-youtube-url" class="break-all"></code>
+          <p>Subscribe the channel on the hub — pass the callback above, the topic <code>https://www.youtube.com/xml/feeds/videos.xml?channel_id=<em>CHANNEL_ID</em></code>, and <code>hub.secret</code> set to the configured webhook secret:</p>
+          <pre id="edit-youtube-curl" class="sample-json mono"></pre>
+          <p class="field-hint">The renewal schedule re-subscribes every channel a <code>youtube / video.published</code> workflow item filters on every five days, so subscriptions stay live; the manual subscribe above starts watching immediately. With a webhook secret configured, unsigned deliveries are rejected.</p>
+        </section>
+        <section id="edit-dropbox-setup" class="detail-block" hidden>
+          <h3>Dropbox webhook</h3>
+          <p>Set this Webhook URI in your Dropbox app's settings (App Console → Webhooks). Dapier answers Dropbox's validation challenge.</p>
+          <code id="edit-dropbox-url" class="break-all"></code>
+          <p class="field-hint">Dropbox signs every delivery with the app secret, so the secret stored for the dropbox OAuth client (<a href="/credentials">Credentials</a>, or <code>dapier oauth-clients set dropbox</code>) must match the App Console secret. Use the <code>dropbox / file.created</code> trigger (also <code>file.updated</code>, <code>file.deleted</code>) in a workflow.</p>
+        </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
         <p id="edit-connection-test-result" class="sub" hidden></p>
       </div>
@@ -660,6 +746,7 @@
       <label id="sample-connection-field" hidden>Connection<select id="sample-connection"></select><small class="field-hint">Optional — an account lets the sample come live from it.</small></label>
       <label id="sample-event-field" hidden>Event<select id="sample-event"></select><small class="field-hint">Optional; leave on the default unless the connector has several.</small></label>
       <label id="sample-resource-field" hidden>Field options<select id="sample-resource"></select><small class="field-hint">Pick a field to list its options (channels, folders…) instead of pulling an event sample.</small></label>
+      <div id="sample-params" hidden></div>
       <label id="sample-limit-field">Limit<input id="sample-limit" class="mono-input" type="number" min="1" max="25" placeholder="5"><small class="field-hint">Option lists are capped at 25.</small></label>
       <p id="sample-error" class="form-error" role="alert"></p>
       <div id="sample-result" hidden></div>
@@ -725,6 +812,45 @@
   </dialog>
   <dialog id="versions-confirm-dialog" aria-labelledby="versions-confirm-title" aria-describedby="versions-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body"><p id="versions-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Restore version</button></div></form>
+  </dialog>
+  <dialog id="workflow-delete-confirm-dialog" aria-labelledby="workflow-delete-confirm-title" aria-describedby="workflow-delete-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="workflow-delete-confirm-title">Delete workflow</h2></div><div class="dialog-body"><p id="workflow-delete-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Delete permanently</button></div></form>
+  </dialog>
+  <dialog id="workflow-tags-dialog" aria-labelledby="workflow-tags-title">
+    <form id="workflow-tags-form" method="dialog">
+      <div class="dialog-head">
+        <h2 id="workflow-tags-title">Tags</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="sub" id="workflow-tags-blurb"></p>
+        <label>Tags<input id="workflow-tags-input" class="mono-input" type="text" placeholder="billing, ops, weekly-report" autocomplete="off"></label>
+        <p class="field-hint">Comma-separated labels; they live in the workflow YAML and are saved live like any other change. Leave empty to remove all tags.</p>
+        <p id="workflow-tags-error" class="form-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button id="workflow-tags-save" class="button primary" type="submit">Save tags</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="workflow-folder-dialog" aria-labelledby="workflow-folder-title">
+    <form id="workflow-folder-form" method="dialog">
+      <div class="dialog-head">
+        <h2 id="workflow-folder-title">Folder</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="sub" id="workflow-folder-blurb"></p>
+        <label>Folder<input id="workflow-folder-input" type="text" placeholder="Invoices" autocomplete="off"></label>
+        <p class="field-hint">Flat Zapier-style folders: one per workflow, a plain name (no slashes). It lives in the workflow YAML and is saved live like any other change. Leave empty to remove the folder.</p>
+        <p id="workflow-folder-error" class="form-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button id="workflow-folder-save" class="button primary" type="submit">Save folder</button>
+      </div>
+    </form>
   </dialog>
 </body>
 </html>

@@ -99,6 +99,13 @@ const CONNECTION_STATUS_LABELS = {
   revoked: 'revoked',
 };
 
+/* A stored token can expire while the record still reads 'connected' — the
+   API flags that via health; treat such rows as needing reconnection
+   everywhere the list aggregates, not just in the row rendering. */
+const effectiveStatus = (connection) =>
+  (connection.health === 'expired' && connection.status === 'connected' ? 'expired' : connection.status);
+const needsAttention = (connection) => ['ready', 'expired', 'revoked'].includes(effectiveStatus(connection));
+
 let addPickerOpen = false;
 
 const OAUTH_RESULTS = {
@@ -297,6 +304,22 @@ function openEditConnection(connectionId) {
     $('#edit-slack-url').textContent = `${window.location.origin}/hooks/slack/${encodeURIComponent(connectionId)}`;
     form.signing_secret.value = '';
   }
+  const youtubeSetup = $('#edit-youtube-setup');
+  youtubeSetup.hidden = connection.provider !== 'youtube';
+  if (connection.provider === 'youtube') {
+    const callback = `${window.location.origin}/hooks/youtube`;
+    $('#edit-youtube-url').textContent = callback;
+    $('#edit-youtube-curl').textContent = [
+      'curl -d hub.mode=subscribe -d hub.verify=async \\',
+      `  -d hub.callback=${callback} \\`,
+      `  -d 'hub.topic=https://www.youtube.com/xml/feeds/videos.xml?channel_id=CHANNEL_ID' \\`,
+      '  -d hub.secret=<webhook secret> \\',
+      '  https://pubsubhubbub.appspot.com/subscribe',
+    ].join('\n');
+  }
+  const dropboxSetup = $('#edit-dropbox-setup');
+  dropboxSetup.hidden = connection.provider !== 'dropbox';
+  if (connection.provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = TOKEN_PROVIDERS.includes(connection.provider) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
@@ -312,8 +335,8 @@ function openEditConnection(connectionId) {
 
 function renderConnections(connections) {
   renderConnectCards(connections);
-  const connected = connections.filter((connection) => connection.status === 'connected').length;
-  const attention = connections.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status)).length;
+  const connected = connections.filter((connection) => effectiveStatus(connection) === 'connected').length;
+  const attention = connections.filter(needsAttention).length;
   $('#connection-summary').textContent = connections.length
     ? `${connected} connected · ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
     : 'No accounts connected';
@@ -326,14 +349,14 @@ function renderConnections(connections) {
   const statusFilter = $('#connection-status-filter')?.value || 'all';
   const filtered = connections.filter((connection) => {
     if (statusFilter === 'connected' && connection.status !== 'connected') return false;
-    if (statusFilter === 'attention' && !['ready', 'expired', 'revoked'].includes(connection.status)) return false;
+    if (statusFilter === 'attention' && !needsAttention(connection)) return false;
     if (!query) return true;
     return [connection.display_name, connection.connection_id, connection.provider,
       connection.account_title, connection.verified_account_id].some((value) => String(value || '').toLowerCase().includes(query));
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
   const withinGroup = (a, b) =>
-    (priority[a.status] ?? 4) - (priority[b.status] ?? 4) ||
+    (priority[effectiveStatus(a)] ?? 4) - (priority[effectiveStatus(b)] ?? 4) ||
     String(a.display_name || a.connection_id).localeCompare(String(b.display_name || b.connection_id));
   const groups = new Map();
   for (const connection of filtered) {
@@ -345,7 +368,7 @@ function renderConnections(connections) {
     providerLabel(a).localeCompare(providerLabel(b))).map(([provider, group]) => {
     const rows = [...group].sort(withinGroup).map(connectionRow).join('');
     if (group.length < 2) return rows;
-    const attention = group.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status)).length;
+    const attention = group.filter(needsAttention).length;
     return `<tr class="provider-group-row"><th colspan="4" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span><span class="provider-group-meta">${group.length} account${group.length === 1 ? '' : 's'}${attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} attention` : ''}</span></th></tr>${rows}`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
@@ -354,18 +377,23 @@ function renderConnections(connections) {
 }
 
 function connectionRow(connection) {
-    const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && connection.status !== 'connected'
-      ? `<a class="button ${connection.status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${connection.status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+    /* health is computed by the API from the stored token expiry; an expired
+       token turns a connected row into "needs reconnection" (the label the
+       status map already carried) without rewriting the stored record. */
+    const status = effectiveStatus(connection);
+    const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && status !== 'connected'
+      ? `<a class="button ${status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     /* Console mirror of `dapier token exec`: only OAuth connections hold a
        refreshable provider access token — token providers (slack, telegram,
        zoom) keep a pasted secret, and the shared domain call 502s for them. */
-    const tokenAction = connection.status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
+    const tokenAction = status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
       ? `<button class="button secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
     const identity = connection.account_title || connection.verified_account_id;
+    const expires = formatTimestamp(connection.token_expires_at);
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
-    <td data-label="Status">${statusLine(connection.status, CONNECTION_STATUS_LABELS)}</td>
+    <td data-label="Status">${statusLine(status, CONNECTION_STATUS_LABELS)}${expires && status !== 'expired' ? `<span class="cell-sub muted-cell">token expires ${escapeHtml(expires)}</span>` : ''}</td>
     <td class="action-cell">${nextAction}${tokenAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
 }
@@ -681,6 +709,11 @@ function renderSampleConnections() {
   $('#sample-connection-field').hidden = !connections.length;
 }
 
+function discoveryEntry(connector, resource) {
+  return ((sampleCatalog || {}).discoveries || []).find((entry) =>
+    entry.connector === connector && entry.name === resource);
+}
+
 function renderSampleFields() {
   const connector = $('#sample-connector').value;
   const events = (((sampleCatalog || {}).connectors || []).find((entry) => entry.name === connector) || {}).events || [];
@@ -688,13 +721,41 @@ function renderSampleFields() {
   $('#sample-event-field').hidden = !events.length;
   $('#sample-event').innerHTML = ['<option value="">(default)</option>']
     .concat(events.map((event) => `<option value="${escapeHtml(event)}">${escapeHtml(event)}</option>`)).join('');
-  $('#sample-resource-field').hidden = !resources.length;
   $('#sample-resource').innerHTML = ['<option value="">(event sample)</option>']
     .concat(resources.map((resource) => `<option value="${escapeHtml(resource)}">${escapeHtml(resource)}</option>`)).join('');
+  $('#sample-resource-field').hidden = !resources.length;
+  renderSampleParams();
   renderSampleConnections();
   $('#sample-result').hidden = true;
   $('#sample-result').innerHTML = '';
   $('#sample-error').textContent = '';
+}
+
+/* Option listings that take parameters (an s3 bucket, a spreadsheet id)
+   carry them in the discovery call's event slot, "/"-joined positionally —
+   the convention listing_params parses. Render one input per param from
+   the catalog's discovery metadata so the console can drive those
+   resources instead of 404ing on the missing bucket/spreadsheet. */
+function renderSampleParams() {
+  const connector = $('#sample-connector').value;
+  const resource = $('#sample-resource-field').hidden ? '' : $('#sample-resource').value;
+  const entry = resource ? discoveryEntry(connector, resource) : null;
+  const params = (entry?.params || []).filter((param) => param.key !== 'connection_id');
+  $('#sample-params').innerHTML = params.map((param) => `
+    <label>${escapeHtml(param.label || param.key)}${param.required ? '' : ' <span class="muted-cell">(optional)</span>'}<input name="sample-param-${escapeHtml(param.key)}" class="mono-input" value="${escapeHtml(param.default || '')}">${param.help ? `<small class="field-hint">${escapeHtml(param.help)}</small>` : ''}</label>`).join('');
+  $('#sample-params').hidden = !params.length;
+}
+
+function sampleParamEvent(connector, resource) {
+  const entry = discoveryEntry(connector, resource);
+  const params = (entry?.params || []).filter((param) => param.key !== 'connection_id');
+  if (!params.length) return '';
+  const values = params.map((param) =>
+    ($(`#sample-params [name="sample-param-${param.key}"]`)?.value || '').trim());
+  if (!values[0]) {
+    throw new Error(`${params[0].label || params[0].key} is required for ${resource}`);
+  }
+  return values.join('/');
 }
 
 async function openSamplePuller() {
@@ -744,6 +805,7 @@ function renderSampleResult(data, resource) {
 
 $('#sample-connector').addEventListener('change', renderSampleFields);
 $('#sample-resource').addEventListener('change', () => {
+  renderSampleParams();
   $('#sample-result').hidden = true;
   $('#sample-result').innerHTML = '';
 });
@@ -754,9 +816,19 @@ $('#sample-run').addEventListener('click', async (event) => {
   if (!connector || button.disabled) return;
   const resource = $('#sample-resource-field').hidden ? '' : $('#sample-resource').value;
   const body = { connector, kind: resource ? 'options' : 'sample' };
-  if (resource) body.resource = resource;
+  let paramEvent = '';
+  if (resource) {
+    body.resource = resource;
+    try {
+      paramEvent = sampleParamEvent(connector, resource);
+      if (paramEvent) body.event = paramEvent;
+    } catch (error) {
+      $('#sample-error').textContent = error.message;
+      return;
+    }
+  }
   const eventName = $('#sample-event-field').hidden ? '' : $('#sample-event').value;
-  if (eventName) body.event = eventName;
+  if (eventName && !paramEvent) body.event = eventName;
   const connectionId = $('#sample-connection').value;
   if (connectionId) body.connection_id = connectionId;
   const limit = $('#sample-limit').value.trim();

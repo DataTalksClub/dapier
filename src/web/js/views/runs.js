@@ -39,7 +39,7 @@ function runRow(run) {
    API's `since` timestamp), and Load more appends the next page through the
    API's paging token. Until a server fetch happens, the view shows the
    overview's recent sample (state.data.runs), filtered locally as before. */
-const runsPage = { runs: null, nextToken: null, workflow: '', status: '', date: '' };
+const runsPage = { runs: null, nextToken: null, workflow: '', status: '', date: '', search: '' };
 let fetchSeq = 0;
 
 function selectedFilters() {
@@ -47,6 +47,7 @@ function selectedFilters() {
     workflow: $('#runs-workflow-filter').value || '',
     status: $('#runs-status-filter').value || '',
     date: $('#runs-date-filter').value || '',
+    search: ($('#runs-search-filter').value || '').trim(),
   };
 }
 
@@ -58,16 +59,18 @@ function sinceFor(date) {
 }
 
 async function fetchRunsPage({ append = false } = {}) {
-  const { workflow, status, date } = selectedFilters();
+  const { workflow, status, date, search } = selectedFilters();
   const since = sinceFor(date);
   const seq = ++fetchSeq;
   runsPage.workflow = workflow;
   runsPage.status = status;
   runsPage.date = date;
+  runsPage.search = search;
   const params = new URLSearchParams({ limit: '25' });
   if (workflow) params.set('workflow_id', workflow);
   if (status) params.set('status', status);
   if (since) params.set('since', since);
+  if (search) params.set('q', search);
   if (append && runsPage.nextToken) params.set('next', runsPage.nextToken);
   try {
     const data = await api(`/api/admin/runs?${params}`);
@@ -85,10 +88,11 @@ async function fetchRunsPage({ append = false } = {}) {
 /* Programmatic filter changes (the workflows view's "Runs" buttons) set the
    select values directly; pick the change up here and re-fetch server-side. */
 function syncServerFilters() {
-  const { workflow, status, date } = selectedFilters();
+  const { workflow, status, date, search } = selectedFilters();
   const stale = runsPage.runs === null
-    ? Boolean(workflow || status || date)
-    : workflow !== runsPage.workflow || status !== runsPage.status || date !== runsPage.date;
+    ? Boolean(workflow || status || date || search)
+    : workflow !== runsPage.workflow || status !== runsPage.status ||
+      date !== runsPage.date || search !== runsPage.search;
   if (stale) fetchRunsPage();
 }
 
@@ -130,6 +134,10 @@ export function renderRuns() {
       shown = shown.filter((run) => Number.isFinite(Date.parse(run.started_at)) &&
         now - Date.parse(run.started_at) <= maxAge);
     }
+    const search = ($('#runs-search-filter').value || '').trim().toLowerCase();
+    if (search) {
+      shown = shown.filter((run) => JSON.stringify(run).toLowerCase().includes(search));
+    }
   }
   const emptyText = workflowFilter.value ? 'No recent runs for this workflow'
     : runs.length || statusFilter.value ? 'No runs match these filters' : 'No runs yet';
@@ -149,19 +157,62 @@ $('#runs-load-more').addEventListener('click', () => fetchRunsPage({ append: tru
 $('#runs-workflow-filter').addEventListener('change', () => fetchRunsPage());
 $('#runs-status-filter').addEventListener('change', () => fetchRunsPage());
 $('#runs-date-filter').addEventListener('change', () => fetchRunsPage());
+/* Content search goes through the API like the other filters; debounced so
+   typing does not fire a request per keystroke. */
+let runsSearchTimer = null;
+$('#runs-search-filter').addEventListener('input', () => {
+  clearTimeout(runsSearchTimer);
+  runsSearchTimer = setTimeout(fetchRunsPage, 300);
+});
 
-/* One flow card: head row plus optional data sections. */
-function stepCard({ icon, title, badge, status, duration, at, data, error }) {
+/* Export the filtered run history as CSV (the audit view's export button,
+   over /api/admin/runs/export): the same server filters the list applies,
+   capped well past what the 25-row page shows. */
+$('#runs-export').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    const { workflow, status, date, search } = selectedFilters();
+    const since = sinceFor(date);
+    const params = new URLSearchParams({ max_rows: '5000' });
+    if (workflow) params.set('workflow_id', workflow);
+    if (status) params.set('status', status);
+    if (since) params.set('since', since);
+    if (search) params.set('q', search);
+    const data = await api(`/api/admin/runs/export?${params}`);
+    const blob = new Blob([data.csv || ''], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = data.filename || 'dapier-runs.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    notice(`Exported ${data.count || 0} runs${data.truncated ? ' (capped — narrow the filters for the rest)' : ''}`);
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* One flow card: head row plus optional data sections. A top-level step
+   card carries "Replay from here" when a run id is in scope. */
+function stepCard({ icon, title, badge, status, duration, at, data, error, replayFrom, stepId }) {
   const sections = Object.entries(data || {})
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${jsonBlock(value) || '<p class="detail-muted">Empty</p>'}</div>`)
     .join('');
+  const replayFromHere = replayFrom && stepId
+    ? `<button class="button secondary run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
+        title="Re-run from this step: earlier steps do not run again, their recorded outputs seed the rerun">Replay from here</button>`
+    : '';
   return `<div class="flow-step ${error ? 'failed' : ''}">
     <div class="flow-head">
       <span class="flow-icon"><i data-lucide="${icon}"></i></span>
       <span class="flow-title">${escapeHtml(title)}</span>
       ${badge ? `<span class="action-type">${escapeHtml(badge)}</span>` : ''}
       <span class="flow-meta">${[status ? statusLine(status) : '', duration ? escapeHtml(duration) : '', at ? escapeHtml(at) : ''].filter(Boolean).join(' ')}</span>
+      ${replayFromHere}
     </div>
     ${error ? `<div class="detail-error"><i data-lucide="alert-triangle"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${sections ? `<div class="flow-data">${sections}</div>` : ''}
@@ -172,6 +223,7 @@ function flow(data) {
   const run = data.run || {};
   const steps = data.steps || [];
   const firstInput = steps.find((step) => step.input !== undefined && step.input !== null);
+  const replayFrom = run.run_id || '';
   const cards = [];
   cards.push(stepCard({
     icon: 'zap',
@@ -182,6 +234,11 @@ function flow(data) {
   }));
   steps.forEach((step, index) => {
     cards.push(`<div class="flow-link" aria-hidden="true"></div>`);
+    /* The API replays from top-level steps only (a nested id like
+       `branch.post` cannot start a chain), and the action targets a failed
+       step — offer it exactly there. */
+    const replayable = step.status === 'failed' &&
+      step.action_id && !String(step.action_id).includes('.');
     cards.push(stepCard({
       icon: STEP_ICONS[step.action_type] || 'arrow-right',
       title: step.action_id || `Step ${index + 1}`,
@@ -191,6 +248,8 @@ function flow(data) {
       at: formatTimestamp(step.finished_at),
       data: { Input: step.input, Output: step.output },
       error: step.error,
+      replayFrom: replayable ? replayFrom : '',
+      stepId: step.action_id,
     }));
   });
   return `<div class="flow">${cards.join('')}</div>`;
@@ -250,6 +309,38 @@ document.addEventListener('click', async (event) => {
     result.textContent = 'Run cancelled: the parked continuation is dropped and the remaining actions will not run.';
     result.hidden = false;
     fetchRunsPage(); // the list row reads cancelled again
+  } catch (error) {
+    const result = $('#run-replay-result');
+    result.textContent = error.message;
+    result.classList.add('error');
+    result.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* Replay-from-step retries a run at one step (the same route
+   `dapier runs replay --from-step` calls): the API rebuilds the worker's
+   resume envelope from the recorded outputs of the earlier steps, so the
+   trigger and the already-done actions do not fire again. The rerun lands
+   in run history as its own run, tied to this one by correlation id. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.run-replay-from-step');
+  if (!button || !button.dataset.run || button.disabled) return;
+  const runId = button.dataset.run;
+  const stepId = button.dataset.step;
+  if (!confirm(`Replay ${runId} from step '${stepId}'? Earlier steps will not run again.`)) return;
+  button.disabled = true;
+  try {
+    const data = await api(`/api/admin/runs/${encodeURIComponent(runId)}/replay`, {
+      method: 'POST',
+      body: JSON.stringify({ from_step: stepId }),
+    });
+    const result = $('#run-replay-result');
+    result.classList.remove('error');
+    result.textContent = `Replay from step '${stepId}' accepted: the rerun (${data.run_id || 'pending'}) `
+      + 'appears in run history once the worker picks it up.';
+    result.hidden = false;
   } catch (error) {
     const result = $('#run-replay-result');
     result.textContent = error.message;

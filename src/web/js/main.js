@@ -8,6 +8,7 @@ import { openDesigner, designerFromLocation, confirmDesignerLeave } from './view
 import { showOAuthResult } from './views/connections.js';
 import './views/storage.js';
 import { refreshAudit } from './views/audit.js';
+import { refreshUsers } from './views/users.js';
 import { renderTriggers } from './views/triggers.js';
 import { toggleTheme } from './theme.js';
 
@@ -35,6 +36,8 @@ document.addEventListener('click', async (event) => {
     button.disabled = false;
   }
 });
+
+/* Tags and Delete live in views/overview.js (dialog-based flows there). */
 
 document.addEventListener('click', (event) => {
   const link = event.target.closest('.workflow-edit');
@@ -195,6 +198,7 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   const target = link.dataset.view || link.dataset.target;
   if (!await setView(target)) return;
   if (target === 'audit') refreshAudit();
+  if (target === 'users') refreshUsers();
 }));
 $('#overview-attention').addEventListener('click', async (event) => {
   const link = event.target.closest('.view-link');
@@ -217,6 +221,7 @@ window.addEventListener('popstate', async () => {
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
     if (view === 'audit') refreshAudit();
+    if (view === 'users') refreshUsers();
   }
 });
 
@@ -236,7 +241,7 @@ $('#startup-retry').addEventListener('click', async () => {
   $('#startup-retry').disabled = true;
   try {
     const me = await api('/api/admin/me');
-    if (!me.operator) { $('#startup-error').hidden = true; showForbidden(); return; }
+    if (!me.operator && !me.role) { $('#startup-error').hidden = true; showForbidden(); return; }
     await refresh();
   } catch (error) {
     if ($('#forbidden-view').hidden) showStartupError(error.message);
@@ -286,7 +291,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if ($('#forbidden-view').hidden) showStartupError(error.message);
     return;
   }
-  if (!me.operator) { showForbidden(); return; }
+  /* Roles v1: a stored viewer/editor assignment enters the console too —
+     the server still decides, per route, what each role may do. */
+  if (!me.operator && !me.role) { showForbidden(); return; }
   const initialView = viewFromPath(window.location.pathname);
   await setView(initialView, false);
   if (initialView === 'designer') await designerFromLocation();
@@ -297,6 +304,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (initialView === 'triggers') renderTriggers();
   if (initialView === 'audit') refreshAudit();
+  if (initialView === 'users') refreshUsers();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

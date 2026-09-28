@@ -1,14 +1,60 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudDownload, FlaskConical, GitBranch, Loader2, Play, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Play, Sparkles, Trash2, TriangleAlert, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
-import { actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
-import type { ConnectionOption, DiagramShape, FilterRule, GitStatus, NodeData, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import type { ConnectionOption, DiagramShape, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
+
+/** localStorage key copying a step across workflows: Copy step writes it,
+    Paste step (any workflow's editor) reads it. */
+const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
+
+/** What Copy step stores: everything needed to rebuild the action node.
+    Forgiving on purpose — an entry pasted where it does not fit surfaces the
+    mismatch through the ordinary save validation, like a manual step. */
+interface StepClipboardEntry {
+  actionType?: string;
+  fields?: Record<string, string>;
+  raw?: Record<string, unknown>;
+  label?: string;
+}
+
+function readStepClipboard(): StepClipboardEntry | null {
+  try {
+    const text = window.localStorage.getItem(STEP_CLIPBOARD_KEY);
+    if (!text) return null;
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as StepClipboardEntry;
+  } catch {
+    return null;
+  }
+}
+
+function writeStepClipboard(step: StepClipboardEntry) {
+  try {
+    window.localStorage.setItem(STEP_CLIPBOARD_KEY, JSON.stringify(step));
+  } catch { /* best-effort: private mode or blocked storage just skips it */ }
+}
+
+/** Rows for the "?" cheat sheet; ⌘ where the platform uses it, Ctrl elsewhere. */
+const MOD_KEY = /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘" : "Ctrl";
+const SHORTCUTS: Array<{ keys: string[]; description: string }> = [
+  { keys: [`${MOD_KEY} Z`], description: "Undo" },
+  { keys: [`${MOD_KEY} ⇧ Z`, "Ctrl Y"], description: "Redo" },
+  { keys: [`${MOD_KEY} D`], description: "Duplicate the selected step" },
+  { keys: [`${MOD_KEY} C`], description: "Copy the selected step for pasting into any workflow" },
+  { keys: [`${MOD_KEY} V`], description: "Paste a copied step as a new node" },
+  { keys: ["Delete", "Backspace"], description: "Delete the selected shape (undoable)" },
+  { keys: ["?"], description: "Show this cheat sheet" },
+  { keys: ["Esc"], description: "Close menus and dialogs" }
+];
 
 /** Plain words for a connection status, mirroring the console's labels. */
 const CONNECTION_STATUS_LABELS: Record<string, string> = {
@@ -442,6 +488,83 @@ function StepsTemplatePicker({ steps, onPick, onClose }: {
   );
 }
 
+/** Template gallery: GET /api/admin/designer/templates, one card per
+    template flagged `template: true`. Applying is the server's fork route
+    (the same commit-and-publish path the CLI's `templates apply` uses), so
+    the template itself stays in the gallery untouched. */
+function TemplatesGallery({ config, onApply, onClose }: {
+  config: DesignerConfig;
+  onApply: (template: WorkflowSummary) => void;
+  onClose: () => void;
+}) {
+  const [templates, setTemplates] = useState<WorkflowSummary[] | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    api<{ templates: WorkflowSummary[] }>(config, "/templates")
+      .then((data) => { if (!cancelled) setTemplates(data.templates); })
+      .catch((err) => { if (!cancelled) setError(String(err)); });
+    return () => { cancelled = true; };
+  }, [config]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="picker-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="picker-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templates-gallery-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="templates-gallery-title">Start from a template</h2>
+        <p className="picker-status">
+          Applying forks a template into a new workflow that starts Off — wire up your
+          connections, then switch it on. The template stays in the gallery.
+        </p>
+        <div className="picker-list">
+          {(templates ?? []).map((template) => (
+            <div key={template.source} className="step-templates">
+              <p className="step-templates-head">
+                <span className="picker-item-id">{template.id}</span>
+                <span className="picker-item-name">
+                  {template.description || `${template.connector}/${template.event}`}
+                </span>
+              </p>
+              <div className="template-chips">
+                <button
+                  type="button"
+                  className="template-chip"
+                  title={`Apply ${template.id}`}
+                  onClick={() => onApply(template)}
+                >
+                  {connectorLabel(template.connector)}/{template.event} · {template.actionCount} action{template.actionCount === 1 ? "" : "s"} — Apply
+                </button>
+              </div>
+            </div>
+          ))}
+          {templates && templates.length === 0 && (
+            <p className="inspector-hint">
+              No templates yet — publish one with &ldquo;Publish as template&rdquo; or
+              {" "}<code>dapier templates publish</code>.
+            </p>
+          )}
+          {!templates && !error && <p className="inspector-hint">Loading…</p>}
+          {error && <p className="inspector-hint">Could not load templates: {error}</p>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /** Console copilot: a natural-language prompt becomes a DRAFT workflow from
     POST /api/admin/copilot/draft. The draft is shown read-only with its
     validation errors; nothing is saved or published here — loading it into
@@ -584,6 +707,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       insert-from-previous picker over the earlier steps' outputs. */
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [stepsPickerOpen, setStepsPickerOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  /** "?" overlay listing the editor's keyboard shortcuts. */
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  /** A step sits on the cross-workflow clipboard, so Paste step can appear. */
+  const [clipboardHasStep, setClipboardHasStep] = useState(() => readStepClipboard() !== null);
 
   const dirty = useMemo(
     () => view === "yaml"
@@ -591,6 +719,231 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
     [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
   );
+
+  /** Whole-editor undo history (designer/src/history.ts): canvas ops,
+      inspector typing, renames, the on/off toggle, and YAML materializations
+      all push here, so one timeline covers everything instead of the board
+      alone. Entries hold the snapshot from BEFORE each change. */
+  const [editHistory, setEditHistory] = useState<HistoryState>(initHistory);
+  const canUndo = editHistory.past.length > 0;
+  const canRedo = editHistory.future.length > 0;
+  /** Always-fresh draft snapshot: handlers registered in dep-array effects
+      (the console's set-id message) would otherwise commit stale shapes. */
+  const draftRef = useRef<DraftSnapshot>({ shapes: EMPTY_SHAPES, workflowId: "new-workflow", enabled: true });
+  draftRef.current = { shapes, workflowId, enabled };
+
+  /** Records the editor state as restorable right before a change lands.
+      Pass coalesceKey for rapid like-key edits (typing bursts) so they
+      collapse into one undo step instead of one per keystroke. */
+  function commitEdit(previous: DraftSnapshot, coalesceKey?: string) {
+    setEditHistory((current) => pushHistory(current, previous, coalesceKey ? { key: coalesceKey } : {}));
+  }
+
+  /** History-tracked shape edit — the board's discrete ops and the inspector. */
+  function editShapes(updater: (current: DiagramShape[]) => DiagramShape[], coalesceKey?: string) {
+    const current = draftRef.current;
+    const nextShapes = updater(current.shapes);
+    if (nextShapes === current.shapes) return;
+    commitEdit(current, coalesceKey);
+    setShapes(nextShapes);
+  }
+
+  /** Records a drag that already mutated shapes live through setShapes while
+      the pointer was down: the board hands back its pre-drag snapshot, which
+      is what undo must restore. */
+  function commitDrag(preDragShapes: DiagramShape[]) {
+    if (preDragShapes === draftRef.current.shapes) return;
+    commitEdit({ ...draftRef.current, shapes: preDragShapes });
+  }
+
+  function applySnapshot(snapshot: DraftSnapshot) {
+    setShapes(snapshot.shapes);
+    setWorkflowId(snapshot.workflowId);
+    setEnabled(snapshot.enabled);
+    setSelectedId((current) => snapshot.shapes.some((shape) => shape.id === current) ? current : null);
+  }
+
+  function undo() {
+    const step = undoHistory(editHistory, draftRef.current);
+    if (!step) return;
+    applySnapshot(step.snapshot);
+    setEditHistory(step.state);
+  }
+
+  function redo() {
+    const step = redoHistory(editHistory, draftRef.current);
+    if (!step) return;
+    applySnapshot(step.snapshot);
+    setEditHistory(step.state);
+  }
+
+  /** Opening or creating a workflow starts a fresh timeline. */
+  function resetHistory() {
+    setEditHistory(initHistory());
+  }
+
+  /** Rename from the standalone input or the console's set-id message. */
+  function renameWorkflow(id: string) {
+    commitEdit(draftRef.current, "workflow-id");
+    setWorkflowId(id);
+  }
+
+  function toggleEnabled(next: boolean) {
+    commitEdit(draftRef.current);
+    setEnabled(next);
+  }
+
+  /** Deletes the selected shape (node — with its arrows — note, or connector).
+      One undo entry, so no confirm dialog. */
+  function deleteSelectedShape() {
+    const id = selectedId;
+    if (!id) return;
+    commitEdit(draftRef.current);
+    setShapes((current) => current.filter((shape) => (
+      shape.id !== id && shape.sourceId !== id && shape.targetId !== id
+    )));
+    setSelectedId(null);
+  }
+
+  /** Duplicate: a copy of the action directly after it in the chain, with a
+      fresh node id, its Action ID suffixed "-copy", and its field values,
+      filters and raw extras carried over. */
+  function duplicateStep(id: string) {
+    const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+    if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+    const data = shape.data;
+    const label = `${shape.label ?? actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Step"} (copy)`;
+    const copy: DiagramShape = {
+      ...shape,
+      id: crypto.randomUUID(),
+      x: shape.x + 36,
+      y: shape.y + 36,
+      label,
+      data: {
+        ...data,
+        fields: { ...data.fields, id: data.fields?.id ? `${data.fields.id.trim()}-copy` : "" },
+        ...(data.filters ? { filters: data.filters.map((rule) => ({ ...rule })) } : {}),
+        ...(data.raw ? { raw: { ...data.raw } } : {})
+      }
+    };
+    commitEdit(draftRef.current);
+    setShapes((current) => {
+      const at = current.findIndex((entry) => entry.id === id);
+      if (at < 0) return [...current, copy];
+      const next = [...current];
+      next.splice(at + 1, 0, copy);
+      return next;
+    });
+    setSelectedId(copy.id);
+    setStatus({ kind: "ok", message: `Step duplicated as "${label}".` });
+  }
+
+  /** Copy step onto the cross-workflow clipboard: type, fields, raw extras
+      and label. Paste lives in any workflow's editor, this browser only. */
+  function copyStep(id: string) {
+    const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+    if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+    const data = shape.data;
+    writeStepClipboard({
+      actionType: data.actionType,
+      fields: { ...(data.fields ?? {}) },
+      ...(data.raw ? { raw: { ...data.raw } } : {}),
+      label: shape.label
+    });
+    setClipboardHasStep(true);
+    setStatus({ kind: "ok", message: "Step copied — open another workflow and press Ctrl/Cmd+V or right-click → Paste step." });
+  }
+
+  /** Paste the clipboard step as a NEW action node: fresh node id, the copied
+      field values ride along (Action ID included — a collision surfaces
+      through save validation). Unconnected, like a manually-added step. */
+  function pasteStep(at?: Point) {
+    const step = readStepClipboard();
+    if (!step || view !== "canvas") return;
+    const anchor = at ?? (selected
+      ? { x: selected.x + 36, y: selected.y + 36 }
+      : { x: 420, y: 260 });
+    const type = step.actionType ?? "webhook";
+    const label = step.label ?? actionMeta(type)?.label ?? type;
+    const next: DiagramShape = {
+      id: crypto.randomUUID(),
+      type: "node",
+      x: anchor.x,
+      y: anchor.y,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+      label,
+      data: {
+        nodeKind: "action",
+        actionType: type,
+        fields: { ...(step.fields ?? {}) },
+        ...(step.raw ? { raw: step.raw } : {})
+      }
+    };
+    commitEdit(draftRef.current);
+    setShapes((current) => [...current, next]);
+    setSelectedId(next.id);
+    setStatus({ kind: "ok", message: `Step pasted as "${label}" — connect it, review its settings, then save.` });
+  }
+
+  // Editor shortcuts: Ctrl/Cmd+Z / +Shift+Z / Ctrl+Y mirror the toolbar
+  // buttons, Ctrl/Cmd+D duplicates the selected step, Ctrl/Cmd+C copies it
+  // for pasting into any workflow, Ctrl/Cmd+V pastes a copied step,
+  // Delete/Backspace deletes the selection, ? opens the cheat sheet. Text
+  // fields keep the browser's native editing keys, the YAML view edits text
+  // not shapes, and open dialogs swallow everything but their own Escape.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (shortcutsOpen) {
+          event.preventDefault();
+          setShortcutsOpen(false);
+        }
+        return;
+      }
+      if (leaveOpen || copilotOpen || stepsPickerOpen || templatesOpen || shortcutsOpen) return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+      // Rich-text hosts (contenteditable) keep the browser's editing keys too.
+      if (target instanceof HTMLElement && target.isContentEditable) return;
+      if (event.metaKey || event.ctrlKey) {
+        if (view !== "canvas") return;
+        const key = event.key.toLowerCase();
+        if (key === "z") {
+          event.preventDefault();
+          if (event.shiftKey) redo();
+          else undo();
+        } else if (key === "y") {
+          event.preventDefault();
+          redo();
+        } else if (key === "v" && readStepClipboard()) {
+          event.preventDefault();
+          pasteStep();
+        } else if (key === "d") {
+          // The editor owns Cmd/Ctrl+D on the canvas: duplicate the selected
+          // step, and always swallow the key so it never becomes a bookmark.
+          event.preventDefault();
+          if (selectedId) duplicateStep(selectedId);
+        } else if (key === "c" && selectedId) {
+          event.preventDefault();
+          copyStep(selectedId);
+        }
+        return;
+      }
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
+        if (view !== "canvas") return;
+        event.preventDefault();
+        deleteSelectedShape();
+        return;
+      }
+      if (event.key === "?") {
+        event.preventDefault();
+        setShortcutsOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   // Removing an unknown node or changing its action type also removes its
   // unparseable editor text; other unknown nodes keep their draft on selection.
@@ -696,7 +1049,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit id: in the YAML." });
         return;
       }
-      setWorkflowId(id);
+      renameWorkflow(id);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -791,6 +1144,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSelectedId(null);
       setStepTest({ nodeId: null, busy: false, result: null });
       setStepOutputs({});
+      resetHistory();
       setStatus({ kind: "idle", message: "" });
       if (config.mode === "console" && !config.embedded) {
         history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
@@ -827,6 +1181,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setSelectedId(null);
     setStepTest({ nodeId: null, busy: false, result: null });
     setStepOutputs({});
+    resetHistory();
     setStatus({ kind: "idle", message: "" });
   }
 
@@ -867,12 +1222,15 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     } else {
       const parsed = parseYamlText(yamlText);
       if (!parsed) return;
-      const shapes = shapesFromWorkflow(parsed);
-      setShapes(shapes);
+      const nextShapes = shapesFromWorkflow(parsed);
+      const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
+      const nextEnabled = parsed.enabled !== false;
+      commitEdit({ shapes, workflowId, enabled });
+      setShapes(nextShapes);
       setCanvasExtraDirty(yamlText !== savedYaml);
       setBase(parsed);
-      if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
-      setEnabled(parsed.enabled !== false);
+      setWorkflowId(nextId);
+      setEnabled(nextEnabled);
       setSelectedId(null);
     }
     setTestOpen(false);
@@ -932,6 +1290,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         return [...others, summarize(`${workflow.id}.yaml`, workflow)].sort((a, b) => a.source.localeCompare(b.source));
       });
       refreshGit();
+      // A save is the new baseline: undo cannot reach past it.
+      resetHistory();
       setStatus({
         kind: "ok",
         message: result.published === false
@@ -968,9 +1328,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     if (!parsed) return;
     allowUnload.current = false;
     const nextShapes = shapesFromWorkflow(parsed);
+    const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
+    const nextEnabled = parsed.enabled !== false;
+    // A draft load is a baseline: the fresh timeline starts at the loaded draft.
+    resetHistory();
     setShapes(nextShapes);
-    if (typeof parsed.id === "string" && parsed.id.trim()) setWorkflowId(parsed.id.trim());
-    setEnabled(parsed.enabled !== false);
+    setWorkflowId(nextId);
+    setEnabled(nextEnabled);
     setCanvasExtraDirty(false);
     setInvalidRawDrafts({});
     setBase(parsed);
@@ -1003,6 +1367,60 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         message: result.published === false
           ? `Duplicated as ${result.file}; goes live after deployment.`
           : `Duplicated as ${result.file}.`
+      });
+    } catch (error) {
+      setStatus({ kind: "error", message: String(error) });
+    }
+  }
+
+  /** Forks a template into a real workflow through the server's apply route
+     (the same commit-and-publish path the CLI's `templates apply` uses),
+     then opens the copy. The template itself stays in the gallery. */
+  async function applyTemplate(summary: WorkflowSummary) {
+    const name = window.prompt(`New workflow name (blank for the suggested name):`, `${summary.id}-copy`);
+    if (name === null) return;
+    setStatus({ kind: "busy", message: "Applying template…" });
+    try {
+      const result = await api<{ file: string; published?: boolean }>(
+        config, `/templates/${encodeURIComponent(summary.source)}/apply`, {
+          method: "POST",
+          body: JSON.stringify(name.trim() ? { name: name.trim() } : {})
+        });
+      const workflows = await refreshList();
+      refreshGit();
+      const created = workflows.find((entry) => entry.source === result.file);
+      if (created) await openWorkflow(created);
+      setStatus({
+        kind: "ok",
+        message: result.published === false
+          ? `Created ${result.file} from the template; it goes live after deployment.`
+          : `Created ${result.file} from the template. It starts Off — wire it up, then switch it On.`
+      });
+    } catch (error) {
+      setStatus({ kind: "error", message: String(error) });
+    }
+  }
+
+  /** Publishes/unpublishes the saved workflow as a template through the
+     server's flag route; the flag rides the YAML like tags do. */
+  async function toggleTemplateFlag() {
+    if (!sourceName) return;
+    const next = base?.template !== true;
+    setStatus({ kind: "busy", message: next ? "Publishing as template…" : "Removing from templates…" });
+    try {
+      await api<{ template: boolean }>(config, `/workflows/${encodeURIComponent(sourceName)}/template`, {
+        method: "PUT",
+        body: JSON.stringify({ template: next })
+      });
+      const data = await api<{ workflow: Workflow }>(config, `/workflows/${encodeURIComponent(sourceName)}`);
+      setBase(data.workflow);
+      await refreshList();
+      refreshGit();
+      setStatus({
+        kind: "ok",
+        message: next
+          ? `Offered as a template (${workflowId}).`
+          : `Removed from the template gallery (${workflowId}).`
       });
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
@@ -1171,14 +1589,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   function updateSelected(mutate: (data: NodeData) => NodeData) {
     if (!selectedId) return;
-    setShapes((current) => current.map((shape) => {
+    // Coalesced under the node's key: field edits arrive per keystroke, and
+    // one undo step per burst beats one per character.
+    editShapes((current) => current.map((shape) => {
       if (shape.id !== selectedId || !shape.data) return shape;
       const data = mutate(shape.data);
       const label = data.nodeKind === "trigger"
         ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}`
         : shape.label;
       return { ...shape, data, label };
-    }));
+    }), `node:${selectedId}`);
   }
 
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
@@ -1582,7 +2002,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 placeholder="workflow-id"
                 disabled={view === "yaml"}
                 title={view === "yaml" ? "Edit the id in the YAML view" : undefined}
-                onChange={(event) => setWorkflowId(event.target.value)}
+                onChange={(event) => renameWorkflow(event.target.value)}
               />
             )}
             {view === "canvas" && triggerNodes.length === 0 && (
@@ -1598,7 +2018,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 type="checkbox"
                 checked={enabled}
                 disabled={view === "yaml"}
-                onChange={(event) => setEnabled(event.target.checked)}
+                onChange={(event) => toggleEnabled(event.target.checked)}
                 aria-label="Workflow state after saving"
               />
               {enabled ? "On" : "Off"}
@@ -1625,6 +2045,31 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 title={!sourceName ? "Save the workflow first — duplicates copy the saved file" : undefined}
               >
                 <span>Duplicate</span>
+              </button>
+            )}
+            {config.mode === "console" && (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={toggleTemplateFlag}
+                disabled={status.kind === "busy" || !sourceName}
+                title={!sourceName
+                  ? "Save the workflow first — the flag rides the saved YAML"
+                  : base?.template
+                    ? "Remove this workflow from the template gallery"
+                    : "Offer this workflow in the template gallery"}
+              >
+                <span>{base?.template ? "Unpublish template" : "Publish as template"}</span>
+              </button>
+            )}
+            {config.mode === "console" && (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setTemplatesOpen(true)}
+                title="Start from a workflow template"
+              >
+                <span>Templates</span>
               </button>
             )}
             {config.mode === "console" && (
@@ -1674,12 +2119,21 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           <WorkflowBoard
             shapes={shapes}
             setShapes={setShapes}
+            editShapes={editShapes}
+            commitDrag={commitDrag}
             selectedId={selectedId}
             setSelectedId={setSelectedId}
+            canPasteStep={clipboardHasStep}
+            onDuplicateStep={duplicateStep}
+            onCopyStep={copyStep}
+            onPasteStep={pasteStep}
             sessionControls={(actions) => (
               <>
-                <button className="icon-button" disabled={!actions.canUndo} onClick={actions.undo} title="Undo" type="button">↺</button>
-                <button className="icon-button" disabled={!actions.canRedo} onClick={actions.redo} title="Redo" type="button">↻</button>
+                <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button">↺</button>
+                <button className="icon-button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)" type="button">↻</button>
+                <button className="icon-button" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" type="button">
+                  <Keyboard size={18} />
+                </button>
                 <button className="icon-button" onClick={actions.clearCanvas} title="Clear canvas" type="button">✕</button>
               </>
             )}
@@ -1785,6 +2239,19 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 ))}
               </nav>
             )}
+            {selected?.type === "node" && selected.data?.nodeKind === "action" && (
+              <div className="inspector-toolbar">
+                <button className="button secondary" type="button" onClick={() => duplicateStep(selected.id)} title="Duplicate this step (Ctrl/Cmd+D)">
+                  <Copy size={15} /><span>Duplicate</span>
+                </button>
+                <button className="button secondary" type="button" onClick={() => copyStep(selected.id)} title="Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)">
+                  <ClipboardCopy size={15} /><span>Copy step</span>
+                </button>
+                <button className="button danger" type="button" onClick={deleteSelectedShape} title="Delete this step (Delete)">
+                  <Trash2 size={15} /><span>Delete</span>
+                </button>
+              </div>
+            )}
             {selectedInspector()}
             {selected?.type === "arrow" && (
               <p className="inspector-hint">Connector. Drag an endpoint handle to reattach it; Delete removes it.</p>
@@ -1817,12 +2284,46 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           onClose={() => setStepsPickerOpen(false)}
         />
       )}
+      {templatesOpen && (
+        <TemplatesGallery
+          config={config}
+          onApply={(template) => {
+            setTemplatesOpen(false);
+            void applyTemplate(template);
+          }}
+          onClose={() => setTemplatesOpen(false)}
+        />
+      )}
       {copilotOpen && (
         <CopilotDraftDialog
           config={config}
           onLoad={loadCopilotDraft}
           onClose={() => setCopilotOpen(false)}
         />
+      )}
+      {shortcutsOpen && (
+        <div className="picker-backdrop" role="presentation" onClick={() => setShortcutsOpen(false)}>
+          <section
+            className="picker-panel shortcuts-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcuts-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+            <div className="shortcut-list">
+              {SHORTCUTS.map((shortcut) => (
+                <div className="shortcut-row" key={shortcut.description}>
+                  <span className="shortcut-keys">
+                    {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                  </span>
+                  <span className="shortcut-desc">{shortcut.description}</span>
+                </div>
+              ))}
+            </div>
+            <p className="picker-status">Double-click a node to rename it; drag from a handle to connect steps.</p>
+          </section>
+        </div>
       )}
     </div>
   );

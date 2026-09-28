@@ -118,7 +118,7 @@ function render() {
   const enabled = data.workflows.filter((workflow) => workflow.enabled);
   const configured = data.credentials.filter((credential) => credential.configured).length;
   const connected = data.connections.filter((connection) => connection.status === 'connected').length;
-  const attention = data.connections.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status)).length;
+  const attention = data.connections.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status) || connection.health === 'expired').length;
   const recentRuns = data.runs || [];
   $('#metric-workflows').textContent = enabled.length;
   $('#metric-connections').textContent = connected;
@@ -155,6 +155,33 @@ export function renderWorkflows() {
   const all = state.data?.workflows || [];
   const query = $('#workflow-search').value.trim().toLowerCase();
   const status = $('#workflow-filter').value;
+  // Zapier-style tag filter: the option list tracks the tags actually in
+  // use (client-side; the API exposes the same narrowing as ?tag=).
+  const tagSelect = $('#workflow-tag-filter');
+  const tagNames = [...new Set(all.flatMap((workflow) => workflow.tags || []).map((tag) => String(tag).toLowerCase()))].sort();
+  if (tagSelect.dataset.tags !== tagNames.join(',')) {
+    const selectedTag = tagSelect.value;
+    tagSelect.dataset.tags = tagNames.join(',');
+    tagSelect.innerHTML = '<option value="all">All tags</option>'
+      + tagNames.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('');
+    tagSelect.value = tagNames.includes(selectedTag) ? selectedTag : 'all';
+  }
+  const tagFilter = tagSelect.value;
+  // Zapier-style folder filter, beside the tag one: flat folders, one per
+  // workflow (the API exposes the same narrowing as ?folder=).
+  const folderSelect = $('#workflow-folder-filter');
+  const folderNames = [...new Set(all.flatMap((workflow) => {
+    const folder = String(workflow.folder || '').trim();
+    return folder ? [folder] : [];
+  }))].sort((a, b) => a.localeCompare(b));
+  if (folderSelect.dataset.folders !== folderNames.join(',')) {
+    const selectedFolder = folderSelect.value;
+    folderSelect.dataset.folders = folderNames.join(',');
+    folderSelect.innerHTML = '<option value="all">All folders</option>'
+      + folderNames.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`).join('');
+    folderSelect.value = folderNames.includes(selectedFolder) ? selectedFolder : 'all';
+  }
+  const folderFilter = folderSelect.value;
   // The server owns text search once its ?q= result is in
   // (state.workflowSearchIds); while that call is in flight or has failed,
   // the loaded payload filters client-side.
@@ -163,7 +190,9 @@ export function renderWorkflows() {
     `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
   const shown = all.filter((workflow) =>
     (serverIds ? serverIds.has(workflow.id) : matchesText(workflow)) &&
-    (status === 'all' || workflow.enabled === (status === 'enabled')));
+    (status === 'all' || workflow.enabled === (status === 'enabled')) &&
+    (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
+    (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
   $('#workflow-count').textContent = `${shown.length} of ${all.length} workflows`;
   const runs = state.data?.runs || [];
   $('#workflow-table').innerHTML = shown.map((workflow) => {
@@ -176,8 +205,14 @@ export function renderWorkflows() {
     const edit = workflow.source
       ? `<a class="button secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="button secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
+    const tags = (workflow.tags || []).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join(' ');
+    const folderChip = String(workflow.folder || '').trim()
+      ? `<span class="tag-chip folder-chip" title="Folder">${escapeHtml(String(workflow.folder).trim())}</span>` : '';
+    const sourceButtons = workflow.source ? '' : 'disabled title="No source file available"';
+    const selected = selectedWorkflows.has(workflow.source);
     return `<tr class="workflow-list-row">
-      <td class="cell-title">${detail}</td>
+      <td class="select-col" data-label="Select"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></td>
+      <td class="cell-title">${detail}${(folderChip || tags) ? `<div class="cell-tags">${folderChip} ${tags}</div>` : ''}</td>
       <td data-label="When">${escapeHtml(workflowTriggerText(workflow))}</td>
       <td data-label="Do"><span class="workflow-action-chain">${actions || '—'}</span></td>
       <td data-label="Recent run">${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No recent runs</span>'}</td>
@@ -185,19 +220,72 @@ export function renderWorkflows() {
       <td class="action-cell workflow-actions" data-label="Manage">
         ${edit}
         <button type="button" class="button secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
-        <button type="button" class="button secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${workflow.source ? '' : 'disabled title="No source file available"'}>Versions</button>
-        <button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${workflow.source ? '' : 'disabled title="No source file available"'}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>
+        <button type="button" class="button secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
+        <button type="button" class="button secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
+        <button type="button" class="button secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
+        <button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>
+        <button type="button" class="button danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
       </td>
     </tr>`;
   }).join('');
   $('#workflow-empty').hidden = all.length > 0;
   $('#workflow-filter-empty').hidden = all.length === 0 || shown.length > 0;
   $('#workflow-table-wrap').hidden = shown.length === 0;
+  renderBulkBar(shown);
+}
+
+/* Bulk selection: checkboxes collect file names across the shown rows; the
+   bar applies one enable/disable call to all of them at once. Selection
+   survives re-renders (filtering, refresh) and drops files that leave the
+   list. */
+const selectedWorkflows = new Set();
+
+function selectableFiles(rows) {
+  return rows.map((workflow) => workflow.source).filter(Boolean);
+}
+
+function renderBulkBar(shown) {
+  const files = selectableFiles(shown);
+  selectedWorkflows.forEach((file) => {
+    if (!files.includes(file)) selectedWorkflows.delete(file);
+  });
+  /* Scope buttons: with a tag filter or search active, the whole shown set is
+     one bulk target — no checkbox picking needed. The count is exact: the
+     same rows the table shows are the ids the call sends. */
+  const query = $('#workflow-search').value.trim();
+  const tagFilter = $('#workflow-tag-filter').value;
+  const folderFilter = $('#workflow-folder-filter').value;
+  const scoped = (query !== '' || tagFilter !== 'all' || folderFilter !== 'all') && files.length > 0;
+  const scopeNote = $('#workflow-scope-note');
+  const scopeLabel = tagFilter !== 'all' ? `tag “${tagFilter}”`
+    : folderFilter !== 'all' ? `folder “${folderFilter}”` : `search “${query}”`;
+  if (scopeNote) {
+    scopeNote.hidden = !scoped;
+    scopeNote.textContent = scoped ? `${files.length} match ${scopeLabel}` : '';
+  }
+  const pauseShown = $('#workflow-scope-pause');
+  const resumeShown = $('#workflow-scope-resume');
+  if (pauseShown) {
+    pauseShown.hidden = !scoped;
+    pauseShown.textContent = `Pause shown (${files.length})`;
+    pauseShown.dataset.scope = scopeLabel;
+  }
+  if (resumeShown) {
+    resumeShown.hidden = !scoped;
+    resumeShown.textContent = `Resume shown (${files.length})`;
+    resumeShown.dataset.scope = scopeLabel;
+  }
+  const bar = $('#workflow-bulk-bar');
+  bar.hidden = selectedWorkflows.size === 0 && !scoped;
+  $('#workflow-bulk-count').textContent = selectedWorkflows.size
+    ? `${selectedWorkflows.size} selected` : '';
+  $('#workflow-select-all').checked = files.length > 0
+    && files.every((file) => selectedWorkflows.has(file));
 }
 
 function renderAttention(data) {
   const failed = (data.runs || []).filter((run) => ['failed', 'error'].includes(run.status));
-  const connections = data.connections.filter((connection) => connection.status !== 'connected');
+  const connections = data.connections.filter((connection) => connection.status !== 'connected' || connection.health === 'expired');
   const items = [];
   if (failed.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${failed.length} failed ${failed.length === 1 ? 'run' : 'runs'} in recent history</strong><span>Inspect failures →</span></a>`);
   if (connections.length) items.push(`<a class="attention-item view-link" href="/connections" data-target="connections" data-connection-status="attention"><strong>${connections.length} ${connections.length === 1 ? 'account needs' : 'accounts need'} attention</strong><span>Complete setup or reconnect →</span></a>`);
@@ -295,6 +383,8 @@ $('#workflow-search').addEventListener('input', () => {
   searchWorkflows.timer = setTimeout(searchWorkflows, 250);
 });
 $('#workflow-filter').addEventListener('change', renderWorkflows);
+$('#workflow-tag-filter').addEventListener('change', renderWorkflows);
+$('#workflow-folder-filter').addEventListener('change', renderWorkflows);
 
 export async function refresh() {
   $('#loading').hidden = false;
@@ -402,9 +492,259 @@ export async function restoreVersion(button) {
 }
 
 export function openRowFor(event) {
-  if (event.target.closest('.workflow-toggle')) return; // the toggle handles itself
+  if (event.target.closest('.workflow-toggle, .workflow-tags, .workflow-folder, .workflow-delete')) return; // the button handles itself
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');
   if (runRow) return openRun(runRow.dataset.run);
 }
+
+/* Send the operator error digest now (POST /api/admin/errors/digest) — the
+   same render-and-send the daily schedule runs; the API answers with what
+   was sent, or skipped when nothing failed. */
+const sendDigestButton = $('#overview-errors-send-digest');
+if (sendDigestButton) sendDigestButton.addEventListener('click', async () => {
+  sendDigestButton.disabled = true;
+  try {
+    const data = await api('/api/admin/errors/digest', { method: 'POST', body: '{}' });
+    notice(data.skipped
+      ? `Nothing failed in the last ${data.window_days || 1} day(s) — no digest sent.`
+      : `Digest sent to ${data.to} (${data.total_failed_runs} failed).`);
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    sendDigestButton.disabled = false;
+  }
+});
+
+/* ---- Bulk selection (POST /api/admin/designer/workflows/bulk) ---- */
+
+$('#workflow-table').addEventListener('change', (event) => {
+  const checkbox = event.target.closest('.workflow-select');
+  if (!checkbox) return;
+  if (checkbox.checked) selectedWorkflows.add(checkbox.dataset.file);
+  else selectedWorkflows.delete(checkbox.dataset.file);
+  renderWorkflows();
+});
+
+$('#workflow-select-all').addEventListener('change', (event) => {
+  // Select-all scopes to the rows the table is showing right now.
+  const shown = selectableFiles(currentShownWorkflows());
+  if (event.target.checked) shown.forEach((file) => selectedWorkflows.add(file));
+  else shown.forEach((file) => selectedWorkflows.delete(file));
+  renderWorkflows();
+});
+
+/* The exact rows the table is showing right now (search + status + tag +
+   folder). */
+function currentShownWorkflows() {
+  const all = state.data?.workflows || [];
+  const query = $('#workflow-search').value.trim().toLowerCase();
+  const status = $('#workflow-filter').value;
+  const tagFilter = $('#workflow-tag-filter').value;
+  const folderFilter = $('#workflow-folder-filter').value;
+  const serverIds = query ? state.workflowSearchIds : null;
+  return all.filter((workflow) =>
+    (serverIds ? serverIds.has(workflow.id)
+      : `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query)) &&
+    (status === 'all' || workflow.enabled === (status === 'enabled')) &&
+    (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
+    (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
+}
+
+async function bulkToggle(action, button) {
+  if (selectedWorkflows.size === 0) return;
+  const ids = [...selectedWorkflows];
+  button.disabled = true;
+  try {
+    const data = await api('/api/admin/designer/workflows/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ ids, action }),
+    });
+    const failed = (data.results || []).filter((result) => !result.ok);
+    notice(failed.length
+      ? `${data.ok || 0} of ${data.requested || ids.length} ${action}d; ${failed.length} failed: ${failed.map((result) => `${result.id} — ${result.error}`).join('; ')}`
+      : `${data.ok ?? ids.length} workflow${ids.length === 1 ? '' : 's'} ${action}d — live now.`);
+    selectedWorkflows.clear();
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$('#workflow-bulk-enable').addEventListener('click', (event) => bulkToggle('enable', event.target.closest('button')));
+$('#workflow-bulk-disable').addEventListener('click', (event) => bulkToggle('disable', event.target.closest('button')));
+
+/* Pause/Resume every workflow the current tag filter or search matches —
+   the same ids the table shows, so the confirmed count is exact. */
+async function bulkToggleShown(action, button) {
+  const ids = selectableFiles(currentShownWorkflows());
+  if (!ids.length) return;
+  const verb = action === 'disable' ? 'Pause' : 'Resume';
+  const done = action === 'disable' ? 'paused' : 'resumed';
+  if (!window.confirm(`${verb} ${ids.length} workflow${ids.length === 1 ? '' : 's'} matching ${button.dataset.scope || 'the current filter'}? They ${action === 'disable' ? 'stop on their next trigger until resumed' : 'run on their next trigger'}.`)) return;
+  button.disabled = true;
+  try {
+    const data = await api('/api/admin/designer/workflows/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ ids, action }),
+    });
+    const failed = (data.results || []).filter((result) => !result.ok);
+    notice(failed.length
+      ? `${data.ok || 0} of ${data.requested || ids.length} ${done}; failures: ${failed.map((result) => `${result.id} — ${result.error}`).join('; ')}`
+      : `${data.ok ?? ids.length} workflow${ids.length === 1 ? '' : 's'} ${done} — live now.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$('#workflow-scope-pause').addEventListener('click', (event) => bulkToggleShown('disable', event.target.closest('button')));
+$('#workflow-scope-resume').addEventListener('click', (event) => bulkToggleShown('enable', event.target.closest('button')));
+
+/* ---- Delete (DELETE /api/admin/designer/workflows/<file>) ----
+   Permanent: the live item, its version history, and the repo YAML all go. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-delete');
+  if (!button || button.disabled || !button.dataset.file) return;
+  /* Disable-first messaging: an On workflow stops the moment it is deleted,
+     and the confirm says so before anything else. */
+  const workflow = (state.data.workflows || []).find((item) => item.id === button.dataset.workflow);
+  const dialog = $('#workflow-delete-confirm-dialog');
+  $('#workflow-delete-confirm-message').textContent =
+    `Delete ${button.dataset.workflow} permanently? `
+    + (workflow && workflow.enabled ? 'The workflow is On — deleting stops it immediately. ' : '')
+    + `Its version history is removed and workflows/${button.dataset.file} is deleted from the repository. Past runs stay in history. This cannot be undone.`;
+  dialog.returnValue = '';
+  dialog.showModal();
+  const confirmed = await new Promise(
+    (resolve) => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
+  if (!confirmed) return;
+  button.disabled = true;
+  try {
+    await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`, {
+      method: 'DELETE',
+    });
+    notice(`Deleted ${button.dataset.workflow}. It is off now and no deploy will bring it back.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+    button.disabled = false;
+  }
+});
+
+/* ---- Tags editor (PUT /api/admin/designer/workflows/<file>/tags) ---- */
+$('#workflow-table').addEventListener('click', (event) => {
+  const button = event.target.closest('.workflow-tags');
+  if (!button || button.disabled || !button.dataset.file) return;
+  const dialog = $('#workflow-tags-dialog');
+  $('#workflow-tags-title').textContent = `Tags — ${button.dataset.workflow || button.dataset.file.replace(/\.yaml$/, '')}`;
+  $('#workflow-tags-blurb').textContent = `Organize ${button.dataset.file} with labels you can filter the list by.`;
+  $('#workflow-tags-input').value = button.dataset.tags || '';
+  const error = $('#workflow-tags-error');
+  error.hidden = true;
+  dialog.dataset.file = button.dataset.file;
+  dialog.showModal();
+});
+
+$('#workflow-tags-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const dialog = $('#workflow-tags-dialog');
+  const file = dialog.dataset.file;
+  const save = $('#workflow-tags-save');
+  const error = $('#workflow-tags-error');
+  const tags = $('#workflow-tags-input').value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  save.disabled = true;
+  try {
+    await api(`/api/admin/designer/workflows/${encodeURIComponent(file)}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify({ tags }),
+    });
+    dialog.close();
+    notice(tags.length ? `Tags saved for ${file}.` : `Tags removed from ${file}.`);
+    await refresh();
+  } catch (caught) {
+    error.textContent = caught.message;
+    error.hidden = false;
+  } finally {
+    save.disabled = false;
+  }
+});
+
+/* ---- Folder editor (PUT /api/admin/designer/workflows/<file>/folder) ----
+   Flat Zapier-style folders: one per workflow; an empty value clears it. */
+$('#workflow-table').addEventListener('click', (event) => {
+  const button = event.target.closest('.workflow-folder');
+  if (!button || button.disabled || !button.dataset.file) return;
+  const dialog = $('#workflow-folder-dialog');
+  $('#workflow-folder-title').textContent = `Folder — ${button.dataset.workflow || button.dataset.file.replace(/\.yaml$/, '')}`;
+  $('#workflow-folder-blurb').textContent = `File ${button.dataset.file} under a folder you can filter the list by.`;
+  $('#workflow-folder-input').value = button.dataset.folder || '';
+  const error = $('#workflow-folder-error');
+  error.hidden = true;
+  dialog.dataset.file = button.dataset.file;
+  dialog.showModal();
+});
+
+$('#workflow-folder-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const dialog = $('#workflow-folder-dialog');
+  const file = dialog.dataset.file;
+  const save = $('#workflow-folder-save');
+  const error = $('#workflow-folder-error');
+  const folder = $('#workflow-folder-input').value.trim();
+  save.disabled = true;
+  try {
+    await api(`/api/admin/designer/workflows/${encodeURIComponent(file)}/folder`, {
+      method: 'PUT',
+      body: JSON.stringify({ folder }),
+    });
+    dialog.close();
+    notice(folder ? `${file} moved to folder “${folder}”.` : `Folder removed from ${file}.`);
+    await refresh();
+  } catch (caught) {
+    error.textContent = caught.message;
+    error.hidden = false;
+  } finally {
+    save.disabled = false;
+  }
+});
+
+/* Export all: the server-built zip of every workflow's canonical YAML — the
+   same bundle `dapier workflows export --all` writes. The zip arrives base64
+   in the JSON body with an attachment content-disposition naming it (fetch
+   the JSON, build a Blob, download it under the server-suggested name). */
+const exportAllButton = $('#export-all-yaml');
+if (exportAllButton) exportAllButton.addEventListener('click', async () => {
+  exportAllButton.disabled = true;
+  try {
+    const data = await api('/api/admin/designer/export');
+    const raw = atob(data.b64 || '');
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = data.filename || 'dapier-workflows.zip';
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    const skipped = data.skipped || [];
+    notice(skipped.length
+      ? `Exported ${data.count} workflow(s); skipped (no source file): ${skipped.join(', ')}.`
+      : `Exported ${data.count} workflow(s).`);
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    exportAllButton.disabled = false;
+  }
+});
