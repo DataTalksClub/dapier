@@ -197,6 +197,7 @@
         <div class="section-head">
           <p id="connection-summary" class="register-summary mono">Loading accounts…</p><div class="connection-filters"><label class="visually-hidden" for="connection-search">Search connections</label><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"><label class="visually-hidden" for="connection-status-filter">Connection status</label><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></div>
           <button id="pull-trigger-sample" class="button secondary" type="button">Pull sample</button>
+          <button id="import-connection" class="button secondary" type="button">Import</button>
           <button id="add-connection" class="button primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>
         </div>
         <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a provider to connect your first account.</p></div>
@@ -526,6 +527,42 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Create connection</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-connection-dialog" aria-labelledby="import-connection-title">
+    <form id="import-connection-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="import-connection-title">Import a connection</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="sub">Bring an existing provider credential over. It is verified against the provider before anything is stored, and it only travels in this request.</p>
+        <label>Provider<select name="provider">
+          <option value="google">Google</option>
+          <option value="youtube">YouTube</option>
+          <option value="dropbox">Dropbox</option>
+          <option value="slack">Slack</option>
+          <option value="telegram">Telegram</option>
+          <option value="zoom">Zoom</option>
+        </select></label>
+        <label>Connection ID<input name="connection_id" class="mono-input" placeholder="google-work" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">Lowercase letters, numbers, dashes.</small></label>
+        <label>Display name<input name="display_name" placeholder="Defaults to the verified account identity"></label>
+        <label id="import-credential-label">Credential<input name="credential" class="mono-input secret-input" type="password" autocomplete="new-password" required><small id="import-credential-hint" class="field-hint"></small></label>
+        <label id="import-signing-field" hidden>Slack signing secret<input name="signing_secret" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="From the app's credentials page"></label>
+        <label id="import-scopes-field" hidden>Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope URLs"><small class="field-hint">Blank imports the provider's standard set.</small></label>
+        <label id="import-root-field" hidden>Dropbox root path<input name="root_path" class="mono-input" placeholder="/scans"></label>
+        <details id="import-advanced"><summary>Advanced</summary>
+          <label>Client ID<input name="client_id" class="mono-input" placeholder="For tokens issued by another OAuth client"></label>
+          <label>Client secret<input name="client_secret" class="mono-input secret-input" type="password" autocomplete="new-password"></label>
+          <label>Expected account<input name="expected_account_id" placeholder="Refuse the import unless the verified account matches"></label>
+        </details>
+        <p id="import-connection-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary dialog-close" type="button">Cancel</button>
+        <button class="button primary" type="submit">Import connection</button>
       </div>
     </form>
   </dialog>
