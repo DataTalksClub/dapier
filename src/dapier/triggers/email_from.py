@@ -87,10 +87,43 @@ def api_remove(address, table_ref=None):
     return 200, {"addresses": addresses, "removed": removed}
 
 
-def sender_of(event):
-    """The From of an email event, SES field or Datamailer field."""
+def _bare_candidates(raw):
+    """Bare addresses from an SES From string or a Datamailer sender object.
+
+    Datamailer inbound-email v1 stores ``sender`` as
+    ``{"addresses": [...], "header": "Name <addr@host>"}``. SES stores a
+    plain ``From`` string. Either form can carry a display name.
+    """
+    found = []
+
+    def add(value):
+        bare = bare_address(value)
+        if bare and bare not in found:
+            found.append(bare)
+
+    if isinstance(raw, str):
+        add(raw)
+        return found
+    if isinstance(raw, dict):
+        header = raw.get("header")
+        if isinstance(header, str):
+            add(header)
+        addresses = raw.get("addresses") or []
+        if isinstance(addresses, str):
+            addresses = [addresses]
+        for item in addresses:
+            if isinstance(item, str):
+                add(item)
+    return found
+
+
+def sender_addresses(event):
+    """Bare sender addresses on an email event, SES or Datamailer."""
     data = (event or {}).get("data") or {}
-    return data.get("from") or data.get("sender") or ""
+    raw = data.get("from")
+    if raw in (None, ""):
+        raw = data.get("sender")
+    return _bare_candidates(raw)
 
 
 def rejected(event):
@@ -98,11 +131,11 @@ def rejected(event):
 
     Other connectors are never rejected. With no sender table configured the
     check stays off, so deployments that have not created the table keep
-    today's behavior.
+    today's behavior. An email with no recognizable sender is rejected.
     """
     if not isinstance(event, dict) or event.get("connector") != "email":
         return False
     if not os.environ.get(TABLE_ENV):
         return False
     allowed = set(_read(_table(None)))
-    return bare_address(sender_of(event)) not in allowed
+    return not any(address in allowed for address in sender_addresses(event))

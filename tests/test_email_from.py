@@ -17,9 +17,20 @@ class Table:
         item = self.items.get(Key["id"] if "id" in Key else Key.get("name"))
         return {"Item": dict(item)} if item is not None else {}
 
-    def put_item(self, Item):
-        key = Item.get("id") or Item["name"]
+    def put_item(self, Item, **_kwargs):
+        key = Item.get("id") or Item.get("name") or Item.get("inbox_id")
         self.items[key] = dict(Item)
+
+    def update_item(self, Key, UpdateExpression, ExpressionAttributeNames=None, ExpressionAttributeValues=None, **_):
+        key = Key.get("inbox_id") or Key.get("id") or Key.get("name")
+        item = self.items[key]
+        expr = UpdateExpression
+        for placeholder, attr in (ExpressionAttributeNames or {}).items():
+            expr = expr.replace(placeholder, attr)
+        body = expr.split("SET", 1)[1]
+        for assignment in body.split(","):
+            left, right = assignment.split("=")
+            item[left.strip()] = ExpressionAttributeValues[right.strip()]
 
     def delete_item(self, Key):
         self.items.pop(Key.get("id") or Key.get("name"), None)
@@ -94,32 +105,52 @@ def test_worker_ignores_a_stranger_and_runs_an_allowed_sender(monkeypatch):
 
 
 def test_datamailer_sns_uses_the_same_sender_list(monkeypatch):
+    """Replay the inbound-email v1 shape: sender is {addresses, header}, not a string."""
+    from src.dapier.triggers import inbox
+
     _bind(monkeypatch)
+    inbox_table = Table()
+    monkeypatch.setenv("TRIGGER_INBOX_TABLE", "inbox")
+    monkeypatch.setattr(inbox, "_table", lambda: inbox_table)
     ran = []
     monkeypatch.setattr(worker, "execute", lambda event, **kwargs: ran.append(event) or [])
     message = {
-        "contract": "inbound-email", "version": 1, "event_id": "sns-1",
-        "route": "agent", "occurred_at": "2026-01-01T00:00:00Z",
-        "message_id": "<s@x>", "sender": "Other <alexey@datatalks.club>",
-        "recipients": ["agent@dtcdev.click"], "subject": "hello",
-        "body": {"text": "hi", "html": None}, "attachments": [],
-        "raw_mime": {"bucket": "b", "key": "k"},
+        "contract": "inbound-email",
+        "version": 1,
+        "event_id": "sns-1",
+        "event_type": "email.received",
+        "occurred_at": "2026-07-12T10:00:00Z",
+        "route": "agent",
+        "message_id": "message-1",
+        "sender": {
+            "addresses": ["alexey@datatalks.club"],
+            "header": "Alexey <alexey@datatalks.club>",
+        },
+        "recipients": {"matched": ["agent@dtcdev.click"]},
+        "subject": "Do this",
+        "date": "2026-07-12T09:59:00Z",
+        "body": {"html": {"value": "<p>Do this</p>"}},
+        "attachments": [],
+        "raw_mime": {"bucket": "mail", "key": "raw/1"},
     }
     worker.handler({"Records": [{
         "messageId": "m",
         "body": json.dumps({"Type": "Notification", "Message": json.dumps(message)}),
     }]}, None)
     assert ran and ran[0]["connector"] == "email"
-    assert "datatalks" in (ran[0]["data"].get("sender") or "")
+    assert ran[0]["data"]["sender"]["addresses"] == ["alexey@datatalks.club"]
+    assert inbox_table.items["sns-1"]["status"] != "ignored"
 
     ran.clear()
-    message["sender"] = "nope@example.com"
+    message["sender"] = {"addresses": ["nope@example.com"]}
     message["event_id"] = "sns-2"
     worker.handler({"Records": [{
         "messageId": "m2",
         "body": json.dumps({"Type": "Notification", "Message": json.dumps(message)}),
     }]}, None)
     assert ran == []
+    assert inbox_table.items["sns-2"]["status"] == "ignored"
+    assert inbox_table.items["sns-2"]["matched"] == []
 
 
 def test_address_keeps_route_and_ands_subject_and_rejects_from(monkeypatch):
