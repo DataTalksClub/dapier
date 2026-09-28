@@ -1,0 +1,21 @@
+# Starter template: inbound webhook -> Slack message.
+#
+# Templates are ordinary workflows flagged `template: true` and shipped
+# disabled: applying one (`dapier templates apply` or the designer gallery)
+# forks it under a new id with the flag stripped, so only your copy runs.
+# Point `connection_id` at your Slack connection, then enable the fork.
+id: template-webhook-to-slack
+enabled: false
+template: true
+description: Post a Slack message for every inbound webhook call
+tags: [starter]
+actions:
+  - id: announce
+    type: slack
+    connection_id: slack
+    channel: general
+    text: "Webhook received: {payload}"
+trigger:
+  connector: custom
+  event: received
+  filters: {}

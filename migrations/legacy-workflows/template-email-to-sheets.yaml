@@ -1,0 +1,23 @@
+# Starter template: inbound email -> Google Sheets row.
+#
+# Templates are ordinary workflows flagged `template: true` and shipped
+# disabled: applying one (`dapier templates apply` or the designer gallery)
+# forks it under a new id with the flag stripped, so only your copy runs.
+# Point `connection_id` and `spreadsheet_id` at your own sheet, then enable
+# the fork.
+id: template-email-to-sheets
+enabled: false
+template: true
+description: Log every inbound email as a spreadsheet row
+tags: [starter]
+actions:
+  - id: log-row
+    type: sheets_append_row
+    connection_id: google-sheets
+    spreadsheet_id: YOUR_SPREADSHEET_ID
+    sheet_name: Sheet1
+    values: [["{trigger.occurred_at|date_format:%Y-%m-%d}", "{from}", "{subject}"]]
+trigger:
+  connector: email
+  event: message.received
+  filters: {}
