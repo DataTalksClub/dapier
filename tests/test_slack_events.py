@@ -155,16 +155,18 @@ def test_bot_posts_and_unsubscribed_events_never_publish(monkeypatch):
     assert slack_events.handle("slack-conn", bot_headers, bot, connections_table=table,
                                publish=publish)[1] == {"accepted": False}
     other, other_headers = signed({"type": "event_callback", "team_id": "TWORKSPACE", "event_id": "EvR", "event": {
-        "type": "reaction_added", "channel": "C1", "user": "U1", "reaction": "tada"}})
+        "type": "pin_added", "channel": "C1", "user": "U1", "item": {"type": "message"}}})
     assert slack_events.handle("slack-conn", other_headers, other, connections_table=table,
                                publish=publish)[1] == {"accepted": False}
     assert published == []
-    # app_mention is in the message family and publishes.
+    # app_mention publishes under its own app.mention name (see
+    # test_slack_event_variety); message.* keeps message.received.
     mention, mention_headers = signed({"type": "event_callback", "team_id": "TWORKSPACE", "event_id": "EvM", "event": {
         "type": "app_mention", "channel": "C1", "user": "U1", "text": "<@U0> hi"}})
     assert slack_events.handle("slack-conn", mention_headers, mention, connections_table=table,
                                publish=publish)[1] == {"accepted": True}
     assert len(published) == 1
+    assert published[0][:2] == ("slack", "app.mention")
 
 
 def test_workspace_binding_is_enforced(monkeypatch):
@@ -203,6 +205,65 @@ def test_console_and_agent_apis_share_signing_secret(monkeypatch):
          "signing_secret": "fagent-side-signing-secret"}, table, monkeypatch, stored)
     assert status == 200
     assert stored["oauth#slack-2"]["signing_secret"] == "fagent-side-signing-secret"
+
+
+def test_agent_reimport_without_a_new_token_still_requires_one(monkeypatch):
+    """The import path has no stored-token fallback: re-importing a token
+    provider without pasting a token fails closed, whatever is stored."""
+    table, stored = Table(), {}
+    setup_connection(table)
+    slack_secrets(monkeypatch, stored)
+    stored["oauth#slack-conn"] = {"token": "xoxb-" + "t" * 20,
+                                  "signing_secret": "faslack-signing-secret-000"}
+    status, payload = import_slack({"connection_id": "slack-conn", "provider": "slack"},
+                                   table, monkeypatch, stored)
+    assert status == 400
+    assert payload["error"] == "This provider imports with a token, not an authorized-user file"
+    # Nothing moved: same item version, same stored credential value.
+    assert table.items["slack-conn"]["version"] == 1
+    assert stored["oauth#slack-conn"] == {"token": "xoxb-" + "t" * 20,
+                                          "signing_secret": "faslack-signing-secret-000"}
+
+
+def test_console_and_agent_token_saves_write_the_same_domain_effects(monkeypatch):
+    """One save chain, two surfaces: identical item shape, credential value
+    and verified binding, with each surface's audit trail naming its own
+    action (console "connect", import "import")."""
+    table, stored = Table(), {}
+    slack_secrets(monkeypatch, stored)
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(admin_routes.boto3, "resource", lambda _: type(
+        "Resource", (), {"Table": lambda self, name: table})())
+    monkeypatch.setattr(admin_routes.session, "_session_subject", lambda _: "operator")
+    console_audit, import_audit = [], []
+    monkeypatch.setattr(admin_routes.session, "_audit_event",
+                        lambda connection_id, action, actor, **kw:
+                        console_audit.append((action, actor, kw)))
+    monkeypatch.setattr(importing.audit, "emit",
+                        lambda connection_id, action, actor, **kw:
+                        import_audit.append((action, actor, kw)))
+    monkeypatch.setattr(importing.slack_tokens, "validate_token", lambda token: token)
+    monkeypatch.setattr(importing.slack_tokens, "verify_account",
+                        lambda token: ("TWORKSPACE", "DataTalks Slack"))
+
+    event = {"body": json.dumps({"connection_id": "slack-conn", "provider": "slack",
+                                 "token": "xoxb-" + "t" * 20})}
+    assert admin_routes.save_connection(event)["statusCode"] == 200
+    assert importing.import_core(
+        {"connection_id": "slack-agent", "provider": "slack", "token": "xoxb-" + "z" * 20},
+        operator_subject="operator", connections_table=table)[0] == 200
+
+    console_item, agent_item = table.items["slack-conn"], table.items["slack-agent"]
+    for field in ("provider", "status", "verified_account_id", "account_title",
+                  "granted_scopes"):
+        assert console_item[field] == agent_item[field]
+    assert console_item["status"] == "connected"
+    assert console_item["verified_account_id"] == "TWORKSPACE"
+    assert console_item["credential_id"] == "oauth#slack-conn"
+    assert agent_item["credential_id"] == "oauth#slack-agent"
+    assert stored["oauth#slack-conn"].keys() == stored["oauth#slack-agent"].keys() == {"token"}
+    assert console_audit == [("connect", "operator", {"outcome": "ok"})]
+    assert import_audit == [("import", "operator", {"outcome": "ok"})]
 
 
 def test_slack_hook_route_dispatches_signed_challenge(monkeypatch):
@@ -269,10 +330,41 @@ def test_slack_trigger_sample_falls_back_to_synthetic(monkeypatch):
         raise trigger_discovery.DiscoveryNotFound("no connection")
 
     monkeypatch.setattr(trigger_discovery, "connected_connection", missing)
-    monkeypatch.setattr(trigger_discovery, "history_sample", lambda connector: None)
+    monkeypatch.setattr(trigger_discovery, "history_sample",
+                        lambda connector, event=None: None)
     status, payload = trigger_discovery.api_discover({"connector": "slack"})
     assert status == 200
     assert payload["source"] == "synthetic"
     data = payload["sample"]["data"]
     assert payload["sample"]["event"] == "message.received"
     assert data["channel_id"] and data["text"] and data["event"]["type"] == "message"
+
+
+def test_slack_trigger_sample_per_event(monkeypatch):
+    """The event field of a discovery request picks the documented payload —
+    one sample per declared chip event, each shaped like a real delivery."""
+    def missing(*args, **kwargs):
+        raise trigger_discovery.DiscoveryNotFound("no connection")
+
+    monkeypatch.setattr(trigger_discovery, "connected_connection", missing)
+    monkeypatch.setattr(trigger_discovery, "history_sample",
+                        lambda connector, event=None: None)
+    expected = {
+        "app.mention": ("app_mention", "text"),
+        "reaction.added": ("reaction_added", "reaction"),
+        "member.joined": ("member_joined_channel", "inviter"),
+    }
+    for event, (slack_type, field) in expected.items():
+        status, payload = trigger_discovery.api_discover(
+            {"connector": "slack", "event": event})
+        assert status == 200, (event, payload)
+        assert payload["source"] == "synthetic"
+        sample = payload["sample"]
+        assert sample["event"] == event
+        assert sample["data"]["event"]["type"] == slack_type
+        assert sample["data"][field]
+    # An unknown event falls back to the message sample rather than failing.
+    status, payload = trigger_discovery.api_discover(
+        {"connector": "slack", "event": "nope.nada"})
+    assert status == 200
+    assert payload["sample"]["event"] == "message.received"

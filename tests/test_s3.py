@@ -45,7 +45,7 @@ ACTION = {
 }
 
 
-def run(overrides=None, event=None, *, transport=None, s3_client=None):
+def run(overrides=None, event=None, *, transport=None, s3_client=None, steps=None):
     transport = transport if transport is not None else FakeTransport()
     with patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"connection_id": "google-drive", "provider": "google",
@@ -55,7 +55,7 @@ def run(overrides=None, event=None, *, transport=None, s3_client=None):
          patch("src.dapier.connections.credentials.get_credential",
                return_value={"access_key_id": "AKIAEXAMPLE0000", "secret_access_key": "b" * 40}):
         return run_s3_upload({**ACTION, **(overrides or {})}, event or DRIVE_FILE_EVENT,
-                             transport=transport, steps={}, s3_client=s3_client)
+                             transport=transport, steps=steps or {}, s3_client=s3_client)
 
 
 class UploadTests(unittest.TestCase):
@@ -123,6 +123,22 @@ class UploadTests(unittest.TestCase):
         body, _kwargs = s3.objects[("datatalks-mailchimp-backup", "mailchimp/contacts export.csv")]
         self.assertEqual(body, b"staged-bytes")
         self.assertEqual(output["bytes"], len(b"staged-bytes"))
+
+    def test_staged_source_takes_templated_bucket_and_key(self):
+        s3 = FakeS3()
+        steps = {"read": {"status": "completed",
+                          "output": {"bucket": "staged", "key": "dropbox/e1/fetch/a.pdf"}}}
+
+        with patch("src.dapier.engine.actions.base._s3_body", return_value=b"staged-bytes") as stage:
+            run({"source_url": "", "source_connection_id": "",
+                 "source_s3": {"bucket": "{steps.read.output.bucket}",
+                               "key": "{steps.read.output.key}"}},
+                s3_client=s3, steps=steps)
+
+        stage.assert_called_once_with({"bucket": "staged", "key": "dropbox/e1/fetch/a.pdf"})
+        self.assertEqual(
+            list(s3.objects),
+            [("datatalks-mailchimp-backup", "mailchimp/contacts export.csv")])
 
 
 class UploadErrorTests(unittest.TestCase):

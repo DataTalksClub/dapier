@@ -156,6 +156,7 @@ Globals:
         PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
         DEVICE_SESSIONS_TABLE: !Ref DeviceSessionsTable
+        ROLE_ASSIGNMENTS_TABLE: !Ref RoleAssignmentsTable
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
 Resources:
@@ -240,6 +241,8 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref DeviceSessionsTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref RoleAssignmentsTable
+        - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref PollTriggersTable
@@ -265,6 +268,9 @@ Resources:
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
+          # The save path subscribes/unsubscribes WebSub topics on designer
+          # saves, toggles, and deletes (designer_store._sync_youtube).
+          YOUTUBE_CALLBACK_URL: !Sub https://${DomainName}/hooks/youtube
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           COPILOT_LLM_BASE_URL: !Ref CopilotLlmBaseUrl
@@ -309,6 +315,9 @@ Resources:
         ConsoleTokens:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /tokens, Method: GET}
+        ConsoleUsers:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /users, Method: GET}
         ConsoleRuns:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}
@@ -318,9 +327,6 @@ Resources:
         ConsoleStorage:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
-        ConsoleAudit:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
         ConsoleAudit:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
@@ -962,6 +968,23 @@ Resources:
         - {AttributeName: token_hash, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
+  # User roles (src/dapier/auth/roles.py): one row per identity (DTC subject
+  # or email) carrying viewer/editor/operator/admin, an optional display
+  # name, and a disabled flag. A stored row wins over the operator allowlist
+  # (narrowing or widening it); with no rows the allowlist is authoritative,
+  # so deployments behave exactly as before roles exist.
+  RoleAssignmentsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: identity, AttributeType: S}
+      KeySchema:
+        - {AttributeName: identity, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
   # Per-workflow key-value state for the storage_* actions
   # (src/dapier/engine/actions/storage.py): the workflow's id is the
   # partition, the stored key the sort; optional per-item TTL on expires.
@@ -1140,6 +1163,25 @@ Resources:
           Properties:
             Schedule: cron(0 7 * * ? *)
 
+  # A digest that dies silently is the failure mode it exists to prevent:
+  # function errors page the same alarm chain the alarms use.
+  ErrorDigestErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Dapier daily error digest Lambda errors
+      AlarmActions: [!Ref AlarmTopic]
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ErrorDigestFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
 Outputs:
   ApiUrl:
     Value: !Sub https://${DomainName}
@@ -1163,6 +1205,8 @@ Outputs:
     Value: !GetAtt CredentialsTable.Arn
   GrantsTableName:
     Value: !Ref GrantsTable
+  RoleAssignmentsTableName:
+    Value: !Ref RoleAssignmentsTable
   CursorsTableName:
     Value: !Ref CursorsTable
   PollTriggersTableName:
