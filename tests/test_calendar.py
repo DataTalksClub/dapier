@@ -12,6 +12,7 @@ stubbed at the same seams tests/test_drive_changes.py stubs.
 import json
 import re
 import urllib.parse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -466,8 +467,12 @@ def test_a_scheduled_fire_publishes_the_new_event(monkeypatch):
     assert result.get("emitted") in (0, None)
     assert fired == []
 
+    # The seed fire parks the watermark at now, so the "new" event must be
+    # created after that instant — a fixed clock time goes stale daily.
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z")
     with patch.object(provider, "_default_transport",
-                      events_transport(google_event(created="2026-09-28T11:00:00.000Z"))):
+                      events_transport(google_event(created=future))):
         poll_triggers.fire(stored["poll_id"], cursor_table_ref=cursors)
 
     assert len(fired) == 1
