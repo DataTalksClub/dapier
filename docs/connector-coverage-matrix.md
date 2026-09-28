@@ -6,16 +6,17 @@ registry (`registry.ACTIONS / DISCOVERIES / CONNECTION_TESTS`,
 `trigger_discovery.TRIGGER_DISCOVERIES`). Regenerate the raw dump with
 `.tmp/coverage-audit/dump_registry.py` → `.tmp/coverage-audit/registry_dump.json`.
 
-## Providers (connection-capable): 7/7 tested, 7/7 discoverable
+## Providers (connection-capable): 8/8 tested, 8/8 discoverable
 
 | Provider | ConnectionTest | Discovery sources | Notes |
 |---|---|---|---|
-| google | ✅ (`sheets.py`, key `google`) | google-sheets, google-drive | one OAuth connection serves both |
+| google | ✅ (`sheets.py`, key `google`) | google-sheets, google-drive, google-calendar, gmail | one OAuth connection serves all four |
 | youtube | ✅ (`youtube.py`) | youtube | |
 | zoom | ✅ (`zoom.py`) | zoom | |
 | dropbox | ✅ (`dropbox.py`) | dropbox | |
 | slack | ✅ (`slack.py`) | slack | token provider |
 | telegram | ✅ (`telegram.py`) | telegram | token provider |
+| mailchimp | ✅ (`mailchimp.py`) | mailchimp | credential, not a connection record — pseudo-connection |
 | aws | ✅ (`s3.py`, key `aws`, alias `s3`→`aws`) | s3 | credential, not a connection record — pseudo-connection |
 
 `PROVIDER_DISCOVERY_SOURCES` covers every provider; every discovery
@@ -25,60 +26,83 @@ console Credentials "test" (`views/connections.js`). Discovery endpoints
 `GET …/connections/{id}/discover[/{resource}]` on agent + admin, CLI
 `dapier connections discover`.
 
-## Discovery resources: 20 registered
+## Discovery resources: 28 registered
 
 | Resource | Consumed by action field hints |
 |---|---|
-| slack.channels | `slack.channel` |
-| telegram.chats | `telegram_send.chat_id`, `telegram_find_chat.chat_id` |
+| slack.channels | `slack.channel`, `slack_add_reaction.channel`, `slack_invite_to_channel.channel`, `slack_pin_message.channel`, `slack_schedule_message.channel`, `slack_set_purpose.channel`, `slack_set_topic.channel`, `slack_update_message.channel`, `slack_upload_file.channel` |
+| slack.users | `slack_dm.user_id`, `slack_find_user.email`, `slack_invite_to_channel.users` |
+| slack.messages | `slack.thread_ts`, `slack_add_reaction.timestamp`, `slack_pin_message.timestamp`, `slack_schedule_message.thread_ts`, `slack_update_message.ts`, `slack_upload_file.thread_ts` |
+| telegram.chats | all nine `telegram_*` actions' `chat_id` (send, send_document, send_photo, send_poll, find_chat, edit_message, pin_message, ban_member, unban_member) |
 | dropbox.folders | `dropbox_upload.folder`, `dropbox_find.path` |
-| dropbox.files | `dropbox_delete.path` |
+| dropbox.files | `dropbox_delete.path`, `dropbox_read_file.path`, `dropbox_get_temp_link.path`, `dropbox_move.from_path`, `dropbox_copy.from_path` |
 | dropbox.search | `dropbox_find.query` |
-| google-drive.files | `drive_find_file.name`, `s3_upload.source_url` |
-| google-drive.folders | `drive_find_file.folder` |
-| google-sheets.spreadsheets / worksheets / columns | all four `sheets_*` actions (spreadsheet → worksheet → column cascades) |
-| google-sheets.rows | `sheets_update_row.row` |
-| s3.buckets / s3.objects | `s3_upload`, `s3_find` (bucket → prefix/key cascade; objects takes an optional `prefix` param) |
-| zoom.meetings | `zoom_find_meeting.meeting_id` |
-| zoom.recordings | `zoom_find_recording.meeting_id` (also the action's data source) |
-| slack.users, slack.messages | `slack_find_user.email` (slack.users picker); slack.messages **browse-only** |
+| google-drive.files | `drive_copy_file.file_id`, `drive_delete_file.file_id`, `drive_find_file.name`, `drive_move_file.file_id`, `drive_read_file.file_id`, `drive_share_file.file_id`, `s3_upload.source_url` |
+| google-drive.folders | `drive_create_folder.parent_folder_id`, `drive_find_file.folder`, `drive_move_file.add_parent`/`remove_parent`, `drive_upload_file.folder_id` |
+| google-sheets.spreadsheets / worksheets / columns | every `sheets_*` action (spreadsheet → worksheet → column cascades, incl. `sheets_delete_row`) |
+| google-sheets.rows | `sheets_update_row.row`, `sheets_delete_row.row` |
+| google-calendar.calendars | all five `calendar_*` actions' `calendar_id` (create, delete, find_events, quick_add, update) |
+| gmail.labels | **browse-only** |
+| google-calendar.events | **browse-only** (a calendar's events) |
+| s3.buckets / s3.objects | `s3_upload`, `s3_find`, `s3_list_objects`, `s3_read_object`, `s3_delete_object`, `s3_presign_url` (bucket → key cascade; objects takes an optional `prefix` param), `render_html_to_pdf.output_bucket` |
+| mailchimp.audiences / mailchimp.members | all five member actions (`upsert`, `find`, `tag`, `unsubscribe`, `remove`): `list_id` from audiences, `email` from members (scoped by the picked `list_id`) |
+| youtube.videos | `youtube_add_to_playlist.video_id`, `youtube_update_video.video_id` |
+| youtube.playlists | `youtube_add_to_playlist.playlist_id`, `youtube_find_playlist_items.playlist_id` |
+| youtube.playlist_items | **browse-only** (the `youtube_find_playlist_items` data source) |
 | youtube.channel | **browse-only** (static "connected channel" fact, nothing to select) |
-| youtube.playlists | `youtube_find_playlist_items.playlist_id` |
-| youtube.playlist_items | `youtube_find_playlist_items` (the action's data source) |
+| zoom.meetings | `zoom_add_registrant.meeting_id`, `zoom_find_meeting.meeting_id`, `zoom_update_meeting.meeting_id` |
+| zoom.past_meetings | `zoom_delete_meeting.meeting_id`, `zoom_list_past_participants.meeting_id` |
+| zoom.recordings | `zoom_find_recording.meeting_id`, `zoom_delete_recording.meeting_id` |
+| zoom.webinars | `zoom_add_webinar_registrant`, `zoom_find_webinar`, `zoom_delete_webinar`, `zoom_list_past_webinar_participants` (`.webinar_id`) |
 
 Browse-only resources still work end-to-end (CLI/console list + items); they
-lack a designer field that would use them. Remaining: `youtube.channel` (a
-static fact about the connection, not a selectable list) and `slack.messages`
-(a candidate for future message-template actions).
+lack a designer field that would use them. The four: `gmail.labels` and
+`youtube.channel` are static facts about the connection, `google-calendar.events`
+lists a calendar's events (the calendar actions take ids picked from
+`calendars`), and `youtube.playlist_items` is `youtube_find_playlist_items`'s
+data source (`youtube_remove_from_playlist` takes a raw `playlist_item_id`,
+copyable from that action's output via templates).
 
-## Actions: 32 registered, hint coverage
+## Actions: 105 registered, 75 with discover hints
 
 Every action with a connection-bound *selection* field carries a `discover`
-hint. The only ones without (and why that's acceptable):
+hint. The 30 without, grouped (all acceptable):
 
-- `slack_find.query`, `slack_find.find` — free-text search term, nothing to list.
-- `youtube_find_video.query` — free-text search.
-- `http_request`, `webhook`, `email_send`, `code`, `js`, `render_html_to_pdf`,
-  `dataops` — no provider-backed selection fields (URLs, buckets-by-env, free text).
-- `storage_get|set|delete|find`, `run_workflow` — G12/G13 additions: free keys
-  and workflow ids, nothing provider-backed to list.
+- **No provider-backed selection at all** (compute, transport, email):
+  `agent`, `ai_complete`, `code`, `js`, `csv_parse`, `csv_format`,
+  `http_request`, `webhook`, `email_send`, `gmail_send`, `dataops`,
+  `digest_add`, `digest_flush`, `run_workflow`.
+- **Storage keys are free** (G12/G13): `storage_get`, `storage_set`,
+  `storage_delete`, `storage_find`.
+- **Create-shaped** (they name things into existence, nothing to select):
+  `dropbox_create_folder`, `sheets_create_spreadsheet`,
+  `slack_create_channel`, `youtube_create_playlist`, `youtube_upload_video`,
+  `zoom_create_meeting`, `zoom_create_webinar`.
+- **Free-text or raw identity**: `slack_find`, `slack_find_message`,
+  `youtube_find_video` (queries); `youtube_remove_from_playlist` (raw
+  `playlist_item_id`, templateable from `youtube_find_playlist_items`
+  output); `slack_add_reminder` (text + time for yourself).
 
 Designer catalog mirror (`designer/src/catalog.ts`) is in sync with the
 registry — `tests/test_designer_pickers.py` green; bundle
 (`src/web/designer.js`) rebuilt after the last catalog edit.
 
-## Triggers: 9/9 palette connectors have sample discovery
+## Triggers: 17/18 palette connectors have sample discovery
 
-custom, dropbox, email, poll, renderer, schedule, slack, youtube, zoom — all
-register `TriggerDiscovery(kind="sample")`, live where the provider allows
-(slack: the newest channel message, delivery-shaped via
+18 palette connectors (ai, custom, dropbox, email, gmail, google-calendar,
+google-drive, google-sheets, mailchimp, poll, renderer, rss, s3, schedule,
+slack, telegram, youtube, zoom) declare 43 events. 17 register
+`TriggerDiscovery(kind="sample")`, live where the provider allows (slack:
+the newest channel message, delivery-shaped via
 `triggers.intake.slack_events.event_data`), else history-first with
-synthetic fallback — and multi-event connectors (dropbox, zoom) serve one
-documented payload per declared event. Field options (`kind="options"`):
-dropbox folders, s3 buckets, s3 objects (bucket passed as `event`), slack
-channels, telegram chats, zoom meetings, google-sheets spreadsheets,
-google-drive files. Extras beyond the palette: dataops, webhook — used by
-trigger setup flows.
+synthetic fallback — and multi-event connectors (dropbox, zoom, email,
+google-drive, s3, telegram, slack, mailchimp) serve one documented payload
+per declared event. `ai` is action-side only (`ai_complete`): it declares
+no events and needs no sample. Field options (`kind="options"`): all 28
+registry discovery resources plus `poll.triggers` / `schedule.triggers`
+(30 option listings; the set-equality invariant is pinned in
+`tests/test_options_breadth.py`). Extras beyond the palette: dataops,
+webhook — used by trigger setup flows.
 
 ## Replay & test surfaces
 
@@ -97,8 +121,11 @@ trigger setup flows.
    (`src/web/js/views/inbox.js`) lists events, opens the stored envelope and
    replays with a confirm dialog.
 2. ~~Browse-only discoveries~~ — closed for the six actionable resources
-   (round 5, below); `youtube.channel` and `slack.messages` stay browse-only
-   by design (static connection fact / no matching action yet).
+   (round 5, below); `slack.messages` left the browse-only set when the
+   message actions gained `thread_ts`/`ts`/`timestamp` pickers (six fields).
+   The current browse-only four — `gmail.labels`, `google-calendar.events`,
+   `youtube.channel`, `youtube.playlist_items` — stay so by design (see the
+   resources section).
 3. Both previously failing tests are fixed upstream
    (`test_discovery.py` cursor test passes; worker lease test renamed to
    `test_is_pending_raises_leasebusy_while_lease_is_live`, passes) —
@@ -185,3 +212,15 @@ trigger setup flows.
   distinct event ids, unsubscribed events dropped).
 - Trigger-variety gap: closed — every palette connector now declares exactly
   the events its sample pull serves and its intake publishes.
+
+## Round 9, 2026-09-28: full re-dump — 105 actions, 28 discovery resources
+
+The factual sections above were regenerated from a fresh
+`.tmp/coverage-audit/registry_dump.json` (105 actions, 18 trigger
+connectors, 28 discovery resources, 8 connection tests, 49 trigger
+discoveries). Since round 8 the connectors grew the google-calendar and
+gmail resources (browse-only `google-calendar.events`, `gmail.labels`),
+mailchimp member actions, and the slack message-timestamp pickers — the
+resource table and the no-hint action list now say exactly that. The
+75/105 hint split and the four browse-only resources are the only
+remaining follow-ups worth naming, and both are deliberate.

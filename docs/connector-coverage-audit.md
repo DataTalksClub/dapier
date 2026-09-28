@@ -446,3 +446,41 @@ documented with signing-secret setup (`docs/connectors/slack.md`),
 `reply_to`/`cc`/`bcc`/`attachments` (raw MIME with an explicit Message-ID),
 and the UI/CLI parity audit re-verified clean against the new surfaces
 (runs CSV export on console, `/api/agent/*`, and CLI).
+
+## Re-verified — 2026-09-28, latest: fresh registry dump, every number re-counted
+
+A fresh `.tmp/coverage-audit/registry_dump.json` (`dump_registry.py` over
+the working tree) re-counted every surface this doc claims, and the
+connector-coverage matrix's factual sections were regenerated from it.
+Live numbers, all dumped not remembered:
+
+- **Palette chips: 18** (ai, custom, dropbox, email, gmail,
+  google-calendar, google-drive, google-sheets, mailchimp, poll, renderer,
+  rss, s3, schedule, slack, telegram, youtube, zoom) declaring **43
+  events**; 17 have sample discovery (`ai` is action-side only — it
+  declares no events), and every multi-event connector serves per-event
+  samples. `dataops` + `webhook` remain sample-capable beyond the palette.
+- **Actions: 105 registered, 75 with discover hints.** The 30 without are
+  grouped and justified in the matrix (compute/transport, free storage
+  keys, create-shaped, free-text/raw-identity).
+- **Discovery resources: 28**, every one consumed by at least one designer
+  picker except the four browse-only: `gmail.labels`,
+  `google-calendar.events`, `youtube.channel`, `youtube.playlist_items`
+  (static facts, a calendar's events, and a data source — the matrix
+  table says which fields the other 24 feed).
+- **Connection tests: 8/8 providers** (google, youtube, zoom, dropbox,
+  slack, telegram, mailchimp, aws; `s3` aliases to `aws`).
+- **Trigger discoveries: 49** — 19 samples (17 palette chips + dataops +
+  webhook) and 30 options listings (all 28 registry resources plus
+  `poll.triggers` / `schedule.triggers`; set-equality pinned in
+  `tests/test_options_breadth.py`).
+- **Mirror sync re-verified**: `test_designer_pickers.py`,
+  `test_options_breadth.py`, `test_action_breadth.py` — 39 passed against
+  the same tree the dump came from.
+
+Discover / replay / test remains platform-level (full replay,
+replay-from-step, inbox replay, per-step test, sample autofill, connection
+test), so the verdict stands: **every connector can be discovered, replayed
+and tested.** Remaining named follow-ups are design, not parity: trigger
+variety beyond the declared events (gap 3/5 above), and the four
+browse-only resources.
