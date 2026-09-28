@@ -594,10 +594,10 @@ def _dispatch_action(step, event, workflow_id, run_action, step_outputs, autoret
     for tries in range(1, attempts + 2):
         try:
             output = run_action(step, event, workflow_id, steps=step_outputs) or {}
-        except Exception:
+        except Exception as exc:
             if tries > attempts:
                 raise
-            time.sleep(_autoretry_backoff(autoretry, tries))
+            time.sleep(_autoretry_backoff(autoretry, tries, error=exc))
         else:
             output = dict(output)
             output["attempts"] = tries
@@ -626,14 +626,38 @@ def _autoretry_plan(step, action_id):
             "max_seconds": float(plan["max_seconds"])}
 
 
-def _autoretry_backoff(plan, retry_number):
+def _autoretry_backoff(plan, retry_number, error=None):
     """Seconds to wait before retry ``retry_number`` (1-based): the initial
     delay doubling each retry, capped at ``max_seconds``, plus up to a
     quarter of the delay as jitter so many failing steps do not retry in
-    lockstep. Bounds-checked at save time, the inline sleeps stay small."""
-    delay = min(float(plan["max_seconds"]),
-                float(plan["initial_seconds"]) * (2 ** (retry_number - 1)))
+    lockstep. A failure carrying an HTTP 429/503 status and the server's
+    ``Retry-After`` hint (the webhook/http_request ``HttpError``) waits the
+    hinted delay for that step's backoff instead of the doubling one — the
+    provider's own pacing, still capped at ``max_seconds``. Bounds-checked
+    at save time, the inline sleeps stay small."""
+    hinted = _retry_after_hint(error, plan)
+    delay = hinted if hinted is not None else min(
+        float(plan["max_seconds"]),
+        float(plan["initial_seconds"]) * (2 ** (retry_number - 1)))
     return delay + random.uniform(0, delay / 4)
+
+
+def _retry_after_hint(error, plan):
+    """The Retry-After seconds a rate-limited (429/503) failure asks for,
+    capped at the plan's max sleep; None when there is no usable hint.
+
+    Only the delay-in-seconds form is honored (the webhook/http actions
+    parse nothing else); a hint at or below zero is no hint at all.
+    """
+    if error is None or getattr(error, "status", None) not in (429, 503):
+        return None
+    try:
+        seconds = float(getattr(error, "retry_after", None))
+    except (TypeError, ValueError):
+        return None
+    if seconds <= 0:
+        return None
+    return min(float(plan["max_seconds"]), seconds)
 
 
 def _predicate_scope(event, scope):

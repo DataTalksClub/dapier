@@ -110,6 +110,14 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+# The trigger envelope every step records as its ``input``: capped higher
+# than step outputs so an ordinary webhook or email event (hook bodies run
+# to 200 KB, email bodies to 60 KB apiece) still replays from run history —
+# api/runs.replay_event refuses a truncated input. Events too big even for
+# this keep that explicit refusal.
+TRIGGER_INPUT_LIMIT = 65_000
+
+
 def _trim(value, limit=6000):
     """Cap a captured step value so execution items stay far below the
     DynamoDB 400 KB limit; oversized values keep a JSON preview."""
@@ -141,8 +149,10 @@ def _is_pending(workflow_id, action_id, event, action_type=None, retry_attempt=N
         "lease_until": now + 300,
         "expires_at": now + 90 * 86400,
         # Step telemetry for the run view: the action type and the event data
-        # every action in the flow receives as its input.
-        "input": _trim(event.get("data") or {}),
+        # every action in the flow receives as its input. The input is the
+        # trigger envelope, so it gets the replay-sized cap (run-history
+        # replay re-injects it); outputs keep the small step cap.
+        "input": _trim(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
     }
     if action_type:
         item["action_type"] = action_type
@@ -435,6 +445,46 @@ def _close_paused_step(workflow_id, action_id, event, *, count_usage=False):
             logger.info("task usage rollup failed", exc_info=True)
 
 
+def _mark_reused(workflow_id, event, *, action_id, action_type=None, output=None):
+    """Record a replayed-from-step run's earlier step as ``reused``.
+
+    Replay-from-step (api/runs.py) resumes a run through this module's
+    resume envelope with the earlier steps' recorded outputs seeded in —
+    those steps do not run again, but the rerun's history should still show
+    them: without a record the rerun would read as if the chain started at
+    the replayed step. One row per reused step, status ``reused`` (a new
+    rollup-invisible status: neither success nor failure — the run's own
+    outcome comes from the steps that did re-execute), carrying the recorded
+    output that was seeded into the ``steps`` context. Only envelopes that
+    name ``reused_steps`` write anything: a delay resume's parked steps are
+    real records already, never rewritten here.
+    """
+    if not os.environ.get("EXECUTIONS_TABLE") or not str(action_id or "").strip():
+        return
+    import boto3
+
+    now = int(time.time())
+    item = {
+        "execution_id": _execution_id(workflow_id, str(action_id), event),
+        "run_id": _run_id(workflow_id, event),
+        "workflow_id": workflow_id,
+        "action_id": str(action_id),
+        "connector": event.get("connector"),
+        "event_type": event.get("event"),
+        "correlation_id": event.get("correlation_id") or event.get("id"),
+        "status": "reused",
+        "started_at": _now_iso(),
+        "finished_at": _now_iso(),
+        "expires_at": now + 90 * 86400,
+        "input": _trim(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
+    }
+    if action_type:
+        item["action_type"] = str(action_type)
+    if output is not None:
+        item["output"] = _trim(output)
+    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(Item=item)
+
+
 def _resume_run(resume, *, queue=None):
     """Continue a parked run from its ``dapier_resume`` envelope.
 
@@ -489,6 +539,17 @@ def _resume_run(resume, *, queue=None):
         for position, action_id in enumerate(paused):
             _close_paused_step(workflow_id, action_id, event,
                                count_usage=(position == 0))
+    # A replay-from-step envelope (api/runs.py) lists the earlier steps it
+    # seeded from history: record them as ``reused`` in the rerun's run
+    # history before the remainder executes. Written only once the run is
+    # actually going ahead — a dropped envelope (workflow gone, operator
+    # cancel) records nothing.
+    for reused in resume.get("reused_steps") or []:
+        if not isinstance(reused, dict):
+            continue
+        _mark_reused(workflow_id, event, action_id=reused.get("action_id"),
+                     action_type=reused.get("action_type"),
+                     output=reused.get("output"))
     try:
         return resume_chain(
             workflow_id, resume.get("segments") or [], event, _run_connector,

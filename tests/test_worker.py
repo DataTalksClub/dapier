@@ -168,6 +168,32 @@ def test_trim_keeps_small_values_and_previews_oversized_ones(monkeypatch=None):
     assert trimmed["preview"].startswith('{"body"')
 
 
+def test_is_pending_stores_a_20kb_event_whole_for_replay(monkeypatch):
+    """Hook bodies run to 200 KB and email bodies to 60 KB apiece, so the
+    trigger envelope is captured at the raised replay cap: a 20 KB webhook
+    event stays whole (run-history replay re-injects it) instead of the old
+    6 KB preview that made every large run permanently unreplayable."""
+    calls = []
+    _patch_table(monkeypatch, calls)
+    big = {"body": "x" * 20_000}
+
+    worker._is_pending("gh-issue", "notify", dict(EVENT, data=big), "slack")
+
+    assert calls[0][1]["Item"]["input"] == big
+
+
+def test_is_pending_previews_an_event_past_the_replay_limit(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    huge = {"body": "x" * (worker.TRIGGER_INPUT_LIMIT + 1)}
+
+    worker._is_pending("gh-issue", "notify", dict(EVENT, data=huge), "slack")
+
+    stored = calls[0][1]["Item"]["input"]
+    assert stored["truncated"] is True
+    assert len(stored["preview"]) == worker.TRIGGER_INPUT_LIMIT
+
+
 class NormalizeTests(unittest.TestCase):
     def test_normalizes_raw_sns_inbound_email(self):
         email = {
