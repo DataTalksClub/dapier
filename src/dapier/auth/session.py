@@ -78,18 +78,40 @@ def _session_payload(event):
 def authenticated(event):
     return _verify(_cookie(event, SESSION_COOKIE)) is not None
 
-def require_operator(event):
-    """Return ``(payload, None)`` for operators, ``(None, response)`` otherwise."""
+def require_role(event, minimum="operator"):
+    """Return ``(payload, None)`` when the session holds at least ``minimum``.
+
+    The effective role comes from roles.py: a stored assignment wins (a
+    ``disabled`` user is denied everywhere, a stored viewer narrows an
+    allowlisted operator), and with no stored row the operator allowlist
+    decides exactly as before. Operator denials keep the historical audit
+    outcome.
+    """
+    from . import roles
+
     payload = _session_payload(event)
     if not payload:
         return None, http._json_response(401, {"error": "Authentication required"})
-    if not authz.is_operator(payload):
-        _audit_event(
-            "unknown", audit_log.CONNECT, subject_fallback(payload),
-            outcome="denied-not-operator",
-        )
-        return None, http._json_response(403, {"error": "Operator authorization required"})
-    return payload, None
+    effective = roles.effective_role(payload)
+    if roles.satisfies(effective, minimum):
+        return payload, None
+    if effective == "disabled":
+        _audit_event("unknown", audit_log.CONNECT, subject_fallback(payload),
+                     outcome="denied-disabled")
+        return None, http._json_response(403, {"error": "This account is disabled"})
+    _audit_event(
+        "unknown", audit_log.CONNECT, subject_fallback(payload),
+        outcome="denied-not-operator" if not effective
+        else "denied-insufficient-role",
+    )
+    error = ("Operator authorization required" if not effective
+             else f"This action needs the '{minimum}' role")
+    return None, http._json_response(403, {"error": error})
+
+
+def require_operator(event):
+    """Return ``(payload, None)`` for operators, ``(None, response)`` otherwise."""
+    return require_role(event, "operator")
 
 def subject_fallback(payload):
     subject = (payload or {}).get("subject") or (payload or {}).get("sub")
