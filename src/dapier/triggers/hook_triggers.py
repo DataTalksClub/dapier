@@ -7,6 +7,16 @@ constant-time compare before anything runs. The published event carries the
 parsed body, query parameters, and content type so downstream actions can
 reference the caller's fields.
 
+A webhook trigger saved with an optional ``secret`` locks the URL behind a
+shared-secret HMAC check instead: callers sign the raw body —
+``sha256=<hex of HMAC-SHA256(secret, raw body)>``, lowercase hex, in
+``X-Dapier-Signature`` (bare hex tolerated) — and a valid signature alone
+admits the delivery, constant-time verified; the bearer token alone is then
+rejected with 401 and nothing is published. The same header and scheme the
+outbound webhook action sends (``engine.actions.webhook``), mirrored inbound
+for wary providers; a ``signature_header`` rename points the check at the
+provider's own header (GitHub's ``X-Hub-Signature-256``, ...).
+
 Creating a Telegram trigger binds one Telegram bot connection to
 ``/hooks/telegram/{name}``: Dapier registers the delivery URL with
 ``setWebhook`` and a per-trigger secret that Telegram echoes in
@@ -41,6 +51,7 @@ on every invocation, so a created trigger is live without a deploy.
 """
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -71,6 +82,19 @@ TELEGRAM_EVENT = "message.received"
 TELEGRAM_CHANNEL_POST_EVENT = "channel_post.received"
 YOUTUBE_EVENT = "video.published"
 TOKEN_BYTES = 32
+
+# Optional shared-secret HMAC check for webhook deliveries (webhook kind
+# only): a trigger saved with a ``secret`` no longer accepts its bearer
+# token alone — the caller must send the HMAC-SHA256 of the raw body in
+# ``X-Dapier-Signature`` as ``sha256=<hex>`` (bare hex tolerated), verified
+# constant-time. Same header and scheme the outbound webhook action signs
+# with, mirrored for inbound deliveries.
+SIGNATURE_HEADER = "x-dapier-signature"
+SIGNATURE_PREFIX = "sha256="
+# Providers sign deliveries in their own header (GitHub's
+# X-Hub-Signature-256, ...), so a trigger may store ``signature_header`` —
+# the name intake reads instead of SIGNATURE_HEADER.
+SIGNATURE_HEADER_PATTERN = re.compile(r"[a-z0-9][a-z0-9.-]*")
 
 # response.mode: how the hook URL answers a delivery (webhook kind only —
 # Telegram requires a fast 200 or it retries the update forever, so its
@@ -174,6 +198,81 @@ def dedupe_event_id(hook_id, value):
     POST), so a provider retry of the same delivery publishes — and
     therefore runs — under the id it already used."""
     return f"{hook_id}-{hashlib.sha256(str(value).encode()).hexdigest()[:16]}"
+
+
+def validate_secret(value, kind):
+    """The validated shared secret (or "" when unset) for a hook save.
+
+    Optional and webhook-only: a trigger saved with one locks its URL
+    behind the signature check (``verify_signature``) — the bearer token
+    alone no longer admits a delivery. Non-webhook kinds never verify
+    signatures, so a secret there is rejected rather than silently
+    ignored. An omitted value on an edit keeps the stored secret (the
+    binding survives the save, like Telegram's ``connection_id``); an
+    explicit ``""`` or ``null`` clears it. The value is write-only:
+    ``public_view`` exposes ``signed: true``, never the secret.
+    """
+    if value is None:
+        value = ""
+    if not isinstance(value, str):
+        raise TriggerError("secret must be a string")
+    secret = value.strip()
+    if secret and kind != "webhook":
+        raise TriggerError(
+            f"{kind} triggers do not verify signatures; secret is webhook-only")
+    return secret
+
+
+def validate_signature_header(value, kind):
+    """The validated custom signature header name (or "" for the default).
+
+    Part of the same webhook-only binding as ``secret`` — the header is
+    meaningless without one, so a non-empty value on another kind is
+    rejected rather than silently ignored. Stored lowercase; an empty value
+    reads as ``SIGNATURE_HEADER`` at read time. An omitted value on an edit
+    keeps the stored name, like ``secret`` (the binding survives the save).
+    """
+    if value is None:
+        value = ""
+    if not isinstance(value, str):
+        raise TriggerError("signature_header must be a string")
+    header = value.strip().lower()
+    if header and kind != "webhook":
+        raise TriggerError(
+            f"{kind} triggers do not verify signatures; signature_header is webhook-only")
+    if header and not SIGNATURE_HEADER_PATTERN.fullmatch(header):
+        raise TriggerError(
+            "signature_header must be a header name like 'x-hub-signature-256'")
+    return header
+
+
+def signature_header_for(item):
+    """The header whose value must carry the delivery's signature — the
+    trigger's stored custom name, else ``SIGNATURE_HEADER``."""
+    return str(item.get("signature_header") or "").strip().lower() or SIGNATURE_HEADER
+
+
+def signature_for(secret, body):
+    """The lowercase hex HMAC-SHA256(secret, raw body) a signed delivery
+    carries. Shared by the intake (``api.router._webhook_hook``) and the
+    tests, so a verified delivery is hashed exactly as the docs' examples
+    compute it."""
+    return hmac.new(str(secret).encode(), body, hashlib.sha256).hexdigest()
+
+
+def verify_signature(secret, body, header):
+    """Constant-time check of the signature header value on a raw delivery
+    body (the header name is the caller's — ``signature_header_for``).
+
+    The value carries ``sha256=<hex>`` — the scheme prefix is
+    case-insensitive, the hex must be the lowercase HMAC-SHA256 digest of
+    the body exactly as received (bare hex is accepted too). Anything else
+    — a missing header, another scheme, a mismatch — is False.
+    """
+    value = str(header or "").strip()
+    if value.lower().startswith(SIGNATURE_PREFIX):
+        value = value[len(SIGNATURE_PREFIX):].strip()
+    return hmac.compare_digest(value.lower(), signature_for(secret, body))
 
 
 def validate_response(value, kind):
@@ -315,6 +414,11 @@ def build_item(body, operator, kind, previous=None):
         "token": token,
         "description": str(body.get("description") or "")[:200],
         "dedupe_path": validate_dedupe_path(body.get("dedupe_path")),
+        "secret": validate_secret(
+            body["secret"] if "secret" in body else previous.get("secret"), kind),
+        "signature_header": validate_signature_header(
+            body["signature_header"] if "signature_header" in body
+            else previous.get("signature_header"), kind),
         "response": validate_response(body.get("response"), kind),
         "actions": actions or [],
         "flow": flow,
@@ -685,6 +789,12 @@ def public_view(item):
     else:
         view["header"] = "authorization"
         view["auth_scheme"] = "Bearer"
+        if item.get("secret"):
+            # The secret is write-only: callers see that the URL is
+            # signature-locked (and which header carries the digest), never
+            # the value.
+            view["signed"] = True
+            view["signature_header"] = signature_header_for(item)
     return view
 
 

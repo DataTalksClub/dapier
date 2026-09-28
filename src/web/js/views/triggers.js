@@ -146,6 +146,15 @@ function openHookDialog(hook) {
   $('#hook-response-field').hidden = form.kind.value === 'telegram';
   $('#hook-response-template-field').hidden =
     form.kind.value === 'telegram' || form.response_mode.value !== 'sync';
+  // The secret is write-only (the API never echoes it back): a signed hook
+  // shows only that the lock exists, and an edit keeps it unless the value
+  // is replaced or explicitly cleared.
+  const signed = Boolean(hook && hook.signed);
+  form.secret.value = '';
+  form.secret.placeholder = signed ? '(configured — leave empty to keep)' : 'shared secret';
+  form.clear_secret.checked = false;
+  $('#hook-clear-secret-field').hidden = !signed;
+  $('#hook-secret-field').hidden = form.kind.value !== 'webhook';
   form.enabled.checked = hook ? Boolean(hook.enabled) : true;
   form.actions.value = hook && hook.actions
     ? JSON.stringify(hook.actions, null, 2)
@@ -192,6 +201,7 @@ $('#hook-form').elements.kind.addEventListener('change', (event) => {
   $('#hook-connection-field').hidden = event.currentTarget.value !== 'telegram';
   $('#hook-list-field').hidden = event.currentTarget.value !== 'mailchimp';
   $('#hook-response-field').hidden = event.currentTarget.value === 'telegram';
+  $('#hook-secret-field').hidden = event.currentTarget.value !== 'webhook';
 });
 
 $('#hook-form').elements.response_mode.addEventListener('change', (event) => {
@@ -217,6 +227,11 @@ $('#hook-form').addEventListener('submit', async (event) => {
     if (body.kind === 'telegram') {
       body.connection_id = form.connection_id.value.trim();
     } else {
+      if (body.kind === 'webhook') {
+        const secret = form.secret.value.trim();
+        if (form.clear_secret.checked) body.secret = '';
+        else if (secret) body.secret = secret; // omitted: keep the stored lock
+      }
       if (body.kind === 'mailchimp') body.list_id = form.list_id.value.trim();
       const response = { mode: form.response_mode.value };
       if (response.mode === 'sync' && form.response_template.value.trim()) {

@@ -351,9 +351,21 @@ def _webhook_hook(event, name, body, query):
     item = _hook_item(name)
     if not item or item.get("kind") != "webhook":
         return _response(404, {"error": "unknown hook"})
-    supplied = _bearer_token(event)
-    if not supplied or not hmac.compare_digest(supplied, item.get("token") or ""):
-        return _response(401, {"error": "invalid token"})
+    if item.get("secret"):
+        # A saved secret locks the URL: the bearer token alone no longer
+        # admits a delivery. The trigger's signature header (a stored
+        # ``signature_header`` rename, else X-Dapier-Signature) must carry
+        # sha256=HMAC-SHA256(secret, raw body) over the bytes exactly as
+        # received, constant-time compared (the Slack/Zoom pattern); a valid
+        # signature is sufficient on its own.
+        if not hook_triggers.verify_signature(
+                item["secret"], body,
+                _header(event, hook_triggers.signature_header_for(item))):
+            return _response(401, {"error": "invalid signature"})
+    else:
+        supplied = _bearer_token(event)
+        if not supplied or not hmac.compare_digest(supplied, item.get("token") or ""):
+            return _response(401, {"error": "invalid token"})
     content_type = _header(event, "content-type").split(";")[0].strip().lower()
     payload = _webhook_payload(body, content_type)
     mode = ((item.get("response") or {}).get("mode")) or "ack"

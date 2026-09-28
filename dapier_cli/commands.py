@@ -1067,11 +1067,17 @@ def hooks_save(api_url, path, debug=False, sync_response=False):
             print(f"  Audience: {data.get('list_id')} — webhook registered on the list")
     else:
         print(f"  URL: {data.get('url')}")
-        print(f"  Callers send: {data.get('header', 'authorization')}: Bearer {data.get('token', '')}")
-        url, token = data.get("url", ""), data.get("token", "")
-        print("  Try it: curl -X POST '" + url + "' "
-              "-H 'authorization: Bearer " + token + "' "
-              "-H 'content-type: application/json' -d '{\"hello\":\"world\"}'")
+        if data.get("signed"):
+            # Signature-locked: the bearer token alone is rejected, so the
+            # hint signs the body the way the ingress verifies it.
+            header = data.get("signature_header", "x-dapier-signature")
+            print(f"  Callers send: {header}: sha256=<hex HMAC-SHA256(secret, raw body)>")
+        else:
+            print(f"  Callers send: {data.get('header', 'authorization')}: Bearer {data.get('token', '')}")
+            url, token = data.get("url", ""), data.get("token", "")
+            print("  Try it: curl -X POST '" + url + "' "
+                  "-H 'authorization: Bearer " + token + "' "
+                  "-H 'content-type: application/json' -d '{\"hello\":\"world\"}'")
     return 0
 
 

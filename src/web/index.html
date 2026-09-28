@@ -605,6 +605,10 @@
           <label>Response<select name="response_mode"><option value="ack">Ack (queue, answer 202)</option><option value="challenge">Challenge (verification handshake)</option><option value="sync">Sync (run inline, answer the outcome)</option></select><small class="field-hint">Webhook only. Sync answers with the run's outcome — a template if given, else <code>{"ok", "workflow", "steps"}</code> — and must finish inside ~30&nbsp;s.</small></label>
           <label id="hook-response-template-field" hidden>Response template (JSON)<textarea name="response_template" rows="6" class="mono-input" placeholder='{"challenge": "{trigger.body.challenge}"}'></textarea><small class="field-hint">Optional, sync mode: any JSON value; string parts render like actions (<code>{trigger.body.*}</code>, <code>{steps.&lt;id&gt;.output.*}</code>).</small></label>
         </div>
+        <div id="hook-secret-field">
+          <label>Signature secret (optional)<input name="secret" class="mono-input" placeholder="shared secret" maxlength="512" autocomplete="off"><small class="field-hint">Webhook only. When set, callers sign the raw body — <code>x-dapier-signature: sha256=&lt;HMAC-SHA256 of the body&gt;</code> — and the bearer token alone is rejected with 401. Editing: leave empty to keep the stored secret.</small></label>
+          <label id="hook-clear-secret-field" hidden><input type="checkbox" name="clear_secret"> Remove the signature lock (callers go back to the bearer token)</label>
+        </div>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
         <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input" required></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
         <p id="hook-error" class="form-error" role="alert"></p>

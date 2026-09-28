@@ -1239,7 +1239,21 @@ inbox replay-bounce notes). New findings this pass, ranked:
 7. **Optional inbound webhook signature check (value L/M, effort S).**
    Custom hook intake verifies nothing beyond the URL; an optional
    shared-secret HMAC header check (WebSub intake already verifies) lets
-   wary providers lock their target.
+   wary providers lock their target. Landed (2026-09-28, round 30): a
+   webhook hook saved with a `secret` locks its URL — callers sign the
+   raw body exactly as received, `x-dapier-signature: sha256=<hex
+   HMAC-SHA256(secret, body)>` (bare hex and `SHA256=` tolerated), verified
+   constant-time; the signature alone admits the delivery and the bearer
+   token alone is rejected 401 with nothing published. The header and
+   scheme mirror the outbound webhook action's signing, so one mental
+   model covers both directions. The secret is write-only (`signed: true` +
+   `signature_header` in the public view, never the value); an edit omits
+   it to keep the lock, sends `""`/`null` to clear, and non-webhook kinds
+   reject it (their providers verify). Surfaces: the shared hook-save API,
+   `dapier hooks save` (the JSON body carries `secret`; the save hint
+   prints the signature header instead of the bearer curl), console hook
+   dialog (secret field + explicit remove-lock checkbox). Tests:
+   `tests/test_hook_signature.py`.
 8. **Designer list paging (scale note).** `designer_store.api_list` scans
    the whole published store each call; fine at current scale, keyset
    paging when the store grows.
