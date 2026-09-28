@@ -1,12 +1,13 @@
-"""Trigger-event breadth: telegram channel posts and zoom registrations.
+"""Trigger-event breadth: telegram channel posts, callback queries, zoom.
 
-Two events on the way to "every connector fires Zapier-style events", each
+Three events on the way to "every connector fires Zapier-style events", each
 covered on both of its surfaces: the intake that publishes the event
 (api.router._telegram_hook, triggers.intake.zoom_webhooks) and the sample
 pull that documents it (connectors.telegram, connectors.zoom), so a filter
 or template copied from a pulled sample matches a real delivery. Channel
 announcements are their own telegram event (channel_post.received) with the
-same hook/filter matching as message.received; zoom registrations arrive as
+same hook/filter matching as message.received, and inline-keyboard button
+taps a third (callback_query.received); zoom registrations arrive as
 meeting.registration_created with the registrant's submitted fields.
 """
 import json
@@ -90,28 +91,61 @@ def test_telegram_plain_message_keeps_message_received(monkeypatch):
     assert envelope["data"]["is_channel_post"] is False
 
 
+def test_telegram_callback_query_publishes_callback_query_received(monkeypatch):
+    """A button tap is its own event, flattened around the tap: the button's
+    payload, the tapper, and the message the button rode on."""
+    envelope = _post_telegram(monkeypatch, {
+        "update_id": 95, "callback_query": {
+            "id": "4382bfdwdsb323b2d9",
+            "from": {"id": 9, "is_bot": False, "first_name": "Ada",
+                     "username": "ada", "language_code": "en"},
+            "message": {
+                "message_id": 27, "text": "Pick a cohort:",
+                "chat": {"id": 555, "type": "private", "first_name": "Ada"},
+                "reply_markup": {"inline_keyboard": [[
+                    {"text": "September", "callback_data": "join:september"}]]},
+            },
+            "chat_instance": "-9923423423",
+            "data": "join:september",
+        }})
+    assert envelope["connector"] == "telegram"
+    assert envelope["event"] == "callback_query.received"
+    data = envelope["data"]
+    assert data["id"] == "4382bfdwdsb323b2d9"
+    assert data["data"] == "join:september"
+    assert data["from"]["username"] == "ada"
+    assert data["message_id"] == 27
+    assert data["text"] == "Pick a cohort:"
+    assert data["chat_id"] == 555
+    assert data["inline_message_id"] is None
+    assert data["update"]["callback_query"]["chat_instance"] == "-9923423423"
+
+
 def test_channel_post_matches_the_same_stored_trigger_filters(monkeypatch):
     """Same filter/matching behavior as message.received: one stored telegram
-    trigger matches both events, so a chat_id (or any other) filter written
-    for messages applies unchanged to channel announcements."""
+    trigger matches all three events (messages, channel announcements,
+    callback queries), so a chat_id (or any other) filter written for
+    messages applies unchanged to the other two."""
     from src.dapier.engine import matches
 
     workflow = hook_triggers.workflow_for({
         "hook_id": "bot-inbox", "kind": "telegram", "actions": []})
     # workflow_for owns the trigger specs: one per telegram event, same hook
     assert [t["event"] for t in workflow["triggers"]] == \
-        ["message.received", "channel_post.received"]
+        ["message.received", "channel_post.received", "callback_query.received"]
     assert all(t["filters"]["hook"] == {"equals": "bot-inbox"}
                for t in workflow["triggers"])
-    for event in ("message.received", "channel_post.received"):
+    for event in ("message.received", "channel_post.received",
+                  "callback_query.received"):
         assert matches(workflow, {"connector": "telegram", "event": event,
                                   "data": {"hook": "bot-inbox"}}), event
-    # a workflow author's extra filter (chat_id) applies unchanged to both
+    # a workflow author's extra filter (chat_id) applies unchanged to all
     scoped = {"enabled": True, "actions": [], "triggers": [
         {**spec, "filters": {**spec["filters"],
                              "chat_id": {"equals": "-1001730331343"}}}
         for spec in workflow["triggers"]]}
-    for event in ("message.received", "channel_post.received"):
+    for event in ("message.received", "channel_post.received",
+                  "callback_query.received"):
         assert matches(scoped, {"connector": "telegram", "event": event,
                                 "data": {"hook": "bot-inbox",
                                          "chat_id": -1001730331343}}), event
@@ -174,6 +208,24 @@ def test_telegram_sample_serves_both_events():
     assert post["data"]["update_id"] != message["data"]["update_id"]
 
 
+def test_telegram_sample_serves_callback_queries():
+    tap = _sample("telegram", event="callback_query.received")["sample"]
+    _assert_envelope(tap, "telegram", "callback_query.received")
+    data = tap["data"]
+    # the flattened shape a real delivery publishes: the tap, the tapper,
+    # and the originating message's chat fields
+    assert data["id"] and data["data"] == "join:september"
+    assert data["from"]["id"] and data["from"]["username"]
+    assert data["message_id"] == 27
+    assert data["chat_id"] == 555
+    assert data["inline_message_id"] is None
+    raw = data["update"]["callback_query"]
+    assert raw["message"]["reply_markup"]["inline_keyboard"][0][0]["callback_data"] \
+        == data["data"]
+    # still a distinct payload from the other two events
+    assert data["update_id"] != _sample("telegram", event="message.received")["sample"]["data"]["update_id"]
+
+
 def test_telegram_sample_without_an_event_defaults_to_messages():
     default = _sample("telegram")["sample"]
     _assert_envelope(default, "telegram", "message.received")
@@ -225,8 +277,9 @@ def test_chip_events_name_events_the_intakes_publish():
     from src.dapier.triggers.intake import zoom_webhooks
 
     assert CONNECTORS["telegram"].events == \
-        ("message.received", "channel_post.received")
+        ("message.received", "channel_post.received", "callback_query.received")
     assert hook_triggers.TELEGRAM_CHANNEL_POST_EVENT in CONNECTORS["telegram"].events
+    assert hook_triggers.TELEGRAM_CALLBACK_QUERY_EVENT in CONNECTORS["telegram"].events
     assert "meeting.registration_created" in CONNECTORS["zoom"].events
     assert "meeting.registration_created" in \
         zoom_webhooks.RECORDING_EVENTS + zoom_webhooks.MEETING_EVENTS \

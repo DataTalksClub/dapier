@@ -219,22 +219,26 @@ class TelegramSaveTests(unittest.TestCase):
         self.assertEqual(len(self.registered), 1)
 
     def test_trigger_matches_messages_and_channel_posts(self):
-        """One stored telegram trigger fires for both telegram events, under
+        """One stored telegram trigger fires for every telegram event, under
         the same hook filter — channel announcements are their own event
-        (channel_post.received), selectable, never a silent drop."""
+        (channel_post.received) and button taps another
+        (callback_query.received), selectable, never a silent drop."""
         stub = StubTable()
         self.api_save({"name": "bot-inbox", "connection_id": "tg-bot",
                        "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}]},
                       table=stub)
         workflow = hook_triggers.load_workflows(table_ref=stub)[0]
         self.assertEqual(sorted(t["event"] for t in workflow["triggers"]),
-                         ["channel_post.received", "message.received"])
-        for event in ("message.received", "channel_post.received"):
+                         ["callback_query.received", "channel_post.received",
+                          "message.received"])
+        for event in ("message.received", "channel_post.received",
+                      "callback_query.received"):
             self.assertTrue(matches(
                 workflow, {"connector": "telegram", "event": event,
                            "data": {"hook": "bot-inbox", "text": "hi", "chat_id": -100}}))
         # the hook filter still scopes: another hook's data matches neither
-        for event in ("message.received", "channel_post.received"):
+        for event in ("message.received", "channel_post.received",
+                      "callback_query.received"):
             self.assertFalse(matches(
                 workflow, {"connector": "telegram", "event": event,
                            "data": {"hook": "other", "text": "hi", "chat_id": -100}}))
@@ -250,7 +254,54 @@ class TelegramSaveTests(unittest.TestCase):
             {"update_id": 3, "edited_channel_post": {"text": "edit",
                                                      "chat": {"id": -100}}}),
             "channel_post.received")
+        self.assertEqual(hook_triggers.telegram_event_for(
+            {"update_id": 4, "callback_query": {"id": "cq1", "data": "join",
+                                                "from": {"id": 9}}}),
+            "callback_query.received")
         self.assertEqual(hook_triggers.telegram_event_for(None), "message.received")
+
+    def test_update_data_flattens_callback_queries(self):
+        """A button tap flattens into what a workflow filters on: the tap's
+        id and payload, the tapper, and the originating message's chat
+        fields; the raw update rides along like the message events."""
+        data = hook_triggers.update_data({
+            "update_id": 95,
+            "callback_query": {
+                "id": "4382bfdwdsb323b2d9",
+                "from": {"id": 9, "first_name": "Ada", "username": "ada"},
+                "message": {"message_id": 27, "text": "Pick a cohort:",
+                            "chat": {"id": 555, "type": "private"}},
+                "chat_instance": "-9923423423",
+                "data": "join:september",
+            },
+        }, "bot-inbox")
+        self.assertEqual(data["hook"], "bot-inbox")
+        self.assertEqual(data["update_id"], 95)
+        self.assertEqual(data["id"], "4382bfdwdsb323b2d9")
+        self.assertEqual(data["data"], "join:september")
+        self.assertEqual(data["from"]["username"], "ada")
+        self.assertEqual(data["message_id"], 27)
+        self.assertEqual(data["text"], "Pick a cohort:")
+        self.assertEqual(data["chat_id"], 555)
+        self.assertEqual(data["inline_message_id"], None)
+        self.assertEqual(data["update"]["callback_query"]["chat_instance"], "-9923423423")
+
+    def test_update_data_flattens_inline_callback_queries(self):
+        """A tap on a keyboard of a message sent via inline mode carries an
+        inline_message_id and no message — the flatten keeps it addressable."""
+        data = hook_triggers.update_data({
+            "update_id": 96,
+            "callback_query": {
+                "id": "cq-inline", "from": {"id": 9, "first_name": "Ada"},
+                "inline_message_id": "BQAAAAIAAAABmQAAAOZpq78",
+                "chat_instance": "-9923423423", "data": "vote:yes",
+            },
+        }, "bot-inbox")
+        self.assertEqual(data["id"], "cq-inline")
+        self.assertEqual(data["inline_message_id"], "BQAAAAIAAAABmQAAAOZpq78")
+        self.assertEqual(data["message_id"], None)
+        self.assertEqual(data["text"], "")
+        self.assertEqual(data["chat_id"], None)
 
 
 class MailchimpTransport:

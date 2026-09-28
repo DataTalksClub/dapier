@@ -89,6 +89,11 @@ class ApiCallTests(unittest.TestCase):
                                  "secret-value", transport=transport)
         self.assertEqual(calls[0]["body"]["url"], "https://dapier.example.test/hooks/telegram/orders")
         self.assertEqual(calls[0]["body"]["secret_token"], "secret-value")
+        # the subscription names every event the intake publishes — a type
+        # left out here is one Telegram never delivers
+        self.assertEqual(calls[0]["body"]["allowed_updates"],
+                         ["message", "edited_message", "channel_post",
+                          "edited_channel_post", "callback_query"])
 
 
 class SendMessageActionTests(unittest.TestCase):

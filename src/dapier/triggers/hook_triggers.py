@@ -80,6 +80,11 @@ TELEGRAM_EVENT = "message.received"
 # instead of poking at the raw update. Both events share the hook filter and
 # every other filter rule — see telegram_event_for and workflow_for.
 TELEGRAM_CHANNEL_POST_EVENT = "channel_post.received"
+# Button taps (the Bot API's callback_query updates — the answer to an
+# inline keyboard) are their own event, like channel announcements: same
+# hook filter and fan-out, selectable by event name — see telegram_event_for
+# and workflow_for.
+TELEGRAM_CALLBACK_QUERY_EVENT = "callback_query.received"
 YOUTUBE_EVENT = "video.published"
 TOKEN_BYTES = 32
 
@@ -488,16 +493,47 @@ def telegram_event_for(update):
     """The event name one raw Telegram update publishes as.
 
     Channel announcements (``channel_post`` / ``edited_channel_post``) are
-    their own event — ``channel_post.received`` — so a workflow can select
-    them by event name; every other update stays ``message.received``.
-    Shared by the ingress hook (``api.router._telegram_hook``) and live
-    trigger discovery, so a discovered sample names the event its payload
-    really arrives as.
+    their own event — ``channel_post.received`` — and inline-keyboard button
+    taps (``callback_query``) another — ``callback_query.received`` — so a
+    workflow can select them by event name; every other update stays
+    ``message.received``. Shared by the ingress hook
+    (``api.router._telegram_hook``) and live trigger discovery, so a
+    discovered sample names the event its payload really arrives as.
     """
-    if isinstance(update, dict) and (update.get("channel_post")
-                                     or update.get("edited_channel_post")):
-        return TELEGRAM_CHANNEL_POST_EVENT
+    if isinstance(update, dict):
+        if update.get("channel_post") or update.get("edited_channel_post"):
+            return TELEGRAM_CHANNEL_POST_EVENT
+        if update.get("callback_query"):
+            return TELEGRAM_CALLBACK_QUERY_EVENT
     return TELEGRAM_EVENT
+
+
+def _telegram_callback_data(update, hook_id):
+    """The flattened event data for one callback_query update (see
+    update_data). Key names match the message events for what they share
+    (hook, update_id, message_id, text, entities, chat_id, chat, from,
+    update) — the originating message, when Telegram attaches one — plus
+    the tap's own fields: ``id`` (what an answerCallbackQuery call echoes),
+    ``data`` (the button's payload string a workflow branches on) and
+    ``inline_message_id`` (present instead of ``message`` for keyboards on
+    messages sent via the inline mode)."""
+    query = update.get("callback_query") or {}
+    message = query.get("message") or {}
+    chat = message.get("chat") or {}
+    return {
+        "hook": hook_id,
+        "update_id": update.get("update_id"),
+        "id": query.get("id"),
+        "data": query.get("data") or "",
+        "from": query.get("from") or {},
+        "inline_message_id": query.get("inline_message_id"),
+        "message_id": message.get("message_id"),
+        "text": message.get("text") or message.get("caption") or "",
+        "entities": message.get("entities") or message.get("caption_entities") or [],
+        "chat_id": chat.get("id"),
+        "chat": chat,
+        "update": update,
+    }
 
 
 def update_data(update, hook_id):
@@ -507,8 +543,11 @@ def update_data(update, hook_id):
     trigger discovery, so a discovered sample is exactly the shape a real
     delivery publishes. Channel posts (announcement channels) carry no
     "from"; text may arrive as a media caption with caption_entities
-    instead of entities.
+    instead of entities; a button tap (callback_query) flattens into its
+    own shape — see _telegram_callback_data.
     """
+    if isinstance(update, dict) and update.get("callback_query"):
+        return _telegram_callback_data(update, hook_id)
     message = (update.get("message") or update.get("edited_message")
                or update.get("channel_post") or update.get("edited_channel_post") or {})
     chat = message.get("chat") or {}
@@ -732,12 +771,13 @@ def workflow_for(item):
     elif kind == "telegram":
         # One trigger spec per telegram event, like the mailchimp fan-out:
         # the same stored trigger (and therefore the same filters a workflow
-        # author added — chat_id, text prefix, ...) matches both a direct
-        # message and a channel announcement, while the event name stays
-        # selectable for workflows that want only one of the two.
+        # author added — chat_id, text prefix, ...) matches a direct message,
+        # a channel announcement and a button tap alike, while the event
+        # name stays selectable for workflows that want only one of them.
         triggers = [
             {"connector": kind, "event": name, "filters": dict(filters)}
-            for name in (TELEGRAM_EVENT, TELEGRAM_CHANNEL_POST_EVENT)
+            for name in (TELEGRAM_EVENT, TELEGRAM_CHANNEL_POST_EVENT,
+                         TELEGRAM_CALLBACK_QUERY_EVENT)
         ]
     else:
         triggers = [{

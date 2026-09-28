@@ -63,7 +63,8 @@ def test_every_sample_connector_is_a_palette_chip():
         chip = aliases.get(connector, connector)
         if chip not in internal:
             assert chip in chips, connector
-    assert chips["telegram"]["events"] == ["message.received", "channel_post.received"]
+    assert chips["telegram"]["events"] == ["message.received", "channel_post.received",
+                                           "callback_query.received"]
     assert chips["telegram"]["label"] == "Telegram"
     assert chips["custom"]["events"] == []
 
@@ -244,6 +245,45 @@ def test_telegram_sample_falls_back_when_getUpdates_is_rejected(monkeypatch):
     payload = _sample("telegram")
     assert payload["source"] == "synthetic"
     assert payload["sample"]["event"] == "message.received"
+
+
+def test_telegram_sample_picks_a_live_callback_query_per_event(monkeypatch):
+    """A pending button tap is served live under its own event name — and
+    named callback_query.received even in the un-asked pull, never misfiled
+    as a message."""
+    from src.dapier.connections.providers import telegram_api
+
+    pending = [
+        {"update_id": 90127, "callback_query": {
+            "id": "cq1", "from": {"id": 9, "first_name": "Ada", "username": "ada"},
+            "message": {"message_id": 27, "text": "Pick a cohort:",
+                        "chat": {"id": 555, "type": "private"}},
+            "chat_instance": "-9923423423", "data": "join:september"}},
+        {"update_id": 90125, "message": {
+            "message_id": 7, "text": "Hello dapier",
+            "chat": {"id": 555, "type": "private"},
+            "from": {"id": 9, "first_name": "Ada"}}},
+    ]
+
+    def updates(method, name, params, transport=None):
+        return pending
+
+    monkeypatch.setattr(telegram_api, "call", updates)
+    monkeypatch.setattr(
+        "src.dapier.connections.credentials.get_credential",
+        lambda credential_id: {"token": "12:ABC"})
+    configure_connections(monkeypatch, {
+        "tg": {"connection_id": "tg", "provider": "telegram", "status": "connected",
+               "credential_id": "oauth#tg"}})
+    asked = _sample("telegram", event="callback_query.received")
+    assert asked["source"] == "live"
+    assert asked["sample"]["event"] == "callback_query.received"
+    assert asked["sample"]["data"]["data"] == "join:september"
+    # the un-asked pull takes the first pending update and names it truly
+    unasked = _sample("telegram")
+    assert unasked["source"] == "live"
+    assert unasked["sample"]["event"] == "callback_query.received"
+    assert unasked["sample"]["data"]["id"] == "cq1"
 
 
 # --- domain: poll pulls a live list item ---

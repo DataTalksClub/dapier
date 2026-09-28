@@ -301,9 +301,10 @@ register_connection_test(ConnectionTest(connector="telegram", run=_run_test))
 # Realistic updates, delivered-shaped through ``hook_triggers.update_data``
 # (the same builder a real delivery uses), for the no-live tail of the
 # sample chain — the designer preview must always render. One per telegram
-# event: a direct message, and a channel announcement (the Bot API's
+# event: a direct message, a channel announcement (the Bot API's
 # channel_post — chat with a title, an author signature instead of a
-# visible "from").
+# visible "from"), and an inline-keyboard button tap (callback_query — the
+# tapper, the button's payload string, and the message the button rode on).
 _SYNTHETIC_UPDATE = {
     "update_id": 90125,
     "message": {
@@ -322,6 +323,26 @@ _SYNTHETIC_CHANNEL_POST = {
         "chat": {"id": -1001730331343, "title": "DataTalksClub Courses",
                  "type": "channel"},
         "author_signature": "DataTalksClub",
+    },
+}
+
+_SYNTHETIC_CALLBACK_QUERY = {
+    "update_id": 90127,
+    "callback_query": {
+        "id": "4382bfdwdsb323b2d9",
+        "from": {"id": 9, "is_bot": False, "first_name": "Ada",
+                 "username": "ada", "language_code": "en"},
+        "message": {
+            "message_id": 27,
+            "text": "Pick a cohort:",
+            "chat": {"id": 555, "type": "private", "first_name": "Ada"},
+            "reply_markup": {"inline_keyboard": [[
+                {"text": "September", "callback_data": "join:september"},
+                {"text": "October", "callback_data": "join:october"},
+            ]]},
+        },
+        "chat_instance": "-9923423423",
+        "data": "join:september",
     },
 }
 
@@ -348,9 +369,9 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport
     """One real Telegram update via ``getUpdates``, delivery-shaped, per event.
 
     The ``event`` request field picks which telegram event to sample —
-    ``message.received`` (the default) or ``channel_post.received`` — and the
-    live fetch picks the first pending update that actually arrives as that
-    event. Read-only: updates are never confirmed (no offset), so the bot's
+    ``message.received`` (the default), ``channel_post.received`` or
+    ``callback_query.received`` — and the live fetch picks the first pending
+    update that actually arrives as that event. Read-only: updates are never confirmed (no offset), so the bot's
     own webhook keeps delivering them. A webhook-mode bot cannot also poll —
     Telegram rejects ``getUpdates`` — and that is the normal working state
     of a dapier telegram trigger, not an error: like the other chips, the
@@ -402,6 +423,8 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport
             hook_triggers.update_data(_SYNTHETIC_UPDATE, hook_id),
         hook_triggers.TELEGRAM_CHANNEL_POST_EVENT:
             hook_triggers.update_data(_SYNTHETIC_CHANNEL_POST, hook_id),
+        hook_triggers.TELEGRAM_CALLBACK_QUERY_EVENT:
+            hook_triggers.update_data(_SYNTHETIC_CALLBACK_QUERY, hook_id),
     })
     return per_event(event=event, connection_id=connection_id, limit=limit)
 

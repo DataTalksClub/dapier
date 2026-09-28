@@ -91,12 +91,14 @@ def set_webhook(token, url, secret_token, *, transport=None):
 
     Channel posts are included so a bot sitting in announcement channels can
     drive workflows (the au-tomator port); private/group messages stay
-    subscribed for trigger-and-reply workflows.
+    subscribed for trigger-and-reply workflows, and callback queries so
+    inline-keyboard button taps fire callback_query.received.
     """
     call(token, "setWebhook", {
         "url": url,
         "secret_token": secret_token,
-        "allowed_updates": ["message", "edited_message", "channel_post", "edited_channel_post"],
+        "allowed_updates": ["message", "edited_message", "channel_post",
+                            "edited_channel_post", "callback_query"],
     }, transport=transport)
 
 

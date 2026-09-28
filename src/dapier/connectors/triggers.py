@@ -31,7 +31,8 @@ connector(Connector(name="slack", label="Slack",
                             "reaction.added", "member.joined"),
                     icon="slack"))
 connector(Connector(name="telegram", label="Telegram",
-                    events=("message.received", "channel_post.received"),
+                    events=("message.received", "channel_post.received",
+                            "callback_query.received"),
                     icon="send"))
 connector(Connector(name="mailchimp", label="Mailchimp",
                     events=("subscribe", "unsubscribe", "profile", "upemail",
