@@ -176,6 +176,18 @@ def get_version(workflow_id, revision, table_ref=None):
     return {key: _decode_numbers(value) for key, value in item.items()} if item else None
 
 
+def diff_versions(workflow_id, from_revision, to_revision, table_ref=None):
+    """Two version records of one workflow side by side, ready to compare:
+    ``{"from": <record>, "to": <record>}``. None when either revision is
+    missing — never published, pruned beyond MAX_VERSIONS, or not a real
+    number — so the caller answers 404 instead of half a diff."""
+    source = get_version(workflow_id, from_revision, table_ref)
+    target = get_version(workflow_id, to_revision, table_ref)
+    if not source or not target:
+        return None
+    return {"from": source, "to": target}
+
+
 def load_workflows(table_ref=None):
     """Parsed definitions from the table, ready for the engine's merge."""
     return [

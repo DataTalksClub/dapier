@@ -307,7 +307,7 @@ _VIEWER_ROUTES = (
     (r"/api/admin/designer/workflows", ("GET",)),
     (r"/api/admin/designer/templates", ("GET",)),
     (r"/api/admin/designer/export(?:-all)?", ("GET",)),
-    (r"/api/admin/designer/workflows/[^/]+(?:/versions)?", ("GET",)),
+    (r"/api/admin/designer/workflows/[^/]+(?:/versions(?:/diff)?)?", ("GET",)),
     (r"/api/admin/grants", ("GET",)),
     (r"/api/admin/tokens", ("GET",)),
     (r"/api/admin/(?:email|hook|schedule|poll)-triggers", ("GET",)),

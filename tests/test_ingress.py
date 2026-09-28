@@ -245,7 +245,7 @@ def test_every_console_module_in_the_import_graph_is_served():
         response = ingress._static(asset)
         assert response is not None and response["statusCode"] == 200, asset
         graph = re.findall(
-            r"""from\s*['"]([^'"]+)['"]|import\s*['"]([^'"]+)['"]""",
+            r"""from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]""",
             module.read_text())
         for groups in graph:
             specifier = next(part for part in groups if part)

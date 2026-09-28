@@ -551,6 +551,15 @@ def versions_designer_workflow(source):
     return http._json_response(status, payload)
 
 
+def diff_designer_workflow(event, source):
+    """Console mirror of the CLI diff: the unified diff between two
+    published versions, for the Versions dialog's Diff button."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = designer_store.api_diff(source, query.get("from"),
+                                              query.get("to"))
+    return http._json_response(status, payload)
+
+
 def rollback_designer_workflow(event, operator, source):
     """Console mirror of the CLI rollback: republish an old version."""
     try:

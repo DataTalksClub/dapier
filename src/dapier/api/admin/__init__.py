@@ -190,6 +190,10 @@ def route(event, method, path):
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
         return routes.versions_designer_workflow(designer_versions_match.group(1))
+    designer_versions_diff_match = re.fullmatch(
+        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions/diff", path)
+    if method == "GET" and designer_versions_diff_match:
+        return routes.diff_designer_workflow(event, designer_versions_diff_match.group(1))
     designer_rollback_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if method == "POST" and designer_rollback_match:
@@ -296,6 +300,7 @@ from .routes import (  # noqa: F401
     test_connection,
     trigger_sample,
     rollback_designer_workflow,
+    diff_designer_workflow,
     versions_designer_workflow,
 )
 from ...connections.oauth_flow import (  # noqa: F401

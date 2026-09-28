@@ -6,6 +6,7 @@ when configured, a save also commits a readable YAML copy to the repo.
 """
 
 import base64
+import difflib
 import io
 import json
 import os
@@ -842,6 +843,64 @@ def api_versions(source):
         "file": source,
         "revision": live_revision,
         "versions": versions,
+    }
+
+
+# The unified diff body is capped so a pathological revision pair cannot
+# flood a console dialog or a Lambda response; past the cap the text is cut
+# and ``truncated`` says so.
+MAX_DIFF_CHARS = 20000
+
+
+def api_diff(source, from_revision, to_revision):
+    """Unified text diff between two published versions of one workflow —
+    the rollback-confidence half of the versions list.
+
+    Answers ``{file, workflow, from: {revision, yaml}, to: {revision, yaml},
+    diff, same, truncated}`` where the YAML texts are the same canonical
+    dumps api_get renders and ``diff`` is a plain unified diff between them
+    (empty when the definitions are identical, which ``same`` flags — a
+    re-save without changes, or the same revision on both sides). Like
+    api_versions, it still answers for a deleted workflow's id: the version
+    records outlive the live item.
+    """
+    if not published_workflows.configured():
+        return 503, {"error": "published workflows are not configured"}
+    if not FILE_PATTERN.fullmatch(source or ""):
+        return 400, {"error": f"invalid workflow file name: {source!r}"}
+    try:
+        revisions = (int(from_revision), int(to_revision))
+    except (TypeError, ValueError):
+        return 400, {"error": "from and to must be version numbers, "
+                              "as shown by the versions list"}
+    status, payload = api_get(source)
+    if status == 200:
+        workflow_id = str(payload["workflow"]["id"])
+    elif status == 404:
+        workflow_id = source.removesuffix(".yaml")
+    else:
+        return status, payload
+    pair = published_workflows.diff_versions(workflow_id, *revisions)
+    if pair is None:
+        return 404, {"error": f"no version {revisions[0]} or version {revisions[1]} "
+                              f"of workflow {workflow_id}"}
+    for side, revision in zip(("from", "to"), revisions):
+        if not isinstance(pair[side].get("workflow"), dict):
+            return 404, {"error": f"no version {revision} of workflow {workflow_id}"}
+    from_text = workflow_yaml_text(pair["from"]["workflow"])
+    to_text = workflow_yaml_text(pair["to"]["workflow"])
+    diff = "".join(difflib.unified_diff(
+        from_text.splitlines(keepends=True), to_text.splitlines(keepends=True),
+        fromfile=f"{source} v{revisions[0]}", tofile=f"{source} v{revisions[1]}",
+    ))
+    return 200, {
+        "file": source,
+        "workflow": workflow_id,
+        "from": {"revision": revisions[0], "yaml": from_text},
+        "to": {"revision": revisions[1], "yaml": to_text},
+        "diff": diff[:MAX_DIFF_CHARS],
+        "same": from_text == to_text,
+        "truncated": len(diff) > MAX_DIFF_CHARS,
     }
 
 

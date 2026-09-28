@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from . import auth, commands, config
+from . import api, auth, commands, config
 from .api import ApiError
 
 
@@ -374,6 +374,13 @@ def build_parser():
     wf_versions_p = wf_sub.add_parser("versions",
                                       help="List a workflow's published versions (newest first)")
     wf_versions_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_diff_p = wf_sub.add_parser("diff",
+                                  help="Unified diff between two published versions")
+    wf_diff_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_diff_p.add_argument("--from", dest="from_revision", type=int, required=True,
+                           help="Version to diff from, as shown by workflows versions")
+    wf_diff_p.add_argument("--to", dest="to_revision", type=int, required=True,
+                           help="Version to diff to, as shown by workflows versions")
     wf_rollback_p = wf_sub.add_parser("rollback",
                                       help="Restore an old version of a workflow (live immediately)")
     wf_rollback_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
@@ -655,6 +662,9 @@ def cmd_workflows(args, api_url, debug):
         return commands.workflows_duplicate(api_url, args.file, name=args.name, debug=debug)
     if args.command == "versions":
         return commands.workflows_versions(api_url, args.file, debug=debug)
+    if args.command == "diff":
+        return workflows_diff(api_url, args.file, args.from_revision,
+                              args.to_revision, debug=debug)
     if args.command == "rollback":
         return commands.workflows_rollback(api_url, args.file, args.revision, debug=debug)
     if args.command == "delete":
@@ -674,6 +684,23 @@ def cmd_workflows(args, api_url, debug):
                                             steps_spec=args.steps, execute=args.execute,
                                             debug=debug)
     return 2
+
+
+def workflows_diff(api_url, file, from_revision, to_revision, debug=False):
+    """Unified diff between two published versions (the server builds it;
+    the raw text goes to stdout so it pipes into `less` or `patch`)."""
+    data = api.call(api_url, "GET",
+                    f"/api/agent/designer/workflows/{file}/versions/diff"
+                    f"?from={from_revision}&to={to_revision}", debug=debug)
+    diff = data.get("diff") or ""
+    if diff:
+        sys.stdout.write(diff if diff.endswith("\n") else diff + "\n")
+    if data.get("same"):
+        print(f"v{from_revision} and v{to_revision} are identical.")
+    if data.get("truncated"):
+        print("Warning: the diff was truncated at the server's size cap; "
+              "narrow the revision range to see more.", file=sys.stderr)
+    return 0
 
 
 def cmd_templates(args, api_url, debug):

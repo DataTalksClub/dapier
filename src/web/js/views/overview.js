@@ -443,9 +443,24 @@ async function loadVersions(file) {
     <td data-label="State">${version.enabled ? 'On' : 'Off'}</td>
     <td class="action-cell" data-label="Manage">${version.current ? '' : `<button type="button" class="button secondary version-restore" data-revision="${version.revision}">Restore</button>`}</td>
   </tr>`).join('');
-  $('#versions-detail').innerHTML = rows
+  // The rollback half of the list: pick any two revisions and see what
+  // changed before restoring one (`dapier workflows diff` prints the same).
+  const ascending = [...(data.versions || [])].map((version) => version.revision).reverse();
+  const revisionOptions = (selected) => ascending.map((rev) =>
+    `<option value="${rev}"${rev === selected ? ' selected' : ''}>v${rev}</option>`).join('');
+  const diffUI = ascending.length >= 2 ? `
+    <div class="versions-diff-row">
+      <label class="sub">Diff
+        <select class="mono version-diff-from">${revisionOptions(ascending[ascending.length - 2])}</select>
+        →
+        <select class="mono version-diff-to">${revisionOptions(ascending[ascending.length - 1])}</select>
+      </label>
+      <button type="button" class="button secondary version-diff">Diff…</button>
+    </div>
+    <pre class="mono version-diff-output" hidden></pre>` : '';
+  $('#versions-detail').innerHTML = (rows
     ? `<div class="table-wrap"><table><thead><tr><th>Version</th><th>When</th><th>Change</th><th>By</th><th>State</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
-    : '<p class="sub">No version history yet. Every save, toggle, and rollback is recorded from now on.</p>';
+    : '<p class="sub">No version history yet. Every save, toggle, and rollback is recorded from now on.</p>') + diffUI;
   icons();
 }
 
@@ -493,8 +508,39 @@ export async function restoreVersion(button) {
   icons();
 }
 
+/* The Versions dialog's Diff button: the unified diff between the two
+   picked revisions, the same plain text `dapier workflows diff` prints. */
+async function diffVersions(button) {
+  const dialog = $('#versions-dialog');
+  const file = dialog.dataset.file;
+  const from = dialog.querySelector('.version-diff-from').value;
+  const to = dialog.querySelector('.version-diff-to').value;
+  const output = dialog.querySelector('.version-diff-output');
+  const feedback = $('#versions-feedback');
+  button.disabled = true;
+  output.hidden = true;
+  try {
+    const data = await api(`/api/admin/designer/workflows/${encodeURIComponent(file)}/versions/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    output.innerHTML = escapeHtml(data.same
+      ? `v${from} and v${to} are identical.`
+      : data.diff || '');
+    output.hidden = false;
+  } catch (error) {
+    feedback.textContent = error.message;
+    feedback.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.version-diff');
+  if (!button || button.disabled) return;
+  void diffVersions(button);
+});
+
 export function openRowFor(event) {
-  if (event.target.closest('.workflow-toggle, .workflow-tags, .workflow-folder, .workflow-delete, .workflow-duplicate, .workflow-template')) return; // the button handles itself
+  if (event.target.closest('.workflow-toggle, .workflow-resume, .workflow-tags, .workflow-folder, .workflow-delete, .workflow-duplicate, .workflow-template')) return; // the button handles itself
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');

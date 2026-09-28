@@ -534,6 +534,10 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if designer_versions_match and method == "GET":
         return designer_versions_api(event, designer_versions_match.group(1))
+    designer_versions_diff_match = re.fullmatch(
+        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions/diff", path)
+    if designer_versions_diff_match and method == "GET":
+        return designer_versions_diff_api(event, designer_versions_diff_match.group(1))
     designer_rollback_match = re.fullmatch(
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if designer_rollback_match and method == "POST":
@@ -824,6 +828,20 @@ def designer_versions_api(event, source):
     if error:
         return error
     status, payload = designer_store.api_versions(source)
+    return _json_response(status, payload)
+
+
+def designer_versions_diff_api(event, source):
+    """Operator-only version diff: the unified diff between two revisions
+    (the rollback-confidence half of the versions list). Mirrors the
+    console's diff endpoint; like the versions read it is not itself
+    audited — require_operator records the denials."""
+    subject, error = require_operator(event, "workflow.versions")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = designer_store.api_diff(source, query.get("from"),
+                                              query.get("to"))
     return _json_response(status, payload)
 
 
