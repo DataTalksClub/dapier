@@ -270,6 +270,18 @@ def api_save(body, operator, table_ref=None):
     if previous:
         item["created_by"] = previous.get("created_by", item["created_by"])
         item["created_at"] = previous.get("created_at", item["created_at"])
+        if "event" not in body and previous.get("event"):
+            # An update that omits the event — the console's toggle and edit
+            # round-trips — keeps the stored watcher: build_item defaulted to
+            # an address trigger, which would silently demote it. Explicit
+            # filters win; absent ones carry over.
+            filters = body.get("filters")
+            if filters is not None and not isinstance(filters, dict):
+                raise TriggerError("filters must be an object")
+            item["event"] = previous["event"]
+            item["address"] = ""
+            item["filters"] = (filters if isinstance(filters, dict)
+                               else previous.get("filters") or {})
     get_table(table_ref).put_item(Item=item)
     return 200, {"created": created, **public_view(item)}
 

@@ -13,6 +13,7 @@ let current = { domain: '', triggers: [] };
 let editing = null; // trigger being edited, or null when creating
 
 function addressOf(trigger) {
+  if (trigger.event && trigger.event !== 'message.received') return `${trigger.name} · ${trigger.event}`;
   return trigger.address || `${trigger.name}@${current.domain}`;
 }
 
@@ -27,6 +28,8 @@ function openDialog(trigger) {
   form.reset();
   $('#email-error').textContent = '';
   $('#email-dialog-title').textContent = trigger ? `Edit ${addressOf(trigger)}` : 'New email';
+  form.event.value = (trigger && trigger.event) || 'message.received';
+  syncEventFields(trigger);
   form.name.value = trigger ? trigger.name : '';
   form.name.disabled = Boolean(trigger); // renaming would orphan the address
   form.description.value = trigger ? (trigger.description || '') : '';
@@ -38,6 +41,22 @@ function openDialog(trigger) {
   $('#email-dialog').showModal();
   if (!trigger) form.name.focus();
 }
+
+/* Address triggers reserve <name>@domain; SES feedback watchers match
+   domain-wide and scope through a filters object instead. */
+function syncEventFields(trigger) {
+  const form = $('#email-form');
+  const watcher = form.event.value !== 'message.received';
+  $('#email-address-field').hidden = watcher;
+  $('#email-filters-field').hidden = !watcher;
+  // A hidden required input would block submit with an unfocusable error.
+  form.name.required = !watcher;
+  form.filters.value = watcher && trigger && trigger.filters && Object.keys(trigger.filters).length
+    ? JSON.stringify(trigger.filters, null, 2)
+    : '';
+}
+
+$('#email-form').elements.event.addEventListener('change', () => syncEventFields(editing));
 
 function bindRowButtons() {
   $$('.email-edit').forEach((button) => button.addEventListener('click', () => {
@@ -54,6 +73,10 @@ function bindRowButtons() {
         description: trigger.description || '',
         enabled: !trigger.enabled,
       };
+      if (trigger.event && trigger.event !== 'message.received') {
+        body.event = trigger.event; // api_save replaces the item: carry watcher fields
+        body.filters = trigger.filters || {};
+      }
       if (trigger.flow) body.flow = trigger.flow;
       else body.actions = trigger.actions || [];
       await api('/api/admin/email-triggers', { method: 'PUT', body: JSON.stringify(body) });
@@ -65,8 +88,11 @@ function bindRowButtons() {
     const trigger = current.triggers.find((item) => item.name === button.dataset.name);
     if (!trigger) return;
     const dialog = $('#email-confirm-dialog');
+    const watcher = Boolean(trigger.event && trigger.event !== 'message.received');
     $('#email-confirm-title').textContent = `Delete ${addressOf(trigger)}?`;
-    $('#email-confirm-message').textContent = 'Mail to this address will no longer run any actions. The address becomes free to reserve again.';
+    $('#email-confirm-message').textContent = watcher
+      ? 'This watcher stops matching SES feedback and its actions stop running.'
+      : 'Mail to this address will no longer run any actions. The address becomes free to reserve again.';
     dialog.returnValue = '';
     dialog.showModal();
     const confirmed = await new Promise((resolve) => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
@@ -121,6 +147,16 @@ $('#email-form').addEventListener('submit', async (event) => {
       description: form.description.value.trim(),
       enabled: form.enabled.checked,
     };
+    if (form.event.value !== 'message.received') {
+      body.event = form.event.value;
+      const raw = form.filters.value.trim();
+      if (raw) {
+        let filters;
+        try { filters = JSON.parse(raw); } catch (_) { throw new Error('Filters must be valid JSON'); }
+        if (!filters || Array.isArray(filters) || typeof filters !== 'object') throw new Error('Filters must be a JSON object');
+        body.filters = filters;
+      }
+    }
     if (editing && editing.flow) {
       body.flow = editing.flow;
     } else {

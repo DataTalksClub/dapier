@@ -275,7 +275,52 @@ class WatcherEventTests(unittest.TestCase):
         workflow = email_triggers.load_workflows(table_ref=stub)[0]
         self.assertEqual(workflow["trigger"]["event"], "bounce.received")
 
+    def test_update_omitting_event_keeps_the_stored_watcher(self):
+        stub = StubTable()
+        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
+        # the console toggle's exact body shape: no event, no filters
+        _status, payload = email_triggers.api_save(
+            {"name": "bounce-alert", "description": "d", "enabled": False,
+             "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
+        self.assertEqual(payload["event"], "bounce.received")
+        stored = stub.items["bounce-alert"]
+        self.assertEqual(stored["event"], "bounce.received")
+        self.assertEqual(stored["filters"], {})
+        self.assertEqual(stored["address"], "")
+        self.assertFalse(stored["enabled"])
 
+    def test_update_keeps_stored_filters_unless_supplied(self):
+        stub = StubTable()
+        email_triggers.api_save(
+            dict(WATCHER_BODY, filters={"bounce_type": {"equals": "Permanent"}}),
+            "op", table_ref=stub)
+        email_triggers.api_save(
+            {"name": "bounce-alert", "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
+        self.assertEqual(stub.items["bounce-alert"]["filters"],
+                         {"bounce_type": {"equals": "Permanent"}})
+        email_triggers.api_save(
+            {"name": "bounce-alert", "actions": WATCHER_BODY["actions"], "filters": {}},
+            "op", table_ref=stub)
+        self.assertEqual(stub.items["bounce-alert"]["filters"], {})
+
+    def test_update_rejects_non_dict_filters_on_a_watcher(self):
+        stub = StubTable()
+        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
+        with self.assertRaises(email_triggers.TriggerError):
+            email_triggers.api_save(
+                {"name": "bounce-alert", "actions": WATCHER_BODY["actions"],
+                 "filters": "gone"}, "op", table_ref=stub)
+
+    def test_explicit_message_received_demotes_a_watcher(self):
+        stub = StubTable()
+        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
+        email_triggers.api_save(
+            {"name": "bounce-alert", "event": "message.received",
+             "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
+        stored = stub.items["bounce-alert"]
+        self.assertNotIn("event", stored)
+        self.assertNotIn("filters", stored)
+        self.assertEqual(stored["address"], "bounce-alert@dtcdev.click")
 
 
 class FlowBindingTests(unittest.TestCase):

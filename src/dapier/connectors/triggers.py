@@ -15,7 +15,8 @@ each owns its sample.
 """
 from .registry import Connector, connector
 
-connector(Connector(name="email", label="Email", events=("message.received",), icon="mail"))
+connector(Connector(name="email", label="Email",
+                    events=("message.received", "bounce.received", "complaint.received"), icon="mail"))
 connector(Connector(name="youtube", label="YouTube", events=("video.published",), icon="youtube"))
 connector(Connector(name="dropbox", label="Dropbox", events=("file.created", "file.updated", "file.deleted"), icon="dropbox"))
 connector(Connector(name="zoom", label="Zoom",

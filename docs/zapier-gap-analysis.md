@@ -331,7 +331,8 @@ Still open after round 6 (deliberately deferred): plan/quota *enforcement*
 on top of usage metering; multi-user workspaces (and with it template
 cross-account transfer); new app connectors beyond the current chips
 (Gmail, an AI/LLM provider; Google Calendar closed in round 28); Google Sheets `row.updated` (needs snapshot
-diffing; closed in round 30); an SES bounce/complaint trigger chip.
+diffing; closed in round 30); an SES bounce/complaint trigger chip
+(closed in round 30).
 
 ### Landed 2026-09-28 (round 7: test-trigger in the console, live workflow samples, thread/poll/participant staples)
 
@@ -1179,7 +1180,7 @@ beyond roles v1 (no invitations/shared workspaces), new app chips (zero
 `calendar` references in `src/` — Gmail and no AI/LLM provider;
 Google Calendar closed in round 28), Google Sheets `row.updated` (only `row.new` in the poll source),
 and an SES bounce/complaint trigger chip (no SES notification intake; only
-inbox replay-bounce notes). New findings this pass, ranked:
+inbox replay-bounce notes; closed in round 30). New findings this pass, ranked:
 
 1. **Auto-disable on repeated failures (value H, effort M).** Zapier pauses
    a zap after consecutive errors and emails the owner; dapier has no trip
@@ -1269,7 +1270,7 @@ inbox replay-bounce notes). New findings this pass, ranked:
    the whole published store each call; fine at current scale, keyset
    paging when the store grows.
 
-### Landed 2026-09-28 (round 30: queue alarms, configurable signature headers, Sheets row.updated)
+### Landed 2026-09-28 (round 30: queue alarms, configurable signature headers, Sheets row.updated, SES bounce intake)
 
 - **Event-queue alarms** — `EventQueueAgeAlarm` and `EventQueueDepthAlarm`
   watch the SQS queue the API enqueues runs onto and the worker drains,
@@ -1300,44 +1301,22 @@ inbox replay-bounce notes). New findings this pass, ranked:
   source). Tests: `tests/test_sheets_row_updated.py`,
   `tests/test_google_triggers.py`, `tests/test_poll_presets.py`,
   `tests/test_console_trigger_sources.py`.
-- **Doc hygiene** — this document's body had been re-appended whole four
-  times plus a doubled fresh-audit tail; deduped to the newest revision
-  (~2300 stale lines dropped).
-
-Still open from the fresh audit: draft vs live (the publish moment) and
-designer list paging (a scale note, fine until the published store grows).
-
-### Landed 2026-09-28 (round 30: queue alarms, configurable signature headers, Sheets row.updated)
-
-- **Event-queue alarms** — `EventQueueAgeAlarm` and `EventQueueDepthAlarm`
-  watch the SQS queue the API enqueues runs onto and the worker drains,
-  closing the wedged-but-not-erroring blind spot (a stuck consumer never
-  reaches the DLQ where the existing alarms live). Age ≥ 900 s is a full
-  redrive cycle (5 receives × 180 s visibility); depth ≥ 100 visible over
-  a 5-minute period so a one-minute inbound burst doesn't page. Both notify
-  `AlarmTopic`; `alarm_notify.py` is unchanged (generic summarizer).
-  Tests: `tests/test_template_alarms.py`, `tests/test_alarm_notify.py`.
-- **Per-hook signature header** — completing the round-30 webhook
-  signature lock: `signature_header` (header-name-validated, lowercased,
-  webhook-only) lets a provider that signs in its own header (e.g.
-  `x-hub-signature-256`) lock its target; intake verifies against the
-  stored name instead of assuming `x-dapier-signature`. Console hook
-  dialog gained the field (prefilled when signed, blank = the default);
-  the name rides the shared hook-save API, so all three surfaces set it.
-  Tests: `tests/test_hook_signature.py`.
-- **Google Sheets `row.updated`** — Zapier's "New or Updated Spreadsheet
-  Row", the last round-6 deferral on the Sheets chip: a second poll source
-  (`google-sheets.updates`) diffs consecutive listings — the values API
-  exposes no per-row modified time, so the cursor carries a
-  row → content-digest snapshot; the first fire seeds and emits nothing,
-  an edited row fires once with its latest cells (`id` =
-  `<row>:<digest>`, so the seen-set recognizes a re-edit), brand-new rows
-  stay `row.new`'s news, deleted rows never fire, and `row.new`/`row.updated`
-  cursors are independent per trigger. Console Source select +
-  `CONNECTION_POLL_SOURCES` + designer catalogs (bundle rebuilt from
-  source). Tests: `tests/test_sheets_row_updated.py`,
-  `tests/test_google_triggers.py`, `tests/test_poll_presets.py`,
-  `tests/test_console_trigger_sources.py`.
+- **SES bounce/complaint intake** — the last round-6 deferral, on the
+  Email chip: an SNS intake at `/hooks/ses-notifications` (auto-confirms
+  subscriptions, 400s unparseable input, never 5xx on provider data)
+  turns SES feedback notifications into `bounce.received` /
+  `complaint.received` events — Delivery ignored, `event_id =
+  ses:<feedbackId>` so SNS's at-least-once redelivery dedupes, and
+  `SES_NOTIFICATION_TOPICS` allowlists the feedback TopicArn (unset
+  accepts). Email triggers gain an `event`: `message.received` (default —
+  reserved address, unchanged) or a domain-wide watcher with optional
+  engine filters; watchers reserve no address and cannot shadow YAML
+  routes. Chip events + synthetic samples, console Emails dialog (event
+  select, filters JSON for watchers; edit and toggle carry `event`
+  because the save replaces the item), designer catalog rebuilt. Setup:
+  point the SES configuration set's feedback destination at the intake
+  URL and set `SES_NOTIFICATION_TOPICS`. Tests:
+  `tests/test_ses_bounce_intake.py`, `tests/test_email_triggers.py`.
 - **Doc hygiene** — this document's body had been re-appended whole four
   times plus a doubled fresh-audit tail; deduped to the newest revision
   (~2300 stale lines dropped).
