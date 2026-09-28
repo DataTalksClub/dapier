@@ -441,6 +441,8 @@ def route(event, method, path):
         return runs_replay_failed_api(event)
     if path == "/api/agent/usage" and method == "GET":
         return usage_api(event)
+    if path == "/api/agent/quota" and method in ("GET", "PUT"):
+        return quota_api(event, method)
     if path == "/api/agent/audit/export" and method == "GET":
         return audit_export_api(event)
     if path == "/api/agent/audit" and method == "GET":
@@ -1230,12 +1232,43 @@ def runs_export_api(event):
 
 
 def usage_api(event):
-    """Operator-only task usage rollup: tasks per workflow per month."""
+    """Operator-only task usage rollup: tasks per workflow per month.
+
+    Carries the quota block alongside the rollup so one read shows both the
+    spend and the budget it counts against.
+    """
     _, error = require_operator(event, "usage")
     if error:
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = usage.api_usage(query.get("months", 12))
+    payload["quota"] = usage.quota_status()
+    return _no_store(_json_response(status, payload))
+
+
+def quota_api(event, method):
+    """Operator-only monthly task quota: show the budget, or store/clear
+    the limit with PUT ({"limit": 1000}, {"limit": "off"} clears it).
+
+    Mirrors the console's /api/admin/quota on the same domain functions in
+    engine.usage — the budget the worker's gate enforces on every action
+    step. Settings writes land in the audit trail.
+    """
+    subject, error = require_operator(event, "quota.set" if method == "PUT" else "quota")
+    if error:
+        return error
+    if method == "GET":
+        status, payload = usage.api_quota_get()
+        return _no_store(_json_response(status, payload))
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid request"})
+    status, payload = usage.api_quota_set(body.get("limit"))
+    if status == 200:
+        audit.emit("usage", "quota.set", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 

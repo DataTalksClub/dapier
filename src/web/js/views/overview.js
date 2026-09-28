@@ -370,7 +370,44 @@ function renderUsage() {
     + `<td class="mono muted-cell" data-label="3-month total">${entry.total}</td></tr>`).join('');
   $('#overview-usage-empty').hidden = shown.length > 0;
   $('#overview-usage-table').hidden = shown.length === 0;
+  renderQuota();
 }
+
+/* The monthly task quota (the budget the worker enforces on action steps):
+   a status line plus an inline limit editor. Absent payload = metering is
+   not wired, so the editor stays hidden rather than pretending to work. */
+function renderQuota() {
+  const quota = (state.data && state.data.quota) || null;
+  const line = $('#overview-quota-line');
+  const form = $('#quota-form');
+  if (!line || !form) return;
+  line.hidden = !quota;
+  form.hidden = !quota;
+  if (!quota) return;
+  const used = Number(quota.used) || 0;
+  if (quota.enabled) {
+    const left = quota.remaining;
+    line.textContent = `Monthly limit ${quota.limit} — ${used} used`
+      + (left != null ? `, ${left} left this month (${quota.month}).` : ` (${quota.month}).`);
+  } else {
+    line.textContent = `No monthly limit — ${used} tasks used this month (${quota.month}).`;
+  }
+  $('#quota-limit').value = quota.enabled ? quota.limit : '';
+}
+
+$('#quota-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const raw = $('#quota-limit').value.trim();
+  const limit = raw === '' ? 'off' : Number(raw);
+  try {
+    await api('/api/admin/quota', { method: 'PUT', body: JSON.stringify({ limit }) });
+    notice(limit === 'off' ? 'Task quota removed — usage is uncapped again.'
+                           : `Monthly task quota set to ${limit}.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message || 'Could not set the task quota.', true);
+  }
+});
 
 let searchSequence = 0;
 

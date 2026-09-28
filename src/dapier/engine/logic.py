@@ -176,6 +176,18 @@ AUTORETRY_DEFAULTS = {"initial_seconds": 1, "max_seconds": 60}
 _TOKEN = re.compile(r"\{([^{}]+)\}")
 
 
+class QuotaExceeded(Exception):
+    """The account's monthly task quota is spent; a gate refused the step.
+
+    Raised by a ``before_action`` hook (engine.usage.enforce, the worker's
+    task-quota gate). ``_run_step`` re-raises it inside the step-execution
+    try so the ordinary action-error machinery applies — the step closes
+    ``failed`` with the quota message and honors on_fail/on_error exactly
+    like a connector the plan disallows. Lives here (not in usage) so
+    engine.logic stays dependency-free.
+    """
+
+
 class RunSuspended(Exception):
     """A delay step paused the run past what one invocation may sleep.
 
@@ -413,15 +425,30 @@ def _run_step(workflow_id, step, index, event, run_action, *,
     if step_outputs is None:
         step_outputs = {}
     action_id = _step_id(prefix, step, index)
-    if before_action and not before_action(workflow_id, action_id, event, step.get("type")):
-        step_outputs[action_id] = {"status": "skipped"}
-        return None
+    quota_gate = None
+    if before_action:
+        try:
+            gate = before_action(workflow_id, action_id, event, step.get("type"))
+        except QuotaExceeded as exc:
+            # A spent task budget refuses the step before the connector
+            # call; the re-raise inside the try below hands it to the
+            # ordinary error machinery so the step record, the on_fail /
+            # on_error policy and the retry tagging all apply exactly as
+            # for a connector failure. Anything else the gate raises
+            # (LeaseBusy) keeps its own semantics.
+            quota_gate = exc
+        else:
+            if not gate:
+                step_outputs[action_id] = {"status": "skipped"}
+                return None
     # The autoretry plan is parsed and validated before the step runs: a bad
     # config is an authoring error, loud even when on_fail would absorb the
     # step's failures (mirroring the lazy on_fail/on_error checks).
     autoretry = _autoretry_plan(step, action_id)
     started = time.monotonic()
     try:
+        if quota_gate is not None:
+            raise quota_gate
         stop, output, status = _execute_step(
             workflow_id, action_id, step, event, run_action,
             before_action=before_action, after_action=after_action,

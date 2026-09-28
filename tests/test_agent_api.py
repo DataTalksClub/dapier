@@ -1166,6 +1166,9 @@ def test_usage_endpoint_serves_the_rollup_over_bearer(monkeypatch):
                 return {"Items": []}
             return {"Items": [{"month": "202609", "workflow_id": "wf-1", "tasks": 7}]}
 
+        def get_item(self, **kwargs):
+            return {}  # no quota config item, no _total row yet
+
     monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
     monkeypatch.setattr(agent_api.usage, "_table", lambda: UsageTable())
 

@@ -585,7 +585,7 @@ def _resume_run(resume, *, queue=None):
     try:
         result = resume_chain(
             workflow_id, resume.get("segments") or [], event, _run_connector,
-            before_action=_is_pending, after_action=_mark_completed,
+            before_action=_quota_pending, after_action=_mark_completed,
             on_action_error=_release_action,
             step_outputs=resume.get("step_outputs") or {},
         )
@@ -645,6 +645,19 @@ def _poll_failure_event(event):
     }
 
 
+def _quota_pending(workflow_id, action_id, event, action_type=None,
+                   retry_attempt=None):
+    """The worker's step gate: the account's monthly task budget first
+    (``usage.enforce`` raises ``QuotaExceeded`` once it is spent, and
+    ``_run_step`` fails the step like a connector), then the lease/dedupe
+    check. Test runs enter through engine.execute without the worker's
+    hooks, so editor tests neither burn tasks nor hit the limit.
+    """
+    usage.enforce(workflow_id)
+    return _is_pending(workflow_id, action_id, event, action_type,
+                       retry_attempt=retry_attempt)
+
+
 def _attempt_hooks(attempt):
     """Step-telemetry hooks for one attempt of an event.
 
@@ -654,8 +667,8 @@ def _attempt_hooks(attempt):
     """
 
     def before_action(workflow_id, action_id, event, action_type=None):
-        return _is_pending(workflow_id, action_id, event, action_type,
-                           retry_attempt=attempt or None)
+        return _quota_pending(workflow_id, action_id, event, action_type,
+                              retry_attempt=attempt or None)
 
     return {
         "before_action": before_action,

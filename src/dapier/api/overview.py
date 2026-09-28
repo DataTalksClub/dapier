@@ -170,6 +170,13 @@ def _usage():
     return usage.api_usage(3)[1].get("usage", [])
 
 
+def _quota():
+    """The monthly task budget; None when the rollup table is not wired."""
+    if not os.environ.get("TASK_USAGE_TABLE"):
+        return None
+    return usage.quota_status()
+
+
 def overview(event=None):
     """The operator overview. ``?q=`` filters the workflows list (same match
     text as the designer list: id, description, trigger, action types, tags,
@@ -213,6 +220,7 @@ def overview(event=None):
         "executions": executions[:25],
         "runs": runs.recent(25),
         "usage": _usage(),
+        "quota": _quota(),
         "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
         "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
         "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],

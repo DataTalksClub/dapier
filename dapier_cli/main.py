@@ -206,6 +206,13 @@ def build_parser():
     usage_p.add_argument("--months", type=int, default=12,
                          help="How many months of rollup to show (default 12, max 24)")
 
+    quota_p = sub.add_parser("quota", help="Monthly task quota: the budget action steps run against")
+    quota_sub = quota_p.add_subparsers(dest="command")
+    quota_sub.add_parser("show", help="Show the limit and this month's standing (default)")
+    quota_set_p = quota_sub.add_parser("set", help="Set or clear the monthly task limit")
+    quota_set_p.add_argument("limit",
+                             help="A positive integer, or 'off' to remove the cap")
+
     errors_p = sub.add_parser("errors", help="Failed runs by workflow over the recent window")
     errors_p.add_argument("--days", type=int, default=7,
                           help="Window size in days (default 7, max 90)")
@@ -550,6 +557,12 @@ def main(argv=None):
             return cmd_polls(args, api_url, debug)
         if args.group == "usage":
             return commands.usage(api_url, debug, months=args.months)
+        if args.group == "quota":
+            command = getattr(args, "command", None) or "show"
+            if command == "set" and not getattr(args, "limit", None):
+                quota_p.error("quota set needs a limit: a positive integer or 'off'")
+            return commands.quota(api_url, debug, command=command,
+                                  limit=getattr(args, "limit", None))
         if args.group == "errors":
             if getattr(args, "command", None) == "send-digest":
                 return commands.errors_send_digest(api_url, debug)

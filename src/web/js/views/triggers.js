@@ -31,7 +31,7 @@ const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mod
    instead, so they stay off this list. */
 const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
   'google-drive.files', 'google-drive.updates', 'google-drive.deletions',
-  'google-calendar.events',
+  'google-calendar.events', 'gmail.messages',
   'zoom.recordings', 'dropbox.files', 'youtube.videos', 'slack.messages'];
 
 let hooks = [];
