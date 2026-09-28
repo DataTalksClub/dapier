@@ -741,7 +741,7 @@ def test_agent_designer_toggle_drives_the_same_store(monkeypatch, agent_identity
 
 def test_designer_versions_routes_to_the_store(monkeypatch, operator_session):
     seen = {}
-    monkeypatch.setattr(designer_store, "api_versions", lambda source: (
+    monkeypatch.setattr(designer_store, "api_versions", lambda source, visible=None: (
         seen.update(source=source) or (200, {"versions": []})))
     response = admin.route(
         admin_request("GET", "/api/admin/designer/workflows/test-flow.yaml/versions"),
@@ -772,7 +772,7 @@ def test_designer_rollback_routes_to_the_store(monkeypatch, operator_session):
 
 def test_agent_designer_versions_and_rollback_drive_the_same_store(monkeypatch, agent_identity):
     seen = {}
-    monkeypatch.setattr(designer_store, "api_versions", lambda source: (
+    monkeypatch.setattr(designer_store, "api_versions", lambda source, visible=None: (
         seen.update(versions_source=source) or (200, {"versions": []})))
     monkeypatch.setattr(designer_store, "api_rollback", lambda source, body, operator=None: (
         seen.update(rollback_source=source, rollback_body=body, rollback_operator=operator)

@@ -207,7 +207,7 @@ DIFF_PATH = "/api/admin/designer/workflows/test-flow.yaml/versions/diff"
 def test_admin_diff_routes_to_the_store_with_the_query(monkeypatch, operator_session):
     seen = {}
 
-    def fake_api_diff(source, from_revision, to_revision):
+    def fake_api_diff(source, from_revision, to_revision, visible=None):
         seen.update(source=source, frm=from_revision, to=to_revision)
         return 200, {"diff": ""}
 

@@ -488,7 +488,7 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     }
 
 
-def api_get(run_id):
+def api_get(run_id, visible=None):
     run_id = str(run_id or "").strip()
     if not run_id:
         return 400, {"error": "run_id is required"}
@@ -507,6 +507,13 @@ def api_get(run_id):
             if run_id_of(item) == run_id
         ]
     if not items:
+        return 404, {"error": "Run not found"}
+    owners = visibility.owners_for(visible)
+    if visible is not None and not any(
+            visible.workflow_visible(item.get("workflow_id"), owners)
+            for item in items):
+        # Same answer as a missing run: a hidden run must not reveal that
+        # it exists (the list the caller came from already dropped it).
         return 404, {"error": "Run not found"}
     items.sort(key=lambda item: (str(item.get("started_at") or ""), str(item.get("execution_id") or "")))
     return 200, {
@@ -838,7 +845,7 @@ def _workflow_poll_name(workflow_id, connector):
     return None
 
 
-def api_trigger_sample(workflow_id):
+def api_trigger_sample(workflow_id, visible=None):
     """The trigger input an author can fill ``{trigger.*}`` templates from.
 
     The most recent run for ``workflow`` carries its recorded trigger input
@@ -853,15 +860,23 @@ def api_trigger_sample(workflow_id):
     example. Neither source applies — unknown workflow, or a connector
     nothing can sample — is a 404.
 
+    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the whole
+    ask: a workflow the caller may not see has no sample (404), and the
+    history branch reads only the runs that scope allows.
+
     Behind ``GET /api/admin|agent/triggers/sample?workflow=<id>``.
     """
     workflow_id = str(workflow_id or "").strip()
     if not workflow_id:
         return 400, {"error": "workflow is required"}
-    status, payload = api_list(DEFAULT_LIMIT, workflow_id=workflow_id)
+    owners = visibility.owners_for(visible)
+    if visible is not None and not visible.workflow_visible(workflow_id, owners):
+        return 404, {"error": f"no runs recorded for workflow '{workflow_id}'"}
+    status, payload = api_list(DEFAULT_LIMIT, workflow_id=workflow_id,
+                               visible=visible)
     newest = next(iter(payload.get("runs") or []), None)
     if newest:
-        got_status, detail = api_get(newest["run_id"])
+        got_status, detail = api_get(newest["run_id"], visible=visible)
         if got_status == 200:
             envelope, error = replay_event(newest["run_id"], detail.get("steps") or [])
             if envelope is not None and not error:

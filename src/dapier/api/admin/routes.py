@@ -97,10 +97,14 @@ def quota_save(event, operator):
     return http._json_response(status, payload)
 
 
-def errors_summary(event):
-    """Failed-run counts by workflow over the recent window (default 7 days)."""
+def errors_summary(event, visible=None):
+    """Failed-run counts by workflow over the recent window (default 7 days).
+
+    ``visible`` (G17 auth.visibility) scopes the counts like the runs list:
+    a non-operator keeps its own workflows' failures."""
     query = event.get("queryStringParameters") or {}
-    status, payload = errors_api.api_summary(query.get("days", 7))
+    status, payload = errors_api.api_summary(query.get("days", 7),
+                                             visible=visible)
     return http._json_response(status, payload)
 
 
@@ -148,34 +152,37 @@ def export_audit(event, operator):
     return http._json_response(status, payload)
 
 
-def export_all_designer_workflows(event, operator):
+def export_all_designer_workflows(event, operator, visible=None):
     """Every workflow's canonical YAML as one zip (designer_store.api_export_all).
 
     Same domain function the agent route serves the CLI; the response carries
     {filename, count, skipped, b64} — the console decodes the base64 zip into
-    a download. The bulk export is audited like the audit CSV export: bulk
+    a download. ``visible`` leaves out the workflows the caller may not see.
+    The bulk export is audited like the audit CSV export: bulk
     reads leave a mark in the trail.
     """
-    status, payload = designer_store.api_export_all()
+    status, payload = designer_store.api_export_all(visible=visible)
     if status == 200:
         session._audit_event("workflows", "workflow.export-all", operator or "unknown",
                              outcome="ok")
     return http._json_response(status, payload)
 
 
-def export_designer_workflows(event, operator):
+def export_designer_workflows(event, operator, visible=None):
     """Every workflow's canonical YAML as one zip (designer_store.api_export),
     optionally narrowed with ``?tag=`` / ``?folder=`` like the designer list.
 
     Same domain function the agent route serves `workflows export --all`; the
     response carries {filename, count, skipped, b64} and an attachment
     content-disposition carrying the dated filename — the console decodes the
-    base64 zip into that download. The bulk export is audited like the audit
-    CSV export: bulk reads leave a mark in the trail.
+    base64 zip into that download. ``visible`` leaves out the workflows the
+    caller may not see. The bulk export is audited like the audit CSV export:
+    bulk reads leave a mark in the trail.
     """
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_export(tag=query.get("tag"),
-                                                folder=query.get("folder"))
+                                                folder=query.get("folder"),
+                                                visible=visible)
     if status == 200:
         session._audit_event("workflows", "workflow.export", operator or "unknown",
                              outcome="ok")
@@ -184,15 +191,18 @@ def export_designer_workflows(event, operator):
     return http._json_response(status, payload)
 
 
-def storage_read(event, workflow_id):
-    """Workflow storage: one key (``key=``) or the keys under ``prefix=``."""
+def storage_read(event, workflow_id, visible=None):
+    """Workflow storage: one key (``key=``) or the keys under ``prefix=``.
+
+    ``visible`` scopes the reads exactly as the writes gate: a hidden
+    partition answers like an empty one."""
     query = event.get("queryStringParameters") or {}
     key = str(query.get("key") or "").strip()
     if key:
-        status, payload = storage_api.get(workflow_id, key)
+        status, payload = storage_api.get(workflow_id, key, visible=visible)
     else:
         status, payload = storage_api.find(workflow_id, query.get("prefix"),
-                                           query.get("limit"))
+                                           query.get("limit"), visible=visible)
     return http._json_response(status, payload)
 
 
@@ -219,9 +229,12 @@ def storage_delete(event, workflow_id, visible=None, operator=None):
     return http._json_response(status, payload)
 
 
-def get_run(run_id):
-    """One run's step-by-step flow: status, input, output, duration, error."""
-    status, payload = runs.api_get(run_id)
+def get_run(run_id, visible=None):
+    """One run's step-by-step flow: status, input, output, duration, error.
+
+    ``visible`` scopes the single read exactly as the runs list does: a
+    hidden run answers like a missing one."""
+    status, payload = runs.api_get(run_id, visible=visible)
     return http._json_response(status, payload)
 
 
@@ -283,9 +296,12 @@ def list_inbox(event, visible=None):
     return http._json_response(status, payload)
 
 
-def get_inbox_event(inbox_id):
-    """One inbox event: the stored envelope and the workflows that matched."""
-    status, payload = inbox.api_get(inbox_id)
+def get_inbox_event(inbox_id, visible=None):
+    """One inbox event: the stored envelope and the workflows that matched.
+
+    ``visible`` scopes the single read exactly as the list does: a hidden
+    event answers like a missing one."""
+    status, payload = inbox.api_get(inbox_id, visible=visible)
     return http._json_response(status, payload)
 
 
@@ -517,8 +533,8 @@ def designer_list(event, visible=None):
                                               visible=visible)
     return http._json_response(status, payload)
 
-def designer_get(source):
-    status, payload = designer_store.api_get(source)
+def designer_get(source, visible=None):
+    status, payload = designer_store.api_get(source, visible=visible)
     return http._json_response(status, payload)
 
 def save_designer_workflow(event, operator, visible=None):
@@ -720,18 +736,18 @@ def test_designer_step(event, operator, source=None, visible=None):
     return http._json_response(status, payload)
 
 
-def versions_designer_workflow(source):
+def versions_designer_workflow(source, visible=None):
     """Console mirror of the CLI versions list: one workflow's history."""
-    status, payload = designer_store.api_versions(source)
+    status, payload = designer_store.api_versions(source, visible=visible)
     return http._json_response(status, payload)
 
 
-def diff_designer_workflow(event, source):
+def diff_designer_workflow(event, source, visible=None):
     """Console mirror of the CLI diff: the unified diff between two
     published versions, for the Versions dialog's Diff button."""
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_diff(source, query.get("from"),
-                                              query.get("to"))
+                                              query.get("to"), visible=visible)
     return http._json_response(status, payload)
 
 
@@ -777,14 +793,14 @@ def discard_designer_draft(event, operator, source, visible=None):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def draft_designer_workflow(source):
+def draft_designer_workflow(source, visible=None):
     """Console mirror of the draft read: one workflow's drafted definition."""
-    status, payload = designer_store.api_draft(source)
+    status, payload = designer_store.api_draft(source, visible=visible)
     return http._json_response(status, payload)
 
-def draft_diff_designer_workflow(source):
+def draft_diff_designer_workflow(source, visible=None):
     """Console mirror of `workflows draft-diff`: draft vs live, api_diff shape."""
-    status, payload = designer_store.api_draft_diff(source)
+    status, payload = designer_store.api_draft_diff(source, visible=visible)
     return http._json_response(status, payload)
 
 def _hook_kind(event, body=None):
@@ -1009,14 +1025,15 @@ def discover_samples(event, operator):
     return http._json_response(status, payload)
 
 
-def trigger_sample(event, operator):
+def trigger_sample(event, operator, visible=None):
     """The workflow's own last trigger input, for the inspector's template
     autofill: the newest run's recorded input, else the trigger-discovery
     sample for its connector (runs.api_trigger_sample, shared verbatim with
-    the agent route the CLI calls)."""
+    the agent route the CLI calls). ``visible`` hides a workflow the caller
+    may not see behind the same 404 an unknown one gets."""
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_trigger_sample(
-        query.get("workflow") or query.get("workflow_id"))
+        query.get("workflow") or query.get("workflow_id"), visible=visible)
     session._audit_event(
         str(query.get("workflow") or query.get("workflow_id") or "unknown"),
         "triggers.sample", operator or "unknown",

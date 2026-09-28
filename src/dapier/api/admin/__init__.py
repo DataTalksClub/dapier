@@ -73,7 +73,7 @@ def route(event, method, path):
     if method == "PUT" and path == "/api/admin/quota":
         return routes.quota_save(event, operator_subject)
     if method == "GET" and path == "/api/admin/errors/summary":
-        return routes.errors_summary(event)
+        return routes.errors_summary(event, visible=_read_scope(operator_payload))
     if method == "POST" and path == "/api/admin/errors/digest":
         return routes.send_error_digest(event, operator_subject)
     run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
@@ -85,17 +85,20 @@ def route(event, method, path):
         return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
-        return routes.get_run(unquote(run_match.group(1)))
+        return routes.get_run(unquote(run_match.group(1)),
+                              visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/triggers/inbox":
         return routes.list_inbox(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/triggers/sample":
-        return routes.trigger_sample(event, operator_subject)
+        return routes.trigger_sample(event, operator_subject,
+                                     visible=_read_scope(operator_payload))
     inbox_replay_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)/replay", path)
     if method == "POST" and inbox_replay_match:
         return routes.replay_inbox_event(unquote(inbox_replay_match.group(1)), operator_subject)
     inbox_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)", path)
     if method == "GET" and inbox_match:
-        return routes.get_inbox_event(unquote(inbox_match.group(1)))
+        return routes.get_inbox_event(unquote(inbox_match.group(1)),
+                                      visible=_read_scope(operator_payload))
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return routes.save_credential(path.rsplit("/", 1)[1], event)
     if method == "GET" and path == "/api/admin/oauth-clients":
@@ -172,14 +175,17 @@ def route(event, method, path):
         return routes.bulk_designer_workflow(event, operator_subject,
                                              visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/workflows/export-all":
-        return routes.export_all_designer_workflows(event, operator_subject)
+        return routes.export_all_designer_workflows(event, operator_subject,
+                                                    visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/export":
-        return routes.export_designer_workflows(event, operator_subject)
+        return routes.export_designer_workflows(event, operator_subject,
+                                                visible=_read_scope(operator_payload))
     if method == "POST" and path == "/api/admin/copilot/draft":
         return routes.copilot_draft(event, operator_subject)
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if method == "GET" and designer_match:
-        return routes.designer_get(designer_match.group(1))
+        return routes.designer_get(designer_match.group(1),
+                                   visible=_read_scope(operator_payload))
     if method == "PUT" and designer_match:
         return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1),
                                                visible=_read_scope(operator_payload))
@@ -224,11 +230,13 @@ def route(event, method, path):
     designer_versions_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
-        return routes.versions_designer_workflow(designer_versions_match.group(1))
+        return routes.versions_designer_workflow(designer_versions_match.group(1),
+                                                 visible=_read_scope(operator_payload))
     designer_versions_diff_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions/diff", path)
     if method == "GET" and designer_versions_diff_match:
-        return routes.diff_designer_workflow(event, designer_versions_diff_match.group(1))
+        return routes.diff_designer_workflow(event, designer_versions_diff_match.group(1),
+                                             visible=_read_scope(operator_payload))
     designer_rollback_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if method == "POST" and designer_rollback_match:
@@ -243,17 +251,20 @@ def route(event, method, path):
     designer_draft_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft", path)
     if method == "GET" and designer_draft_match:
-        return routes.draft_designer_workflow(designer_draft_match.group(1))
+        return routes.draft_designer_workflow(designer_draft_match.group(1),
+                                              visible=_read_scope(operator_payload))
     if method == "DELETE" and designer_draft_match:
         return routes.discard_designer_draft(event, operator_subject, designer_draft_match.group(1),
                                              visible=_read_scope(operator_payload))
     designer_draft_diff_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft/diff", path)
     if method == "GET" and designer_draft_diff_match:
-        return routes.draft_diff_designer_workflow(designer_draft_diff_match.group(1))
+        return routes.draft_diff_designer_workflow(designer_draft_diff_match.group(1),
+                                                   visible=_read_scope(operator_payload))
     storage_match = re.fullmatch(r"/api/admin/storage/([^/]+)", path)
     if method == "GET" and storage_match:
-        return routes.storage_read(event, unquote(storage_match.group(1)))
+        return routes.storage_read(event, unquote(storage_match.group(1)),
+                                   visible=_read_scope(operator_payload))
     if method == "POST" and storage_match:
         return routes.storage_write(event, unquote(storage_match.group(1)),
                                     visible=_read_scope(operator_payload),

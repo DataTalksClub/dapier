@@ -290,13 +290,18 @@ def _visible_event(event, visible, owners):
     return any(visible.workflow_visible(m, owners) for m in matched)
 
 
-def api_get(inbox_id, *, table_ref=None):
+def api_get(inbox_id, *, table_ref=None, visible=None):
     inbox_id = str(inbox_id or "").strip()
     if not inbox_id:
         return 400, {"error": "inbox_id is required"}
     item = (table_ref if table_ref is not None else _table()).get_item(
         Key={"inbox_id": inbox_id}).get("Item")
     if not item:
+        return 404, {"error": "Inbox event not found"}
+    if visible is not None and not _visible_event(
+            _view(item), visible, visibility.owners_for(visible)):
+        # Same answer as a missing row: the list dropped it, the single
+        # read must not reveal it either.
         return 404, {"error": "Inbox event not found"}
     return 200, {"event": _view(item)}
 

@@ -10,12 +10,18 @@ DEFAULT_DAYS = 7
 MAX_DAYS = 90
 
 
-def api_summary(days=DEFAULT_DAYS, now=None):
+def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
     """Failed-run counts by workflow for the last ``days`` days.
 
     The window is the runs list's own filter (newest-first scan, bounded
     like every list call), so counts cover the scanned window rather than
     the whole ledger — the same trade the runs list makes.
+
+    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the
+    counts to the workflows the caller may see, like the runs list does.
+    The bounded flag still reads the raw scan length: a window filled with
+    other owners' failures stays bounded even when every visible count
+    below is small.
     """
     from . import runs
 
@@ -26,6 +32,11 @@ def api_summary(days=DEFAULT_DAYS, now=None):
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=days)).isoformat()
     failed = runs.recent(runs.MAX_LIMIT, status="problems", since=since)
+    bounded = len(failed) >= runs.MAX_LIMIT
+    owners = runs.visibility.owners_for(visible)
+    if visible is not None:
+        failed = [run for run in failed
+                  if visible.workflow_visible(run.get("workflow_id"), owners)]
     counts = {}
     for run in failed:
         workflow_id = run.get("workflow_id") or "unknown"
@@ -50,7 +61,7 @@ def api_summary(days=DEFAULT_DAYS, now=None):
         "total_failed_runs": sum(row["failed_runs"] for row in workflows),
         "workflows": workflows,
     }
-    if len(failed) >= runs.MAX_LIMIT:
+    if bounded:
         # The scan window filled up: more failures than the cap allows may
         # exist in the window, so consumers must not read the total as the
         # day's true count. The digest renders the caveat from these fields.

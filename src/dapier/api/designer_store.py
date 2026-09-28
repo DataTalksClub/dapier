@@ -283,7 +283,7 @@ def api_list(q=None, tag=None, folder=None, visible=None):
     return 200, {"workflows": ordered, **sync_status()}
 
 
-def api_export(tag=None, folder=None, now=None):
+def api_export(tag=None, folder=None, now=None, visible=None):
     """Every workflow's canonical YAML as one zip bundle: ``(status, payload)``.
 
     The one-shot bundle behind `workflows export --all` and the console's
@@ -307,11 +307,17 @@ def api_export(tag=None, folder=None, now=None):
     The API has no binary channel, so the archive travels base64 in the JSON
     payload (``b64``) and the callers decode it; the routes carry the
     ``content-disposition`` attachment header with the dated filename.
+    ``visible`` (G17 auth.visibility, None = unrestricted) leaves out the
+    workflows the caller may not see, exactly like the list does.
     """
     managed = {}
     versions = {}
     if published_workflows.configured():
-        for item in published_workflows.load_items():
+        items = published_workflows.load_items()
+        if visible is not None:
+            items = [item for item in items
+                     if visible.owner_visible(visibility.owner_of_item(item))]
+        for item in items:
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
@@ -377,7 +383,28 @@ def workflow_yaml_text(workflow):
     return yaml.safe_dump(ordered_workflow(workflow), sort_keys=False)
 
 
-def api_get(source):
+def _read_denied(source, visible):
+    """The G17 read rule for one file-keyed read: True when ``visible`` may
+    not see this workflow. The owner resolves from the live item, else the
+    draft row (a draft-only workflow's owner, the write gate's resolution);
+    nothing stored under the id is unclaimed and stays visible — the
+    read-side default that never hides data, so a deleted workflow's
+    surviving version history reads like every no-owner item."""
+    if visible is None:
+        return False
+    item = _published_by_file(source)
+    if item is None:
+        try:
+            item = published_workflows.get_draft(
+                str(source or "").removesuffix(".yaml"))
+        except Exception:  # noqa: BLE001 — the gate must not fail the read
+            return False
+    if item is None:
+        return False
+    return not visible.owner_visible(visibility.owner_of_item(item))
+
+
+def api_get(source, visible=None):
     """One workflow from the live published store.
 
     The payload carries ``yaml``, the canonical text rendered from the stored
@@ -386,8 +413,13 @@ def api_get(source):
     not served here (this is the live read — the toggle/tags/folder/delete
     verbs resolve through it); the list rows carry ``has_draft`` /
     ``published: false`` and the versions list carries the ``draft`` block.
+    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the read:
+    a workflow the caller may not see answers exactly like a missing one.
     """
     item = _published_by_file(source)
+    if visible is not None and item is not None and not visible.owner_visible(
+            visibility.owner_of_item(item)):
+        item = None
     if item and isinstance(item.get("workflow"), dict):
         return 200, {"workflow": item["workflow"], "published": True,
                      "yaml": workflow_yaml_text(item["workflow"])}
@@ -397,7 +429,7 @@ def api_get(source):
 MAX_EXPORT_WORKFLOWS = 500
 
 
-def api_export_all(now=None):
+def api_export_all(now=None, visible=None):
     """Every workflow's canonical YAML as one zip: ``(status, payload)``.
 
     The same canonical bytes api_get renders, one ``workflows/<file>.yaml``
@@ -413,11 +445,17 @@ def api_export_all(now=None):
     secrets — workflow YAML only. Refuses deployments with more than
     MAX_EXPORT_WORKFLOWS workflows to keep Lambda responses sane. Entries are
     sorted with a fixed timestamp, so the same set of workflows always
-    bundles to the same bytes.
+    bundles to the same bytes. ``visible`` (G17 auth.visibility, None =
+    unrestricted) leaves out the workflows the caller may not see, exactly
+    like the list does.
     """
     managed = {}
     if published_workflows.configured():
-        for item in published_workflows.load_items():
+        items = published_workflows.load_items()
+        if visible is not None:
+            items = [item for item in items
+                     if visible.owner_visible(visibility.owner_of_item(item))]
+        for item in items:
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
@@ -639,15 +677,19 @@ def api_discard(source, *, operator=None):
     return 200, {"file": source, "workflow_id": workflow_id, "discarded": True}
 
 
-def api_draft(source):
+def api_draft(source, visible=None):
     """One workflow's draft (the designer's load path for a draft-only
     workflow, and the "you have a draft" indicator): the drafted definition,
-    its canonical YAML, and the draft block. 404 when nothing is drafted."""
+    its canonical YAML, and the draft block. 404 when nothing is drafted —
+    or when ``visible`` (G17 auth.visibility, None = unrestricted) may not
+    see the workflow, same answer."""
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
     workflow_id = source.removesuffix(".yaml")
+    if _read_denied(source, visible):
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
     draft = published_workflows.get_draft(workflow_id)
     if not draft or not isinstance(draft.get("workflow"), dict):
         return 404, {"error": f"no draft of workflow {workflow_id}"}
@@ -662,16 +704,20 @@ def api_draft(source):
     }
 
 
-def api_draft_diff(source):
+def api_draft_diff(source, visible=None):
     """Draft vs live in the api_diff shape: ``from`` is the live definition
     (revision 0, empty YAML, when the workflow is draft-only — the diff shows
     it all as new), ``to`` is the draft at revision ``"draft"``. ``same``
-    flags a draft identical to live (safe to publish; it refreshes nothing)."""
+    flags a draft identical to live (safe to publish; it refreshes nothing).
+    ``visible`` (G17 auth.visibility, None = unrestricted) hides both sides
+    when the caller may not see the workflow — same 404 as no draft."""
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
     workflow_id = source.removesuffix(".yaml")
+    if _read_denied(source, visible):
+        return 404, {"error": f"no draft of workflow {workflow_id}"}
     draft = published_workflows.get_draft(workflow_id)
     if not draft or not isinstance(draft.get("workflow"), dict):
         return 404, {"error": f"no draft of workflow {workflow_id}"}
@@ -1129,7 +1175,7 @@ def api_bulk(body, operator=None, visible=None):
     }
 
 
-def api_versions(source):
+def api_versions(source, visible=None):
     """Version history for one workflow, newest revision first.
 
     Every save, toggle, and rollback publishes a version record; this lists
@@ -1137,11 +1183,17 @@ def api_versions(source):
     revision as ``current``. A deleted workflow's history survives the
     delete (the records outlive the YAML and the live item), so the list
     still answers for the id — nothing flagged current, revision 0.
+    ``visible`` (G17 auth.visibility, None = unrestricted) hides a workflow
+    the caller may not see behind the same 404 an unknown file gets; a
+    deleted workflow (nothing stored) stays answerable, like every
+    no-owner item.
     """
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
+    if _read_denied(source, visible):
+        return 404, {"error": f"no such workflow: {source}"}
     status, payload = api_get(source)
     if status == 200:
         workflow_id = str(payload["workflow"]["id"])
@@ -1184,7 +1236,7 @@ def api_versions(source):
 MAX_DIFF_CHARS = 20000
 
 
-def api_diff(source, from_revision, to_revision):
+def api_diff(source, from_revision, to_revision, visible=None):
     """Unified text diff between two published versions of one workflow —
     the rollback-confidence half of the versions list.
 
@@ -1194,12 +1246,16 @@ def api_diff(source, from_revision, to_revision):
     (empty when the definitions are identical, which ``same`` flags — a
     re-save without changes, or the same revision on both sides). Like
     api_versions, it still answers for a deleted workflow's id: the version
-    records outlive the live item.
+    records outlive the live item. ``visible`` (G17 auth.visibility, None =
+    unrestricted) hides a workflow the caller may not see behind the same
+    404 an unknown file gets.
     """
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
+    if _read_denied(source, visible):
+        return 404, {"error": f"no such workflow: {source}"}
     try:
         revisions = (int(from_revision), int(to_revision))
     except (TypeError, ValueError):
