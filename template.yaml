@@ -165,6 +165,10 @@ Globals:
         OPERATOR_SUBJECTS: !Ref OperatorSubjects
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
         EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
+        AGENT_MAILBOXES_TABLE: !Ref AgentMailboxesTable
+        AGENT_FROM_TABLE: !Ref AgentFromTable
+        AGENT_TASKS_TABLE: !Ref AgentTasksTable
+        AGENT_TASK_QUEUE_URL: !Ref AgentTaskQueue
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable
@@ -331,6 +335,9 @@ Resources:
         ConsoleEmails:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /emails, Method: GET}
+        ConsoleAgentMail:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /agent-mail, Method: GET}
         ConsoleCredentials:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /credentials, Method: GET}
@@ -473,6 +480,10 @@ Resources:
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt AgentTaskQueue.QueueName
+        - DynamoDBReadPolicy:
+            TableName: !Ref AgentMailboxesTable
         - S3ReadPolicy:
             BucketName: !Sub ${AWS::StackName}-mail-${AWS::AccountId}
       Events:
@@ -662,6 +673,19 @@ Resources:
             BatchSize: 5
             FunctionResponseTypes: [ReportBatchItemFailures]
 
+  # No Lambda subscribes. dapier agent-mail work long-polls this queue
+  # on the machine where Aplexer runs.
+  AgentTaskQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt AgentTaskDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  AgentTaskDeadLetterQueue:
+    Type: AWS::SQS::Queue
+
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -800,6 +824,23 @@ Resources:
       Dimensions:
         - Name: QueueName
           Value: !GetAtt DropboxDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AgentTaskDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Agent-mail messages are waiting in the dead-letter queue
+      AlarmActions: [!Ref AlarmTopic]
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt AgentTaskDeadLetterQueue.QueueName
       Statistic: Maximum
       Period: 60
       EvaluationPeriods: 1
@@ -969,6 +1010,39 @@ Resources:
         - {AttributeName: name, AttributeType: S}
       KeySchema:
         - {AttributeName: name, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  AgentMailboxesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: name, AttributeType: S}
+      KeySchema:
+        - {AttributeName: name, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  AgentFromTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  AgentTasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: task_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: task_id, KeyType: HASH}
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   HookTriggersTable:
@@ -1259,6 +1333,8 @@ Outputs:
     Value: !GetAtt EmailIngressFunction.Arn
   EventQueueUrl:
     Value: !Ref EventQueue
+  AgentTaskQueueUrl:
+    Value: !Ref AgentTaskQueue
   RenderQueueUrl:
     Value: !Ref RenderQueue
   RenderArtifactsBucketName:

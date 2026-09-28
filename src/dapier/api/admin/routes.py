@@ -13,7 +13,7 @@ from ...connections import credentials, importing, zoom
 from ...connectors import trigger_discovery
 from ...connections import records as connection_model
 from ...connections.providers import oauth_clients
-from ...triggers import email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
+from ...triggers import agent_mailboxes, email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
 from ...engine import usage as usage_rollup
 from .. import designer_store, discovery as discovery_api, errors as errors_api, overview, runs
 from .. import storage as storage_api
@@ -372,6 +372,87 @@ def delete_email_trigger(event, operator):
     except email_triggers.TriggerError as exc:
         return http._json_response(404, {"error": str(exc)})
     session._audit_event(payload.get("name", "unknown"), "email-trigger.delete", operator, outcome="deleted")
+    return http._json_response(status, payload)
+
+
+def _mailbox_error(exc):
+    text = str(exc) or "Invalid request"
+    status = 404 if text.startswith("no rule") or "does not exist" in text else 400
+    return http._json_response(status, {"error": text})
+
+
+def agent_mailbox_get(event, operator=""):
+    try:
+        status, payload = agent_mailboxes.api_get_mailbox(operator=operator)
+    except agent_mailboxes.MailboxError as exc:
+        return _mailbox_error(exc)
+    return http._json_response(status, payload)
+
+
+def agent_mailbox_save(event, operator):
+    try:
+        body = http._request_json(event)
+        status, payload = agent_mailboxes.api_save_mailbox(body, operator)
+    except (agent_mailboxes.MailboxError, ValueError, json.JSONDecodeError) as exc:
+        return _mailbox_error(exc)
+    session._audit_event("agent", "agent-mail.save", operator,
+                         outcome="created" if payload.get("created") else "updated")
+    return http._json_response(status, payload)
+
+
+def agent_from_list(event):
+    try:
+        status, payload = agent_mailboxes.api_from_list()
+    except agent_mailboxes.MailboxError as exc:
+        return _mailbox_error(exc)
+    return http._json_response(status, payload)
+
+
+def agent_from_add(event, operator):
+    try:
+        body = http._request_json(event)
+        status, payload = agent_mailboxes.api_from_add((body or {}).get("address"))
+    except (agent_mailboxes.MailboxError, ValueError, json.JSONDecodeError) as exc:
+        return _mailbox_error(exc)
+    session._audit_event("from-allow", "agent-mail.from", operator, outcome="added")
+    return http._json_response(status, payload)
+
+
+def agent_from_remove(event, operator):
+    query = event.get("queryStringParameters") or {}
+    try:
+        status, payload = agent_mailboxes.api_from_remove(query.get("address", ""))
+    except agent_mailboxes.MailboxError as exc:
+        return _mailbox_error(exc)
+    session._audit_event("from-allow", "agent-mail.from", operator, outcome="removed")
+    return http._json_response(status, payload)
+
+
+def agent_rule_add(event, operator):
+    try:
+        body = http._request_json(event)
+        status, payload = agent_mailboxes.api_rule_add(body)
+    except (agent_mailboxes.MailboxError, ValueError, json.JSONDecodeError) as exc:
+        return _mailbox_error(exc)
+    session._audit_event("agent", "agent-mail.rule", operator, outcome="added")
+    return http._json_response(status, payload)
+
+
+def agent_rule_delete(event, operator):
+    query = event.get("queryStringParameters") or {}
+    try:
+        status, payload = agent_mailboxes.api_rule_delete(query.get("id", ""))
+    except agent_mailboxes.MailboxError as exc:
+        return _mailbox_error(exc)
+    session._audit_event("agent", "agent-mail.rule", operator, outcome="deleted")
+    return http._json_response(status, payload)
+
+
+def agent_tasks_list(event):
+    try:
+        status, payload = agent_mailboxes.api_tasks()
+    except agent_mailboxes.MailboxError as exc:
+        return _mailbox_error(exc)
     return http._json_response(status, payload)
 
 def designer_list(event):

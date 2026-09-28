@@ -1836,3 +1836,96 @@ def oauth_clients_set(api_url, provider, client_id, secret_path, debug=False):
     print(f"Stored the OAuth client for {data.get('provider', provider)}. "
           "It is live immediately; the secret is never shown again.")
     return 0
+
+
+def agent_mail_show(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/agent-mailboxes", debug=debug)
+    mailbox = data.get("mailbox") or {}
+    for key in ("name", "address", "engine", "profile", "workspace", "tag_prefix",
+                "instructions", "enabled", "created_at", "updated_at"):
+        if mailbox.get(key) not in (None, ""):
+            print(f"{key}: {mailbox[key]}")
+    for rule in mailbox.get("rules") or []:
+        print(f"rule {rule.get('id')}: {rule.get('field')} {rule.get('operator')} {rule.get('value')}")
+    return 0
+
+
+def agent_mail_save(api_url, path, debug=False):
+    body, error = _read_json_file(path)
+    if error:
+        print(error)
+        return 2
+    # Settings only. A file that also carries rules or senders must not replace them.
+    for key in ("rules", "from_allow", "addresses"):
+        if isinstance(body, dict):
+            body.pop(key, None)
+    data = api.call(api_url, "PUT", "/api/agent/agent-mailboxes", body, debug=debug)
+    mailbox = data.get("mailbox") or {}
+    verb = "Created" if data.get("created") else "Updated"
+    print(f"{verb} {mailbox.get('address') or 'agent'}. "
+          "It accepts mail once `dapier agent-mail work` is running.")
+    return 0
+
+
+def agent_mail_from_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/agent-mail/from", debug=debug)
+    addresses = data.get("addresses") or []
+    if not addresses:
+        print("No senders. An empty list ignores every message.")
+        return 0
+    for address in addresses:
+        print(address)
+    return 0
+
+
+def agent_mail_from_add(api_url, address, debug=False):
+    data = api.call(api_url, "POST", "/api/agent/agent-mail/from",
+                    {"address": address}, debug=debug)
+    print("Already on the list." if not data.get("added") else f"Added {address}.")
+    return 0
+
+
+def agent_mail_from_remove(api_url, address, debug=False):
+    data = api.call(api_url, "DELETE",
+                    f"/api/agent/agent-mail/from?address={quote(address, safe='')}",
+                    debug=debug)
+    print(f"Removed {address}." if data.get("removed") else f"{address} was not on the list.")
+    return 0
+
+
+def agent_mail_rule_add(api_url, field, operator, value, debug=False):
+    data = api.call(api_url, "POST", "/api/agent/agent-mailboxes/agent/rules",
+                    {"field": field, "operator": operator, "value": value}, debug=debug)
+    rule = data.get("rule") or {}
+    print(f"Added rule {rule.get('id')}: {rule.get('field')} {rule.get('operator')} {rule.get('value')}")
+    return 0
+
+
+def agent_mail_rule_delete(api_url, rule_id, debug=False):
+    data = api.call(api_url, "DELETE",
+                    f"/api/agent/agent-mailboxes/agent/rules?id={quote(rule_id, safe='')}",
+                    debug=debug)
+    print(f"Deleted rule {data.get('deleted') or rule_id}.")
+    return 0
+
+
+def agent_mail_tasks(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/agent-tasks", debug=debug)
+    items = data.get("tasks") or []
+    if not items:
+        print("No agent-mail tasks yet.")
+        return 0
+    print(f"{'STATUS':10} {'FROM':40} SUBJECT")
+    for item in items:
+        print(f"{item.get('status', ''):10} {str(item.get('from') or ''):40} {item.get('subject') or ''}")
+        if item.get("tag"):
+            print(f"           tag {item['tag']}")
+    return 0
+
+
+def agent_mail_work():
+    """Long-poll the agent-task queue and start Aplexer sessions. Not an API call."""
+    from src.dapier.agent_mail.work import serve
+
+    serve()
+    return 0

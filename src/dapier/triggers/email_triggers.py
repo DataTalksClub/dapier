@@ -140,8 +140,11 @@ def build_item(body, operator):
     if event == ADDRESS_EVENT:
         # Only address triggers claim a route; watchers match SES feedback
         # for the whole domain and never shadow a YAML workflow's address.
-        if name in yaml_email_routes():
-            raise TriggerError(f"the route '{name}' is already handled by a YAML workflow")
+        from .addresses import claim_error
+
+        error = claim_error(name, "email-trigger")
+        if error:
+            raise TriggerError(error)
         address, filters = address_for(name), None
     else:
         # A route filter can never match a bounce/complaint (their data has

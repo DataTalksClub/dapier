@@ -5,7 +5,7 @@ import boto3
 
 from ..auth import api_tokens
 from .. import http
-from ..triggers import email_triggers, published_workflows
+from ..triggers import agent_mailboxes, email_triggers, published_workflows
 from ..engine import usage
 from . import runs
 from ..connections import records as connection_records
@@ -155,6 +155,17 @@ def _email_triggers():
         "yaml_routes": yaml_routes,
     }
 
+def _agent_mail():
+    """Mailbox, shared senders, and recent tasks. Empty when the tables are absent."""
+    try:
+        mailbox = agent_mailboxes.api_get_mailbox()[1]
+        senders = agent_mailboxes.api_from_list()[1]["addresses"]
+        tasks = agent_mailboxes.api_tasks()[1]["tasks"]
+    except Exception:  # noqa: BLE001 — the overview must render without these tables
+        return {"domain": "", "mailbox": None, "addresses": [], "tasks": []}
+    return {**mailbox, "addresses": senders, "tasks": tasks}
+
+
 def _usage():
     """The 3-month usage block; empty when the rollup table is not wired."""
     if not os.environ.get("TASK_USAGE_TABLE"):
@@ -210,4 +221,5 @@ def overview(event=None):
         "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
         "api_tokens": [api_tokens.public_view(item) for item in api_tokens.list_all()],
         "email_triggers": _email_triggers(),
+        "agent_mail": _agent_mail(),
     })

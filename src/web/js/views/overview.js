@@ -9,6 +9,7 @@ import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
 import { renderEmails } from './emails.js';
+import { renderAgentMail } from './agent-mail.js';
 import { renderRuns, openRun } from './runs.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
@@ -155,6 +156,7 @@ function render() {
   renderOAuthClients(data.oauth_clients || []);
   renderTokens(data.api_tokens || []);
   renderEmails(data.email_triggers);
+  renderAgentMail(data.agent_mail);
   renderRuns();
   renderInbox();
   renderSchedules();

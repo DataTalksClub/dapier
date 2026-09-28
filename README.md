@@ -268,6 +268,27 @@ never prints it. `token write` creates a `0600` file and refuses to overwrite
 without `--force`. Both commands verify the returned provider account ID
 against the connection's bound account before handing anything out.
 
+Mail to `agent@dtcdev.click` does nothing until `dapier agent-mail work` is
+running on the Aplexer machine. That command long-polls a queue and starts
+one fresh session per accepted message. Senders that are not on the shared
+list are ignored. Mail which arrives only as a Datamailer SNS event does not
+start an agent; only the SES catch-all (the S3 ingress) can.
+
+```bash
+dapier agent-mail show
+dapier agent-mail from list
+dapier agent-mail from add alexey@datatalks.club
+dapier agent-mail rule add --field subject --contains invoice
+dapier agent-mail work
+```
+
+The shared sender list starts as `alexey.s.grigoriev@gmail.com` and
+`alexey@datatalks.club`. `from add` and `from remove` change it. An empty
+list ignores everyone. Extra rules (`subject` or `body`, same operators as
+workflow filters) are AND conditions on the mailbox. `save` updates the
+engine, workspace, and instructions and does not replace the sender list or
+the rules. Disabling the mailbox is the off switch.
+
 Email triggers reserve `name@dtcdev.click` and run actions for every message
 sent to that address. They are live immediately — no deploy. Operators manage
 them with:

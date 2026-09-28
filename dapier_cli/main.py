@@ -453,6 +453,29 @@ def build_parser():
     poll_save_p.add_argument("file", help="Path to the poll trigger JSON, or - for stdin")
     poll_del_p = poll_sub.add_parser("delete", help="Delete a poll trigger and its rule")
     poll_del_p.add_argument("name")
+    mail_p = sub.add_parser("agent-mail", help="Mail that starts an Aplexer session")
+    mail_sub = mail_p.add_subparsers(dest="command", required=True)
+    mail_sub.add_parser("show", help="Show the agent mailbox")
+    mail_save_p = mail_sub.add_parser("save", help="Update engine, workspace, and instructions from JSON")
+    mail_save_p.add_argument("file", help="Path to the mailbox JSON, or - for stdin")
+    mail_from = mail_sub.add_parser("from", help="The shared sender allow-list")
+    mail_from_sub = mail_from.add_subparsers(dest="from_command", required=True)
+    mail_from_sub.add_parser("list", help="List allowed senders")
+    mail_from_add = mail_from_sub.add_parser("add", help="Allow one sender address")
+    mail_from_add.add_argument("address")
+    mail_from_rm = mail_from_sub.add_parser("remove", help="Drop one sender address")
+    mail_from_rm.add_argument("address")
+    mail_rule = mail_sub.add_parser("rule", help="Extra AND filters on subject or body")
+    mail_rule_sub = mail_rule.add_subparsers(dest="rule_command", required=True)
+    mail_rule_add = mail_rule_sub.add_parser("add", help="Add a subject or body rule")
+    mail_rule_add.add_argument("--field", required=True, choices=("subject", "body"))
+    mail_rule_add.add_argument("--operator", default=None)
+    mail_rule_add.add_argument("--value", default=None)
+    mail_rule_add.add_argument("--contains", default=None, help="Shorthand for --operator contains --value")
+    mail_rule_del = mail_rule_sub.add_parser("delete", help="Delete a rule by id")
+    mail_rule_del.add_argument("id")
+    mail_sub.add_parser("tasks", help="Recent agent-mail tasks")
+    mail_sub.add_parser("work", help="Long-poll the queue and start an Aplexer session per accepted mail")
     catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
     catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
     return parser
@@ -495,6 +518,8 @@ def main(argv=None):
             if getattr(args, "command", None) == "send-digest":
                 return commands.errors_send_digest(api_url, debug)
             return commands.errors_summary(api_url, debug, days=args.days)
+        if args.group == "agent-mail":
+            return cmd_agent_mail(args, api_url, debug)
         if args.group == "catalog":
             return commands.catalog_show(api_url, debug, as_json=args.json)
         if args.group == "credentials":
@@ -606,6 +631,39 @@ def cmd_token(args, api_url, debug, child=None):
     if args.command == "write":
         return commands.token_write(api_url, args.connection_id, args.agent,
                                     args.output, args.force, debug)
+    return 2
+
+
+def cmd_agent_mail(args, api_url, debug):
+    if args.command == "show":
+        return commands.agent_mail_show(api_url, debug)
+    if args.command == "save":
+        return commands.agent_mail_save(api_url, args.file, debug)
+    if args.command == "tasks":
+        return commands.agent_mail_tasks(api_url, debug)
+    if args.command == "work":
+        return commands.agent_mail_work()
+    if args.command == "from":
+        if args.from_command == "list":
+            return commands.agent_mail_from_list(api_url, debug)
+        if args.from_command == "add":
+            return commands.agent_mail_from_add(api_url, args.address, debug)
+        if args.from_command == "remove":
+            return commands.agent_mail_from_remove(api_url, args.address, debug)
+    if args.command == "rule":
+        if args.rule_command == "delete":
+            return commands.agent_mail_rule_delete(api_url, args.id, debug)
+        operator = args.operator
+        value = args.value
+        if args.contains is not None:
+            if operator or value is not None:
+                print("Pass either --contains or --operator and --value, not both.")
+                return 2
+            operator, value = "contains", args.contains
+        if not operator or value is None:
+            print("A rule needs --operator and --value, or --contains.")
+            return 2
+        return commands.agent_mail_rule_add(api_url, args.field, operator, value, debug)
     return 2
 
 
