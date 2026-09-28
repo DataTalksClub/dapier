@@ -27,6 +27,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+from ..auth import visibility
+
 logger = logging.getLogger(__name__)
 
 TABLE_ENV = "TRIGGER_INBOX_TABLE"
@@ -254,7 +256,7 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
-    owners = _visible_owners(visible)
+    owners = visibility.owners_for(visible)
     items = (table_ref if table_ref is not None else _table()).scan(
         Limit=max(limit * 6, 150)).get("Items", [])
     events = [_view(item) for item in items]
@@ -276,16 +278,6 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
             "filtered": bool(connector or next_token),
         },
     }
-
-
-def _visible_owners(visible):
-    """The workflow-owner map a filtered inbox call resolves matches against
-    — skipped entirely for an unrestricted (operator) caller."""
-    from ..auth import visibility
-
-    if visible is None or visible.is_operator:
-        return {}
-    return visibility.workflow_owners()
 
 
 def _visible_event(event, visible, owners):

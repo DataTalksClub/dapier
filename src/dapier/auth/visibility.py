@@ -25,7 +25,7 @@ from ..triggers import published_workflows
 from . import roles
 
 __all__ = ["Visibility", "visible_to", "owner_of_item", "workflow_owners",
-           "for_role", "for_session"]
+           "owners_for", "for_role", "for_session"]
 
 
 def visible_to(subject, owner, *, is_operator=False):
@@ -99,6 +99,16 @@ class Visibility:
         if self.is_operator:
             return True
         return self.owner_visible((owners or {}).get(str(workflow_id or "")))
+
+
+def owners_for(visible):
+    """The workflow-owner map a filtered read resolves rows against.
+
+    An unrestricted caller (no scope, or an operator) skips the store read.
+    """
+    if visible is None or visible.is_operator:
+        return {}
+    return workflow_owners()
 
 
 def for_role(subject, effective_role):

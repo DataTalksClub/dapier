@@ -204,7 +204,7 @@ def overview(event=None, visible=None):
     whose workflow is gone stays visible). Connections, credentials, tokens,
     and the trigger registries are not workflow-owned and are untouched."""
     query = (event or {}).get("queryStringParameters") or {}
-    owners = _visible_owners(visible)
+    owners = visibility.owners_for(visible)
     workflows = _workflows(visible, owners)
     workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
     workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
@@ -251,11 +251,3 @@ def overview(event=None, visible=None):
     })
 
 
-def _visible_owners(visible):
-    """The workflow-owner map the overview's workflow_id-keyed blocks
-    (executions, usage) resolve rows against — skipped entirely for an
-    unrestricted (operator) caller. The runs block resolves its own inside
-    runs.api_list."""
-    if visible is None or visible.is_operator:
-        return {}
-    return visibility.workflow_owners()

@@ -16,6 +16,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
+from ..auth import visibility
 from .logic import QuotaExceeded
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def api_usage(months=12, now=None, visible=None):
         months = 12
     now = now or datetime.now(timezone.utc)
     year, month = now.year, now.month
-    owners = _visible_owners(visible)
+    owners = visibility.owners_for(visible)
     usage = []
     for _ in range(months):
         items = _table().query(
@@ -95,17 +96,6 @@ def api_usage(months=12, now=None, visible=None):
     usage.sort(key=lambda row: (str(row["month"]), str(row["workflow_id"])),
                reverse=True)
     return 200, {"usage": usage}
-
-
-def _visible_owners(visible):
-    """The workflow-owner map a filtered usage read resolves rows against —
-    skipped entirely for an unrestricted (operator) caller. Read filtering
-    only: the metering and quota paths above never filter."""
-    from ..auth import visibility
-
-    if visible is None or visible.is_operator:
-        return {}
-    return visibility.workflow_owners()
 
 
 def quota_status(now=None):

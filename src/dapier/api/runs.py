@@ -25,6 +25,8 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
+
+from ..auth import visibility
 from botocore.exceptions import ClientError
 
 GSI_NAME = "runs-by-run-id"
@@ -398,7 +400,7 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
     query = str(q or "").strip().lower()
-    owners = _visible_owners(visible)
+    owners = visibility.owners_for(visible)
     grouped = _grouped(_scan_items(limit))
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     runs = [run for run in runs
@@ -424,16 +426,6 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
                              or query or next_token),
         },
     }
-
-
-def _visible_owners(visible):
-    """The workflow-owner map a filtered runs call resolves rows against —
-    skipped entirely for an unrestricted (operator) caller."""
-    from ..auth import visibility
-
-    if visible is None or visible.is_operator:
-        return {}
-    return visibility.workflow_owners()
 
 
 def runs_to_csv(rows):
@@ -470,7 +462,7 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
         max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
     except (TypeError, ValueError):
         max_rows = EXPORT_DEFAULT_ROWS
-    owners = _visible_owners(visible)
+    owners = visibility.owners_for(visible)
     grouped = _grouped(_export_window(max_rows))
     rows = [run_summary(run_id, group) for run_id, group in grouped.items()]
     rows = [row for row in rows
