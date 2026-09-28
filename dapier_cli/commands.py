@@ -1,5 +1,6 @@
 """Implementations of the `dapier connections|token` commands."""
 
+import base64
 import json
 import os
 import subprocess
@@ -7,6 +8,7 @@ import sys
 import time
 import webbrowser
 from urllib.parse import quote, urlencode
+from datetime import datetime
 
 from . import api
 
@@ -18,18 +20,29 @@ TOKEN_ENV_VARS = {
 }
 
 
+def _local_expiry(item):
+    """The token expiry as a local timestamp, '-' when unknown."""
+    if not item.get("token_expires_at"):
+        return "-"
+    try:
+        stamp = datetime.fromisoformat(str(item["token_expires_at"])).astimezone()
+        return stamp.strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return "-"
+
+
 def print_connections(items):
-    print(f"{'CONNECTION':24} {'PROVIDER':10} {'STATUS':10} {'ACCOUNT'}")
+    print(f"{'CONNECTION':24} {'PROVIDER':10} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'ACCOUNT'}")
     for item in items:
         account = item.get("account_title") or item.get("verified_account_id") or "-"
         scopes = ",".join((item.get("granted_scopes") or item.get("scopes") or [])[:2])
         extra = f" [{scopes}]" if scopes else ""
         print(f"{item.get('connection_id', ''):24} {item.get('provider', ''):10} "
-              f"{item.get('status', ''):10} {account}{extra}")
+              f"{item.get('status', ''):10} {item.get('health') or '-':8} {_local_expiry(item):17} {account}{extra}")
 
 
 def print_connection(item):
-    for key in ("connection_id", "provider", "display_name", "status",
+    for key in ("connection_id", "provider", "display_name", "status", "health",
                 "verified_account_id", "account_title", "expected_account_id",
                 "granted_scopes", "scopes", "version", "updated_at", "connected_at"):
         if item.get(key) not in (None, "", []):
@@ -37,6 +50,8 @@ def print_connection(item):
             if isinstance(value, list):
                 value = " ".join(value)
             print(f"{key}: {value}")
+    if item.get("token_expires_at"):
+        print(f"token_expires_at: {_local_expiry(item)}")
 
 
 def connections_list(api_url, debug=False):
@@ -83,9 +98,32 @@ def connections_connect(api_url, connection_id, agent, timeout=300, debug=False)
         if item.get("status") == "connected":
             print(f"Connected {connection_id} "
                   f"({item.get('account_title') or item.get('verified_account_id')}).")
+            print_hook_setup(item.get("provider", ""), api_url)
             return 0
     print("Timed out waiting for consent. Re-run `dapier connections connect` to retry.")
     return 5
+
+
+# Provider-side webhook setup steps, printed after a connection succeeds: the
+# CLI twin of the console Manage-dialog setup blocks (zoom and slack print
+# inline from connections_import below). The youtube and dropbox hooks are
+# global endpoints, so unlike zoom/slack no per-connection id appears in them.
+YOUTUBE_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe"
+
+
+def print_hook_setup(provider, api_url):
+    base = api_url.rstrip("/")
+    if provider == "youtube":
+        print(f"To receive video pushes, subscribe the channel on the WebSub hub "
+              f"({YOUTUBE_HUB_URL}) with callback {base}/hooks/youtube and topic "
+              f"https://www.youtube.com/xml/feeds/videos.xml?channel_id=<CHANNEL_ID>; "
+              f"the renewal schedule also re-subscribes every channel a youtube "
+              f"workflow item filters on every five days.")
+    elif provider == "dropbox":
+        print(f"To receive file events, set the Dropbox app's Webhook URI to "
+              f"{base}/hooks/dropbox in the App Console; deliveries are signed "
+              f"with the app secret, so the dropbox OAuth client in Dapier must "
+              f"hold the current App Console secret.")
 
 
 def connections_create(api_url, connection_id, provider, scopes, *, display_name=None,
@@ -283,6 +321,8 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
             print(f"To listen for messages, set the Slack app's Event Subscription Request URL to "
                   f"{api_url.rstrip('/')}/hooks/slack/{data.get('connection_id')} "
                   f"and subscribe to the message and app_mention event types.")
+        elif provider in ("youtube", "dropbox"):
+            print_hook_setup(provider, api_url)
     return 0
 
 
@@ -409,12 +449,19 @@ def triggers_workflow_sample(api_url, workflow, debug=False):
     return 0
 
 
-def workflows_list(api_url, debug=False, search=None):
-    query = f"?q={quote(search, safe='')}" if search else ""
+def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
+    params = []
+    if search:
+        params.append(f"q={quote(search, safe='')}")
+    if tag:
+        params.append(f"tag={quote(tag, safe='')}")
+    if folder:
+        params.append(f"folder={quote(folder, safe='')}")
+    query = f"?{'&'.join(params)}" if params else ""
     data = api.call(api_url, "GET", f"/api/agent/designer/workflows{query}", debug=debug)
     items = data.get("workflows", [])
     if not items:
-        print("No workflows match this search." if search else
+        print("No workflows match this search." if search or tag or folder else
               "No workflows yet. Create one in the console or run `dapier workflows save`.")
     for item in items:
         state = "On" if item.get("enabled", True) else "Off"
@@ -422,8 +469,12 @@ def workflows_list(api_url, debug=False, search=None):
         extra = (item.get("triggerCount") or 1) - 1
         if extra > 0:
             trigger = f"{trigger} +{extra}"
+        tags = item.get("tags") or []
+        item_folder = item.get("folder") or ""
         print(f"{item.get('source', ''):36} {trigger:34} "
-              f"{item.get('actionCount', 0)} action(s) {state}")
+              f"{item.get('actionCount', 0)} action(s) {state}"
+              + (f" [folder: {item_folder}]" if item_folder else "")
+              + (f" [{' '.join(tags)}]" if tags else ""))
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
@@ -463,6 +514,71 @@ def workflows_export(api_url, file, output=None, debug=False):
     return 0
 
 
+def workflows_export_all(api_url, output=None, debug=False):
+    """`workflows export --all`: the server-built zip of every workflow.
+
+    Thin client over the operator-gated bundle endpoint — the same domain
+    function the console's Export-all button drives. The zip (one canonical
+    YAML per workflow under its source file name, plus a manifest.json
+    listing file, enabled state, tags, folder, and latest version) is built
+    server-side, arrives base64 in the JSON body, and is only decoded and
+    written here; nothing is fetched per workflow or assembled client-side.
+    """
+    data = api.call(api_url, "GET", "/api/agent/designer/export", debug=debug)
+    count = int(data.get("count") or 0)
+    if not count:
+        print("No workflows to export. Create one in the console or run `dapier workflows save`.")
+        return 2
+    try:
+        raw = base64.b64decode(data.get("b64") or "")
+    except (ValueError, TypeError):
+        print("The API returned an unreadable bundle.")
+        return 5
+    # The server suggests the filename; basename keeps a hostile suggestion
+    # from writing outside the caller's directory.
+    target = output or os.path.basename(data.get("filename") or "") or "dapier-workflows.zip"
+    try:
+        with open(target, "wb") as handle:
+            handle.write(raw)
+    except OSError as exc:
+        print(f"Cannot write {target}: {exc}")
+        return 2
+    skipped = data.get("skipped") or []
+    note = f" (skipped: {', '.join(skipped)})" if skipped else ""
+    print(f"Exported {count} workflow(s) to {target}{note}.")
+    print("Each workflow is workflows/<file>.yaml; manifest.json describes the bundle.")
+    return 0
+
+
+def workflows_export_all_bundle(api_url, out=None, debug=False):
+    """`workflows export-all`: the server-built zip of every workflow's YAML.
+
+    Thin client over the operator-gated export-all endpoint — the same domain
+    function the console's Export-all button drives. The zip arrives base64
+    in the JSON body and is decoded here; unlike `workflows export --all`
+    nothing is fetched per workflow or assembled client-side.
+    """
+    data = api.call(api_url, "GET", "/api/agent/designer/workflows/export-all", debug=debug)
+    try:
+        raw = base64.b64decode(data.get("b64") or "")
+    except (ValueError, TypeError):
+        print("The API returned an unreadable bundle.")
+        return 5
+    # The server suggests the filename; basename keeps a hostile suggestion
+    # from writing outside the caller's directory.
+    target = out or os.path.basename(data.get("filename") or "") or "dapier-workflows.zip"
+    try:
+        with open(target, "wb") as handle:
+            handle.write(raw)
+    except OSError as exc:
+        print(f"Cannot write {target}: {exc}")
+        return 2
+    skipped = data.get("skipped") or []
+    note = f" (skipped: {', '.join(skipped)})" if skipped else ""
+    print(f"Exported {data.get('count', 0)} workflow(s) to {target}{note}")
+    return 0
+
+
 def workflows_save(api_url, path, rename_from, debug=False):
     try:
         with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as handle:
@@ -484,6 +600,8 @@ def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
     else:
         print(f"Committed {data.get('file')} ({str(data.get('commit', ''))[:7]}). "
               "The deploy pipeline publishes it in a few minutes.")
+    for warning in data.get("warnings") or []:
+        print(f"Warning: {warning}")
     return 0
 
 
@@ -508,16 +626,48 @@ def workflows_draft(api_url, prompt, save=False, debug=False):
     return _save_workflow_yaml(api_url, yaml_text, None, debug=debug)
 
 
-def workflows_set_enabled(api_url, file, enabled, debug=False):
-    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}",
-                    {"enabled": enabled}, debug=debug)
+def workflows_set_enabled(api_url, files, enabled, debug=False):
+    """Turn one or more workflows on/off through the bulk endpoint (one call,
+    per-id results; the API applies the usual toggle semantics to each)."""
+    if isinstance(files, str):
+        files = [files]
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/bulk",
+                    {"ids": list(files), "action": "enable" if enabled else "disable"},
+                    debug=debug)
     state = "On" if enabled else "Off"
-    print(f"{data.get('file') or file} is {state} — live now.")
-    if data.get("commit"):
-        print(f"Committed {str(data['commit'])[:7]}.")
-    if data.get("git_sync_error"):
-        print(f"Warning: the git commit failed ({data['git_sync_error']}); "
-              "the next deploy may revert this toggle.")
+    for result in data.get("results") or []:
+        label = result.get("file") or result.get("id") or "?"
+        if result.get("ok"):
+            print(f"{label} is {state} — live now.")
+            if result.get("commit"):
+                print(f"Committed {str(result['commit'])[:7]}.")
+            for warning in result.get("warnings") or []:
+                print(f"Warning: {warning}")
+        else:
+            print(f"{label}: {result.get('error') or 'failed'}")
+    return 0
+
+
+def workflows_bulk_enabled(api_url, enabled, tag=None, all_workflows=False, debug=False):
+    """Bulk enable/disable by scope (`workflows enable|disable --tag x|--all`):
+    every workflow carrying a tag, or all of them, through the same bulk
+    endpoint the explicit file list uses. Failures print per workflow —
+    nothing fails silently."""
+    if not tag and not all_workflows:
+        print("Nothing to do: pass --tag <tag> or --all (or name workflow files).")
+        return 2
+    body = {"action": "enable" if enabled else "disable"}
+    if tag:
+        body["tag"] = tag
+    else:
+        body["all"] = True
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/bulk", body, debug=debug)
+    state = "On" if enabled else "Off"
+    print(f"{data.get('ok', 0)} of {data.get('requested', 0)} workflow(s) set {state} "
+          f"[{data.get('scope', '?')}].")
+    for result in data.get("results") or []:
+        if not result.get("ok"):
+            print(f"{result.get('id') or '?'}: {result.get('error') or 'failed'}")
     return 0
 
 
@@ -533,6 +683,51 @@ def workflows_duplicate(api_url, file, name=None, debug=False):
     else:
         print(f"Duplicated {file} as {new_file} ({str(data.get('commit', ''))[:7]}). "
               "The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def templates_list(api_url, as_json=False, debug=False):
+    """The template gallery: bundled starters plus operator-published ones."""
+    data = api.call(api_url, "GET", "/api/agent/designer/templates", debug=debug)
+    items = data.get("templates", [])
+    if as_json:
+        print(json.dumps(items, indent=2))
+        return 0
+    if not items:
+        print("No templates yet. Publish one with `dapier templates publish <file>`.")
+        return 0
+    for item in items:
+        trigger = f"{item.get('connector', '?')} · {item.get('event', '?')}"
+        extra = item.get("triggerCount", 0) - 1
+        more = f" (+{extra} more)" if extra > 0 else ""
+        print(f"{item.get('source', ''):44} {trigger:40} "
+              f"{item.get('actionCount', 0)} action(s){more}  {item.get('description', '')}")
+    return 0
+
+
+def templates_apply(api_url, file, name=None, debug=False):
+    """Fork a template into a new workflow (the server slugifies `--name`,
+    default `<template-id>-copy`) through the same commit-and-publish path
+    as a save; the template stays in the gallery."""
+    body = {"name": name} if name else {}
+    data = api.call(api_url, "POST", f"/api/agent/designer/templates/{file}/apply",
+                    body, debug=debug)
+    new_file = data.get("file") or file
+    if data.get("published"):
+        print(f"Applied {file} as {new_file} ({str(data.get('commit', ''))[:7]}) and published it live.")
+    else:
+        print(f"Applied {file} as {new_file} ({str(data.get('commit', ''))[:7]}). "
+              "The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def templates_publish(api_url, file, flag, debug=False):
+    """Offer a saved workflow in the template gallery (or withdraw it)."""
+    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}/template",
+                    {"template": bool(flag)}, debug=debug)
+    state = "published as a template" if flag else "removed from the template gallery"
+    suffix = f" ({str(data.get('commit', ''))[:7]})" if data.get("commit") else ""
+    print(f"{data.get('workflow_id') or file} {state}{suffix}.")
     return 0
 
 
@@ -566,6 +761,107 @@ def workflows_rollback(api_url, file, revision, debug=False):
     else:
         print(f"Rolled {file} back to {label} "
               f"({str(data.get('commit', ''))[:7]}). The deploy pipeline publishes it in a few minutes.")
+    return 0
+
+
+def workflows_delete(api_url, file, assume_yes=False, debug=False):
+    """Delete a workflow on every surface at once (the agent DELETE route):
+    the live published item is removed and one atomic git commit takes the
+    YAML out of the repo; version history and past runs survive as history.
+    Refused while runs of the workflow are parked on a delay, so a resume
+    cannot dangle."""
+    if not assume_yes:
+        try:
+            answer = input(f"Delete {file}? It stops immediately and the YAML is "
+                           "deleted from the repo; past runs and version history "
+                           "remain [y/N]: ")
+        except EOFError:
+            # No interactive stdin (scripts, CI): never guess on a destroy.
+            print("No terminal to confirm on; pass --yes to delete without a prompt.")
+            return 2
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
+    data = api.call(api_url, "DELETE", f"/api/agent/designer/workflows/{file}", debug=debug)
+    print(f"Deleted {data.get('file') or file}. It is off now and no deploy will bring it back.")
+    if data.get("commit"):
+        print(f"Committed the removal ({str(data['commit'])[:7]}).")
+    for warning in data.get("warnings") or []:
+        print(f"Warning: {warning}")
+    if data.get("git_sync_error"):
+        print(f"Warning: the git commit failed ({data['git_sync_error']}); "
+              "the next deploy may restore the file — retry `workflows delete`.")
+    return 0
+
+
+def _split_tags(spec, what):
+    """Comma-separated tags as a clean list, or None when the flag is absent."""
+    if spec is None:
+        return None
+    tags = [part.strip() for part in spec.split(",") if part.strip()]
+    return tags or None
+
+
+def workflows_tags(api_url, file, tags_spec=None, clear=False, add=None,
+                   remove=None, debug=False):
+    """Edit a workflow's tags (the agent PUT .../tags route): Zapier-style
+    organization labels the list filters on. `--tags` replaces the whole set,
+    `--add`/`--remove` edit it (removals win, case-insensitive), `--clear`
+    empties it. The set lives in the workflow YAML, so it travels with saves,
+    deploys, and rollbacks."""
+    if clear:
+        body = {"tags": []}
+    elif tags_spec is not None:
+        tags = _split_tags(tags_spec, "--tags")
+        if not tags:
+            print("Nothing to do: pass --tags 'billing,ops', --add/--remove, or --clear.")
+            return 2
+        body = {"tags": tags}
+    elif add is not None or remove is not None:
+        body = {}
+        adds = _split_tags(add, "--add")
+        removes = _split_tags(remove, "--remove")
+        if adds:
+            body["add"] = adds
+        if removes:
+            body["remove"] = removes
+        if not body:
+            print("Nothing to do: pass --tags 'billing,ops', --add/--remove, or --clear.")
+            return 2
+    else:
+        print("Nothing to do: pass --tags 'billing,ops', --add/--remove, or --clear.")
+        return 2
+    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}/tags",
+                    body, debug=debug)
+    shown = ", ".join(data.get("tags") or []) or "(none)"
+    print(f"Tags for {data.get('file') or file}: {shown}"
+          + (" — published live." if data.get("published") else "."))
+    if data.get("git_sync_error"):
+        print(f"Warning: the git commit failed ({data['git_sync_error']}); "
+              "the tags are live but the next deploy may not carry them.")
+    return 0
+
+
+def workflows_folder(api_url, file, set_value=None, clear=False, debug=False):
+    """Put a workflow in a Zapier-style folder (`--set "Name"`) or take it
+    out (`--clear`) through the agent PUT .../folder route. Folders are flat —
+    at most one per workflow, and a name, never a path — and the folder lives
+    in the workflow YAML, so it travels with saves, deploys, and rollbacks."""
+    if clear and set_value is not None:
+        print("Pass --set <name> or --clear, not both.")
+        return 2
+    if not clear and set_value is None:
+        print("Nothing to do: pass --set 'Name' or --clear.")
+        return 2
+    body = {"folder": "" if clear else set_value}
+    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}/folder",
+                    body, debug=debug)
+    shown = data.get("folder") or "(none)"
+    print(f"Folder for {data.get('file') or file}: {shown}"
+          + (" — published live." if data.get("published") else "."))
+    if data.get("git_sync_error"):
+        print(f"Warning: the git commit failed ({data['git_sync_error']}); "
+              "the folder is live but the next deploy may not carry it.")
     return 0
 
 
@@ -697,12 +993,19 @@ def workflows_test_step(api_url, path, action_id, event_spec, steps_spec=None,
 
 
 def print_hook(item):
-    for key in ("hook_id", "kind", "url", "connection_id", "description", "flow",
-                "enabled", "created_by", "created_at", "updated_at"):
+    for key in ("hook_id", "kind", "url", "connection_id", "list_id", "description",
+                "dedupe_path", "flow", "enabled", "created_by", "created_at",
+                "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
+    if item.get("events"):
+        print(f"events: {', '.join(item['events'])}")
+    if item.get("response"):
+        print(f"response: {json.dumps(item['response'], sort_keys=True)}")
     if item.get("kind") == "telegram":
         print("secret header: x-telegram-bot-api-secret-token (managed by Telegram)")
+    elif item.get("kind") == "mailchimp":
+        print("auth: none — Mailchimp calls the unguessable URL directly")
     else:
         print(f"auth header: {item.get('header', 'authorization')}: Bearer {item.get('token', '')}")
     for index, action in enumerate(item.get("actions") or [], 1):
@@ -733,19 +1036,34 @@ def hooks_show(api_url, name, debug=False):
     return 0
 
 
-def hooks_save(api_url, path, debug=False):
+def hooks_save(api_url, path, debug=False, sync_response=False):
     body, error = _read_json_file(path)
     if error:
         print(error)
         return 2
+    if sync_response:
+        # Force response.mode sync (a template in the file's own response
+        # object is kept); the API's shared validator still bounds the shape,
+        # so a telegram kind or an unknown mode is rejected server-side.
+        response = body.get("response") if isinstance(body.get("response"), dict) else {}
+        body["response"] = {**response, "mode": "sync"}
     data = api.call(api_url, "PUT", "/api/agent/hook-triggers", body, debug=debug)
     verb = "Created" if data.get("created") else "Updated"
     print(f"{verb} {data.get('kind', 'webhook')} hook '{data.get('hook_id')}'. "
           "It is live immediately; no deploy needed.")
+    for warning in data.get("warnings") or []:
+        print(f"  warning: {warning}")
     if data.get("kind") == "telegram":
         print(f"  Telegram delivery URL: {data.get('url')}")
         if data.get("connection_id"):
             print(f"  Bot connection: {data.get('connection_id')}")
+    elif data.get("kind") == "mailchimp":
+        # Mailchimp sends no auth headers — the unguessable URL is the
+        # credential — and the webhook registration was just (re)drawn with
+        # the stored Mailchimp API key, so no curl hint with a bearer token.
+        print(f"  Mailchimp delivery URL: {data.get('url')}")
+        if data.get("list_id"):
+            print(f"  Audience: {data.get('list_id')} — webhook registered on the list")
     else:
         print(f"  URL: {data.get('url')}")
         print(f"  Callers send: {data.get('header', 'authorization')}: Bearer {data.get('token', '')}")
@@ -760,6 +1078,8 @@ def hooks_delete(api_url, name, kind=None, debug=False):
     query = f"name={name}" + (f"&kind={kind}" if kind else "")
     data = api.call(api_url, "DELETE", f"/api/agent/hook-triggers?{query}", debug=debug)
     print(f"Deleted {data.get('kind') or 'hook'} trigger '{data.get('hook_id') or name}'.")
+    for warning in data.get("warnings") or []:
+        print(f"  warning: {warning}")
     return 0
 
 
@@ -796,6 +1116,15 @@ def schedules_delete(api_url, name, debug=False):
     return 0
 
 
+def _poll_target(item):
+    """What a poll watches: the URL for http, the provider target otherwise."""
+    if item.get("source") and item.get("source") != "http":
+        target = (item.get("bucket") or item.get("spreadsheet_id")
+                  or item.get("folder_id") or item.get("for_email") or "")
+        return f"{item['source']} {target}".strip()
+    return f"{item.get('method', 'GET')} {item.get('url', '')}".strip()
+
+
 def polls_list(api_url, debug=False):
     data = api.call(api_url, "GET", "/api/agent/poll-triggers", debug=debug)
     items = data.get("polls", [])
@@ -804,7 +1133,7 @@ def polls_list(api_url, debug=False):
     for item in items:
         state = "enabled" if item.get("enabled", True) else "disabled"
         print(f"{item.get('poll_id', ''):20} {item.get('expression', ''):40} "
-              f"{state:9} {item.get('url', '')}")
+              f"{state:9} {_poll_target(item)}")
     print_flows(data.get("flows") or [])
     return 0
 
@@ -819,7 +1148,7 @@ def polls_save(api_url, path, debug=False):
     state = "enabled" if data.get("enabled", True) else "disabled"
     print(f"{verb} poll trigger '{data.get('poll_id')}' ({data.get('expression')}, {state}).")
     print(f"  EventBridge rule: {data.get('rule')}")
-    print(f"  Watches {data.get('method')} {data.get('url')} — one event per new item, no deploy needed.")
+    print(f"  Watches {_poll_target(data)} — one event per new item, no deploy needed.")
     return 0
 
 
@@ -927,6 +1256,54 @@ def grants_delete(api_url, connection_id, grantee, debug=False):
     query = urlencode({"connection_id": connection_id, "grantee": grantee})
     api.call(api_url, "DELETE", f"/api/agent/grants?{query}", debug=debug)
     print(f"Revoked {grantee} on {connection_id}.")
+    return 0
+
+
+def print_users(items):
+    print(f"{'SUBJECT':44} {'ROLE':10} {'DISPLAY NAME':28} STATUS")
+    for item in items:
+        status = "disabled" if item.get("disabled") else "active"
+        display_name = item.get("display_name") or "-"
+        print(f"{item.get('subject', ''):44} {item.get('role', ''):10} "
+              f"{display_name:28} {status}")
+
+
+def users_list(api_url, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/users", debug=debug)
+    items = data.get("users", [])
+    if not items:
+        print("No users in the roles store; the operator allowlist governs access. "
+              "Assign one with `dapier users set-role`.")
+        return 0
+    print_users(items)
+    return 0
+
+
+def users_set_role(api_url, subject, role, display_name=None, debug=False):
+    body = {"subject": subject, "role": role}
+    if display_name:
+        body["display_name"] = display_name
+    data = api.call(api_url, "POST", "/api/agent/users", body, debug=debug)
+    suffix = f" ({data['subject']})" if data.get("subject") != subject else ""
+    print(f"Set {data.get('subject', subject)}{suffix} to {data.get('role', role)}.")
+    return 0
+
+
+def users_remove(api_url, subject, assume_yes=False, debug=False):
+    if not assume_yes:
+        try:
+            answer = input(f"Remove {subject}'s stored role? The operator "
+                           "allowlist decides their access again [y/N]: ")
+        except EOFError:
+            # No interactive stdin (scripts, CI): never guess on a destroy.
+            print("No terminal to confirm on; pass --yes to remove without a prompt.")
+            return 2
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
+    query = urlencode({"subject": subject})
+    api.call(api_url, "DELETE", f"/api/agent/users?{query}", debug=debug)
+    print(f"Removed {subject}. The operator allowlist decides their access again.")
     return 0
 
 
@@ -1099,7 +1476,7 @@ def print_runs(items):
 
 
 def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,
-              next_token=None, debug=False):
+              next_token=None, query=None, debug=False):
     params = {"limit": int(limit)}
     if workflow:
         params["workflow_id"] = workflow
@@ -1109,12 +1486,14 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
         params["since"] = since
     if before:
         params["before"] = before
+    if query:
+        params["q"] = query
     if next_token:
         params["next"] = next_token
     data = api.call(api_url, "GET", f"/api/agent/runs?{urlencode(params)}", debug=debug)
     items = data.get("runs", [])
     if not items:
-        filtered = workflow or status or since or before or next_token
+        filtered = workflow or status or since or before or next_token or query
         print("No runs match these filters." if filtered else
               "No runs recorded yet. Runs appear once a workflow handles a trigger event.")
         return 0
@@ -1122,6 +1501,32 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
     next_page = (data.get("paging") or {}).get("next")
     if next_page:
         print(f"\nnext page: {next_page}  (pass it to --next)")
+    return 0
+
+
+def runs_export(api_url, out=None, max_rows=None, workflow=None, status=None,
+                since=None, before=None, query=None, debug=False):
+    """Run history as CSV (thin client over the agent export route): the
+    list's filters, one bounded export, written to --out or the server's
+    suggested filename."""
+    params = {}
+    if workflow:
+        params["workflow_id"] = workflow
+    for key, value in (("status", status), ("since", since),
+                       ("before", before), ("q", query)):
+        if value:
+            params[key] = value
+    if max_rows:
+        params["max_rows"] = int(max_rows)
+    data = api.call(api_url, "GET", f"/api/agent/runs/export?{urlencode(params)}",
+                    debug=debug)
+    # The server suggests the filename; basename keeps a hostile suggestion
+    # from writing outside the caller's directory.
+    path = out or os.path.basename(data.get("filename") or "") or "dapier-runs.csv"
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(data.get("csv") or "")
+    note = " (capped; narrow the filters for the rest)" if data.get("truncated") else ""
+    print(f"Wrote {data.get('count', 0)} runs to {path}{note}")
     return 0
 
 
@@ -1211,6 +1616,22 @@ def errors_summary(api_url, debug=False, days=7):
     return 0
 
 
+def errors_send_digest(api_url, debug=False):
+    """Render and email the operator error digest now (thin client over the
+    agent route — the same function the daily schedule runs)."""
+    data = api.call(api_url, "POST", "/api/agent/errors/digest", body={}, debug=debug)
+    if data.get("skipped"):
+        print(f"Nothing failed in the last {data.get('window_days', 1)} day(s); "
+              "digest skipped (no email sent).")
+        return 0
+    print(f"Digest sent to {data.get('to', '')} "
+          f"({data.get('total_failed_runs', 0)} failed runs in the last "
+          f"{data.get('window_days', 1)} day(s)).")
+    if data.get("subject"):
+        print(data["subject"])
+    return 0
+
+
 def print_audit(items):
     print(f"{'TIMESTAMP':20} {'ACTION':12} {'ACTOR':34} {'AGENT':20} "
           f"{'OUTCOME':22} CONNECTION")
@@ -1246,9 +1667,15 @@ def runs_show(api_url, run_id, debug=False):
     return 0
 
 
-def runs_replay(api_url, run_id, debug=False):
-    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/replay", body={}, debug=debug)
-    print(f"Replay accepted for {data.get('replayed_from') or run_id}.")
+def runs_replay(api_url, run_id, from_step=None, debug=False):
+    body = {"from_step": from_step} if from_step else {}
+    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/replay",
+                    body=body, debug=debug)
+    if from_step:
+        print(f"Replay from step '{from_step}' accepted for {data.get('replayed_from') or run_id}.")
+        print("Earlier steps do not run again; their recorded outputs seed the rerun.")
+    else:
+        print(f"Replay accepted for {data.get('replayed_from') or run_id}.")
     print(f"The re-injected run ({data.get('run_id') or 'pending'}) appears in `dapier runs list` "
           "once the worker picks it up.")
     return 0

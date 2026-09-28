@@ -1,11 +1,14 @@
+import base64
 import io
 import json
 import os
 import stat
+import zipfile
 
 import pytest
 
 from dapier_cli import auth, commands, config, main
+from dapier_cli import commands as cli_commands
 from dapier_cli.api import ApiError
 
 
@@ -392,6 +395,54 @@ def test_import_posts_files_without_logging(monkeypatch, tmp_path, capsys):
     assert "client-secret-value" not in out
 
 
+def test_import_prints_youtube_hub_setup(monkeypatch, tmp_path, capsys):
+    user_file = tmp_path / "user.json"
+    user_file.write_text(json.dumps({"refresh_token": "r"}))
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"connection_id": "youtube", "account_title": "My channel"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_import(
+        "https://api.example.test", "youtube", "youtube", None, None,
+        str(user_file)) == 0
+    out, _ = capsys.readouterr()
+    assert "pubsubhubbub.appspot.com/subscribe" in out
+    assert "https://api.example.test/hooks/youtube" in out
+    assert "videos.xml?channel_id=" in out
+
+
+def test_import_prints_dropbox_webhook_setup(monkeypatch, tmp_path, capsys):
+    user_file = tmp_path / "user.json"
+    user_file.write_text(json.dumps({"refresh_token": "r"}))
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"connection_id": "dropbox", "account_title": "Team Dropbox"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_import(
+        "https://api.example.test", "dropbox", "dropbox", None, None,
+        str(user_file)) == 0
+    out, _ = capsys.readouterr()
+    assert "https://api.example.test/hooks/dropbox" in out
+    assert "Webhook URI" in out
+
+
+def test_connect_prints_provider_webhook_setup(monkeypatch, capsys):
+    responses = [
+        {"authorize_url": "https://oauth.example.test/authorize"},
+        {"connection_id": "yt", "status": "connected", "provider": "youtube",
+         "account_title": "My channel"},
+    ]
+    monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: responses.pop(0))
+    monkeypatch.setattr(commands.webbrowser, "open", lambda url: True)
+    monkeypatch.setattr(commands.time, "sleep", lambda seconds: None)
+    assert commands.connections_connect("https://api.example.test", "yt", "agent-1") == 0
+    out, _ = capsys.readouterr()
+    assert "/hooks/youtube" in out
+    assert "pubsubhubbub.appspot.com/subscribe" in out
+
+
 TRIGGER = {
     "name": "consulting",
     "address": "consulting@dtcdev.click",
@@ -708,7 +759,8 @@ def test_main_hooks_parsing(monkeypatch):
     seen = {}
 
     monkeypatch.setattr(commands, "hooks_save",
-                        lambda api_url, path, debug=False: seen.update(file=path) or 0)
+                        lambda api_url, path, debug=False, sync_response=False:
+                        seen.update(file=path) or 0)
     assert main.main(["hooks", "save", "/tmp/hook.json"]) == 0
     assert seen["file"] == "/tmp/hook.json"
 
@@ -716,12 +768,18 @@ def test_main_hooks_parsing(monkeypatch):
                         lambda api_url, kind=None, debug=False: seen.update(kind=kind) or 0)
     assert main.main(["hooks", "list", "--kind", "telegram"]) == 0
     assert seen["kind"] == "telegram"
+    # The youtube hook kind filters like the others (its rows travel in the
+    # same hook-triggers table).
+    assert main.main(["hooks", "list", "--kind", "youtube"]) == 0
+    assert seen["kind"] == "youtube"
 
     monkeypatch.setattr(commands, "hooks_delete",
                         lambda api_url, name, kind=None, debug=False:
                         seen.update(deleted=name, delete_kind=kind) or 0)
     assert main.main(["hooks", "delete", "orders"]) == 0
     assert seen["deleted"] == "orders" and seen["delete_kind"] is None
+    assert main.main(["hooks", "delete", "orders", "--kind", "youtube"]) == 0
+    assert seen["delete_kind"] == "youtube"
 
 
 def test_connections_import_token_provider_uses_token_file(monkeypatch, tmp_path, capsys):
@@ -1038,23 +1096,23 @@ def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, 
     assert "wf-1:replay-abc" in out
 
 
-def test_runs_replay_hits_the_agent_replay_endpoint(isolated_home, monkeypatch, capsys):
+def test_runs_replay_from_step_forwards_the_step(isolated_home, monkeypatch, capsys):
     calls = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
-        calls.append((method, path))
-        return {"accepted": True, "replayed_from": "wf-1:evt-1",
+        calls.append((method, path, body))
+        return {"accepted": True, "replayed_from": "wf-1:evt-1", "from_step": "post",
                 "event_id": "replay-abc", "run_id": "wf-1:replay-abc"}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    rc = main.main(["runs", "replay", "wf-1:evt-1"])
+    rc = main.main(["runs", "replay", "wf-1:evt-1", "--from-step", "post"])
 
     assert rc == 0
-    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay")]
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay", {"from_step": "post"})]
     out = capsys.readouterr().out
-    assert "wf-1:evt-1" in out
-    assert "wf-1:replay-abc" in out
+    assert "from step 'post'" in out
+    assert "Earlier steps do not run again" in out
 
 
 def test_usage_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):
@@ -1084,11 +1142,48 @@ def test_runs_list_forwards_filter_flags(isolated_home, monkeypatch, capsys):
     monkeypatch.setattr(commands.api, "call", fake_call)
 
     rc = main.main(["runs", "list", "--workflow", "wf-1", "--status", "failed",
-                    "--since", "2026-09-26T00:00:00+00:00"])
+                    "--since", "2026-09-26T00:00:00+00:00", "--search", "order-1234"])
 
     assert rc == 0
     assert calls == [("GET", "/api/agent/runs?limit=25&workflow_id=wf-1&status=failed"
-                              "&since=2026-09-26T00%3A00%3A00%2B00%3A00")]
+                              "&since=2026-09-26T00%3A00%3A00%2B00%3A00&q=order-1234")]
+
+
+def test_runs_export_writes_the_csv_file(isolated_home, monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"filename": "dapier-runs-20260925-100000.csv", "count": 1,
+                "truncated": False, "csv": "run_id,workflow_id\r\nwf-1:evt-1,wf-1\r\n"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    out_path = tmp_path / "runs.csv"
+
+    rc = main.main(["runs", "export", "--out", str(out_path),
+                    "--workflow", "wf-1", "--max-rows", "100"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/runs/export?workflow_id=wf-1&max_rows=100")]
+    assert out_path.read_bytes().endswith(b"wf-1:evt-1,wf-1\r\n")
+    assert "1 runs" in capsys.readouterr().out
+
+
+def test_runs_export_defaults_to_the_suggested_filename(isolated_home, monkeypatch,
+                                                        tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"filename": "dapier-runs-20260925-100000.csv", "count": 0,
+                "truncated": False, "csv": "run_id,workflow_id\r\n"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "export"])
+
+    assert rc == 0
+    assert (tmp_path / "dapier-runs-20260925-100000.csv").exists()
+
 
 def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
     calls = []
@@ -1318,6 +1413,95 @@ def test_workflows_export_writes_the_output_file_verbatim(isolated_home, monkeyp
     assert f"Exported test-flow.yaml to {target}" in capsys.readouterr().out
 
 
+def _server_bundle_bytes(names=("invoice-alert.yaml", "standup-digest.yaml")):
+    """A server-shaped export bundle: manifest.json plus workflows/<file>."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as bundle:
+        bundle.writestr("manifest.json", json.dumps(
+            {"count": len(names),
+             "workflows": [{"file": name} for name in names]}))
+        for name in names:
+            bundle.writestr(f"workflows/{name}", f"id: {name.removesuffix('.yaml')}\n")
+    return buffer.getvalue()
+
+
+def test_workflows_export_all_writes_the_server_bundle(isolated_home, monkeypatch,
+                                                       tmp_path, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"filename": "dapier-workflows-20260928.zip", "count": 2,
+                "skipped": ["odd"],
+                "b64": base64.b64encode(_server_bundle_bytes()).decode()}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    target = tmp_path / "bundle.zip"
+
+    rc = main.main(["workflows", "export", "--all", "-o", str(target)])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/designer/export")]
+    with zipfile.ZipFile(target) as bundle:
+        assert bundle.namelist() == ["manifest.json",
+                                     "workflows/invoice-alert.yaml",
+                                     "workflows/standup-digest.yaml"]
+        assert bundle.read("workflows/standup-digest.yaml").decode() == \
+            "id: standup-digest\n"
+    out = capsys.readouterr().out
+    assert "Exported 2 workflow(s) to" in out
+    assert "skipped: odd" in out
+
+
+def test_workflows_export_all_defaults_to_the_server_suggested_name(isolated_home,
+                                                                    monkeypatch,
+                                                                    tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {
+                            "filename": "dapier-workflows-20260928.zip",
+                            "count": 1, "skipped": [],
+                            "b64": base64.b64encode(
+                                _server_bundle_bytes(("solo.yaml",))).decode()})
+
+    rc = main.main(["workflows", "export", "--all"])
+
+    assert rc == 0
+    with zipfile.ZipFile(tmp_path / "dapier-workflows-20260928.zip") as bundle:
+        assert bundle.namelist() == ["manifest.json", "workflows/solo.yaml"]
+
+
+def test_workflows_export_all_refuses_an_empty_bundle(isolated_home, monkeypatch,
+                                                      tmp_path, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"filename": "dapier-workflows-x.zip",
+                                                 "count": 0, "skipped": [],
+                                                 "b64": base64.b64encode(
+                                                     _server_bundle_bytes(())).decode()})
+    target = tmp_path / "empty.zip"
+
+    rc = main.main(["workflows", "export", "--all", "-o", str(target)])
+
+    assert rc == 2
+    assert "No workflows to export" in capsys.readouterr().out
+    assert not target.exists()
+
+
+def test_workflows_export_all_reports_an_unreadable_bundle(isolated_home, monkeypatch,
+                                                           tmp_path, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"filename": "dapier-workflows-x.zip",
+                                                 "count": 2, "skipped": [],
+                                                 "b64": "zzz"})
+    target = tmp_path / "broken.zip"
+
+    rc = main.main(["workflows", "export", "--all", "-o", str(target)])
+
+    assert rc == 5
+    assert "unreadable bundle" in capsys.readouterr().out
+    assert not target.exists()
+
+
 def test_workflows_list_forwards_the_search(isolated_home, monkeypatch, capsys):
     calls = []
 
@@ -1335,3 +1519,70 @@ def test_workflows_list_forwards_the_search(isolated_home, monkeypatch, capsys):
     assert rc == 0
     assert calls == [("GET", "/api/agent/designer/workflows?q=invoice")]
     assert "invoice-alert.yaml" in capsys.readouterr().out
+
+
+def test_connections_list_prints_health_and_expiry(capsys, monkeypatch):
+    def fake_call(url, method, path, body=None, debug=False):
+        assert path == "/api/agent/connections"
+        return {"connections": [
+            {"connection_id": "youtube-personal", "provider": "youtube", "status": "connected",
+             "health": "expired", "token_expires_at": "2026-01-02T03:04:00+00:00",
+             "account_title": "Ch"},
+            {"connection_id": "slack-team", "provider": "slack", "status": "connected",
+             "health": "ok"},
+        ]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_list("https://api.example.test") == 0
+    out = capsys.readouterr().out
+    assert "HEALTH" in out and "EXPIRES" in out
+    assert "expired" in out
+    assert "2026-01-02" in out
+    assert " ok " in out
+
+
+def test_connections_show_prints_health(capsys, monkeypatch):
+    def fake_call(url, method, path, body=None, debug=False):
+        assert path == "/api/agent/connections/youtube-personal"
+        return {"connection_id": "youtube-personal", "provider": "youtube",
+                "status": "connected", "health": "expired",
+                "token_expires_at": "2026-01-02T03:04:00+00:00"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_show("https://api.example.test", "youtube-personal") == 0
+    out = capsys.readouterr().out
+    assert "health: expired" in out
+    assert "token_expires_at: 2026-01-02" in out
+
+
+def test_main_templates_parsing(monkeypatch):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen["method"] = method
+        seen["path"] = path
+        seen["body"] = body
+        if path.endswith("/templates"):
+            return {"templates": []}
+        return {"file": "my-flow.yaml", "workflow_id": "my-flow",
+                "commit": "abc1234", "published": True}
+
+    monkeypatch.setattr(cli_commands.api, "call", fake_call)
+    assert main.main(["templates", "list"]) == 0
+    assert seen["method"] == "GET"
+
+    assert main.main(["templates", "apply", "template-starter.yaml",
+                      "--name", "My Flow"]) == 0
+    assert (seen["method"], seen["path"], seen["body"]) == (
+        "POST", "/api/agent/designer/templates/template-starter.yaml/apply",
+        {"name": "My Flow"})
+
+    assert main.main(["templates", "publish", "my-flow.yaml"]) == 0
+    assert (seen["method"], seen["path"], seen["body"]) == (
+        "PUT", "/api/agent/designer/workflows/my-flow.yaml/template", {"template": True})
+
+    assert main.main(["templates", "unpublish", "my-flow.yaml"]) == 0
+    assert (seen["method"], seen["path"], seen["body"]) == (
+        "PUT", "/api/agent/designer/workflows/my-flow.yaml/template", {"template": False})
+
+
