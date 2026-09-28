@@ -268,39 +268,32 @@ never prints it. `token write` creates a `0600` file and refuses to overwrite
 without `--force`. Both commands verify the returned provider account ID
 against the connection's bound account before handing anything out.
 
-Mail to `agent@dtcdev.click` does nothing until `dapier agent-mail work` is
-running on the Aplexer machine. That command long-polls a queue and starts
-one fresh session per accepted message. Senders that are not on the shared
-list are ignored. Mail which arrives only as a Datamailer SNS event does not
-start an agent; only the SES catch-all (the S3 ingress) can.
-
-```bash
-dapier agent-mail show
-dapier agent-mail from list
-dapier agent-mail from add alexey@datatalks.club
-dapier agent-mail rule add --field subject --contains invoice
-dapier agent-mail work
-```
-
-The shared sender list starts as `alexey.s.grigoriev@gmail.com` and
-`alexey@datatalks.club`. `from add` and `from remove` change it. An empty
-list ignores everyone. Extra rules (`subject` or `body`, same operators as
-workflow filters) are AND conditions on the mailbox. `save` updates the
-engine, workspace, and instructions and does not replace the sender list or
-the rules. Disabling the mailbox is the off switch.
-
-Email triggers reserve `name@dtcdev.click` and run actions for every message
+Email addresses reserve `name@dtcdev.click` and run actions for every message
 sent to that address. They are live immediately — no deploy. Operators manage
 them with:
 
 ```bash
-dapier triggers list
-dapier triggers show consulting
-dapier triggers save trigger.json
-dapier triggers delete consulting
+dapier emails list
+dapier emails show consulting
+dapier emails save email.json
+dapier emails delete consulting
+dapier emails from list
+dapier emails from add alexey@datatalks.club
 ```
 
-`save` takes a JSON file (or `-` for stdin) with a name, an optional
+One sender list applies to every inbound email, including a Datamailer SNS
+event. It starts as `alexey.s.grigoriev@gmail.com` and
+`alexey@datatalks.club`. An address that is not on the list is ignored and
+runs no actions. An empty list ignores everyone. Extra `subject` or `body`
+filters on an address AND with its route. `from` is not a per-address filter.
+
+An `agent` action queues a prompt for `dapier worker`, which runs on the
+machine where Aplexer is installed and starts one session per job. The same
+action can sit on an email, a webhook, a schedule, or a poll. `dapier worker`
+does not call the API. Webhooks are managed with `dapier webhooks`. A sample
+of what a flow receives is `dapier workflows sample`.
+
+`emails save` takes a JSON file (or `-` for stdin) with a name, an optional
 description, and one or more actions, e.g.:
 
 ```json
@@ -357,11 +350,11 @@ HTTP. A webhook trigger reserves `https://dapier.dtcdev.click/hooks/webhook/{nam
 and answers only calls carrying its bearer token; a Telegram trigger binds a
 Telegram bot connection to `/hooks/telegram/{name}` (one webhook per bot, so
 one connection drives at most one trigger). Both are created and listed with
-`dapier hooks save|list|show|delete`, fire the same action catalog as email
+`dapier webhooks save|list|show|delete`, fire the same action catalog as email
 triggers, and are live immediately — no deploy.
 
 A webhook trigger created or updated with an optional `secret` (a plain JSON
-field, so `dapier hooks save webhook.json` passes it straight through;
+field, so `dapier webhooks save webhook.json` passes it straight through;
 `"secret": ""` clears it, an edit that omits it keeps it) locks the URL
 behind a shared-secret HMAC check instead of the bearer token: callers must
 send `X-Dapier-Signature: sha256=<hex>` where `<hex>` is the lowercase
@@ -428,7 +421,7 @@ dapier oauth-clients set zoom --client-id my-id --client-secret-file -
 dapier tokens list                           # operator-issued API tokens (no secrets)
 dapier tokens create --name personal-scheduler --agent personal-scheduler
 dapier tokens revoke personal-scheduler
-dapier hooks save webhook.json               # webhook/Telegram triggers (see below)
+dapier webhooks save webhook.json            # webhook and Telegram callbacks (see below)
 dapier schedules save schedule.json          # {"name", "expression": "cron(0 8 * * ? *)", "actions"}
 ```
 

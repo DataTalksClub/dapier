@@ -140,12 +140,26 @@ def build_item(body, operator):
     if event == ADDRESS_EVENT:
         # Only address triggers claim a route; watchers match SES feedback
         # for the whole domain and never shadow a YAML workflow's address.
-        from .addresses import claim_error
-
-        error = claim_error(name, "email-trigger")
-        if error:
-            raise TriggerError(error)
-        address, filters = address_for(name), None
+        if name in yaml_email_routes():
+            raise TriggerError(f"the route '{name}' is already handled by a YAML workflow")
+        extra = body.get("filters") or {}
+        if extra is None:
+            extra = {}
+        if not isinstance(extra, dict):
+            raise TriggerError("filters must be an object")
+        if "from" in extra:
+            raise TriggerError("from is the shared sender list, not an address filter")
+        for field, rule in extra.items():
+            if field not in ("subject", "body"):
+                raise TriggerError("address filters may only use subject or body")
+            if not isinstance(rule, dict) or not rule:
+                raise TriggerError(f"filter '{field}' must be an operator object")
+            from ..engine.matching import _matches_filter
+            try:
+                _matches_filter("", rule)
+            except KeyError:
+                raise TriggerError(f"unknown operator in filter '{field}'") from None
+        address, filters = address_for(name), extra
     else:
         # A route filter can never match a bounce/complaint (their data has
         # no route), so storing one would silently dead the trigger.
@@ -173,6 +187,8 @@ def build_item(body, operator):
     # the watcher-only fields are stored only when a watcher is defined.
     if event != ADDRESS_EVENT:
         item["event"] = event
+        item["filters"] = filters
+    elif filters:
         item["filters"] = filters
     return item
 
@@ -227,9 +243,11 @@ def workflow_for(item):
             "event": str(item.get("event") or ADDRESS_EVENT),
             # Watchers keep their stored filters (default match-all);
             # address triggers scope to the reserved route as before.
-            "filters": ({"route": {"equals": item["name"]}}
-                        if not item.get("event") or item["event"] == ADDRESS_EVENT
-                        else dict(item.get("filters") or {})),
+            "filters": (
+                {"route": {"equals": item["name"]}, **dict(item.get("filters") or {})}
+                if not item.get("event") or item["event"] == ADDRESS_EVENT
+                else dict(item.get("filters") or {})
+            ),
         },
         "actions": actions,
     }
@@ -249,7 +267,7 @@ def public_view(item):
         "created_by", "created_at", "updated_at",
     )}
     view["event"] = item.get("event") or ADDRESS_EVENT
-    if item.get("event") and item["event"] != ADDRESS_EVENT:
+    if item.get("filters") or (item.get("event") and item["event"] != ADDRESS_EVENT):
         view["filters"] = item.get("filters") or {}
     return view
 
@@ -285,6 +303,8 @@ def api_save(body, operator, table_ref=None):
             item["address"] = ""
             item["filters"] = (filters if isinstance(filters, dict)
                                else previous.get("filters") or {})
+    elif previous and previous.get("filters") and "filters" not in body:
+        item["filters"] = previous.get("filters") or {}
     get_table(table_ref).put_item(Item=item)
     return 200, {"created": created, **public_view(item)}
 

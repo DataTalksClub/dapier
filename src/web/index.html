@@ -70,7 +70,6 @@
         <a class="nav-item" href="/templates" data-view="templates"><i data-lucide="layout-template"></i><span>Templates</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
-        <a class="nav-item" href="/agent-mail" data-view="agent-mail"><i data-lucide="bot"></i><span>Agent mail</span></a>
         <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
         <a class="nav-item" href="/triggers" data-view="triggers"><i data-lucide="webhook"></i><span>Triggers</span></a>
         <p class="nav-group-label">Administration</p>
@@ -247,43 +246,13 @@
           </table>
         </div>
         <p id="email-yaml-routes" class="sub" hidden>Also handled by managed workflows (edit in Workflows): <span id="email-yaml-list" class="mono"></span></p>
-      </section>
-      <section class="view" data-page="agent-mail">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Agent mail</h2><p class="sub">Mail to <span id="agent-mail-address" class="mono">agent@</span> starts an Aplexer session when <code>dapier agent-mail work</code> is running. Senders not on the shared list are ignored. The same list and rules are reachable with <code>dapier agent-mail</code>.</p></div>
-        </div>
-        <div id="agent-mail-empty" class="empty-state"><h3>Agent mailbox is not configured</h3><p>The mailbox tables are not available in this deployment.</p></div>
-        <div id="agent-mail-body" hidden>
-          <form id="agent-mail-settings" class="stack-form" autocomplete="off">
-            <label>Engine<input name="engine" class="mono-input" placeholder="claude"></label>
-            <label>Workspace<input name="workspace" class="mono-input" required></label>
-            <label>Instructions<textarea name="instructions" rows="3"></textarea></label>
-            <label class="check-line"><input name="enabled" type="checkbox"> Enabled</label>
-            <button class="button primary" type="submit">Save mailbox</button>
-          </form>
-          <h3 class="sub-head">Allowed senders</h3>
-          <form id="agent-mail-from-add" class="inline-form" autocomplete="off">
-            <input name="address" type="email" class="mono-input" placeholder="name@example.com" required>
-            <button class="button secondary" type="submit">Add sender</button>
-          </form>
-          <ul id="agent-mail-from-list" class="plain-list"></ul>
-          <h3 class="sub-head">Rules</h3>
-          <form id="agent-mail-rule-add" class="inline-form" autocomplete="off">
-            <select name="field"><option value="subject">subject</option><option value="body">body</option></select>
-            <select name="operator"><option>contains</option><option>equals</option><option>prefix</option><option>suffix</option><option>not_equals</option><option>does_not_contain</option></select>
-            <input name="value" class="mono-input" placeholder="value" required>
-            <button class="button secondary" type="submit">Add rule</button>
-          </form>
-          <ul id="agent-mail-rules" class="plain-list"></ul>
-          <h3 class="sub-head">Recent tasks</h3>
-          <p id="agent-mail-tasks-empty" class="sub">No tasks yet.</p>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Status</th><th>From</th><th>Subject</th><th>Tag</th><th>When</th></tr></thead>
-              <tbody id="agent-mail-tasks"></tbody>
-            </table>
-          </div>
-        </div>
+        <h3 class="sub-head">Allowed senders</h3>
+        <p class="sub">One list for every inbound email. An address that is not on it is ignored. <code>dapier emails from</code> changes the same list.</p>
+        <form id="email-from-add" class="inline-form" autocomplete="off">
+          <input name="address" type="email" class="mono-input" placeholder="name@example.com" required>
+          <button class="button secondary" type="submit">Add sender</button>
+        </form>
+        <ul id="email-from-list" class="plain-list"></ul>
       </section>
       <section class="view" data-page="schedules">
         <div class="section-head">

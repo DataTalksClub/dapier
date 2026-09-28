@@ -46,6 +46,7 @@ RECEIVED = "received"
 MATCHED = "matched"
 UNMATCHED = "unmatched"
 FAILED = "failed"
+IGNORED = "ignored"
 
 # Terminal step statuses, mirrored from engine.worker — a redelivery may
 # skip a step that already finished, never one still being processed.
@@ -130,6 +131,30 @@ def record(event, *, table_ref=None):
         logger.warning("inbox record failed", extra={"inbox_id": item["inbox_id"]})
         return None
     return item["inbox_id"]
+
+
+def ignore(inbox_id, *, table_ref=None):
+    """Close an event that the sender list refused. No workflow runs."""
+    if not inbox_id:
+        return None
+    try:
+        table = table_ref if table_ref is not None else _table()
+        table.update_item(
+            Key={"inbox_id": inbox_id},
+            UpdateExpression="SET #status = :status, matched = :matched, processed_at = :at",
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={
+                ":status": IGNORED,
+                ":matched": [],
+                ":at": _now_iso(),
+            },
+        )
+    except InboxError:
+        return None
+    except Exception:
+        logger.warning("inbox ignore failed", extra={"inbox_id": inbox_id})
+        return None
+    return inbox_id
 
 
 def complete(inbox_id, matched, *, error=None, table_ref=None):

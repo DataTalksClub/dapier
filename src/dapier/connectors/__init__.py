@@ -11,6 +11,7 @@ specs.
 
 from . import registry, trigger_discovery  # noqa: F401
 from . import (  # noqa: F401  (import = registration)
+    agent,
     ai,
     calendar,
     code,
@@ -20,6 +21,7 @@ from . import (  # noqa: F401  (import = registration)
     dropbox,
     drive,
     email,
+    gmail,
     ingress,
     logic,
     mailchimp,

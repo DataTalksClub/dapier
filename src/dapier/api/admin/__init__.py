@@ -129,22 +129,12 @@ def route(event, method, path):
         return routes.save_email_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/email-triggers":
         return routes.delete_email_trigger(event, operator_subject)
-    if method == "GET" and path == "/api/admin/agent-mailboxes":
-        return routes.agent_mailbox_get(event, operator_subject)
-    if method == "PUT" and path == "/api/admin/agent-mailboxes":
-        return routes.agent_mailbox_save(event, operator_subject)
-    if method == "GET" and path == "/api/admin/agent-mail/from":
-        return routes.agent_from_list(event)
-    if method == "POST" and path == "/api/admin/agent-mail/from":
-        return routes.agent_from_add(event, operator_subject)
-    if method == "DELETE" and path == "/api/admin/agent-mail/from":
-        return routes.agent_from_remove(event, operator_subject)
-    if method == "POST" and path == "/api/admin/agent-mailboxes/agent/rules":
-        return routes.agent_rule_add(event, operator_subject)
-    if method == "DELETE" and path == "/api/admin/agent-mailboxes/agent/rules":
-        return routes.agent_rule_delete(event, operator_subject)
-    if method == "GET" and path == "/api/admin/agent-tasks":
-        return routes.agent_tasks_list(event)
+    if method == "GET" and path == "/api/admin/email-from":
+        return routes.email_from_list(event)
+    if method == "POST" and path == "/api/admin/email-from":
+        return routes.email_from_add(event, operator_subject)
+    if method == "DELETE" and path == "/api/admin/email-from":
+        return routes.email_from_remove(event, operator_subject)
     if method == "GET" and path == "/api/admin/designer/workflows":
         return routes.designer_list(event)
     if method == "GET" and path == "/api/admin/designer/catalog":

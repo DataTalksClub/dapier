@@ -21,7 +21,7 @@ from ..connections import tokens
 from ..connections.providers import oauth_clients, oauth_providers
 from ..connections.records import BindingError
 from ..connections.tokens import TokenError
-from ..triggers import agent_mailboxes, email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
+from ..triggers import email_from, email_triggers, hook_triggers, inbox, poll_triggers, schedule_triggers
 from ..auth.dtc_auth import auth_config
 from ..connections import oauth_flow
 from . import overview
@@ -417,14 +417,8 @@ def route(event, method, path):
         return import_connection(event)
     if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
         return email_triggers_api(event, method)
-    if path == "/api/agent/agent-mailboxes" and method in ("GET", "PUT"):
-        return agent_mailbox_api(event, method)
-    if path == "/api/agent/agent-mail/from" and method in ("GET", "POST", "DELETE"):
-        return agent_from_api(event, method)
-    if path == "/api/agent/agent-mailboxes/agent/rules" and method in ("POST", "DELETE"):
-        return agent_rule_api(event, method)
-    if path == "/api/agent/agent-tasks" and method == "GET":
-        return agent_tasks_api(event)
+    if path == "/api/agent/email-from" and method in ("GET", "POST", "DELETE"):
+        return email_from_api(event, method)
     if path == "/api/agent/hook-triggers" and method in ("GET", "PUT", "DELETE"):
         return hook_triggers_api(event, method)
     if path == "/api/agent/schedule-triggers" and method in ("GET", "PUT", "DELETE"):
@@ -943,56 +937,23 @@ def trigger_sample_api(event):
     return _no_store(_json_response(status, payload))
 
 
-def _agent_mail_call(event, action, run):
-    subject, error = require_operator(event, action)
+def email_from_api(event, method):
+    subject, error = require_operator(event, "email-from")
     if error:
         return error
     try:
-        status, payload = run(subject)
-    except (agent_mailboxes.MailboxError, ValueError, json.JSONDecodeError) as exc:
-        text = str(exc) or "Invalid request"
-        code = 404 if text.startswith("no rule") or "does not exist" in text else 400
-        return _json_response(code, {"error": text})
-    audit.emit("agent", action, subject, outcome="ok" if status == 200 else "error")
+        if method == "GET":
+            status, payload = email_from.api_list()
+        elif method == "POST":
+            body = json.loads(event.get("body") or "{}")
+            status, payload = email_from.api_add((body or {}).get("address"))
+        else:
+            query = event.get("queryStringParameters") or {}
+            status, payload = email_from.api_remove(query.get("address", ""))
+    except (email_from.FromError, ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit("email-from", "email-from", subject, outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
-
-
-def agent_mailbox_api(event, method):
-    def run(subject):
-        if method == "GET":
-            return agent_mailboxes.api_get_mailbox(operator=subject)
-        body = json.loads(event.get("body") or "{}")
-        return agent_mailboxes.api_save_mailbox(body, subject)
-
-    return _agent_mail_call(event, "agent-mail", run)
-
-
-def agent_from_api(event, method):
-    def run(_subject):
-        if method == "GET":
-            return agent_mailboxes.api_from_list()
-        if method == "POST":
-            body = json.loads(event.get("body") or "{}")
-            return agent_mailboxes.api_from_add((body or {}).get("address"))
-        query = event.get("queryStringParameters") or {}
-        return agent_mailboxes.api_from_remove(query.get("address", ""))
-
-    return _agent_mail_call(event, "agent-mail.from", run)
-
-
-def agent_rule_api(event, method):
-    def run(_subject):
-        if method == "POST":
-            body = json.loads(event.get("body") or "{}")
-            return agent_mailboxes.api_rule_add(body)
-        query = event.get("queryStringParameters") or {}
-        return agent_mailboxes.api_rule_delete(query.get("id", ""))
-
-    return _agent_mail_call(event, "agent-mail.rule", run)
-
-
-def agent_tasks_api(event):
-    return _agent_mail_call(event, "agent-mail.tasks", lambda _subject: agent_mailboxes.api_tasks())
 
 
 def email_triggers_api(event, method):

@@ -107,6 +107,36 @@ function bindRowButtons() {
   }));
 }
 
+export function renderEmailFrom(addresses) {
+  const list = $('#email-from-list');
+  if (!list) return;
+  const items = addresses || [];
+  list.innerHTML = items.map((address) => `<li>
+      <span class="mono">${escapeHtml(address)}</span>
+      <button class="button secondary email-from-remove" type="button" data-address="${escapeHtml(address)}">Remove</button>
+    </li>`).join('') || '<li class="muted-cell">No senders. Every message is ignored.</li>';
+  $$('.email-from-remove').forEach((button) => button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await api(`/api/admin/email-from?address=${encodeURIComponent(button.dataset.address)}`, { method: 'DELETE' });
+      await refresh();
+    } catch (error) { notice(error.message, true); }
+    finally { button.disabled = false; }
+  }));
+}
+
+$('#email-from-add')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const address = form.address.value.trim();
+  if (!address) return;
+  try {
+    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify({ address }) });
+    form.reset();
+    await refresh();
+  } catch (error) { notice(error.message, true); }
+});
+
 export function renderEmails(data) {
   current = {
     domain: (data && data.domain) || '',

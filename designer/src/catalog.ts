@@ -1,4 +1,4 @@
-import { Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
+import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -123,6 +123,18 @@ export const logicOperators = [
 
 /** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
+  {
+    type: "agent",
+    label: "Agent",
+    icon: Bot,
+    description: "Queue a prompt for the host worker, which starts an Aplexer session. The step returns as soon as the job is queued.",
+    fields: [
+      { key: "prompt", label: "Prompt", type: "textarea", required: true, placeholder: "{subject}\n\n{text}" },
+      { key: "workspace", label: "Workspace", required: true, placeholder: "/home/alexey/git/dapier" },
+      { key: "engine", label: "Engine", placeholder: "claude" },
+      { key: "tag_prefix", label: "Tag prefix", placeholder: "agent" }
+    ]
+  },
   {
     type: "webhook",
     label: "Webhook",
@@ -525,6 +537,21 @@ export const actionCatalog: ActionEntry[] = [
       { key: "references", label: "References", placeholder: "{trigger.message_id} — the thread's chain" },
       { key: "attachments", label: "Attachments (YAML)", type: "textarea",
         placeholder: '- filename: report.pdf\n  source_url: "{link}"' }
+    ]
+  },
+  {
+    type: "gmail_send",
+    label: "Gmail: send email",
+    icon: Mail,
+    description: "Send an email from the connection's Gmail mailbox (users.messages.send). Gmail delivers only from the authenticated account, so there is no sender field. The body is the text body, the HTML body, or both.",
+    fields: [
+      { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+      { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
+      { key: "subject", label: "Subject", placeholder: "{subject}" },
+      { key: "text", label: "Text body", type: "textarea" },
+      { key: "html", label: "HTML body", type: "textarea" },
+      { key: "cc", label: "Cc", placeholder: "comma-separated or {templated}" },
+      { key: "bcc", label: "Bcc", placeholder: "comma-separated or {templated}" }
     ]
   },
   {
@@ -1672,6 +1699,7 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
+  { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
   { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },

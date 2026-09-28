@@ -822,6 +822,11 @@ def handler(event, _context):
                 continue
             payload = normalize_payload(payload)
             inbox_id = inbox.record(payload)
+            from ..triggers.email_from import rejected as _sender_rejected
+
+            if _sender_rejected(payload):
+                inbox.ignore(inbox_id)
+                continue
             matched = execute(
                 payload,
                 **_attempt_hooks(attempt),
