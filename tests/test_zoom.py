@@ -108,6 +108,72 @@ def test_zoom_ignores_non_video_recordings(monkeypatch):
     assert published == []
 
 
+def test_zoom_transcript_event_publishes_the_transcript_file(monkeypatch):
+    table, _ = setup(monkeypatch)
+    body, headers = signed({"event": "recording.transcript_completed", "event_ts": 2000,
+                            "payload": {"account_id": "account-1", "object": {
+                                "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+                                "recording_files": [
+                                    {"id": "video", "file_type": "MP4",
+                                     "play_url": "https://zoom.test/play"},
+                                    {"id": "vtt", "file_type": "TRANSCRIPT",
+                                     "play_url": "https://zoom.test/vtt"},
+                                ]}}})
+    published = []
+    status, answer = zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                          publish=lambda *a, **k: published.append((a, k)))
+    assert status == 200
+    assert answer == {"accepted": True}
+    assert published[0][0][:2] == ("zoom", "recording.transcript_completed")
+    data = published[0][0][2]
+    assert [f["file_type"] for f in data["video_files"]] == ["MP4", "TRANSCRIPT"]
+    assert "object" not in json.dumps(data)
+
+
+def test_zoom_meeting_lifecycle_events_publish_metadata_only(monkeypatch):
+    table, _ = setup(monkeypatch)
+    meeting = {"account_id": "account-1", "object": {
+        "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+        "host_id": "host-1", "start_time": "2026-09-28T09:00:00Z",
+        "duration": 45, "timezone": "Europe/Berlin",
+        "participant": {"user_name": "Private Person"},
+        "settings": {"approval_type": 2}}}
+    started_body, started_headers = signed(
+        {"event": "meeting.started", "event_ts": 3000, "payload": dict(meeting)})
+    ended_body, ended_headers = signed(
+        {"event": "meeting.ended", "event_ts": 3060000,
+         "payload": {**meeting, "object": {**meeting["object"],
+                                           "end_time": "2026-09-28T09:45:00Z"}}})
+    published = []
+    for body, headers in ((started_body, started_headers), (ended_body, ended_headers)):
+        status, answer = zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                              publish=lambda *a, **k: published.append((a, k)))
+        assert status == 200
+        assert answer == {"accepted": True}
+    assert [args[1] for args, _ in published] == ["meeting.started", "meeting.ended"]
+    started_data, ended_data = published[0][0][2], published[1][0][2]
+    assert started_data["topic"] == "Course" and started_data["duration"] == 45
+    assert "end_time" not in started_data and ended_data["end_time"] == "2026-09-28T09:45:00Z"
+    dumped = json.dumps([started_data, ended_data])
+    assert "Private Person" not in dumped and "approval_type" not in dumped
+    assert "object" not in dumped and "download_token" not in dumped
+    # distinct lifecycle moments never share a dedup id
+    assert published[0][1]["event_id"] != published[1][1]["event_id"]
+
+
+def test_zoom_drops_unsubscribed_events(monkeypatch):
+    table, _ = setup(monkeypatch)
+    body, headers = signed({"event": "meeting.participant_joined", "event_ts": 4000,
+                            "payload": {"account_id": "account-1",
+                                        "object": {"id": 123, "uuid": "meeting-uuid"}}})
+    published = []
+    status, answer = zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                          publish=lambda *a, **k: published.append((a, k)))
+    assert status == 200
+    assert answer == {"accepted": False}
+    assert published == []
+
+
 def test_cli_zoom_import_uses_agent_connection_api(monkeypatch, tmp_path, capsys):
     token_file = tmp_path / "zoom-secret"
     token_file.write_text("zoom-secret-123456\n")

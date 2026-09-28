@@ -7,6 +7,7 @@ import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
 import { showOAuthResult } from './views/connections.js';
 import './views/storage.js';
+import { refreshAudit } from './views/audit.js';
 import { renderTriggers } from './views/triggers.js';
 import { toggleTheme } from './theme.js';
 
@@ -51,6 +52,59 @@ document.addEventListener('click', (event) => {
   const button = event.target.closest('.workflow-versions');
   if (!button || button.disabled) return;
   void openVersions(button.dataset.workflow);
+});
+
+/* Download YAML: the canonical text the API renders from the stored
+   definition — the same bytes `dapier workflows export` writes — as a
+   Blob download named after the workflow file. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('#workflow-download-yaml');
+  if (!button || !button.dataset.file || button.disabled) return;
+  button.disabled = true;
+  try {
+    const data = await api(`/api/admin/designer/workflows/${encodeURIComponent(button.dataset.file)}`);
+    const blob = new Blob([data.yaml || ''], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = button.dataset.file;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* Import YAML: a local file goes through the existing save endpoint — the
+   same commit-and-publish path the designer's save uses — so an export from
+   one deployment lands live on another (or restores here). */
+$('#import-yaml').addEventListener('click', () => $('#import-yaml-input').click());
+$('#import-yaml-input').addEventListener('change', async (event) => {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  let yaml;
+  try {
+    yaml = await file.text();
+  } catch (readError) {
+    notice(`Cannot read ${file.name}.`, true);
+    return;
+  }
+  try {
+    const data = await api('/api/admin/designer/workflows', {
+      method: 'PUT',
+      body: JSON.stringify({ yaml }),
+    });
+    notice(`Imported ${data.file || file.name}${data.published ? ' — live now' : ' (the deploy pipeline publishes it in a few minutes)'}.`);
+    await refresh();
+  } catch (error) {
+    notice(error.message, true);
+  }
 });
 
 document.addEventListener('click', (event) => {
@@ -138,7 +192,9 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   // The designer's leave prompt lives in main. Remove the drawer's inert
   // layer before the asynchronous guard can show that prompt.
   closeMobileMenu(true);
-  await setView(link.dataset.view || link.dataset.target);
+  const target = link.dataset.view || link.dataset.target;
+  if (!await setView(target)) return;
+  if (target === 'audit') refreshAudit();
 }));
 $('#overview-attention').addEventListener('click', async (event) => {
   const link = event.target.closest('.view-link');
@@ -160,6 +216,7 @@ window.addEventListener('popstate', async () => {
   closeMobileMenu(true);
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
+    if (view === 'audit') refreshAudit();
   }
 });
 
@@ -239,6 +296,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (runId) await openRun(runId);
   }
   if (initialView === 'triggers') renderTriggers();
+  if (initialView === 'audit') refreshAudit();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

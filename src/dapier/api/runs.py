@@ -5,11 +5,19 @@ Replay re-injects a past run's original trigger event onto the event queue —
 the same dispatch path every hook and custom event takes — so the rerun
 lands in run history exactly like a normal run, for failed runs (retry) and
 successful ones (replay) alike. Bulk replay-failed does the same for the
-latest failed runs of one workflow.
+latest failed runs of one workflow, and replay-from-step skips the early
+steps: a synthetic resume envelope (the worker's own park-and-continue
+path) re-runs the workflow from a chosen step on, seeded with the recorded
+outputs of everything before it.
+
+Content search answers "which run carried X": the ``q`` filter matches the
+recorded step input/output/error inside the same bounded scan window the
+list already walks.
 """
 import base64
 import json
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -44,6 +52,11 @@ STATUS_ALIASES = {
 # DynamoDB can't filter grouped runs server-side, so the list walks scan
 # pages (never a whole table): page size and page count are both bounded.
 MAX_SCAN_PAGES = 10
+
+# Content search serializes each step's recorded data into a match blob;
+# this cap keeps one oversized (or truncated-preview) step from dominating
+# the work, while leaving plenty for a needle like an order id.
+SEARCH_BLOB_CAP = 20000
 
 
 def _table():
@@ -236,13 +249,37 @@ def _scan_items(limit):
     return items
 
 
-def _group_runs(items):
+def _grouped(items):
+    """The scan window's executions keyed by run, in recorded order."""
     grouped = {}
     for item in items:
         if item.get("kind") == "failure-notice":
             continue
         grouped.setdefault(run_id_of(item), []).append(item)
-    return [run_summary(run_id, group) for run_id, group in grouped.items()]
+    return grouped
+
+
+def _group_runs(items):
+    return [run_summary(run_id, group) for run_id, group in _grouped(items).items()]
+
+
+def _search_blob(run_id, items):
+    """The lowercase text one run's content search matches against.
+
+    Every step's identifying fields plus its recorded input, output, and
+    error — the data the run actually handled — serialized once per list
+    call that carries a ``q``. Runs whose steps never recorded data still
+    match on the run id itself.
+    """
+    parts = [str(run_id)]
+    for item in items:
+        parts.append(json.dumps(
+            {field: item.get(field) for field in
+             ("workflow_id", "action_id", "connector", "event_type",
+              "error", "input", "output")},
+            default=str,
+        )[:SEARCH_BLOB_CAP])
+    return json.dumps(parts, default=str).lower()
 
 
 def recent(limit=25, workflow_id=None, status=None, since=None, before=None):
@@ -261,22 +298,30 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None):
 
 
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
-             next_token=None):
+             q=None, next_token=None):
     """The list response: runs plus a ``paging`` block.
 
     ``next`` carries the last returned row's sort key; the follow-up call
     passes it back as ``next_token`` and the window starts strictly after
-    that row, so filters and paging compose. The shape is backward
-    compatible — ``runs`` is unchanged, ``paging`` is additive.
+    that row, so filters and paging compose. ``q`` is content search: a
+    case-insensitive substring match over each run's recorded step data
+    (input, output, error) and ids, so "which run carried order #1234"
+    answers from history. The shape is backward compatible — ``runs`` is
+    unchanged, ``paging`` is additive.
     """
     limit = max(1, min(_int(limit) or DEFAULT_LIMIT, MAX_LIMIT))
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
-    runs = _group_runs(_scan_items(limit))
+    query = str(q or "").strip().lower()
+    grouped = _grouped(_scan_items(limit))
+    runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     runs = [run for run in runs
             if _wanted(run, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
+    if query:
+        runs = [run for run in runs
+                if query in _search_blob(run["run_id"], grouped[run["run_id"]])]
     runs.sort(key=_sort_key, reverse=True)
     if token_key is not None:
         runs = [run for run in runs if _sort_key(run) < token_key]
@@ -287,7 +332,8 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
         "paging": {
             "next": _encode_token(page[-1]) if more and page else None,
             "limit": limit,
-            "filtered": bool(workflow_id or status or since or before or next_token),
+            "filtered": bool(workflow_id or status or since or before
+                             or query or next_token),
         },
     }
 
@@ -359,7 +405,79 @@ def _queue():
     return boto3.client("sqs")
 
 
-def api_replay(run_id, *, queue=None):
+def _resume_key():
+    from ..engine.worker import RESUME_KEY
+
+    return RESUME_KEY
+
+
+def _workflows_now():
+    from ..engine.matching import all_workflows
+
+    return all_workflows()
+
+
+def _resume_from_step(run_id, run, steps, from_step, event):
+    """The worker resume envelope that re-runs a run from one step on.
+
+    The worker already knows how to continue a parked run: a resume
+    envelope carries the remaining chain segments and the accumulated step
+    outputs, and the engine replays them through the same step leases as a
+    fresh run. Replay-from-step is that path with the pieces rebuilt from
+    history: the tail of the workflow's current definition from the chosen
+    step onward, every step recorded before it seeded into ``step_outputs``
+    (so templates still read ``{steps.<id>.output.*}``), and the fresh
+    event the run replay always mints — a new run in history tied to the
+    original by correlation id.
+
+    Returns ``(resume_body, None)``, or ``(None, (status, payload))`` when
+    the workflow or the step cannot start a replay.
+    """
+    workflow_id = run.get("workflow_id") or run_id.split(":", 1)[0]
+    workflow = next((candidate for candidate in _workflows_now()
+                     if candidate.get("id") == workflow_id), None)
+    if workflow is None:
+        return None, (404, {"error": f"Workflow '{workflow_id}' no longer exists; "
+                                     "it cannot be replayed from a step"})
+    if not workflow.get("enabled", True):
+        return None, (409, {"error": f"Workflow '{workflow_id}' is disabled; "
+                                     "enable it before replaying from a step"})
+    actions = workflow.get("actions") or []
+    position = next((index for index, action in enumerate(actions)
+                     if str(action.get("id") or index) == from_step), None)
+    if position is None:
+        return None, (409, {"error": f"Step '{from_step}' is not a top-level step of "
+                                     f"workflow '{workflow_id}'; only top-level "
+                                     "steps can start a replay"})
+    # Seed every step recorded before the chosen one started (the rerun
+    # re-executes the chosen step and everything after); a chosen step the
+    # original run never reached seeds everything, the rerun starts fresh
+    # there.
+    chosen = next((step for step in steps if step.get("action_id") == from_step), None)
+    moment = str(chosen.get("started_at") or "") if chosen else ""
+    step_outputs = {}
+    for step in steps:
+        action_id = str(step.get("action_id") or "")
+        if not action_id or (moment and str(step.get("started_at") or "") >= moment):
+            continue
+        entry = {"status": step.get("status") or "completed",
+                 "output": step.get("output") if isinstance(step.get("output"), dict) else {}}
+        if step.get("error"):
+            entry["error"] = step.get("error")
+        step_outputs[action_id] = entry
+    return {
+        "workflow_id": workflow_id,
+        "event": event,
+        "resume_at": time.time(),
+        "delay_action_id": None,
+        "paused_ids": [],
+        "segments": [{"steps": actions[position:], "prefix": "", "scope": None}],
+        "step_outputs": step_outputs,
+        "run_id": f"{workflow_id}:{event['id']}",
+    }, None
+
+
+def api_replay(run_id, *, queue=None, from_step=None):
     """Re-execute a past run by re-injecting its original trigger event.
 
     The rebuilt envelope is published to the event queue, so the worker
@@ -367,27 +485,47 @@ def api_replay(run_id, *, queue=None):
     the rerun is recorded in run history like any other run. Asynchronous,
     hence 202; the response projects the replayed run's id from the
     original run's workflow.
+
+    With ``from_step`` (a top-level step id), the early steps do not run
+    again — the envelope is a synthetic resume (the worker's own
+    park-and-continue path) carrying the workflow from that step onward
+    plus the recorded outputs of everything before it, so a long chain can
+    be retried at the step that failed without re-firing the trigger and
+    the paid-for early actions.
     """
     run_id = str(run_id or "").strip()
+    from_step = str(from_step or "").strip()
     if not run_id:
         return 400, {"error": "run_id is required"}
     status, payload = api_get(run_id)
     if status != 200:
         return status, payload
-    event, error = replay_event(run_id, payload.get("steps") or [])
+    steps = payload.get("steps") or []
+    event, error = replay_event(run_id, steps)
     if error:
         return 409, {"error": error}
+    if from_step:
+        resume, error = _resume_from_step(run_id, payload.get("run") or {},
+                                          steps, from_step, event)
+        if error:
+            return error
+        message = {_resume_key(): resume}
+    else:
+        message = event
     (queue or _queue()).send_message(
         QueueUrl=os.environ["EVENT_QUEUE_URL"],
-        MessageBody=json.dumps(event),
+        MessageBody=json.dumps(message, default=str),
     )
     workflow_id = (payload.get("run") or {}).get("workflow_id") or run_id.split(":", 1)[0]
-    return 202, {
+    response = {
         "accepted": True,
         "replayed_from": run_id,
         "event_id": event["id"],
         "run_id": f"{workflow_id}:{event['id']}",
     }
+    if from_step:
+        response["from_step"] = from_step
+    return 202, response
 
 
 def api_cancel(run_id):

@@ -328,3 +328,52 @@ class SaveValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FormatterBreadthTests(unittest.TestCase):
+    """The Zapier-Formatter breadth beyond trim/upper/replace."""
+
+    def test_split_picks_an_element(self):
+        self.assertEqual(render("{path | split:/:1}", {"data": {"path": "a/b/c"}}), "b")
+
+    def test_split_out_of_range_renders_empty(self):
+        self.assertEqual(render("{path | split:/:9}", {"data": {"path": "a/b"}}), "")
+
+    def test_join_flattens_a_json_list(self):
+        self.assertEqual(render("{tags | join:;}", {"data": {"tags": ["a", "b"]}}), "a;b")
+
+    def test_join_passes_non_lists_through(self):
+        self.assertEqual(render("{name | join:-}", {"data": {"name": "solo"}}), "solo")
+
+    def test_title_capitalizes_words(self):
+        self.assertEqual(render("{name | title}", {"data": {"name": "hello world"}}), "Hello World")
+
+    def test_urlencode_escapes_for_urls(self):
+        self.assertEqual(render("{q | urlencode}", {"data": {"q": "a b&c"}}), "a+b%26c")
+
+    def test_length_counts_strings_and_lists(self):
+        self.assertEqual(render("{name | length}", {"data": {"name": "abcd"}}), "4")
+        self.assertEqual(render("{items | length}", {"data": {"items": [1, 2, 3]}}), "3")
+
+    def test_truncate_keeps_the_limit_including_the_suffix(self):
+        self.assertEqual(render("{text | truncate:5}", {"data": {"text": "abcdefg"}}), "abcd…")
+
+    def test_truncate_leaves_short_values_alone(self):
+        self.assertEqual(render("{text | truncate:10}", {"data": {"text": "short"}}), "short")
+
+    def test_slugify_normalizes_a_heading(self):
+        self.assertEqual(render("{t | slugify}", {"data": {"t": "Hello, Zapier World!"}}),
+                         "hello-zapier-world")
+
+    def test_arithmetic_formatters_collapse_integral_results(self):
+        self.assertEqual(render("{n | add:2}", {"data": {"n": "40"}}), "42")
+        self.assertEqual(render("{n | subtract:2}", {"data": {"n": "40"}}), "38")
+        self.assertEqual(render("{n | multiply:3}", {"data": {"n": "7"}}), "21")
+        self.assertEqual(render("{n | divide:4}", {"data": {"n": "10"}}), "2.5")
+
+    def test_divide_by_zero_renders_empty_like_any_formatter_failure(self):
+        self.assertEqual(render("{n | divide:0}", {"data": {"n": "10"}}), "")
+
+    def test_new_formatters_pass_save_time_validation(self):
+        validate_template("{a | split:,:0 | title | truncate:80} {b | urlencode | slugify} "
+                          "{c | length} {d | join:-} {e | add:1}")

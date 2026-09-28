@@ -17,8 +17,11 @@ from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import tokens
 from src.dapier.connections.providers import telegram_api
 from src.dapier.engine.actions.telegram import run_telegram_find_chat
-from src.dapier.engine.actions.youtube import run_youtube_find_video
-from src.dapier.engine.actions.zoom import run_zoom_find_meeting
+from src.dapier.engine.actions.youtube import (
+    run_youtube_find_playlist_items,
+    run_youtube_find_video,
+)
+from src.dapier.engine.actions.zoom import run_zoom_find_meeting, run_zoom_find_recording
 
 
 class FakeTransport:
@@ -149,6 +152,67 @@ def test_youtube_find_video_requires_a_query():
     assert transport.calls == []
 
 
+# --- youtube_find_playlist_items ----------------------------------------------
+
+
+def run_youtube_playlist(action, transport):
+    with with_connection("youtube", GOOGLE_CONNECTION):
+        return run_youtube_find_playlist_items(
+            {"type": "youtube_find_playlist_items", "connection_id": "yt-main", **action},
+            EVENT, transport=transport)
+
+
+def test_youtube_find_playlist_items_lists_the_playlist():
+    transport = FakeTransport(
+        ("playlistItems", 200,
+         {"items": [
+             {"snippet": {"title": "Episode 2", "publishedAt": "2026-09-02T00:00:00Z",
+                          "channelTitle": "DTC", "resourceId": {"videoId": "abc2"}},
+              "contentDetails": {"videoId": "abc2"}},
+             {"snippet": {"title": "Episode 1", "publishedAt": "2026-09-01T00:00:00Z",
+                          "resourceId": {"videoId": "abc1"}},
+              "contentDetails": {"videoId": "abc1"}},
+         ]}))
+
+    output = run_youtube_playlist({"playlist_id": "PL-1"}, transport)
+
+    assert output["found"] is True
+    assert output["count"] == 2
+    assert [video["id"] for video in output["videos"]] == ["abc2", "abc1"]
+    assert output["video"]["title"] == "Episode 2"
+    call = transport.calls[0]
+    assert call["url"].startswith("https://www.googleapis.com/youtube/v3/playlistItems")
+    assert call["headers"]["authorization"] == "Bearer tok"
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(call["url"]).query)
+    assert query["playlistId"] == ["PL-1"]
+
+
+def test_youtube_find_playlist_items_unknown_playlist_is_a_verdict():
+    transport = FakeTransport(
+        ("playlistItems", 404, {"error": {"message": "Playlist not found"}}))
+
+    output = run_youtube_playlist({"playlist_id": "PL-gone"}, transport)
+
+    assert output == {"found": False, "count": 0, "videos": [], "video": None}
+
+
+def test_youtube_find_playlist_items_provider_error_raises():
+    transport = FakeTransport(("playlistItems", 403, {"error": {"message": "Forbidden"}}))
+
+    with pytest.raises(RuntimeError) as excinfo:
+        run_youtube_playlist({"playlist_id": "PL-1"}, transport)
+    assert "HTTP 403" in str(excinfo.value)
+    assert "Forbidden" in str(excinfo.value)
+
+
+def test_youtube_find_playlist_items_requires_a_playlist_id():
+    transport = FakeTransport()
+
+    with pytest.raises(ValueError):
+        run_youtube_playlist({}, transport)
+    assert transport.calls == []
+
+
 # --- zoom_find_meeting --------------------------------------------------------
 
 
@@ -249,6 +313,103 @@ def test_zoom_find_meeting_requires_meeting_id_or_topic():
     assert transport.calls == []
 
 
+# --- zoom_find_recording ------------------------------------------------------
+
+
+def run_zoom_recording(action, transport):
+    with with_connection("zoom", ZOOM_CONNECTION):
+        return run_zoom_find_recording(
+            {"type": "zoom_find_recording", "connection_id": "zoom-main", **action},
+            EVENT, transport=transport)
+
+
+def test_zoom_find_recording_by_meeting_id():
+    transport = FakeTransport(
+        ("meetings/9001/recordings", 200,
+         {"id": 9001, "topic": "Standup", "start_time": "2026-09-28T09:00:00Z",
+          "duration": 30,
+          "recording_files": [
+              {"id": "f-1", "file_type": "MP4", "file_size": 1024,
+               "play_url": "https://zoom.us/rec/play/f-1",
+               "download_url": "https://zoom.us/rec/download/f-1",
+               "recording_start": "2026-09-28T09:00:00Z"}]}))
+
+    output = run_zoom_recording({"meeting_id": "9001"}, transport)
+
+    assert output["found"] is True
+    assert output["count"] == 1
+    assert output["recording"]["id"] == "9001"
+    assert output["recording"]["files"][0]["download_url"] == "https://zoom.us/rec/download/f-1"
+    call = transport.calls[0]
+    assert call["url"] == "https://api.zoom.us/v2/meetings/9001/recordings"
+    assert call["headers"]["authorization"] == "Bearer tok"
+
+
+def test_zoom_find_recording_unknown_meeting_is_a_verdict():
+    transport = FakeTransport(("meetings/9001/recordings", 404, {"code": 3001}))
+
+    output = run_zoom_recording({"meeting_id": "9001"}, transport)
+
+    assert output == {"found": False, "recording": None, "recordings": [], "count": 0}
+
+
+def test_zoom_find_recording_by_topic_filters_the_30_day_listing():
+    transport = FakeTransport(("users/me/recordings", 200, {"meetings": [
+        {"id": 9002, "topic": "Design review", "recording_files": []},
+        {"id": 9003, "topic": "Kubernetes Course Live",
+         "recording_files": [{"id": "f-9", "file_type": "MP4"}]},
+    ]}))
+
+    output = run_zoom_recording({"topic": "kubernetes course"}, transport)
+
+    assert output["found"] is True
+    assert output["matched_by"] == "topic"
+    assert output["recording"]["id"] == "9003"
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(transport.calls[0]["url"]).query)
+    assert query["per_page"] == ["300"]
+    assert "from" in query
+
+
+def test_zoom_find_recording_without_arguments_returns_the_latest():
+    transport = FakeTransport(("users/me/recordings", 200, {"meetings": [
+        {"id": 9004, "topic": "Newest", "recording_files": [{"id": "f-4"}]},
+        {"id": 9005, "topic": "Older", "recording_files": []},
+    ]}))
+
+    output = run_zoom_recording({}, transport)
+
+    assert output["found"] is True
+    assert output["recording"]["id"] == "9004"
+    assert output["count"] == 2
+    assert "matched_by" not in output
+
+
+def test_zoom_find_recording_no_recordings_is_a_verdict():
+    transport = FakeTransport(("users/me/recordings", 200, {"meetings": []}))
+
+    output = run_zoom_recording({"topic": "anything"}, transport)
+
+    assert output == {"found": False, "recording": None, "recordings": [],
+                      "count": 0, "matched_by": "topic"}
+
+
+def test_zoom_find_recording_provider_error_raises():
+    transport = FakeTransport(("users/me/recordings", 500, {"code": 500, "message": "Zoom is sad"}))
+
+    with pytest.raises(RuntimeError) as excinfo:
+        run_zoom_recording({}, transport)
+    assert "HTTP 500" in str(excinfo.value)
+    assert "Zoom is sad" in str(excinfo.value)
+
+
+def test_zoom_find_recording_rejects_an_unknown_match_mode():
+    transport = FakeTransport()
+
+    with pytest.raises(ValueError):
+        run_zoom_recording({"match": "fuzzy"}, transport)
+    assert transport.calls == []
+
+
 # --- telegram_find_chat -------------------------------------------------------
 
 
@@ -325,6 +486,20 @@ def test_registry_exposes_the_three_find_actions():
     assert specs["telegram_find_chat"] == ({"connection_id", "chat_id"}, set())
 
 
+def test_registry_exposes_the_recording_and_playlist_actions():
+    specs = registry.action_specs()
+    assert specs["zoom_find_recording"] == (
+        {"connection_id"}, {"meeting_id", "topic", "match"})
+    assert specs["youtube_find_playlist_items"] == (
+        {"connection_id", "playlist_id"}, set())
+    recording = registry.ACTIONS["zoom_find_recording"]
+    meeting_field = next(f for f in recording.fields if f["key"] == "meeting_id")
+    assert meeting_field["discover"] == {"resource": "zoom.recordings"}
+    playlist = registry.ACTIONS["youtube_find_playlist_items"]
+    playlist_field = next(f for f in playlist.fields if f["key"] == "playlist_id")
+    assert playlist_field["discover"] == {"resource": "youtube.playlists"}
+
+
 def test_find_action_fields_carry_the_picker_hints():
     youtube = registry.ACTIONS["youtube_find_video"]
     assert [field["key"] for field in youtube.fields] == ["connection_id", "query"]
@@ -345,6 +520,9 @@ def test_find_actions_validate_against_the_registry_chain():
         {"type": "youtube_find_video", "connection_id": "yt", "query": "{topic}"},
         {"type": "zoom_find_meeting", "connection_id": "zoom", "topic": "standup"},
         {"type": "telegram_find_chat", "connection_id": "tg", "chat_id": "@dtc"},
+        {"type": "zoom_find_recording", "connection_id": "zoom"},
+        {"type": "youtube_find_playlist_items", "connection_id": "yt",
+         "playlist_id": "{steps.pick.output.playlist_id}"},
     ])
     with pytest.raises(registry.ActionError):
         registry.validate_action_chain([

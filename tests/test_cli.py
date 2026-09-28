@@ -1256,3 +1256,82 @@ def test_runs_cancel_of_a_run_not_suspended_reports_the_409(isolated_home, monke
 
     assert rc == 5
     assert "Run is not suspended; nothing to cancel" in capsys.readouterr().out
+
+
+# --- Audit trail, workflows export, and server-side workflow search ---
+
+def test_audit_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"events": [{
+            "connection_id": "youtube-personal", "action": "connect",
+            "actor_subject": "op-1", "agent": None, "outcome": "created",
+            "timestamp": "2026-09-28T10:00:00+00:00",
+        }]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["audit", "list", "--action", "connect", "--limit", "10"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/audit?limit=10&action=connect")]
+    out = capsys.readouterr().out
+    assert "youtube-personal" in out and "connect" in out and "created" in out
+
+
+def test_audit_empty_trail_prints_a_hint(isolated_home, monkeypatch, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"events": []})
+
+    rc = main.main(["audit", "list"])
+
+    assert rc == 0
+    assert "No audit events" in capsys.readouterr().out
+
+
+def test_workflows_export_prints_the_canonical_yaml(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/designer/workflows/test-flow.yaml")
+        return {"workflow": {"id": "test-flow"}, "published": False,
+                "yaml": "id: test-flow\nactions:\n- type: webhook\n"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["workflows", "export", "test-flow.yaml"])
+
+    assert rc == 0
+    assert "id: test-flow" in capsys.readouterr().out
+
+
+def test_workflows_export_writes_the_output_file_verbatim(isolated_home, monkeypatch, tmp_path, capsys):
+    yaml_text = "id: test-flow\nactions:\n- type: webhook\n"
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"workflow": {"id": "test-flow"}, "yaml": yaml_text})
+    target = tmp_path / "export.yaml"
+
+    rc = main.main(["workflows", "export", "test-flow.yaml", "-o", str(target)])
+
+    assert rc == 0
+    assert target.read_text() == yaml_text
+    assert f"Exported test-flow.yaml to {target}" in capsys.readouterr().out
+
+
+def test_workflows_list_forwards_the_search(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"workflows": [{"id": "invoice-alert", "enabled": True,
+                               "source": "invoice-alert.yaml", "connector": "email",
+                               "event": "message.received", "actionCount": 1}],
+                "git_sync": {"configured": False, "repo": "r", "branch": "main"}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["workflows", "list", "--search", "invoice"])
+
+    assert rc == 0
+    assert calls == [("GET", "/api/agent/designer/workflows?q=invoice")]
+    assert "invoice-alert.yaml" in capsys.readouterr().out

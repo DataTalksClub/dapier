@@ -62,6 +62,8 @@ def build_parser():
                           help="Refresh-token JSON for OAuth providers")
     import_p.add_argument("--token-file", default=None,
                           help="Provider token or Zoom webhook Secret Token (read from file)")
+    import_p.add_argument("--signing-secret-file", default=None,
+                          help="Slack only: Events API signing secret (read from file)")
     import_p.add_argument("--display-name", default=None)
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])
@@ -134,6 +136,34 @@ def build_parser():
     runs_cancel_p = runs_sub.add_parser(
         "cancel", help="Cancel a suspended run: it closes out cancelled and will not resume")
     runs_cancel_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+
+    def add_audit_filters(parser):
+        parser.add_argument("--connection", help="Only events for this connection id")
+        parser.add_argument("--action",
+                            help="Exact action, or an action family like 'workflow.'")
+        parser.add_argument("--actor", help="Only events recorded for this actor subject")
+        parser.add_argument("--agent", help="Only events recorded for this agent")
+        parser.add_argument("--outcome",
+                            help="Only events with this outcome (ok, error, denied-no-grant, ...)")
+        parser.add_argument("--since", help="Only events at or after this ISO date/datetime")
+        parser.add_argument("--before",
+                            help="Only events before this ISO date/datetime (exclusive)")
+        parser.add_argument("--query",
+                            help="Substring search over action, connection, actor, agent, and error text")
+
+    audit_p = sub.add_parser("audit",
+                             help="Operator audit trail: who changed what, and when")
+    audit_sub = audit_p.add_subparsers(dest="command", required=True)
+    audit_list_p = audit_sub.add_parser("list", help="Recent audit events, newest first")
+    audit_list_p.add_argument("--limit", type=int, default=50)
+    add_audit_filters(audit_list_p)
+    audit_list_p.add_argument("--next", dest="next_token",
+                              help="Page token from the previous call's `next page:` footer")
+    audit_export_p = audit_sub.add_parser("export", help="Export the audit trail as CSV")
+    add_audit_filters(audit_export_p)
+    audit_export_p.add_argument("--max-rows", type=int,
+                                help="Cap on exported rows (default 1000, max 5000)")
+    audit_export_p.add_argument("--out", help="Write the CSV here (default: the suggested filename)")
 
     usage_p = sub.add_parser("usage", help="Task usage rollup: tasks per workflow per month")
     usage_p.add_argument("--months", type=int, default=12,
@@ -225,9 +255,16 @@ def build_parser():
 
     wf_p = sub.add_parser("workflows", help="Workflow YAML committed by the console designer")
     wf_sub = wf_p.add_subparsers(dest="command", required=True)
-    wf_sub.add_parser("list", help="List workflows and their On/Off state")
+    wf_list_p = wf_sub.add_parser("list", help="List workflows and their On/Off state")
+    wf_list_p.add_argument("--search", default=None,
+                           help="Only workflows whose id, description, trigger, "
+                                "or action types contain this text")
     wf_show_p = wf_sub.add_parser("show", help="Show one workflow (JSON)")
     wf_show_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_export_p = wf_sub.add_parser("export", help="Print (or write) a workflow's canonical YAML")
+    wf_export_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_export_p.add_argument("-o", "--output", default=None,
+                             help="Write the YAML to this file instead of stdout")
     wf_save_p = wf_sub.add_parser("save", help="Commit a workflow YAML to the repo and publish it live")
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
@@ -355,6 +392,8 @@ def main(argv=None):
             return commands.overview(api_url, debug)
         if args.group == "runs":
             return cmd_runs(args, api_url, debug)
+        if args.group == "audit":
+            return cmd_audit(args, api_url, debug)
         if args.group == "inbox":
             return cmd_inbox(args, api_url, debug)
         if args.group == "storage":
@@ -430,6 +469,7 @@ def cmd_connections(args, api_url, debug):
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
             token_path=args.token_file, root_path=args.root_path,
             display_name=args.display_name,
+            signing_secret_path=args.signing_secret_file,
         )
     if args.command == "revoke":
         return commands.connections_revoke(api_url, args.connection_id, debug)
@@ -475,9 +515,11 @@ def cmd_triggers(args, api_url, debug):
 
 def cmd_workflows(args, api_url, debug):
     if args.command == "list":
-        return commands.workflows_list(api_url, debug)
+        return commands.workflows_list(api_url, debug, search=args.search)
     if args.command == "show":
         return commands.workflows_show(api_url, args.file, debug)
+    if args.command == "export":
+        return commands.workflows_export(api_url, args.file, output=args.output, debug=debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
     if args.command == "draft":
@@ -592,6 +634,23 @@ def cmd_inbox(args, api_url, debug):
         return commands.inbox_show(api_url, args.inbox_id, debug)
     if args.command == "replay":
         return commands.inbox_replay(api_url, args.inbox_id, debug)
+    return 2
+
+
+def cmd_audit(args, api_url, debug):
+    if args.command == "list":
+        return commands.audit_list(api_url, args.limit, connection=args.connection,
+                                   action=args.action, actor=args.actor,
+                                   agent=args.agent, outcome=args.outcome,
+                                   since=args.since, before=args.before,
+                                   query=args.query, next_token=args.next_token,
+                                   debug=debug)
+    if args.command == "export":
+        return commands.audit_export(api_url, out=args.out, max_rows=args.max_rows,
+                                     connection=args.connection, action=args.action,
+                                     actor=args.actor, agent=args.agent,
+                                     outcome=args.outcome, since=args.since,
+                                     before=args.before, query=args.query, debug=debug)
     return 2
 
 

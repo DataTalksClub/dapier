@@ -18,6 +18,7 @@ saved (``validate_template``) and are skipped with a warning at run time.
 """
 import json
 import logging
+import operator
 import re
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
@@ -266,12 +267,73 @@ def _date_offset(value, spec):
     return (_parse_datetime(value) + timedelta(seconds=seconds)).isoformat()
 
 
+def _split(value, sep, index="0"):
+    parts = value.split(sep)
+    try:
+        position = int(index)
+    except ValueError:
+        raise ValueError(f"split index must be an integer, got {index!r}") from None
+    return parts[position] if -len(parts) <= position < len(parts) else ""
+
+
+def _join(value, sep):
+    """Join a list the context JSON-stringified; a non-list passes through."""
+    try:
+        items = json.loads(value)
+    except ValueError:
+        return value
+    if not isinstance(items, list):
+        return value
+    return str(sep).join(_stringify(item) for item in items)
+
+
+def _title(value):
+    return " ".join(word.capitalize() for word in value.split())
+
+
+def _urlencode(value):
+    from urllib.parse import quote_plus
+
+    return quote_plus(value)
+
+
+def _length(value):
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return str(len(value))
+    return str(len(parsed)) if isinstance(parsed, (str, list, dict)) else str(len(value))
+
+
+def _truncate(value, limit, suffix="…"):
+    cap = int(limit)
+    if len(value) <= cap:
+        return value
+    return value[:max(0, cap - len(suffix))] + suffix
+
+
+def _slugify(value):
+    return re.sub(r"[\s_-]+", "-", re.sub(r"[^a-z0-9\s_-]", "", value.lower())).strip("-")
+
+
+def _math(operate):
+    def apply(value, operand):
+        result = operate(float(value), float(operand))
+        if isinstance(result, float) and result.is_integer():
+            return str(int(result))
+        return str(result)
+    return apply
+
+
 # name -> (callable, (min_args, max_args), split_args_on_colon)
 FORMATTERS = {
     "trim": (_trim, (0, 0), True),
     "lower": (str.lower, (0, 0), True),
     "upper": (str.upper, (0, 0), True),
+    "title": (_title, (0, 0), True),
     "slice": (_slice, (1, 2), True),
+    "split": (_split, (1, 2), True),
+    "join": (_join, (1, 1), False),
     "replace": (str.replace, (2, 2), True),
     "regex_extract": (_regex_extract, (1, 1), False),
     "round": (_round, (0, 1), True),
@@ -280,4 +342,12 @@ FORMATTERS = {
     "number_format": (_number_format, (0, 1), True),
     "date_format": (_date_format, (1, 1), False),
     "date_offset": (_date_offset, (1, 1), False),
+    "urlencode": (_urlencode, (0, 0), True),
+    "length": (_length, (0, 0), True),
+    "truncate": (_truncate, (1, 2), True),
+    "slugify": (_slugify, (0, 0), True),
+    "add": (_math(operator.add), (1, 1), True),
+    "subtract": (_math(operator.sub), (1, 1), True),
+    "multiply": (_math(operator.mul), (1, 1), True),
+    "divide": (_math(operator.truediv), (1, 1), True),
 }

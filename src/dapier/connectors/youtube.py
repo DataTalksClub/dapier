@@ -7,7 +7,7 @@ discovery and health-check runners delegate to the shared provider layer
 connection's own token.
 """
 from ..connections import discovery as provider
-from ..engine.actions.youtube import run_youtube_find_video
+from ..engine.actions.youtube import run_youtube_find_video, run_youtube_find_playlist_items
 from .registry import (
     Action,
     ConnectionTest,
@@ -31,6 +31,23 @@ register(Action(
          "required": True},
         {"key": "query", "label": "Search query", "required": True,
          "placeholder": "DataTalks kubernetes"},
+    ),
+))
+
+register(Action(
+    type="youtube_find_playlist_items",
+    label="YouTube: playlist videos",
+    description="List the videos in a playlist, newest first (Find Playlist Videos)",
+    icon="youtube",
+    run=lambda action, event, workflow_id, steps=None: run_youtube_find_playlist_items(
+        action, event, steps=steps),
+    required=frozenset({"connection_id", "playlist_id"}),
+    optional=frozenset(),
+    fields=(
+        {"key": "connection_id", "label": "Connection ID", "placeholder": "youtube",
+         "required": True},
+        {"key": "playlist_id", "label": "Playlist ID",
+         "discover": {"resource": "youtube.playlists"}},
     ),
 ))
 

@@ -318,6 +318,12 @@ Resources:
         ConsoleStorage:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
+        ConsoleAudit:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
+        ConsoleAudit:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
         ConsoleSchedules:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /schedules, Method: GET}
@@ -645,6 +651,32 @@ Resources:
   DeadLetterQueue:
     Type: AWS::SQS::Queue
 
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+
+  AlarmNotifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.alarm_notify.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action: [ses:SendEmail]
+            Resource: '*'
+      Events:
+        Alarm:
+          Type: SNS
+          Properties:
+            Topic: !Ref AlarmTopic
+
   DropboxQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -671,6 +703,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: Dapier events are waiting in the dead-letter queue
+      AlarmActions: [!Ref AlarmTopic]
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:
@@ -687,6 +720,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: Dropbox notifications are waiting in the dead-letter queue
+      AlarmActions: [!Ref AlarmTopic]
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:
@@ -703,6 +737,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: HTML render jobs are waiting in the dead-letter queue
+      AlarmActions: [!Ref AlarmTopic]
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:
@@ -719,6 +754,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: Dapier workflow worker Lambda errors
+      AlarmActions: [!Ref AlarmTopic]
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
@@ -1059,6 +1095,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: Dapier daily DynamoDB backup Lambda errors
+      AlarmActions: [!Ref AlarmTopic]
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
@@ -1070,6 +1107,38 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+
+  # Daily operator error digest (src/dapier/error_digest.py): renders the
+  # errors summary (api/errors.py api_summary) into one short SES email to
+  # the operator address; a window with zero failed runs sends nothing.
+  # POST /api/{admin,agent}/errors/digest and `dapier errors send-digest`
+  # call the same send() for send-now parity.
+  ErrorDigestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.error_digest.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
+          EXECUTIONS_TABLE: !Ref ExecutionsTable
+          DAPIER_ERROR_DIGEST_DAYS: '1'
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action: [ses:SendEmail]
+            Resource: '*'
+        - DynamoDBReadPolicy:
+            TableName: !Ref ExecutionsTable
+      Events:
+        Daily:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 7 * * ? *)
 
 Outputs:
   ApiUrl:

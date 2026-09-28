@@ -577,7 +577,7 @@ def agent_identity(monkeypatch):
 
 
 def test_agent_designer_list_and_save_drive_the_same_store(monkeypatch, agent_identity):
-    monkeypatch.setattr(designer_store, "api_list", lambda: (200, {"workflows": [], "git_sync": {}}))
+    monkeypatch.setattr(designer_store, "api_list", lambda q=None: (200, {"workflows": [], "git_sync": {}}))
     listed = agent_api.route(
         agent_request("GET", "/api/agent/designer/workflows"), "GET", "/api/agent/designer/workflows",
     )
@@ -1009,3 +1009,81 @@ def test_agent_versions_and_rollback_round_trip_over_bearer(git_sync, history_st
     live = published_workflows.get_item("test-flow")
     assert live["revision"] == 3
     assert live["workflow"]["actions"][0]["url"] == "https://example.test/hook"
+
+
+# ---- Export/import symmetry and server-side search ----
+
+def test_api_get_returns_canonical_reusable_yaml(monkeypatch, tmp_path):
+    (tmp_path / "sample-flow.yaml").write_text(WORKFLOW_YAML)
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+
+    status, payload = designer_store.api_get("sample-flow.yaml")
+    assert status == 200
+    yaml_text = payload["yaml"]
+    assert "id: test-flow" in yaml_text
+    # The export re-saves byte-equivalent: dumping the parsed export is the
+    # same text, which is what a save would commit.
+    assert designer_store.workflow_yaml_text(
+        designer_store.parse_workflow(yaml_text)) == yaml_text
+
+
+def test_summary_carries_description_and_action_types(monkeypatch, tmp_path):
+    (tmp_path / "described.yaml").write_text(
+        "id: described\ndescription: Ship the weekly digest\n"
+        "trigger: {connector: email, event: message.received}\n"
+        "actions: [{type: slack}, {type: webhook, url: 'https://x'}]\n")
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+
+    _, payload = designer_store.api_list()
+    row = payload["workflows"][0]
+    assert row["description"] == "Ship the weekly digest"
+    assert row["actionTypes"] == ["slack", "webhook"]
+
+
+def test_api_list_search_filters_on_id_description_trigger_and_types(monkeypatch, tmp_path):
+    (tmp_path / "invoice-alert.yaml").write_text(
+        "id: invoice-alert\ndescription: Alert on new invoices\n"
+        "trigger: {connector: email, event: message.received}\n"
+        "actions: [{type: slack, channel: '#ops'}]\n")
+    (tmp_path / "nightly-backup.yaml").write_text(
+        "id: nightly-backup\ndescription: Copy files to S3\n"
+        "trigger: {connector: schedule, event: tick}\n"
+        "actions: [{type: dropbox_upload}]\n")
+    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+
+    _, all_rows = designer_store.api_list()
+    assert [row["id"] for row in all_rows["workflows"]] == ["invoice-alert", "nightly-backup"]
+
+    _, by_id = designer_store.api_list("INVOICE")   # id, case-insensitive
+    assert [row["id"] for row in by_id["workflows"]] == ["invoice-alert"]
+    _, by_description = designer_store.api_list("copy files")
+    assert [row["id"] for row in by_description["workflows"]] == ["nightly-backup"]
+    _, by_trigger = designer_store.api_list("dropbox")
+    assert [row["id"] for row in by_trigger["workflows"]] == ["nightly-backup"]
+    _, by_type = designer_store.api_list("slack")
+    assert [row["id"] for row in by_type["workflows"]] == ["invoice-alert"]
+    _, no_match = designer_store.api_list("nothing-matches-this")
+    assert no_match["workflows"] == []
+
+
+def test_designer_list_passes_the_search_to_the_store(monkeypatch, operator_session):
+    seen = {}
+    monkeypatch.setattr(designer_store, "api_list",
+                        lambda q=None: seen.update(q=q) or (200, {"workflows": [], "git_sync": {}}))
+    event = admin_request("GET", "/api/admin/designer/workflows")
+    event["queryStringParameters"] = {"q": "invoice"}
+    admin.route(event, "GET", "/api/admin/designer/workflows")
+    assert seen["q"] == "invoice"
+
+
+def test_agent_designer_list_passes_the_search_to_the_store(monkeypatch, agent_identity):
+    seen = {}
+    monkeypatch.setattr(designer_store, "api_list",
+                        lambda q=None: seen.update(q=q) or (200, {"workflows": [], "git_sync": {}}))
+    event = agent_request("GET", "/api/agent/designer/workflows")
+    event["queryStringParameters"] = {"q": "backup"}
+    agent_api.route(event, "GET", "/api/agent/designer/workflows")
+    assert seen["q"] == "backup"

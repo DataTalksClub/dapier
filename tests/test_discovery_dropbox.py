@@ -11,8 +11,10 @@ import json
 import pytest
 
 from src.dapier.api import discovery as api_discovery
+from src.dapier.api import runs
 from src.dapier.connectors import dropbox as dropbox_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
+from src.dapier.connectors import trigger_discovery
 from src.dapier.connections import tokens
 from src.dapier.engine.actions import base as action_base
 
@@ -219,3 +221,101 @@ def test_delete_action_picks_paths_from_the_files_discovery():
     path_field = next(field for field in registry.ACTIONS["dropbox_delete"].fields
                       if field.get("key") == "path")
     assert path_field["discover"] == {"resource": "dropbox.files"}
+
+
+# --- trigger samples: one sample per file event, history only when it matches ---
+#
+# The resolver publishes file.created / file.updated / file.deleted envelopes
+# with different data shapes; the sample discovery must answer each event ask
+# with its own shape, and recorded history only counts when the replayed
+# envelope carries the asked event (a deleted run is never renamed to created).
+
+FILE_DATA_KEYS = {"account_id", "path", "path_lower",
+                  "file_id", "rev", "content_hash", "size"}
+
+DELETED_ENVELOPE = {
+    "id": "dropbox:dbid:acct1:/invoices/invoice-4137.pdf:deleted",
+    "connector": "dropbox",
+    "event": "file.deleted",
+    "source": "dbid:acct1",
+    "occurred_at": "2026-09-27T10:00:00+00:00",
+    "data": {"account_id": "dbid:acct1",
+             "path": "/Invoices/invoice-4137.pdf",
+             "path_lower": "/invoices/invoice-4137.pdf"},
+}
+
+
+@pytest.fixture(autouse=True)
+def no_recorded_runs(monkeypatch):
+    """The sample chain starts at synthetic: no recorded runs, by default."""
+    monkeypatch.setattr(runs, "recent", lambda *args, **kwargs: [])
+
+
+def _trigger_sample(**body):
+    status, payload = trigger_discovery.api_discover({"connector": "dropbox", **body})
+    assert status == 200, payload
+    return payload
+
+
+def test_sample_without_event_stays_the_created_example():
+    payload = _trigger_sample()
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "file.created"
+    assert payload["sample"]["event"] == "file.created"
+    assert set(payload["sample"]["data"]) == FILE_DATA_KEYS
+
+
+def test_sample_event_file_updated_keeps_the_resolver_file_shape():
+    payload = _trigger_sample(event="file.updated")
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "file.updated"
+    data = payload["sample"]["data"]
+    assert set(data) == FILE_DATA_KEYS
+    assert data["rev"] != "discover1"  # an update means the rev moved
+
+
+def test_sample_event_file_deleted_carries_only_the_gone_path():
+    payload = _trigger_sample(event="file.deleted")
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "file.deleted"
+    data = payload["sample"]["data"]
+    assert set(data) == {"account_id", "path", "path_lower"}
+
+
+def test_sample_unknown_event_falls_back_to_the_created_example():
+    payload = _trigger_sample(event="file.renamed")
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "file.created"
+    assert set(payload["sample"]["data"]) == FILE_DATA_KEYS
+
+
+def test_history_serves_only_the_matching_event(monkeypatch):
+    """A recorded file.deleted run fills a file.deleted ask — and only that."""
+    monkeypatch.setattr(runs, "recent", lambda *args, **kwargs: [
+        {"run_id": "invoices:evt-9", "connector": "dropbox"}])
+    monkeypatch.setattr(runs, "api_get", lambda run_id: (200, {"steps": []}))
+    monkeypatch.setattr(runs, "replay_event",
+                        lambda run_id, steps: (DELETED_ENVELOPE, None))
+
+    deleted = _trigger_sample(event="file.deleted")
+    assert deleted["source"] == "history"
+    assert deleted["sample"]["event"] == "file.deleted"
+    assert deleted["sample"]["data"] == DELETED_ENVELOPE["data"]
+    assert deleted["sample"]["id"] == DELETED_ENVELOPE["id"]
+
+    created = _trigger_sample(event="file.created")
+    assert created["source"] == "synthetic"
+    assert created["event"] == "file.created"  # history is never renamed
+
+
+def test_history_does_not_fill_the_default_ask_with_other_events(monkeypatch):
+    """No event means the file.created ask: a deleted run stays out of it."""
+    monkeypatch.setattr(runs, "recent", lambda *args, **kwargs: [
+        {"run_id": "invoices:evt-9", "connector": "dropbox"}])
+    monkeypatch.setattr(runs, "api_get", lambda run_id: (200, {"steps": []}))
+    monkeypatch.setattr(runs, "replay_event",
+                        lambda run_id, steps: (DELETED_ENVELOPE, None))
+
+    payload = _trigger_sample()
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "file.created"

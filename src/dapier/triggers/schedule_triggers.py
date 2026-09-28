@@ -34,7 +34,10 @@ TARGET_ID = "dapier-worker"
 SCHEDULE_EVENT = "schedule.triggered"
 
 EXPRESSION_PATTERN = re.compile(
-    r"^cron\(\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s*\)$"
+    # EventBridge cron's optional seventh field is an IANA timezone
+    # (e.g. cron(0 9 ? * MON * Europe/Berlin)); it is passed through to
+    # PutRule untouched, which rejects unsupported tz names itself.
+    r"^cron\(\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+(?:\s+\S+)?\s*\)$"
     r"|^rate\(\s*\d+\s+(minutes?|hours?|days?)\s*\)$"
 )
 
@@ -43,7 +46,7 @@ def validate_expression(expression):
     expression = str(expression or "").strip()
     if not EXPRESSION_PATTERN.fullmatch(expression):
         raise TriggerError(
-            "schedule expression must be cron(minute hour dom month dow year) "
+            "schedule expression must be cron(minute hour dom month dow year [timezone]) "
             "or rate(<number> minutes|hours|days)")
     return expression
 

@@ -1,4 +1,10 @@
-"""Verify Zoom cloud-recording webhooks and normalize safe workflow events."""
+"""Verify Zoom webhooks and normalize safe workflow events.
+
+The four events dapier subscribes to are the ones the Zoom chip declares
+(connectors.triggers): recording.completed, recording.transcript_completed,
+meeting.started, meeting.ended. Every builder returns metadata only —
+download tokens, participant lists, and private payloads stay out of runs.
+"""
 
 import hashlib
 import hmac
@@ -25,7 +31,15 @@ def verify(headers, body, secret, *, now=None):
     return hmac.compare_digest(signature, expected)
 
 
-def recording_data(payload):
+RECORDING_EVENTS = ("recording.completed", "recording.transcript_completed")
+MEETING_EVENTS = ("meeting.started", "meeting.ended")
+# The video-file filter for recording events; transcript_completed deliveries
+# widen it so the TRANSCRIPT entry rides along with the video.
+RECORDING_FILE_TYPES = frozenset({"MP4", "M4V"})
+TRANSCRIPT_FILE_TYPES = frozenset({"MP4", "M4V", "TRANSCRIPT"})
+
+
+def recording_data(payload, *, file_types=RECORDING_FILE_TYPES):
     """Return metadata only; Zoom download tokens and private payloads stay out of runs."""
     if not isinstance(payload, dict):
         return None
@@ -45,7 +59,7 @@ def recording_data(payload):
             "download_url": item.get("download_url"),
         }
         for item in files if isinstance(item, dict)
-        and str(item.get("file_type", "")).upper() in {"MP4", "M4V"}
+        and str(item.get("file_type", "")).upper() in file_types
     ]
     if not videos:
         return None
@@ -60,6 +74,36 @@ def recording_data(payload):
         "share_url": meeting.get("share_url"),
         "video_files": videos,
     }
+
+
+def meeting_data(payload):
+    """Metadata-only flatten of a meeting lifecycle delivery (started/ended).
+
+    Zoom nests the details under ``payload.object`` and puts ``account_id``
+    at the payload level for meeting events, so the account for binding is
+    read from the object with a payload-level fallback. Only the scheduling
+    facts a workflow templates over survive — participant lists and
+    per-account settings stay out of runs; ``end_time`` appears on ended
+    deliveries only.
+    """
+    if not isinstance(payload, dict):
+        return None
+    meeting = payload.get("object")
+    if not isinstance(meeting, dict):
+        return None
+    data = {
+        "account_id": meeting.get("account_id") or payload.get("account_id"),
+        "uuid": meeting.get("uuid"),
+        "id": meeting.get("id"),
+        "topic": meeting.get("topic"),
+        "host_id": meeting.get("host_id"),
+        "start_time": meeting.get("start_time"),
+        "duration": meeting.get("duration"),
+        "timezone": meeting.get("timezone"),
+    }
+    if meeting.get("end_time"):
+        data["end_time"] = meeting.get("end_time")
+    return data
 
 
 def handle(connection_id, headers, body, *, connections_table, publish, now=None):
@@ -97,14 +141,32 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             records.put_connection(connections_table, updated)
         return 200, {"plainToken": plain, "encryptedToken": hmac.new(
             secret.encode(), plain.encode(), hashlib.sha256).hexdigest()}
-    if event != "recording.completed":
+    if event not in RECORDING_EVENTS + MEETING_EVENTS:
         return 200, {"accepted": False}
-    data = recording_data(message.get("payload"))
-    if data is None:
-        return 200, {"accepted": False}
-    account_id = data.get("account_id")
-    if not account_id or not data.get("meeting_uuid") or not message.get("event_ts"):
-        return 400, {"error": "incomplete Zoom recording event"}
+    if event in RECORDING_EVENTS:
+        data = recording_data(message.get("payload"),
+                              file_types=TRANSCRIPT_FILE_TYPES
+                              if event == "recording.transcript_completed"
+                              else RECORDING_FILE_TYPES)
+        if data is None:
+            return 200, {"accepted": False}
+        account_id = data.get("account_id")
+        if not account_id or not data.get("meeting_uuid") or not message.get("event_ts"):
+            return 400, {"error": "incomplete Zoom recording event"}
+        # recording.completed keeps its original dedup identity (no event
+        # name); the newer events name themselves so one meeting can complete
+        # and transcript-complete at the same timestamp without colliding.
+        who = data.get("meeting_uuid") or data.get("meeting_id")
+        identity = (f"{connection_id}:{who}:{message.get('event_ts')}"
+                    if event == "recording.completed"
+                    else f"{connection_id}:{event}:{who}:{message.get('event_ts')}")
+    else:
+        data = meeting_data(message.get("payload"))
+        account_id = (data or {}).get("account_id")
+        if (data is None or not account_id or not data.get("uuid")
+                or not data.get("id") or not message.get("event_ts")):
+            return 400, {"error": "incomplete Zoom meeting event"}
+        identity = f"{connection_id}:{event}:{data.get('uuid')}:{message.get('event_ts')}"
     try:
         records.check_binding(connection, account_id)
     except records.BindingError:
@@ -114,8 +176,7 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             connection, verified_account_id=account_id,
             account_title=account_id, granted_scopes=[], connected_by="zoom-webhook")
         records.put_connection(connections_table, updated)
-    identity = f"{connection_id}:{data.get('meeting_uuid') or data.get('meeting_id')}:{message.get('event_ts')}"
     event_id = "zoom:" + hashlib.sha256(identity.encode()).hexdigest()[:32]
-    publish("zoom", "recording.completed", {"connection_id": connection_id, **data},
+    publish("zoom", event, {"connection_id": connection_id, **data},
             source=connection_id, event_id=event_id)
     return 200, {"accepted": True}

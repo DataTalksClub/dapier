@@ -18,11 +18,16 @@ FIND_MATCH_MODES = ("contains", "exact")
 SEARCH_TIMEOUT = 15
 
 
-def _drive_query(name, mode):
-    """The Drive ``q`` filter: not trashed, name matched per mode."""
+def _drive_query(name, mode, folder=""):
+    """The Drive ``q`` filter: not trashed, name matched per mode, and when
+    a folder id is given, only that folder's children."""
     escaped = name.replace("'", "\\'")
     operator = "=" if mode == "exact" else "contains"
-    return f"trashed=false and name {operator} '{escaped}'"
+    query = f"trashed=false and name {operator} '{escaped}'"
+    folder = str(folder or "").strip()
+    if folder:
+        query += f" and '{folder.replace(chr(39), chr(92) + chr(39))}' in parents"
+    return query
 
 
 def _search_files(access_token, query, *, transport=None):
@@ -61,8 +66,10 @@ def run_drive_find_file(action, event, *, transport=None, steps=None):
     """Find the most recently modified Drive file whose name matches.
 
     ``match`` selects ``contains`` (default) or ``exact`` against the file
-    name. The output carries the first hit under ``file`` and how many
-    candidates the search returned under ``count``.
+    name; an optional ``folder`` id (the folders discovery serves it)
+    restricts the search to that folder's children. The output carries the
+    first hit under ``file`` and how many candidates the search returned
+    under ``count``.
     """
     connection = base._connected_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection, transport=transport)
@@ -72,7 +79,8 @@ def run_drive_find_file(action, event, *, transport=None, steps=None):
     mode = str(action.get("match") or "contains").strip().lower()
     if mode not in FIND_MATCH_MODES:
         raise ValueError(f"drive_find_file match must be one of: {', '.join(FIND_MATCH_MODES)}")
-    result = _search_files(access_token, _drive_query(name, mode), transport=transport)
+    folder = render(str(action.get("folder") or ""), event, steps).strip()
+    result = _search_files(access_token, _drive_query(name, mode, folder), transport=transport)
     files = result.get("files") if isinstance(result.get("files"), list) else []
     if not files:
         return {"found": False, "file": None, "count": 0}

@@ -103,6 +103,11 @@ export function openWorkflow(id) {
   } else {
     edit.hidden = true;
   }
+  /* Export: the canonical YAML the API renders from the stored definition
+     (the same bytes `dapier workflows export` writes). */
+  const download = $('#workflow-download-yaml');
+  download.dataset.file = workflow.source || '';
+  download.hidden = !workflow.source;
   $('#workflow-dialog').showModal();
   icons();
 }
@@ -130,6 +135,8 @@ function render() {
   $('#overview-runs-table').hidden = recentRuns.length === 0;
   renderAttention(data);
   renderErrors();
+  renderAudit();
+  renderUsage();
   renderWorkflows();
   renderConnections(data.connections);
   renderCredentials(data.credentials);
@@ -148,8 +155,14 @@ export function renderWorkflows() {
   const all = state.data?.workflows || [];
   const query = $('#workflow-search').value.trim().toLowerCase();
   const status = $('#workflow-filter').value;
+  // The server owns text search once its ?q= result is in
+  // (state.workflowSearchIds); while that call is in flight or has failed,
+  // the loaded payload filters client-side.
+  const serverIds = query ? state.workflowSearchIds : null;
+  const matchesText = (workflow) =>
+    `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
   const shown = all.filter((workflow) =>
-    `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query) &&
+    (serverIds ? serverIds.has(workflow.id) : matchesText(workflow)) &&
     (status === 'all' || workflow.enabled === (status === 'enabled')));
   $('#workflow-count').textContent = `${shown.length} of ${all.length} workflows`;
   const runs = state.data?.runs || [];
@@ -201,7 +214,86 @@ function renderErrors() {
   $('#overview-errors-table').hidden = rows.length === 0;
 }
 
-$('#workflow-search').addEventListener('input', renderWorkflows);
+/* Activity: the operator-action audit trail (same rows `dapier audit`
+   prints). The action dropdown filters the loaded rows client-side; the API
+   exposes the same filter as ?action= for the full trail. */
+function renderAudit() {
+  const rows = (state.audit && state.audit.events) || [];
+  const filter = $('#audit-action-filter');
+  const selected = filter.value;
+  const actions = [...new Set(rows.map((row) => row.action).filter(Boolean))].sort();
+  if (filter.dataset.actions !== actions.join(',')) {
+    filter.dataset.actions = actions.join(',');
+    filter.innerHTML = '<option value="all">All actions</option>'
+      + actions.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('');
+    filter.value = actions.includes(selected) ? selected : 'all';
+  }
+  const shown = filter.value === 'all' ? rows : rows.filter((row) => row.action === filter.value);
+  $('#overview-audit').innerHTML = shown.slice(0, 8).map((row) =>
+    `<tr><td class="mono muted-cell" data-label="When">${escapeHtml(formatTimestamp(row.timestamp) || '—')}</td>`
+    + `<td class="mono" data-label="Action">${escapeHtml(row.action || '—')}</td>`
+    + `<td class="mono muted-cell" data-label="Actor">${escapeHtml(row.actor_subject || '—')}</td>`
+    + `<td data-label="Outcome">${statusLine(row.outcome === 'ok' ? 'completed' : String(row.outcome || 'unknown'), { completed: 'ok' })}`
+    + `${row.error ? `<span class="field-hint" title="${escapeHtml(row.error)}">${escapeHtml(row.error)}</span>` : ''}</td></tr>`).join('');
+  $('#overview-audit-empty').hidden = rows.length > 0;
+  $('#overview-audit-table').hidden = rows.length === 0;
+}
+
+$('#audit-action-filter').addEventListener('change', renderAudit);
+
+/* Usage: the per-workflow-per-month task rollup the overview payload
+   carries (last 3 months). Ranked by 3-month total; workflows with no
+   recorded tasks stay off the list. */
+function renderUsage() {
+  const rows = (state.data && state.data.usage) || [];
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}${pad2(now.getMonth() + 1)}`;
+  const byWorkflow = new Map();
+  for (const row of rows) {
+    const tasks = Number(row.tasks) || 0;
+    const entry = byWorkflow.get(row.workflow_id) || { current: 0, total: 0 };
+    entry.total += tasks;
+    if (row.month === monthKey) entry.current += tasks;
+    byWorkflow.set(row.workflow_id, entry);
+  }
+  const shown = [...byWorkflow.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+  $('#overview-usage').innerHTML = shown.map(([workflowId, entry]) =>
+    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}">${escapeHtml(workflowId)}</button></td>`
+    + `<td class="mono" data-label="This month">${entry.current}</td>`
+    + `<td class="mono muted-cell" data-label="3-month total">${entry.total}</td></tr>`).join('');
+  $('#overview-usage-empty').hidden = shown.length > 0;
+  $('#overview-usage-table').hidden = shown.length === 0;
+}
+
+let searchSequence = 0;
+
+/* The search box queries server-side (?q= on the overview endpoint — the
+   server matches workflow id, description, trigger, and action types),
+   debounced so typing does not fire a request per key. A failed fetch falls
+   back to the client-side filter over the already-loaded payload. */
+async function searchWorkflows() {
+  const query = $('#workflow-search').value.trim();
+  const stamp = ++searchSequence;
+  if (!query) {
+    state.workflowSearchIds = null;
+    renderWorkflows();
+    return;
+  }
+  try {
+    const data = await api(`/api/admin/overview?q=${encodeURIComponent(query)}`);
+    if (stamp !== searchSequence) return; // a newer keystroke superseded this
+    state.workflowSearchIds = new Set((data.workflows || []).map((workflow) => workflow.id));
+  } catch (error) {
+    if (stamp !== searchSequence) return;
+    state.workflowSearchIds = null;
+  }
+  renderWorkflows();
+}
+
+$('#workflow-search').addEventListener('input', () => {
+  clearTimeout(searchWorkflows.timer);
+  searchWorkflows.timer = setTimeout(searchWorkflows, 250);
+});
 $('#workflow-filter').addEventListener('change', renderWorkflows);
 
 export async function refresh() {
@@ -218,6 +310,13 @@ export async function refresh() {
       state.errors = null;
     }
     renderErrors();
+    // The audit trail trails too; a miss leaves Activity quietly empty.
+    try {
+      state.audit = await api('/api/admin/audit?limit=20');
+    } catch (auditError) {
+      state.audit = null;
+    }
+    renderAudit();
     // Fresh connections data for an open designer: the iframe may have
     // mounted before this fetch answered.
     if (state.view === 'designer') postConnectionsToDesigner();

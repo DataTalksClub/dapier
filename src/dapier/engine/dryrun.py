@@ -328,7 +328,8 @@ def test_step(workflow, action_id, sample, *, execute=False, step_outputs=None):
     else:
         _evaluate_logic_step(step, step_type, envelope,
                              _template_context(envelope, steps_context),
-                             steps_context, entry)
+                             steps_context, entry,
+                             workflow_id=str(resolved.get("id")))
 
     report = _report(resolved, envelope, [entry],
                      mode="execute-step" if execute else "test-step")
@@ -337,7 +338,7 @@ def test_step(workflow, action_id, sample, *, execute=False, step_outputs=None):
 
 
 def _evaluate_logic_step(step, step_type, envelope, context,
-                         steps_context, entry):
+                         steps_context, entry, workflow_id=""):
     """What one logic step would do, evaluated without executing it.
 
     Logic steps carry no side effects of their own — the risk sits in their
@@ -346,7 +347,8 @@ def _evaluate_logic_step(step, step_type, envelope, context,
     step takes, whether a filter passes, how long a delay waits, what a loop
     would iterate. ``context`` is the template context (the delay's duration
     fields render against it), ``steps_context`` rides along for shape
-    symmetry with the connector path.
+    symmetry with the connector path, and ``workflow_id`` scopes the digest
+    peek.
     """
     from . import logic
 
@@ -455,6 +457,28 @@ def _evaluate_logic_step(step, step_type, envelope, context,
                            "truncated": len(items) > cap,
                            "item_var": str(step.get("item") or "item").strip() or "item",
                            "note": "loop body not executed — test its steps individually"}
+    elif step_type == "digest":
+        key = str(step.get("key") or "").strip()
+        if not key:
+            entry["ok"] = False
+            entry["error"] = f"digest '{step.get('id', '')}' needs a key"
+            return
+        output = {"mode": str(step.get("mode") or "accumulate").strip().lower() or "accumulate",
+                  "key": key,
+                  "note": "not executed — a step test never adds or flushes"}
+        try:
+            from .actions import digest as digest_actions
+
+            # An informative peek at the batch the step would touch; the
+            # store may be unreachable in a test run, which keeps the count
+            # out of the report instead of failing the step.
+            output["pending"] = digest_actions._pending_count(
+                str(workflow_id), digest_actions._prefix(key))
+        except Exception:
+            pass
+        entry["ok"] = True
+        entry["status"] = "completed"
+        entry["output"] = output
     else:
         entry["ok"] = False
         entry["error"] = f"unsupported action: {step_type}"

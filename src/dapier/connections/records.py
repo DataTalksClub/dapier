@@ -22,6 +22,9 @@ CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
 
 STATUS_READY = "ready"
 STATUS_CONNECTED = "connected"
+# Set by the token lifecycle (connections.tokens) after provider-side
+# revocation; the connection must be reconnected before any use.
+STATUS_REVOKED = "revoked"
 
 # Providers that authenticate with a directly supplied token instead of an
 # OAuth consent round-trip (see admin._save_token_connection). Zoom's meeting
@@ -195,8 +198,51 @@ def mark_connected(item, *, verified_account_id, account_title, granted_scopes, 
     return updated
 
 
-def public_view(item):
-    """Metadata safe for list/status responses (never secrets)."""
+def token_expires_at(stored):
+    """The stored token's expiry as an ISO instant, or None when it has none.
+
+    ``stored`` is the connection's credential value (tokens live in the
+    credentials store, not the metadata item); ``expires_at`` there is an
+    epoch-seconds timestamp. Only the expiry field is read — no secret
+    passes through.
+    """
+    try:
+        epoch = int((stored or {}).get("expires_at"))
+    except (TypeError, ValueError):
+        return None
+    if epoch <= 0:
+        return None
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+
+
+def health(item, stored=None, *, now=None):
+    """Computed connection health for listings: ``ok`` or ``expired``.
+
+    ``expired`` means "needs reconnection": the stored access token is past
+    its expiry (same skew the token refresh uses, so the two never
+    disagree), or the connection was revoked and must be reconnected
+    outright whatever the stored tokens say. Connections without expiring
+    tokens (pasted bot tokens, awaiting consent) stay ``ok``. Callers that
+    did not read the credential store pass ``stored=None`` and get the
+    status-derived verdict only.
+    """
+    if item.get("status") == STATUS_REVOKED:
+        return "expired"
+    stored = stored or {}
+    if "expires_at" not in stored:
+        return "ok"
+    return "expired" if oauth_providers.is_expired(stored, now=now) else "ok"
+
+
+def public_view(item, stored=None):
+    """Metadata safe for list/status responses (never secrets).
+
+    ``stored`` is the connection's credential value when the caller has it
+    (listing/show handlers read the store); the view then also carries
+    ``token_expires_at`` (ISO, None without a stored expiry) and the
+    computed ``health`` so surfaces can flag connections needing
+    reconnection.
+    """
     return {
         "connection_id": item.get("connection_id"),
         "provider": item.get("provider"),
@@ -208,6 +254,8 @@ def public_view(item):
         "verified_account_id": item.get("verified_account_id"),
         "account_title": item.get("account_title"),
         "status": item.get("status"),
+        "health": health(item, stored),
+        "token_expires_at": token_expires_at(stored),
         "version": item.get("version"),
         "updated_at": item.get("updated_at"),
         "connected_at": item.get("connected_at"),

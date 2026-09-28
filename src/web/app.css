@@ -611,6 +611,12 @@ dialog form { display: contents; }
 }
 .detail-error svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
 
+/* audit view: outcome cells for error/denied rows */
+.audit-problem { color: var(--red); }
+
+/* audit view: outcome cells for error/denied rows */
+.audit-problem { color: var(--red); }
+
 /* run flow: the trigger feeding each step, Zapier-history style */
 #run-dialog { width: min(760px, calc(100vw - 32px)); }
 .flow { display: flex; flex-direction: column; }

@@ -139,6 +139,10 @@ export function renderRuns() {
     ? `Showing ${shown.length} of ${runs.length} loaded runs${runsPage.nextToken ? ' · more history available' : ''}`
     : `Showing ${shown.length} of ${runs.length} loaded runs · recent sample, up to 25`;
   $('#runs-load-more').hidden = !(serverPaged && runsPage.nextToken);
+  /* Bulk replay names one workflow (the API's requirement), so the button
+     only shows with a workflow picked and failures actually in sight. */
+  $('#runs-replay-failed').hidden = !(workflowFilter.value &&
+    (selectedStatus === 'problems' || shown.some((run) => ['failed', 'error'].includes(run.status))));
 }
 
 $('#runs-load-more').addEventListener('click', () => fetchRunsPage({ append: true }));
@@ -251,6 +255,31 @@ document.addEventListener('click', async (event) => {
     result.textContent = error.message;
     result.classList.add('error');
     result.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* Bulk replay re-injects the workflow's recent failed runs (up to the API's
+   cap) through the same route `dapier runs replay-failed` calls; runs whose
+   event data was never recorded are skipped by the API and reported. Same
+   confirm-then-refresh shape as the cancel handler above. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('#runs-replay-failed');
+  if (!button || button.hidden || button.disabled) return;
+  const workflowId = $('#runs-workflow-filter').value;
+  if (!workflowId || !confirm(`Replay the recent failed runs of ${workflowId}?`)) return;
+  button.disabled = true;
+  try {
+    const data = await api('/api/admin/runs/replay-failed', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_id: workflowId }),
+    });
+    notice(`Replayed ${data.replayed} failed run(s) of ${workflowId}` +
+      (data.skipped ? ` — ${data.skipped} skipped (no recorded event data)` : '') + '.');
+    fetchRunsPage(); // the replayed rows re-enter history as running
+  } catch (error) {
+    notice(error.message, true);
   } finally {
     button.disabled = false;
   }

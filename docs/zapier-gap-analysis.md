@@ -76,7 +76,11 @@
   `dapier storage get|set|find|delete` drive the same `kv_*` domain layer
   the runs use, and designer test-runs exercise storage through the
   router's own table grants. Tests in `tests/test_storage_actions.py`,
-  `tests/test_storage_api.py`, `tests/test_storage_cli.py`.
+  `tests/test_storage_api.py`, `tests/test_storage_cli.py`. The console side
+  is the Data store view (`src/web/js/views/storage.js`): browse a
+  workflow's keys by prefix, store with optional TTL, delete per key —
+  verified end-to-end in a headless browser against `/api` fixtures
+  (Playwright route interception; evidence in `.tmp/storage-verify/`).
 - **G13** — sub-workflows: a `run_workflow` connector action runs another
   published workflow in-process (trigger bypassed, optional rendered
   `payload`, step outputs under `output_field`), nesting capped at depth 2
@@ -188,6 +192,40 @@ Still open: none — G1–G13 are all landed.
   (run order, save-time ids) with their tested output keys as click-to-copy
   `{steps.<id>.output.*}` chips, so templating no longer requires hand-typed
   paths.
+- **Operator search surfaces** — cross-workflow search moved server-side
+  (`?q=` over id/description/trigger/action types on the designer list and
+  overview routes, `dapier workflows list --search`, debounced console
+  search) and workflow summaries carry `description`.
+- **Alarm emails** — the five CloudWatch alarms (event/dropbox/render DLQs,
+  worker, backup) had no `AlarmActions`, so fired alarms went nowhere; they
+  now point at one SNS topic whose subscriber (`alarm_notify.py`) emails
+  the operator address via SES, the same recipient run failures use.
+- **Schedule timezones** — `cron(...)` expressions accept EventBridge's
+  optional seventh timezone field (`cron(0 9 ? * MON * Europe/Berlin)`),
+  passed through to PutRule untouched.
+- **Audit trail, workflow export, and workflow search** — the operator-action
+  audit trail (`audit.py`) became readable: `GET /api/{admin,agent}/audit`
+  (operator-gated, no-store; exact-or-family `action` filters — a trailing
+  dot like `workflow.` covers the family — plus connection, actor, agent,
+  outcome, `since`/`before`, free-text `?q=` over the display fields, and
+  keyset paging via `?next=`), a bounded CSV export at
+  `/api/{admin,agent}/audit/export` that itself writes an `audit.export` row
+  so bulk reads leave a mark in the trail, `dapier audit list` /
+  `audit export [--out F] [--max-rows N]` mirroring every filter, an overview
+  **Activity** panel and a full `/audit` console view (search, filters, Load
+  more, **Export CSV**); rows are projected to exactly what the audit module
+  stores, so no token or client secret can surface. Workflow round-trip is
+  symmetric: `designer_store.api_get` now returns the canonical `yaml` beside
+  the parsed definition (re-saving an export is byte-identical), exposed as
+  `dapier workflows export <file> [-o out.yaml]` and the console's
+  **Download YAML** / **Import YAML** (the import posts the existing save
+  endpoint). And `?q=` search matches workflow id, description, trigger, and
+  action step types on `GET /api/{admin,agent}/designer/workflows` and the
+  overview endpoints (description now surfaced in list summaries and
+  `_workflow_view`), wired to `dapier workflows list --search` and the
+  console's workflow search box. Tests: `tests/test_audit_reader.py`,
+  `tests/test_designer.py`, `tests/test_admin.py`, `tests/test_agent_api.py`,
+  `tests/test_cli.py`.
 
 Reviewed 2026-09-27 against committed HEAD (`97b2a2c`) plus the in-flight working
 tree (trigger discovery and designer changes are being built separately; noted
@@ -435,3 +473,54 @@ sleep-based behavior.
   webhook users cannot chain on responses.
 - **Poll-trigger failures never notify anyone** (`engine/worker.py:176-178`
   passes `event=None`, which `notify.py:71-73` declines).
+
+## Round 3 (2026-09-28): every provider can discover, test, replay
+
+The last connector-level hole is closed: **Mailchimp** is now a real
+connector, not just a credential spec —
+`mailchimp_find_member` / `mailchimp_upsert_member` actions,
+`mailchimp.audiences` / `mailchimp.members` discovery, and a ping health
+check, all behind the stored API key and reachable through the synthetic
+"mailchimp" connection (`api.discovery.PSEUDO_CONNECTION_PROVIDERS`), so
+`dapier connections discover|test mailchimp` and the designer's audience
+picker work like every other provider. Designer palette entries +
+`make designer-console` rebuild; console Credentials view grew a **Test**
+button for credential-backed providers (mailchimp, aws) hitting the same
+`POST /api/admin/connections/{provider}/test`. Tests:
+`tests/test_discovery_mailchimp.py`.
+
+Also landed from the 2026-09-28 audit: **digest steps no longer fail
+"Test step" as unsupported** (`dryrun._evaluate_logic_step` evaluates
+mode/key and peeks the pending count), and **11 new formatters** —
+`split, join, title, urlencode, length, truncate, slugify, add, subtract,
+multiply, divide` (`engine/actions/templating.py`).
+
+### Open findings from the 2026-09-28 product-loop audit (ranked)
+
+1. **Replay always reruns the whole workflow** — no replay-from-failed-step
+   (`runs.py` `api_replay`); a targeted resume can seed the steps context
+   from the stored run (M).
+2. **Run history has no content search** — `_wanted` filters by
+   workflow/status/time only; `q` matching over step input/output JSON
+   inside the existing scan window would answer "which run carried order
+   #1234" (M).
+3. **Connection listings show no token expiry / reconnect flag** —
+   `public_view` exposes status only; the console's `expired → needs
+   reconnection` mapping is dead code because nothing writes that status.
+   Enrich the list with `token_expires_at` + offline `health: ok|expired`
+   (S).
+4. **No scheduled daily operator error digest** — `errors.api_summary` is
+   on-demand only; EventBridge rule → SES render of the summary, plus a
+   send-now endpoint for parity (S/M).
+5. **Workflows cannot be deleted on any surface** — only disable;
+   unpublish + one atomic git tree-delete commit, refusing while runs are
+   delayed (M).
+6. **Webhook trigger response is a fixed 202 ack** — no sync-response
+   option for challenge/interactivity callers; needs inline execution when
+   `response.sync` is set (M/L).
+7. **Dedupe gaps** — `next_cursor` polls treat every page as new; webhook
+   retries double-run (fresh uuid per POST). A seen-item TTL set for polls
+   and an optional `dedupe_path` for hooks close it (S/M).
+8. **Workflow organization: search yes, tags/folders/bulk-toggle no**
+   (M).
+

@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit, copilot
+from .. import audit, copilot, error_digest
 from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
@@ -434,6 +434,10 @@ def route(event, method, path):
         return runs_replay_failed_api(event)
     if path == "/api/agent/usage" and method == "GET":
         return usage_api(event)
+    if path == "/api/agent/audit/export" and method == "GET":
+        return audit_export_api(event)
+    if path == "/api/agent/audit" and method == "GET":
+        return audit_api(event)
     if path == "/api/agent/errors/summary" and method == "GET":
         return errors_summary_api(event)
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
@@ -532,7 +536,11 @@ def designer_api(event, method, source=None):
     if error:
         return error
     if method == "GET":
-        status, payload = designer_store.api_get(source) if source else designer_store.api_list()
+        if source:
+            status, payload = designer_store.api_get(source)
+        else:
+            query = event.get("queryStringParameters") or {}
+            status, payload = designer_store.api_list(query.get("q") or None)
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -885,7 +893,7 @@ def operator_overview(event):
     _, error = require_operator(event, "overview")
     if error:
         return error
-    return overview.overview()
+    return overview.overview(event)
 
 
 def runs_api(event, run_id=None):
@@ -908,6 +916,7 @@ def runs_api(event, run_id=None):
         status=query.get("status") or None,
         since=query.get("since") or None,
         before=query.get("before") or None,
+        q=query.get("q") or None,
         next_token=query.get("next") or None,
     )
     return _no_store(_json_response(status, payload))
@@ -934,6 +943,43 @@ def errors_summary_api(event):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = errors_api.api_summary(query.get("days", 7))
+    return _no_store(_json_response(status, payload))
+
+
+def audit_api(event):
+    """Operator-only audit trail: the operator actions audit.record writes
+    (connects, grants, token issues, workflow saves), newest first.
+
+    Same domain function as /api/admin/audit (audit.api_recent) — rows are
+    projected to the display fields, so nothing beyond what the audit module
+    stores can surface. Mirrors the usage/errors reads: operator-gated and
+    no-store.
+    """
+    _, error = require_operator(event, "audit")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = audit.api_recent(
+        limit=query.get("limit", 50), next_token=query.get("next") or None,
+        **audit.filters_from_query(query))
+    return _no_store(_json_response(status, payload))
+
+
+def audit_export_api(event):
+    """Operator-only audit trail CSV export (audit.api_export): the list's
+    filters, one bounded export served as {filename, count, truncated, csv}.
+
+    The export itself is audited, so bulk reads of the trail leave a mark in
+    the trail; denials are recorded by require_operator.
+    """
+    subject, error = require_operator(event, "audit.export")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = audit.api_export(
+        max_rows=query.get("max_rows"), **audit.filters_from_query(query))
+    if status == 200:
+        audit.emit("audit-log", "audit.export", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 
@@ -984,14 +1030,22 @@ def runs_replay_api(event, run_id):
 
     Re-injects the run's original trigger event onto the event queue; the
     worker re-executes it and the rerun lands in run history like a normal
-    run.
+    run. A body ``from_step`` (a top-level step id) targets the replay:
+    the recorded outputs before that step seed the rerun, so a long chain
+    is retried at the step that failed.
     """
     subject, error = require_operator(event, "runs")
     if error:
         return error
-    status, payload = runs.api_replay(run_id)
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _json_response(400, {"error": "Invalid request"})
+    from_step = str((body or {}).get("from_step") or "").strip()
+    status, payload = runs.api_replay(run_id, from_step=from_step or None)
     if status == 202:
-        audit.emit(run_id, "runs.replay", subject, outcome="ok")
+        audit.emit(run_id, "runs.replay-from-step" if from_step else "runs.replay",
+                   subject, outcome="ok")
     return _no_store(_json_response(status, payload))
 
 

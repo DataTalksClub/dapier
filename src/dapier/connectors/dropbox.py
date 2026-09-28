@@ -193,19 +193,21 @@ def _run_test(connection, *, transport=None):
 register_connection_test(ConnectionTest(connector="dropbox", run=_run_test))
 
 
-# --- trigger discovery: the newest recorded file event, else a realistic sample
+# --- trigger discovery: a per-event file sample — recorded history when its
+# envelope carries the asked event, else a realistic example
 
 from . import trigger_discovery
 from .trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
-    history_or_synthetic_fetch,
     options_from_registry,
+    per_event_sample_fetch,
     register_trigger_discovery,
 )
 
-# The file-event shape the dropbox resolver publishes for a new file (see
-# triggers.intake.dropbox_resolver.process_entry).
+# The file-event shapes the dropbox resolver publishes (see
+# triggers.intake.dropbox_resolver.process_entry): a new or changed file
+# carries the full file state, a deletion only the path that disappeared.
 _DROPBOX_SYNTHETIC_DATA = {
     "account_id": "dbid:discover-example",
     "path": "/Invoices/invoice-4137.pdf",
@@ -216,10 +218,32 @@ _DROPBOX_SYNTHETIC_DATA = {
     "size": 51200,
 }
 
+# file.updated: same shape, a changed rev and the size that change implies.
+_DROPBOX_UPDATED_DATA = {
+    "account_id": "dbid:discover-example",
+    "path": "/Invoices/invoice-4137.pdf",
+    "path_lower": "/invoices/invoice-4137.pdf",
+    "file_id": "id:discover-example",
+    "rev": "discover2",
+    "content_hash": None,
+    "size": 76800,
+}
+
+# file.deleted: only the identity of the path that disappeared.
+_DROPBOX_DELETED_DATA = {
+    "account_id": "dbid:discover-example",
+    "path": "/Invoices/invoice-4137.pdf",
+    "path_lower": "/invoices/invoice-4137.pdf",
+}
+
 
 register_trigger_discovery(TriggerDiscovery(
     connector="dropbox", label="Dropbox", kind="sample", resource="",
-    fetch=history_or_synthetic_fetch("dropbox", "file.created", _DROPBOX_SYNTHETIC_DATA)))
+    fetch=per_event_sample_fetch("dropbox", "file.created", {
+        "file.created": _DROPBOX_SYNTHETIC_DATA,
+        "file.updated": _DROPBOX_UPDATED_DATA,
+        "file.deleted": _DROPBOX_DELETED_DATA,
+    })))
 
 
 def _fetch_folder_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):

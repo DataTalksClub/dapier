@@ -142,6 +142,7 @@ PROVIDER_DISCOVERY_SOURCES = {
     "dropbox": ("dropbox",),
     "s3": ("s3",),
     "aws": ("s3",),
+    "mailchimp": ("mailchimp",),
 }
 
 # Providers whose health check is registered under another key.

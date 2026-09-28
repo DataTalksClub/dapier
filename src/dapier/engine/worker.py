@@ -251,9 +251,14 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
     ``RunSuspended``, and the suspension only knows the chain it unwound
     from — here it is tagged with the workflow and event it parked, so the
     handler can leave the run's continuation on the queue (``_park_suspension``).
-    Keep this loop in lockstep with engine.execute.
+    The raise happens only after the sweep: every other matching workflow
+    still runs, and extra suspensions park inline — one workflow's long
+    delay must not silence its siblings (the handler completes the record,
+    so nothing would re-deliver them). Matching, hooks and dispatch stay in
+    lockstep with engine.execute.
     """
     matched = []
+    suspended = []
     for workflow in all_workflows():
         if matches(workflow, event):
             matched.append(workflow["id"])
@@ -267,7 +272,18 @@ def execute(event, before_action=None, after_action=None, on_action_error=None):
             except RunSuspended as susp:
                 susp.workflow_id = workflow["id"]
                 susp.event = event
-                raise
+                suspended.append(susp)
+    if suspended:
+        # The handler parks the one raised suspension and completes the
+        # record — which would strand every other workflow this event
+        # matched (no redelivery follows a completed record). So each
+        # suspension beyond the first parks right here, and only the first
+        # propagates. A failed inline park escapes past RunSuspended: the
+        # record fails, the event re-runs, and leases skip the steps that
+        # already ran — the same recovery the handler's park path relies on.
+        for susp in suspended[1:]:
+            _park_suspension(susp)
+        raise suspended[0]
     return matched
 
 

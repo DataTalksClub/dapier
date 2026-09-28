@@ -327,6 +327,75 @@ class TestPark:
         assert susp.event["id"] == "evt-1"
         assert susp.segments == [{"steps": [POST], "prefix": "", "scope": None}]
 
+    def test_a_suspending_workflow_does_not_silence_its_siblings(self, monkeypatch):
+        delay_wf = {"id": "wf-delay", "enabled": True,
+                    "trigger": {"connector": "email", "event": "message.received",
+                                "filters": {}},
+                    "actions": [PAUSE, POST]}
+        sibling = {"id": "wf-sibling", "enabled": True,
+                   "trigger": {"connector": "email", "event": "message.received",
+                               "filters": {}},
+                   "actions": [FINAL]}
+        monkeypatch.setattr(worker, "all_workflows", lambda: [delay_wf, sibling])
+        ran = []
+        monkeypatch.setattr(worker, "_run_connector",
+                            lambda action, event, workflow_id, steps=None:
+                                ran.append((workflow_id, action["id"])) or {})
+
+        with pytest.raises(logic.RunSuspended) as excinfo:
+            worker.execute(dict(EVENT))
+
+        # The sibling ran even though the first workflow parked: the
+        # handler completes the record on a park, so nothing would have
+        # re-delivered this event for the sibling.
+        assert ("wf-sibling", "final") in ran
+        assert excinfo.value.workflow_id == "wf-delay"
+
+    def test_every_suspending_sibling_gets_parked(self, monkeypatch):
+        def suspending(wf_id, pause_id):
+            return {"id": wf_id, "enabled": True,
+                    "trigger": {"connector": "email", "event": "message.received",
+                                "filters": {}},
+                    "actions": [{"id": pause_id, "type": "delay", "seconds": 90},
+                                POST]}
+        monkeypatch.setattr(worker, "all_workflows", lambda: [
+            suspending("wf-first", "pause-a"), suspending("wf-second", "pause-b")])
+        monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+        sqs = FakeSqs()
+        monkeypatch.setattr(worker, "_sqs", lambda: sqs)
+
+        with pytest.raises(logic.RunSuspended) as excinfo:
+            worker.execute(dict(EVENT))
+
+        # The raised suspension parks through the handler; the second one
+        # parked inline, so both continuations are on the queue exactly once.
+        assert excinfo.value.workflow_id == "wf-first"
+        assert [json.loads(m["MessageBody"])["dapier_resume"]["workflow_id"]
+                for m in sqs.messages] == ["wf-second"]
+
+    def test_a_failed_sibling_park_fails_the_event(self, monkeypatch):
+        def suspending(wf_id, pause_id):
+            return {"id": wf_id, "enabled": True,
+                    "trigger": {"connector": "email", "event": "message.received",
+                                "filters": {}},
+                    "actions": [{"id": pause_id, "type": "delay", "seconds": 90},
+                                POST]}
+        monkeypatch.setattr(worker, "all_workflows", lambda: [
+            suspending("wf-first", "pause-a"), suspending("wf-second", "pause-b")])
+        monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+
+        class DownSqs(FakeSqs):
+            def send_message(self, **kwargs):
+                raise RuntimeError("sqs down")
+
+        monkeypatch.setattr(worker, "_sqs", lambda: DownSqs())
+
+        # The park failure must surface as itself, not as the suspension:
+        # a failed record re-runs on redelivery (leases skip the steps that
+        # already ran), while a completed one would strand both continuations.
+        with pytest.raises(RuntimeError, match="sqs down"):
+            worker.execute(dict(EVENT))
+
 
 def resume_envelope(resume_at=None):
     """A due resume envelope, as _enqueue_resume parks it."""

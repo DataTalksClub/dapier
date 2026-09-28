@@ -5,6 +5,7 @@ import os
 import boto3
 
 from ... import audit as audit_log
+from ... import error_digest
 from ... import http
 from ...auth import api_tokens, authz, session
 from ... import copilot
@@ -27,6 +28,7 @@ def list_runs(event):
         status=query.get("status") or None,
         since=query.get("since") or None,
         before=query.get("before") or None,
+        q=query.get("q") or None,
         next_token=query.get("next") or None,
     )
     return http._json_response(status, payload)
@@ -44,6 +46,20 @@ def errors_summary(event):
     query = event.get("queryStringParameters") or {}
     status, payload = errors_api.api_summary(query.get("days", 7))
     return http._json_response(status, payload)
+
+
+def send_error_digest(event, operator):
+    """Render-and-send the operator error digest now.
+
+    The same domain function the daily ErrorDigestFunction schedule runs;
+    the response reports what was sent, or ``skipped`` when nothing failed
+    in the window (no noise email).
+    """
+    payload = error_digest.send()
+    if payload.get("sent"):
+        session._audit_event("errors", "errors.send-digest",
+                             operator or "unknown", outcome="ok")
+    return http._json_response(200, payload)
 
 
 def list_audit(event):
@@ -111,11 +127,23 @@ def get_run(run_id):
     return http._json_response(status, payload)
 
 
-def replay_run(run_id, operator):
-    """Re-execute a run: its original trigger event goes back on the queue."""
-    status, payload = runs.api_replay(run_id)
+def replay_run(run_id, operator, event=None):
+    """Re-execute a run: its original trigger event goes back on the queue.
+
+    A body ``from_step`` (a top-level step id) replays from that step
+    instead: the recorded outputs before it seed the rerun, so a long
+    chain is retried at the step that failed. The audit trail names the
+    targeted replay distinctly.
+    """
+    try:
+        body = json.loads(event.get("body") or "{}") if event else {}
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    from_step = str((body or {}).get("from_step") or "").strip()
+    status, payload = runs.api_replay(run_id, from_step=from_step or None)
     if status == 202:
-        session._audit_event(run_id, "runs.replay", operator or "unknown", outcome="ok")
+        session._audit_event(run_id, "runs.replay-from-step" if from_step
+                             else "runs.replay", operator or "unknown", outcome="ok")
     return http._json_response(status, payload)
 
 

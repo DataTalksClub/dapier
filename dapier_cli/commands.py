@@ -195,7 +195,8 @@ TOKEN_PROVIDERS = ("slack", "telegram", "zoom")
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
                        authorized_user_path, expected_account_id=None, scopes=(), debug=False,
-                       token_path=None, root_path=None, display_name=None):
+                       token_path=None, root_path=None, display_name=None,
+                       signing_secret_path=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
     body = {
         "connection_id": connection_id,
@@ -219,6 +220,20 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
             print("The token file is empty.")
             return 2
         body["token"] = token
+        if signing_secret_path:
+            if provider != "slack":
+                print("--signing-secret-file applies only to Slack connections.")
+                return 2
+            try:
+                with open(signing_secret_path, encoding="utf-8") as handle:
+                    signing_secret = handle.read().strip()
+            except OSError as exc:
+                print(f"Cannot read {signing_secret_path}: {exc}")
+                return 2
+            if not signing_secret:
+                print("The signing-secret file is empty.")
+                return 2
+            body["signing_secret"] = signing_secret
     else:
         if not authorized_user_path:
             print("OAuth providers import with --authorized-user-file (a refresh-token JSON).")
@@ -264,6 +279,10 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
     else:
         print(f"Imported {data.get('connection_id')} "
               f"({data.get('account_title') or data.get('verified_account_id')}).")
+        if provider == "slack":
+            print(f"To listen for messages, set the Slack app's Event Subscription Request URL to "
+                  f"{api_url.rstrip('/')}/hooks/slack/{data.get('connection_id')} "
+                  f"and subscribe to the message and app_mention event types.")
     return 0
 
 
@@ -390,11 +409,13 @@ def triggers_workflow_sample(api_url, workflow, debug=False):
     return 0
 
 
-def workflows_list(api_url, debug=False):
-    data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
+def workflows_list(api_url, debug=False, search=None):
+    query = f"?q={quote(search, safe='')}" if search else ""
+    data = api.call(api_url, "GET", f"/api/agent/designer/workflows{query}", debug=debug)
     items = data.get("workflows", [])
     if not items:
-        print("No workflows yet. Create one in the console or run `dapier workflows save`.")
+        print("No workflows match this search." if search else
+              "No workflows yet. Create one in the console or run `dapier workflows save`.")
     for item in items:
         state = "On" if item.get("enabled", True) else "Off"
         trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
@@ -415,6 +436,30 @@ def workflows_list(api_url, debug=False):
 def workflows_show(api_url, file, debug=False):
     data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
     print(json.dumps(data.get("workflow", {}), indent=2))
+    return 0
+
+
+def workflows_export(api_url, file, output=None, debug=False):
+    """The workflow's canonical YAML (api_get's `yaml` field) to stdout or -o.
+
+    The round-trip twin of `workflows save`: exporting a saved workflow and
+    saving the export back reproduces the stored definition byte for byte.
+    """
+    data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
+    yaml_text = data.get("yaml")
+    if not yaml_text:
+        print(f"The API returned no YAML for {file}.")
+        return 5
+    if output:
+        try:
+            with open(output, "w", encoding="utf-8") as handle:
+                handle.write(yaml_text)
+        except OSError as exc:
+            print(f"Cannot write {output}: {exc}")
+            return 2
+        print(f"Exported {file} to {output}.")
+    else:
+        print(yaml_text)
     return 0
 
 
@@ -1080,6 +1125,63 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
     return 0
 
 
+def _audit_params(connection=None, action=None, actor=None, agent=None,
+                  outcome=None, since=None, before=None, query=None,
+                  next_token=None, limit=None):
+    params = {}
+    if limit:
+        params["limit"] = int(limit)
+    for key, value in (("connection", connection), ("action", action),
+                       ("actor", actor), ("agent", agent), ("outcome", outcome),
+                       ("since", since), ("before", before), ("q", query),
+                       ("next", next_token)):
+        if value:
+            params[key] = value
+    return params
+
+
+def audit_list(api_url, limit=50, connection=None, action=None, actor=None,
+               agent=None, outcome=None, since=None, before=None, query=None,
+               next_token=None, debug=False):
+    params = _audit_params(connection=connection, action=action, actor=actor,
+                           agent=agent, outcome=outcome, since=since,
+                           before=before, query=query, next_token=next_token,
+                           limit=limit)
+    data = api.call(api_url, "GET", f"/api/agent/audit?{urlencode(params)}", debug=debug)
+    events = data.get("events", [])
+    if not events:
+        filtered = any((connection, action, actor, agent, outcome, since,
+                        before, query, next_token))
+        print("No audit events match these filters." if filtered else
+              "No audit events yet. Actions appear as operators change connections, workflows, and triggers.")
+        return 0
+    print_audit(events)
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
+    return 0
+
+
+def audit_export(api_url, out=None, max_rows=None, connection=None, action=None,
+                 actor=None, agent=None, outcome=None, since=None, before=None,
+                 query=None, debug=False):
+    params = _audit_params(connection=connection, action=action, actor=actor,
+                           agent=agent, outcome=outcome, since=since,
+                           before=before, query=query)
+    if max_rows:
+        params["max_rows"] = int(max_rows)
+    data = api.call(api_url, "GET", f"/api/agent/audit/export?{urlencode(params)}",
+                    debug=debug)
+    # The server suggests the filename; basename keeps a hostile suggestion
+    # from writing outside the caller's directory.
+    path = out or os.path.basename(data.get("filename") or "") or "dapier-audit.csv"
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(data.get("csv") or "")
+    note = " (capped; narrow the filters for the rest)" if data.get("truncated") else ""
+    print(f"Wrote {data.get('count', 0)} audit events to {path}{note}")
+    return 0
+
+
 def usage(api_url, debug=False, months=12):
     data = api.call(api_url, "GET", f"/api/agent/usage?months={int(months)}", debug=debug)
     items = data.get("usage", [])
@@ -1107,6 +1209,18 @@ def errors_summary(api_url, debug=False, days=7):
         if item.get("last_error"):
             print(f"{'':40} {'':11} {item['last_error']}")
     return 0
+
+
+def print_audit(items):
+    print(f"{'TIMESTAMP':20} {'ACTION':12} {'ACTOR':34} {'AGENT':20} "
+          f"{'OUTCOME':22} CONNECTION")
+    for item in items:
+        timestamp = (item.get("timestamp") or "-")[:19]
+        error = item.get("error")
+        suffix = f"  ({error})" if error else ""
+        print(f"{timestamp:20} {item.get('action', ''):12} "
+              f"{item.get('actor_subject', ''):34} {item.get('agent') or '-':20} "
+              f"{item.get('outcome', ''):22} {item.get('connection_id', '')}{suffix}")
 
 
 def runs_show(api_url, run_id, debug=False):

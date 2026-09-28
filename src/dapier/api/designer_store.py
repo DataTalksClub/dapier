@@ -123,11 +123,15 @@ def _summary(workflow, source):
     return {
         "id": str(workflow["id"]),
         "enabled": workflow.get("enabled", True),
+        "description": str(workflow.get("description") or ""),
         "source": source,
         "connector": str(primary.get("connector", "?")),
         "event": str(primary.get("event", "?")),
         "triggerCount": len(triggers),
         "actionCount": len(actions or []),
+        # Step types (flow-resolved) for the list's ?q= search and clients.
+        "actionTypes": [str(action.get("type") or "") for action in (actions or [])
+                        if isinstance(action, dict)],
     }
 
 
@@ -156,11 +160,13 @@ def _published_by_file(source):
     return published_workflows.get_item(source.removesuffix(".yaml"))
 
 
-def api_list():
+def api_list(q=None):
     """Bundled workflows with the live published state overlaid by id.
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
-    here too — its published state is what actually runs.
+    here too — its published state is what actually runs. ``q`` filters
+    case-insensitively over each row's id, description, trigger connector
+    and event, and action step types.
     """
     summaries = {
         summary["id"]: {**summary, "published": False}
@@ -176,16 +182,37 @@ def api_list():
                 summary["deployed"] = False
             summaries[summary["id"]] = {**summary, "published": True}
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
+    search = str(q or "").strip().lower()
+    if search:
+        ordered = [
+            summary for summary in ordered
+            if search in " ".join(
+                [summary["id"], summary.get("description") or "",
+                 summary.get("connector") or "", summary.get("event") or "",
+                 *(summary.get("actionTypes") or [])]).lower()
+        ]
     return 200, {"workflows": ordered, **sync_status()}
+
+
+def workflow_yaml_text(workflow):
+    """The canonical YAML text for a stored definition — the same dump the
+    save/toggle/duplicate/rollback paths write, so an export re-saves
+    byte-identical."""
+    return yaml.safe_dump(ordered_workflow(workflow), sort_keys=False)
 
 
 def api_get(source):
     """One workflow: the live published state first, then the bundle, then
     committed git state (covering a save whose deploy has not finished).
+
+    The payload carries ``yaml``, the canonical text rendered from the stored
+    definition, so `workflows export` and the console's download round-trip
+    through `workflows save` without re-rendering client-side.
     """
     item = _published_by_file(source)
     if item and isinstance(item.get("workflow"), dict):
-        return 200, {"workflow": item["workflow"], "published": True}
+        return 200, {"workflow": item["workflow"], "published": True,
+                     "yaml": workflow_yaml_text(item["workflow"])}
     workflow = bundled_yaml(source)
     if workflow is None:
         try:
@@ -197,7 +224,8 @@ def api_get(source):
             return 404, {"error": f"no such workflow: {source}"}
         except (SyncError, WorkflowError) as exc:
             return 502, {"error": f"git fetch failed: {exc}"}
-    return 200, {"workflow": workflow, "published": False}
+    return 200, {"workflow": workflow, "published": False,
+                 "yaml": workflow_yaml_text(workflow)}
 
 
 def api_save(body, operator=None, cause="save", message=None):
@@ -275,7 +303,7 @@ def api_toggle(source, body, operator=None):
     }
     try:
         committed = commit_workflow(
-            yaml.safe_dump(ordered_workflow(workflow), sort_keys=False),
+            workflow_yaml_text(workflow),
             message=f"designer: {'enable' if body['enabled'] else 'disable'} workflow {workflow['id']}",
         )
         result["commit"] = committed["commit"]
@@ -353,7 +381,7 @@ def api_rollback(source, body, operator=None):
         if key not in RUN_STATE_KEYS
     }
     restored["enabled"] = bool(version.get("enabled", True))
-    yaml_text = yaml.safe_dump(ordered_workflow(restored), sort_keys=False)
+    yaml_text = workflow_yaml_text(restored)
     return api_save(
         {"yaml": yaml_text},
         operator=operator,
@@ -433,7 +461,7 @@ def api_duplicate(source, body=None, operator=None):
         return 409, {"error": f"a workflow named '{new_id}' already exists"}
     copy = {key: value for key, value in workflow.items() if key not in RUN_STATE_KEYS}
     copy["id"] = new_id
-    yaml_text = yaml.safe_dump(ordered_workflow(copy), sort_keys=False)
+    yaml_text = workflow_yaml_text(copy)
     try:
         result = commit_workflow(
             yaml_text,

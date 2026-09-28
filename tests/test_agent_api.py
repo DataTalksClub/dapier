@@ -1217,3 +1217,78 @@ def test_runs_cancel_over_bearer_rejects_a_run_not_suspended(monkeypatch):
 
     assert cancelled["statusCode"] == 409
     assert json.loads(cancelled["body"])["error"] == "Run is not suspended; nothing to cancel"
+
+
+# --- Audit trail read (GET /api/agent/audit, mirroring /api/admin/audit) ---
+
+def _configure_audit_table(monkeypatch, items):
+    class AuditTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+    monkeypatch.setenv("AUDIT_TABLE", "audit")
+    monkeypatch.setattr(agent_api.audit, "audit_table", lambda: AuditTable())
+
+
+def test_audit_endpoint_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "agent-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+
+    response = agent_api.route(event(), "GET", "/api/agent/audit")
+
+    assert response["statusCode"] == 403
+
+
+def test_audit_endpoint_never_serves_an_api_token(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"})
+    secret = _issue_token(tables)
+
+    response = agent_api.route(event(token=secret), "GET", "/api/agent/audit")
+
+    assert response["statusCode"] == 403
+
+
+def test_audit_endpoint_serves_rows_newest_first_filtered_and_projected(monkeypatch):
+    _operator(monkeypatch)
+    _configure_audit_table(monkeypatch, [
+        {"audit_id": "conn-a#100#2", "connection_id": "conn-a", "action": "connect",
+         "actor_subject": "op-1", "outcome": "created",
+         "timestamp": "2026-09-27T10:00:00+00:00", "expires_at": 999},
+        {"audit_id": "conn-b#200#1", "connection_id": "conn-b", "action": "token",
+         "actor_subject": "token:scheduler", "agent": "scheduler", "outcome": "error",
+         "timestamp": "2026-09-28T10:00:00+00:00", "error": "provider is unavailable",
+         "internal_field": "never"},
+    ])
+
+    response = agent_api.route(
+        event(query={"action": "token", "limit": "10"}),
+        "GET", "/api/agent/audit",
+    )
+
+    assert response["statusCode"] == 200
+    assert response["headers"]["cache-control"] == "no-store"
+    body = json.loads(response["body"])
+    # Action filter applied: only the token row survives.
+    assert [item["action"] for item in body["events"]] == ["token"]
+    assert body["events"][0] == {
+        "audit_id": "conn-b#200#1",
+        "connection_id": "conn-b", "action": "token",
+        "actor_subject": "token:scheduler", "agent": "scheduler",
+        "outcome": "error", "timestamp": "2026-09-28T10:00:00+00:00",
+        "error": "provider is unavailable",
+    }
+    # The projection keeps internal bookkeeping and any unexpected column
+    # out of the payload, even if one ever reached the table.
+    serialized = json.dumps(body)
+    assert "expires_at" not in serialized
+    assert "internal_field" not in serialized
+
+
+def test_audit_endpoint_without_the_table_is_an_empty_trail(monkeypatch):
+    _operator(monkeypatch)
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+
+    response = agent_api.route(event(), "GET", "/api/agent/audit")
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["events"] == []

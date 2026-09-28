@@ -12,6 +12,7 @@
 
 from . import records as connections
 from .providers import oauth_clients, oauth_providers
+from .records import STATUS_REVOKED  # noqa: F401 (re-exported for callers)
 from .records import BindingError
 from .credentials import (
     VersionConflict,
@@ -19,7 +20,7 @@ from .credentials import (
     put_credential_if_version,
 )
 
-STATUS_REVOKED = "revoked"
+STATUS_REVOKED = records.STATUS_REVOKED
 
 
 class TokenError(Exception):

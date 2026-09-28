@@ -751,3 +751,134 @@ def test_admin_run_cancel_requires_authentication(monkeypatch):
     )
 
     assert cancelled["statusCode"] == 401
+
+
+# --- Audit trail read surface (GET /api/admin/audit) ---
+
+from src.dapier import audit as audit_module
+from src.dapier.api import overview as overview_api
+
+
+def _configure_audit(monkeypatch, items):
+    class AuditTable:
+        def scan(self, **kwargs):
+            return {"Items": items}
+
+    monkeypatch.setenv("AUDIT_TABLE", "audit")
+    monkeypatch.setattr(audit_module, "audit_table", lambda: AuditTable())
+
+
+def test_admin_audit_lists_rows_newest_first_and_projected(monkeypatch):
+    _, cookies = configure_tokens(monkeypatch)
+    _configure_audit(monkeypatch, [
+        {"audit_id": "conn-a#100#2", "connection_id": "conn-a", "action": "connect",
+         "actor_subject": "op-1", "outcome": "created",
+         "timestamp": "2026-09-27T10:00:00+00:00", "expires_at": 12345},
+        {"audit_id": "conn-b#200#1", "connection_id": "conn-b", "action": "grant",
+         "actor_subject": "op-2", "agent": "scheduler", "outcome": "ok",
+         "timestamp": "2026-09-28T10:00:00+00:00", "error": "provider said no",
+         "secret_field": "xoxb-should-never-appear"},
+    ])
+
+    response = admin.route(
+        operator_request("GET", "/api/admin/audit", cookies=cookies),
+        "GET", "/api/admin/audit",
+    )
+
+    assert response["statusCode"] == 200
+    events = json.loads(response["body"])["events"]
+    assert [event["timestamp"] for event in events] == [
+        "2026-09-28T10:00:00+00:00", "2026-09-27T10:00:00+00:00"]
+    assert events[0] == {
+        "audit_id": "conn-b#200#1",
+        "connection_id": "conn-b", "action": "grant", "actor_subject": "op-2",
+        "agent": "scheduler", "outcome": "ok",
+        "timestamp": "2026-09-28T10:00:00+00:00", "error": "provider said no",
+    }
+    # Only the audit module's display fields surface — never the internal
+    # expires_at bookkeeping or anything else that reaches the table.
+    serialized = json.dumps(events)
+    assert "expires_at" not in serialized
+    assert "secret_field" not in serialized
+
+
+def test_admin_audit_filters_by_action(monkeypatch):
+    _, cookies = configure_tokens(monkeypatch)
+    _configure_audit(monkeypatch, [
+        {"connection_id": "conn-a", "action": "connect", "actor_subject": "op-1",
+         "outcome": "created", "timestamp": "2026-09-27T10:00:00+00:00"},
+        {"connection_id": "conn-b", "action": "grant", "actor_subject": "op-1",
+         "outcome": "ok", "timestamp": "2026-09-28T10:00:00+00:00"},
+    ])
+    event = operator_request("GET", "/api/admin/audit", cookies=cookies)
+    event["queryStringParameters"] = {"action": "grant"}
+
+    response = admin.route(event, "GET", "/api/admin/audit")
+
+    assert response["statusCode"] == 200
+    assert [item["action"] for item in json.loads(response["body"])["events"]] == ["grant"]
+
+
+def test_admin_audit_without_the_table_is_an_empty_trail(monkeypatch):
+    _, cookies = configure_tokens(monkeypatch)
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+
+    response = admin.route(
+        operator_request("GET", "/api/admin/audit", cookies=cookies),
+        "GET", "/api/admin/audit",
+    )
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["events"] == []
+
+
+def test_admin_audit_requires_authentication(monkeypatch):
+    configure_tokens(monkeypatch)
+
+    response = admin.route(operator_request("GET", "/api/admin/audit"),
+                           "GET", "/api/admin/audit")
+
+    assert response["statusCode"] == 401
+
+
+# --- Overview search (?q= on /api/admin/overview) ---
+
+def test_overview_view_surfaces_description():
+    view = overview_api._workflow_view(
+        {"id": "invoice-alert", "description": "Alert on invoices",
+         "trigger": {"connector": "email", "event": "message.received"}},
+        "invoice-alert.yaml", published=False,
+    )
+    assert view["description"] == "Alert on invoices"
+
+
+def test_overview_q_filters_the_workflow_list(monkeypatch):
+    views = [
+        {"id": "invoice-alert", "description": "Alert on invoices", "enabled": True,
+         "trigger": {"connector": "email", "event": "message.received"},
+         "triggerCount": 1, "actions": [{"type": "slack"}], "published": False},
+        {"id": "nightly-backup", "description": "", "enabled": True,
+         "trigger": {"connector": "schedule", "event": "tick"},
+         "triggerCount": 1, "actions": [{"type": "dropbox_upload"}], "published": False},
+    ]
+    monkeypatch.setattr(overview_api, "_workflows", lambda: views)
+    monkeypatch.setattr(overview_api, "_scan", lambda *args, **kwargs: [])
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(overview_api, "_credential_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
+    monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
+    monkeypatch.setattr(overview_api, "_email_triggers",
+                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+    monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
+    event = operator_request("GET", "/api/admin/overview")
+    event["queryStringParameters"] = {"q": "Slack"}
+
+    payload = json.loads(overview_api.overview(event)["body"])
+
+    assert [workflow["id"] for workflow in payload["workflows"]] == ["invoice-alert"]
+    unfiltered = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
+    assert [workflow["id"] for workflow in unfiltered["workflows"]] == ["invoice-alert", "nightly-backup"]
+
+

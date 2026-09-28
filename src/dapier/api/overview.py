@@ -48,6 +48,7 @@ def _workflow_view(workflow, source, *, published):
     view = {
         "id": workflow["id"],
         "enabled": workflow.get("enabled", True),
+        "description": str(workflow.get("description") or ""),
         "trigger": triggers[0] if triggers else {},
         "triggerCount": len(triggers),
         "flow": workflow.get("flow"),
@@ -58,6 +59,18 @@ def _workflow_view(workflow, source, *, published):
     if len(triggers) > 1:
         view["triggers"] = triggers
     return view
+
+
+def _workflow_matches(view, query):
+    """Case-insensitive ?q= match: workflow id, description, the trigger's
+    connector and event, and the action step types."""
+    text = " ".join(
+        [str(view.get("id") or ""), str(view.get("description") or ""),
+         str((view.get("trigger") or {}).get("connector") or ""),
+         str((view.get("trigger") or {}).get("event") or "")]
+        + [str(action.get("type") or "") for action in view.get("actions") or []]
+    )
+    return query in text.lower()
 
 def _action_views(actions):
     return [
@@ -105,7 +118,14 @@ def _usage():
     return usage.api_usage(3)[1].get("usage", [])
 
 
-def overview():
+def overview(event=None):
+    """The operator overview. ``?q=`` filters the workflows list (same match
+    text as the designer list: id, description, trigger, action types)."""
+    query = (event or {}).get("queryStringParameters") or {}
+    workflows = _workflows()
+    search = str(query.get("q") or "").strip().lower()
+    if search:
+        workflows = [view for view in workflows if _workflow_matches(view, search)]
     executions = sorted(
         _scan(os.environ["EXECUTIONS_TABLE"]),
         key=lambda item: item.get("execution_id", ""),
@@ -115,7 +135,7 @@ def overview():
     return http._json_response(200, {
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),
-        "workflows": _workflows(),
+        "workflows": workflows,
         "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
         "runs": runs.recent(25),

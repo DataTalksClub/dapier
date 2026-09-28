@@ -37,7 +37,11 @@ def route(event, method, path):
         return operator_error
     operator_subject = session.subject_fallback(operator_payload)
     if method == "GET" and path == "/api/admin/overview":
-        return overview.overview()
+        return overview.overview(event)
+    if method == "GET" and path == "/api/admin/audit/export":
+        return routes.export_audit(event, operator_subject)
+    if method == "GET" and path == "/api/admin/audit":
+        return routes.list_audit(event)
     if method == "GET" and path == "/api/admin/runs":
         return routes.list_runs(event)
     if method == "POST" and path == "/api/admin/runs/replay-failed":
@@ -46,9 +50,12 @@ def route(event, method, path):
         return routes.usage(event)
     if method == "GET" and path == "/api/admin/errors/summary":
         return routes.errors_summary(event)
+    if method == "POST" and path == "/api/admin/errors/digest":
+        return routes.send_error_digest(event, operator_subject)
     run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
     if method == "POST" and run_replay_match:
-        return routes.replay_run(unquote(run_replay_match.group(1)), operator_subject)
+        return routes.replay_run(unquote(run_replay_match.group(1)),
+                                 operator_subject, event)
     run_cancel_match = re.fullmatch(r"/api/admin/runs/([^/]+)/cancel", path)
     if method == "POST" and run_cancel_match:
         return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject)
@@ -197,12 +204,15 @@ from .routes import (  # noqa: F401
     discover_connection,
     duplicate_designer_workflow,
     errors_summary,
+    send_error_digest,
     get_inbox_event,
     get_run,
     import_connection,
     issue_connection_token,
     list_api_tokens,
+    list_audit,
     list_email_triggers,
+    export_audit,
     list_grants,
     list_hook_triggers,
     list_inbox,

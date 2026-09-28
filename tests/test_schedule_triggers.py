@@ -74,8 +74,16 @@ class ExpressionTests(unittest.TestCase):
         for expression in ("cron(0 8 * * ? *)", "rate(5 minutes)", "rate(1 day)"):
             schedule_triggers.validate_expression(expression)
 
+    def test_accepts_cron_timezone_field(self):
+        for expression in (
+            "cron(0 9 ? * MON * Europe/Berlin)",
+            "cron(30 14 1 * ? * Etc/UTC)",
+            "cron(0 0 * * ? * UTC)",
+        ):
+            schedule_triggers.validate_expression(expression)
+
     def test_rejects_bad_expressions(self):
-        for expression in ("cron(* * * *)", "rate(sometimes)", "daily", ""):
+        for expression in ("cron(* * * *)", "cron(0 8 * * ? * extra field)", "rate(sometimes)", "daily", ""):
             with self.assertRaises(schedule_triggers.TriggerError):
                 schedule_triggers.validate_expression(expression)
 

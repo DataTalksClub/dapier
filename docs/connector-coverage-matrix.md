@@ -73,10 +73,12 @@ custom, dropbox, email, poll, renderer, schedule, slack, youtube, zoom — all
 register `TriggerDiscovery(kind="sample")`, live where the provider allows
 (slack: the newest channel message, delivery-shaped via
 `triggers.intake.slack_events.event_data`), else history-first with
-synthetic fallback. Field options (`kind="options"`): dropbox folders, s3
-buckets, s3 objects (bucket passed as `event`), slack channels, telegram
-chats, zoom meetings, google-sheets spreadsheets, google-drive files. Extras
-beyond the palette: dataops, webhook — used by trigger setup flows.
+synthetic fallback — and multi-event connectors (dropbox, zoom) serve one
+documented payload per declared event. Field options (`kind="options"`):
+dropbox folders, s3 buckets, s3 objects (bucket passed as `event`), slack
+channels, telegram chats, zoom meetings, google-sheets spreadsheets,
+google-drive files. Extras beyond the palette: dataops, webhook — used by
+trigger setup flows.
 
 ## Replay & test surfaces
 
@@ -162,16 +164,24 @@ beyond the palette: dataops, webhook — used by trigger setup flows.
   still gets the one recording.completed sample renamed; other connectors
   declare a single event, where renaming is correct.
 
-## Round 7, 2026-09-28: per-event trigger samples — dropbox file events
+## Round 8, 2026-09-28: per-event trigger samples — zoom recording + meeting events
 
-- A multi-event connector's sample pull now serves each declared event its
-  own payload (`trigger_discovery.per_event_sample_fetch`): dropbox answers
-  `file.created` / `file.updated` / `file.deleted` with exactly the shapes
-  `triggers.intake.dropbox_resolver.process_entry` publishes — file state
-  for created/updated, path-only for deleted — and recorded history only
-  fills a sample when its replayed envelope carries the asked event.
-- Tests: `tests/test_trigger_variety_dropbox.py` (per-event payloads,
-  fallback for unknown events, history never crosses events).
-- Remaining trigger-variety gap: zoom declares four events but every ask
-  still gets the one recording.completed sample renamed; other connectors
-  declare a single event, where renaming is correct.
+- Zoom's sample pull moved into its connector module (`connectors.zoom`,
+  where the docstring already placed it) and serves each declared event its
+  own payload via `per_event_sample_fetch`: `recording.completed`,
+  `recording.transcript_completed` (MP4 + TRANSCRIPT files),
+  `meeting.started`, `meeting.ended` — each mirroring exactly what the
+  webhook intake publishes, metadata only.
+- The intake (`triggers.intake.zoom_webhooks`) accepts all four events now
+  (it dropped everything but `recording.completed`): transcript deliveries
+  reuse the recording shape with the TRANSCRIPT file included; meeting
+  lifecycle deliveries flatten `payload.object` to the scheduling facts a
+  workflow templates over (topic, host, start/end, duration, timezone) —
+  participants and settings stay out of runs. Dedup ids include the event
+  name, so a meeting's started and ended deliveries never collide.
+- Tests: `tests/test_trigger_variety_zoom.py` (per-event payloads, unknown-
+  event fallback, history never crosses events) and the intake variety in
+  `tests/test_zoom.py` (transcript file, metadata-only meeting envelopes,
+  distinct event ids, unsubscribed events dropped).
+- Trigger-variety gap: closed — every palette connector now declares exactly
+  the events its sample pull serves and its intake publishes.

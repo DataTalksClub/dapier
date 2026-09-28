@@ -133,12 +133,15 @@ def synthetic_sample(connector, event, data):
     }
 
 
-def history_sample(connector):
+def history_sample(connector, event=None):
     """The newest recorded run for ``connector``, as a sample — or None.
 
     Run history stores one run per workflow handling of a trigger event; the
     same envelope rebuild the replay button uses (``runs.replay_event``)
-    turns the newest run's recorded input back into a sample event.
+    turns the newest run's recorded input back into a sample event. With
+    ``event``, only runs whose recorded envelope carries that event qualify —
+    a multi-event connector never answers a ``file.deleted`` ask with a
+    renamed ``file.created`` run.
     """
     from ..api import runs
 
@@ -152,6 +155,8 @@ def history_sample(connector):
             continue
         envelope, error = runs.replay_event(summary["run_id"], payload.get("steps") or [])
         if error or envelope is None:
+            continue
+        if event and envelope.get("event") != event:
             continue
         return as_sample(envelope)
     return None
@@ -172,6 +177,34 @@ def history_or_synthetic_fetch(connector, default_event, synthetic_data):
             return {"sample": found, "source": "history", "connection_id": connection_id}
         return {
             "sample": synthetic_sample(connector, event or default_event, dict(synthetic_data)),
+            "source": "synthetic",
+            "connection_id": connection_id,
+        }
+    return fetch
+
+
+def per_event_sample_fetch(connector, default_event, data_by_event):
+    """A sample fetch that serves a different documented payload per event.
+
+    Multi-event connectors (Dropbox file events, Zoom meeting and recording
+    events) register one sample whose ``event`` request field picks the
+    payload: ``data_by_event`` maps each declared event name to its
+    realistic synthetic example, drawn from the provider's own webhook
+    schema. An unknown event falls back to ``default_event``. Recorded
+    history only fills the sample when its replayed envelope carries the
+    requested event — see :func:`history_sample`.
+    """
+    def fetch(event=None, connection_id=None, limit=DEFAULT_LIMIT):
+        wanted = event or default_event
+        found = history_sample(connector, event=wanted)
+        if found is not None:
+            return {"sample": found, "source": "history", "connection_id": connection_id}
+        data = data_by_event.get(wanted)
+        if data is None:
+            wanted = default_event
+            data = data_by_event[default_event]
+        return {
+            "sample": synthetic_sample(connector, wanted, dict(data)),
             "source": "synthetic",
             "connection_id": connection_id,
         }

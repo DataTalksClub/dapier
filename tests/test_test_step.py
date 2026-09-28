@@ -407,3 +407,45 @@ def test_main_workflows_test_step_parsing(monkeypatch):
     assert main.main(["workflows", "test-step", "wf.yaml", "--action", "tell",
                       "--event", "@e.json", "--steps", "@s.json", "--execute"]) == 0
     assert seen["execute"] is True and seen["steps"] == "@s.json"
+
+
+# ---- digest steps evaluate like the other logic steps (a peek, not a run) ----
+
+DIGEST_WORKFLOW = {
+    "id": "digest-test",
+    "trigger": {"connector": "email", "event": "message.received"},
+    "actions": [
+        {"id": "collect", "type": "digest", "mode": "accumulate",
+         "key": "nightly-items", "item": "{subject}"},
+    ],
+}
+
+
+def test_step_evaluates_a_digest_step_instead_of_calling_it_unsupported(no_runners):
+    report = dryrun.test_step(DIGEST_WORKFLOW, "collect", SAMPLE)
+    step = report["steps"][0]
+    assert step["ok"] is True
+    assert "unsupported" not in (step.get("error") or "")
+    output = step["output"]
+    assert output["mode"] == "accumulate"
+    assert output["key"] == "nightly-items"
+    assert "not executed" in output["note"]
+
+
+def test_flush_digest_step_reports_its_mode(no_runners):
+    workflow = {**DIGEST_WORKFLOW,
+                "actions": [{"id": "collect", "type": "digest",
+                             "mode": "flush", "key": "nightly-items"}]}
+    report = dryrun.test_step(workflow, "collect", SAMPLE)
+    step = report["steps"][0]
+    assert step["ok"] is True
+    assert step["output"]["mode"] == "flush"
+
+
+def test_digest_step_without_a_key_fails_the_evaluation(no_runners):
+    workflow = {**DIGEST_WORKFLOW,
+                "actions": [{"id": "collect", "type": "digest", "mode": "flush"}]}
+    report = dryrun.test_step(workflow, "collect", SAMPLE)
+    step = report["steps"][0]
+    assert step["ok"] is False
+    assert "needs a key" in step["error"]

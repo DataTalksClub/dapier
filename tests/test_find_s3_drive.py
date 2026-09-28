@@ -242,6 +242,34 @@ class DriveFindTests(unittest.TestCase):
             run_drive_find_with({"name": ""}, transport=FakeTransport())
         self.assertIn("requires a name", str(caught.exception))
 
+    def test_folder_narrows_the_search_to_that_parent(self):
+        transport = FakeTransport(("drive/v3/files", 200, {"files": []}))
+
+        run_drive_find_with({"folder": "folder-9"}, transport=transport)
+
+        query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(transport.calls[0]["url"]).query)
+        self.assertEqual(
+            query["q"],
+            ["trashed=false and name contains 'report.pdf' and 'folder-9' in parents"])
+
+    def test_folder_is_templated_and_optional(self):
+        transport = FakeTransport(("drive/v3/files", 200, {"files": []}))
+
+        run_drive_find_with({"folder": "{data.folder_id}"}, transport=transport)
+        query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(transport.calls[0]["url"]).query)
+        self.assertNotIn(" in parents", query["q"][0])
+
+        run_drive_find_with({"folder": "{data.folder_id}",
+                             "name": "o'brien's report"}, transport=transport)
+        query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(transport.calls[1]["url"]).query)
+        # The template renders empty against this event, so no parent clause
+        # lands; the name's quotes are still escaped.
+        self.assertEqual(query["q"],
+                         ["trashed=false and name contains 'o\\'brien\\'s report'"])
+
 
 class RegistryTests(unittest.TestCase):
     """The registry entries are what the engine and trigger validation use."""
@@ -285,7 +313,7 @@ class RegistryTests(unittest.TestCase):
             optional, frozenset({"prefix", "match", "credential_id", "connection_id"}))
         required, optional = action_specs()["drive_find_file"]
         self.assertEqual(required, frozenset({"connection_id", "name"}))
-        self.assertEqual(optional, frozenset({"match"}))
+        self.assertEqual(optional, frozenset({"match", "folder"}))
 
     def test_s3_objects_discovery_lists_bucket_keys(self):
         s3 = FakeS3(page([{"Key": "reports/2026/report.pdf", "Size": 9,
