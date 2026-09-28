@@ -709,7 +709,8 @@ def designer_api(event, method, source=None):
         return error
     if method == "GET":
         if source:
-            status, payload = designer_store.api_get(source)
+            status, payload = designer_store.api_get(
+                source, visible=_visibility(event, subject))
         else:
             query = event.get("queryStringParameters") or {}
             status, payload = designer_store.api_list(query.get("q") or None,
@@ -742,7 +743,8 @@ def designer_export_all_api(event):
     subject, error = require_operator(event, "workflow.export-all")
     if error:
         return error
-    status, payload = designer_store.api_export_all()
+    status, payload = designer_store.api_export_all(
+        visible=_visibility(event, subject))
     if status == 200:
         audit.emit("workflows", "workflow.export-all", subject, outcome="ok")
     return _no_store(_json_response(status, payload))
@@ -765,7 +767,8 @@ def designer_export_api(event):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_export(tag=query.get("tag"),
-                                                folder=query.get("folder"))
+                                                folder=query.get("folder"),
+                                                visible=_visibility(event, subject))
     if status == 200:
         audit.emit("workflows", "workflow.export", subject, outcome="ok")
         return _no_store(_json_response(status, payload, headers={
@@ -969,7 +972,8 @@ def designer_versions_api(event, source):
     subject, error = require_operator(event, "workflow.versions")
     if error:
         return error
-    status, payload = designer_store.api_versions(source)
+    status, payload = designer_store.api_versions(
+        source, visible=_visibility(event, subject))
     return _json_response(status, payload)
 
 
@@ -983,7 +987,8 @@ def designer_versions_diff_api(event, source):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_diff(source, query.get("from"),
-                                              query.get("to"))
+                                              query.get("to"),
+                                              visible=_visibility(event, subject))
     return _json_response(status, payload)
 
 
@@ -1050,7 +1055,8 @@ def designer_draft_api(event, source):
     subject, error = require_operator(event, "workflow.versions")
     if error:
         return error
-    status, payload = designer_store.api_draft(source)
+    status, payload = designer_store.api_draft(
+        source, visible=_visibility(event, subject))
     return _json_response(status, payload)
 
 
@@ -1060,7 +1066,8 @@ def designer_draft_diff_api(event, source):
     subject, error = require_operator(event, "workflow.versions")
     if error:
         return error
-    status, payload = designer_store.api_draft_diff(source)
+    status, payload = designer_store.api_draft_diff(
+        source, visible=_visibility(event, subject))
     return _json_response(status, payload)
 
 
@@ -1146,7 +1153,8 @@ def trigger_sample_api(event):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_trigger_sample(
-        query.get("workflow") or query.get("workflow_id"))
+        query.get("workflow") or query.get("workflow_id"),
+        visible=_visibility(event, subject))
     audit.emit(str(query.get("workflow") or query.get("workflow_id") or "unknown"),
                "triggers.sample", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
@@ -1408,7 +1416,7 @@ def runs_api(event, run_id=None):
     if error:
         return error
     if run_id:
-        status, payload = runs.api_get(run_id)
+        status, payload = runs.api_get(run_id, visible=_visibility(event, subject))
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(
@@ -1518,11 +1526,12 @@ def errors_summary_api(event):
     Same domain function as /api/admin/errors/summary (api/errors.py), so
     the CLI and the console see the same grouping over the same window.
     """
-    _, error = require_operator(event, "errors")
+    subject, error = require_operator(event, "errors")
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = errors_api.api_summary(query.get("days", 7))
+    status, payload = errors_api.api_summary(query.get("days", 7),
+                                             visible=_visibility(event, subject))
     return _no_store(_json_response(status, payload))
 
 
@@ -1585,16 +1594,18 @@ def storage_read_api(event, workflow_id):
     Same domain layer as the storage_* actions (api/storage.py over
     engine.actions.storage), so the CLI sees exactly what a run sees.
     """
-    _, error = require_operator(event, "storage.read")
+    subject, error = require_operator(event, "storage.read")
     if error:
         return error
     query = event.get("queryStringParameters") or {}
     key = str(query.get("key") or "").strip()
     if key:
-        status, payload = storage_api.get(workflow_id, key)
+        status, payload = storage_api.get(workflow_id, key,
+                                          visible=_visibility(event, subject))
     else:
         status, payload = storage_api.find(workflow_id, query.get("prefix"),
-                                           query.get("limit"))
+                                           query.get("limit"),
+                                           visible=_visibility(event, subject))
     return _no_store(_json_response(status, payload))
 
 
@@ -1701,7 +1712,8 @@ def inbox_api(event, inbox_id=None):
     if error:
         return error
     if inbox_id:
-        status, payload = inbox.api_get(inbox_id)
+        status, payload = inbox.api_get(inbox_id,
+                                        visible=_visibility(event, subject))
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = inbox.api_list(
