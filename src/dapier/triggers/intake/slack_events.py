@@ -1,4 +1,4 @@
-"""Verify Slack Events API deliveries and publish message events.
+"""Verify Slack Events API deliveries and publish workflow events.
 
 Connection-scoped like Zoom (``/hooks/slack/{connection_id}``): each Slack
 connection gets its own Request URL, so one Slack app can serve one workspace
@@ -9,13 +9,29 @@ handshake included — as ``v0=<hmac-sha256(signing_secret,
 rejected. The signing secret is an app-level value, so it is pasted into the
 connection alongside the bot token (see ``connections.importing``).
 
-Published events are the message family only — ``message.*`` (including
-``message.channels/groups/im/mpim`` and edit subtypes) and ``app_mention``.
+Published events are the four workflow-facing names in ``EVENTS``, each
+mirroring one Zapier-style trigger chip:
+
+- ``message.received`` — the ``message.*`` family (including
+  ``message.channels/groups/im/mpim`` and edit subtypes),
+- ``app.mention`` — ``app_mention`` (@-mentions of the bot),
+- ``reaction.added`` — ``reaction_added``,
+- ``member.joined`` — ``member_joined_channel``.
+
+Backward compatibility: until the variety change ``app_mention`` was folded
+into ``message.received``; going forward it publishes **only**
+``app.mention``. Stored workflows that relied on mentions firing
+``message.received`` must re-filter on ``app.mention`` — while every
+``message.*`` delivery keeps publishing ``message.received`` exactly as
+before (same name, same envelope, same dedup identity), so existing
+message workflows keep working unchanged.
+
 Every other subscribed event answers ``accepted: False`` so Slack stops
 retrying it. Posts made by apps (``bot_id`` present) never publish: a
 workflow that posts into the channel it listens on would otherwise loop
-forever. Everything else — channel, user, text, ts, plus the raw event —
-travels in the envelope for templates and trigger filters.
+forever. Everything else — channel, user, text, ts, reaction, inviter,
+plus the raw event — travels in the envelope for templates and trigger
+filters.
 """
 
 import hashlib
@@ -27,6 +43,23 @@ from ...connections import credentials
 from ...connections import records
 
 SLACK_EVENT = "message.received"
+EVENTS = ("message.received", "app.mention", "reaction.added", "member.joined")
+
+# Slack event type -> the workflow-facing event name it publishes.
+_EVENT_NAMES = {
+    "app_mention": "app.mention",
+    "reaction_added": "reaction.added",
+    "member_joined_channel": "member.joined",
+}
+
+
+def event_name(slack_type):
+    """The published event for one Slack event type, or None when dapier does
+    not subscribe to it (``message.*`` all fold into ``message.received``)."""
+    name = str(slack_type or "")
+    if name.startswith("message"):
+        return SLACK_EVENT
+    return _EVENT_NAMES.get(name)
 
 
 def verify(headers, body, secret, *, now=None):
@@ -54,6 +87,7 @@ def event_data(payload, connection_id):
     beyond the flattened ones.
     """
     event = payload.get("event") if isinstance(payload.get("event"), dict) else {}
+    item = event.get("item") if isinstance(event.get("item"), dict) else {}
     return {
         "connection_id": connection_id,
         "team_id": payload.get("team_id"),
@@ -61,11 +95,16 @@ def event_data(payload, connection_id):
         "event_time": payload.get("event_time"),
         "type": event.get("type"),
         "subtype": event.get("subtype"),
-        "channel_id": event.get("channel"),
+        # reaction_added nests the channel inside ``item``; everything else
+        # has it at the top level.
+        "channel_id": event.get("channel") or item.get("channel"),
         "user_id": event.get("user"),
         "text": event.get("text"),
         "ts": event.get("ts") or event.get("event_ts"),
         "thread_ts": event.get("thread_ts"),
+        "reaction": event.get("reaction"),
+        "item_ts": item.get("ts"),
+        "inviter": event.get("inviter"),
         "event": event,
     }
 
@@ -106,7 +145,8 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
         # posts into would loop on its own messages otherwise.
         return 200, {"accepted": False}
     event_type = str(event.get("type") or "")
-    if event_type != "app_mention" and not event_type.startswith("message"):
+    name = event_name(event_type)
+    if name is None:
         return 200, {"accepted": False}
     team_id = message.get("team_id")
     if team_id:
@@ -116,7 +156,7 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             return 403, {"error": "Slack workspace does not match connection"}
     event_id = "slack:" + hashlib.sha256(
         f"{connection_id}:{message.get('event_id')}".encode()).hexdigest()[:32]
-    publish("slack", SLACK_EVENT,
+    publish("slack", name,
             {"connection_id": connection_id, **event_data(message, connection_id)},
             source=connection_id, event_id=event_id)
     return 200, {"accepted": True}

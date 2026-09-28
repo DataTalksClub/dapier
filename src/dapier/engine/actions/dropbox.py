@@ -1,5 +1,8 @@
-"""dropbox_upload / dropbox_delete / dropbox_find actions."""
+"""dropbox_upload / dropbox_delete / dropbox_find / dropbox_read_file /
+dropbox_get_temp_link / dropbox_create_folder / dropbox_move / dropbox_copy
+actions."""
 import json
+import mimetypes
 import os
 import urllib.request
 
@@ -12,6 +15,8 @@ DROPBOX_DOWNLOAD_URL = "https://content.dropboxapi.com/2/files/download"
 DROPBOX_DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 DROPBOX_SEARCH_URL = "https://api.dropboxapi.com/2/files/search"
 DROPBOX_CREATE_FOLDER_URL = "https://api.dropboxapi.com/2/files/create_folder_v2"
+DROPBOX_MOVE_URL = "https://api.dropboxapi.com/2/files/move_v2"
+DROPBOX_COPY_URL = "https://api.dropboxapi.com/2/files/copy_v2"
 
 
 def _dropbox_connection(connection_id):
@@ -226,3 +231,175 @@ def _found_item(metadata):
         item["size"] = metadata.get("size")
         item["modified"] = str(metadata.get("server_modified") or "")
     return item
+
+
+def run_dropbox_read_file(action, event, *, transport=None, steps=None, s3_client=None):
+    """Download one file and stage it for the steps that follow (Zapier's
+    Read File).
+
+    ``path`` renders against the event and falls back to the triggering
+    file's path, so a dropbox file.created → read_file chain needs nothing
+    but the connection. The bytes land in the render-artifacts bucket under
+    ``dropbox/<event id>/<step id>/<filename>`` and the output names the
+    staged ref: ``{filename, size, content_type, bucket, key, path}``. Pair
+    with Amazon S3's ``source_s3`` — its bucket/key take templates — to hand
+    the bytes to another bucket.
+    """
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    path = _rendered_field(action, "path", event, steps)
+    if not path:
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        path = str(data.get("path") or "").strip()
+    if not path:
+        raise ValueError("dropbox_read_file requires a file path")
+    body = _dropbox_download(access_token, path, transport=transport)
+    filename = base._safe_filename(path.split("/")[-1])
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    bucket = os.environ["RENDER_ARTIFACTS_BUCKET"]
+    key = "dropbox/{}/{}/{}".format(
+        str(event.get("id") or "unknown").replace("/", "_"),
+        str(action.get("id") or "read").replace("/", "_"),
+        filename,
+    )
+    client = s3_client
+    if client is None:
+        import boto3
+
+        client = boto3.client("s3")
+    client.put_object(
+        Bucket=bucket, Key=key, Body=body, ContentType=content_type,
+        ServerSideEncryption="AES256",
+    )
+    return {
+        "filename": filename,
+        "size": len(body),
+        "content_type": content_type,
+        "bucket": bucket,
+        "key": key,
+        "path": path,
+    }
+
+
+# A read that hands over where the bytes live instead of moving them — the
+# role Google Drive's webContentLink plays for s3_upload's source_url.
+# get_temporary_link is an RPC route (JSON body on the api host) even though
+# the link it returns points at the content host.
+DROPBOX_TEMP_LINK_URL = "https://api.dropboxapi.com/2/files/get_temporary_link"
+
+
+def _dropbox_temp_link(access_token, path, *, transport=None):
+    raw = _dropbox_rpc(
+        DROPBOX_TEMP_LINK_URL, access_token, {"path": path},
+        transport=transport, unreachable="dropbox temp-link unreachable",
+    )
+    try:
+        return json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise RuntimeError("dropbox temp-link returned an unreadable body") from None
+
+
+def run_dropbox_get_temp_link(action, event, *, transport=None, steps=None):
+    """Get a short-lived direct-download link for one file
+    (files/get_temporary_link).
+
+    ``path`` renders against the event and falls back to the triggering
+    file's path, so a dropbox file.created → temp-link chain needs nothing
+    but the connection. The output is ``{link, item}`` — ``item`` is the
+    found-file shape (id/name/path/tag/size/modified) — and ``link`` feeds
+    straight into s3_upload's ``source_url`` when a chain wants the bytes
+    without staging them first. Dropbox links expire after about four hours.
+    """
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    path = _rendered_field(action, "path", event, steps)
+    if not path:
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        path = str(data.get("path") or "").strip()
+    if not path:
+        raise ValueError("dropbox_get_temp_link requires a file path")
+    response = _dropbox_temp_link(access_token, path, transport=transport)
+    link = str(response.get("link") or "")
+    if not link:
+        raise RuntimeError("dropbox temp-link returned no link")
+    metadata = response.get("metadata") if isinstance(response.get("metadata"), dict) else {}
+    return {
+        "link": link,
+        "item": _found_item(metadata) if metadata.get("id") else None,
+    }
+
+
+def run_dropbox_create_folder(action, event, *, transport=None, steps=None):
+    """Create one folder (files/create_folder_v2, Zapier's Create Folder).
+
+    ``path`` renders against the event and must be the full path including
+    the folder name (``/Invoices/{month}``). An existing folder is a
+    ``path/conflict/folder_conflict`` error, not a result — chain
+    dropbox_find with ``create_if_missing`` when find-or-create is wanted.
+    Output: ``{folder: path, item: {id, name, path, tag}}``.
+    """
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    path = _rendered_field(action, "path", event, steps)
+    if not path:
+        raise ValueError("dropbox_create_folder requires a folder path")
+    raw = _dropbox_rpc(
+        DROPBOX_CREATE_FOLDER_URL, access_token, {"path": path},
+        transport=transport, unreachable="dropbox create-folder unreachable",
+    )
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise RuntimeError("dropbox create-folder returned an unreadable body") from None
+    metadata = data.get("metadata") or {}
+    return {
+        "folder": path,
+        "item": _found_item(metadata) if metadata.get("id") else None,
+    }
+
+
+def _run_dropbox_transfer(action, event, *, url, verb, transport, steps):
+    """One files/move_v2 or files/copy_v2 call; the two share every shape.
+
+    Both paths render against the event. ``to_path`` includes the new name —
+    a move within the same folder under a different name is a rename. With
+    ``autorename`` Dropbox appends a suffix instead of erroring when the
+    destination exists. Output: ``{moved|copied: to_path, item}``.
+    """
+    connection = _dropbox_connection(action["connection_id"])
+    access_token, _info = tokens.get_access_token(connection, transport=transport)
+    from_path = _rendered_field(action, "from_path", event, steps)
+    to_path = _rendered_field(action, "to_path", event, steps)
+    if not from_path or not to_path:
+        raise ValueError(f"dropbox_{verb} requires from_path and to_path")
+    raw = _dropbox_rpc(
+        url, access_token,
+        {"from_path": from_path, "to_path": to_path,
+         "autorename": bool(action.get("autorename"))},
+        transport=transport, unreachable=f"dropbox {verb} unreachable",
+    )
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise RuntimeError(f"dropbox {verb} returned an unreadable body") from None
+    metadata = data.get("metadata") or {}
+    return {
+        verb: to_path,
+        "item": _found_item(metadata) if metadata.get("id") else None,
+    }
+
+
+def run_dropbox_move(action, event, *, transport=None, steps=None):
+    """Move (or rename) one file or folder (files/move_v2, Zapier's Move
+    File / Rename File). See :func:`_run_dropbox_transfer` for the shared
+    semantics; output is ``{moved: to_path, item}``."""
+    return _run_dropbox_transfer(action, event, url=DROPBOX_MOVE_URL, verb="moved",
+                                 transport=transport, steps=steps)
+
+
+def run_dropbox_copy(action, event, *, transport=None, steps=None):
+    """Copy one file or folder to a new path (files/copy_v2, Zapier's Copy
+    File). See :func:`_run_dropbox_transfer` for the shared semantics;
+    output is ``{copied: to_path, item}``."""
+    return _run_dropbox_transfer(action, event, url=DROPBOX_COPY_URL, verb="copied",
+                                 transport=transport, steps=steps)

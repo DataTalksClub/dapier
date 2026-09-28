@@ -223,3 +223,58 @@ class RegistrationTests(unittest.TestCase):
         self.assertIn("slack_find", registry.ACTIONS)
         self.assertIn("slack_find_user", registry.ACTIONS)
         self.assertIn("dropbox_find", registry.ACTIONS)
+
+
+class SlackFindOrCreateTests(unittest.TestCase):
+    """create_if_missing on the channel branch — Zapier's Find or Create
+    Channel: a missed name is reserved via conversations.create."""
+
+    def test_channel_miss_creates_the_channel(self):
+        transport = FakeTransport(
+            {"ok": True, "channels": [{"id": "C1", "name": "general"}]},
+            {"ok": True, "channel": {"id": "C9", "name": "incident-room",
+                                     "is_private": True}},
+        )
+        output = run_slack(transport, {"find": "channel", "query": "#Incident Room",
+                                       "create_if_missing": True, "is_private": True})
+
+        self.assertEqual(output, {"found": True, "created": True, "channel": {
+            "id": "C9", "name": "incident-room", "is_private": True}})
+        create = transport.calls[1]
+        self.assertEqual(create["url"], "https://slack.com/api/conversations.create")
+        self.assertEqual(json.loads(create["body"]),
+                         {"name": "incident-room", "is_private": True})
+
+    def test_channel_hit_never_creates(self):
+        transport = FakeTransport(
+            {"ok": True, "channels": [{"id": "C2", "name": "docks"}]})
+        output = run_slack(transport, {"find": "channel", "query": "docks",
+                                       "create_if_missing": True})
+
+        self.assertEqual(output["found"], True)
+        self.assertNotIn("created", output)
+        self.assertEqual(len(transport.calls), 1)
+
+    def test_channel_miss_without_the_flag_stays_a_miss(self):
+        transport = FakeTransport({"ok": True, "channels": []})
+        output = run_slack(transport, {"find": "channel", "query": "missing"})
+
+        self.assertEqual(output, {"found": False, "channel": None})
+        self.assertEqual(len(transport.calls), 1)
+
+    def test_user_miss_stays_a_miss_even_with_the_flag(self):
+        transport = FakeTransport({"ok": False, "error": "users_not_found"})
+        output = run_slack(transport, {"find": "user",
+                                       "create_if_missing": True})
+
+        self.assertEqual(output, {"found": False, "user": None})
+        self.assertEqual(len(transport.calls), 1)
+
+    def test_a_failed_create_raises(self):
+        transport = FakeTransport(
+            {"ok": True, "channels": []},
+            {"ok": False, "error": "invalid_auth"},
+        )
+        with self.assertRaises(RuntimeError):
+            run_slack(transport, {"find": "channel", "query": "new-channel",
+                                  "create_if_missing": True})

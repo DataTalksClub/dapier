@@ -21,7 +21,11 @@ from src.dapier.engine.actions.youtube import (
     run_youtube_find_playlist_items,
     run_youtube_find_video,
 )
-from src.dapier.engine.actions.zoom import run_zoom_find_meeting, run_zoom_find_recording
+from src.dapier.engine.actions.zoom import (
+    run_zoom_create_meeting,
+    run_zoom_find_meeting,
+    run_zoom_find_recording,
+)
 
 
 class FakeTransport:
@@ -262,7 +266,8 @@ def test_zoom_find_meeting_by_topic_contains_is_case_insensitive():
 
     output = run_zoom({"topic": "kubernetes course"}, transport)
 
-    assert output == {"found": True, "matched_by": "topic", "meeting": {
+    assert output == {"found": True, "matched_by": "topic", "scope": "upcoming",
+                      "meeting": {
         "id": "9003", "topic": "Kubernetes Course Live",
         "start_time": "2026-09-30T17:00:00Z",
         "join_url": "https://zoom.us/j/9003", "duration": 90}}
@@ -277,7 +282,8 @@ def test_zoom_find_meeting_exact_mode_requires_the_full_topic():
         {"id": 9003, "topic": "Kubernetes Course Live"}]}))
 
     exact_miss = run_zoom({"topic": "kubernetes course", "match": "exact"}, transport)
-    assert exact_miss == {"found": False, "meeting": None, "matched_by": "topic"}
+    assert exact_miss == {"found": False, "meeting": None, "matched_by": "topic",
+                          "scope": "upcoming"}
 
     exact_hit = run_zoom({"topic": "kubernetes course live", "match": "exact"},
                          transport)
@@ -410,6 +416,135 @@ def test_zoom_find_recording_rejects_an_unknown_match_mode():
     assert transport.calls == []
 
 
+# --- zoom_create_meeting ------------------------------------------------------
+
+
+def run_zoom_create(action, transport):
+    with with_connection("zoom", ZOOM_CONNECTION):
+        return run_zoom_create_meeting(
+            {"type": "zoom_create_meeting", "connection_id": "zoom-main", **action},
+            EVENT, transport=transport)
+
+
+def test_zoom_create_meeting_schedules_with_start_time():
+    transport = FakeTransport(
+        ("users/me/meetings", 201,
+         {"id": 9100, "topic": "Live lecture", "start_time": "2026-10-01T09:00:00Z",
+          "duration": 45, "timezone": "Europe/Berlin",
+          "join_url": "https://zoom.us/j/9100", "start_url": "https://zoom.us/s/9100",
+          "password": "secret1"}))
+
+    output = run_zoom_create(
+        {"topic": "Live lecture", "start_time": "2026-10-01T09:00:00Z",
+         "duration": "45", "timezone": "Europe/Berlin", "agenda": "Week 1"}, transport)
+
+    assert output == {"created": True, "scheduled": True, "meeting": {
+        "id": "9100", "topic": "Live lecture", "start_time": "2026-10-01T09:00:00Z",
+        "duration": 45, "join_url": "https://zoom.us/j/9100",
+        "start_url": "https://zoom.us/s/9100", "passcode": "secret1"}}
+    call = transport.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"] == "https://api.zoom.us/v2/users/me/meetings"
+    assert call["headers"]["authorization"] == "Bearer tok"
+    assert call["headers"]["content-type"] == "application/json"
+    assert json.loads(call["body"]) == {
+        "topic": "Live lecture", "type": 2, "start_time": "2026-10-01T09:00:00Z",
+        "duration": 45, "timezone": "Europe/Berlin", "agenda": "Week 1"}
+
+
+def test_zoom_create_meeting_without_start_time_is_instant():
+    transport = FakeTransport(("users/me/meetings", 201, {"id": 9101, "topic": "Now"}))
+
+    output = run_zoom_create({"topic": "Now"}, transport)
+
+    assert output == {"created": True, "scheduled": False, "meeting": {
+        "id": "9101", "topic": "Now", "start_time": None, "duration": None,
+        "join_url": None, "start_url": None, "passcode": None}}
+    assert json.loads(transport.calls[0]["body"]) == {"topic": "Now", "type": 1}
+
+
+def test_zoom_create_meeting_defaults_scheduled_duration_to_60():
+    transport = FakeTransport(("users/me/meetings", 201, {"id": 9102}))
+
+    run_zoom_create({"topic": "Live", "start_time": "2026-10-01T09:00:00Z"}, transport)
+
+    assert json.loads(transport.calls[0]["body"])["duration"] == 60
+
+
+def test_zoom_create_meeting_renders_the_topic_template():
+    transport = FakeTransport(("users/me/meetings", 201, {"id": 9103}))
+
+    run_zoom_create({"topic": "{topic} live"}, transport)
+
+    assert json.loads(transport.calls[0]["body"])["topic"] == "kubernetes course live"
+
+
+def test_zoom_create_meeting_passes_settings_through_and_keeps_offsets():
+    transport = FakeTransport(("users/me/meetings", 201, {"id": 9104}))
+
+    run_zoom_create({"topic": "Live", "start_time": "2026-10-01T09:00:00+02:00",
+                     "settings": '{{"join_before_host": true}}'}, transport)
+
+    body = json.loads(transport.calls[0]["body"])
+    assert body["settings"] == {"join_before_host": True}
+    assert body["start_time"] == "2026-10-01T09:00:00+02:00"
+
+
+def test_zoom_create_meeting_settings_take_templates_like_merge_fields():
+    transport = FakeTransport(("users/me/meetings", 201, {"id": 9105}))
+
+    run_zoom_create({"topic": "Live", "settings": '{"agenda": "{topic}"}'}, transport)
+
+    assert json.loads(transport.calls[0]["body"])["settings"] == {
+        "agenda": "kubernetes course"}
+
+
+def test_zoom_create_meeting_rejects_non_object_settings():
+    transport = FakeTransport()
+
+    for bad in ("[1]", "not json"):
+        with pytest.raises(ValueError):
+            run_zoom_create({"topic": "Live", "settings": bad}, transport)
+    assert transport.calls == []
+
+
+def test_zoom_create_meeting_provider_error_raises():
+    transport = FakeTransport(
+        ("users/me/meetings", 400, {"code": 300, "message": "Invalid start time"}))
+
+    with pytest.raises(RuntimeError) as excinfo:
+        run_zoom_create({"topic": "Live", "start_time": "2026-10-01T09:00:00Z"},
+                        transport)
+    assert "HTTP 400" in str(excinfo.value)
+    assert "Invalid start time" in str(excinfo.value)
+
+
+def test_zoom_create_meeting_requires_a_topic():
+    transport = FakeTransport()
+
+    with pytest.raises(ValueError):
+        run_zoom_create({"topic": "{missing_field}"}, transport)
+    assert transport.calls == []
+
+
+def test_zoom_create_meeting_rejects_a_bad_start_time():
+    transport = FakeTransport()
+
+    with pytest.raises(ValueError):
+        run_zoom_create({"topic": "Live", "start_time": "tomorrow at 9"}, transport)
+    assert transport.calls == []
+
+
+def test_zoom_create_meeting_rejects_a_bad_duration():
+    transport = FakeTransport()
+
+    for duration in ("long", "0", "-5"):
+        with pytest.raises(ValueError):
+            run_zoom_create({"topic": "Live", "start_time": "2026-10-01T09:00:00Z",
+                             "duration": duration}, transport)
+    assert transport.calls == []
+
+
 # --- telegram_find_chat -------------------------------------------------------
 
 
@@ -482,7 +617,9 @@ def test_registry_exposes_the_three_find_actions():
     specs = registry.action_specs()
     assert specs["youtube_find_video"] == ({"connection_id", "query"}, set())
     assert specs["zoom_find_meeting"] == (
-        {"connection_id"}, {"meeting_id", "topic", "match"})
+        {"connection_id"},
+        {"meeting_id", "topic", "match", "scope", "create_if_missing",
+         "start_time", "duration", "timezone", "agenda", "settings"})
     assert specs["telegram_find_chat"] == ({"connection_id", "chat_id"}, set())
 
 
@@ -528,4 +665,22 @@ def test_find_actions_validate_against_the_registry_chain():
         registry.validate_action_chain([
             {"type": "youtube_find_video", "connection_id": "yt", "query": "k8s",
              "channel": "UCnope"}  # unknown key
+        ])
+
+
+def test_registry_exposes_the_zoom_create_action():
+    specs = registry.action_specs()
+    assert specs["zoom_create_meeting"] == (
+        {"connection_id", "topic"},
+        {"start_time", "duration", "timezone", "agenda", "settings"})
+    create = registry.ACTIONS["zoom_create_meeting"]
+    assert [field["key"] for field in create.fields] == [
+        "connection_id", "topic", "start_time", "duration", "timezone",
+        "agenda", "settings"]
+    registry.validate_action_chain([
+        {"type": "zoom_create_meeting", "connection_id": "zoom", "topic": "Live",
+         "start_time": "2026-10-01T09:00:00Z"}])
+    with pytest.raises(registry.ActionError):
+        registry.validate_action_chain([
+            {"type": "zoom_create_meeting", "connection_id": "zoom"}  # no topic
         ])

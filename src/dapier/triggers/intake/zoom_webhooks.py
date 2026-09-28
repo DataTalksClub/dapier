@@ -1,9 +1,16 @@
 """Verify Zoom webhooks and normalize safe workflow events.
 
-The four events dapier subscribes to are the ones the Zoom chip declares
+The eight events dapier subscribes to are the ones the Zoom chip declares
 (connectors.triggers): recording.completed, recording.transcript_completed,
-meeting.started, meeting.ended. Every builder returns metadata only —
-download tokens, participant lists, and private payloads stay out of runs.
+meeting.started, meeting.ended, meeting.registration_created, and their
+webinar twins webinar.started, webinar.ended,
+webinar.registration_created. Every builder returns metadata only —
+download tokens and meeting-wide settings stay out of runs. The
+registration builder keeps the registrant's own submitted fields (email,
+name): the registrant is the event, the same way a telegram delivery keeps
+the sender's profile. Webinar deliveries carry the same object shape as
+meeting ones, so the lifecycle and registration builders serve both kinds;
+only the published event name differs.
 """
 
 import hashlib
@@ -33,6 +40,12 @@ def verify(headers, body, secret, *, now=None):
 
 RECORDING_EVENTS = ("recording.completed", "recording.transcript_completed")
 MEETING_EVENTS = ("meeting.started", "meeting.ended")
+REGISTRATION_EVENTS = ("meeting.registration_created",)
+# Webinar deliveries reuse the meeting builders (same object shape); the
+# dedup identities name the event, so a webinar and its meeting-kind cousin
+# at the same timestamp never collide.
+WEBINAR_EVENTS = ("webinar.started", "webinar.ended")
+WEBINAR_REGISTRATION_EVENTS = ("webinar.registration_created",)
 # The video-file filter for recording events; transcript_completed deliveries
 # widen it so the TRANSCRIPT entry rides along with the video.
 RECORDING_FILE_TYPES = frozenset({"MP4", "M4V"})
@@ -106,6 +119,37 @@ def meeting_data(payload):
     return data
 
 
+def registration_data(payload):
+    """Flatten a meeting.registration_created delivery to what a workflow
+    templates over: the meeting's identity plus the registrant's own
+    submitted fields (email, name, approval status). The registrant object
+    is the event's payload — this is the one place a person's email rides
+    into runs on purpose — while meeting-wide settings and join URLs stay
+    out (a join URL is a credential, and add_registrant mints fresh ones).
+    """
+    if not isinstance(payload, dict):
+        return None
+    meeting = payload.get("object")
+    if not isinstance(meeting, dict):
+        return None
+    registrant = meeting.get("registrant")
+    if not isinstance(registrant, dict):
+        return None
+    return {
+        "account_id": meeting.get("account_id") or payload.get("account_id"),
+        "meeting_id": meeting.get("id"),
+        "meeting_uuid": meeting.get("uuid"),
+        "topic": meeting.get("topic"),
+        "start_time": meeting.get("start_time"),
+        "timezone": meeting.get("timezone"),
+        "registrant_id": registrant.get("id") or registrant.get("registrant_id"),
+        "email": registrant.get("email"),
+        "first_name": registrant.get("first_name"),
+        "last_name": registrant.get("last_name"),
+        "status": registrant.get("status"),
+    }
+
+
 def handle(connection_id, headers, body, *, connections_table, publish, now=None):
     """Return (HTTP status, JSON body) for a connection-specific Zoom URL."""
     try:
@@ -141,7 +185,8 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             records.put_connection(connections_table, updated)
         return 200, {"plainToken": plain, "encryptedToken": hmac.new(
             secret.encode(), plain.encode(), hashlib.sha256).hexdigest()}
-    if event not in RECORDING_EVENTS + MEETING_EVENTS:
+    if event not in (RECORDING_EVENTS + MEETING_EVENTS + WEBINAR_EVENTS
+                     + REGISTRATION_EVENTS + WEBINAR_REGISTRATION_EVENTS):
         return 200, {"accepted": False}
     if event in RECORDING_EVENTS:
         data = recording_data(message.get("payload"),
@@ -160,7 +205,20 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
         identity = (f"{connection_id}:{who}:{message.get('event_ts')}"
                     if event == "recording.completed"
                     else f"{connection_id}:{event}:{who}:{message.get('event_ts')}")
+    elif event in REGISTRATION_EVENTS + WEBINAR_REGISTRATION_EVENTS:
+        data = registration_data(message.get("payload"))
+        account_id = (data or {}).get("account_id")
+        if (data is None or not account_id or not data.get("meeting_uuid")
+                or not data.get("meeting_id") or not data.get("registrant_id")
+                or not message.get("event_ts")):
+            return 400, {"error": "incomplete Zoom registration event"}
+        # Per-registrant identity: two sign-ups for one meeting or webinar at
+        # the same event_ts are distinct deliveries.
+        identity = (f"{connection_id}:{event}:{data.get('meeting_uuid')}:"
+                    f"{data.get('registrant_id')}:{message.get('event_ts')}")
     else:
+        # Meeting and webinar lifecycle deliveries share the object shape;
+        # the builders flatten both, and the identity names the event.
         data = meeting_data(message.get("payload"))
         account_id = (data or {}).get("account_id")
         if (data is None or not account_id or not data.get("uuid")

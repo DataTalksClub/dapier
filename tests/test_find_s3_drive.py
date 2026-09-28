@@ -84,7 +84,11 @@ class S3FindTests(unittest.TestCase):
         self.assertEqual(output, {"found": True, "key": "reports/2026/report.pdf",
                                   "size": 1234,
                                   "last_modified": "2026-09-26T21:03:49+00:00",
-                                  "bucket": "backups"})
+                                  "bucket": "backups",
+                                  "matches": [{"key": "reports/2026/report.pdf",
+                                               "size": 1234,
+                                               "last_modified": "2026-09-26T21:03:49+00:00"}],
+                                  "next_token": ""})
         self.assertEqual(s3.calls[0], {"Bucket": "backups", "Prefix": "",
                                        "MaxKeys": 1000})
 
@@ -119,7 +123,8 @@ class S3FindTests(unittest.TestCase):
 
         output = run_s3_find_with(s3_client=s3)
 
-        self.assertEqual(output, {"found": False, "key": None})
+        self.assertEqual(output, {"found": False, "key": None,
+                                  "matches": [], "next_token": ""})
         self.assertEqual(len(s3.calls), 1)
 
     def test_empty_bucket_is_found_false(self):
@@ -127,7 +132,8 @@ class S3FindTests(unittest.TestCase):
 
         output = run_s3_find_with(s3_client=s3)
 
-        self.assertEqual(output, {"found": False, "key": None})
+        self.assertEqual(output, {"found": False, "key": None,
+                                  "matches": [], "next_token": ""})
 
     def test_pagination_follows_the_continuation_token(self):
         s3 = FakeS3(
@@ -180,7 +186,14 @@ class DriveFindTests(unittest.TestCase):
         self.assertEqual(output, {"found": True, "count": 2, "file": {
             "id": "f1", "name": "report 2026.pdf",
             "mimeType": "application/pdf",
-            "modified": "2026-09-26T21:03:49.887Z"}})
+            "modified": "2026-09-26T21:03:49.887Z"},
+            "files": [
+                {"id": "f1", "name": "report 2026.pdf",
+                 "mimeType": "application/pdf",
+                 "modified": "2026-09-26T21:03:49.887Z"},
+                {"id": "f2", "name": "report 2025.pdf",
+                 "mimeType": None, "modified": None}],
+            "next_page_token": None})
         call = transport.calls[0]
         self.assertEqual(call["method"], "GET")
         self.assertEqual(call["headers"]["authorization"], "Bearer tok")
@@ -219,14 +232,16 @@ class DriveFindTests(unittest.TestCase):
 
         output = run_drive_find_with(transport=transport)
 
-        self.assertEqual(output, {"found": False, "file": None, "count": 0})
+        self.assertEqual(output, {"found": False, "file": None, "count": 0,
+                                  "files": [], "next_page_token": None})
 
     def test_missing_files_key_is_found_false(self):
         transport = FakeTransport(("drive/v3/files", 200, {}))
 
         output = run_drive_find_with(transport=transport)
 
-        self.assertEqual(output, {"found": False, "file": None, "count": 0})
+        self.assertEqual(output, {"found": False, "file": None, "count": 0,
+                                  "files": [], "next_page_token": None})
 
     def test_http_error_surfaces_the_status_and_detail(self):
         transport = FakeTransport(
@@ -286,7 +301,10 @@ class RegistryTests(unittest.TestCase):
                 {"data": {}}, "wf-1", steps={})
 
         self.assertEqual(output, {"found": True, "key": "report.pdf", "size": 5,
-                                  "last_modified": None, "bucket": "backups"})
+                                  "last_modified": None, "bucket": "backups",
+                                  "matches": [{"key": "report.pdf", "size": 5,
+                                               "last_modified": None}],
+                                  "next_token": ""})
 
     def test_run_action_searches_drive_through_the_default_transport(self):
         transport = FakeTransport(
@@ -310,7 +328,8 @@ class RegistryTests(unittest.TestCase):
         required, optional = action_specs()["s3_find"]
         self.assertEqual(required, frozenset({"bucket", "pattern"}))
         self.assertEqual(
-            optional, frozenset({"prefix", "match", "credential_id", "connection_id"}))
+            optional, frozenset({"prefix", "match", "next_token",
+                                 "credential_id", "connection_id"}))
         required, optional = action_specs()["drive_find_file"]
         self.assertEqual(required, frozenset({"connection_id", "name"}))
         self.assertEqual(optional, frozenset({"match", "folder"}))

@@ -65,6 +65,41 @@ The scope meanings are:
 | `files.content.read` | Download invoice contents |
 | `files.content.write` | Upload or delete files; the invoice workflow deletes processed files |
 
+## File webhooks
+
+Webhook-driven `dropbox` / `file.created` (also `file.updated` and
+`file.deleted`) events need the Dropbox app's webhook pointed at Dapier:
+
+1. In the [Dropbox App Console](https://www.dropbox.com/developers/apps), open
+   **Dapier DTC Dev → Webhooks** and set the Webhook URI to exactly:
+
+   ```
+   https://dapier.dtcdev.click/hooks/dropbox
+   ```
+
+   Dropbox validates the URI with a GET `challenge` request before saving it;
+   Dapier answers the challenge.
+
+2. Dropbox signs every notification body with the app secret
+   (`X-Dropbox-Signature`, HMAC-SHA256). Dapier verifies against the secret
+   stored for the `dropbox` OAuth client — the one the
+   [shared credential procedure](README.md#updating-or-rotating-an-oauth-client-id-and-secret)
+   maintains — so it must match the current App Console secret. The deploy-time
+   `DROPBOX_OAUTH_CLIENT_SECRET` environment variable is accepted too, so a
+   rotation window does not drop deliveries. With no secret configured
+   anywhere, verification fails closed and every notification is rejected.
+
+3. Connect the Dropbox account as above. A notification only names the changed
+   account; Dapier's resolver lists the account's changes with the
+   connection's token and publishes one event per file change, with
+   deterministic event ids so a replayed notification cannot re-fire actions.
+
+Workflow items match `connector: dropbox` with `event: file.created`,
+`file.updated`, or `file.deleted`. The `dropbox.files` poll source fires the
+same `file.created` event on a schedule, without the webhook. The console's
+Dropbox **Manage** dialog and the `dapier connections connect`/`import` output
+print this endpoint and the signing requirement.
+
 ## Discovery
 
 Dropbox connections expose three live listings to the console/CLI pickers and
@@ -72,6 +107,21 @@ Dropbox connections expose three live listings to the console/CLI pickers and
 (one level of a folder; `path` defaults to the connection's root) and
 `search` (files and folders matching a required `query` param, via Dropbox's
 `files/search_v2` — the same listing `dropbox_find`'s query field browses).
+
+## Actions
+
+All Dropbox actions take `connection_id` and render paths from the event.
+
+| action | Dropbox call | notes |
+| --- | --- | --- |
+| `dropbox_upload` | `files/upload` | email attachments or a rendered output file; output `{uploaded: [paths]}` |
+| `dropbox_read_file` | `files/download` | stages the bytes for `s3_upload` `source_s3` |
+| `dropbox_get_temp_link` | `files/get_temporary_link` | direct download link for `s3_upload` `source_url` |
+| `dropbox_create_folder` | `files/create_folder_v2` | full destination path; an existing folder errors — use `dropbox_find` with `create_if_missing` for find-or-create |
+| `dropbox_move` | `files/move_v2` | also rename: move within the same folder under a new name; `autorename` avoids conflict errors |
+| `dropbox_copy` | `files/copy_v2` | same shape as move, original stays |
+| `dropbox_delete` | `files/delete_v2` | defaults to the triggering event's path |
+| `dropbox_find` | `files/search` | output `{found, item}`; folder finds can `create_if_missing` |
 
 ## Setup history and troubleshooting
 

@@ -1,12 +1,12 @@
 """Zoom trigger variety: one documented sample per declared event.
 
 The catalog declares recording.completed / recording.transcript_completed /
-meeting.started / meeting.ended and the webhook intake publishes all four
-(see triggers.intake.zoom_webhooks), so the sample pull — the shared
-api_discover dispatch behind `dapier triggers sample` and the designer's
-test panel — must serve each event its own realistic, metadata-only
-payload, and recorded history must never answer one event's ask with
-another event's run.
+meeting.started / meeting.ended / meeting.registration_created and the
+webhook intake publishes all five (see triggers.intake.zoom_webhooks), so
+the sample pull — the shared api_discover dispatch behind
+`dapier triggers sample` and the designer's test panel — must serve each
+event its own realistic, metadata-only payload, and recorded history must
+never answer one event's ask with another event's run.
 """
 import json
 
@@ -36,7 +36,10 @@ def _sample(**kwargs):
 def test_every_declared_event_serves_its_own_sample():
     events = CONNECTORS["zoom"].events
     assert events == ("recording.completed", "recording.transcript_completed",
-                      "meeting.started", "meeting.ended")
+                      "meeting.started", "meeting.ended",
+                      "meeting.registration_created",
+                      "webinar.started", "webinar.ended",
+                      "webinar.registration_created")
     for event in events:
         payload = _sample(event=event)
         assert payload["event"] == event, event
@@ -60,6 +63,21 @@ def test_recording_events_carry_files_and_meetings_the_schedule():
     assert "end_time" not in started and ended["end_time"]
     for state in (started, ended):
         assert "video_files" not in state and state["timezone"]
+
+
+def test_registration_created_sample_carries_the_registrant():
+    registration = _sample(event="meeting.registration_created")["sample"]["data"]
+    assert registration["email"] == "ada@example.test"
+    assert registration["registrant_id"] and registration["status"]
+    assert registration["first_name"] and registration["last_name"]
+    assert registration["topic"] and registration["start_time"]
+    # the meeting's identity rides along, its settings and join URLs do not
+    assert registration["meeting_uuid"] and registration["meeting_id"]
+    dumped = json.dumps(registration)
+    assert "join_url" not in dumped and "settings" not in dumped
+    # a recording ask never answers with the registration payload
+    recording = _sample(event="recording.completed")["sample"]["data"]
+    assert "email" not in recording and "registrant_id" not in recording
 
 
 def test_default_and_unknown_events_fall_back_to_recording_completed():

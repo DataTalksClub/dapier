@@ -174,6 +174,159 @@ def test_zoom_drops_unsubscribed_events(monkeypatch):
     assert published == []
 
 
+def test_zoom_meeting_events_reject_incomplete_deliveries(monkeypatch):
+    table, _ = setup(monkeypatch)
+    meeting_object = {"id": 123, "uuid": "meeting-uuid", "topic": "Course",
+                      "host_id": "host-1", "start_time": "2026-09-28T09:00:00Z",
+                      "duration": 45, "timezone": "Europe/Berlin"}
+    incomplete = [
+        {"event": "meeting.started", "event_ts": 5000,
+         "payload": {"account_id": "account-1",
+                     "object": {**meeting_object, "uuid": None}}},
+        {"event": "meeting.started", "event_ts": 5001,
+         "payload": {"account_id": "account-1",
+                     "object": {**meeting_object, "id": None}}},
+        {"event": "meeting.started",
+         "payload": {"account_id": "account-1", "object": meeting_object}},
+        {"event": "meeting.ended", "event_ts": 5002,
+         "payload": {"object": meeting_object}},
+        {"event": "meeting.started", "event_ts": 5003,
+         "payload": {"account_id": "account-1"}},
+    ]
+    published = []
+    for message in incomplete:
+        body, headers = signed(message)
+        assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                    publish=lambda *a, **k: published.append((a, k))) == \
+            (400, {"error": "incomplete Zoom meeting event"}), message
+    assert published == []
+    assert not table.items["zoom"].get("verified_account_id")
+
+
+def test_zoom_transcript_event_rejects_incomplete_deliveries(monkeypatch):
+    table, _ = setup(monkeypatch)
+    recording_object = {"id": 123, "uuid": "meeting-uuid", "topic": "Course",
+                        "recording_files": [{"id": "video", "file_type": "MP4"}]}
+    incomplete = [
+        {"event": "recording.transcript_completed",
+         "payload": {"account_id": "account-1", "object": recording_object}},
+        {"event": "recording.transcript_completed", "event_ts": 6000,
+         "payload": {"object": {**recording_object, "uuid": None}}},
+        {"event": "recording.transcript_completed", "event_ts": 6001,
+         "payload": {"object": recording_object}},
+    ]
+    published = []
+    for message in incomplete:
+        body, headers = signed(message)
+        assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                    publish=lambda *a, **k: published.append((a, k))) == \
+            (400, {"error": "incomplete Zoom recording event"}), message
+    assert published == []
+
+
+def test_zoom_new_events_keep_stable_dedup_identities(monkeypatch):
+    table, _ = setup(monkeypatch)
+    published = []
+    publish = lambda *args, **kwargs: published.append((args, kwargs))
+    meeting = {"account_id": "account-1", "object": {
+        "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+        "start_time": "2026-09-28T09:00:00Z"}}
+    body, headers = signed({"event": "meeting.started", "event_ts": 7000,
+                            "payload": meeting})
+    for _ in range(2):
+        assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                    publish=publish) == (200, {"accepted": True})
+    started_id = published[0][1]["event_id"]
+    assert started_id == published[1][1]["event_id"]
+    assert published[0][0][2] == {"connection_id": "zoom", "account_id": "account-1",
+                                  "uuid": "meeting-uuid", "id": 123, "topic": "Course",
+                                  "host_id": None, "start_time": "2026-09-28T09:00:00Z",
+                                  "duration": None, "timezone": None}
+    ended_body, ended_headers = signed({"event": "meeting.ended", "event_ts": 7000,
+                                        "payload": meeting})
+    zoom_webhooks.handle("zoom", ended_headers, ended_body,
+                         connections_table=table, publish=publish)
+    # started and ended at the same timestamp never share a dedup identity
+    assert published[2][1]["event_id"] != started_id
+
+    recording = {"account_id": "account-1", "object": {
+        "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+        "recording_files": [{"id": "video", "file_type": "MP4",
+                             "play_url": "https://zoom.test/play"}]}}
+    done_body, done_headers = signed({"event": "recording.completed", "event_ts": 7000,
+                                      "payload": recording})
+    vtt_body, vtt_headers = signed({"event": "recording.transcript_completed",
+                                    "event_ts": 7000, "payload": recording})
+    zoom_webhooks.handle("zoom", done_headers, done_body,
+                         connections_table=table, publish=publish)
+    zoom_webhooks.handle("zoom", vtt_headers, vtt_body,
+                         connections_table=table, publish=publish)
+    # completed and transcript_completed at the same timestamp never share one either
+    assert published[3][0][2]["video_files"] == published[4][0][2]["video_files"]
+    assert published[4][1]["event_id"] != published[3][1]["event_id"]
+    assert len({entry[1]["event_id"] for entry in published}) == 4
+
+
+def test_zoom_registration_created_publishes_the_registrant(monkeypatch):
+    table, _ = setup(monkeypatch)
+    body, headers = signed({
+        "event": "meeting.registration_created", "event_ts": 8000,
+        "payload": {"account_id": "account-1", "object": {
+            "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+            "start_time": "2026-09-28T09:00:00Z", "timezone": "Europe/Berlin",
+            "settings": {"approval_type": 2},
+            "registrant": {"id": "registrant-1", "email": "ada@example.test",
+                           "first_name": "Ada", "last_name": "Lovelace",
+                           "status": "approved"}}}})
+    published = []
+    publish = lambda *args, **kwargs: published.append((args, kwargs))
+    assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                publish=publish) == (200, {"accepted": True})
+    assert published[0][0][:2] == ("zoom", "meeting.registration_created")
+    data = published[0][0][2]
+    assert data == {"connection_id": "zoom", "account_id": "account-1",
+                    "meeting_id": 123, "meeting_uuid": "meeting-uuid",
+                    "topic": "Course", "start_time": "2026-09-28T09:00:00Z",
+                    "timezone": "Europe/Berlin", "registrant_id": "registrant-1",
+                    "email": "ada@example.test", "first_name": "Ada",
+                    "last_name": "Lovelace", "status": "approved"}
+    # meeting-wide settings and the registrant's join credential stay out
+    dumped = json.dumps(data)
+    assert "approval_type" not in dumped and "join_url" not in dumped
+    assert "object" not in dumped
+    # a retry of the same registration delivery keeps one dedup identity
+    assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                publish=publish) == (200, {"accepted": True})
+    assert published[1][1]["event_id"] == published[0][1]["event_id"]
+
+
+def test_zoom_registration_rejects_incomplete_deliveries(monkeypatch):
+    table, _ = setup(monkeypatch)
+    registrant = {"id": "registrant-1", "email": "ada@example.test",
+                  "first_name": "Ada", "last_name": "Lovelace", "status": "approved"}
+    meeting_object = {"id": 123, "uuid": "meeting-uuid", "topic": "Course",
+                      "registrant": registrant}
+    incomplete = [
+        {"event": "meeting.registration_created",
+         "payload": {"account_id": "account-1", "object": {"id": 123, "uuid": "u"}}},
+        {"event": "meeting.registration_created", "event_ts": 9000,
+         "payload": {"object": meeting_object}},
+        {"event": "meeting.registration_created", "event_ts": 9001,
+         "payload": {"account_id": "account-1",
+                     "object": {**meeting_object,
+                                "registrant": {**registrant, "id": None}}}},
+        {"event": "meeting.registration_created", "event_ts": 9002,
+         "payload": {"account_id": "account-1"}},
+    ]
+    published = []
+    for message in incomplete:
+        body, headers = signed(message)
+        assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                    publish=lambda *a, **k: published.append((a, k))) == \
+            (400, {"error": "incomplete Zoom registration event"}), message
+    assert published == []
+
+
 def test_cli_zoom_import_uses_agent_connection_api(monkeypatch, tmp_path, capsys):
     token_file = tmp_path / "zoom-secret"
     token_file.write_text("zoom-secret-123456\n")
