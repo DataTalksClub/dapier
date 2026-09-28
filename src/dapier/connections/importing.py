@@ -19,6 +19,32 @@ def verify_token_provider(provider, token):
     token = telegram_api.validate_token(token)
     return telegram_api.get_me(token)
 
+
+def token_secret_value(provider, token, body, credential_id):
+    """The credential value for a token-provider save: the verified token
+    plus, for Slack, the Events API signing secret (supplied now or kept
+    from the stored value) that the ``/hooks/slack/{connection_id}``
+    trigger verifies deliveries with.
+
+    Raises ValueError on a malformed signing secret; callers map that to 400.
+    """
+    value = {"token": token}
+    if str(provider or "").lower() != "slack":
+        return value
+    supplied = str((body or {}).get("signing_secret") or "").strip()
+    if not supplied:
+        try:
+            stored = credentials.get_credential(credential_id)
+        except KeyError:
+            stored = {}
+        supplied = str(stored.get("signing_secret") or "")
+    if supplied:
+        if not 16 <= len(supplied) <= 256:
+            raise ValueError("The Slack signing secret must be 16-256 characters")
+        value["signing_secret"] = supplied
+    return value
+
+
 def _import_token_connection(body, *, operator_subject, connections_table):
     """Operator import for pasted-token providers (Slack, Telegram).
 
@@ -53,7 +79,13 @@ def _import_token_connection(body, *, operator_subject, connections_table):
                    outcome="denied-account-mismatch", error=str(exc))
         status = 409 if isinstance(exc, connections.BindingError) else 400
         return status, {"error": str(exc)}
-    credentials.put_credential(item["credential_id"], {"token": token}, provider=item["provider"])
+    try:
+        secret_value = token_secret_value(fields["provider"], token, body, item["credential_id"])
+    except ValueError as exc:
+        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
+                   outcome="error", error=str(exc))
+        return 400, {"error": str(exc)}
+    credentials.put_credential(item["credential_id"], secret_value, provider=item["provider"])
     connections.put_connection(connections_table, item)
     audit.emit(item["connection_id"], audit.IMPORT, operator_subject, outcome="ok")
     return 200, connections.public_view(item)

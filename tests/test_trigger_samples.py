@@ -25,7 +25,9 @@ import src.dapier.connectors  # noqa: F401  (import = registration)
 @pytest.fixture(autouse=True)
 def no_recorded_history(monkeypatch):
     """Pin the fallback chain to synthetic: history depends on run tables."""
-    monkeypatch.setattr(trigger_discovery, "history_sample", lambda connector: None)
+    monkeypatch.setattr(
+        trigger_discovery, "history_sample",
+        lambda connector, event=None: None)
 
 
 # --- domain: the catalog and the synthetic samples ---
@@ -34,7 +36,8 @@ def no_recorded_history(monkeypatch):
 def test_every_trigger_chip_has_a_sample():
     cat = trigger_discovery.trigger_discovery_catalog()
     for connector in ("email", "webhook", "telegram", "dropbox", "dataops",
-                      "renderer", "schedule", "youtube", "zoom", "poll", "custom"):
+                      "renderer", "schedule", "youtube", "zoom", "poll", "custom",
+                      "slack"):
         assert connector in cat["sample"], connector
     for connector in ("dropbox", "s3", "slack", "telegram", "zoom",
                       "google-sheets", "google-drive"):

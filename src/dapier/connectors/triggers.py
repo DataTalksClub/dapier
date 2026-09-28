@@ -4,18 +4,20 @@ These feed the designer's Triggers group and the event suggestions per
 connector. Ingress normalization for the sources dapier itself receives
 lives in ``connectors.ingress``.
 
-The connectors without a module of their own (renderer, custom) register
-their trigger sample discoveries here, next to the chip that offers them;
-youtube and zoom sample in their connector modules, and schedule and poll
-in connectors.schedule / connectors.poll — a schedule fire is synthesized
-and a poll fire has a live fetch path, so each owns its sample.
+The connectors without a module of their own (renderer, custom, youtube)
+register their trigger sample discoveries here, next to the chip that
+offers them; zoom samples in its connector module (one documented payload
+per declared event), and schedule and poll in connectors.schedule /
+connectors.poll — a schedule fire is synthesized and a poll fire has a
+live fetch path, so each owns its sample.
 """
 from .registry import Connector, connector
 
 connector(Connector(name="email", label="Email", events=("message.received",), icon="mail"))
 connector(Connector(name="youtube", label="YouTube", events=("video.published",), icon="youtube"))
-connector(Connector(name="dropbox", label="Dropbox", events=("file.created",), icon="dropbox"))
-connector(Connector(name="zoom", label="Zoom", events=("recording.completed",), icon="video"))
+connector(Connector(name="dropbox", label="Dropbox", events=("file.created", "file.updated", "file.deleted"), icon="dropbox"))
+connector(Connector(name="zoom", label="Zoom", events=("recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended"), icon="video"))
+connector(Connector(name="slack", label="Slack", events=("message.received",), icon="slack"))
 connector(Connector(name="renderer", label="Renderer", events=("job.completed",), icon="file-text"))
 connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))
 connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw"))
@@ -56,29 +58,6 @@ register_trigger_discovery(TriggerDiscovery(
         "channel_id": "UCbW5IB0F8d1MpdW2AhifDzw",
         "title": "Deploying dapier: a walkthrough",
         "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    })))
-
-# Zoom's recording.completed webhook, metadata only — download tokens and
-# private payloads stay out of runs (see triggers.intake.zoom_webhooks).
-register_trigger_discovery(TriggerDiscovery(
-    connector="zoom", label="Zoom", kind="sample", resource="",
-    fetch=history_or_synthetic_fetch("zoom", "recording.completed", {
-        "account_id": "discover-account",
-        "meeting_id": "94839610293",
-        "meeting_uuid": "discover-sample-uuid",
-        "topic": "Weekly sync",
-        "host_id": "discover-host",
-        "host_email": "host@example.test",
-        "start_time": "2026-09-27T10:00:00Z",
-        "share_url": "https://example.zoom.us/rec/share/discover-sample",
-        "video_files": [{
-            "id": "discover-mp4",
-            "file_type": "MP4",
-            "recording_type": "cloud_recording",
-            "file_size": 184357376,
-            "play_url": "https://example.zoom.us/rec/play/discover-sample",
-            "download_url": "https://example.zoom.us/rec/download/discover-sample",
-        }],
     })))
 
 # The Custom chip is freeform: a placeholder the author pastes over, like

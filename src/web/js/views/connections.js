@@ -69,7 +69,7 @@ const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
 const TOKEN_PROVIDER_META = {
   slack: {
     heading: 'New Slack connection',
-    blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials.',
+    blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials. To listen for messages, open Manage afterwards and wire up event subscriptions.',
     label: 'Slack token',
     placeholder: 'xoxb-… or xoxp-…',
     displayName: 'DataTalks Slack',
@@ -291,6 +291,12 @@ function openEditConnection(connectionId) {
   const zoomSetup = $('#edit-zoom-setup');
   zoomSetup.hidden = connection.provider !== 'zoom';
   if (connection.provider === 'zoom') $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
+  const slackSetup = $('#edit-slack-setup');
+  slackSetup.hidden = connection.provider !== 'slack';
+  if (connection.provider === 'slack') {
+    $('#edit-slack-url').textContent = `${window.location.origin}/hooks/slack/${encodeURIComponent(connectionId)}`;
+    form.signing_secret.value = '';
+  }
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = TOKEN_PROVIDERS.includes(connection.provider) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
@@ -989,12 +995,17 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     const token = form.token.value.trim();
     if (token) body.token = token;
   }
+  if (provider === 'slack') {
+    const signingSecret = form.signing_secret.value.trim();
+    if (signingSecret) body.signing_secret = signingSecret;
+  }
   if (provider === 'dropbox') body.root_path = form.root_path.value.trim();
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (connection && connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
   try {
     await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
     form.token.value = '';
+    form.signing_secret.value = '';
     $('#edit-connection-dialog').close();
     notice('Connection updated');
     await refresh();

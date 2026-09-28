@@ -1,5 +1,6 @@
 """Slack connector: post messages through a stored credential or connection,
-plus channel/user discovery and the auth.test health check.
+plus channel/user discovery, the auth.test health check, and the Events-API
+trigger sample (``message.received``, delivered by triggers.intake.slack_events).
 
 The discovery and health-check runners delegate to the shared provider layer
 (``connections.discovery``), which reads the connection's stored bot token.
@@ -8,6 +9,7 @@ import json
 
 from ..connections import discovery as provider
 from ..engine.actions.slack import run_slack, run_slack_find, run_slack_find_user
+from . import trigger_discovery
 from .registry import (
     Action,
     ConnectionTest,
@@ -15,6 +17,13 @@ from .registry import (
     register,
     register_connection_test,
     register_discovery,
+)
+from .trigger_discovery import (
+    DEFAULT_LIMIT,
+    DiscoveryNotFound,
+    DiscoveryUpstream,
+    TriggerDiscovery,
+    register_trigger_discovery,
 )
 
 register(Action(
@@ -127,10 +136,75 @@ register_discovery(Discovery(
 register_connection_test(ConnectionTest(connector="slack", run=_tested))
 
 
-# --- trigger discovery: channel options for the action's channel field ---------
+# --- trigger discovery: one channel message shaped like a real delivery ---------
 
-from . import trigger_discovery
-from .trigger_discovery import DEFAULT_LIMIT, TriggerDiscovery, register_trigger_discovery
+_SYNTHETIC_DELIVERY = {
+    "team_id": "T0SLACKTEAM",
+    "event_id": "Ev0SAMPLE0001",
+    "event_time": 1758900000,
+    "event": {"type": "message", "channel": "C01BQC114P2", "user": "U02PFU1LS",
+              "text": "Heads up: the deploy finished cleanly.",
+              "ts": "1758900012.000300"},
+}
+
+
+def _envelope(connection_id, payload, event=None):
+    """A sample envelope with the exact data shape a real delivery publishes."""
+    from ..triggers.intake import slack_events
+
+    return {
+        "connector": "slack",
+        "event": event or slack_events.SLACK_EVENT,
+        "source": connection_id,
+        "data": slack_events.event_data(payload, connection_id),
+    }
+
+
+def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport=None):
+    """The newest channel message from the connected workspace, delivery-shaped.
+
+    Slack serves history per channel (no channel-less read like Telegram's
+    getUpdates), so the fetch walks the workspace's channels and returns the
+    first message found. With nothing live, it falls back to recorded runs,
+    then a documented example — the designer preview must always render.
+    """
+    try:
+        connection = trigger_discovery.connected_connection("slack", connection_id)
+    except DiscoveryNotFound:
+        connection = None
+    if connection is not None:
+        try:
+            for channel in provider.discover(connection, "channels", {}, transport=transport):
+                messages = provider.discover(
+                    connection, "messages",
+                    {"channel": channel["id"], "limit": max(limit, 1)}, transport=transport)
+                for item in messages:
+                    payload = {"team_id": None, "event_id": None, "event_time": None,
+                               "event": {"type": "message", "channel": channel["id"],
+                                         "user": item.get("user"), "text": item.get("name"),
+                                         "ts": item.get("ts")}}
+                    return {"sample": trigger_discovery.as_sample(_envelope(
+                        connection["connection_id"], payload, event)),
+                        "source": "live", "connection_id": connection["connection_id"]}
+        except (DiscoveryNotFound, DiscoveryUpstream):
+            pass  # not connected yet, or the API came back empty — fall through
+    found = trigger_discovery.history_sample("slack")
+    if found is not None:
+        if event:
+            found["event"] = event
+        return {"sample": found, "source": "history", "connection_id": connection_id}
+    envelope = _envelope(connection_id or "slack", _SYNTHETIC_DELIVERY, event)
+    return {"sample": trigger_discovery.synthetic_sample(
+        envelope["connector"], envelope["event"], envelope["data"]),
+        "source": "synthetic", "connection_id": connection_id}
+
+
+register_trigger_discovery(TriggerDiscovery(
+    connector="slack", label="Slack", kind="sample", resource="",
+    fetch=_fetch_sample))
+
+
+# --- trigger discovery: channel options for the action's channel field ---------
 
 
 def _fetch_channel_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):

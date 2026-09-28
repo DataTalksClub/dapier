@@ -168,7 +168,11 @@ export const actionCatalog: ActionEntry[] = [
       { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
       { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
-      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
+      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+      { key: "telegram_format", label: "Telegram formatting", type: "boolean",
+        placeholder: "renders {text} + entities as Slack blocks; long posts split into a thread" },
+      { key: "source_link", label: "Source link template",
+        placeholder: "https://t.me/channel/{message_id}" }
     ]
   },
   {
@@ -313,6 +317,35 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "mailchimp_find_member",
+    label: "Mailchimp: find member",
+    icon: MailLogo,
+    description: "Find one audience member by email. Output: {found, member}; a miss is {found: false, member: null}.",
+    fields: [
+      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+      { key: "list_id", label: "Audience", required: true,
+        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
+      { key: "email", label: "Email", placeholder: "{sender}", required: true,
+        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } }
+    ]
+  },
+  {
+    type: "mailchimp_upsert_member",
+    label: "Mailchimp",
+    icon: MailLogo,
+    description: "Add or update one audience member: Status applies to new members; merge fields are a JSON object.",
+    fields: [
+      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+      { key: "list_id", label: "Audience", required: true,
+        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
+      { key: "email", label: "Email", placeholder: "{sender}", required: true,
+        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } },
+      { key: "status", label: "Status if new", type: "select",
+        options: ["subscribed", "pending", "unsubscribed", "cleaned"], default: "subscribed" },
+      { key: "merge_fields", label: "Merge fields (JSON)", placeholder: '{"FNAME": "{name}"}' }
+    ]
+  },
+  {
     type: "drive_find_file",
     label: "Drive: find file",
     icon: FileText,
@@ -321,6 +354,8 @@ export const actionCatalog: ActionEntry[] = [
       { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
       { key: "name", label: "File name", placeholder: "report.pdf — substring unless Match is exact", required: true,
         discover: { resource: "files", value: "{name}" } },
+      { key: "folder", label: "Folder ID", placeholder: "restricts the search to one folder's children",
+        discover: { resource: "folders" } },
       { key: "match", label: "Match", type: "select", options: ["contains", "exact"], default: "contains" }
     ]
   },
@@ -332,6 +367,16 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
       { key: "query", label: "Search query", placeholder: "DataTalks kubernetes", required: true }
+    ]
+  },
+  {
+    type: "youtube_find_playlist_items",
+    label: "YouTube: playlist videos",
+    icon: YouTubeLogo,
+    description: "List the videos in a playlist, newest first (Find Playlist Videos). Output: {found, count, videos, video}.",
+    fields: [
+      { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+      { key: "playlist_id", label: "Playlist ID", discover: { resource: "playlists" } }
     ]
   },
   {
@@ -415,6 +460,19 @@ export const actionCatalog: ActionEntry[] = [
       { key: "meeting_id", label: "Meeting ID",
         discover: { resource: "meetings" } },
       { key: "topic", label: "Topic", placeholder: "used when no meeting id is given" },
+      { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
+    ]
+  },
+  {
+    type: "zoom_find_recording",
+    label: "Zoom: find recording",
+    icon: Video,
+    description: "Find Zoom cloud recordings by meeting id or topic, or the most recent (Find Recording). Output: {found, recording, recordings, count}.",
+    fields: [
+      { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+      { key: "meeting_id", label: "Meeting ID",
+        discover: { resource: "recordings" } },
+      { key: "topic", label: "Topic", placeholder: "filters the last 30 days when no meeting id is given" },
       { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
     ]
   },
@@ -614,8 +672,9 @@ export const actionCatalog: ActionEntry[] = [
 export const connectorCatalog: ConnectorEntry[] = [
   { name: "email", label: "Email", logo: MailLogo, events: ["message.received"] },
   { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
-  { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created"] },
-  { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed"] },
+  { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
+  { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended"] },
+  { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
   { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },

@@ -29,7 +29,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/designer")
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/credentials", "/tokens", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 
@@ -75,6 +75,7 @@ def _static(path):
         "/assets/js/views/schedules.js": ("js/views/schedules.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/storage.js": ("js/views/storage.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/audit.js": ("js/views/audit.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/triggers.js": ("js/views/triggers.js", "text/javascript; charset=utf-8"),
         "/assets/js/theme.js": ("js/theme.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
@@ -365,6 +366,20 @@ def handler(event, _context):
             return _response(413, {"error": "body too large"})
         table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
         status, payload = zoom_webhooks.handle(
+            connection_id, event.get("headers"), body,
+            connections_table=table, publish=_publish,
+        )
+        return _response(status, payload)
+    elif path.startswith("/hooks/slack/"):
+        from ..triggers.intake import slack_events
+
+        connection_id = path.removeprefix("/hooks/slack/").strip("/")
+        if not connection_id or "/" in connection_id:
+            return _response(404, {"error": "not found"})
+        if len(body) > MAX_HOOK_BODY_BYTES:
+            return _response(413, {"error": "body too large"})
+        table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
+        status, payload = slack_events.handle(
             connection_id, event.get("headers"), body,
             connections_table=table, publish=_publish,
         )

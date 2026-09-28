@@ -75,6 +75,7 @@
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
+        <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
@@ -129,12 +130,19 @@
             <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
             <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
           </section>
+          <section>
+            <div class="section-head"><div><h2>Activity</h2><p class="sub">Operator actions from the audit trail, newest first.</p></div><label class="visually-hidden" for="audit-action-filter">Filter by action</label><select id="audit-action-filter" aria-label="Filter by action"><option value="all">All actions</option></select></div>
+            <div id="overview-audit-table" class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Outcome</th></tr></thead><tbody id="overview-audit"></tbody></table></div>
+            <div id="overview-audit-empty" class="empty-state" hidden><h3>No audit entries</h3><p>Operator actions — connects, grants, token issues, workflow saves — appear here once recorded.</p></div>
+          </section>
         </div>
       </section>
 
       <section class="view" data-page="workflows">
         <div class="section-head">
           <div class="section-head-text"><h2>Your workflows</h2><p class="sub">See what starts each workflow and what it does. Turn it on or off here; open it to edit or test it.</p></div>
+          <button id="import-yaml" class="button secondary" type="button">Import YAML</button>
+          <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
           <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
         </div>
         <p class="workflow-explainer"><strong>On</strong> means new triggers can run the workflow. <strong>Off</strong> stops new triggers. Changes to the on/off state take effect immediately.</p>
@@ -312,7 +320,7 @@
         <div class="section-head">
           <div class="section-head-text"><h2>Recent runs</h2><p class="sub">Open a run to trace its steps and errors. Records are kept for 90 days.</p></div>
         </div>
-        <div class="run-filters"><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span></div>
+        <div class="run-filters"><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span><button id="runs-replay-failed" class="button secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
@@ -320,6 +328,20 @@
           </table>
         </div>
         <button id="runs-load-more" class="button secondary" type="button" hidden>Load more</button>
+      </section>
+
+      <section class="view" data-page="audit">
+        <div class="section-head">
+          <div class="section-head-text"><h2>Audit log</h2><p class="sub">Every operator action on connections, workflows, triggers, and tokens. Records are kept for 90 days.</p></div>
+        </div>
+        <div class="run-filters"><label>Search<input id="audit-log-search" type="search" placeholder="action, connection, actor, error&hellip;"></label><label>Action<select id="audit-log-action-filter" data-blank="All actions"><option value="">All actions</option></select></label><label>Outcome<select id="audit-log-outcome-filter" data-blank="All outcomes"><option value="">All outcomes</option></select></label><label>Date<select id="audit-log-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><button id="audit-log-export" class="button secondary" type="button">Export CSV</button><span id="audit-log-note" class="field-hint">Showing up to 25 events.</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>When</th><th>Action</th><th>Resource</th><th>Actor</th><th>Agent</th><th>Outcome</th><th>Error</th></tr></thead>
+            <tbody id="audit-log-table"></tbody>
+          </table>
+        </div>
+        <button id="audit-log-load-more" class="button secondary" type="button" hidden>Load more</button>
       </section>
     </main>
   </div>
@@ -381,6 +403,7 @@
     <div id="workflow-detail" class="dialog-body detail"></div>
     <div class="dialog-actions">
       <button class="button secondary dialog-close" type="button">Close</button>
+      <button id="workflow-download-yaml" class="button secondary" type="button" hidden>Download YAML</button>
       <a id="workflow-edit-github" class="button secondary" target="_blank" rel="noopener">Edit on GitHub</a>
       <a id="workflow-edit" class="button primary">Edit in designer</a>
     </div>
@@ -579,6 +602,13 @@
           <p>Set this Event Notification Endpoint URL in your Zoom app, select <code>recording.completed</code>, then click Validate in Zoom. Cloud recording must be enabled for the host.</p>
           <code id="edit-zoom-url" class="break-all"></code>
           <p class="field-hint">The connection becomes active after Zoom validates the URL. Use the <code>zoom / recording.completed</code> trigger in a workflow.</p>
+        </section>
+        <section id="edit-slack-setup" class="detail-block" hidden>
+          <h3>Slack event subscriptions</h3>
+          <p>Set this Request URL in your Slack app's Event Subscriptions, subscribe to the <code>message.channels</code>, <code>message.groups</code>, <code>message.im</code>, <code>message.mpim</code> and <code>app_mention</code> events, then reinstall the app.</p>
+          <code id="edit-slack-url" class="break-all"></code>
+          <label>Signing secret<input name="signing_secret" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="the app's Signing Secret (fa…)"><small class="field-hint">Required for events — Slack signs every delivery with it. Leave blank to keep the stored value. Bot posts never fire the trigger, so a workflow posting into the channel it listens on cannot loop.</small></label>
+          <p class="field-hint">Use the <code>slack / message.received</code> trigger in a workflow; filter on <code>channel_id</code> or <code>type</code> (e.g. <code>app_mention</code>).</p>
         </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
         <p id="edit-connection-test-result" class="sub" hidden></p>

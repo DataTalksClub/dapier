@@ -35,22 +35,23 @@ console Credentials "test" (`views/connections.js`). Discovery endpoints
 | dropbox.files | `dropbox_delete.path` |
 | dropbox.search | `dropbox_find.query` |
 | google-drive.files | `drive_find_file.name`, `s3_upload.source_url` |
-| google-drive.folders | **browse-only** — no consuming field yet |
+| google-drive.folders | `drive_find_file.folder` |
 | google-sheets.spreadsheets / worksheets / columns | all four `sheets_*` actions (spreadsheet → worksheet → column cascades) |
 | google-sheets.rows | `sheets_update_row.row` |
 | s3.buckets / s3.objects | `s3_upload`, `s3_find` (bucket → prefix/key cascade; objects takes an optional `prefix` param) |
 | zoom.meetings | `zoom_find_meeting.meeting_id` |
+| zoom.recordings | `zoom_find_recording.meeting_id` (also the action's data source) |
 | slack.users, slack.messages | `slack_find_user.email` (slack.users picker); slack.messages **browse-only** |
-| youtube.channel / playlists / playlist_items | **browse-only** |
-| zoom.recordings | **browse-only** |
+| youtube.channel | **browse-only** (static "connected channel" fact, nothing to select) |
+| youtube.playlists | `youtube_find_playlist_items.playlist_id` |
+| youtube.playlist_items | `youtube_find_playlist_items` (the action's data source) |
 
 Browse-only resources still work end-to-end (CLI/console list + items); they
-lack a designer field that would use them. Candidates: `zoom.recordings` → a
-future "Zoom: fetch recording" download action; `youtube.playlists` /
-`playlist_items` → video-download or playlist-trigger config;
-`slack.messages` → message templates.
+lack a designer field that would use them. Remaining: `youtube.channel` (a
+static fact about the connection, not a selectable list) and `slack.messages`
+(a candidate for future message-template actions).
 
-## Actions: 30 registered, hint coverage
+## Actions: 32 registered, hint coverage
 
 Every action with a connection-bound *selection* field carries a `discover`
 hint. The only ones without (and why that's acceptable):
@@ -66,14 +67,16 @@ Designer catalog mirror (`designer/src/catalog.ts`) is in sync with the
 registry — `tests/test_designer_pickers.py` green; bundle
 (`src/web/designer.js`) rebuilt after the last catalog edit.
 
-## Triggers: 8/8 palette connectors have sample discovery
+## Triggers: 9/9 palette connectors have sample discovery
 
-custom, dropbox, email, poll, renderer, schedule, youtube, zoom — all
-register `TriggerDiscovery(kind="sample")`, history-first with synthetic
-fallback. Field options (`kind="options"`): dropbox folders, s3 buckets,
-s3 objects (bucket passed as `event`), slack channels, telegram chats,
-zoom meetings, google-sheets spreadsheets, google-drive files. Extras beyond
-the palette: dataops, webhook — used by trigger setup flows.
+custom, dropbox, email, poll, renderer, schedule, slack, youtube, zoom — all
+register `TriggerDiscovery(kind="sample")`, live where the provider allows
+(slack: the newest channel message, delivery-shaped via
+`triggers.intake.slack_events.event_data`), else history-first with
+synthetic fallback. Field options (`kind="options"`): dropbox folders, s3
+buckets, s3 objects (bucket passed as `event`), slack channels, telegram
+chats, zoom meetings, google-sheets spreadsheets, google-drive files. Extras
+beyond the palette: dataops, webhook — used by trigger setup flows.
 
 ## Replay & test surfaces
 
@@ -91,9 +94,9 @@ the palette: dataops, webhook — used by trigger setup flows.
 1. ~~Console inbox replay~~ — closed: the Trigger inbox view
    (`src/web/js/views/inbox.js`) lists events, opens the stored envelope and
    replays with a confirm dialog.
-2. **Browse-only discoveries** (six resources, table above — now including
-   `google-drive.folders`) — reachable, but no designer field consumes them;
-   wire when the matching actions land.
+2. ~~Browse-only discoveries~~ — closed for the six actionable resources
+   (round 5, below); `youtube.channel` and `slack.messages` stay browse-only
+   by design (static connection fact / no matching action yet).
 3. Both previously failing tests are fixed upstream
    (`test_discovery.py` cursor test passes; worker lease test renamed to
    `test_is_pending_raises_leasebusy_while_lease_is_live`, passes) —
@@ -114,3 +117,61 @@ the palette: dataops, webhook — used by trigger setup flows.
   `webhook` optional templated `payload`.
 - Remaining known gap: per-connector trigger *variety* (more event types per
   provider) — design work, not surface parity.
+
+## Round 5, 2026-09-28: browse-only discoveries wired to actions
+
+- `zoom_find_recording` — cloud recordings by meeting id (404 is a
+  `found: False` verdict), by topic over the 30-day listing, or the latest
+  with no arguments; `zoom.recordings` feeds its `meeting_id` picker.
+- `youtube_find_playlist_items` — a playlist's videos newest-first, same
+  `{found, count, videos, video}` shape as `youtube_find_video`; dead
+  playlist id is a verdict. `youtube.playlists` feeds its `playlist_id`
+  picker, `youtube.playlist_items` is its data source.
+- `drive_find_file` gains an optional templated `folder`
+  (`'…' in parents` clause); `google-drive.folders` feeds the picker.
+- Remaining known gaps: trigger variety (unchanged), plus `slack.messages`
+  browse-only until a message action wants it.
+
+## Round 6, 2026-09-28: slack Events trigger — the last connector gets a trigger half
+
+- `POST /hooks/slack/{connection_id}` (`triggers.intake.slack_events`,
+  zoom-style): per-connection Request URL, `X-Slack-Signature` verification
+  against the app signing secret stored on the connection credential
+  (`importing.token_secret_value`, shared by console and CLI save paths),
+  `url_verification` handshake, deterministic event ids for Slack retries.
+- Publishes `slack / message.received` for the message family
+  (`message.*`, `app_mention`); app posts (`bot_id`) never publish, so a
+  workflow posting into the channel it listens on cannot loop. Filters:
+  `channel_id`, `type`, `user_id`, `subtype`, `text` …
+- Palette chip + live trigger sample (`channels → conversations.history`),
+  signing secret over `dapier connections import --signing-secret-file` and
+  the console Manage-connection dialog; replay works like every connector
+  event (recorded run envelopes).
+
+## Round 7, 2026-09-28: per-event trigger samples — dropbox file events
+
+- A multi-event connector's sample pull now serves each declared event its
+  own payload (`trigger_discovery.per_event_sample_fetch`): dropbox answers
+  `file.created` / `file.updated` / `file.deleted` with exactly the shapes
+  `triggers.intake.dropbox_resolver.process_entry` publishes — file state
+  for created/updated, path-only for deleted — and recorded history only
+  fills a sample when its replayed envelope carries the asked event.
+- Tests: `tests/test_trigger_variety_dropbox.py` (per-event payloads,
+  fallback for unknown events, history never crosses events).
+- Remaining trigger-variety gap: zoom declares four events but every ask
+  still gets the one recording.completed sample renamed; other connectors
+  declare a single event, where renaming is correct.
+
+## Round 7, 2026-09-28: per-event trigger samples — dropbox file events
+
+- A multi-event connector's sample pull now serves each declared event its
+  own payload (`trigger_discovery.per_event_sample_fetch`): dropbox answers
+  `file.created` / `file.updated` / `file.deleted` with exactly the shapes
+  `triggers.intake.dropbox_resolver.process_entry` publishes — file state
+  for created/updated, path-only for deleted — and recorded history only
+  fills a sample when its replayed envelope carries the asked event.
+- Tests: `tests/test_trigger_variety_dropbox.py` (per-event payloads,
+  fallback for unknown events, history never crosses events).
+- Remaining trigger-variety gap: zoom declares four events but every ask
+  still gets the one recording.completed sample renamed; other connectors
+  declare a single event, where renaming is correct.

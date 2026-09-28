@@ -46,6 +46,36 @@ def errors_summary(event):
     return http._json_response(status, payload)
 
 
+def list_audit(event):
+    """Operator action audit trail, newest first (audit.api_recent).
+
+    Same domain function the agent route serves the CLI; rows are projected
+    to the audit module's display fields, so no internal key can leak.
+    """
+    query = event.get("queryStringParameters") or {}
+    status, payload = audit_log.api_recent(
+        limit=query.get("limit", 50), next_token=query.get("next") or None,
+        **audit_log.filters_from_query(query))
+    return http._json_response(status, payload)
+
+
+def export_audit(event, operator):
+    """The audit trail as CSV (audit.api_export): the list's filters, one
+    bounded export.
+
+    The response carries {filename, count, truncated, csv}; the console turns
+    it into a download and the CLI writes the file. The export itself is
+    audited, so bulk reads of the trail leave a mark in the trail.
+    """
+    query = event.get("queryStringParameters") or {}
+    status, payload = audit_log.api_export(
+        max_rows=query.get("max_rows"), **audit_log.filters_from_query(query))
+    if status == 200:
+        session._audit_event("audit-log", "audit.export", operator or "unknown",
+                             outcome="ok")
+    return http._json_response(status, payload)
+
+
 def storage_read(event, workflow_id):
     """Workflow storage: one key (``key=``) or the keys under ``prefix=``."""
     query = event.get("queryStringParameters") or {}
@@ -237,7 +267,14 @@ def _save_token_connection(fields, body, previous, operator, connections_table):
         session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
                      outcome="error", error=str(exc))
         return http._json_response(400, {"error": str(exc)})
-    credentials.put_credential(item["credential_id"], {"token": token}, provider=fields["provider"])
+    try:
+        secret_value = importing.token_secret_value(
+            fields["provider"], token, body, item["credential_id"])
+    except ValueError as exc:
+        session._audit_event(fields["connection_id"], audit_log.CONNECT, operator or "unknown",
+                     outcome="error", error=str(exc))
+        return http._json_response(400, {"error": str(exc)})
+    credentials.put_credential(item["credential_id"], secret_value, provider=fields["provider"])
     connection_model.put_connection(connections_table, item)
     session._audit_event(item["connection_id"], audit_log.CONNECT, operator or "unknown", outcome="ok")
     return http._json_response(200, connection_model.public_view(item))
@@ -297,7 +334,8 @@ def delete_email_trigger(event, operator):
     return http._json_response(status, payload)
 
 def designer_list(event):
-    status, payload = designer_store.api_list()
+    query = event.get("queryStringParameters") or {}
+    status, payload = designer_store.api_list(query.get("q") or None)
     return http._json_response(status, payload)
 
 def designer_get(source):
