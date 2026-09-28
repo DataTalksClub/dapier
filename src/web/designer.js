@@ -21970,6 +21970,7 @@
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
+    const [testStrict, setTestStrict] = reactExports.useState(false);
     const [sampleBusy, setSampleBusy] = reactExports.useState(false);
     const [testResult, setTestResult] = reactExports.useState(null);
     const [stepTest, setStepTest] = reactExports.useState({
@@ -22599,7 +22600,7 @@
         setStatus({ kind: "error", message: String(error) });
       }
     }
-    async function runTest(execute) {
+    async function runTest(execute, strict) {
       const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
       if (problems.length) {
         setStatus({ kind: "error", message: problems.join(" ") });
@@ -22623,7 +22624,7 @@
       try {
         setTestResult(await api(config, "/workflows/test", {
           method: "POST",
-          body: JSON.stringify({ event: sample, workflow, execute })
+          body: JSON.stringify({ event: sample, workflow, execute, ...strict ? { strict: true } : {} })
         }));
       } catch (error) {
         setTestResult({ mode, matched: false, steps: [], error: String(error) });
@@ -23313,11 +23314,11 @@
               )
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: testBusy, onClick: () => runTest(false), children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
                 testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 15 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", disabled: testBusy, onClick: () => runTest(true), children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
               ] }),
@@ -23332,6 +23333,25 @@
                   children: [
                     sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 15 }),
                     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
+                  ]
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "label",
+                {
+                  className: "check-label",
+                  title: "Dry run only: rendered-input warnings (an empty required field, a value implausible for its type) fail their step instead of riding along",
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        type: "checkbox",
+                        checked: testStrict,
+                        onChange: (event) => setTestStrict(event.target.checked),
+                        "aria-label": "Strict test run"
+                      }
+                    ),
+                    "Strict"
                   ]
                 }
               )

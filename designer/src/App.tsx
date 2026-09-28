@@ -688,6 +688,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [testOpen, setTestOpen] = useState(false);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);
+  const [testStrict, setTestStrict] = useState(false);
   const [sampleBusy, setSampleBusy] = useState(false);
   const [testResult, setTestResult] = useState<TestRunResult | null>(null);
   /** Per-step test (Zapier's "Test step"): the selected action runs alone
@@ -1437,8 +1438,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
   }
 
-  /** Test the unsaved canvas against a sample event (dry-run unless execute). */
-  async function runTest(execute: boolean) {
+  /** Test the unsaved canvas against a sample event (dry-run unless execute;
+     strict fails dry-run steps whose rendered inputs trip the field rules). */
+  async function runTest(execute: boolean, strict: boolean) {
     const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
     if (problems.length) {
       setStatus({ kind: "error", message: problems.join(" ") });
@@ -1463,7 +1465,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       // The draft goes inline: the server tests exactly what would be saved.
       setTestResult(await api<TestRunResult>(config, "/workflows/test", {
         method: "POST",
-        body: JSON.stringify({ event: sample, workflow, execute })
+        body: JSON.stringify({ event: sample, workflow, execute, ...(strict ? { strict: true } : {}) })
       }));
     } catch (error) {
       setTestResult({ mode, matched: false, steps: [], error: String(error) });
@@ -2159,11 +2161,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 />
               </label>
               <div className="test-actions">
-                <button className="button primary" type="button" disabled={testBusy} onClick={() => runTest(false)}>
+                <button className="button primary" type="button" disabled={testBusy} onClick={() => runTest(false, testStrict)}>
                   {testBusy ? <Loader2 size={15} className="spin" /> : <FlaskConical size={15} />}
                   <span>Dry run</span>
                 </button>
-                <button className="button danger" type="button" disabled={testBusy} onClick={() => runTest(true)}>
+                <button className="button danger" type="button" disabled={testBusy} onClick={() => runTest(true, testStrict)}>
                   <Play size={15} /><span>Run for real</span>
                 </button>
                 <button
@@ -2176,6 +2178,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                   {sampleBusy ? <Loader2 size={15} className="spin" /> : <CloudDownload size={15} />}
                   <span>Pull sample</span>
                 </button>
+                <label
+                  className="check-label"
+                  title="Dry run only: rendered-input warnings (an empty required field, a value implausible for its type) fail their step instead of riding along"
+                >
+                  <input
+                    type="checkbox"
+                    checked={testStrict}
+                    onChange={(event) => setTestStrict(event.target.checked)}
+                    aria-label="Strict test run"
+                  />
+                  Strict
+                </label>
               </div>
               {testResult && (
                 <div className={`test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`}>
