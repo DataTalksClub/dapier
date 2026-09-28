@@ -27,7 +27,7 @@ STATUS_CONNECTED = "connected"
 STATUS_REVOKED = "revoked"
 
 # Providers that authenticate with a directly supplied token instead of an
-# OAuth consent round-trip (see admin._save_token_connection). Zoom's meeting
+# OAuth consent round-trip (see importing.save_token_connection). Zoom's meeting
 # connections are regular OAuth; its webhook signing token is not a provider
 # credential — the console's webhook setup has its own provider=="zoom" path.
 TOKEN_PROVIDERS = {"slack", "telegram"}

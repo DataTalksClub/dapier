@@ -12,7 +12,9 @@ import urllib.parse
 import pytest
 
 from src.dapier.api import discovery as api_discovery
+from src.dapier.api import runs
 from src.dapier.connectors import registry
+from src.dapier.connectors import trigger_discovery
 from src.dapier.connectors import zoom as zoom_connector  # noqa: F401 (registers)
 from src.dapier.connections import discovery as provider
 from src.dapier.connections import tokens
@@ -61,9 +63,10 @@ def discovery(name):
 # --- registry and domain: the resources a Zoom connection can discover ---
 
 
-def test_zoom_exposes_meetings_and_recordings():
+def test_zoom_exposes_meetings_past_meetings_recordings_and_webinars():
     entries = registry.discoveries_for_provider("zoom")
-    assert [entry.name for entry in entries] == ["meetings", "recordings"]
+    assert [entry.name for entry in entries] == \
+        ["meetings", "past_meetings", "recordings", "webinars"]
     for entry in entries:
         assert entry.label and entry.description
         assert entry.params == ()
@@ -103,9 +106,9 @@ def test_recordings_look_back_thirty_days():
 
 def test_unknown_resource_names_the_known_ones():
     with pytest.raises(provider.DiscoveryError) as excinfo:
-        provider.discover(CONNECTION, "webinars", {})
+        provider.discover(CONNECTION, "polls", {})
     assert excinfo.value.status == 404
-    assert "known: meetings, recordings" in str(excinfo.value)
+    assert "known: meetings, past_meetings, recordings, webinars" in str(excinfo.value)
 
 
 def test_zoom_health_check_verifies_the_account_profile():
@@ -151,7 +154,7 @@ def test_api_resources_render_picker_metadata():
     assert status == 200
     assert payload["provider"] == "zoom"
     assert [resource["name"] for resource in payload["resources"]] == \
-        ["meetings", "recordings"]
+        ["meetings", "past_meetings", "recordings", "webinars"]
 
 
 def test_api_discover_runs_meetings_end_to_end(monkeypatch):
@@ -197,10 +200,10 @@ def test_api_discover_unknown_resource_names_the_known_ones():
     table = Table({"zoom-main": CONNECTION})
 
     status, payload = api_discovery.discover(
-        "zoom-main", "webinars", {}, connections_table=table)
+        "zoom-main", "polls", {}, connections_table=table)
 
     assert status == 404
-    assert "known: meetings, recordings" in payload["error"]
+    assert "known: meetings, past_meetings, recordings, webinars" in payload["error"]
 
 
 def test_api_discover_requires_a_connected_connection():
@@ -227,3 +230,83 @@ def test_api_connection_test_reports_the_zoom_identity(monkeypatch):
     assert status == 200
     assert payload["ok"] is True
     assert payload["identity"] == {"id": "u-123", "name": "Ada Byron"}
+
+
+# --- trigger samples: one documented payload per declared event -----------------
+#
+# connectors.zoom registers a sample TriggerDiscovery backed by
+# per_event_sample_fetch: the request's ``event`` field picks the payload,
+# and recorded history fills the sample only when its replayed envelope
+# carries the asked event (a started run is never renamed to ended).
+
+
+@pytest.fixture(autouse=True)
+def no_recorded_runs(monkeypatch):
+    """The sample chain starts at synthetic: no recorded runs, by default."""
+    monkeypatch.setattr(runs, "recent", lambda *args, **kwargs: [])
+
+
+def _trigger_sample(**body):
+    status, payload = trigger_discovery.api_discover({"connector": "zoom", **body})
+    assert status == 200, payload
+    return payload
+
+
+def test_trigger_sample_meeting_started_serves_the_meeting_payload():
+    payload = _trigger_sample(event="meeting.started")
+
+    assert payload["connector"] == "zoom"
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "meeting.started"
+    assert payload["sample"]["event"] == "meeting.started"
+    data = payload["sample"]["data"]
+    assert data["uuid"] and data["id"] and data["topic"] and data["start_time"]
+    assert "end_time" not in data
+    assert "download_token" not in json.dumps(payload["sample"])
+
+
+def test_trigger_sample_serves_each_declared_event():
+    recording = _trigger_sample(event="recording.completed")["sample"]
+    transcript = _trigger_sample(event="recording.transcript_completed")["sample"]
+    ended = _trigger_sample(event="meeting.ended")["sample"]
+
+    assert recording["event"] == "recording.completed"
+    assert [file["file_type"] for file in recording["data"]["video_files"]] == ["MP4"]
+    assert transcript["event"] == "recording.transcript_completed"
+    assert [file["file_type"] for file in transcript["data"]["video_files"]] == \
+        ["MP4", "TRANSCRIPT"]
+    assert ended["event"] == "meeting.ended"
+    assert ended["data"]["end_time"]
+    assert "end_time" not in _trigger_sample(event="meeting.started")["sample"]["data"]
+
+
+def test_trigger_sample_unknown_event_falls_back_to_the_recording_example():
+    payload = _trigger_sample(event="meeting.participant_joined")
+
+    assert payload["source"] == "synthetic"
+    assert payload["event"] == "recording.completed"
+    assert payload["sample"]["data"]["video_files"]
+
+
+def test_trigger_sample_history_only_fills_the_matching_event(monkeypatch):
+    """A recorded meeting.started run fills a meeting.started ask — only that."""
+    envelope = {"id": "zoom:abc123", "connector": "zoom", "event": "meeting.started",
+                "source": "zoom", "occurred_at": "2026-09-28T09:00:00+00:00",
+                "data": {"account_id": "acct-1", "uuid": "u-1", "id": 123,
+                         "topic": "Standup", "host_id": "host-1",
+                         "start_time": "2026-09-28T09:00:00Z", "duration": 45,
+                         "timezone": "Europe/Berlin"}}
+    monkeypatch.setattr(runs, "recent", lambda *args, **kwargs: [
+        {"run_id": "standup:evt-1", "connector": "zoom"}])
+    monkeypatch.setattr(runs, "api_get", lambda run_id: (200, {"steps": []}))
+    monkeypatch.setattr(runs, "replay_event", lambda run_id, steps: (envelope, None))
+
+    started = _trigger_sample(event="meeting.started")
+    assert started["source"] == "history"
+    assert started["event"] == "meeting.started"
+    assert started["sample"]["data"] == envelope["data"]
+    assert started["sample"]["id"] == envelope["id"]
+
+    ended = _trigger_sample(event="meeting.ended")
+    assert ended["source"] == "synthetic"  # history is never renamed
+    assert ended["event"] == "meeting.ended"

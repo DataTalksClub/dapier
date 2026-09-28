@@ -41,13 +41,16 @@ def live_token(monkeypatch):
 # --- domain: catalog and fetchers ---
 
 
-def test_youtube_catalog_lists_channel_playlists_and_playlist_items():
+def test_youtube_catalog_lists_channel_playlists_playlist_items_and_videos():
     resources = discovery.resources_for("youtube")
     assert [resource.name for resource in resources] == \
-        ["channel", "playlists", "playlist_items"]
+        ["channel", "playlists", "playlist_items", "videos"]
     playlist_items = resources[2]
     assert [(param.name, param.required) for param in playlist_items.params] == \
         [("playlist_id", True)]
+    # videos is param-free, so the designer picker can open it with no
+    # sibling fields to resolve.
+    assert resources[3].params == ()
 
 
 def test_channel_lists_the_connected_channel(live_token):
@@ -102,6 +105,31 @@ def test_playlist_items_require_the_playlist_id(live_token):
     assert transport.calls == []
 
 
+def test_videos_list_the_channel_uploads(live_token):
+    transport = FakeTransport(
+        ("channels?part=contentDetails", 200,
+         {"items": [{"id": "UCdatatalks",
+                     "contentDetails": {"relatedPlaylists":
+                                        {"uploads": "UUdatatalks"}}}]}),
+        ("playlistItems?", 200,
+         {"items": [{"snippet": {"title": "Intro lecture",
+                                 "publishedAt": "2026-03-04T00:00:00Z"},
+                     "contentDetails": {"videoId": "vid1"}}]}))
+    items = discovery.discover(CONNECTION, "videos", {}, transport=transport)
+    assert items == [{"id": "vid1", "name": "Intro lecture",
+                      "published": "2026-03-04T00:00:00Z"}]
+    assert "playlistId=UUdatatalks" in transport.calls[1]["url"]
+
+
+def test_videos_without_an_uploads_playlist_list_nothing(live_token):
+    transport = FakeTransport(
+        ("channels?part=contentDetails", 200,
+         {"items": [{"id": "UCdatatalks",
+                     "contentDetails": {"relatedPlaylists": {}}}]}))
+    assert discovery.discover(CONNECTION, "videos", {}, transport=transport) == []
+    assert len(transport.calls) == 1
+
+
 def test_youtube_error_maps_to_502_with_the_provider_message(live_token):
     transport = FakeTransport(
         ("playlists?", 403,
@@ -136,7 +164,8 @@ def test_registry_runners_delegate_to_the_matching_resource(monkeypatch):
         entry.run(CONNECTION, {"a": "b"})
     assert sorted(seen) == sorted([("yt-main", "channel", {"a": "b"}),
                                    ("yt-main", "playlists", {"a": "b"}),
-                                   ("yt-main", "playlist_items", {"a": "b"})])
+                                   ("yt-main", "playlist_items", {"a": "b"}),
+                                   ("yt-main", "videos", {"a": "b"})])
 
 
 def test_youtube_connection_test_reports_the_channel_identity(monkeypatch):

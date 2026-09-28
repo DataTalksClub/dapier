@@ -126,6 +126,27 @@ def get_access_token(connection, *, transport=None, _retry=True):
                 connection["provider"], access_token, transport=transport,
             )
         except oauth_providers.ProviderError as exc:
+            # The token looks fresh locally but the provider rejected it
+            # (revoked or rotated server-side). One refresh attempt is the
+            # way out — without it the connection wedges until the stored
+            # expiry passes despite a perfectly good refresh token. The
+            # re-verify and binding check happen inside refresh_and_store;
+            # a second consecutive verify failure ends in the TokenError
+            # below, so a genuinely dead credential still fails loudly.
+            if _retry and stored.get("refresh_token"):
+                try:
+                    new_value, _, account_id, account_title = refresh_and_store(
+                        connection, record, transport=transport,
+                    )
+                except VersionConflict:
+                    raise TokenError("Concurrent refresh conflict; retry the request")
+                return new_value["access_token"], {
+                    "expires_at": new_value.get("expires_at"),
+                    "scope": new_value.get("scope", ""),
+                    "provider_account_id": account_id,
+                    "account_title": account_title,
+                    "refreshed": True,
+                }
             raise TokenError(str(exc))
         connections.check_binding(connection, account_id)
         return access_token, {

@@ -49,6 +49,9 @@ PROVIDER_LABELS = {
     "zoom": "Zoom",
     "slack": "Slack",
     "telegram": "Telegram",
+    "mailchimp": "Mailchimp",
+    "aws": "AWS",
+    "s3": "S3",
 }
 
 
@@ -314,6 +317,27 @@ def _youtube_playlist_items(connection, token, params, limit, *, transport=None)
     return items
 
 
+def _youtube_videos(connection, token, params, limit, *, transport=None):
+    """The connected channel's recent uploads, newest first.
+
+    The uploads playlist id comes from the channel's contentDetails
+    (relatedPlaylists.uploads), so the listing needs no search quota and
+    also covers videos not placed in any public playlist.
+    """
+    url = f"{YOUTUBE_API_URL}/channels?part=contentDetails&mine=true"
+    data = _request("GET", url, token, None, transport=transport)
+    uploads = ""
+    for channel in data.get("items") or []:
+        if isinstance(channel, dict) and channel.get("id"):
+            related = (channel.get("contentDetails") or {}).get("relatedPlaylists") or {}
+            uploads = related.get("uploads") or ""
+            break
+    if not uploads:
+        return []
+    return _youtube_playlist_items(connection, token, {"playlist_id": uploads},
+                                   limit, transport=transport)
+
+
 # --- Dropbox ---
 
 
@@ -519,20 +543,64 @@ def _telegram_chat(connection, token, params, limit, *, transport=None):
 
 # --- Zoom ---
 
+# The /users/me/meetings listing windows the meeting fetcher serves:
+# ``upcoming`` (scheduled meetings, the pickable resource) and
+# ``previous_meetings`` (the ones already held). Zoom's other list types
+# are refused rather than passed through.
+ZOOM_MEETING_LIST_TYPES = ("upcoming", "previous_meetings")
 
-def _zoom_meetings(connection, token, params, limit, *, transport=None):
-    url = f"{ZOOM_API_URL}/users/me/meetings?" + urllib.parse.urlencode(
+
+def _zoom_meetings_fetcher(default_type="upcoming"):
+    """One Zoom meeting listing with a fixed default ``type`` window.
+
+    ``type`` may still be overridden through the listing's params (declared
+    as an optional Param on the resource); the default is baked per
+    resource, so ``past_meetings`` answers with ``previous_meetings`` even
+    when the picker sends no params — the same factory shape the Drive
+    file listings use.
+    """
+    def fetch(connection, token, params, limit, *, transport=None):
+        listing_type = str((params or {}).get("type") or "").strip() or default_type
+        if listing_type not in ZOOM_MEETING_LIST_TYPES:
+            raise DiscoveryError(
+                "zoom meetings type must be one of: "
+                + ", ".join(ZOOM_MEETING_LIST_TYPES), status=400)
+        url = f"{ZOOM_API_URL}/users/me/meetings?" + urllib.parse.urlencode(
+            {"type": listing_type, "per_page": limit})
+        data = _request("GET", url, token, None, transport=transport)
+        return [
+            {
+                "id": str(meeting.get("id")),
+                "name": meeting.get("topic"),
+                "start_time": meeting.get("start_time"),
+                "join_url": meeting.get("join_url"),
+            }
+            for meeting in data.get("meetings") or []
+            if isinstance(meeting, dict) and meeting.get("id")
+        ]
+    return fetch
+
+
+_zoom_meetings = _zoom_meetings_fetcher("upcoming")
+_zoom_past_meetings = _zoom_meetings_fetcher("previous_meetings")
+
+
+def _zoom_webinars(connection, token, params, limit, *, transport=None):
+    """The upcoming webinars a Zoom connection can pick from (Zapier's
+    webinar pickers): the ``/users/me/webinars`` list, same item shape as
+    the meetings listing."""
+    url = f"{ZOOM_API_URL}/users/me/webinars?" + urllib.parse.urlencode(
         {"type": "upcoming", "per_page": limit})
     data = _request("GET", url, token, None, transport=transport)
     return [
         {
-            "id": str(meeting.get("id")),
-            "name": meeting.get("topic"),
-            "start_time": meeting.get("start_time"),
-            "join_url": meeting.get("join_url"),
+            "id": str(webinar.get("id")),
+            "name": webinar.get("topic"),
+            "start_time": webinar.get("start_time"),
+            "join_url": webinar.get("join_url"),
         }
-        for meeting in data.get("meetings") or []
-        if isinstance(meeting, dict) and meeting.get("id")
+        for webinar in data.get("webinars") or []
+        if isinstance(webinar, dict) and webinar.get("id")
     ]
 
 
@@ -581,6 +649,8 @@ CATALOG = {
         Resource("playlist_items", "Playlist videos", "Videos in one playlist, newest first",
                  _youtube_playlist_items,
                  (Param("playlist_id", True, "Playlist ID from the playlists list"),)),
+        Resource("videos", "Channel videos", "The channel's recent uploads, newest first",
+                 _youtube_videos),
     ],
     "dropbox": [
         Resource("folder", "Folder entries",
@@ -610,8 +680,15 @@ CATALOG = {
     ],
     "zoom": [
         Resource("meetings", "Meetings", "Upcoming meetings on the account", _zoom_meetings),
+        Resource("past_meetings", "Past meetings",
+                 "Meetings already held on the account, newest first",
+                 _zoom_past_meetings,
+                 (Param("type", False,
+                        "Meeting window — previous_meetings (default) or upcoming"),)),
         Resource("recordings", "Recordings", "Recordings from the last 30 days",
                  _zoom_recordings),
+        Resource("webinars", "Webinars", "Upcoming webinars on the account",
+                 _zoom_webinars),
     ],
 }
 

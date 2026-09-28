@@ -45,26 +45,48 @@ def token_secret_value(provider, token, body, credential_id):
     return value
 
 
-def _import_token_connection(body, *, operator_subject, connections_table):
-    """Operator import for pasted-token providers (Slack, Telegram).
+def save_token_connection(body, *, operator_subject, connections_table, audit_event,
+                          action, reuse_stored_token=False):
+    """Create/update a pasted-token connection (Slack, Telegram) — the one
+    chain the console save and the operator import both drive.
 
-    Mirrors the console's token-connection path over the CLI's bearer
-    authentication: the token is verified against its provider before it is
-    stored, so an imported connection always carries a checked identity.
+    The token is verified against its provider before anything is stored, so
+    a saved connection always carries a checked identity. ``audit_event`` is
+    the surface's audit writer — the console session trail
+    (``session._audit_event``, action ``connect``) or the operator trail
+    (``audit.emit``, action ``import``); it fires once per failure point and
+    once on success, exactly as each surface did before the paths unified.
+    ``reuse_stored_token`` lets the console edit re-verify the already-stored
+    credential's token when the body omits a new one; the import path keeps
+    requiring an explicit token.
+
+    Returns ``(status_code, payload)``.
     """
-    from .providers import slack_tokens, telegram_api
+    actor = operator_subject or "unknown"
     try:
         fields = connections.validate_new_connection(body)
     except connections.ConnectionError as exc:
         return 400, {"error": str(exc)}
     token = str(body.get("token") or "").strip()
+    if not token and reuse_stored_token:
+        # An edit without a re-pasted token re-verifies the stored one.
+        try:
+            token = str(credentials.get_credential(
+                connections.credential_id_for(fields["connection_id"])).get("token") or "").strip()
+        except KeyError:
+            token = None
     if not token:
-        return 400, {"error": "This provider imports with a token, not an authorized-user file"}
+        if reuse_stored_token:
+            error = ("A Slack bot (xoxb-) or user (xoxp-) token is required"
+                     if fields["provider"] == "slack"
+                     else "A Telegram bot token from @BotFather is required")
+        else:
+            error = "This provider imports with a token, not an authorized-user file"
+        return 400, {"error": error}
     try:
         account_id, account_title = verify_token_provider(fields["provider"], token)
     except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError) as exc:
-        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
-                   outcome="error", error=str(exc))
+        audit_event(fields["connection_id"], action, actor, outcome="error", error=str(exc))
         return 400, {"error": str(exc)}
     previous = connections.get_connection(connections_table, fields["connection_id"])
     try:
@@ -74,21 +96,30 @@ def _import_token_connection(body, *, operator_subject, connections_table):
             item, verified_account_id=account_id, account_title=account_title,
             granted_scopes=fields["scopes"], connected_by=operator_subject,
         )
+    except connections.BindingError as exc:
+        audit_event(fields["connection_id"], action, actor,
+                    outcome="denied-account-mismatch", error=str(exc))
+        return 409, {"error": str(exc)}
     except connections.ConnectionError as exc:
-        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
-                   outcome="denied-account-mismatch", error=str(exc))
-        status = 409 if isinstance(exc, connections.BindingError) else 400
-        return status, {"error": str(exc)}
+        audit_event(fields["connection_id"], action, actor, outcome="error", error=str(exc))
+        return 400, {"error": str(exc)}
     try:
         secret_value = token_secret_value(fields["provider"], token, body, item["credential_id"])
     except ValueError as exc:
-        audit.emit(fields["connection_id"], audit.IMPORT, operator_subject,
-                   outcome="error", error=str(exc))
+        audit_event(fields["connection_id"], action, actor, outcome="error", error=str(exc))
         return 400, {"error": str(exc)}
     credentials.put_credential(item["credential_id"], secret_value, provider=item["provider"])
     connections.put_connection(connections_table, item)
-    audit.emit(item["connection_id"], audit.IMPORT, operator_subject, outcome="ok")
+    audit_event(item["connection_id"], action, actor, outcome="ok")
     return 200, connections.public_view(item)
+
+def _import_token_connection(body, *, operator_subject, connections_table):
+    """Operator import for pasted-token providers over the CLI's bearer
+    authentication: the token must be supplied explicitly (no stored-token
+    fallback) and the trail records the ``import`` action."""
+    return save_token_connection(
+        body, operator_subject=operator_subject, connections_table=connections_table,
+        audit_event=audit.emit, action=audit.IMPORT)
 
 def import_core(body, *, operator_subject, connections_table):
     """Shared operator import. Returns ``(status_code, payload)``.
