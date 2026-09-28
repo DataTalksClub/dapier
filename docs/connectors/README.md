@@ -12,6 +12,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Telegram | [Telegram](telegram.md) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
 | Mailchimp | [Mailchimp](mailchimp.md) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
 | Amazon S3 | [AWS / S3](aws.md) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
+| AI (LLM) | [AI](ai.md) | — (no connection; the env is the config) | `COPILOT_LLM_API_KEY` (+ optional `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_MODEL`), shared with the workflow copilot |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle
 procedures. A connection is a named record (`connection_id`, provider, display

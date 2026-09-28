@@ -3440,7 +3440,18 @@ inbox replay-bounce notes). New findings this pass, ranked:
    (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
    but nothing a workflow can call. An `ai_complete` connector action
    (templated prompt + input → text, optional JSON mode) behind the same
-   env config closes the biggest per-app gap with no new infra.
+   env config closes the biggest per-app gap with no new infra. Landed
+   (2026-09-28, round 29): `ai_complete` (connectors/ai.py) sends a
+   rendered prompt (plus an optional system message) to the copilot's
+   endpoint — `json_mode` parses the reply into `data` (an unparsable reply
+   is `{ok: false, error, text}` the chain branches on, never a step
+   failure), `temperature`/`model`/`timeout_seconds` ride along, and
+   transport failures raise the webhook `HttpError` (status + Retry-After)
+   so `autoretry` paces a rate-limited endpoint like any other HTTP call.
+   A palette **AI** chip (no connection, no discovery — the env is the
+   config) makes it findable; the designer bundle is rebuilt. Setup is the
+   Worker function's `COPILOT_LLM_*` env (docs/connectors/ai.md). Tests:
+   `tests/test_ai_action.py`.
 3. **Draft vs live (value M, effort M/L).** Every save publishes instantly;
    versions and rollback soften it, but there is no draft state and no
    publish moment. Zapier's editor loop is draft-then-publish — a draft
@@ -3505,7 +3516,18 @@ inbox replay-bounce notes). New findings this pass, ranked:
    (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
    but nothing a workflow can call. An `ai_complete` connector action
    (templated prompt + input → text, optional JSON mode) behind the same
-   env config closes the biggest per-app gap with no new infra.
+   env config closes the biggest per-app gap with no new infra. Landed
+   (2026-09-28, round 29): `ai_complete` (connectors/ai.py) sends a
+   rendered prompt (plus an optional system message) to the copilot's
+   endpoint — `json_mode` parses the reply into `data` (an unparsable reply
+   is `{ok: false, error, text}` the chain branches on, never a step
+   failure), `temperature`/`model`/`timeout_seconds` ride along, and
+   transport failures raise the webhook `HttpError` (status + Retry-After)
+   so `autoretry` paces a rate-limited endpoint like any other HTTP call.
+   A palette **AI** chip (no connection, no discovery — the env is the
+   config) makes it findable; the designer bundle is rebuilt. Setup is the
+   Worker function's `COPILOT_LLM_*` env (docs/connectors/ai.md). Tests:
+   `tests/test_ai_action.py`.
 3. **Draft vs live (value M, effort M/L).** Every save publishes instantly;
    versions and rollback soften it, but there is no draft state and no
    publish moment. Zapier's editor loop is draft-then-publish — a draft
