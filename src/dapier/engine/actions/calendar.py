@@ -287,7 +287,13 @@ def run_calendar_update_event(action, event, *, transport=None, steps=None):
 
 
 def run_calendar_delete_event(action, event, *, transport=None, steps=None):
-    """Delete one event from a calendar (Delete Event)."""
+    """Delete one event from a calendar (Delete Event).
+
+    Like zoom_delete_meeting, an event id that is already gone is Google's
+    404 — an error like any provider refusal, not an idempotent success —
+    so branch on calendar_find_event's ``found`` verdict first when the
+    event may not exist. Output: ``{event_id, deleted: true}``.
+    """
     connection = base._connected_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection, transport=transport)
     calendar_id = _field(action, "calendar_id", event, steps)
