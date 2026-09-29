@@ -66,6 +66,18 @@ the agent works in `~/git/zoom-calls` and follows that repository's
 `zoom-recording` skill, script, and summary templates. The forwarded Zoom
 message must include a share link and passcode. This instruction is evaluated
 by the agent; the headless process still starts in the configured worker root.
+The agent commits the resulting transcript and summary and pushes them to the
+private `zoom-calls` GitHub repository.
+
+If the instruction says `AI Shipping Labs` above a forwarded Zoom recording,
+that route takes priority over `zoom calls recording`. By default, the agent
+uses the `ai-shipping-labs` event and recap skills to identify the exact
+existing event, ensure its video reaches S3, and create the recap through the
+event's source of truth. The site's Zoom
+recording pipeline handles S3 uploads. The agent can refresh Zoom metadata or
+retry an upload through the authenticated event API, then checks the event
+again. It reports an ambiguous event match instead of selecting one by guess.
+It does not notify registrants unless the operator asks for that action.
 Open **Emails** in the console and select **Flow** on the `agents@dtcdev.click`
 row to see the route, headless action, and completion email. This route sends
 the report from `agents@dtcdev.click`, so replies return to the same address.
