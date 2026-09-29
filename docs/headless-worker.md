@@ -49,19 +49,22 @@ automatically reruns work that lost its lease after starting. An interrupted
 run needs operator review before retrying, because a coding task may already
 have changed files or called external services.
 
-## Configure a future email route
+## Forward a task
 
-Create a reserved address with `dapier emails save` or the console's Emails
-view. The action needs only a prompt; omitting `workspace` uses the host root.
-For a forwarded Zoom mail, include `{body.text.value}` in the prompt. This is
-the inline plain-text body from Datamailer's inbound-email contract. If that
-field is empty or the body exceeded the inline limit, inspect the trigger
-input before enabling the workflow; large bodies are stored as private S3
-objects rather than inserted into the prompt.
+Send from an address in `dapier emails from list` to `agents@dtcdev.click`.
+Put your task instructions above the forwarded message, for example, "Write a
+Telegram article from this Zoom conversation." Include the Zoom shared
+recording URL and passcode in the email body. The stored route is defined in
+[`agents-email-trigger.json`](agents-email-trigger.json); apply changes with
+`dapier emails save docs/agents-email-trigger.json` or the console's Emails
+view. It uses the configured worker root, with no project pinned. The worker
+reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
+completion report to the sender. Inspect runs with `dapier agent-tasks list`
+or the console's **Headless runs** section.
 
-The shared `fetch-zoom` skill at
-`/home/alexey/git/.agents/skills/fetch-zoom/SKILL.md` can fetch Zoom captions
-or transcribe the recording if captions are absent. The prompt can point the
-agent to that file and ask it to carry out the instructions at the top of the
-forwarded message. No address or project-specific action is created by this
-worker setup.
+The route inserts Datamailer's inline plain-text body, `{body.text.value}`,
+into the agent prompt. Email attachments and messages whose body exceeds the
+inline limit are not passed to the agent yet; provide a Zoom link in the body
+for this first workflow. Completion emails use SES in the configured
+`EmailSendRegion` (currently `us-east-1`), where the sender identity is
+verified.
