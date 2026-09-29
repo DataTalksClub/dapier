@@ -201,7 +201,7 @@ def _notify(table, task_id, row, ses_ref=None):
     summary = str(row.get("summary") or row.get("error") or "")[:1500]
     title = str(row.get("email_subject") or "Agent task")[:150]
     ses_ref.send_email(
-        Source=os.environ["DAPIER_EMAIL_SENDER"],
+        Source=str(row.get("notify_from") or os.environ["DAPIER_EMAIL_SENDER"]),
         Destination={"ToAddresses": [address]},
         Message={"Subject": {"Data": f"Agent {row['status']}: {title}"[:250], "Charset": "utf-8"},
                  "Body": {"Text": {"Data": f"Task: {task_id}\nStatus: {row['status']}\n\n{summary}",

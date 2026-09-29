@@ -75,7 +75,8 @@ def test_template_host_queue_is_send_only():
 
 def test_email_action_can_use_the_host_root_and_reply_to_sender():
     message = build_message(
-        {"type": "agent", "prompt": "{body.text.value}"},
+        {"type": "agent", "prompt": "{body.text.value}",
+         "notify_from": "agents@dtcdev.click"},
         {"id": "e1", "connector": "email", "data": {
             "body": {"text": {"value": "Draft from this Zoom recording"}},
             "sender": {"addresses": ["writer@example.com"]},
@@ -86,4 +87,17 @@ def test_email_action_can_use_the_host_root_and_reply_to_sender():
     assert message["workspace"] == ""
     assert message["prompt"] == "Draft from this Zoom recording"
     assert message["notify_to"] == "writer@example.com"
+    assert message["notify_from"] == "agents@dtcdev.click"
     assert message["email_subject"] == "Zoom assets"
+
+
+def test_agent_rejects_display_name_in_completion_sender():
+    import pytest
+
+    with pytest.raises(ValueError, match="notify_from must be one email address"):
+        build_message(
+            {"type": "agent", "prompt": "hello",
+             "notify_from": "Agent <agents@dtcdev.click>"},
+            {"id": "e1", "connector": "email", "data": {}},
+            "email-trigger-agents",
+        )

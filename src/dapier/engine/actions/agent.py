@@ -25,6 +25,9 @@ def build_message(action, event, workflow_id, steps=None):
                  if event.get("connector") == "email" else "")
     if notify_to and bare_address(notify_to) != notify_to.lower():
         raise ValueError("agent notify_to must be one email address")
+    notify_from = str(action.get("notify_from") or "").strip().lower()
+    if notify_from and bare_address(notify_from) != notify_from:
+        raise ValueError("agent notify_from must be one email address")
     return {
         "kind": "agent",
         "task_id": task_id,
@@ -33,6 +36,7 @@ def build_message(action, event, workflow_id, steps=None):
         "tag_prefix": tag_prefix,
         "prompt": render(str(prompt_template), event, steps),
         "notify_to": notify_to,
+        "notify_from": notify_from,
         "email_subject": str((event.get("data") or {}).get("subject") or "")[:200],
     }
 

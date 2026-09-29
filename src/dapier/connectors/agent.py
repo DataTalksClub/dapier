@@ -10,7 +10,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_agent(
         action, event, workflow_id, steps),
     required=frozenset({"prompt"}),
-    optional=frozenset({"workspace", "engine", "tag_prefix", "notify_to", "id"}),
+    optional=frozenset({"workspace", "engine", "tag_prefix", "notify_to", "notify_from", "id"}),
     fields=(
         {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
          "placeholder": "{subject}\n\n{text}"},
@@ -20,5 +20,7 @@ register(Action(
         {"key": "tag_prefix", "label": "Tag prefix", "placeholder": "agent"},
         {"key": "notify_to", "label": "Completion email (optional)",
          "placeholder": "defaults to the sender for email triggers"},
+        {"key": "notify_from", "label": "Completion email From (optional)",
+         "placeholder": "defaults to the deployment sender"},
     ),
 ))

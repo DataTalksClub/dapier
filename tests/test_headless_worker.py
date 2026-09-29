@@ -64,6 +64,7 @@ def test_completion_emails_forwarding_sender(monkeypatch):
                    "prompt": "write a draft"}
         table.put_item(Item={**message, "status": "queued", "created_at": 1,
                              "notify_to": "writer@example.com",
+                             "notify_from": "agents@dtcdev.click",
                              "email_subject": "Zoom recording"})
         queue.send_message(QueueUrl=url, MessageBody=json.dumps(message))
         job = host_jobs.claim("token:host", table_ref=table, queue_ref=queue,
@@ -79,6 +80,7 @@ def test_completion_emails_forwarding_sender(monkeypatch):
                                 "token:host", table_ref=table, queue_ref=queue,
                                 queue_url=url, ses_ref=Ses(), now=1010)[0] == 200
         assert len(sent) == 1
+        assert sent[0]["Source"] == "agents@dtcdev.click"
         assert sent[0]["Destination"]["ToAddresses"] == ["writer@example.com"]
         assert "Draft ready" in sent[0]["Message"]["Body"]["Text"]["Data"]
         assert table.get_item(Key={"task_id": job["task_id"]})["Item"]["notified_at"]
@@ -109,6 +111,7 @@ def test_completion_email_uses_configured_ses_region(monkeypatch):
         "summary": "Done", "email_subject": "A task",
     })
     assert calls[0]["Destination"]["ToAddresses"] == ["writer@example.com"]
+    assert calls[0]["Source"] == "no-reply@dtcdev.click"
 
 
 def test_worker_runs_foreground_harness_and_reports_result(tmp_path):
