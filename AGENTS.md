@@ -80,3 +80,12 @@ docs together — and push. Do not leave finished work as a pile of uncommitted
 local changes, and do not bundle unrelated changes into a feature commit.
 Before pushing, run `make test` at the committed tip and confirm the push
 landed (`git status -sb`, `git log origin/main`).
+
+## Deployment and live configuration (required)
+
+Pushing `main` runs `.github/workflows/deploy.yml`, which tests, builds, and
+deploys Dapier with GitHub OIDC. Monitor that workflow with `gh run watch` and
+verify the affected behavior through the Dapier API or CLI. Live email routes,
+sender lists, and other operator configuration are changed through the Console
+or `dapier` CLI after the code deploys. Routine Dapier work does not require
+local AWS credentials or an AWS Gate; use the API and CI/CD path first.
