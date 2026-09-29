@@ -196,7 +196,8 @@ def _notify(table, task_id, row, ses_ref=None):
     if ses_ref is None:
         import boto3
 
-        ses_ref = boto3.client("ses")
+        ses_ref = boto3.client(
+            "ses", region_name=os.environ.get("DAPIER_EMAIL_REGION") or None)
     summary = str(row.get("summary") or row.get("error") or "")[:1500]
     title = str(row.get("email_subject") or "Agent task")[:150]
     ses_ref.send_email(

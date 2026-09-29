@@ -83,6 +83,10 @@ Parameters:
     Type: String
     Default: no-reply@dtcdev.click
     Description: From address for email_send workflow actions (must be SES-verified)
+  EmailSendRegion:
+    Type: String
+    Default: us-east-1
+    Description: SES region with the verified completion-email sender identity
   GithubWorkflowsTokenSecret:
     Type: String
     Default: ''
@@ -179,6 +183,7 @@ Globals:
         EMAIL_FROM_TABLE: !Ref EmailFromTable
         HOST_TASKS_TABLE: !Ref HostTasksTable
         HOST_QUEUE_URL: !Ref HostQueue
+        DAPIER_EMAIL_REGION: !Ref EmailSendRegion
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable

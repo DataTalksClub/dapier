@@ -84,6 +84,33 @@ def test_completion_emails_forwarding_sender(monkeypatch):
         assert table.get_item(Key={"task_id": job["task_id"]})["Item"]["notified_at"]
 
 
+def test_completion_email_uses_configured_ses_region(monkeypatch):
+    calls = []
+
+    class Ses:
+        def send_email(self, **kwargs):
+            calls.append(kwargs)
+
+    def client(service, **kwargs):
+        assert service == "ses"
+        assert kwargs == {"region_name": "us-east-1"}
+        return Ses()
+
+    monkeypatch.setenv("DAPIER_EMAIL_REGION", "us-east-1")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    monkeypatch.setattr(boto3, "client", client)
+
+    class Table:
+        def update_item(self, **kwargs):
+            pass
+
+    host_jobs._notify(Table(), "task-1", {
+        "status": "succeeded", "notify_to": "writer@example.com",
+        "summary": "Done", "email_subject": "A task",
+    })
+    assert calls[0]["Destination"]["ToAddresses"] == ["writer@example.com"]
+
+
 def test_worker_runs_foreground_harness_and_reports_result(tmp_path):
     calls = []
 
