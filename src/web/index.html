@@ -4,21 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <script>
-    /* Apply the stored theme before first paint; with no stored choice the
-       OS preference decides. ?theme= forces one view without persisting.
-       Same key and script as the designer app. */
-    (function () {
-      var theme = null;
-      try { theme = localStorage.getItem('dapier-theme'); } catch (_) {}
-      if (theme !== 'dark' && theme !== 'light') {
-        theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-      var forced = new URLSearchParams(location.search).get('theme');
-      if (forced === 'dark' || forced === 'light') theme = forced;
-      document.documentElement.dataset.theme = theme;
-    })();
-  </script>
+  <script src="/assets/js/theme-init.js"></script>
   <title>Dapier</title>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="stylesheet" href="/assets/app.css">
@@ -605,6 +591,19 @@
       </div>
     </form>
   </dialog>
+  <dialog id="email-flow-dialog" aria-labelledby="email-flow-title">
+    <div class="dialog-head">
+      <h2 id="email-flow-title">Email flow</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p id="email-flow-description" class="sub"></p>
+      <div id="email-flow-steps" class="flow"></div>
+    </div>
+    <div class="dialog-actions">
+      <button class="button secondary dialog-close" type="button">Close</button>
+    </div>
+  </dialog>
   <dialog id="email-confirm-dialog" aria-label="Delete email trigger">
     <form id="email-confirm-form" method="dialog" autocomplete="off">
       <div class="dialog-head">
@@ -709,7 +708,7 @@
     </div>
     <div class="dialog-body">
       <p id="poll-sample-meta" class="sub mono"></p>
-      <pre id="poll-sample-data" class="mono break-all" style="max-height:50vh;overflow:auto"></pre>
+      <pre id="poll-sample-data" class="mono break-all"></pre>
       <p class="field-hint">The newest event the poll would publish — pulled live from the provider when it can, else the newest recorded run, else a documented example. This is the shape <code>{trigger.*}</code> templates read.</p>
     </div>
     <div class="dialog-actions"><button class="button primary dialog-close" type="button">Close</button></div>

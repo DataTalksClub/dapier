@@ -61,6 +61,9 @@ view. It uses the configured worker root, with no project pinned. The worker
 reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`
 or the console's **Headless runs** section.
+Open **Emails** in the console and select **Flow** on the `agents@dtcdev.click`
+row to see the route, headless action, and completion email. This route sends
+the report from `agents@dtcdev.click`, so replies return to the same address.
 
 The route inserts Datamailer's inline plain-text body, `{body.text.value}`,
 into the agent prompt. Email attachments and messages whose body exceeds the

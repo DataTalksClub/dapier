@@ -305,6 +305,21 @@ def test_console_assets_are_self_hosted():
     assert "forbidden-view" in index["body"]
 
 
+def test_console_email_page_uses_csp_allowed_assets():
+    body = ingress._static("/emails")["body"]
+    assert '<script src="/assets/js/theme-init.js"></script>' in body
+    assert ingress._static("/assets/js/theme-init.js")["statusCode"] == 200
+    assert "<script>" not in body
+    assert 'style="' not in body
+    assert 'id="email-flow-dialog"' in body
+
+
+def test_ingress_role_can_read_overview_failure_counts():
+    template = pathlib.Path("template.yaml").read_text()
+    ingress_policy = template.split("\n  IngressFunction:\n", 1)[1].split("\n  # Standalone", 1)[0]
+    assert "DynamoDBReadPolicy:\n            TableName: !Ref CursorsTable" in ingress_policy
+
+
 # --- Webhook and Telegram trigger hooks -------------------------------------
 
 def _hook_stub(hook_id="orders", kind="webhook", token="tok-123", enabled=True):
@@ -483,4 +498,3 @@ def test_telegram_media_captions_hoist_caption_entities(monkeypatch):
     data = json.loads(sent[0]["MessageBody"])["data"]
     assert data["text"] == "photo caption"
     assert data["entities"] == entities
-

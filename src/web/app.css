@@ -646,6 +646,11 @@ dialog form { display: contents; }
   gap: 10px;
 }
 .flow-step.failed { border-color: var(--red-line); }
+#email-flow-dialog { width: min(720px, calc(100vw - 32px)); }
+#email-flow-description { margin-bottom: 18px; }
+.email-flow-detail { font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+.email-flow-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin-top: 10px; }
+#poll-sample-data { max-height: 50vh; overflow: auto; }
 .flow-link {
   width: 1px;
   height: 16px;

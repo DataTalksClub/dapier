@@ -255,6 +255,9 @@ Resources:
           - !Ref AWS::NoValue
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
+        # The overview reads consecutive-failure counts from this table.
+        - DynamoDBReadPolicy:
+            TableName: !Ref CursorsTable
         - Statement:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]

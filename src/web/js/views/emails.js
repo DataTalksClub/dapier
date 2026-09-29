@@ -22,6 +22,41 @@ function actionSummary(trigger) {
   return (trigger.actions || []).map((action) => action.type).join(' → ') || '—';
 }
 
+function flowStep(number, title, detail) {
+  return `<div class="flow-step"><div class="flow-head"><span class="flow-icon">${number}</span><strong class="flow-title">${escapeHtml(title)}</strong></div><div class="email-flow-detail">${detail}</div></div>`;
+}
+
+function openFlow(trigger) {
+  const address = addressOf(trigger);
+  $('#email-flow-title').textContent = `Flow for ${address}`;
+  $('#email-flow-description').textContent = trigger.description || 'What happens when this email trigger fires.';
+  const steps = [];
+  const watcher = trigger.event && trigger.event !== 'message.received';
+  steps.push(flowStep(1, watcher ? trigger.event : 'Email received',
+    watcher ? 'A matching SES feedback event starts this flow.'
+      : `Mail to <span class="mono">${escapeHtml(address)}</span> from an allowed sender starts this flow.`));
+  if (trigger.flow) {
+    steps.push(flowStep(steps.length + 1, `Shared flow: ${trigger.flow}`, 'Dapier runs the actions in this shared flow.'));
+  } else {
+    for (const action of trigger.actions || []) {
+      if (action.type === 'agent') {
+        const engine = action.engine || 'claude';
+        const workspace = action.workspace || 'the worker’s configured root';
+        const to = Object.hasOwn(action, 'notify_to') ? (action.notify_to || 'disabled') : 'the email sender';
+        const from = action.notify_from || 'the deployment sender';
+        const detail = `Dapier queues a headless <span class="mono">${escapeHtml(engine)}</span> run. It starts in <span class="mono">${escapeHtml(workspace)}</span>. When it finishes, Dapier sends a summary from <span class="mono">${escapeHtml(from)}</span> to <span class="mono">${escapeHtml(to)}</span>.`;
+        const prompt = action.prompt ? `<details><summary>Prompt template</summary><pre class="email-flow-prompt">${escapeHtml(action.prompt)}</pre></details>` : '';
+        steps.push(flowStep(steps.length + 1, 'Headless agent', detail + prompt));
+      } else {
+        steps.push(flowStep(steps.length + 1, action.type || 'Action',
+          `Dapier runs the <span class="mono">${escapeHtml(action.type || 'unknown')}</span> action.`));
+      }
+    }
+  }
+  $('#email-flow-steps').innerHTML = steps.join('<div class="flow-link" aria-hidden="true"></div>');
+  $('#email-flow-dialog').showModal();
+}
+
 function openDialog(trigger) {
   editing = trigger || null;
   const form = $('#email-form');
@@ -59,6 +94,10 @@ function syncEventFields(trigger) {
 $('#email-form').elements.event.addEventListener('change', () => syncEventFields(editing));
 
 function bindRowButtons() {
+  $$('.email-flow').forEach((button) => button.addEventListener('click', () => {
+    const trigger = current.triggers.find((item) => item.name === button.dataset.name);
+    if (trigger) openFlow(trigger);
+  }));
   $$('.email-edit').forEach((button) => button.addEventListener('click', () => {
     const trigger = current.triggers.find((item) => item.name === button.dataset.name);
     if (trigger) openDialog(trigger);
@@ -188,6 +227,7 @@ export function renderEmails(data) {
       <td data-label="Status">${statusLine(trigger.enabled ? 'enabled' : 'disabled')}</td>
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(trigger.updated_at) || '—'}</td>
       <td class="action-cell">
+        <button class="button secondary email-flow" data-name="${escapeHtml(trigger.name)}" type="button">Flow</button>
         <button class="button secondary email-edit" data-name="${escapeHtml(trigger.name)}" type="button">Edit</button>
         <button class="button secondary email-toggle" data-name="${escapeHtml(trigger.name)}" type="button">${trigger.enabled ? 'Disable' : 'Enable'}</button>
         <button class="button secondary email-delete" data-name="${escapeHtml(trigger.name)}" type="button">Delete</button>

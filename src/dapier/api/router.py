@@ -60,6 +60,7 @@ def _static(path):
         "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
         "/assets/lucide.min.js": ("lucide.min.js", "text/javascript; charset=utf-8"),
         "/assets/js/api.js": ("js/api.js", "text/javascript; charset=utf-8"),
+        "/assets/js/theme-init.js": ("js/theme-init.js", "text/javascript; charset=utf-8"),
         "/assets/js/format.js": ("js/format.js", "text/javascript; charset=utf-8"),
         "/assets/js/main.js": ("js/main.js", "text/javascript; charset=utf-8"),
         "/assets/js/router.js": ("js/router.js", "text/javascript; charset=utf-8"),
