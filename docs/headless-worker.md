@@ -61,6 +61,11 @@ view. It uses the configured worker root, with no project pinned. The worker
 reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`
 or the console's **Headless runs** section.
+If the instruction above the forwarded message says `zoom calls recording`,
+the agent works in `~/git/zoom-calls` and follows that repository's
+`zoom-recording` skill, script, and summary templates. The forwarded Zoom
+message must include a share link and passcode. This instruction is evaluated
+by the agent; the headless process still starts in the configured worker root.
 Open **Emails** in the console and select **Flow** on the `agents@dtcdev.click`
 row to see the route, headless action, and completion email. This route sends
 the report from `agents@dtcdev.click`, so replies return to the same address.
