@@ -981,6 +981,16 @@ def test_tokens_create_prints_value_once(isolated_home, monkeypatch, capsys):
     assert "token:personal-scheduler" in out
 
 
+def test_tokens_create_writes_owner_only_file(isolated_home, monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: dict(TOKEN_CREATED))
+    path = tmp_path / "private" / "host.token"
+    assert main.main(["tokens", "create", "--name", "host-worker", "--agent",
+                      "host-worker", "--output", str(path)]) == 0
+    assert path.read_text().strip() == "dap_SECRET_VALUE"
+    assert path.stat().st_mode & 0o077 == 0
+    assert "SECRET_VALUE" not in capsys.readouterr().out
+
+
 def test_tokens_list_never_prints_secrets(isolated_home, monkeypatch, capsys):
     listed = {key: value for key, value in TOKEN_CREATED.items() if key != "token"}
 
@@ -1534,5 +1544,4 @@ def test_main_templates_parsing(monkeypatch):
     assert main.main(["templates", "unpublish", "my-flow.yaml"]) == 0
     assert (seen["method"], seen["path"], seen["body"]) == (
         "PUT", "/api/agent/designer/workflows/my-flow.yaml/template", {"template": False})
-
 

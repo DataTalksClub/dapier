@@ -10,7 +10,7 @@ import webbrowser
 from urllib.parse import quote, urlencode
 from datetime import datetime
 
-from . import api
+from . import api, config
 
 # Documented child-process variables. The provider-specific alias exists so
 # existing upload tooling works; DAPIER_ACCESS_TOKEN is always set too.
@@ -1430,14 +1430,29 @@ def tokens_list(api_url, debug=False):
     return 0
 
 
-def tokens_create(api_url, name, agent, debug=False):
+def tokens_create(api_url, name, agent, debug=False, output=None):
+    if output:
+        from pathlib import Path
+        if Path(output).expanduser().exists():
+            raise ValueError(f"Token file already exists: {output}")
     data = api.call(api_url, "PUT", "/api/agent/tokens",
                     {"token_id": name, "agent": agent}, debug=debug)
     print(f"Created API token {data.get('token_id')} "
           f"(subject {data.get('subject')}, agent {data.get('agent')}).")
-    print(f"Grant it access with `dapier grants save` using subject {data.get('subject')}.")
-    print("Store the value now; it is not retrievable again:")
-    print(data.get("token", ""))
+    if agent != "host-worker":
+        print(f"Grant it access with `dapier grants save` using subject {data.get('subject')}.")
+    if output:
+        from pathlib import Path
+        import os
+        path = Path(output).expanduser()
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(data["token"] + "\n")
+        print(f"Stored the one-time token in {path} (owner-only).")
+    else:
+        print("Store the value now; it is not retrievable again:")
+        print(data.get("token", ""))
     return 0
 
 
@@ -2010,16 +2025,20 @@ def agent_tasks_list(api_url, debug=False, limit=None, status=None):
     for item in items:
         print(f"{item.get('status', ''):10} {str(item.get('workflow') or ''):30} "
               f"{item.get('task_id') or ''}")
-        if item.get("tag"):
-            print(f"           tag {item['tag']}")
+        if item.get("summary"):
+            print(f"           result {item['summary']}")
         if item.get("error"):
             print(f"           error {item['error']}")
     return 0
 
 
-def worker_run():
-    """Long-poll the host queue. This command does not call the API."""
-    from src.dapier.host_worker import serve
+def worker_run(api_url=None, *, token_file=None, workspace_root=None,
+               max_runtime=3600, once=False):
+    """Run headless jobs through the authenticated HTTPS host API."""
+    from src.dapier.headless_worker import DEFAULT_ROOT, DEFAULT_TOKEN_FILE, serve
 
-    serve()
+    serve(api_url=api_url or config.api_url(),
+          token_file=token_file or DEFAULT_TOKEN_FILE,
+          workspace_root=workspace_root or DEFAULT_ROOT,
+          max_runtime=max_runtime, once=once)
     return 0

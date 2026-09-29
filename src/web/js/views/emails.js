@@ -166,9 +166,9 @@ export async function renderAgentTasks() {
   body.innerHTML = tasks.map((task) => `<tr>
       <td class="cell-title mono"><span class="cell-name">${escapeHtml(wrapTokens(task.task_id || ''))}</span><span class="cell-sub">${escapeHtml(task.engine || '')}</span></td>
       <td class="mono muted-cell" data-label="Workflow">${escapeHtml(task.workflow || '—')}</td>
-      <td data-label="Status">${statusLine(task.status, { started: 'running' })}</td>
-      <td class="mono muted-cell" data-label="Error">${escapeHtml(task.error || '—')}</td>
-      <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(task.sent_at || task.created_at) || '—')}</td>
+      <td data-label="Status">${statusLine(task.status)}</td>
+      <td class="mono muted-cell" data-label="Result">${escapeHtml(task.summary || task.error || '—')}</td>
+      <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(task.finished_at || task.started_at || task.created_at) || '—')}</td>
     </tr>`).join('');
 }
 

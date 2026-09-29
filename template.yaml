@@ -263,6 +263,18 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref EmailTriggersTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref EmailFromTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HostTasksTable
+        - Statement:
+            Effect: Allow
+            Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility]
+            Resource: !GetAtt HostQueue.Arn
+        - Statement:
+            Effect: Allow
+            Action: [ses:SendEmail]
+            Resource: '*'
+        - DynamoDBCrudPolicy:
             TableName: !Ref HookTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref TriggerInboxTable
@@ -305,6 +317,7 @@ Resources:
           # (triggers.intake.ses_notifications); empty accepts any topic.
           SES_NOTIFICATION_TOPICS: !Ref SesNotificationTopics
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           COPILOT_LLM_BASE_URL: !Ref CopilotLlmBaseUrl
           COPILOT_LLM_API_KEY: !Ref CopilotLlmApiKey

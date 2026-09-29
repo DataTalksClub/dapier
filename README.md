@@ -288,11 +288,12 @@ event. It starts as `alexey.s.grigoriev@gmail.com` and
 runs no actions. An empty list ignores everyone. Extra `subject` or `body`
 filters on an address AND with its route. `from` is not a per-address filter.
 
-An `agent` action queues a prompt for `dapier worker`, which runs on the
-machine where Aplexer is installed and starts one session per job. The same
-action can sit on an email, a webhook, a schedule, or a poll. `dapier worker`
-does not call the API. Webhooks are managed with `dapier webhooks`. A sample
-of what a flow receives is `dapier workflows sample`.
+An `agent` action queues a prompt for `dapier worker`, which runs a headless
+Claude Code process on a host and reports its terminal result through the
+authenticated API. It can sit on an email, a webhook, a schedule, or a poll.
+The host needs a dedicated Dapier token, not AWS credentials or Aplexer; see
+[headless worker setup](docs/headless-worker.md). Webhooks are managed with
+`dapier webhooks`. A sample of what a flow receives is `dapier workflows sample`.
 
 `emails save` takes a JSON file (or `-` for stdin) with a name, an optional
 description, and one or more actions, e.g.:

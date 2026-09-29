@@ -159,7 +159,9 @@ def test_agent_agent_tasks_list_through_the_shared_list(tasks_table, agent_ident
         "task_id": "agent:f:e1:wake", "kind": "agent", "engine": None,
         "workspace": "/work", "tag_prefix": None, "status": "started",
         "session_id": None, "tag": None, "error": None,
-        "created_at": 100, "sent_at": 105, "workflow": "f",
+        "created_at": 100, "sent_at": 105, "started_at": None,
+        "finished_at": None, "exit_code": None, "summary": None,
+        "notified_at": None, "workflow": "f",
     }]
 
 
@@ -171,8 +173,8 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         seen.append((method, path))
         if len(seen) == 1:
-            return {"tasks": [task_row("agent:orders:e9:wake", 300, status="starting",
-                                       error="session was not ready for input")]}
+            return {"tasks": [task_row("agent:orders:e9:wake", 300, status="succeeded",
+                                       summary="Draft ready")]}
         return {"tasks": []}
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
@@ -184,5 +186,5 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
     ]
     out = capsys.readouterr().out
     assert "STATUS" in out and "orders" in out and "agent:orders:e9:wake" in out
-    assert "error session was not ready for input" in out
+    assert "result Draft ready" in out
     assert "No host tasks yet" in out

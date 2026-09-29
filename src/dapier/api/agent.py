@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit, copilot, error_digest, host_tasks
+from .. import audit, copilot, error_digest, host_jobs, host_tasks
 from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
@@ -493,6 +493,11 @@ def route(event, method, path):
         return runs_api(event)
     if path == "/api/agent/agent-tasks" and method == "GET":
         return agent_tasks_api(event)
+    if method == "POST" and path in (
+        "/api/agent/host-jobs/claim", "/api/agent/host-jobs/heartbeat",
+        "/api/agent/host-jobs/finish",
+    ):
+        return host_jobs_api(event, path.rsplit("/", 1)[-1])
     if path == "/api/agent/runs/export" and method == "GET":
         return runs_export_api(event)
     if path == "/api/agent/runs/replay-failed" and method == "POST":
@@ -1447,6 +1452,28 @@ def agent_tasks_api(event):
     query = event.get("queryStringParameters") or {}
     status, payload = host_tasks.api_list(
         limit=query.get("limit"), status=query.get("status"))
+    return _no_store(_json_response(status, payload))
+
+
+def host_jobs_api(event, operation):
+    """Machine-only host job protocol. An operator login cannot claim jobs."""
+    subject, error = authenticate(event)
+    if error:
+        return error
+    token = _api_token(event)
+    if not token or token.get("agent") != "host-worker":
+        return _json_response(403, {"error": "Host worker token required"})
+    if operation == "claim":
+        status, payload = host_jobs.claim(subject)
+    else:
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except (TypeError, ValueError):
+            return _json_response(400, {"error": "Invalid request"})
+        if operation == "heartbeat":
+            status, payload = host_jobs.heartbeat(body, subject)
+        else:
+            status, payload = host_jobs.finish(body, subject)
     return _no_store(_json_response(status, payload))
 
 

@@ -22,7 +22,7 @@ def test_email_and_webhook_events_enqueue_a_queued_agent_job(monkeypatch, tmp_pa
         def __init__(self):
             self.items = {}
 
-        def put_item(self, Item):
+        def put_item(self, Item, ConditionExpression=None):
             self.items[Item["task_id"]] = dict(Item)
 
     tasks = Tasks()
@@ -53,7 +53,7 @@ def test_email_and_webhook_events_enqueue_a_queued_agent_job(monkeypatch, tmp_pa
         assert body["tag_prefix"] == "agent"
         assert "Invoice" in body["prompt"] or "Ping" in body["prompt"]
         assert result == {"task_id": body["task_id"], "status": "queued"}
-        assert tasks.items[body["task_id"]]["status"] == "starting"
+        assert tasks.items[body["task_id"]]["status"] == "queued"
     built = build_message(action, email, "email-trigger-agent")
     assert built["prompt"].startswith("Invoice")
 
@@ -65,9 +65,25 @@ def test_template_host_queue_is_send_only():
     assert "maxReceiveCount: 5" in text
     assert "HostDeadLetterQueue:" in text
     assert "HostDeadLetterAlarm:" in text
-    assert "HostQueue.Arn" not in text
+    assert "Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility]" in text
     # The workflow function may send, and does not subscribe.
     assert "QueueName: !GetAtt HostQueue.QueueName" in text
     worker = text.split("WorkerFunction:", 1)[1].split("\n  # Standalone", 1)[0]
     assert "Queue: !GetAtt HostQueue.Arn" not in worker
     assert "sqs:ReceiveMessage" not in worker
+
+
+def test_email_action_can_use_the_host_root_and_reply_to_sender():
+    message = build_message(
+        {"type": "agent", "prompt": "{body.text.value}"},
+        {"id": "e1", "connector": "email", "data": {
+            "body": {"text": {"value": "Draft from this Zoom recording"}},
+            "sender": {"addresses": ["writer@example.com"]},
+            "subject": "Zoom assets", "message_id": "<mail-1@example.com>",
+        }},
+        "email-trigger-agents",
+    )
+    assert message["workspace"] == ""
+    assert message["prompt"] == "Draft from this Zoom recording"
+    assert message["notify_to"] == "writer@example.com"
+    assert message["email_subject"] == "Zoom assets"

@@ -132,6 +132,8 @@ def build_parser():
                                  help="Token ID; the machine subject becomes token:<name>")
     tokens_create_p.add_argument("--agent", required=True,
                                  help="The one agent name this token may act as")
+    tokens_create_p.add_argument("--output", default=None,
+                                 help="Write the one-time token to a new owner-only file")
     tokens_del_p = tokens_sub.add_parser("revoke", help="Revoke an API token")
     tokens_del_p.add_argument("name")
 
@@ -548,10 +550,17 @@ def build_parser():
     agent_tasks_list.add_argument("--limit", default=None,
                                   help="How many to show (default 50, max 200)")
     agent_tasks_list.add_argument("--status", default=None,
-                                  help="Only rows with this status: starting, started, ignored")
-    sub.add_parser(
+                                  help="Only rows with this status: queued, running, succeeded, failed, timed_out, interrupted")
+    worker_p = sub.add_parser(
         "worker",
-        help="Long-poll the host queue and run host jobs until interrupted.")
+        help="Run headless host jobs over HTTPS until interrupted.")
+    worker_p.add_argument("--token-file", default=None,
+                          help="Owner-only Dapier host-worker token file")
+    worker_p.add_argument("--workspace-root", default=None,
+                          help="Host job root directory (default ~/dapier-ws)")
+    worker_p.add_argument("--max-runtime", type=int, default=3600,
+                          help="Maximum seconds per headless job")
+    worker_p.add_argument("--once", action="store_true", help="Poll once and exit")
     catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
     catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
     return parser
@@ -609,7 +618,9 @@ def main(argv=None):
                                              limit=getattr(args, "limit", None),
                                              status=getattr(args, "status", None))
         if args.group == "worker":
-            return commands.worker_run()
+            return commands.worker_run(api_url, token_file=args.token_file,
+                                       workspace_root=args.workspace_root,
+                                       max_runtime=args.max_runtime, once=args.once)
         if args.group == "catalog":
             return commands.catalog_show(api_url, debug, as_json=args.json)
         if args.group == "credentials":
@@ -932,7 +943,8 @@ def cmd_tokens(args, api_url, debug):
     if args.command == "list":
         return commands.tokens_list(api_url, debug)
     if args.command == "create":
-        return commands.tokens_create(api_url, args.name, args.agent, debug)
+        return commands.tokens_create(api_url, args.name, args.agent, debug,
+                                      output=args.output)
     if args.command == "revoke":
         return commands.tokens_revoke(api_url, args.name, debug)
     return 2
