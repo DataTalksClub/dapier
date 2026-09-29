@@ -1,7 +1,7 @@
 .PHONY: build deploy test validate layer designer-install designer designer-build designer-console
 
 build: layer
-	sam build --config-env sandbox
+	scripts/build-sam.sh
 
 # py_mini_racer (embedded V8, for js code steps) ships only as a
 # manylinux_2_27 aarch64 wheel, which SAM's cross-build for the arm64
