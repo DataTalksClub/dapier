@@ -1,0 +1,18 @@
+{
+  "name": "todo",
+  "kind": "telegram",
+  "connection_id": "telegram-bot",
+  "enabled": true,
+  "description": "Telegram delivery for todo-intake. Business actions live in the managed multi-trigger workflow.",
+  "actions": [
+    {
+      "id": "ingress-only",
+      "type": "filter",
+      "when": {
+        "hook": {
+          "not_equals": "todo"
+        }
+      }
+    }
+  ]
+}

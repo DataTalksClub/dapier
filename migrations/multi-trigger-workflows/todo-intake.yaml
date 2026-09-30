@@ -1,0 +1,67 @@
+id: todo-intake
+triggers:
+- connector: email
+  event: message.received
+  filters:
+    route:
+      equals: todo
+- connector: telegram
+  event: message.received
+  filters:
+    hook:
+      equals: todo
+- connector: telegram
+  event: channel_post.received
+  filters:
+    hook:
+      equals: todo
+- connector: telegram
+  event: callback_query.received
+  filters:
+    hook:
+      equals: todo
+actions:
+- id: append-task
+  type: condition
+  when:
+    hook:
+      equals: todo
+  then:
+  - spreadsheet_id: 1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw
+    id: append-row
+    type: sheets_append_row
+    sheet_name: todo
+    connection_id: google-sheets
+    values:
+    - - '{trigger.occurred_at|date_format:%Y-%m-%d}'
+      - '{text|replace:/todo :|trim}'
+      - ''
+      - NEW
+  else:
+  - spreadsheet_id: 1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw
+    id: append-row
+    type: sheets_append_row
+    sheet_name: todo
+    connection_id: google-sheets
+    values:
+    - - '{trigger.occurred_at|date_format:%Y-%m-%d}'
+      - Process email "{subject}" from {from}
+      - ''
+      - NEW
+- id: create-intake
+  type: dataops
+  auth_secret_id: dapier/dataops
+  url_env: DATAOPS_INTAKE_URL
+- id: confirm-telegram
+  type: condition
+  when:
+    hook:
+      equals: todo
+  then:
+  - id: confirm
+    text: Done! Saved "{text|replace:/todo :|trim}" to the todo list.
+    type: telegram_send
+    connection_id: telegram-bot
+enabled: true
+description: Email and Telegram tasks to the TODO sheet and DataOps; confirm Telegram
+  tasks.
