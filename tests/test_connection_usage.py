@@ -69,6 +69,59 @@ def test_collect_counts_hook_bindings():
                                       "enabled": True, "where": "hook"}]
 
 
+def test_collect_walks_hook_actions_for_connection_refs():
+    usage = connection_usage.collect(
+        workflows=[],
+        hooks=[{"hook_id": "automator-telegram", "enabled": True, "actions": [
+            {"id": "post", "type": "condition", "then": [
+                {"type": "slack", "connection_id": "slack",
+                 "channel": "course-mlops-zoomcamp"}]}]}],
+    )
+    assert usage["slack"] == [{"ref": "automator-telegram", "kind": "hook",
+                               "enabled": True, "where": "hook"}]
+
+
+def test_provider_level_trigger_lands_on_the_single_connection():
+    workflows = [workflow_item(
+        "youtube-slack",
+        trigger={"connector": "youtube", "event": "video.published",
+                 "filters": {"channel_id": {"equals": "UC1"}}})]
+    usage = connection_usage.collect(workflows=workflows, hooks=[])
+    assert "youtube" not in usage  # no explicit binding was claimed
+    assert usage["provider:youtube"][0]["ref"] == "youtube-slack"
+
+    single = [{"connection_id": "youtube", "provider": "youtube"}]
+    connection_usage.attach(single, usage=usage)
+    assert single[0]["used_in"][0]["ref"] == "youtube-slack"
+
+    # two youtube accounts: the provider match is ambiguous, both stay empty
+    pair = [{"connection_id": "youtube", "provider": "youtube"},
+            {"connection_id": "youtube-2", "provider": "youtube"}]
+    connection_usage.attach(pair, usage=usage)
+    assert pair[0]["used_in"] == [] and pair[1]["used_in"] == []
+
+    # an explicit binding always wins over the provider fallback
+    explicit = [workflow_item(
+        "bound", actions=[{"type": "youtube_upload", "connection_id": "youtube"}])]
+    merged = connection_usage.collect(
+        workflows=workflows + explicit, hooks=[])
+    rows = [{"connection_id": "youtube", "provider": "youtube"}]
+    connection_usage.attach(rows, usage=merged)
+    assert [entry["ref"] for entry in rows[0]["used_in"]] == ["bound"]
+
+
+def test_provider_level_trigger_guards_delete():
+    table = FakeTable({"youtube": _connection("youtube", "connected",
+                                              provider="youtube")})
+    usage = {"provider:youtube": [{"ref": "youtube-slack", "kind": "workflow",
+                                   "enabled": True, "where": "trigger"}]}
+    status, payload = connections.api_delete_connection(table, "youtube",
+                                                        usage=usage)
+    assert status == 409
+    assert "youtube-slack" in payload["error"]
+    assert "youtube" in table.items
+
+
 def test_attach_stamps_every_row_even_without_usage():
     rows = [{"connection_id": "a"}, {"connection_id": "b"}]
     connection_usage.attach(rows, usage={"a": [{"ref": "wf", "kind": "workflow",
@@ -99,10 +152,10 @@ class FakeTable:
         return {"Items": list(self.items.values())[:Limit] if Limit else list(self.items.values())}
 
 
-def _connection(connection_id="google-drive", status="ready"):
+def _connection(connection_id="google-drive", status="ready", provider="google"):
     return {
         "connection_id": connection_id,
-        "provider": "google",
+        "provider": provider,
         "display_name": connection_id,
         "scopes": [],
         "granted_scopes": [],

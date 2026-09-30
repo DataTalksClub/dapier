@@ -380,7 +380,11 @@ def api_delete_connection(table, connection_id, *, grants_table_ref=None,
     if usage is None:
         from ..triggers import connection_usage
         usage = connection_usage.collect()
-    refs = usage.get(connection_id) or []
+    refs = list(usage.get(connection_id) or [])
+    # Provider-level trigger references (a workflow triggered on
+    # ``youtube.video.published`` with no explicit connection_id) guard the
+    # delete the same way: they name the connection's provider.
+    refs += usage.get(f"provider:{connection.get('provider')}", [])
     if refs and not force:
         names = ", ".join(sorted({str(entry.get("ref")) for entry in refs}))
         return 409, {

@@ -18,6 +18,19 @@ import os
 
 from . import hook_triggers, published_workflows
 
+# Trigger connectors that are their own provider: a workflow triggered on
+# ``youtube.video.published`` rides the provider's connection even when its
+# config carries no explicit connection_id (delivery resolves the connection
+# by provider). Connectors on multi-connection providers (google) are not
+# here — a provider match would be ambiguous with three Google rows.
+CONNECTOR_PROVIDERS = {
+    "youtube": "youtube",
+    "dropbox": "dropbox",
+    "slack": "slack",
+    "telegram": "telegram",
+    "zoom": "zoom",
+}
+
 
 def _collect_ids(value, where, found):
     """Depth-first walk collecting every string under a ``connection_id``
@@ -42,8 +55,12 @@ def collect(workflows=None, hooks=None):
 
     Each entry is ``{"ref": <workflow id or hook name>, "kind":
     "workflow"|"hook", "enabled": <bool>, "where": "trigger"|"step"
-    |"workflow"|"hook"}``. Loading degrades to an empty map on a storage
-    hiccup — usage labels must never break the list that carries them.
+    |"workflow"|"hook"}``. Provider-level trigger references (a trigger
+    whose connector is its own provider but which binds no explicit
+    connection_id) sit under ``"provider:<provider>"`` keys for attach()
+    to place on that provider's single connection. Loading degrades to an
+    empty map on a storage hiccup — usage labels must never break the list
+    that carries them.
     """
     usage = {}
 
@@ -71,6 +88,20 @@ def collect(workflows=None, hooks=None):
                 "enabled": bool(workflow.get("enabled", True)),
                 "where": where,
             })
+        # Provider-level trigger usage: an explicit connection_id is the
+        # precise reference (recorded above); a trigger whose connector is
+        # its own provider still depends on that provider's connection and
+        # lands under "provider:<provider>" for attach() to place — only on
+        # the row when it is that provider's single connection.
+        trigger = workflow.get("trigger") or {}
+        provider = CONNECTOR_PROVIDERS.get(str(trigger.get("connector") or ""))
+        if provider and not found_connection_id(workflow.get("trigger")):
+            record(f"provider:{provider}", {
+                "ref": str(workflow["id"]),
+                "kind": "workflow",
+                "enabled": bool(workflow.get("enabled", True)),
+                "where": "trigger",
+            })
 
     if hooks is None:
         try:
@@ -79,16 +110,22 @@ def collect(workflows=None, hooks=None):
         except Exception:  # noqa: BLE001 — usage is best-effort metadata
             hooks = []
     for item in hooks:
-        connection_id = str(item.get("connection_id") or "").strip()
-        if not connection_id:
-            continue
-        record(connection_id, {
-            "ref": str(item.get("hook_id") or item.get("name") or "hook"),
-            "kind": "hook",
-            "enabled": bool(item.get("enabled", True)),
-            "where": "hook",
-        })
+        found = []
+        _collect_ids(item, "hook", found)
+        for connection_id, where in found:
+            record(connection_id, {
+                "ref": str(item.get("hook_id") or item.get("name") or "hook"),
+                "kind": "hook",
+                "enabled": bool(item.get("enabled", True)),
+                "where": "hook",
+            })
     return usage
+
+
+def found_connection_id(value):
+    found = []
+    _collect_ids(value, "workflow", found)
+    return bool(found)
 
 
 def attach(rows, usage=None):
@@ -97,11 +134,22 @@ def attach(rows, usage=None):
     ``usage=None`` (the normal call) loads the map here; pass an explicit
     map (or ``[]`` to force every row empty) when the caller already has
     one. Rows always come back carrying the key, so the console never
-    special-cases absence.
+    special-cases absence. A row nothing references directly inherits the
+    provider-level trigger entries — but only when it is that provider's
+    single connection; with several accounts the match would be ambiguous
+    and the row stays honestly empty.
     """
     if usage is None:
         usage = collect()
+    provider_counts = {}
+    for row in rows:
+        provider_counts[row.get("provider")] = provider_counts.get(row.get("provider"), 0) + 1
     for row in rows:
         connection_id = row.get("connection_id")
-        row["used_in"] = usage.get(connection_id, [])
+        refs = usage.get(connection_id, [])
+        if not refs:
+            provider = row.get("provider")
+            if provider_counts.get(provider) == 1:
+                refs = list(usage.get(f"provider:{provider}", []))
+        row["used_in"] = refs
     return rows
