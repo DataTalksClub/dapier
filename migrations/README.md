@@ -30,9 +30,9 @@ intake. Email keeps its subject/sender task label; Telegram keeps its trimmed
 task text and confirmation message.
 
 `multi-trigger-workflows/todo-telegram-ingress.json` preserves the enabled
-Telegram webhook and its bot connection. Its stop filter prevents the hook's
-synthetic workflow from running business actions a second time. The hook
-remains visible as a delivery configuration and records a filtered run;
+Telegram webhook and its bot connection. Its no-op Python step keeps the
+hook's synthetic workflow free of business actions. The hook
+remains visible as a delivery configuration and records a completed no-op run;
 the managed `todo-intake` workflow owns the actions. Disabling or deleting
 the hook would stop Telegram delivery.
 

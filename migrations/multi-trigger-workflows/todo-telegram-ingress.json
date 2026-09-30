@@ -7,12 +7,8 @@
   "actions": [
     {
       "id": "ingress-only",
-      "type": "filter",
-      "when": {
-        "hook": {
-          "not_equals": "todo"
-        }
-      }
+      "type": "code",
+      "code": "# Business actions are owned by the managed todo-intake workflow.\nNone"
     }
   ]
 }
