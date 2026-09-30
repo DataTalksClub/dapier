@@ -170,8 +170,8 @@ The sandbox deployment is available at `https://dapier.dtcdev.click`.
 ## Administration console
 
 Home prioritizes paused workflows and latest-run failures, followed by recently
-used workflows and execution results. Create a workflow or browse templates from
-home; inspect failures in Runs and manage accounts in Connections. Usage and the
+used workflows and execution results. Create a workflow from home; inspect
+failures in Runs and manage accounts in Connections. Usage and the
 monthly task limit live under Administration → Usage; the error digest action
 lives in Runs and the operator activity trail in Audit log. The CLI reaches the
 same actions with `dapier workflows`, `dapier runs`, `dapier connections`,
