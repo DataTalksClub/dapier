@@ -222,22 +222,26 @@ export function renderEmails(data) {
   $('#email-domain-hint').textContent = current.domain;
   $('#email-empty').hidden = current.triggers.length > 0;
   $('.table-wrap', $('[data-page=emails]')).hidden = current.triggers.length === 0;
-  $('#email-table').innerHTML = current.triggers.map((trigger) => {
+  $('#email-table').innerHTML = current.triggers.map((trigger, index) => {
     const watcher = Boolean(trigger.event && trigger.event !== 'message.received');
     const title = watcher
       ? `<span class="email-addr-row"><span class="cell-name mono">${escapeHtml(trigger.name)}</span><span class="tag-chip" title="SES feedback watcher — matches domain-wide, not a reserved address">${escapeHtml(trigger.event)}</span></span>`
       : `<span class="cell-name mono">${escapeHtml(addressOf(trigger))}</span>`;
     const description = trigger.description ? `<span class="cell-sub">${escapeHtml(trigger.description)}</span>` : '';
+    const name = escapeHtml(trigger.name);
     return `<tr>
       <td class="cell-title">${title}${description}</td>
       <td data-label="Actions"><span class="cell-tags">${actionChips(trigger)}</span></td>
       <td data-label="Status">${statusLine(trigger.enabled ? 'enabled' : 'disabled')}</td>
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(trigger.updated_at) || '—'}</td>
       <td class="action-cell workflow-actions" data-label="Manage">
-        <button class="button secondary email-flow" data-name="${escapeHtml(trigger.name)}" type="button">Flow</button>
-        <button class="button secondary email-edit" data-name="${escapeHtml(trigger.name)}" type="button">Edit</button>
-        <button class="button secondary email-toggle" data-name="${escapeHtml(trigger.name)}" type="button">${trigger.enabled ? 'Disable' : 'Enable'}</button>
-        <button class="button danger email-delete" data-name="${escapeHtml(trigger.name)}" type="button">Delete</button>
+        <button class="button secondary email-flow" data-name="${name}" type="button">Flow</button>
+        <button class="button secondary email-edit" data-name="${name}" type="button">Edit</button>
+        <button type="button" class="button secondary workflow-more" popovertarget="email-menu-${index}" aria-label="More actions for ${name}">More <span aria-hidden="true">⋯</span></button>
+        <div id="email-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${name}">
+          <button class="button secondary email-toggle" data-name="${name}" type="button">${trigger.enabled ? 'Disable' : 'Enable'}</button>
+          <button class="button danger email-delete" data-name="${name}" type="button">Delete</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -246,6 +250,13 @@ export function renderEmails(data) {
   $('#email-yaml-list').textContent = yamlRoutes.map((route) => `${route}@${current.domain}`).join(', ');
   bindRowButtons();
 }
+
+// Menus close on pick; the delegated handlers above run unchanged when the
+// popover closes (same contract as the workflow rows).
+$('#email-table').addEventListener('click', (event) => {
+  const action = event.target.closest('.workflow-menu button');
+  if (action && !action.disabled) action.closest('.workflow-menu').hidePopover();
+});
 
 $('#new-email').addEventListener('click', () => openDialog(null));
 
