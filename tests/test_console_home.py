@@ -51,3 +51,25 @@ def test_home_only_surfaces_connections_used_by_enabled_workflows():
 def test_usage_and_home_model_deep_links_are_served():
     assert _static('/usage')['statusCode'] == 200
     assert _static('/assets/js/home-model.js')['statusCode'] == 200
+
+
+def test_home_has_one_workflow_list_and_one_results_feed():
+    from collections import Counter
+    from html.parser import HTMLParser
+
+    class Elements(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.ids = []
+
+        def handle_starttag(self, tag, attrs):
+            self.ids.extend(value for key, value in attrs if key == 'id')
+
+    html = (ROOT / 'src/web/index.html').read_text()
+    parser = Elements()
+    parser.feed(html)
+    assert not [key for key, count in Counter(parser.ids).items() if count > 1]
+    home = html.split('data-page="overview">', 1)[1].split('<section class="view" data-page="usage">', 1)[0]
+    assert 'id="overview-runs-table"' not in home
+    assert home.count('<section ') == 2
+    assert home.count('</section>') == 3  # two panels and the home view
