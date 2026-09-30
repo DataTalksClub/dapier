@@ -490,10 +490,11 @@ function bindOAuthLinks() {
   }));
 }
 
-function confirmRevoke(title, message) {
+function confirmRevoke(title, message, confirmLabel = 'Revoke') {
   const dialog = $('#connection-confirm-dialog');
   $('#connection-confirm-title').textContent = title;
   $('#connection-confirm-message').textContent = message;
+  $('#connection-confirm-yes').textContent = confirmLabel;
   dialog.returnValue = '';
   return new Promise((resolve) => {
     dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
@@ -545,7 +546,7 @@ editDeleteButton.addEventListener('click', async () => {
   const message = refs.length
     ? `${connectionId} is still used by: ${refs.join(', ')}. Delete it anyway? Those flows and triggers lose access.`
     : `Delete ${connectionId}? Its stored credential and access grants go with it. This cannot be undone.`;
-  if (!await confirmRevoke('Delete connection', message)) return;
+  if (!await confirmRevoke('Delete connection', message, 'Delete')) return;
   editDeleteButton.disabled = true;
   editDeleteButton.textContent = 'Deleting…';
   $('#edit-connection-error').textContent = '';
