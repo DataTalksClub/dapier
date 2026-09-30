@@ -66,7 +66,10 @@ recording URL and passcode in the email body. The stored route is defined in
 [`agents-workflow.json`](agents-workflow.json), a JSON-compatible YAML
 workflow. Apply changes with `dapier workflows save docs/agents-workflow.json`
 and `dapier workflows publish email-trigger-agents.yaml`, or edit it in
-**Workflows**. Its internal id remains `email-trigger-agents` so earlier runs
+**Workflows**. Use **Expand editor** on the prompt field to read and edit long
+instructions; **Apply to step** updates the canvas, and saving the workflow
+persists the change. Prompt whitespace and template variables are preserved.
+Its internal id remains `email-trigger-agents` so earlier runs
 and agent tasks stay associated with it. It uses the configured worker root, with no project pinned. The worker
 reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`

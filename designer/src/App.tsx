@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
 import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Play, Sparkles, Trash2, TriangleAlert, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
@@ -105,6 +105,54 @@ function workflowYaml(workflow: Workflow): string {
   return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
 }
 
+/** A prose editor with room to read long prompts without changing their text. */
+function PromptField({ field, value, onChange }: {
+  field: CatalogField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const inline = useRef<HTMLTextAreaElement>(null);
+  const expanded = useRef<HTMLTextAreaElement>(null);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    if (open && dialog.current && !dialog.current.open) {
+      dialog.current.showModal();
+      expanded.current?.focus();
+      expanded.current?.setSelectionRange(inline.current?.selectionStart || 0, inline.current?.selectionEnd || 0);
+    } else if (!open && dialog.current?.open) dialog.current.close();
+  }, [open]);
+  const close = () => setOpen(false);
+  return (
+    <div className="prompt-field">
+      <div className="prompt-field-label">
+        <label htmlFor={id}>{field.label}{field.required ? " *" : ""}</label>
+        <button type="button" className="prompt-expand" onClick={() => { setDraft(value); setOpen(true); }}>Expand editor</button>
+      </div>
+      <textarea id={id} ref={inline} className="prompt-inline" rows={10} value={value}
+        placeholder={field.placeholder} onChange={event => onChange(event.target.value)} />
+      <dialog ref={dialog} className="prompt-editor-dialog" aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-hint`} onCancel={close} onClose={close}
+        onKeyDown={event => event.stopPropagation()}>
+        <header className="prompt-editor-head">
+          <h2 id={`${id}-title`}>Edit {field.label.toLowerCase()}</h2>
+          <button type="button" className="button secondary" aria-label="Close prompt editor" onClick={close}><X size={18} /></button>
+        </header>
+        <p id={`${id}-hint`} className="prompt-editor-hint">Changes apply to this step. Save the workflow when you’re ready.</p>
+        <label className="prompt-editor-label" htmlFor={`${id}-expanded`}>{field.label}</label>
+        <textarea id={`${id}-expanded`} ref={expanded} className="prompt-expanded" value={draft}
+          placeholder={field.placeholder} spellCheck onChange={event => setDraft(event.target.value)} />
+        <footer className="prompt-editor-actions">
+          <button className="button secondary" type="button" onClick={close}>Cancel</button>
+          <button className="button primary" type="button" onClick={() => { onChange(draft); close(); }}>Apply to step</button>
+        </footer>
+      </dialog>
+    </div>
+  );
+}
+
 /** One catalog field, rendered per its declared type. */
 function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }: {
   field: CatalogField;
@@ -153,6 +201,9 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
     );
   }
   if (field.type === "textarea") {
+    if (field.key === "prompt" || field.key === "system") {
+      return <PromptField field={field} value={value} onChange={onChange} />;
+    }
     return (
       <label>{field.label}{field.required ? " *" : ""}
         <textarea value={value} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />

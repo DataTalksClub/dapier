@@ -20363,8 +20363,9 @@
         }
         continue;
       }
-      const value = (data.fields?.[field.key] ?? "").trim();
-      if (value === "") continue;
+      const rawValue = data.fields?.[field.key] ?? "";
+      const value = field.key === "prompt" || field.key === "system" ? rawValue : rawValue.trim();
+      if (value.trim() === "") continue;
       if ((field.key === "on_error" || field.key === "on_fail") && value === "halt") continue;
       const parsed = field.type === "number" ? Number(value) : value;
       fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
@@ -21468,6 +21469,88 @@
   function workflowYaml(workflow) {
     return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
   }
+  function PromptField({ field, value, onChange }) {
+    const id = reactExports.useId();
+    const dialog = reactExports.useRef(null);
+    const inline = reactExports.useRef(null);
+    const expanded = reactExports.useRef(null);
+    const [open, setOpen] = reactExports.useState(false);
+    const [draft, setDraft] = reactExports.useState(value);
+    reactExports.useEffect(() => {
+      if (open && dialog.current && !dialog.current.open) {
+        dialog.current.showModal();
+        expanded.current?.focus();
+        expanded.current?.setSelectionRange(inline.current?.selectionStart || 0, inline.current?.selectionEnd || 0);
+      } else if (!open && dialog.current?.open) dialog.current.close();
+    }, [open]);
+    const close = () => setOpen(false);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "prompt-field", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "prompt-field-label", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { htmlFor: id, children: [
+          field.label,
+          field.required ? " *" : ""
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "prompt-expand", onClick: () => {
+          setDraft(value);
+          setOpen(true);
+        }, children: "Expand editor" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "textarea",
+        {
+          id,
+          ref: inline,
+          className: "prompt-inline",
+          rows: 10,
+          value,
+          placeholder: field.placeholder,
+          onChange: (event) => onChange(event.target.value)
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "dialog",
+        {
+          ref: dialog,
+          className: "prompt-editor-dialog",
+          "aria-labelledby": `${id}-title`,
+          "aria-describedby": `${id}-hint`,
+          onCancel: close,
+          onClose: close,
+          onKeyDown: (event) => event.stopPropagation(),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "prompt-editor-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: `${id}-title`, children: [
+                "Edit ",
+                field.label.toLowerCase()
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "button secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 18 }) })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                id: `${id}-expanded`,
+                ref: expanded,
+                className: "prompt-expanded",
+                value: draft,
+                placeholder: field.placeholder,
+                spellCheck: true,
+                onChange: (event) => setDraft(event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "prompt-editor-actions", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: close, children: "Cancel" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: () => {
+                onChange(draft);
+                close();
+              }, children: "Apply to step" })
+            ] })
+          ]
+        }
+      )
+    ] });
+  }
   function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }) {
     const [discovering, setDiscovering] = reactExports.useState(false);
     if (field.type === "boolean") {
@@ -21507,6 +21590,9 @@
       ] });
     }
     if (field.type === "textarea") {
+      if (field.key === "prompt" || field.key === "system") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx(PromptField, { field, value, onChange });
+      }
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
         field.label,
         field.required ? " *" : "",

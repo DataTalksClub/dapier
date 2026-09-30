@@ -183,8 +183,9 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
       }
       continue;
     }
-    const value = (data.fields?.[field.key] ?? "").trim();
-    if (value === "") continue;
+    const rawValue = data.fields?.[field.key] ?? "";
+    const value = field.key === "prompt" || field.key === "system" ? rawValue : rawValue.trim();
+    if (value.trim() === "") continue;
     // halt is the engine default for both policies (engine/logic.py): the
     // keys are written only for the non-default modes, so steps that never
     // handled a failure save byte-identical YAML.
