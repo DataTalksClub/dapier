@@ -343,8 +343,6 @@ main { min-width: 0; padding: 0 40px 64px; }
   border-bottom: 1px solid var(--line-strong);
 }
 .topbar h1 { font-size: 32px; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; }
-.designer-rename { gap: 5px; height: 32px; }
-.designer-rename svg { width: 13px; height: 13px; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .last-updated { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .menu-toggle { display: none; }
@@ -839,7 +837,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .loading { margin: 0 -18px; }
   .topbar { min-height: 72px; gap: 12px; }
   .topbar h1 { font-size: 25px; }
-  .designer-rename { font-size: 11px; }
   .run-filters label { flex: 1 1 140px; }
   .run-filters .field-hint { margin: 4px 0 0; flex-basis: 100%; }
   .connection-filters input, .connection-filters select { width: 100%; flex: 1 1 130px; }

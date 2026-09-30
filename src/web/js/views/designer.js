@@ -34,9 +34,7 @@ function frameSrc(source) {
 function applyMeta() {
   if (state.view !== 'designer') return;
   const title = $('#view-title');
-  const rename = $('#designer-rename');
   title.classList.toggle('renamable', !!meta && meta.editable && !editing);
-  rename.hidden = !meta?.editable || editing;
   if (meta) {
     if (!editing) title.textContent = meta.id || 'Designer';
     title.title = '';
@@ -65,7 +63,6 @@ function syncHead(ref) {
   $('#view-title').textContent = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : 'Designer';
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
-  $('#designer-rename').hidden = true;
 }
 
 /* Swaps the h1 for an input; Enter or blur accepts, Escape restores. The
@@ -75,7 +72,6 @@ function startRename() {
   if (editing || state.view !== 'designer' || !meta?.editable) return;
   const current = title.textContent;
   editing = true;
-  $('#designer-rename').hidden = true;
   title.classList.remove('renamable');
   const input = document.createElement('input');
   input.className = 'title-input';
@@ -115,7 +111,9 @@ function startRename() {
   input.addEventListener('click', (event) => event.stopPropagation());
 }
 
-$('#designer-rename').addEventListener('click', startRename);
+/* Clicking the workflow name itself starts the rename (the h1 carries the
+   renamable class and cursor); startRename no-ops everywhere else. */
+$('#view-title').addEventListener('click', startRename);
 
 /* Back out of the canvas to the workflow list. setView runs the view guard,
    so an unsaved draft raises the designer's own discard prompt first. */
