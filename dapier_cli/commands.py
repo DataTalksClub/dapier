@@ -2041,6 +2041,29 @@ def agent_tasks_list(api_url, debug=False, limit=None, status=None):
     return 0
 
 
+def workers_list(api_url, debug=False):
+    """Host workers (`dapier worker` processes), most recently seen first."""
+    data = api.call(api_url, "GET", "/api/agent/workers", debug=debug)
+    workers = data.get("workers") or []
+    if not workers:
+        print("No worker has checked in yet. Start one with `dapier worker` — "
+              "agent tasks stay queued until a worker picks them up.")
+        return 0
+    print(f"{'STATUS':10} {'WORKER':44} CURRENT TASK")
+    for worker in workers:
+        state = "active" if worker.get("active") else "offline"
+        current = worker.get("current_task_id") or "—"
+        print(f"{state:10} {str(worker.get('worker_id') or ''):44} {current}")
+        where = " @ ".join(part for part in (worker.get("hostname"),
+                                             worker.get("workspace_root")) if part)
+        if where:
+            print(f"           {where}")
+        if worker.get("last_task_id"):
+            print(f"           last {worker['last_task_id']}"
+                  f" -> {worker.get('last_status') or 'unknown'}")
+    return 0
+
+
 def agent_tasks_show(api_url, task_id, debug=False):
     data = api.call(api_url, "GET", "/api/agent/agent-tasks?task_id=" + quote(task_id, safe=""),
                     debug=debug)

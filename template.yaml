@@ -369,6 +369,12 @@ Resources:
         ConsoleAgents:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /agents, Method: GET}
+        ConsoleWorkers:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /workers, Method: GET}
+        ConsoleWorkers:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /workers, Method: GET}
         ConsoleCredentials:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /credentials, Method: GET}

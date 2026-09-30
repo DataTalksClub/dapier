@@ -150,7 +150,7 @@ def test_host_api_requires_the_dedicated_machine_token(monkeypatch):
         return "token:worker", None
 
     monkeypatch.setattr(agent_api, "authenticate", authenticate)
-    monkeypatch.setattr(host_jobs, "claim", lambda owner: (200, {"job": None}))
+    monkeypatch.setattr(host_jobs, "claim", lambda owner, body=None: (200, {"job": None}))
     path = "/api/agent/host-jobs/claim"
     assert agent_api.route({}, "POST", path)["statusCode"] == 403
     assert agent_api.route({"machine": "some-agent"}, "POST", path)["statusCode"] == 403

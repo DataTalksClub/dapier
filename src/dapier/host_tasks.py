@@ -58,6 +58,9 @@ def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None):
         start = page.get("LastEvaluatedKey")
         if not start:
             break
+    # Worker presence rows (host_workers.checkin) share the table but are
+    # not tasks; the Workers tab reads them through its own list.
+    items = [item for item in items if item.get("kind") != "worker"]
     items.sort(key=lambda item: (int(item.get("created_at") or 0),
                                  str(item.get("task_id") or "")), reverse=True)
     wanted = str(status or "").strip().lower()

@@ -3,8 +3,10 @@
 import json
 import os
 import signal
+import socket
 import subprocess
 import time
+import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -90,9 +92,18 @@ def _stop(process):
         process.wait()
 
 
+def identity(workspace_root):
+    """One running `dapier worker` process: registry id plus check-in meta."""
+    hostname = socket.gethostname()
+    worker_id = f"{hostname}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    return worker_id, {"worker_id": worker_id, "hostname": hostname,
+                       "pid": os.getpid(), "workspace_root": str(workspace_root)}
+
+
 def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SECONDS,
-            popen=subprocess.Popen, clock=time.monotonic, sleep=time.sleep):
+            worker_id=None, popen=subprocess.Popen, clock=time.monotonic, sleep=time.sleep):
     task_id, lease_id = job["task_id"], job["lease_id"]
+    presence = {"worker_id": worker_id} if worker_id else None
     status, code, summary = "failed", None, ""
     output_path = error_path = None
     try:
@@ -125,7 +136,8 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
                         _stop(process)
                         break
                     if current >= next_heartbeat:
-                        api.call("heartbeat", {"task_id": task_id, "lease_id": lease_id})
+                        api.call("heartbeat", {"task_id": task_id, "lease_id": lease_id,
+                                               "worker": presence})
                         next_heartbeat = current + HEARTBEAT_SECONDS
                     sleep(1)
             except BaseException:
@@ -140,7 +152,7 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
     except Exception as exc:
         summary = str(exc)[:2000]
     result = {"task_id": task_id, "lease_id": lease_id, "status": status,
-              "exit_code": code, "summary": summary}
+              "exit_code": code, "summary": summary, "worker": presence}
     from .host_jobs import MAX_LOG_CHARS
 
     logs = {"stdout": "", "stderr": "", "truncated": False}
@@ -162,12 +174,16 @@ def serve(*, api_url="https://dapier.dtcdev.click", token_file=DEFAULT_TOKEN_FIL
           api=None):
     if max_runtime < 1:
         raise ValueError("Maximum runtime must be positive")
-    workspace_for(workspace_root, "")
+    root = workspace_for(workspace_root, "")
     api = api or WorkerApi(api_url, token_file)
+    worker_id, meta = identity(root)
+    print(f"dapier worker {worker_id} on {api_url} — polling for agent tasks",
+          flush=True)
     while True:
-        response = api.call("claim")
+        response = api.call("claim", {"worker": meta})
         job = response.get("job")
         if job:
-            run_job(job, api, workspace_root=workspace_root, max_runtime=max_runtime)
+            run_job(job, api, workspace_root=workspace_root, max_runtime=max_runtime,
+                    worker_id=worker_id)
         if once:
             return

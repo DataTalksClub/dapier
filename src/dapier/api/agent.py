@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import unquote
 
-from .. import audit, copilot, error_digest, host_jobs, host_tasks
+from .. import audit, copilot, error_digest, host_jobs, host_tasks, host_workers
 from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
@@ -497,6 +497,8 @@ def route(event, method, path):
         return runs_api(event)
     if path == "/api/agent/agent-tasks" and method == "GET":
         return agent_tasks_api(event)
+    if path == "/api/agent/workers" and method == "GET":
+        return workers_api(event)
     if method == "POST" and path in (
         "/api/agent/host-jobs/claim", "/api/agent/host-jobs/heartbeat",
         "/api/agent/host-jobs/finish",
@@ -1413,6 +1415,21 @@ def agent_tasks_api(event):
     return _no_store(_json_response(status, payload))
 
 
+def workers_api(event):
+    """Operator-only host worker list mirroring /api/admin/workers.
+
+    Same domain function (host_workers.api_list) as the console route, so
+    `dapier workers list` and the console Workers tab see the same rows:
+    which `dapier worker` processes checked in, which is active, what each
+    is running. Like the agent-tasks read it is not itself audited —
+    require_operator records the denials.
+    """
+    _, error = require_operator(event, "workers")
+    if error:
+        return error
+    return _no_store(_json_response(*host_workers.api_list()))
+
+
 def host_jobs_api(event, operation):
     """Machine-only host job protocol. An operator login cannot claim jobs."""
     subject, error = authenticate(event)
@@ -1421,13 +1438,15 @@ def host_jobs_api(event, operation):
     token = _api_token(event)
     if not token or token.get("agent") != "host-worker":
         return _json_response(403, {"error": "Host worker token required"})
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (TypeError, ValueError):
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
     if operation == "claim":
-        status, payload = host_jobs.claim(subject)
+        status, payload = host_jobs.claim(subject, body)
     else:
-        try:
-            body = json.loads(event.get("body") or "{}")
-        except (TypeError, ValueError):
-            return _json_response(400, {"error": "Invalid request"})
         if operation == "heartbeat":
             status, payload = host_jobs.heartbeat(body, subject)
         else:

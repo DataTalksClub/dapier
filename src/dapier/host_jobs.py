@@ -12,6 +12,7 @@ import uuid
 from email.utils import parseaddr
 
 from .host_tasks import tasks_table
+from .host_workers import checkin, meta_of
 
 VISIBILITY_SECONDS = 120
 WAIT_SECONDS = 10
@@ -60,9 +61,15 @@ def _set(table, task_id, fields, condition=None, condition_values=None):
     table.update_item(**kwargs)
 
 
-def claim(owner, *, table_ref=None, queue_ref=None, queue_url=None, now=None):
+def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, now=None):
     """Lease one queued task or return None after a bounded long poll."""
     table, queue = tasks_table(table_ref), queue_client(queue_ref)
+    # Presence first: an idle worker polls this every ~10s, so the check-in
+    # doubles as the worker's heartbeat. Older workers send no meta and
+    # simply never appear in the registry.
+    meta = meta_of(body)
+    if meta:
+        checkin(owner, meta, table_ref=table, now=now)
     url = _queue_url(queue_url)
     response = queue.receive_message(
         QueueUrl=url, WaitTimeSeconds=WAIT_SECONDS, MaxNumberOfMessages=1,
@@ -127,6 +134,8 @@ def claim(owner, *, table_ref=None, queue_ref=None, queue_url=None, now=None):
             raise
         _delete(queue, receipt, url)
         return 200, {"job": None}
+    if meta:
+        checkin(owner, meta, task_id=task_id, table_ref=table, now=now)
     return 200, {"job": {"task_id": task_id, "lease_id": lease_id,
                           "engine": message.get("engine") or "claude",
                           "workspace": message.get("workspace") or "",
@@ -144,6 +153,11 @@ def heartbeat(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, no
     if not isinstance(body, dict) or not body.get("task_id") or not body.get("lease_id"):
         return 400, {"error": "Task ID and lease ID are required"}
     table = tasks_table(table_ref)
+    # Refresh presence even when the lease has lapsed: the worker is alive
+    # either way, and the next claim will reconcile the task state.
+    meta = meta_of(body)
+    if meta:
+        checkin(owner, meta, task_id=body["task_id"], table_ref=table, now=now)
     row = _owned(table, body["task_id"], body["lease_id"], owner)
     if not row or row.get("status") != "running":
         return 409, {"error": "Task lease is no longer active"}
@@ -167,6 +181,7 @@ def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=N
     status = body.get("status")
     if status not in ("succeeded", "failed", "timed_out"):
         return 400, {"error": "Invalid terminal status"}
+    meta = meta_of(body)
     table = tasks_table(table_ref)
     row = _owned(table, body["task_id"], body["lease_id"], owner)
     if not row or row.get("status") not in ({"running"} | TERMINAL):
@@ -197,6 +212,9 @@ def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=N
         row = _row(table, body["task_id"])
     _notify(table, body["task_id"], row, ses_ref=ses_ref)
     _delete(queue_client(queue_ref), row["receipt_handle"], _queue_url(queue_url))
+    if meta:
+        checkin(owner, meta, finished=(body["task_id"], row["status"]),
+                table_ref=table, now=now)
     return 200, {"task_id": body["task_id"], "status": row["status"]}
 
 

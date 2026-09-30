@@ -559,6 +559,10 @@ def build_parser():
                                   help="Only rows with this status: queued, running, succeeded, failed, timed_out, interrupted")
     agent_tasks_show = agent_tasks_sub.add_parser("show", help="Show one agent task and its recorded logs")
     agent_tasks_show.add_argument("task_id")
+    workers_p = sub.add_parser(
+        "workers", help="Host workers (`dapier worker` processes) that run agent tasks")
+    workers_sub = workers_p.add_subparsers(dest="command", required=True)
+    workers_sub.add_parser("list", help="List host workers, most recently seen first")
     worker_p = sub.add_parser(
         "worker",
         help="Run headless host jobs over HTTPS until interrupted.")
@@ -625,6 +629,8 @@ def main(argv=None):
             return commands.agent_tasks_list(api_url, debug,
                                              limit=getattr(args, "limit", None),
                                              status=getattr(args, "status", None))
+        if args.group == "workers":
+            return commands.workers_list(api_url, debug)
         if args.group == "worker":
             return commands.worker_run(api_url, token_file=args.token_file,
                                        workspace_root=args.workspace_root,

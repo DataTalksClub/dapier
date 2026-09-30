@@ -158,6 +158,8 @@ def route(event, method, path):
         return routes.email_from_remove(event, operator_subject)
     if method == "GET" and path == "/api/admin/agent-tasks":
         return routes.agent_tasks_list(event)
+    if method == "GET" and path == "/api/admin/workers":
+        return routes.workers_list(event)
     if method == "GET" and path == "/api/admin/designer/workflows":
         return routes.designer_list(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/catalog":
@@ -299,6 +301,7 @@ def route(event, method, path):
 from .login import auth_callback, auth_error, auth_login, auth_logout  # noqa: F401
 from .routes import (  # noqa: F401
     agent_tasks_list,
+    workers_list,
     copilot_draft,
     create_api_token,
     delete_email_trigger,
