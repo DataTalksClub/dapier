@@ -48,7 +48,7 @@
       <div class="brand"><span class="wordmark">Dapier</span><button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close menu"><i data-lucide="x"></i></button></div>
       <nav aria-label="Main navigation">
         <p class="nav-group-label">Monitor</p>
-        <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
+        <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Home</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
@@ -61,6 +61,7 @@
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
         <a class="nav-item" href="/users" data-view="users"><i data-lucide="users"></i><span>Users</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
+        <a class="nav-item" href="/usage" data-view="usage"><i data-lucide="chart-no-axes-column"></i><span>Usage</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
       </nav>
       <div class="sidebar-foot">
@@ -78,7 +79,7 @@
       <header class="topbar">
         <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu" aria-expanded="false" aria-controls="main-sidebar"><i data-lucide="menu"></i></button>
         <button id="designer-back" class="icon-button designer-back" type="button" aria-label="Back to workflows" title="Back to workflows"><i data-lucide="arrow-left"></i></button>
-        <h1 id="view-title">Overview</h1>
+        <h1 id="view-title">Home</h1>
         <button id="designer-rename" class="text-link designer-rename" type="button" aria-label="Rename workflow" hidden><i data-lucide="pencil"></i>Rename</button>
         <div class="top-actions">
           <a id="designer-github" class="text-link view-link" target="_blank" rel="noopener" hidden><i data-lucide="arrow-up-right"></i>Edit on GitHub</a>
@@ -91,42 +92,35 @@
       <div id="notice" class="notice" role="status" hidden></div>
 
       <section class="view active" data-page="overview">
-        <div class="section-head page-intro"><div><h2>Automation health</h2><p class="sub">Review recent activity and resolve anything that needs attention.</p></div></div>
-        <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
-        <div class="metrics">
-          <div class="metric"><span class="metric-label">Workflows on</span><span class="metric-value mono" id="metric-workflows">-</span></div>
-          <div class="metric"><span class="metric-label">Connected accounts</span><span class="metric-value mono" id="metric-connections">-</span><span class="metric-detail" id="metric-connection-detail"></span></div>
-          <div class="metric"><span class="metric-label">Recent runs completed</span><span class="metric-value mono" id="metric-runs">-</span><span class="metric-detail" id="metric-runs-detail"></span></div>
-          <div class="metric"><span class="metric-label">Credentials</span><span class="metric-value mono" id="metric-credentials">-</span></div>
+        <div class="section-head page-intro home-intro">
+          <div><h2>Your automations</h2><p class="sub">Build a workflow, pick up where you left off, or check its latest result.</p></div>
+          <div class="home-create-actions"><a class="button secondary view-link" href="/templates" data-target="templates">Browse templates</a><a class="button primary" href="/workflows/new" data-new-workflow><i data-lucide="plus"></i>Create workflow</a></div>
         </div>
-
+        <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <div class="overview-columns">
           <section>
             <div class="section-head"><div><h2>Workflow executions</h2><p class="sub">Select a run to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">Run history<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-runs-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Status</th><th>Started</th></tr></thead><tbody id="overview-runs"></tbody></table></div>
             <div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
+          <section aria-labelledby="home-workflows-title">
+            <div class="section-head"><div><h2 id="home-workflows-title">Your workflows</h2><p class="sub" id="home-workflow-count"></p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
+            <div id="overview-workflows" class="home-workflows"></div>
+            <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Choose a template or create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="button secondary view-link" href="/templates" data-target="templates">Choose a template</a></div>
           </section>
-          <section>
-            <div class="section-head"><div><h2>Workflows on</h2><p class="sub">Select a workflow to edit it.</p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
-            <div id="overview-workflows-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Status</th></tr></thead><tbody id="overview-workflows"></tbody></table></div>
-            <div id="overview-workflows-empty" class="empty-state" hidden><h3>No workflows on</h3><p>Create a workflow or turn an existing one on to start automating.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
+          <section aria-labelledby="home-results-title">
+            <div class="section-head"><div><h2 id="home-results-title">Latest results</h2><p class="sub">Recent executions. Open one to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">All runs<i data-lucide="arrow-right"></i></a></div>
+            <div id="overview-runs" class="home-results"></div>
+            <div id="overview-runs-empty" class="empty-state" hidden><h3>Waiting for the first run</h3><p>Results appear when a published workflow receives a matching trigger.</p></div>
           </section>
-          <section>
-            <div class="section-head"><div><h2>Failed runs</h2><p class="sub">By workflow over the last 7 days.</p></div><button id="overview-errors-send-digest" class="button secondary" type="button">Send digest now</button><a class="text-link view-link" href="/runs" data-target="runs" data-run-status="problems">Run history<i data-lucide="arrow-right"></i></a></div>
-            <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
-            <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
-          </section>
-          <section>
-            <div class="section-head"><div><h2>Activity</h2><p class="sub">Operator actions from the audit trail, newest first.</p></div><label class="visually-hidden" for="audit-action-filter">Filter by action</label><select id="audit-action-filter" aria-label="Filter by action"><option value="all">All actions</option></select></div>
-            <div id="overview-audit-table" class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Outcome</th></tr></thead><tbody id="overview-audit"></tbody></table></div>
-            <div id="overview-audit-empty" class="empty-state" hidden><h3>No audit entries</h3><p>Operator actions — connects, grants, token issues, workflow saves — appear here once recorded.</p></div>
-          </section>
+        </div>
+      </section>
+
+      <section class="view" data-page="usage">
           <section>
             <div class="section-head"><div><h2>Usage</h2><p class="sub">Completed action steps per workflow, this month and over the last 3 months.</p><p class="sub" id="overview-quota-line" hidden></p></div><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="button secondary" type="submit">Set limit</button></form></div>
             <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
             <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
           </section>
-        </div>
       </section>
 
       <section class="view" data-page="workflows">
@@ -367,6 +361,11 @@
         </div>
         <button id="inbox-load-more" class="button secondary" type="button" hidden>Load more</button>
       </section>
+          <section>
+            <div class="section-head"><div><h2>Failed runs</h2><p class="sub">By workflow over the last 7 days.</p></div><button id="overview-errors-send-digest" class="button secondary" type="button">Send digest now</button></div>
+            <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
+            <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
+          </section>
       </section>
 
       <section class="view" data-page="audit">

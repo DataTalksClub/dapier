@@ -893,3 +893,26 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   #workflow-table-wrap .workflow-select { width: 20px; height: 20px; }
   #workflow-table-wrap td.cell-title { display: block; grid-row: 1; padding-bottom: 6px; }
 }
+
+/* Home: actions first, then workflows and their latest results. */
+.home-intro { padding-bottom: 24px; border-bottom: 1px solid var(--line-strong); flex-wrap: wrap; gap: 20px; }
+.home-create-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.home-workflow, .home-problem { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.home-workflow > div, .home-problem > div { min-width: 0; }
+.home-workflow .cell-name { overflow-wrap: anywhere; text-align: left; }
+.home-workflow .sub { margin-top: 6px; }
+.home-workflow-state { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; }
+.home-workflow-state .sub { margin: 0; }
+.home-result { display: grid; gap: 8px; width: 100%; padding: 18px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.home-result-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-weight: 500; overflow-wrap: anywhere; }
+.home-result:hover .home-result-title { color: var(--accent); }
+.home-needs-attention { border-left: 3px solid var(--accent); }
+.home-problem:last-child { border-bottom: 0; padding-bottom: 0; }
+.home-problem strong { font-size: 14px; overflow-wrap: anywhere; }
+.home-problem .sub { margin-top: 6px; max-width: 70ch; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .home-intro .home-create-actions { width: 100%; }
+  .home-problem { flex-direction: column; align-items: flex-start; }
+  .home-workflow { align-items: flex-start; }
+  .home-workflow > .button { flex-shrink: 0; }
+}

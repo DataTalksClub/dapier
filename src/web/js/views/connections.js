@@ -332,7 +332,7 @@ function openTokenDialog(provider) {
   form.token.focus();
 }
 
-function openEditConnection(connectionId) {
+export function openEditConnection(connectionId) {
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (!connection) return;
   const form = $('#edit-connection-form');

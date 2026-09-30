@@ -30,7 +30,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/templates", "/connections", "/emails", "/credentials", "/tokens", "/users", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
+CONSOLE_VIEWS = ("/", "/usage", "/workflows", "/templates", "/connections", "/emails", "/credentials", "/tokens", "/users", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 
@@ -64,6 +64,7 @@ def _static(path):
         "/assets/js/format.js": ("js/format.js", "text/javascript; charset=utf-8"),
         "/assets/js/main.js": ("js/main.js", "text/javascript; charset=utf-8"),
         "/assets/js/router.js": ("js/router.js", "text/javascript; charset=utf-8"),
+        "/assets/js/home-model.js": ("js/home-model.js", "text/javascript; charset=utf-8"),
         "/assets/js/state.js": ("js/state.js", "text/javascript; charset=utf-8"),
         "/assets/js/ui.js": ("js/ui.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/connections.js": ("js/views/connections.js", "text/javascript; charset=utf-8"),

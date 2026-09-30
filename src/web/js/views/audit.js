@@ -1,7 +1,5 @@
-/* Audit view: the full operator-action trail with server-side search,
-   filters, paging, and CSV export. The overview's Activity panel shows a
-   recent sample of the same trail; this view is the reader (`audit-log-*`
-   element ids — the overview panel owns the plain `audit-*` ones). */
+/* Audit view: the operator-action trail with server-side search,
+   filters, paging, and CSV export. */
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp } from '../format.js';

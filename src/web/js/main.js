@@ -5,7 +5,7 @@ import { setView, viewFromPath } from './router.js';
 import { refresh, openRowFor, openWorkflow, openVersions, restoreVersion } from './views/overview.js';
 import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
-import { showOAuthResult } from './views/connections.js';
+import { showOAuthResult, openEditConnection } from './views/connections.js';
 import './views/storage.js';
 import { fetchTemplates } from './views/templates.js';
 import { refreshAudit } from './views/audit.js';
@@ -197,10 +197,17 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   closeMobileMenu(true);
   const target = link.dataset.view || link.dataset.target;
   if (!await setView(target)) return;
+  if (target === 'templates') void fetchTemplates();
   if (target === 'audit') refreshAudit();
   if (target === 'users') refreshUsers();
 }));
 $('#overview-attention').addEventListener('click', async (event) => {
+  const connection = event.target.closest('.home-connection');
+  if (connection) {
+    if (await setView('connections')) openEditConnection(connection.dataset.connection);
+    return;
+  }
+
   const link = event.target.closest('.view-link');
   if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
   event.preventDefault();

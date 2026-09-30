@@ -1,4 +1,5 @@
 /* Overview view: metrics, workflow/run tables, and the detail dialogs. */
+import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
 import { $, icons, showApp, showStartupError, notice } from '../ui.js';
 import { api } from '../api.js';
@@ -55,11 +56,14 @@ function workflowState(workflow) {
 }
 
 function workflowRow(workflow) {
-  return `<tr class="workflow-open" data-workflow="${escapeHtml(workflow.id)}" role="button" tabindex="0">
-    <td class="cell-title mono"><span class="cell-name">${escapeHtml(workflow.id)}</span></td>
-    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(workflow))}</td>
-    <td data-label="State">${workflowState(workflow)}</td>
-  </tr>`;
+  const latest = homeModel(state.data).latest.get(workflow.id);
+  return `<article class="home-workflow">
+    <div><button type="button" class="cell-name workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${escapeHtml(workflow.id)}</button>
+      <p class="sub">${escapeHtml(workflow.description || workflowTriggerText(workflow))}</p>
+      <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : '<span class="sub">No recent runs</span>'}</div>
+    </div>
+    <button type="button" class="button secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
+  </article>`;
 }
 
 function triggerBlocks(workflow) {
@@ -128,27 +132,18 @@ export function openWorkflow(id) {
 function render() {
   const data = state.data;
   if (!data) return;
-  const enabled = data.workflows.filter((workflow) => workflow.enabled);
-  const configured = data.credentials.filter((credential) => credential.configured).length;
-  const connected = data.connections.filter((connection) => connection.status === 'connected').length;
-  const attention = data.connections.filter((connection) => ['ready', 'expired', 'revoked'].includes(connection.status) || connection.health === 'expired').length;
-  const recentRuns = data.runs || [];
-  $('#metric-workflows').textContent = enabled.length;
-  $('#metric-connections').textContent = connected;
-  $('#metric-connection-detail').textContent = attention ? `${attention} need attention` : 'No setup issues';
-  $('#metric-runs').textContent = recentRuns.filter((run) => run.status === 'completed').length;
-  $('#metric-runs-detail').textContent = recentRuns.length ? `of ${recentRuns.length} available runs` : 'No recent runs';
-  $('#metric-credentials').textContent = `${configured}/${data.credentials.length}`;
-  $('#overview-workflows').innerHTML = enabled.slice(0, 5).map(workflowRow).join('');
-  $('#overview-workflows-empty').hidden = enabled.length > 0;
-  $('#overview-workflows-table').hidden = enabled.length === 0;
-  $('#overview-runs').innerHTML = (data.runs || []).slice(0, 6).map((run) =>
-    `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0"><td class="mono">${escapeHtml(run.workflow_id || 'Run')}</td><td data-label="Status">${statusLine(run.status)}</td><td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td></tr>`).join('');
-  $('#overview-runs-empty').hidden = recentRuns.length > 0;
-  $('#overview-runs-table').hidden = recentRuns.length === 0;
+  const model = homeModel(data);
+  $('#home-workflow-count').textContent = `${data.workflows.length} workflow${data.workflows.length === 1 ? '' : 's'} · ${model.running} on`;
+  $('#overview-workflows').innerHTML = model.workflows.slice(0, 5).map(workflowRow).join('');
+  $('#overview-workflows-empty').hidden = data.workflows.length > 0;
+  $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
+    `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}">
+      <span class="home-result-title">${escapeHtml(run.workflow_id || 'Run')}${statusLine(run.status)}</span>
+      <span class="sub">${escapeHtml(formatTimestamp(run.started_at) || '—')}${run.failed_step ? ` · Failed at ${escapeHtml(run.failed_step)}` : ''}</span>
+    </button>`).join('');
+  $('#overview-runs-empty').hidden = model.runs.length > 0;
   renderAttention(data);
   renderErrors();
-  renderAudit();
   renderUsage();
   renderWorkflows();
   renderConnections(data.connections);
@@ -308,16 +303,22 @@ function renderBulkBar(shown) {
 }
 
 function renderAttention(data) {
-  const failed = (data.runs || []).filter((run) => ['failed', 'error'].includes(run.status));
-  const paused = (data.workflows || []).filter((workflow) => workflow.auto_paused);
-  const connections = data.connections.filter((connection) => connection.status !== 'connected' || connection.health === 'expired');
-  const items = [];
-  if (paused.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${paused.length} workflow${paused.length === 1 ? ' was' : 's were'} auto-paused after failed runs</strong><span>Inspect failures, then resume from Workflows →</span></a>`);
-  if (failed.length) items.push(`<a class="attention-item view-link" href="/runs" data-target="runs" data-run-status="problems"><strong>${failed.length} failed ${failed.length === 1 ? 'run' : 'runs'} in recent history</strong><span>Inspect failures →</span></a>`);
-  if (connections.length) items.push(`<a class="attention-item view-link" href="/connections" data-target="connections" data-connection-status="attention"><strong>${connections.length} ${connections.length === 1 ? 'account needs' : 'accounts need'} attention</strong><span>Complete setup or reconnect →</span></a>`);
+  const model = homeModel(data);
+  const items = model.problems.map(({ workflow, run }) => `<article class="home-problem">
+    <div><strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong>
+      <p class="sub">${escapeHtml(workflow.auto_paused_reason || (run?.failed_step ? `Failed at ${run.failed_step}` : 'Open the run to see what went wrong.'))}</p></div>
+    <div class="home-create-actions">${run ? `<button class="button secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="button secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
+  </article>`);
+  for (const connection of model.connections) items.push(`<article class="home-problem">
+    <div><strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
+    <button class="button secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
+  </article>`);
+  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="button secondary view-link" href="/usage" data-target="usage">Review limit</a></article>');
+  $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
+  $('#overview-attention').hidden = !items.length && !data.workflows.length;
   $('#overview-attention').innerHTML = items.length
-    ? `<h3>Needs attention</h3><div class="attention-items">${items.join('')}</div>`
-    : `<h3>${data.workflows.length ? 'No issues in recent history' : 'Start your first automation'}</h3><p class="sub">${data.workflows.length ? 'No failed runs or disconnected accounts in the loaded records.' : 'Connect an account, then create a workflow to automate a task.'}</p>${data.workflows.length ? '' : '<a class="text-link view-link" href="/connections" data-target="connections">Connect an account →</a>'}`;
+    ? `<h3>Needs attention</h3>${items.join('')}`
+    : '<p class="sub">No paused workflows or latest-run failures in the loaded records.</p>';
 }
 
 function renderErrors() {
@@ -327,33 +328,6 @@ function renderErrors() {
   $('#overview-errors-empty').hidden = rows.length > 0;
   $('#overview-errors-table').hidden = rows.length === 0;
 }
-
-/* Activity: the operator-action audit trail (same rows `dapier audit`
-   prints). The action dropdown filters the loaded rows client-side; the API
-   exposes the same filter as ?action= for the full trail. */
-function renderAudit() {
-  const rows = (state.audit && state.audit.events) || [];
-  const filter = $('#audit-action-filter');
-  const selected = filter.value;
-  const actions = [...new Set(rows.map((row) => row.action).filter(Boolean))].sort();
-  if (filter.dataset.actions !== actions.join(',')) {
-    filter.dataset.actions = actions.join(',');
-    filter.innerHTML = '<option value="all">All actions</option>'
-      + actions.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('');
-    filter.value = actions.includes(selected) ? selected : 'all';
-  }
-  const shown = filter.value === 'all' ? rows : rows.filter((row) => row.action === filter.value);
-  $('#overview-audit').innerHTML = shown.slice(0, 8).map((row) =>
-    `<tr><td class="mono muted-cell" data-label="When">${escapeHtml(formatTimestamp(row.timestamp) || '—')}</td>`
-    + `<td class="mono" data-label="Action">${escapeHtml(row.action || '—')}</td>`
-    + `<td class="mono muted-cell" data-label="Actor">${escapeHtml(row.actor_subject || '—')}</td>`
-    + `<td data-label="Outcome">${statusLine(row.outcome === 'ok' ? 'completed' : String(row.outcome || 'unknown'), { completed: 'ok' })}`
-    + `${row.error ? `<span class="field-hint" title="${escapeHtml(row.error)}">${escapeHtml(row.error)}</span>` : ''}</td></tr>`).join('');
-  $('#overview-audit-empty').hidden = rows.length > 0;
-  $('#overview-audit-table').hidden = rows.length === 0;
-}
-
-$('#audit-action-filter').addEventListener('change', renderAudit);
 
 /* Usage: the per-workflow-per-month task rollup the overview payload
    carries (last 3 months). Ranked by 3-month total; workflows with no
@@ -370,7 +344,7 @@ function renderUsage() {
     if (row.month === monthKey) entry.current += tasks;
     byWorkflow.set(row.workflow_id, entry);
   }
-  const shown = [...byWorkflow.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+  const shown = [...byWorkflow.entries()].sort((a, b) => b[1].total - a[1].total);
   $('#overview-usage').innerHTML = shown.map(([workflowId, entry]) =>
     `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}">${escapeHtml(workflowId)}</button></td>`
     + `<td class="mono" data-label="This month">${entry.current}</td>`
@@ -463,13 +437,6 @@ export async function refresh() {
       state.errors = null;
     }
     renderErrors();
-    // The audit trail trails too; a miss leaves Activity quietly empty.
-    try {
-      state.audit = await api('/api/admin/audit?limit=20');
-    } catch (auditError) {
-      state.audit = null;
-    }
-    renderAudit();
     // Fresh connections data for an open designer: the iframe may have
     // mounted before this fetch answered.
     if (state.view === 'designer') postConnectionsToDesigner();

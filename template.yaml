@@ -384,6 +384,9 @@ Resources:
         ConsoleStorage:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
+        ConsoleUsage:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /usage, Method: GET}
         ConsoleAudit:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
