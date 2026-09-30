@@ -1,7 +1,8 @@
-/* Triggers view: webhook/Telegram hooks and API polls — the trigger kinds
-   behind /api/admin/hook-triggers and /api/admin/poll-triggers, the same
-   operator endpoints `dapier hooks` and `dapier polls` drive. (Email
-   triggers live in the Emails view; schedules in Schedules.) */
+/* Hooks and polls — the trigger kinds behind /api/admin/hook-triggers and
+   /api/admin/poll-triggers, the same operator endpoints `dapier hooks` and
+   `dapier polls` drive. They render inside the Workflows view (triggers are
+   part of the flows they start, not a separate panel). (Email triggers live
+   in the Emails view; schedules in Schedules.) */
 import { state } from '../state.js';
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
@@ -119,10 +120,11 @@ async function fetchTriggers() {
   renderTables();
 }
 
-/* Called from main after the startup refresh: fetch when the view is on
-   screen, otherwise just repaint the cache. */
+/* Called from the overview render after each refresh: fetch when the
+   Workflows view (which hosts the tables) is on screen, otherwise just
+   repaint the cache. */
 export function renderTriggers() {
-  if (state.view === 'triggers') return void fetchTriggers();
+  if (state.view === 'workflows') return void fetchTriggers();
   renderTables();
 }
 
@@ -382,10 +384,11 @@ document.addEventListener('click', async (event) => {
   }
 });
 
-/* Entering the view (nav click, back/forward) fetches fresh triggers. */
+/* Entering the Workflows view (nav click, view link, back/forward) fetches
+   fresh triggers — its tables live there now. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nav-item[data-view="triggers"]')) void fetchTriggers();
+  if (event.target.closest('.nav-item[data-view="workflows"], .view-link[data-target="workflows"]')) void fetchTriggers();
 });
 window.addEventListener('popstate', () => {
-  if (state.view === 'triggers') void fetchTriggers();
+  if (state.view === 'workflows') void fetchTriggers();
 });

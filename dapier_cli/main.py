@@ -136,10 +136,13 @@ def build_parser():
                                  help="Write the one-time token to a new owner-only file")
     tokens_del_p = tokens_sub.add_parser("revoke", help="Revoke an API token")
     tokens_del_p.add_argument("name")
+    tokens_rm_p = tokens_sub.add_parser("delete",
+                                        help="Permanently remove a revoked API token and its grants")
+    tokens_rm_p.add_argument("name")
 
     sub.add_parser("overview", help="Operator overview: workflows, connections, credentials")
 
-    runs_p = sub.add_parser("runs", help="Workflow run history (one run per trigger event)")
+    runs_p = sub.add_parser("runs", help="Workflow executions and incoming trigger events")
     runs_sub = runs_p.add_subparsers(dest="command", required=True)
     runs_list_p = runs_sub.add_parser("list", help="Recent runs, newest first")
     runs_list_p.add_argument("--limit", type=int, default=25)
@@ -243,6 +246,18 @@ def build_parser():
     inbox_show_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
     inbox_replay_p = inbox_sub.add_parser("replay", help="Send an inbox event through the engine again (fresh event id)")
     inbox_replay_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
+
+    events_p = runs_sub.add_parser("events", help="Incoming events, including those no workflow handled")
+    inbox_sub = events_p.add_subparsers(dest="event_command", required=True)
+    inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
+    inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
+    inbox_list_p.add_argument("--limit", type=int, default=25)
+    inbox_list_p.add_argument("--next", dest="next_token",
+                              help="Page token from the previous call's `next page:` footer")
+    inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
+    inbox_show_p.add_argument("inbox_id", help="Inbox event ID from `dapier runs events list`")
+    inbox_replay_p = inbox_sub.add_parser("replay", help="Send an inbox event through the engine again (fresh event id)")
+    inbox_replay_p.add_argument("inbox_id", help="Inbox event ID from `dapier runs events list`")
 
     storage_p = sub.add_parser("storage",
                                help="Workflow storage: per-workflow key-value state (what the storage_* actions read and write)")
@@ -960,6 +975,9 @@ def cmd_oauth_clients(args, api_url, debug):
 
 
 def cmd_runs(args, api_url, debug):
+    if args.command == "events":
+        args.command = args.event_command
+        return cmd_inbox(args, api_url, debug)
     if args.command == "list":
         return commands.runs_list(api_url, args.limit, workflow=args.workflow,
                                   status=args.status, since=args.since,

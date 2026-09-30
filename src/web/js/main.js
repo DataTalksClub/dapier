@@ -10,7 +10,6 @@ import './views/storage.js';
 import { fetchTemplates } from './views/templates.js';
 import { refreshAudit } from './views/audit.js';
 import { refreshUsers } from './views/users.js';
-import { renderTriggers } from './views/triggers.js';
 import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
@@ -303,7 +302,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     const runId = new URLSearchParams(window.location.search).get('run');
     if (runId) await openRun(runId);
   }
-  if (initialView === 'triggers') renderTriggers();
   if (initialView === 'audit') refreshAudit();
   if (initialView === 'users') refreshUsers();
   if (initialView === 'templates') fetchTemplates();

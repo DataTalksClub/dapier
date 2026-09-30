@@ -49,15 +49,13 @@
       <nav aria-label="Main navigation">
         <p class="nav-group-label">Monitor</p>
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
-        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Run history</span></a>
-        <a class="nav-item" href="/inbox" data-view="inbox"><i data-lucide="inbox"></i><span>Trigger inbox</span></a>
+        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/templates" data-view="templates"><i data-lucide="layout-template"></i><span>Templates</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
         <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
-        <a class="nav-item" href="/triggers" data-view="triggers"><i data-lucide="webhook"></i><span>Triggers</span></a>
         <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
@@ -104,7 +102,7 @@
 
         <div class="overview-columns">
           <section>
-            <div class="section-head"><div><h2>Recent runs</h2><p class="sub">Select a run to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">Run history<i data-lucide="arrow-right"></i></a></div>
+            <div class="section-head"><div><h2>Workflow executions</h2><p class="sub">Select a run to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">Run history<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-runs-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Status</th><th>Started</th></tr></thead><tbody id="overview-runs"></tbody></table></div>
             <div id="overview-runs-empty" class="empty-state" hidden><h3>No recent runs</h3><p>Run history appears after a workflow receives its first trigger. Review your workflows and connections while you wait.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">View workflows</a></div>
           </section>
@@ -148,6 +146,28 @@
           <table>
             <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
             <tbody id="workflow-table"></tbody>
+          </table>
+        </div>
+        <div class="section-head">
+          <div class="section-head-text"><h2 class="sub-head">Hooks</h2><p class="sub">Triggers that start a flow from outside: a caller POSTs to the hook URL (or a Telegram bot forwards its updates) and the flow runs. Webhooks authenticate with the trigger's bearer token; Telegram needs a bot connection. <code>dapier hooks</code> reaches the same triggers.</p></div>
+          <button id="new-hook" class="button primary" type="button">New hook</button>
+        </div>
+        <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
+        <div id="hook-table-wrap" class="table-wrap" hidden>
+          <table>
+            <thead><tr><th>Hook</th><th>Kind</th><th>Runs</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="hook-table"></tbody>
+          </table>
+        </div>
+        <div class="section-head">
+          <div class="section-head-text"><h2 class="sub-head">API polls</h2><p class="sub">Poll an endpoint on a schedule; each new item — matched by <code>id_path</code> or the provider's cursor — starts the flow as its own event. <code>dapier polls</code> reaches the same triggers.</p></div>
+          <button id="new-poll" class="button primary" type="button">New poll</button>
+        </div>
+        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
+        <div id="poll-table-wrap" class="table-wrap" hidden>
+          <table>
+            <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Runs</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="poll-table"></tbody>
           </table>
         </div>
       </section>
@@ -222,32 +242,35 @@
 
       <section class="view" data-page="emails">
         <div class="section-head">
-          <div class="section-head-text"><h2>Emails</h2><p class="sub">Reserve an address at your trigger domain and bind actions to it — mail arrives, the actions run. Changes here are live immediately; no YAML and no deploy.</p></div>
+          <div class="section-head-text"><h2>Email triggers</h2><p class="sub">Reserve an address at your trigger domain and bind actions to it — mail arrives, the actions run. Changes here are live immediately; no YAML and no deploy.</p></div>
           <button id="new-email" class="button primary" type="button">New email</button>
         </div>
         <div id="email-empty" class="empty-state" hidden><h3>No email triggers</h3><p>Reserve an address, then bind actions — for example, save every attachment to Dropbox.</p></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Address</th><th>Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th>Address</th><th>Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Manage</span></th></tr></thead>
             <tbody id="email-table"></tbody>
           </table>
         </div>
-        <p id="email-yaml-routes" class="sub" hidden>Also handled by managed workflows (edit in Workflows): <span id="email-yaml-list" class="mono"></span></p>
-        <h3 class="sub-head">Allowed senders</h3>
-        <p class="sub">One list for every inbound email. An address that is not on it is ignored. <code>dapier emails from</code> changes the same list.</p>
-        <form id="email-from-add" class="inline-form" autocomplete="off">
-          <input name="address" type="email" class="mono-input" placeholder="name@example.com" required>
+        <p id="email-yaml-routes" class="table-footnote" hidden>Also handled by managed workflows (edit in <a href="/workflows" class="view-link" data-target="workflows">Workflows</a>): <span id="email-yaml-list" class="mono"></span></p>
+
+        <div class="section-head">
+          <div class="section-head-text"><h2>Allowed senders</h2><p class="sub">One gate for every inbound email: a message from an address that is not on the list is ignored. <code>dapier emails from</code> changes the same list.</p></div>
+        </div>
+        <form id="email-from-add" class="sender-add" autocomplete="off">
+          <label class="visually-hidden" for="email-from-address">Sender address</label>
+          <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
           <button class="button secondary" type="submit">Add sender</button>
         </form>
-        <ul id="email-from-list" class="plain-list"></ul>
+        <ul id="email-from-list" class="sender-list"></ul>
+
         <div class="section-head">
-          <div class="section-head-text"><h3 class="sub-head">Headless runs</h3><p class="sub">Jobs the <code>agent</code> action enqueued and <code>dapier worker</code> ran to completion. <code>dapier agent-tasks list</code> shows the same results.</p></div>
-          <button id="agent-tasks-refresh" class="button secondary" type="button">Refresh</button>
+          <div class="section-head-text"><h2>Headless runs</h2><p class="sub">Jobs the <code>agent</code> action enqueued and <code>dapier worker</code> ran to completion. <code>dapier agent-tasks list</code> shows the same results.</p></div>
         </div>
         <p id="agent-tasks-empty" class="sub">No tasks yet. An agent action enqueues one when its workflow runs.</p>
         <div id="agent-tasks-wrap" class="table-wrap" hidden>
           <table>
-            <thead><tr><th>Task</th><th>Workflow</th><th>Status</th><th>Error</th><th>Updated</th></tr></thead>
+            <thead><tr><th>Task</th><th>Workflow</th><th>Status</th><th>Result</th><th>Updated</th></tr></thead>
             <tbody id="agent-tasks"></tbody>
           </table>
         </div>
@@ -265,49 +288,9 @@
           </table>
         </div>
       </section>
-      <section class="view" data-page="triggers">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Triggers</h2><p class="sub">Everything that can start a workflow besides email. Changes here are live immediately; no deploy. <code>dapier hooks</code> and <code>dapier polls</code> reach the same triggers.</p></div>
-        </div>
-        <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">Hooks</h2><p class="sub">A caller POSTs to the hook URL (or a Telegram bot forwards its updates) and the actions run. Webhooks authenticate with the trigger's bearer token; Telegram needs a bot connection.</p></div>
-          <button id="new-hook" class="button primary" type="button">New hook</button>
-        </div>
-        <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
-        <div id="hook-table-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Hook</th><th>Kind</th><th>Runs</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="hook-table"></tbody>
-          </table>
-        </div>
-        <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">API polls</h2><p class="sub">Fetch an endpoint on a schedule; each new item — matched by <code>id_path</code> or the provider's cursor — starts the workflow as its own event.</p></div>
-          <button id="new-poll" class="button primary" type="button">New poll</button>
-        </div>
-        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
-        <div id="poll-table-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Runs</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="poll-table"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="view" data-page="inbox">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Trigger inbox</h2><p class="sub">Every inbound trigger event, matched or not — the record of what actually arrived. Open an event to inspect its envelope; replay re-injects it with a fresh id.</p></div>
-        </div>
-        <div id="inbox-empty" class="empty-state" hidden><h3>No inbox events</h3><p>Inbound trigger events land here as they arrive — including ones no workflow matched, so nothing silently disappears.</p></div>
-        <div id="inbox-table-wrap" class="table-wrap">
-          <table>
-            <thead><tr><th>Received</th><th>Trigger</th><th>Matched</th><th>Source</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="inbox-table"></tbody>
-          </table>
-        </div>
-        <button id="inbox-load-more" class="button secondary" type="button" hidden>Load more</button>
-      </section>
       <section class="view" data-page="tokens">
         <div class="section-head">
-          <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent. Grant access from a connection's Manage panel, and revoke the token here any time. The value is shown once, at creation.</p></div>
+          <div class="section-head-text"><h2>API tokens</h2><p class="sub">Long-lived bearer tokens for headless consumers. A token acts as its <code>token:…</code> subject and a single agent. Grant access from a connection's Manage panel, and revoke the token here any time. The value is shown once, at creation. Old revoked tokens can be removed from the list, which also deletes their connection grants.</p></div>
           <button id="new-token" class="button primary" type="button">New token</button>
         </div>
         <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
@@ -359,7 +342,7 @@
 
       <section class="view" data-page="runs">
         <div class="section-head">
-          <div class="section-head-text"><h2>Recent runs</h2><p class="sub">Open a run to trace its steps and errors. Records are kept for 90 days.</p></div>
+          <div class="section-head-text"><h2>Workflow executions</h2><p class="sub">Open a run to trace its steps and errors. Records are kept for 90 days.</p></div>
         </div>
         <div class="run-filters"><label>Search<input id="runs-search-filter" type="search" placeholder="Text in a run's data, or its id&hellip;"></label><label>Workflow<select id="runs-workflow-filter"><option value="">All workflows</option></select></label><label>Status<select id="runs-status-filter"><option value="">All statuses</option></select></label><label>Date<select id="runs-date-filter"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint">Showing up to 25 available runs.</span><button id="runs-replay-failed" class="button secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="button secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
         <div class="table-wrap">
@@ -369,6 +352,19 @@
           </table>
         </div>
         <button id="runs-load-more" class="button secondary" type="button" hidden>Load more</button>
+      <section aria-labelledby="runs-events-title">
+        <div class="section-head">
+          <div class="section-head-text"><h2 id="runs-events-title">Incoming events</h2><p class="sub">Every inbound trigger event, matched or not — the record of what actually arrived. Open an event to inspect its envelope; replay re-injects it with a fresh id.</p></div>
+        </div>
+        <div id="inbox-empty" class="empty-state" hidden><h3>No incoming events</h3><p>Inbound trigger events land here as they arrive — including ones no workflow matched, so nothing silently disappears.</p></div>
+        <div id="inbox-table-wrap" class="table-wrap">
+          <table>
+            <thead><tr><th>Received</th><th>Trigger</th><th>Matched</th><th>Source</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="inbox-table"></tbody>
+          </table>
+        </div>
+        <button id="inbox-load-more" class="button secondary" type="button" hidden>Load more</button>
+      </section>
       </section>
 
       <section class="view" data-page="audit">
@@ -868,6 +864,9 @@
   </dialog>
   <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="button danger" value="confirm">Revoke token</button></div></form>
+  </dialog>
+  <dialog id="token-remove-confirm-dialog" aria-labelledby="token-remove-confirm-title" aria-describedby="token-remove-confirm-message">
+    <form method="dialog"><div class="dialog-head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Remove token</button></div></form>
   </dialog>
   <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Replay event</button></div></form>

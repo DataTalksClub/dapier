@@ -65,7 +65,7 @@ export async function fetchInbox({ append = false } = {}) {
 /* Called from the overview's refresh: fetch when the view is on screen,
    otherwise just repaint the cache. */
 export function renderInbox() {
-  if (state.view === 'inbox') return void fetchInbox();
+  if (state.view === 'runs') return void fetchInbox();
   renderRows();
 }
 
@@ -126,12 +126,12 @@ async function replayEvent(inboxId) {
 
 /* Entering the view (nav click, back/forward) fetches fresh events. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nav-item[data-view="inbox"]')) void fetchInbox();
+  if (event.target.closest('.nav-item[data-view="runs"]')) void fetchInbox();
 });
 $('#inbox-load-more').addEventListener('click', () => fetchInbox({ append: true }));
 $('#inbox-replay-button').addEventListener('click', (event) => {
   if (event.currentTarget.dataset.inbox) openReplayConfirm(event.currentTarget.dataset.inbox);
 });
 window.addEventListener('popstate', () => {
-  if (state.view === 'inbox') void fetchInbox();
+  if (state.view === 'runs') void fetchInbox();
 });
