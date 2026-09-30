@@ -121,28 +121,29 @@
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">Open a workflow to edit or test it. On/off changes take effect immediately.</p></div>
+          <div class="section-head-text"><h2 id="workflow-library-summary">Workflow library</h2><p class="sub">Open a workflow to edit or test it.</p></div>
           <div class="workflow-page-actions">
-          <button id="import-yaml" class="button secondary" type="button">Import YAML</button>
+          <button id="import-yaml" class="button secondary" type="button"><i data-lucide="upload" aria-hidden="true"></i>Import YAML</button>
           <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
-          <button id="export-all-yaml" class="button secondary" type="button">Export all</button>
-          <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
+          <button id="export-all-yaml" class="button secondary" type="button"><i data-lucide="download" aria-hidden="true"></i>Export all</button>
+          <a id="new-workflow" class="button primary" href="/workflows/new"><i data-lucide="plus" aria-hidden="true"></i>New workflow</a>
           </div>
         </div>
-        <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name, trigger, or action"></label><label>Show<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label>Tag<select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label>Folder<select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
+        <div class="list-tools workflow-filters"><label class="workflow-search-field"><span class="visually-hidden">Find a workflow</span><i data-lucide="search" aria-hidden="true"></i><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="button secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="button secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="button secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="button secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
-            <colgroup><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-trigger"><col class="workflow-col-action"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
-            <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
+            <colgroup><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-flow"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
+            <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>Flow</th><th>Latest run</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
         </div>
+        <section class="workflow-trigger-section" aria-labelledby="workflow-hooks-title">
         <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">Hooks</h2><p class="sub">Triggers that start a flow from outside: a caller POSTs to the hook URL (or a Telegram bot forwards its updates) and the flow runs. Webhooks authenticate with the trigger's bearer token; Telegram needs a bot connection. <code>dapier hooks</code> reaches the same triggers.</p></div>
-          <button id="new-hook" class="button primary" type="button">New hook</button>
+          <div class="section-head-text"><h2 id="workflow-hooks-title" class="sub-head">Hooks</h2><p class="sub">Start a workflow from a webhook call or a Telegram message.</p></div>
+          <button id="new-hook" class="button secondary" type="button">New hook</button>
         </div>
         <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
         <div id="hook-table-wrap" class="table-wrap" hidden>
@@ -151,9 +152,11 @@
             <tbody id="hook-table"></tbody>
           </table>
         </div>
+        </section>
+        <section class="workflow-trigger-section" aria-labelledby="workflow-polls-title">
         <div class="section-head">
-          <div class="section-head-text"><h2 class="sub-head">API polls</h2><p class="sub">Poll an endpoint on a schedule; each new item — matched by <code>id_path</code> or the provider's cursor — starts the flow as its own event. <code>dapier polls</code> reaches the same triggers.</p></div>
-          <button id="new-poll" class="button primary" type="button">New poll</button>
+          <div class="section-head-text"><h2 id="workflow-polls-title" class="sub-head">API polls</h2><p class="sub">Watch an API on a schedule and start a workflow for each new item.</p></div>
+          <button id="new-poll" class="button secondary" type="button">New poll</button>
         </div>
         <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
         <div id="poll-table-wrap" class="table-wrap" hidden>
@@ -162,6 +165,7 @@
             <tbody id="poll-table"></tbody>
           </table>
         </div>
+        </section>
       </section>
 
       <section class="view" data-page="designer">

@@ -181,8 +181,9 @@ def test_every_nav_link_resolves_to_a_served_page():
 def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
     index = ingress._static("/")["body"]
     workflows_view = re.search(r'data-page="workflows".*?</section>', index, re.S).group(0)
-    new_link = re.search(r'<a id="new-workflow" class="button primary" href="([^"]+)">New workflow</a>', workflows_view)
+    new_link = re.search(r'<a id="new-workflow" class="button primary" href="([^"]+)">(.*?)</a>', workflows_view, re.S)
     assert new_link and new_link.group(1) == "/workflows/new"
+    assert re.sub(r"<[^>]+>", "", new_link.group(2)).strip() == "New workflow"
     assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
 
     # The workflow dialog deep-links the designer with the workflow source.

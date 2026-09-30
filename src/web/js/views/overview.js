@@ -207,15 +207,16 @@ export function renderWorkflows() {
     (status === 'all' || workflow.enabled === (status === 'enabled')) &&
     (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
     (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
-  $('#workflow-count').textContent = `${shown.length} of ${all.length} workflows`;
+  $('#workflow-library-summary').textContent = `${all.length} workflow${all.length === 1 ? '' : 's'}`;
+  $('#workflow-count').textContent = `${shown.length} of ${all.length} shown`;
   const runs = state.data?.runs || [];
   $('#workflow-table').innerHTML = shown.map((workflow, index) => {
     const recent = runs.find((run) => run.workflow_id === workflow.id);
     const actions = (workflow.actions || []).map((action) => escapeHtml(workflowActionText(action))).join(' <span class="workflow-separator" aria-hidden="true">→</span> ');
     const id = escapeHtml(workflow.id);
     const detail = workflow.source
-      ? `<a class="cell-name mono workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${id}</a>`
-      : `<button class="cell-name mono workflow-detail" type="button" data-workflow="${id}">${id}</button>`;
+      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${id}</a>`
+      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${id}</button>`;
     const edit = workflow.source
       ? `<a class="button secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="button secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
@@ -227,16 +228,14 @@ export function renderWorkflows() {
     return `<tr class="workflow-list-row">
       <td class="select-col" data-label="Select"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></td>
       <td class="cell-title">${detail}${(folderChip || tags) ? `<div class="cell-tags">${folderChip} ${tags}</div>` : ''}</td>
-      <td data-label="When">${escapeHtml(workflowTriggerText(workflow))}</td>
-      <td data-label="Do"><span class="workflow-action-chain">${actions || '—'}</span></td>
-      <td data-label="Recent run">${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No recent runs</span>'}</td>
-      <td data-label="State"><div class="workflow-state-control">${workflowState(workflow)}
-        ${workflow.auto_paused
-          ? `<button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
-          : `<button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>`}
+      <td class="workflow-flow" data-label="Flow"><div class="workflow-flow-line"><span class="workflow-flow-label">When</span><span>${escapeHtml(workflowTriggerText(workflow))}</span></div><div class="workflow-flow-line"><span class="workflow-flow-label">Then</span><span class="workflow-action-chain">${actions || '—'}</span></div></td>
+      <td data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No runs yet</span>'}</td>
+      <td data-label="State"><div class="workflow-state-control">${workflow.auto_paused
+          ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
+          : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${id}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
       </div></td>
       <td class="action-cell workflow-actions" data-label="Manage">
-        <button type="button" class="button secondary workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}">More <span aria-hidden="true">⋯</span></button>
+        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}"><span aria-hidden="true">⋯</span></button>
         <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${id}">
         ${edit}
         <button type="button" class="button secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
