@@ -102,6 +102,10 @@ def api_list(table_ref=None, now=None):
         if item.get("kind") != "worker":
             continue
         worker = {key: item.get(key) for key in PUBLIC_FIELDS}
+        # Rows written before the id was stored as an attribute still carry it
+        # in the row key; fall back so they don't render a blank worker.
+        if not worker["worker_id"]:
+            worker["worker_id"] = str(item.get("task_id") or "").removeprefix("worker:")
         worker["active"] = int(item.get("last_seen") or 0) > current - ACTIVE_WINDOW_SECONDS
         workers.append(worker)
     workers.sort(key=lambda worker: (int(worker.get("last_seen") or 0),
