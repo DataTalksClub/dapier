@@ -2032,6 +2032,8 @@ def agent_tasks_list(api_url, debug=False, limit=None, status=None):
     for item in items:
         print(f"{item.get('status', ''):10} {str(item.get('workflow') or ''):30} "
               f"{item.get('task_id') or ''}")
+        if item.get("email_subject"):
+            print(f"           task {item['email_subject']}")
         if item.get("summary"):
             print(f"           result {item['summary']}")
         if item.get("error"):

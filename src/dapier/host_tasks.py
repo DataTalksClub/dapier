@@ -6,7 +6,7 @@ import os
 PUBLIC_FIELDS = (
     "task_id", "kind", "engine", "workspace", "tag_prefix", "status",
     "session_id", "tag", "error", "created_at", "sent_at",
-    "started_at", "finished_at", "exit_code", "summary", "notified_at",
+    "started_at", "finished_at", "exit_code", "summary", "notified_at", "email_subject",
 )
 
 DEFAULT_LIMIT = 50

@@ -248,16 +248,23 @@
 
       </section>
       <section class="view" data-page="agents">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Agent runs</h2><p class="sub">Agent actions from any workflow, including email, webhook, and scheduled triggers. Open a task for its result and recorded logs.</p></div>
-          <button id="agent-tasks-refresh" class="button secondary" type="button">Refresh</button>
+        <div class="agent-toolbar">
+          <div class="agent-filters" role="group" aria-label="Filter agent runs">
+            <button type="button" data-agent-filter="all" aria-pressed="true">All <span>0</span></button>
+            <button type="button" data-agent-filter="active" aria-pressed="false">Active <span>0</span></button>
+            <button type="button" data-agent-filter="attention" aria-pressed="false">Needs attention <span>0</span></button>
+            <button type="button" data-agent-filter="completed" aria-pressed="false">Completed <span>0</span></button>
+          </div>
+          <div class="agent-refresh"><span id="agent-refresh-note" class="sub" aria-live="polite"></span><button id="agent-tasks-refresh" class="button secondary" type="button">Refresh</button></div>
         </div>
-        <p id="agent-tasks-empty" class="sub">No tasks yet. An agent action enqueues one when its workflow runs.</p>
-        <div id="agent-tasks-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Task</th><th>Workflow</th><th>Status</th><th>Result</th><th>Updated</th></tr></thead>
-            <tbody id="agent-tasks"></tbody>
-          </table>
+        <div class="agent-workspace">
+          <aside class="agent-run-sidebar" aria-label="Agent runs">
+            <label class="visually-hidden" for="agent-runs-search">Search agent runs</label>
+            <input id="agent-runs-search" type="search" placeholder="Search runs…">
+            <p id="agent-runs-note" class="sub">Loading runs…</p>
+            <div id="agent-runs-list"></div>
+          </aside>
+          <article id="agent-run-detail" aria-label="Selected agent run"><div class="agent-detail-empty"><h3>Select a run</h3><p>Read its result and check what happened.</p></div></article>
         </div>
       </section>
       <section class="view" data-page="schedules">
@@ -373,11 +380,7 @@
     </main>
   </div>
 
-  <dialog id="agent-task-dialog" aria-labelledby="agent-task-title">
-    <div class="dialog-head"><h2 id="agent-task-title">Agent run</h2><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
-    <div id="agent-task-detail" class="dialog-body"></div>
-    <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Close</button></div>
-  </dialog>
+
 
   <dialog id="user-role-dialog" aria-labelledby="user-role-title">
     <form id="user-role-form" method="dialog" autocomplete="off">

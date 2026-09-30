@@ -3,7 +3,10 @@
 Dapier's `agent` action enqueues one headless job. A host worker claims it
 through `/api/agent/host-jobs/*`, runs Claude Code in print mode, and reports
 `succeeded`, `failed`, `timed_out`, or `interrupted`. The console's **Agents** tab and `dapier agent-tasks list` show jobs from
-every trigger type. Open a job or use `dapier agent-tasks show <task_id>`
+every trigger type. Filter active runs or failures, search by title or workflow,
+and select a run to read its result. Email runs use their message subject as the
+title; other runs use the workflow name. Active runs refresh every 15 seconds.
+Logs and internal task metadata are expandable below the result. Use `dapier agent-tasks show <task_id>`
 for its result, error, exit code, and recorded stdout/stderr. For email
 triggers, Dapier also emails the sender a short completion report. An action
 can override that address with `notify_to` or set it to an empty string to

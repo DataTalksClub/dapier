@@ -165,7 +165,7 @@ def test_agent_agent_tasks_list_through_the_shared_list(tasks_table, agent_ident
         "session_id": None, "tag": None, "error": None,
         "created_at": 100, "sent_at": 105, "started_at": None,
         "finished_at": None, "exit_code": None, "summary": None,
-        "notified_at": None, "workflow": "f",
+        "notified_at": None, "email_subject": None, "workflow": "f",
     }]
 
 
@@ -178,7 +178,7 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
         seen.append((method, path))
         if len(seen) == 1:
             return {"tasks": [task_row("agent:orders:e9:wake", 300, status="succeeded",
-                                       summary="Draft ready")]}
+                                       summary="Draft ready", email_subject="Launch recap")]}
         return {"tasks": []}
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
@@ -191,6 +191,7 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "STATUS" in out and "orders" in out and "agent:orders:e9:wake" in out
     assert "result Draft ready" in out
+    assert "task Launch recap" in out
     assert "No host tasks yet" in out
 
 
@@ -198,7 +199,7 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
 def test_task_detail_shares_projection_and_keeps_credentials_private(
         tasks_table, operator_session, agent_identity, surface):
     task_id = "agent:webhook-flow:event:run"
-    tasks_table.items = [task_row(task_id, 100, status="succeeded", summary="Done",
+    tasks_table.items = [task_row(task_id, 100, status="succeeded", summary="Done", email_subject="Release notes",
                                 logs={"stdout": "done", "stderr": "", "truncated": False},
                                 lease_id="secret", receipt_handle="private")]
     path = f"/api/{surface}/agent-tasks"
@@ -208,6 +209,8 @@ def test_task_detail_shares_projection_and_keeps_credentials_private(
     assert response["statusCode"] == 200
     task = json.loads(response["body"])["task"]
     assert task["workflow"] == "webhook-flow" and task["logs"]["stdout"] == "done"
+    assert task["email_subject"] == "Release notes"
+    assert host_tasks.api_list()[1]["tasks"][0]["email_subject"] == "Release notes"
     assert not {"prompt", "lease_id", "receipt_handle"} & task.keys()
     assert host_tasks.api_get("missing")[0] == 404
     assert "logs" not in host_tasks.api_list()[1]["tasks"][0]
