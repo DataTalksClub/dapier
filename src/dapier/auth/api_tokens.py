@@ -123,6 +123,31 @@ def revoke(token_id, table_ref=None):
     return 404, {"error": f"No API token named {token_id}"}
 
 
+def delete(token_id, table_ref=None, grants_table_ref=None):
+    """Permanently remove one revoked token and its grants. Returns ``(status, payload)``.
+
+    Removal is for cleaning old revoked entries out of the list: an active
+    token must be revoked first, and a removed ID's grants go with it so no
+    orphaned grantee lingers on connection panels. The payload carries
+    ``grants_removed`` alongside the final public view.
+    """
+    token_id = str(token_id or "").strip()
+    if not token_id:
+        return 400, {"error": "Token ID is required"}
+    table_ref = table_ref or table()
+    for item in list_all(table_ref):
+        if item.get("token_id") == token_id:
+            if not item.get("revoked_at"):
+                return 409, {"error": f"API token {token_id} is still active — revoke it before removing"}
+            table_ref.delete_item(Key={"token_hash": item["token_hash"]})
+            grants_removed = 0
+            if grants_table_ref is not None:
+                grants_removed = authz.delete_subject_grants(
+                    grants_table_ref, item.get("subject") or subject_for(token_id))
+            return 200, {**public_view(item), "grants_removed": grants_removed}
+    return 404, {"error": f"No API token named {token_id}"}
+
+
 def list_all(table_ref=None):
     items = (table_ref or table()).scan(Limit=200).get("Items", [])
     return sorted(items, key=lambda item: (item.get("created_at", ""), item.get("token_id", "")))
@@ -148,3 +173,7 @@ def api_create(body, operator, table_ref=None):
 
 def api_revoke(token_id, table_ref=None):
     return revoke(token_id, table_ref=table_ref)
+
+
+def api_delete(token_id, table_ref=None, grants_table_ref=None):
+    return delete(token_id, table_ref=table_ref, grants_table_ref=grants_table_ref)

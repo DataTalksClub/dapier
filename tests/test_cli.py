@@ -1023,6 +1023,23 @@ def test_tokens_revoke(isolated_home, monkeypatch, capsys):
     assert calls == [("DELETE", "/api/agent/tokens?token_id=personal-scheduler")]
 
 
+def test_tokens_delete_purges_revoked_token(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"token_id": "personal-scheduler", "grants_removed": 2}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["tokens", "delete", "personal-scheduler"])
+
+    assert rc == 0
+    assert calls == [("DELETE", "/api/agent/tokens?token_id=personal-scheduler&purge=1")]
+    assert "Removed revoked API token personal-scheduler and 2 connection grants" \
+        in capsys.readouterr().out
+
+
 def test_tokens_empty_list(isolated_home, monkeypatch, capsys):
     monkeypatch.setattr(commands.api, "call",
                         lambda api_url, method, path, body=None, **kwargs: {"tokens": []})
@@ -1195,7 +1212,8 @@ def test_runs_export_defaults_to_the_suggested_filename(isolated_home, monkeypat
     assert (tmp_path / "dapier-runs-20260925-100000.csv").exists()
 
 
-def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
+@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+def test_inbox_list_hits_agent_endpoint(prefix, isolated_home, monkeypatch, capsys):
     calls = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
@@ -1205,7 +1223,7 @@ def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    rc = main.main(["inbox", "list", "--connector", "webhook"])
+    rc = main.main(prefix + ["list", "--connector", "webhook"])
 
     assert rc == 0
     assert calls == [("GET", "/api/agent/triggers/inbox?limit=25&connector=webhook")]
@@ -1213,7 +1231,8 @@ def test_inbox_list_hits_agent_endpoint(isolated_home, monkeypatch, capsys):
     assert "evt-1" in out and "unmatched" in out
 
 
-def test_inbox_show_prints_the_stored_envelope(isolated_home, monkeypatch, capsys):
+@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+def test_inbox_show_prints_the_stored_envelope(prefix, isolated_home, monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         assert (method, path) == ("GET", "/api/agent/triggers/inbox/evt-1")
         return {"event": {"inbox_id": "evt-1", "connector": "webhook", "status": "unmatched",
@@ -1221,7 +1240,7 @@ def test_inbox_show_prints_the_stored_envelope(isolated_home, monkeypatch, capsy
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    rc = main.main(["inbox", "show", "evt-1"])
+    rc = main.main(prefix + ["show", "evt-1"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -1230,7 +1249,8 @@ def test_inbox_show_prints_the_stored_envelope(isolated_home, monkeypatch, capsy
     assert '{"action": "opened"}' in out
 
 
-def test_inbox_replay_posts_to_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+def test_inbox_replay_posts_to_the_agent_endpoint(prefix, isolated_home, monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         assert (method, path) == ("POST", "/api/agent/triggers/inbox/evt-1/replay")
         return {"accepted": True, "replayed_from": "evt-1", "event_id": "inbox-replay-1",
@@ -1238,7 +1258,7 @@ def test_inbox_replay_posts_to_the_agent_endpoint(isolated_home, monkeypatch, ca
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    rc = main.main(["inbox", "replay", "evt-1"])
+    rc = main.main(prefix + ["replay", "evt-1"])
 
     assert rc == 0
     out = capsys.readouterr().out

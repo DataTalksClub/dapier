@@ -430,6 +430,24 @@ class TokenTable:
     def scan(self, **kwargs):
         return {"Items": list(self.items.values())}
 
+    def delete_item(self, **kwargs):
+        self.items.pop(kwargs["Key"]["token_hash"], None)
+
+
+class GrantsTable:
+    def __init__(self):
+        self.items = {}
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        self.items[(item["connection_id"], item["grantee"])] = item
+
+    def scan(self, **kwargs):
+        return {"Items": list(self.items.values())}
+
+    def delete_item(self, **kwargs):
+        self.items.pop((kwargs["Key"]["connection_id"], kwargs["Key"]["grantee"]), None)
+
 
 def operator_request(method, path, body=None, cookies=None, origin=True):
     event = request(method, path, body, cookies)
@@ -441,22 +459,24 @@ def operator_request(method, path, body=None, cookies=None, origin=True):
 def configure_tokens(monkeypatch):
     monkeypatch.setattr(session, "_credentials", lambda: {"username": "admin", "password": "pw"})
     table = TokenTable()
+    grants = GrantsTable()
 
     class Dynamo:
-        def Table(self, _name):
-            return table
+        def Table(self, name):
+            return grants if name == "grants" else table
 
     import boto3
 
     monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
+    monkeypatch.setenv("GRANTS_TABLE", "grants")
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
     cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
                           "exp": int(time.time()) + 600})
-    return table, [f"dapier_session={cookie}"]
+    return table, [f"dapier_session={cookie}"], grants
 
 
 def test_admin_token_lifecycle_create_list_revoke(monkeypatch):
-    table, cookies = configure_tokens(monkeypatch)
+    table, cookies, grants = configure_tokens(monkeypatch)
 
     created = admin.route(
         operator_request("PUT", "/api/admin/tokens",
@@ -486,6 +506,46 @@ def test_admin_token_lifecycle_create_list_revoke(monkeypatch):
     assert api_tokens.verify(body["token"], table_ref=table) is None
 
 
+def test_admin_token_purge_removes_revoked_token_and_grants(monkeypatch):
+    table, cookies, grants = configure_tokens(monkeypatch)
+
+    created = admin.route(
+        operator_request("PUT", "/api/admin/tokens",
+                         {"token_id": "personal-scheduler", "agent": "personal-scheduler"},
+                         cookies=cookies),
+        "PUT", "/api/admin/tokens",
+    )
+    assert created["statusCode"] == 200
+    grants.put_item(Item={
+        "connection_id": "yt-one",
+        "grantee": "token:personal-scheduler#personal-scheduler",
+        "subject": "token:personal-scheduler",
+        "agent": "personal-scheduler",
+        "operations": ["use"],
+    })
+
+    active_event = operator_request("DELETE", "/api/admin/tokens", cookies=cookies)
+    active_event["queryStringParameters"] = {"token_id": "personal-scheduler", "purge": "1"}
+    assert admin.route(active_event, "DELETE", "/api/admin/tokens")["statusCode"] == 409
+    assert table.items
+
+    revoke_event = operator_request("DELETE", "/api/admin/tokens", cookies=cookies)
+    revoke_event["queryStringParameters"] = {"token_id": "personal-scheduler"}
+    admin.route(revoke_event, "DELETE", "/api/admin/tokens")
+
+    purge_event = operator_request("DELETE", "/api/admin/tokens", cookies=cookies)
+    purge_event["queryStringParameters"] = {"token_id": "personal-scheduler", "purge": "1"}
+    purged = admin.route(purge_event, "DELETE", "/api/admin/tokens")
+    assert purged["statusCode"] == 200
+    assert json.loads(purged["body"])["grants_removed"] == 1
+    assert not table.items
+    assert not grants.items
+
+    missing_event = operator_request("DELETE", "/api/admin/tokens", cookies=cookies)
+    missing_event["queryStringParameters"] = {"token_id": "personal-scheduler", "purge": "1"}
+    assert admin.route(missing_event, "DELETE", "/api/admin/tokens")["statusCode"] == 404
+
+
 def test_admin_tokens_require_operator_session(monkeypatch):
     configure_tokens(monkeypatch)
 
@@ -496,7 +556,7 @@ def test_admin_tokens_require_operator_session(monkeypatch):
 
 
 def test_admin_duplicate_token_is_conflict(monkeypatch):
-    table, cookies = configure_tokens(monkeypatch)
+    table, cookies, grants = configure_tokens(monkeypatch)
 
     first = admin.route(
         operator_request("PUT", "/api/admin/tokens",
@@ -772,7 +832,7 @@ def test_admin_run_replay_from_step_passes_the_step(monkeypatch):
 def test_admin_errors_summary_route(monkeypatch):
     from src.dapier.api import runs as runs_api
 
-    _, cookies = configure_tokens(monkeypatch)
+    _, cookies, _ = configure_tokens(monkeypatch)
     monkeypatch.setattr(runs_api, "recent", lambda *a, **k: [
         {"run_id": "wf-1:e1", "workflow_id": "wf-1", "status": "failed",
          "started_at": "2026-09-25T10:00:00+00:00", "error": "boom"},
@@ -901,7 +961,7 @@ def _configure_audit(monkeypatch, items):
 
 
 def test_admin_audit_lists_rows_newest_first_and_projected(monkeypatch):
-    _, cookies = configure_tokens(monkeypatch)
+    _, cookies, _ = configure_tokens(monkeypatch)
     _configure_audit(monkeypatch, [
         {"audit_id": "conn-a#100#2", "connection_id": "conn-a", "action": "connect",
          "actor_subject": "op-1", "outcome": "created",
@@ -935,7 +995,7 @@ def test_admin_audit_lists_rows_newest_first_and_projected(monkeypatch):
 
 
 def test_admin_audit_filters_by_action(monkeypatch):
-    _, cookies = configure_tokens(monkeypatch)
+    _, cookies, _ = configure_tokens(monkeypatch)
     _configure_audit(monkeypatch, [
         {"connection_id": "conn-a", "action": "connect", "actor_subject": "op-1",
          "outcome": "created", "timestamp": "2026-09-27T10:00:00+00:00"},
@@ -952,7 +1012,7 @@ def test_admin_audit_filters_by_action(monkeypatch):
 
 
 def test_admin_audit_without_the_table_is_an_empty_trail(monkeypatch):
-    _, cookies = configure_tokens(monkeypatch)
+    _, cookies, _ = configure_tokens(monkeypatch)
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
 
     response = admin.route(

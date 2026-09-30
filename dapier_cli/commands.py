@@ -1463,6 +1463,15 @@ def tokens_revoke(api_url, name, debug=False):
     return 0
 
 
+def tokens_delete(api_url, name, debug=False):
+    query = urlencode({"token_id": name, "purge": "1"})
+    data = api.call(api_url, "DELETE", f"/api/agent/tokens?{query}", debug=debug)
+    grants = data.get("grants_removed") or 0
+    suffix = f" and {grants} connection grant{'s' if grants != 1 else ''}" if grants else ""
+    print(f"Removed revoked API token {name}{suffix}.")
+    return 0
+
+
 def connections_revoke(api_url, connection_id, debug=False):
     data = api.call(api_url, "DELETE",
                     f"/api/agent/connections/{connection_id}/tokens", debug=debug)

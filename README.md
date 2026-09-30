@@ -77,6 +77,11 @@ of the chain runs; the run itself still completes. Without the key (or with
 any step — connector action or logic step (`filter`, `condition`, `paths`,
 `delay`, `for_each`, `digest`) alike.
 
+The console’s Runs page combines workflow executions with incoming events, including
+events no workflow handled. Inspect or replay these with `dapier runs events list`,
+`dapier runs events show <event-id>`, and `dapier runs events replay <event-id>`.
+The older `dapier inbox` commands and `/inbox` console links remain compatible.
+
 Every run is recorded in run history (console → Runs, or `dapier runs list`),
 and any run — failed or successful — can be re-executed with its original
 trigger event via the Replay button in the run dialog or
@@ -423,6 +428,7 @@ dapier oauth-clients set zoom --client-id my-id --client-secret-file -
 dapier tokens list                           # operator-issued API tokens (no secrets)
 dapier tokens create --name personal-scheduler --agent personal-scheduler
 dapier tokens revoke personal-scheduler
+dapier tokens delete personal-scheduler      # permanently remove a revoked token (and its grants)
 dapier webhooks save webhook.json            # webhook and Telegram callbacks (see below)
 dapier schedules save schedule.json          # {"name", "expression": "cron(0 8 * * ? *)", "actions"}
 ```
@@ -446,7 +452,9 @@ and its reach is governed by the ordinary grants table — grant
 `token:<id>` on specific connections with `dapier grants save`, and revoke it
 any time with `dapier tokens revoke` (or the console). Only the SHA-256 hash
 is stored; presented values stop authenticating the moment the token is
-revoked. API tokens never qualify for operator actions.
+revoked. Old revoked entries can be cleaned out of the list with
+`dapier tokens delete` (or the console's Remove button) — deleting a revoked
+token also deletes its grants. API tokens never qualify for operator actions.
 
 ## Connector plan
 

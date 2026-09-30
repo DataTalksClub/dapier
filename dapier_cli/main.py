@@ -962,6 +962,8 @@ def cmd_tokens(args, api_url, debug):
                                       output=args.output)
     if args.command == "revoke":
         return commands.tokens_revoke(api_url, args.name, debug)
+    if args.command == "delete":
+        return commands.tokens_delete(api_url, args.name, debug)
     return 2
 
 

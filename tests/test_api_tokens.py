@@ -23,6 +23,24 @@ class TokenTable:
     def scan(self, **kwargs):
         return {"Items": list(self.items.values())}
 
+    def delete_item(self, **kwargs):
+        self.items.pop(kwargs["Key"]["token_hash"], None)
+
+
+class GrantsTable:
+    def __init__(self):
+        self.items = {}
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        self.items[(item["connection_id"], item["grantee"])] = item
+
+    def scan(self, **kwargs):
+        return {"Items": list(self.items.values())}
+
+    def delete_item(self, **kwargs):
+        self.items.pop((kwargs["Key"]["connection_id"], kwargs["Key"]["grantee"]), None)
+
 
 def make(table=None, **overrides):
     body = {"token_id": "personal-scheduler", "agent": "personal-scheduler"}
@@ -102,6 +120,57 @@ def test_revoke_stops_verification_immediately():
 def test_revoke_unknown_token_is_404():
     assert api_tokens.revoke("nope", table_ref=TokenTable())[0] == 404
     assert api_tokens.revoke("", table_ref=TokenTable())[0] == 400
+
+
+def test_delete_removes_only_revoked_tokens():
+    table = TokenTable()
+    _, payload = make(table)
+
+    status, error = api_tokens.delete("personal-scheduler", table_ref=table)
+    assert status == 409
+    assert "revoke" in error["error"]
+
+    api_tokens.revoke("personal-scheduler", table_ref=table)
+    status, view = api_tokens.delete("personal-scheduler", table_ref=table,
+                                     grants_table_ref=GrantsTable())
+    assert status == 200
+    assert view["revoked_at"]
+    assert view["grants_removed"] == 0
+    assert not table.items
+    assert api_tokens.verify(payload["token"], table_ref=table) is None
+
+    assert api_tokens.delete("personal-scheduler", table_ref=table)[0] == 404
+    assert api_tokens.delete("", table_ref=table)[0] == 400
+
+
+def test_delete_removes_the_token_subject_grants():
+    table = TokenTable()
+    grants = GrantsTable()
+    make(table)
+    for connection_id, agent in (("yt-one", "personal-scheduler"), ("yt-two", "personal-scheduler")):
+        grants.put_item(Item={
+            "connection_id": connection_id,
+            "grantee": f"token:personal-scheduler#{agent}",
+            "subject": "token:personal-scheduler",
+            "agent": agent,
+            "operations": ["use"],
+        })
+    other = {
+        "connection_id": "yt-one",
+        "grantee": "human-sub#host-worker",
+        "subject": "human-sub",
+        "agent": "host-worker",
+        "operations": ["use"],
+    }
+    grants.put_item(Item=other)
+
+    api_tokens.revoke("personal-scheduler", table_ref=table)
+    status, view = api_tokens.delete("personal-scheduler", table_ref=table,
+                                     grants_table_ref=grants)
+
+    assert status == 200
+    assert view["grants_removed"] == 2
+    assert list(grants.items.values()) == [other]
 
 
 def test_mark_used_stamps_last_used():

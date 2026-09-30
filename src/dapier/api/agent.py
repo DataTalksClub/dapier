@@ -1372,7 +1372,8 @@ def tokens_api(event, method):
 
     Mirrors the console's /api/admin/tokens endpoints on top of the shared
     token logic in api_tokens. The create response carries the plaintext
-    token exactly once; revocation is the only later change.
+    token exactly once; DELETE revokes, and DELETE with purge=1 permanently
+    removes an already-revoked token together with its grants.
     """
     subject, error = require_operator(event, audit.API_TOKEN)
     if error:
@@ -1393,6 +1394,13 @@ def tokens_api(event, method):
                        agent=payload["agent"], outcome="created")
         return _json_response(status, payload)
     query = event.get("queryStringParameters") or {}
+    if query.get("purge") in ("1", "true", "yes"):
+        status, payload = api_tokens.api_delete(
+            query.get("token_id"), grants_table_ref=authz.grants_table())
+        if status == 200:
+            audit.emit(f"api-token#{payload['token_id']}", audit.API_TOKEN, subject,
+                       outcome="deleted")
+        return _json_response(status, payload)
     status, payload = api_tokens.api_revoke(query.get("token_id"))
     if status == 200:
         audit.emit(f"api-token#{payload.get('token_id', 'unknown')}", audit.API_TOKEN,

@@ -285,3 +285,15 @@ def api_delete_grant(table, connection_id, grantee_id):
         return 400, {"error": "Connection ID and grantee are required"}
     delete_grant(table, connection_id=connection_id, grantee_id=grantee_id)
     return 200, {"ok": True}
+
+
+def delete_subject_grants(table, subject):
+    """Remove every grant held by ``subject`` (e.g. a deleted token's principal).
+
+    Returns the number of grants removed. Grants are keyed by connection, so
+    finding one subject's grants is a full walk.
+    """
+    matches = [item for item in _scan_all_grants(table) if item.get("subject") == subject]
+    for item in matches:
+        delete_grant(table, connection_id=item["connection_id"], grantee_id=item["grantee"])
+    return len(matches)

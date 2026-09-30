@@ -19,6 +19,17 @@ function confirmTokenRevoke(token) {
   });
 }
 
+function confirmTokenRemove(token) {
+  const dialog = $('#token-remove-confirm-dialog');
+  $('#token-remove-confirm-title').textContent = `Remove ${token.token_id}?`;
+  $('#token-remove-confirm-message').textContent = `The revoked entry for agent ${token.agent} is deleted permanently, together with its connection grants. This cannot be undone.`;
+  dialog.returnValue = '';
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+    dialog.showModal();
+  });
+}
+
 function renderGrantConnections() {
   const select = $('#token-grant-connection');
   const connections = ((state.data || {}).connections || []).filter((connection) => connection.provider !== 'zoom');
@@ -41,7 +52,9 @@ function renderTokens(tokens) {
       <td data-label="Status">${token.revoked_at
         ? `<span class="status off"><span class="status-dot" aria-hidden="true"></span>revoked ${formatTimestamp(token.revoked_at) || ''}</span>`
         : statusLine('active')}</td>
-      <td class="action-cell">${token.revoked_at ? '' : `<button class="button secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
+      <td class="action-cell">${token.revoked_at
+        ? `<button class="button secondary token-remove" data-token="${escapeHtml(token.token_id)}" type="button">Remove</button>`
+        : `<button class="button secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
     </tr>`).join('');
   $$('.token-revoke').forEach((button) => button.addEventListener('click', async () => {
     const token = tokens.find((item) => item.token_id === button.dataset.token);
@@ -54,6 +67,18 @@ function renderTokens(tokens) {
       await refresh();
     } catch (error) { notice(error.message, true); }
     finally { button.disabled = false; button.textContent = 'Revoke'; }
+  }));
+  $$('.token-remove').forEach((button) => button.addEventListener('click', async () => {
+    const token = tokens.find((item) => item.token_id === button.dataset.token);
+    if (!token || !await confirmTokenRemove(token)) return;
+    button.disabled = true;
+    button.textContent = 'Removing…';
+    try {
+      await api(`/api/admin/tokens?token_id=${encodeURIComponent(button.dataset.token)}&purge=1`, { method: 'DELETE' });
+      notice(`Token ${button.dataset.token} removed along with its connection grants`);
+      await refresh();
+    } catch (error) { notice(error.message, true); }
+    finally { button.disabled = false; button.textContent = 'Remove'; }
   }));
 }
 

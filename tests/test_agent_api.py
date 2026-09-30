@@ -47,7 +47,11 @@ class Table:
             item["last_used_at"] = kwargs["ExpressionAttributeValues"][":now"]
 
     def delete_item(self, **kwargs):
-        self.items.pop((kwargs["Key"]["connection_id"], kwargs["Key"]["grantee"]), None)
+        key = kwargs["Key"]
+        if "token_hash" in key:
+            self.items.pop(key["token_hash"], None)
+        else:
+            self.items.pop((key["connection_id"], key["grantee"]), None)
 
     def query(self, **kwargs):
         value = kwargs["ExpressionAttributeValues"][":connection"]
@@ -734,6 +738,39 @@ def test_operator_token_lifecycle_over_bearer(monkeypatch):
     missing = agent_api.route(
         event(query={"token_id": "never-existed"}), "DELETE", "/api/agent/tokens")
     assert missing["statusCode"] == 404
+
+
+def test_operator_token_purge_removes_revoked_token_and_grants(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "subject-1"})
+
+    created = agent_api.route(
+        event({"token_id": "personal-scheduler", "agent": "personal-scheduler"}),
+        "PUT", "/api/agent/tokens",
+    )
+    assert created["statusCode"] == 200
+    tables["grants"].put_item(Item={
+        "connection_id": "yt-one",
+        "grantee": "token:personal-scheduler#personal-scheduler",
+        "subject": "token:personal-scheduler",
+        "agent": "personal-scheduler",
+        "operations": ["use"],
+    })
+
+    active = agent_api.route(
+        event(query={"token_id": "personal-scheduler", "purge": "1"}),
+        "DELETE", "/api/agent/tokens")
+    assert active["statusCode"] == 409
+    assert tables["api-tokens"].items
+
+    agent_api.route(
+        event(query={"token_id": "personal-scheduler"}), "DELETE", "/api/agent/tokens")
+    purged = agent_api.route(
+        event(query={"token_id": "personal-scheduler", "purge": "1"}),
+        "DELETE", "/api/agent/tokens")
+    assert purged["statusCode"] == 200
+    assert json.loads(purged["body"])["grants_removed"] == 1
+    assert not tables["api-tokens"].items
+    assert not tables["grants"].items
 
 
 def _configure_runs_table(monkeypatch, items):

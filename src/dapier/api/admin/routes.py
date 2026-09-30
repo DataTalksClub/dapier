@@ -914,6 +914,20 @@ def revoke_api_token(event, operator):
                      audit_log.API_TOKEN, operator, outcome="revoked")
     return http._json_response(status, payload)
 
+def delete_api_token(event, operator):
+    """DELETE /api/admin/tokens: revoke by default; purge=1 permanently removes
+    an already-revoked token and deletes its grants (console mirror of the
+    CLI's `dapier tokens delete`)."""
+    query = event.get("queryStringParameters") or {}
+    if query.get("purge") not in ("1", "true", "yes"):
+        return revoke_api_token(event, operator)
+    status, payload = api_tokens.api_delete(
+        query.get("token_id"), grants_table_ref=authz.grants_table())
+    if status == 200:
+        session._audit_event(f"api-token#{payload['token_id']}",
+                     audit_log.API_TOKEN, operator, outcome="deleted")
+    return http._json_response(status, payload)
+
 def _connection(connection_id):
     return connection_model.get_connection(
         boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]),

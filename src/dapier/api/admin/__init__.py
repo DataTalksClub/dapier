@@ -143,7 +143,7 @@ def route(event, method, path):
     if method == "PUT" and path == "/api/admin/tokens":
         return routes.create_api_token(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/tokens":
-        return routes.revoke_api_token(event, operator_subject)
+        return routes.delete_api_token(event, operator_subject)
     if method == "GET" and path == "/api/admin/email-triggers":
         return routes.list_email_triggers(event)
     if method == "PUT" and path == "/api/admin/email-triggers":
@@ -350,6 +350,7 @@ from .routes import (  # noqa: F401
     replay_failed_runs,
     replay_inbox_event,
     revoke_api_token,
+    delete_api_token,
     replay_run,
     revoke_connection_tokens,
     save_connection,
