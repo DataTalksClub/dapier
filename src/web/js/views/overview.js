@@ -211,7 +211,7 @@ export function renderWorkflows() {
     (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
   $('#workflow-count').textContent = `${shown.length} of ${all.length} workflows`;
   const runs = state.data?.runs || [];
-  $('#workflow-table').innerHTML = shown.map((workflow) => {
+  $('#workflow-table').innerHTML = shown.map((workflow, index) => {
     const recent = runs.find((run) => run.workflow_id === workflow.id);
     const actions = (workflow.actions || []).map((action) => escapeHtml(workflowActionText(action))).join(' <span class="workflow-separator" aria-hidden="true">→</span> ');
     const id = escapeHtml(workflow.id);
@@ -232,8 +232,14 @@ export function renderWorkflows() {
       <td data-label="When">${escapeHtml(workflowTriggerText(workflow))}</td>
       <td data-label="Do"><span class="workflow-action-chain">${actions || '—'}</span></td>
       <td data-label="Recent run">${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No recent runs</span>'}</td>
-      <td data-label="State">${workflowState(workflow)}</td>
+      <td data-label="State"><div class="workflow-state-control">${workflowState(workflow)}
+        ${workflow.auto_paused
+          ? `<button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
+          : `<button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>`}
+      </div></td>
       <td class="action-cell workflow-actions" data-label="Manage">
+        <button type="button" class="button secondary workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}">More <span aria-hidden="true">⋯</span></button>
+        <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${id}">
         ${edit}
         <button type="button" class="button secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
         <button type="button" class="button secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
@@ -241,10 +247,8 @@ export function renderWorkflows() {
         <button type="button" class="button secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
         <button type="button" class="button secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
         <button type="button" class="button secondary workflow-template" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-template="${workflow.template ? 'true' : 'false'}" ${sourceButtons} title="${workflow.template ? 'Remove from the Templates gallery' : 'Publish as a template — offer it under Templates'}">${workflow.template ? 'Unpublish' : 'Publish'}</button>
-        ${workflow.auto_paused
-          ? `<button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
-          : `<button type="button" class="button secondary workflow-toggle" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}>${workflow.enabled ? 'Turn off' : 'Turn on'}</button>`}
         <button type="button" class="button danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -925,3 +929,24 @@ document.addEventListener('click', async (event) => {
   }
 });
 
+
+/* Keep row actions in the viewport, including the last row and narrow screens.
+   The native popover handles Escape, outside clicks, and one open menu at a time. */
+document.addEventListener('toggle', (event) => {
+  const menu = event.target;
+  if (!menu.matches?.('.workflow-menu') || event.newState !== 'open') return;
+  const trigger = document.querySelector(`[popovertarget="${menu.id}"]`);
+  const anchor = trigger.getBoundingClientRect();
+  menu.style.maxHeight = `${window.innerHeight - 24}px`;
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(12, Math.min(anchor.right - bounds.width, window.innerWidth - bounds.width - 12))}px`;
+  const below = anchor.bottom + 6;
+  menu.style.top = `${Math.max(12, below + bounds.height <= window.innerHeight - 12 ? below : anchor.top - bounds.height - 6)}px`;
+}, true);
+
+// Dismiss after choosing an enabled action; existing delegated handlers run
+// unchanged even when the popover closes.
+$('#workflow-table').addEventListener('click', (event) => {
+  const action = event.target.closest('.workflow-menu button, .workflow-menu a');
+  if (action && !action.disabled) action.closest('.workflow-menu').hidePopover();
+});

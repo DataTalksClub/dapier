@@ -131,19 +131,21 @@
 
       <section class="view" data-page="workflows">
         <div class="section-head">
-          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">See what starts each workflow and what it does. Turn it on or off here; open it to edit or test it.</p></div>
+          <div class="section-head-text"><h2>Your workflows</h2><p class="sub">Open a workflow to edit or test it. On/off changes take effect immediately.</p></div>
+          <div class="workflow-page-actions">
           <button id="import-yaml" class="button secondary" type="button">Import YAML</button>
           <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
           <button id="export-all-yaml" class="button secondary" type="button">Export all</button>
           <a id="new-workflow" class="button primary" href="/workflows/new">New workflow</a>
+          </div>
         </div>
-        <p class="workflow-explainer"><strong>On</strong> means new triggers can run the workflow. <strong>Off</strong> stops new triggers. Changes to the on/off state take effect immediately.</p>
         <div class="list-tools"><label>Find a workflow<input id="workflow-search" type="search" placeholder="Search name, trigger, or action"></label><label>Show<select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label>Tag<select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label>Folder<select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="button primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="button secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="button secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="button secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="button secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
+            <colgroup><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-trigger"><col class="workflow-col-action"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
             <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>When</th><th>Do</th><th>Recent run</th><th>State</th><th class="action-col">Manage</th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>

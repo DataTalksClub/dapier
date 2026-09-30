@@ -198,7 +198,7 @@ td.select-col { padding-top: 10px; }
 .workflow-run-link { display: grid; gap: 3px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
 .workflow-run-link:hover .status { text-decoration: underline; }
 .workflow-run-link > span:last-child { color: var(--muted); font-size: 11.5px; }
-.workflow-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.workflow-actions { text-align: right; }
 .workflow-actions .button { height: 32px; min-width: max-content; padding: 0 10px; font-size: 12px; }
 .workflow-toggle:disabled { opacity: .5; cursor: default; }
 
@@ -844,4 +844,52 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   dialog { width: calc(100vw - 24px); }
   .dialog-body { max-height: calc(100dvh - 190px); }
   .login-panel { width: min(400px, calc(100% - 40px)); }
+}
+
+/* Workflow list: reserve space for the definition rather than repeated tools. */
+.workflow-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+[data-page="workflows"] > .section-head:first-child { gap: 16px 24px; }
+[data-page="workflows"] .list-tools { gap: 12px; margin: 16px 0 24px; }
+[data-page="workflows"] .list-tools label { min-width: 120px; flex: 0 1 150px; }
+[data-page="workflows"] .list-tools label:first-child { flex: 1 1 240px; max-width: none; }
+#workflow-count { white-space: nowrap; }
+#workflow-table-wrap table { table-layout: fixed; }
+.workflow-col-select { width: 36px; }
+.workflow-col-name { width: auto; }
+.workflow-col-trigger { width: 17%; }
+.workflow-col-action { width: 22%; }
+.workflow-col-run { width: 16%; }
+.workflow-col-state { width: 104px; }
+.workflow-col-manage { width: 76px; }
+.workflow-list-row .cell-name { overflow-wrap: anywhere; font-size: 13px; }
+.workflow-list-row .status { white-space: normal; }
+.workflow-list-row .tag-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.workflow-state-control { min-width: 0; display: grid; justify-items: start; gap: 7px; }
+.workflow-state-control .button { height: 26px; padding: 0 8px; font-size: 11px; }
+.workflow-menu { position: fixed; inset: auto; margin: 0; width: 180px; padding: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); box-shadow: 0 8px 24px rgb(0 0 0 / .14); overflow-y: auto; }
+.workflow-menu:popover-open { display: grid; gap: 2px; }
+.workflow-menu .button { justify-content: flex-start; width: 100%; height: 32px; min-width: 0; margin: 0 !important; padding: 0 10px; border-color: transparent; background: transparent; text-align: left; }
+.workflow-menu .button:hover { background: var(--wash-soft); }
+.workflow-menu .button:disabled { opacity: .45; cursor: default; }
+.workflow-menu .workflow-delete { border-top: 1px solid var(--line); margin-top: 4px !important; }
+@media (max-width: 1100px) and (min-width: 861px) {
+  .workflow-col-trigger { width: 16%; }
+  .workflow-col-action { width: 21%; }
+  .workflow-col-run { width: 15%; }
+  .workflow-col-state { width: 86px; }
+}
+@media (max-width: 860px) {
+  [data-page="workflows"] .list-tools label:first-child { flex-basis: 100%; }
+  [data-page="workflows"] .list-tools label:not(:first-child) { flex: 1 1 100px; }
+  .table-wrap td.workflow-actions .workflow-menu .button { width: 100%; }
+  .workflow-page-actions .button { padding: 0 12px; }
+}
+@media (max-width: 560px) {
+  #workflow-table-wrap colgroup { display: none; }
+  #workflow-table-wrap .workflow-list-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px 12px; }
+  #workflow-table-wrap td { grid-column: 2; grid-template-columns: 72px minmax(0, 1fr); }
+  #workflow-table-wrap td.select-col { grid-column: 1; grid-row: 1; padding: 0; }
+  #workflow-table-wrap td.select-col::before { display: none; }
+  #workflow-table-wrap .workflow-select { width: 20px; height: 20px; }
+  #workflow-table-wrap td.cell-title { display: block; grid-row: 1; padding-bottom: 6px; }
 }
