@@ -225,17 +225,16 @@
 
       <section class="view" data-page="emails">
         <div class="section-head">
-          <div class="section-head-text"><h2>Email triggers</h2><p class="sub">Reserve an address at your trigger domain and bind actions to it — mail arrives, the actions run. Changes here are live immediately; no YAML and no deploy.</p></div>
+          <div class="section-head-text"><h2>Email triggers</h2><p class="sub">Every address at your trigger domain and the flow that handles it — mail arrives, the flow runs. Workflow rows open in Workflows; the rest are edited here and live immediately.</p></div>
           <button id="new-email" class="button primary" type="button">New email</button>
         </div>
-        <div id="email-empty" class="empty-state" hidden><h3>No email triggers</h3><p>Reserve an address, then bind actions — for example, save every attachment to Dropbox.</p></div>
+        <div id="email-empty" class="empty-state" hidden><h3>No email addresses</h3><p>Reserve an address, then bind actions — for example, save every attachment to Dropbox.</p></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Address</th><th>Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Manage</span></th></tr></thead>
             <tbody id="email-table"></tbody>
           </table>
         </div>
-        <p id="email-yaml-routes" class="table-footnote" hidden>Also handled by managed workflows (edit in <a href="/workflows" class="view-link" data-target="workflows">Workflows</a>): <span id="email-yaml-list" class="mono"></span></p>
 
         <div class="section-head">
           <div class="section-head-text"><h2>Allowed senders</h2><p class="sub">One gate for every inbound email: a message from an address that is not on the list is ignored. <code>dapier emails from</code> changes the same list.</p></div>

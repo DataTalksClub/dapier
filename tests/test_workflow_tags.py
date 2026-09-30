@@ -507,7 +507,7 @@ def test_overview_tag_filter_and_aggregate(monkeypatch):
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
     monkeypatch.setattr(overview_api, "_email_triggers",
-                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+                        lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 

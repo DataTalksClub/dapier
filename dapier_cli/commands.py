@@ -377,16 +377,24 @@ def print_trigger(item):
 
 def triggers_list(api_url, debug=False):
     data = api.call(api_url, "GET", "/api/agent/email-triggers", debug=debug)
-    items = data.get("triggers", [])
-    if not items:
+    domain = data.get("domain", "")
+    # Workflow-claimed routes sit in the same list: every address the domain
+    # answers is one row, and each row says what runs when mail arrives.
+    entries = [
+        (item.get("name", ""), item.get("address", ""),
+         "yes" if item.get("enabled", True) else "no", _entry_label(item))
+        for item in data.get("triggers", [])
+    ]
+    entries += [
+        (route.get("name", ""), f"{route.get('name', '')}@{domain}",
+         "yes" if route.get("status", "enabled") == "enabled" else "no",
+         f"workflow={route.get('workflow', '')} (edit: dapier workflows)")
+        for route in data.get("managed_routes") or []
+    ]
+    if not entries:
         print("No email triggers yet. Create one with `dapier triggers save`.")
-    for item in items:
-        enabled = "yes" if item.get("enabled", True) else "no"
-        print(f"{item.get('name', ''):20} {item.get('address', ''):34} "
-              f"enabled={enabled:3} {_entry_label(item)}")
-    routes = data.get("yaml_routes") or []
-    if routes:
-        print(f"Routes handled by YAML workflows (not editable here): {', '.join(routes)}")
+    for name, address, enabled, label in sorted(entries):
+        print(f"{name:20} {address:34} enabled={enabled:3} {label}")
     print_flows(data.get("flows") or [])
     return 0
 

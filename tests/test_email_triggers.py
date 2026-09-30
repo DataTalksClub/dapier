@@ -115,17 +115,33 @@ class TriggerApiTests(unittest.TestCase):
         self.assertFalse(updated["enabled"])
         self.assertEqual(updated["created_by"], "op")
 
-    def test_list_reports_triggers_domain_and_yaml_routes(self):
+    def test_list_reports_triggers_domain_and_managed_routes(self):
         stub = StubTable([email_triggers.build_item(self.body, "op")])
-        claimed = {"trigger": {"connector": "email", "event": "message.received",
-                               "filters": {"route": {"equals": "invoice-attachment"}}}}
+        claimed = {"id": "invoice-pipeline", "trigger": {"connector": "email", "event": "message.received",
+                                                         "filters": {"route": {"equals": "invoice-attachment"}}}}
         with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
              patch("src.dapier.engine.workflows", return_value=[claimed]):
             status, payload = email_triggers.api_list(stub)
         self.assertEqual(status, 200)
         self.assertEqual(payload["domain"], "dtcdev.click")
         self.assertEqual([t["name"] for t in payload["triggers"]], ["income-2026-08"])
-        self.assertIn("invoice-attachment", payload["yaml_routes"])
+        self.assertEqual(payload["managed_routes"],
+                         [{"name": "invoice-attachment", "workflow": "invoice-pipeline", "status": "enabled"}])
+
+    def test_managed_routes_carry_workflow_state_and_dedupe(self):
+        paused = {"id": "todo-sheet", "enabled": True, "auto_paused": True,
+                  "triggers": [{"connector": "email", "filters": {"route": {"equals": "Todo"}}}]}
+        off = {"id": "agents", "enabled": False,
+               "trigger": {"connector": "email", "filters": {"route": {"equals": "agents"}}}}
+        doubled = {"id": "todo-sheet", "enabled": True,
+                   "triggers": [{"connector": "email", "filters": {"route": {"equals": "todo"}}}]}
+        with patch("src.dapier.engine.workflows", return_value=[paused, off, doubled]):
+            routes = email_triggers.managed_routes()
+            self.assertEqual(routes, [
+                {"name": "agents", "workflow": "agents", "status": "disabled"},
+                {"name": "todo", "workflow": "todo-sheet", "status": "auto-paused"},
+            ])
+            self.assertEqual(email_triggers.yaml_email_routes(), {"agents", "todo"})
 
     def test_delete_missing_is_404_and_existing_is_removed(self):
         stub = StubTable([email_triggers.build_item(self.body, "op")])

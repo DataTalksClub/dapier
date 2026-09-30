@@ -53,7 +53,7 @@ def test_list_renders_all_four_kinds(monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         calls.append((method, path))
         if path == "/api/agent/email-triggers":
-            return {"domain": "dtcdev.click", "triggers": [TRIGGER], "yaml_routes": []}
+            return {"domain": "dtcdev.click", "triggers": [TRIGGER], "managed_routes": []}
         if path == "/api/agent/hook-triggers":
             return {"base_url": "https://dapier.example.test", "hooks": [HOOK], "flows": []}
         if path == "/api/agent/schedule-triggers":

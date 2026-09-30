@@ -455,14 +455,16 @@ TRIGGER = {
 def test_triggers_list_and_show(monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         assert (method, path) == ("GET", "/api/agent/email-triggers")
-        return {"domain": "dtcdev.click", "triggers": [TRIGGER], "yaml_routes": ["todo"]}
+        return {"domain": "dtcdev.click", "triggers": [TRIGGER],
+                "managed_routes": [{"name": "todo", "workflow": "todo-email-sheet", "status": "enabled"}]}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
     assert commands.triggers_list("https://api.example.test") == 0
     out, _ = capsys.readouterr()
     assert "consulting@dtcdev.click" in out
     assert "dropbox_upload" in out
-    assert "todo" in out
+    assert "todo@dtcdev.click" in out
+    assert "workflow=todo-email-sheet" in out
     assert commands.triggers_show("https://api.example.test", "consulting") == 0
     out, _ = capsys.readouterr()
     assert '"type": "dropbox_upload"' in out

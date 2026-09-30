@@ -3,6 +3,7 @@ import { $, $$, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
+import { openDesigner } from './designer.js';
 
 const ACTION_TEMPLATE = JSON.stringify([
   { type: 'dropbox_upload', connection_id: 'dropbox', source: 'attachment', folder: 'email-attachments' },
@@ -179,22 +180,14 @@ $('#email-from-add')?.addEventListener('submit', async (event) => {
   } catch (error) { notice(error.message, true); }
 });
 
-export function renderEmails(data) {
-  current = {
-    domain: (data && data.domain) || '',
-    triggers: (data && data.triggers) || [],
-  };
-  $('#email-domain-hint').textContent = current.domain;
-  $('#email-empty').hidden = current.triggers.length > 0;
-  $('.table-wrap', $('[data-page=emails]')).hidden = current.triggers.length === 0;
-  $('#email-table').innerHTML = current.triggers.map((trigger, index) => {
-    const watcher = Boolean(trigger.event && trigger.event !== 'message.received');
-    const title = watcher
-      ? `<span class="email-addr-row"><span class="cell-name mono">${escapeHtml(trigger.name)}</span><span class="tag-chip" title="SES feedback watcher — matches domain-wide, not a reserved address">${escapeHtml(trigger.event)}</span></span>`
-      : `<span class="cell-name mono">${escapeHtml(addressOf(trigger))}</span>`;
-    const description = trigger.description ? `<span class="cell-sub">${escapeHtml(trigger.description)}</span>` : '';
-    const name = escapeHtml(trigger.name);
-    return `<tr>
+function triggerRow(trigger) {
+  const watcher = Boolean(trigger.event && trigger.event !== 'message.received');
+  const title = watcher
+    ? `<span class="email-addr-row"><span class="cell-name mono">${escapeHtml(trigger.name)}</span><span class="tag-chip" title="SES feedback watcher — matches domain-wide, not a reserved address">${escapeHtml(trigger.event)}</span></span>`
+    : `<span class="cell-name mono">${escapeHtml(addressOf(trigger))}</span>`;
+  const description = trigger.description ? `<span class="cell-sub">${escapeHtml(trigger.description)}</span>` : '';
+  const name = escapeHtml(trigger.name);
+  return `<tr>
       <td class="cell-title">${title}${description}</td>
       <td data-label="Actions"><span class="cell-tags">${actionChips(trigger)}</span></td>
       <td data-label="Status">${statusLine(trigger.enabled ? 'enabled' : 'disabled')}</td>
@@ -202,18 +195,56 @@ export function renderEmails(data) {
       <td class="action-cell workflow-actions" data-label="Manage">
         <button class="button secondary email-flow" data-name="${name}" type="button">Flow</button>
         <button class="button secondary email-edit" data-name="${name}" type="button">Edit</button>
-        <button type="button" class="button secondary workflow-more" popovertarget="email-menu-${index}" aria-label="More actions for ${name}">More <span aria-hidden="true">⋯</span></button>
-        <div id="email-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${name}">
+        <button type="button" class="button secondary workflow-more" popovertarget="email-menu-${name}" aria-label="More actions for ${name}">More <span aria-hidden="true">⋯</span></button>
+        <div id="email-menu-${name}" class="workflow-menu" popover aria-label="Actions for ${name}">
           <button class="button secondary email-toggle" data-name="${name}" type="button">${trigger.enabled ? 'Disable' : 'Enable'}</button>
           <button class="button danger email-delete" data-name="${name}" type="button">Delete</button>
         </div>
       </td>
     </tr>`;
-  }).join('');
-  const yamlRoutes = (data && data.yaml_routes) || [];
-  $('#email-yaml-routes').hidden = yamlRoutes.length === 0;
-  $('#email-yaml-list').textContent = yamlRoutes.map((route) => `${route}@${current.domain}`).join(', ');
+}
+
+/* A route a published workflow claims: the same table, one row, the owning
+   workflow as its flow chip. The workflow is the source of truth, so the
+   only action here opens it in Workflows. */
+function managedRow(route) {
+  const workflow = escapeHtml(route.workflow);
+  const address = `${escapeHtml(route.name)}@${escapeHtml(current.domain)}`;
+  return `<tr>
+      <td class="cell-title"><span class="cell-name mono">${address}</span><span class="cell-sub">Handled by the <strong>${workflow}</strong> workflow.</span></td>
+      <td data-label="Actions"><span class="cell-tags"><span class="tag-chip folder-chip" title="This address is bound in the workflow definition">flow: ${workflow}</span></span></td>
+      <td data-label="Status">${statusLine(route.status || 'enabled')}</td>
+      <td class="mono muted-cell" data-label="Updated">—</td>
+      <td class="action-cell workflow-actions" data-label="Manage">
+        <button class="button secondary email-workflow" data-workflow="${workflow}" type="button">Edit in Workflows</button>
+      </td>
+    </tr>`;
+}
+
+export function renderEmails(data) {
+  current = {
+    domain: (data && data.domain) || '',
+    triggers: (data && data.triggers) || [],
+    managed: (data && data.managed_routes) || [],
+  };
+  $('#email-domain-hint').textContent = current.domain;
+  // One list of every address at the domain: stored triggers and
+  // workflow-handled routes, interleaved alphabetically by local part.
+  const rows = [
+    ...current.triggers.map((trigger) => ({ name: String(trigger.name || ''), row: triggerRow(trigger) })),
+    ...current.managed.map((route) => ({ name: String(route.name || ''), row: managedRow(route) })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  $('#email-empty').hidden = rows.length > 0;
+  $('.table-wrap', $('[data-page=emails]')).hidden = rows.length === 0;
+  $('#email-table').innerHTML = rows.map((entry) => entry.row).join('');
   bindRowButtons();
+  bindManagedButtons();
+}
+
+function bindManagedButtons() {
+  $$('.email-workflow').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.workflow) openDesigner(button.dataset.workflow);
+  }));
 }
 
 // Menus close on pick; the delegated handlers above run unchanged when the

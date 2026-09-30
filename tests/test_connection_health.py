@@ -238,7 +238,7 @@ def _overview(monkeypatch, connections, credential_items):
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
     monkeypatch.setattr(overview_api, "_email_triggers",
-                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+                        lambda: {"domain": "", "triggers": [], "managed_routes": []})
     request = {"requestContext": {"http": {"method": "GET", "path": "/api/admin/overview"}},
                "headers": {"host": "dapier.example.test"}, "cookies": []}
     return json.loads(overview_api.overview(request)["body"])["connections"]

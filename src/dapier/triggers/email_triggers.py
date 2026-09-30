@@ -118,19 +118,39 @@ def flow_catalog():
     return matching.flow_catalog()
 
 
-def yaml_email_routes():
-    """Routes already claimed by YAML workflows, so triggers cannot shadow them."""
+def managed_routes():
+    """Address routes claimed by published workflows, each with its owner.
+
+    One entry per (route, workflow) pair: a workflow may claim several
+    routes, and a route claimed by two workflows lists both owners. These
+    render next to the stored triggers in the console and CLI — every
+    address the domain answers is one row of the same list, never a
+    footnote. ``status`` mirrors the owning workflow's run state.
+    """
     from .. import engine
 
-    routes = set()
+    routes = {}
     for workflow in engine.workflows():
         for trigger in engine.workflow_triggers(workflow):
             if trigger.get("connector") != "email":
                 continue
             rule = (trigger.get("filters") or {}).get("route") or {}
-            if isinstance(rule, dict) and rule.get("equals"):
-                routes.add(str(rule["equals"]).lower())
-    return routes
+            if not (isinstance(rule, dict) and rule.get("equals")):
+                continue
+            key = (str(rule["equals"]).lower(), str(workflow.get("id") or ""))
+            if workflow.get("auto_paused") is True:
+                status = "auto-paused"
+            elif workflow.get("enabled", True):
+                status = "enabled"
+            else:
+                status = "disabled"
+            routes.setdefault(key, {"name": key[0], "workflow": key[1], "status": status})
+    return [routes[key] for key in sorted(routes)]
+
+
+def yaml_email_routes():
+    """Routes already claimed by YAML workflows, so triggers cannot shadow them."""
+    return {route["name"] for route in managed_routes()}
 
 
 def build_item(body, operator):
@@ -295,7 +315,7 @@ def api_list(table_ref=None):
     return 200, {
         "domain": trigger_domain(),
         "triggers": triggers,
-        "yaml_routes": sorted(yaml_email_routes()),
+        "managed_routes": managed_routes(),
         "flows": flow_catalog(),
     }
 

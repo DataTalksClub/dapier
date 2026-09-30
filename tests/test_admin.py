@@ -1061,7 +1061,7 @@ def test_overview_q_filters_the_workflow_list(monkeypatch):
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
     monkeypatch.setattr(overview_api, "_email_triggers",
-                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+                        lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
     event = operator_request("GET", "/api/admin/overview")
@@ -1111,7 +1111,7 @@ def test_overview_connections_carry_token_health(monkeypatch):
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
     monkeypatch.setattr(overview_api, "_email_triggers",
-                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+                        lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 
@@ -1143,7 +1143,7 @@ def test_overview_executions_are_newest_first_by_started_at(monkeypatch):
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])
     monkeypatch.setattr(overview_api, "_email_triggers",
-                        lambda: {"domain": "", "triggers": [], "yaml_routes": []})
+                        lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 

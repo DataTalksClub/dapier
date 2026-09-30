@@ -138,20 +138,20 @@ def _oauth_client_status(provider):
     return oauth_clients.status(provider)
 
 def _email_triggers():
-    """Stored email triggers plus routes managed workflows handle.
+    """Stored email triggers plus the routes managed workflows handle.
 
     Best-effort: the console's startup fetch must survive a triggers-table
     problem, so a failure renders as an empty list rather than an error.
     """
     try:
         triggers = [email_triggers.public_view(item) for item in email_triggers.load_items()]
-        yaml_routes = sorted(email_triggers.yaml_email_routes())
+        managed_routes = email_triggers.managed_routes()
     except Exception:  # noqa: BLE001 — degrade to an empty view, never block the console
-        return {"domain": "", "triggers": [], "yaml_routes": []}
+        return {"domain": "", "triggers": [], "managed_routes": []}
     return {
         "domain": email_triggers.trigger_domain(),
         "triggers": triggers,
-        "yaml_routes": yaml_routes,
+        "managed_routes": managed_routes,
     }
 
 def _email_from():
