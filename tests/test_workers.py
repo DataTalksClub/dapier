@@ -182,6 +182,17 @@ def test_workers_ahead_of_the_window_are_offline(workers_table):
                for worker in workers)
 
 
+def test_rows_without_the_id_attribute_fall_back_to_the_row_key(workers_table):
+    workers_table.items = [
+        # Written before the fix that stored worker_id as an attribute.
+        {"task_id": "worker:legacy-1", "kind": "worker", "last_seen": 990,
+         "started_at": 900},
+    ]
+    status, payload = host_workers.api_list(table_ref=workers_table, now=1000)
+    assert status == 200
+    assert [worker["worker_id"] for worker in payload["workers"]] == ["legacy-1"]
+
+
 def test_meta_of_ignores_old_workers_and_bare_bodies():
     assert host_workers.meta_of(None) is None
     assert host_workers.meta_of({}) is None
@@ -343,7 +354,6 @@ def test_admin_workers_list_through_the_shared_list(workers_table, operator_sess
     ]
     response = admin.route(admin_request("GET", "/api/admin/workers"),
                            "GET", "/api/admin/workers")
-    print("DBG", response["statusCode"], response["body"][:200])
     assert response["statusCode"] == 200
     payload = json.loads(response["body"])
     assert payload["workers"][0]["worker_id"] == "w1"
