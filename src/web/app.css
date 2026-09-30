@@ -786,8 +786,9 @@ body[data-view="designer"] .topbar h1.renamable:hover {
   padding: 0;
   width: 320px;
 }
-#designer-back { display: none; }
+#designer-back { display: none; border-color: transparent; }
 body[data-view="designer"] #designer-back { display: inline-flex; }
+#designer-back:hover { border-color: transparent; background: var(--wash); }
 .designer-embed {
   display: flex;
   flex: 1;
