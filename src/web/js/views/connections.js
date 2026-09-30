@@ -410,7 +410,6 @@ function renderConnections(connections) {
   $('#add-connection').setAttribute('aria-expanded', String(!$('#connect-picker').hidden));
   $('#connection-empty').hidden = connections.length > 0;
   $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
-  const priority = { ready: 0, expired: 1, revoked: 2, connected: 3 };
   const query = ($('#connection-search')?.value || '').trim().toLowerCase();
   const statusFilter = $('#connection-status-filter')?.value || 'all';
   const filtered = connections.filter((connection) => {
@@ -423,20 +422,24 @@ function renderConnections(connections) {
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
   const withinGroup = (a, b) =>
-    (priority[effectiveStatus(a)] ?? 4) - (priority[effectiveStatus(b)] ?? 4) ||
     String(a.display_name || a.connection_id).localeCompare(String(b.display_name || b.connection_id));
   const groups = new Map();
   for (const connection of filtered) {
     groups.set(connection.provider, [...(groups.get(connection.provider) || []), connection]);
   }
-  /* Accounts of one provider stay together; a header row appears only where
-     it carries information (a provider with several accounts). */
+  /* One section per provider — every group gets a header, so single-account
+     providers read the same as multi-account ones and the table scans as a
+     register of services. Rows order alphabetically; attention states surface
+     through the status column, the header meta, and the summary line. */
   $('#connection-table').innerHTML = [...groups.entries()].sort(([a], [b]) =>
     providerLabel(a).localeCompare(providerLabel(b))).map(([provider, group]) => {
     const rows = [...group].sort(withinGroup).map(connectionRow).join('');
-    if (group.length < 2) return rows;
     const attention = group.filter(needsAttention).length;
-    return `<tr class="provider-group-row"><th colspan="4" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span><span class="provider-group-meta">${group.length} account${group.length === 1 ? '' : 's'}${attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} attention` : ''}</span></th></tr>${rows}`;
+    const meta = [
+      group.length > 1 ? `${group.length} account${group.length === 1 ? '' : 's'}` : '',
+      attention ? `${attention} ${attention === 1 ? 'needs' : 'need'} attention` : '',
+    ].filter(Boolean).join(' · ');
+    return `<tr class="provider-group-row"><th colspan="3" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span>${meta ? `<span class="provider-group-meta">${escapeHtml(meta)}</span>` : ''}</th></tr>${rows}`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.provider-token-button').forEach((button) => button.addEventListener('click', () => issueConnectionToken(button)));
@@ -474,7 +477,6 @@ function connectionRow(connection) {
     const expires = formatTimestamp(connection.token_expires_at);
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span><span class="cell-sub muted-cell">${escapeHtml(usageLabel(connection))}</span></td>
-    <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
     <td data-label="Status">${statusLine(status, CONNECTION_STATUS_LABELS)}${expires && status !== 'expired' ? `<span class="cell-sub muted-cell">token expires ${escapeHtml(expires)}</span>` : ''}</td>
     <td class="action-cell">${nextAction}${tokenAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
