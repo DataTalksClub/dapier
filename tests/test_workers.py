@@ -122,8 +122,7 @@ def agent_identity(monkeypatch):
 def operator_session(monkeypatch):
     monkeypatch.setattr(session, "authenticated", lambda event: True)
     monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
-    monkeypatch.setattr(session, "require_role",
-                        lambda event, minimum="operator": ({"sub": "op-1"}, None))
+    monkeypatch.setattr(session, "require_operator", lambda event: ({"sub": "op-1"}, None))
     monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: {"emitted": (args, kwargs)})
 
 

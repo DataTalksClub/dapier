@@ -13,7 +13,7 @@ from ..connectors import trigger_discovery
 from ..engine import usage
 from . import designer_store, discovery as discovery_api, errors as errors_api, runs
 from . import storage as storage_api
-from ..auth import api_tokens, authz, device_sessions, roles, session, visibility
+from ..auth import api_tokens, authz, device_sessions, session, visibility
 from ..auth.dtc_auth import verify_id_token
 from ..connections import credentials, importing
 from ..connections import records as connections
@@ -487,8 +487,6 @@ def route(event, method, path):
         return poll_triggers_api(event, method)
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
         return grants_api(event, method)
-    if path == "/api/agent/users" and method in ("GET", "POST", "DELETE"):
-        return users_api(event, method)
     if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):
         return tokens_api(event, method)
     if path == "/api/agent/overview" and method == "GET":
@@ -631,16 +629,12 @@ def route(event, method, path):
 
 
 def require_operator(event, action):
-    """Authenticate the bearer identity and require the effective role.
+    """Authenticate the bearer identity and require the operator allowlist.
 
     Returns ``(subject, None)`` or ``(None, error_response)``. ``action`` is
-    the audit action recorded on a denial — and, since roles v1, also picks
-    the least role this action accepts: a stored assignment (roles.py) can
-    widen a non-operator DTC identity into the read-only/workflow-editing
-    bands, narrow an allowlisted operator to viewer, or disable an account
-    entirely. With no stored row the operator allowlist decides exactly as
-    before. API tokens never qualify for any role.
-    """
+    the audit action recorded on a denial. A DTC identity passes the same
+    operator allowlist the console gate applies; API tokens pass only
+    through their grants."""
     subject, error = authenticate(event)
     if error:
         return None, error
@@ -649,28 +643,19 @@ def require_operator(event, action):
             return subject, None
         audit.emit("unknown", action, subject, outcome="denied-not-operator")
         return None, _json_response(403, {"error": "Operator authorization required"})
-    minimum = roles.minimum_for_action(action)
     claims = event.get("_dtc_claims") or {}
     payload = {"subject": subject, "sub": claims.get("email", "")}
-    effective = roles.effective_role(payload)
-    if roles.satisfies(effective, minimum):
+    if authz.is_operator(payload):
         return subject, None
-    if effective == "disabled":
-        audit.emit("unknown", action, subject, outcome="denied-disabled")
-        return None, _json_response(403, {"error": "This account is disabled"})
-    audit.emit("unknown", action, subject,
-               outcome="denied-not-operator" if not effective
-               else "denied-insufficient-role")
-    error_text = ("Operator authorization required" if not effective
-                  else f"This action needs the '{minimum}' role")
-    return None, _json_response(403, {"error": error_text})
+    audit.emit("unknown", action, subject, outcome="denied-not-operator")
+    return None, _json_response(403, {"error": "Operator authorization required"})
 
 
 def _visibility(event, subject):
     """The caller's G17 Phase 2 read scope, decided exactly as
     require_operator decides its gate: an API token passes only as an
-    operator, a DTC identity resolves through roles.effective_role —
-    operator-or-admin sees everything, anyone else is owner-scoped to their
+    operator, a DTC identity resolves through the operator allowlist —
+    operators see everything, anyone else is owner-scoped to their
     subject (auth.visibility). Writes gate through the same scope
     (_write_denied, Phase 3)."""
     if event.get("_api_token"):
@@ -1281,38 +1266,6 @@ def grants_api(event, method):
     if status == 200:
         audit.emit(str(query.get("connection_id", "")).strip().lower(),
                    audit.GRANT, subject, outcome="revoked")
-    return _json_response(status, payload)
-
-
-def users_api(event, method):
-    """Admin-only user management over the CLI's bearer authentication.
-
-    Mirrors the console's /api/admin/users endpoints on top of the shared
-    role store in auth.roles: list users (GET), assign a role (POST body
-    ``{subject, role, display_name?, disabled?}``), remove one (DELETE
-    ``?subject=``). The operator gate keeps API tokens out; the admin
-    minimum then reserves the store to admins — with an empty store the
-    allowlist operators are the bootstrap admins (roles.py). Audit rows
-    (``users.set-role`` / ``users.remove``) are written by the shared
-    domain functions, so both surfaces record every mutation.
-    """
-    subject, error = require_operator(event, "users")
-    if error:
-        return error
-    if method == "GET":
-        status, payload = roles.api_list_users()
-        return _json_response(status, payload)
-    if method == "POST":
-        try:
-            body = json.loads(event.get("body") or "{}")
-        except (ValueError, AttributeError, json.JSONDecodeError):
-            return _json_response(400, {"error": "Invalid request"})
-        if not isinstance(body, dict):
-            return _json_response(400, {"error": "Invalid request"})
-        status, payload = roles.api_set_role(body, operator=subject)
-        return _json_response(status, payload)
-    query = event.get("queryStringParameters") or {}
-    status, payload = roles.api_remove_role(query.get("subject"), operator=subject)
     return _json_response(status, payload)
 
 

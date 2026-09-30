@@ -5,11 +5,11 @@ Rule under test: operators see everything; a subject sees the workflows it
 owns (draft-only rows by drafted_by); anything with no owner — including a
 row whose workflow no longer exists — stays visible to everyone.
 
-G17 Phase 3: the same module's owner-or-operator WRITE gate
-(ensure_can_write) and the workflow write routes it guards. The rule is the
-same verdict with the safe direction on the defensive default: an id
-nothing stored claims is a create and stays open, but an item that exists
-with no owner stamp is DENIED for non-operators on writes.
+The gates let only operators through (the operator allowlist is the whole
+auth story since the roles store left), so the scoped reads and the
+owner-or-operator WRITE gate (G17 Phase 3, ensure_can_write) are exercised
+at the domain level with explicit scopes; at the routes, a non-allowlisted
+identity is denied before any of it applies.
 """
 import json
 import time
@@ -97,19 +97,6 @@ def dynamo(monkeypatch, tables):
 def operator_env(monkeypatch, emails="op@example.test", subjects=""):
     monkeypatch.setenv("OPERATOR_EMAILS", emails)
     monkeypatch.setenv("OPERATOR_SUBJECTS", subjects)
-
-
-def roles_env(monkeypatch, rows, tables=None):
-    """Seed role assignments; ``tables`` (a dict another fixture built) is
-    served too, so a test needs exactly one boto3.resource patch."""
-    tables = tables if tables is not None else {}
-    role_table = tables.setdefault("role-assignments", DictTable(("identity",)))
-    for item in rows:
-        role_table.put_item(Item=item)
-    dynamo(monkeypatch, tables)
-    monkeypatch.setenv("ROLE_ASSIGNMENTS_TABLE", "role-assignments")
-    monkeypatch.delenv("AUDIT_TABLE", raising=False)
-    return role_table
 
 
 def session_token(monkeypatch, sub="op@example.test", subject="subject-1"):
@@ -236,22 +223,12 @@ def test_missing_owner_is_visible_to_everyone():
     assert not viewer.workflow_visible("known", {"known": THEIRS})
 
 
-def test_for_role_maps_the_role_bands(monkeypatch):
-    assert visibility.for_role(MINE, "admin").is_operator
-    assert visibility.for_role(MINE, "operator").is_operator
-    assert not visibility.for_role(MINE, "editor").is_operator
-    assert not visibility.for_role(MINE, "viewer").is_operator
-    assert not visibility.for_role(MINE, None).is_operator
-    assert not visibility.for_role(MINE, "disabled").is_operator
-
-
-def test_for_session_scopes_by_the_stored_role(monkeypatch):
+def test_for_session_scopes_by_the_operator_allowlist(monkeypatch):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": MINE, "role": "viewer"},
-                            {"identity": "dev@example.test", "role": "editor"}])
-    # Store populated: the allowlisted operator resolves to "operator", the
-    # stored viewer row scopes its subject.
-    assert visibility.for_session({"sub": "op@example.test", "subject": "subject-9"}).is_operator
+    # On the allowlist: an operator, everything visible.
+    assert visibility.for_session(
+        {"sub": "op@example.test", "subject": "subject-9"}).is_operator
+    # Off it: a subject-scoped view, everything filtered against its owner.
     scoped = visibility.for_session({"sub": "user@example.test", "subject": MINE})
     assert not scoped.is_operator
     assert scoped.subject == MINE
@@ -293,9 +270,8 @@ def test_workflow_owners_survives_store_failures(monkeypatch):
 
 # --- designer list -----------------------------------------------------------
 
-def test_designer_list_operator_sees_all_viewer_sees_own(monkeypatch, published):
+def test_designer_list_operator_sees_all(monkeypatch, published):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published,
          workflow_item("mine", MINE),
          workflow_item("theirs", THEIRS),
@@ -310,28 +286,39 @@ def test_designer_list_operator_sees_all_viewer_sees_own(monkeypatch, published)
     assert [row["id"] for row in operator["workflows"]] == [
         "draft-only", "hidden-live", "mine", "theirs", "unowned"]
 
-    viewer = json.loads(admin.route(
+
+def test_designer_list_denies_non_operators(monkeypatch, published):
+    operator_env(monkeypatch)
+    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
+    response = admin.route(
         cookie_event(session_token(monkeypatch, sub="user@example.test",
                                    subject=MINE)), "GET",
-        "/api/admin/designer/workflows")["body"])
-    # Their workflow and its draft pair disappear; their own draft-only row
-    # and everything unowned stay.
-    assert [row["id"] for row in viewer["workflows"]] == ["draft-only", "mine", "unowned"]
-    assert viewer["workflows"][0]["owner"] == MINE
-    assert viewer["workflows"][0]["published"] is False
+        "/api/admin/designer/workflows")
+    assert response["statusCode"] == 403
+    assert json.loads(response["body"])["error"] == "Operator authorization required"
 
 
-def test_designer_list_cli_scopes_non_operator(monkeypatch, published):
-    # The CLI designer list rides the "workflow.save" gate, so the least
-    # role that reaches it is editor — a non-operator owner-scope band.
-    roles_env(monkeypatch, [{"identity": "cli-editor", "role": "editor"}])
-    agent_identity(monkeypatch, "cli-editor")
-    seed(published, workflow_item("mine", "cli-editor"), workflow_item("theirs", "cli-other"))
+def test_designer_list_cli_operator_sees_all(monkeypatch, published):
+    agent_identity(monkeypatch, "cli-op")
+    seed(published, workflow_item("mine", "cli-op"), workflow_item("theirs", "cli-other"))
 
     listed = json.loads(agent_api.route(
-        agent_event("GET", "/api/agent/designer/workflows", "cli-editor"),
+        agent_event("GET", "/api/agent/designer/workflows", "cli-op"),
         "GET", "/api/agent/designer/workflows")["body"])
-    assert [row["id"] for row in listed["workflows"]] == ["mine"]
+    assert [row["id"] for row in listed["workflows"]] == ["mine", "theirs"]
+
+
+def test_designer_list_cli_denies_non_operators(monkeypatch, published):
+    # No email claim and an allowlist that names someone else: the gate
+    # denies before any ownership question arises.
+    agent_identity(monkeypatch, "cli-nobody")
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@example.test")
+    seed(published, workflow_item("mine", "cli-nobody"))
+
+    response = agent_api.route(
+        agent_event("GET", "/api/agent/designer/workflows", "cli-nobody"),
+        "GET", "/api/agent/designer/workflows")
+    assert response["statusCode"] == 403
 
 
 # --- overview ----------------------------------------------------------------
@@ -343,7 +330,6 @@ def overview_env(monkeypatch, published, tmp_path):
         "connections": DictTable(("connection_id",)),
         "credentials": DictTable(("credential_id",)),
         "api-tokens": DictTable(("token_hash",)),
-        "role-assignments": DictTable(("identity",)),
         "task-usage": DictTable(("month", "workflow_id")),
     }
     dynamo(monkeypatch, tables)
@@ -356,15 +342,13 @@ def overview_env(monkeypatch, published, tmp_path):
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
     monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
-    monkeypatch.setenv("ROLE_ASSIGNMENTS_TABLE", "role-assignments")
     monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
     return tables
 
 
-def test_overview_operator_sees_all_viewer_sees_own(monkeypatch, overview_env, published):
+def test_overview_operator_sees_all_and_scopes_apply(monkeypatch, overview_env, published):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS),
          workflow_item("unowned", ""))
     for workflow_id in ("mine", "theirs", "unowned"):
@@ -379,26 +363,28 @@ def test_overview_operator_sees_all_viewer_sees_own(monkeypatch, overview_env, p
     assert {row["workflow_id"] for row in operator["usage"]} == {"mine", "theirs", "unowned"}
     assert {row["workflow_id"] for row in operator["runs"]} == {"mine", "theirs"}
 
-    viewer = json.loads(overview_api.overview(
-        cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
-        visible=visibility.for_role(MINE, "viewer"),
+    # The scoped variant (the domain-level contract the scope threading
+    # relies on): a subject-scoped view sees its own and the unowned rows.
+    scoped = json.loads(overview_api.overview(
+        cookie_event(session_token(monkeypatch)),
+        visible=visibility.Visibility(MINE),
     )["body"])
-    assert [row["id"] for row in viewer["workflows"]] == ["mine", "unowned"]
-    assert {row["workflow_id"] for row in viewer["usage"]} == {"mine", "unowned"}
-    assert [row["workflow_id"] for row in viewer["runs"]] == ["mine"]
-    assert [row["workflow_id"] for row in viewer["executions"]] == ["mine"]
+    assert [row["id"] for row in scoped["workflows"]] == ["mine", "unowned"]
+    assert {row["workflow_id"] for row in scoped["usage"]} == {"mine", "unowned"}
+    assert [row["workflow_id"] for row in scoped["runs"]] == ["mine"]
+    assert [row["workflow_id"] for row in scoped["executions"]] == ["mine"]
     # Aggregates computed after the filter, so the dropdowns never leak ids.
-    assert viewer["workflow_tags"] == []
+    assert scoped["workflow_tags"] == []
 
 
-def test_overview_route_filters_for_the_console_viewer(monkeypatch, overview_env, published):
+def test_overview_route_denies_non_operators(monkeypatch, overview_env, published):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
-    payload = json.loads(admin.route(
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
+    payload = admin.route(
         cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
-        "GET", "/api/admin/overview")["body"])
-    assert [row["id"] for row in payload["workflows"]] == ["mine"]
+        "GET", "/api/admin/overview")
+    assert payload["statusCode"] == 403
 
 
 # --- runs --------------------------------------------------------------------
@@ -411,9 +397,8 @@ def runs_env(monkeypatch):
     return table
 
 
-def test_runs_list_operator_sees_all_viewer_sees_own(monkeypatch, published, runs_env):
+def test_runs_list_operator_sees_all_and_scopes_apply(monkeypatch, published, runs_env):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
     runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
     runs_env.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
@@ -424,40 +409,39 @@ def test_runs_list_operator_sees_all_viewer_sees_own(monkeypatch, published, run
     assert [run["workflow_id"] for run in operator[1]["runs"]] == [
         "mine", "theirs", "gone-wf"]
 
-    viewer = visibility.for_role(MINE, "viewer")
-    scoped = runs_api.api_list(25, visible=viewer)
+    scoped = runs_api.api_list(25, visible=visibility.Visibility(MINE))
     assert [run["workflow_id"] for run in scoped[1]["runs"]] == ["mine", "gone-wf"]
 
-    exported = runs_api.api_export(visible=viewer)
+    exported = runs_api.api_export(visible=visibility.Visibility(MINE))
     rows = [line.split(",")[1] for line in exported[1]["csv"].splitlines()[1:]]
     assert sorted(rows) == ["gone-wf", "mine"]
 
 
-def test_runs_route_filters_for_the_console_viewer(monkeypatch, published, runs_env):
+def test_runs_route_denies_non_operators(monkeypatch, published, runs_env):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
     runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
     runs_env.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-    payload = json.loads(admin.route(
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
+    payload = admin.route(
         cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
-        "GET", "/api/admin/runs")["body"])
-    assert [run["workflow_id"] for run in payload["runs"]] == ["mine"]
+        "GET", "/api/admin/runs")
+    assert payload["statusCode"] == 403
 
 
-def test_runs_cli_scopes_non_operator(monkeypatch, published):
+def test_runs_cli_denies_non_operators(monkeypatch, published):
     table = DictTable(("execution_id",))
     dynamo(monkeypatch, {"executions": table})
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
-    roles_env(monkeypatch, [{"identity": "cli-viewer", "role": "viewer"}])
-    agent_identity(monkeypatch, "cli-viewer")
-    seed(published, workflow_item("mine", "cli-viewer"), workflow_item("theirs", "cli-other"))
+    agent_identity(monkeypatch, "cli-nobody")
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@example.test")
+    seed(published, workflow_item("mine", "cli-nobody"), workflow_item("theirs", "cli-other"))
     table.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
     table.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-    payload = json.loads(agent_api.route(
-        agent_event("GET", "/api/agent/runs", "cli-viewer"),
-        "GET", "/api/agent/runs")["body"])
-    assert [run["workflow_id"] for run in payload["runs"]] == ["mine"]
+    payload = agent_api.route(
+        agent_event("GET", "/api/agent/runs", "cli-nobody"),
+        "GET", "/api/agent/runs")
+    assert payload["statusCode"] == 403
 
 
 # --- inbox -------------------------------------------------------------------
@@ -480,10 +464,8 @@ def inbox_row(inbox_id, matched, received_at):
     }
 
 
-def test_inbox_list_operator_sees_all_viewer_sees_own_and_unmatched(monkeypatch, published,
-                                                                    inbox_env):
+def test_inbox_list_operator_sees_all_and_scopes_apply(monkeypatch, published, inbox_env):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
     inbox_env.put_item(Item=inbox_row("evt-1", ["mine"], "2026-09-28T10:01:00+00:00"))
     inbox_env.put_item(Item=inbox_row("evt-2", ["theirs"], "2026-09-28T10:02:00+00:00"))
@@ -495,28 +477,28 @@ def test_inbox_list_operator_sees_all_viewer_sees_own_and_unmatched(monkeypatch,
         "evt-4", "evt-3", "evt-2", "evt-1"]
     assert operator[1]["total"] == 4
 
-    scoped = inbox_store.api_list(visible=visibility.for_role(MINE, "viewer"))
+    scoped = inbox_store.api_list(visible=visibility.Visibility(MINE))
     assert [event["inbox_id"] for event in scoped[1]["events"]] == ["evt-4", "evt-3", "evt-1"]
     assert scoped[1]["total"] == 3
     # The matched list stays whole on a visible row — it is what ran.
     assert scoped[1]["events"][0]["matched"] == ["gone-wf"]
 
 
-def test_inbox_route_filters_for_the_console_viewer(monkeypatch, published, inbox_env):
+def test_inbox_route_denies_non_operators(monkeypatch, published, inbox_env):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
     inbox_env.put_item(Item=inbox_row("evt-1", ["mine"], "2026-09-28T10:01:00+00:00"))
     inbox_env.put_item(Item=inbox_row("evt-2", ["theirs"], "2026-09-28T10:02:00+00:00"))
-    payload = json.loads(admin.route(
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
+    payload = admin.route(
         cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
-        "GET", "/api/admin/triggers/inbox")["body"])
-    assert [event["inbox_id"] for event in payload["events"]] == ["evt-1"]
+        "GET", "/api/admin/triggers/inbox")
+    assert payload["statusCode"] == 403
 
 
 # --- usage -------------------------------------------------------------------
 
-def test_usage_operator_sees_all_viewer_sees_own(monkeypatch, published):
+def test_usage_operator_sees_all_and_scopes_apply(monkeypatch, published):
     table = DictTable(("month", "workflow_id"))
     dynamo(monkeypatch, {"task-usage": table})
     monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
@@ -530,23 +512,23 @@ def test_usage_operator_sees_all_viewer_sees_own(monkeypatch, published):
     assert [row["workflow_id"] for row in operator[1]["usage"]] == [
         "theirs", "mine", "gone-wf"]
 
-    scoped = usage_rollup.api_usage(1, visible=visibility.for_role(MINE, "viewer"))
+    scoped = usage_rollup.api_usage(1, visible=visibility.Visibility(MINE))
     assert [row["workflow_id"] for row in scoped[1]["usage"]] == ["mine", "gone-wf"]
 
 
-def test_usage_route_filters_for_the_console_viewer(monkeypatch, published):
+def test_usage_route_denies_non_operators(monkeypatch, published):
     table = DictTable(("month", "workflow_id"))
     dynamo(monkeypatch, {"task-usage": table})
     monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "viewer"}])
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
     for workflow_id in ("mine", "theirs"):
         table.put_item(Item={"month": "202609", "workflow_id": workflow_id, "tasks": 2})
-    payload = json.loads(admin.route(
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
+    payload = admin.route(
         cookie_event(session_token(monkeypatch, sub="user@example.test", subject=MINE)),
-        "GET", "/api/admin/usage")["body"])
-    assert [row["workflow_id"] for row in payload["usage"]] == ["mine"]
+        "GET", "/api/admin/usage")
+    assert payload["statusCode"] == 403
 
 
 # --- G17 Phase 3: the owner-or-operator write gate (helper unit tests) --------
@@ -628,18 +610,17 @@ def test_write_gate_unconfigured_store_is_a_create(monkeypatch):
 
 def test_can_write_uses_the_scope(published):
     seed(published, workflow_item("w1", THEIRS))
-    assert visibility.for_role(MINE, "admin").can_write("w1") is None
-    assert visibility.for_role(MINE, "operator").can_write("w1") is None
-    status, _ = visibility.for_role(MINE, "editor").can_write("w1")
+    assert visibility.Visibility(MINE, is_operator=True).can_write("w1") is None
+    status, _ = visibility.Visibility(MINE).can_write("w1")
     assert status == 403
 
 
-# --- G17 Phase 3: the write routes (console) ----------------------------------
+# --- G17 Phase 3: the write routes --------------------------------------------
 
 def console_response(monkeypatch, method, path, body=None,
-                     sub="user@example.test", subject=MINE):
+                     sub="op@example.test", subject=MINE):
     # The console-write test idiom (test_designer.py): the CSRF same-origin
-    # check is stubbed; the session cookie carries the role under test.
+    # check is stubbed; the session cookie carries the identity under test.
     monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
     event = cookie_event(session_token(monkeypatch, sub=sub, subject=subject),
                          method=method, path=path)
@@ -648,88 +629,48 @@ def console_response(monkeypatch, method, path, body=None,
     return admin.route(event, method, path)
 
 
-def test_console_toggle_gate(monkeypatch, published):
+def test_console_write_routes_write_for_operators(monkeypatch, published):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS),
-         workflow_item("pre-g17", ""))
-
-    # Owner-editor: own workflow toggles.
-    assert console_response(monkeypatch, "PUT",
-                            "/api/admin/designer/workflows/mine.yaml",
-                            {"enabled": False})["statusCode"] == 200
-    # Foreign workflow: denied, untouched.
-    denied = console_response(monkeypatch, "PUT",
-                              "/api/admin/designer/workflows/theirs.yaml",
-                              {"enabled": False})
-    assert denied["statusCode"] == 403
-    assert "another owner" in json.loads(denied["body"])["error"]
-    assert published.items["theirs"]["workflow"]["enabled"] is True
-    # Ownerless stored item: denied on writes even though reads show it.
-    assert console_response(monkeypatch, "PUT",
-                            "/api/admin/designer/workflows/pre-g17.yaml",
-                            {"enabled": False})["statusCode"] == 403
-    # Operators unchanged: they still write anything.
+    seed(published, workflow_item("theirs", THEIRS))
     assert console_response(monkeypatch, "PUT",
                             "/api/admin/designer/workflows/theirs.yaml",
-                            {"enabled": False},
-                            sub="op@example.test", subject="subject-op"
-                            )["statusCode"] == 200
-
-
-def test_console_save_gate(monkeypatch, published):
-    operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
-    seed(published, workflow_item("theirs", THEIRS))
-
-    denied = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
-                              save_body("theirs"))
-    assert denied["statusCode"] == 403
-    assert "theirs#draft" not in published.items  # nothing was written
-    # A rename cannot smuggle a foreign workflow past the gate either.
-    denied = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
-                              save_body("fresh", renameFrom="theirs.yaml"))
-    assert denied["statusCode"] == 403
-    # Unclaimed id: the create stays open.
+                            {"enabled": False})["statusCode"] == 200
     created = console_response(monkeypatch, "PUT", "/api/admin/designer/workflows",
                                save_body("fresh"))
     assert created["statusCode"] == 200
-    assert json.loads(created["body"])["published"] is False
 
 
-def test_console_bulk_gate_is_per_id(monkeypatch, published):
+def test_console_write_routes_deny_non_operators(monkeypatch, published):
     operator_env(monkeypatch)
-    roles_env(monkeypatch, [{"identity": "user@example.test", "role": "editor"}])
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
-    payload = json.loads(console_response(
-        monkeypatch, "POST", "/api/admin/designer/workflows/bulk",
-        {"action": "disable", "ids": ["mine.yaml", "theirs.yaml"]})["body"])
-    results = {row["id"]: row for row in payload["results"]}
-    assert results["mine.yaml"]["ok"] is True
-    assert results["theirs.yaml"]["ok"] is False
-    assert "another owner" in results["theirs.yaml"]["error"]
-    assert payload["ok"] == 1
+    seed(published, workflow_item("theirs", THEIRS))
+    monkeypatch.setattr(session, "_audit_event", lambda *args, **kwargs: None)
+
+    # Off the allowlist, the gate denies before any ownership question.
+    for method, path, body in [
+        ("PUT", "/api/admin/designer/workflows/theirs.yaml", {"enabled": False}),
+        ("PUT", "/api/admin/designer/workflows", save_body("fresh")),
+        ("POST", "/api/admin/designer/workflows/bulk",
+         {"action": "disable", "ids": ["theirs.yaml"]}),
+    ]:
+        response = console_response(monkeypatch, method, path, body,
+                                    sub="user@example.test")
+        assert response["statusCode"] == 403, (method, path)
     assert published.items["theirs"]["workflow"]["enabled"] is True
+    assert "fresh#draft" not in published.items  # nothing was written
 
 
-# --- G17 Phase 3: the write routes (CLI / agent API) --------------------------
+# --- the CLI write routes ------------------------------------------------------
 
-def agent_response(monkeypatch, method, path, body=None, sub="cli-owner"):
+def agent_response(monkeypatch, method, path, body=None, sub="cli-op"):
     event = agent_event(method, path, sub)
     if body is not None:
         event["body"] = json.dumps(body)
     return agent_api.route(event, method, path)
 
 
-def cli_editor(monkeypatch, published, *items):
-    roles_env(monkeypatch, [{"identity": "cli-owner", "role": "editor"}])
-    agent_identity(monkeypatch, "cli-owner")
-    seed(published, *items)
-
-
-def test_cli_save_nonowner_denied_create_allowed(monkeypatch, published):
-    cli_editor(monkeypatch, published,
-               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
+def test_cli_write_routes_write_for_operators(monkeypatch, published):
+    agent_identity(monkeypatch, "cli-op")
+    seed(published, workflow_item("mine", "cli-op"))
 
     created = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
                              save_body("fresh"))
@@ -738,110 +679,28 @@ def test_cli_save_nonowner_denied_create_allowed(monkeypatch, published):
     own = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
                          save_body("mine"))
     assert own["statusCode"] == 200
-    denied = agent_response(monkeypatch, "PUT", "/api/agent/designer/workflows",
-                            save_body("theirs"))
-    assert denied["statusCode"] == 403
-    assert "theirs#draft" not in published.items
 
 
-def test_cli_source_write_routes_gate_nonowners(monkeypatch, published):
-    cli_editor(monkeypatch, published,
-               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
+def test_cli_write_routes_deny_non_operators(monkeypatch, published):
+    agent_identity(monkeypatch, "cli-nobody")
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@example.test")
+    seed(published, workflow_item("theirs", "cli-other"))
     executions = DictTable(("execution_id",))
     dynamo(monkeypatch, {"executions": executions})
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
 
     gated = [
+        ("PUT", "/api/agent/designer/workflows", save_body("fresh")),
         ("PUT", "/api/agent/designer/workflows/theirs.yaml", {"enabled": False}),
         ("DELETE", "/api/agent/designer/workflows/theirs.yaml", None),
         ("PUT", "/api/agent/designer/workflows/theirs.yaml/tags", {"tags": ["x"]}),
-        ("PUT", "/api/agent/designer/workflows/theirs.yaml/folder", {"folder": "x"}),
         ("POST", "/api/agent/designer/workflows/theirs.yaml/publish", None),
-        ("DELETE", "/api/agent/designer/workflows/theirs.yaml/draft", None),
-        ("POST", "/api/agent/designer/workflows/theirs.yaml/rollback", {"revision": 1}),
         ("POST", "/api/agent/designer/workflows/theirs.yaml/test", {"event": {}}),
-        ("POST", "/api/agent/designer/workflows/theirs.yaml/test-step",
-         {"action_id": "a1", "event": {}}),
-        # (the template-flag PUT is operator-banded — roles.py's default —
-        # so a non-operator is denied by the role gate before ownership)
+        # Even the inline (unsaved-draft) test rides the operator gate.
+        ("POST", "/api/agent/designer/workflows/test-step",
+         {"action_id": "a1", "event": {}, "workflow": workflow_dict("theirs")}),
         ("POST", "/api/agent/storage/theirs", {"key": "k", "value": "v"}),
-        ("DELETE", "/api/agent/storage/theirs", None),
     ]
     for method, path, body in gated:
         response = agent_response(monkeypatch, method, path, body)
         assert response["statusCode"] == 403, (method, path, response["body"])
-
-
-def test_cli_owner_writes_own_workflows(monkeypatch, published):
-    cli_editor(monkeypatch, published, workflow_item("mine", "cli-owner"))
-    published.items["mine#draft"] = draft_item("mine", "cli-owner", live=True)
-
-    assert agent_response(monkeypatch, "DELETE",
-                          "/api/agent/designer/workflows/mine.yaml/draft"
-                          )["statusCode"] == 200
-    assert agent_response(monkeypatch, "PUT",
-                          "/api/agent/designer/workflows/mine.yaml",
-                          {"enabled": False})["statusCode"] == 200
-    # The toggle above is now revision 2; a draft based on it publishes.
-    published.items["mine#draft"] = draft_item("mine", "cli-owner", live=True)
-    published.items["mine#draft"]["base_revision"] = 2
-    published_ok = agent_response(monkeypatch, "POST",
-                                  "/api/agent/designer/workflows/mine.yaml/publish")
-    assert published_ok["statusCode"] == 200
-    assert json.loads(published_ok["body"])["published"] is True
-
-
-def test_cli_bulk_gate_is_per_id(monkeypatch, published):
-    cli_editor(monkeypatch, published,
-               workflow_item("mine", "cli-owner"), workflow_item("theirs", "cli-other"))
-    payload = json.loads(agent_response(
-        monkeypatch, "POST", "/api/agent/designer/workflows/bulk",
-        {"action": "disable", "ids": ["mine.yaml", "theirs.yaml"]})["body"])
-    results = {row["id"]: row for row in payload["results"]}
-    assert results["mine.yaml"]["ok"] is True
-    assert results["theirs.yaml"]["ok"] is False
-    assert "another owner" in results["theirs.yaml"]["error"]
-    assert published.items["theirs"]["workflow"]["enabled"] is True
-
-
-def test_cli_keyed_test_gated_inline_test_not(monkeypatch, published):
-    cli_editor(monkeypatch, published, workflow_item("theirs", "cli-other"))
-    # Keyed by a saved workflow: the gate applies.
-    keyed = agent_response(monkeypatch, "POST",
-                           "/api/agent/designer/workflows/theirs.yaml/test",
-                           {"event": {}})
-    assert keyed["statusCode"] == 403
-    # Inline (the designer's unsaved draft): not keyed by a stored row.
-    inline = agent_response(monkeypatch, "POST",
-                            "/api/agent/designer/workflows/test-step",
-                            {"action_id": "a1", "event": {},
-                             "workflow": workflow_dict("theirs")})
-    assert inline["statusCode"] != 403
-
-
-def test_cli_duplicate_is_a_create_not_an_ownership_check(monkeypatch, published):
-    # Duplicating forks into a NEW id (the domain 409s on a collision), so
-    # the write gate's create rule applies: nothing to deny for a non-owner.
-    cli_editor(monkeypatch, published, workflow_item("mine", "cli-owner"))
-    copied = agent_response(monkeypatch, "POST",
-                            "/api/agent/designer/workflows/mine.yaml/duplicate", {})
-    assert copied["statusCode"] == 200
-    assert json.loads(copied["body"])["file"] == "mine-copy.yaml"
-
-
-def test_cli_storage_gate(monkeypatch, published):
-    cli_editor(monkeypatch, published, workflow_item("theirs", "cli-other"))
-    dynamo(monkeypatch, {"workflow-state": DictTable(("scope", "key"))})
-    monkeypatch.setenv("STORAGE_TABLE", "workflow-state")
-
-    denied = agent_response(monkeypatch, "POST", "/api/agent/storage/theirs",
-                            {"key": "k", "value": "v"})
-    assert denied["statusCode"] == 403
-    # The owner may write their workflow's storage.
-    roles_env(monkeypatch, [{"identity": "cli-owner", "role": "editor"},
-                            {"identity": "cli-other", "role": "editor"}])
-    agent_identity(monkeypatch, "cli-other")
-    allowed = agent_response(monkeypatch, "POST", "/api/agent/storage/theirs",
-                             {"key": "k", "value": "v"}, sub="cli-other")
-    assert allowed["statusCode"] == 200
-    assert json.loads(allowed["body"])["workflow"] == "theirs"

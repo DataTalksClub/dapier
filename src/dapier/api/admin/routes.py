@@ -9,7 +9,7 @@ from ... import error_digest
 from ... import host_tasks
 from ... import host_workers
 from ... import http
-from ...auth import api_tokens, authz, roles, session
+from ...auth import api_tokens, authz, session
 from ... import copilot
 from ...connections import credentials, importing, zoom
 from ...connectors import trigger_discovery

@@ -30,7 +30,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/usage", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/users", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
+CONSOLE_VIEWS = ("/", "/usage", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 
@@ -79,7 +79,6 @@ def _static(path):
         "/assets/js/views/workers.js": ("js/views/workers.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/schedules.js": ("js/views/schedules.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/users.js": ("js/views/users.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/storage.js": ("js/views/storage.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/audit.js": ("js/views/audit.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/triggers.js": ("js/views/triggers.js", "text/javascript; charset=utf-8"),

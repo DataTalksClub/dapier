@@ -5,8 +5,7 @@ Workflows are the owned items — ``owner`` is the subject stamped at publish
 rule, applied at the read surfaces (designer list, overview, runs, inbox,
 usage):
 
-1. Operators (and admins, via the same roles.py verdict the route gates use)
-   see everything.
+1. Operators (the allowlist verdict the route gates apply) see everything.
 2. Any other subject sees the workflows it owns.
 3. An item with no owner is visible to everyone — defensive, so a missing
    stamp never hides data.
@@ -29,10 +28,10 @@ before.
 """
 
 from ..triggers import published_workflows
-from . import roles
+from . import authz
 
 __all__ = ["Visibility", "visible_to", "owner_of_item", "workflow_owners",
-           "owners_for", "for_role", "for_session", "owner_for_write",
+           "owners_for", "for_session", "owner_for_write",
            "ensure_can_write"]
 
 
@@ -106,9 +105,9 @@ def owner_for_write(workflow_id):
 def ensure_can_write(subject, workflow_id, *, is_operator):
     """The G17 Phase 3 write rule for one workflow: ``None`` when the write
     may proceed, else ``(403, {"error": ...})`` — the ``(status, payload)``
-    shape the route layers already return, mirroring the roles.py guards.
+    shape the route layers already return.
 
-    Operators (and admins, the same roles.py verdict) write anything. A
+    Operators write anything. A
     non-operator writes only what it owns; an id nothing stored claims is a
     create and stays open. An item that exists with no owner stamp is
     DENIED for non-operators — the write-side default is the safe
@@ -171,18 +170,11 @@ def owners_for(visible):
     return workflow_owners()
 
 
-def for_role(subject, effective_role):
-    """The scope for an already-resolved effective role — the dispatchers
-    compute it for their gate anyway (roles.effective_role), so this is the
-    cheap path. Operator-or-admin sees everything; everyone else is
-    owner-scoped to their subject."""
-    return Visibility(subject, is_operator=roles.satisfies(effective_role, "operator"))
-
-
 def for_session(payload, table_ref=None):
     """The scope of a console cookie / CLI bearer session payload: the
-    subject it names, restricted exactly as roles.py restricts it."""
+    subject it names, with the operator allowlist (authz) deciding the
+    reach."""
     payload = payload or {}
     subject = payload.get("subject") or payload.get("sub")
-    return for_role(str(subject) if subject else "",
-                    roles.effective_role(payload, table_ref))
+    return Visibility(str(subject) if subject else "",
+                      is_operator=authz.is_operator(payload))

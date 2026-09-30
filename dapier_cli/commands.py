@@ -1338,54 +1338,6 @@ def grants_delete(api_url, connection_id, grantee, debug=False):
     return 0
 
 
-def print_users(items):
-    print(f"{'SUBJECT':44} {'ROLE':10} {'DISPLAY NAME':28} STATUS")
-    for item in items:
-        status = "disabled" if item.get("disabled") else "active"
-        display_name = item.get("display_name") or "-"
-        print(f"{item.get('subject', ''):44} {item.get('role', ''):10} "
-              f"{display_name:28} {status}")
-
-
-def users_list(api_url, debug=False):
-    data = api.call(api_url, "GET", "/api/agent/users", debug=debug)
-    items = data.get("users", [])
-    if not items:
-        print("No users in the roles store; the operator allowlist governs access. "
-              "Assign one with `dapier users set-role`.")
-        return 0
-    print_users(items)
-    return 0
-
-
-def users_set_role(api_url, subject, role, display_name=None, debug=False):
-    body = {"subject": subject, "role": role}
-    if display_name:
-        body["display_name"] = display_name
-    data = api.call(api_url, "POST", "/api/agent/users", body, debug=debug)
-    suffix = f" ({data['subject']})" if data.get("subject") != subject else ""
-    print(f"Set {data.get('subject', subject)}{suffix} to {data.get('role', role)}.")
-    return 0
-
-
-def users_remove(api_url, subject, assume_yes=False, debug=False):
-    if not assume_yes:
-        try:
-            answer = input(f"Remove {subject}'s stored role? The operator "
-                           "allowlist decides their access again [y/N]: ")
-        except EOFError:
-            # No interactive stdin (scripts, CI): never guess on a destroy.
-            print("No terminal to confirm on; pass --yes to remove without a prompt.")
-            return 2
-        if answer.strip().lower() not in ("y", "yes"):
-            print("Cancelled.")
-            return 1
-    query = urlencode({"subject": subject})
-    api.call(api_url, "DELETE", f"/api/agent/users?{query}", debug=debug)
-    print(f"Removed {subject}. The operator allowlist decides their access again.")
-    return 0
-
-
 def print_tokens(items):
     print(f"{'TOKEN':24} {'AGENT':24} {'STATUS':10} {'CREATED':20} LAST USED")
     for item in items:

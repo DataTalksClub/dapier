@@ -242,9 +242,7 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
         "GET", "/api/admin/me", cookies=[f"dapier_session={session}"],
     ))
     assert me["statusCode"] == 200
-    # Roles v1: /me also reports the effective role; with no roles store
-    # configured the allowlist operator resolves to the bootstrap "admin".
-    assert json.loads(me["body"]) == {"username": EMAIL, "operator": True, "role": "admin"}
+    assert json.loads(me["body"]) == {"username": EMAIL, "operator": True}
 
     seed_youtube_connection(dynamo.tables["connections"])
 

@@ -113,21 +113,6 @@ def build_parser():
     grants_del_p.add_argument("connection_id")
     grants_del_p.add_argument("grantee", help="The grant's grantee ID (subject#agent)")
 
-    users_p = sub.add_parser("users", help="Console users and their roles (admin)")
-    users_sub = users_p.add_subparsers(dest="command", required=True)
-    users_sub.add_parser("list", help="List users: subject, role, status")
-    users_set_p = users_sub.add_parser("set-role", help="Assign a role to a user")
-    users_set_p.add_argument("subject", help="The user's DTC subject or email")
-    users_set_p.add_argument("role", choices=["admin", "operator", "editor", "viewer"],
-                             help="admin manages users; operator is the full console; "
-                                  "editor edits workflows; viewer is read-only")
-    users_set_p.add_argument("--display-name", default=None,
-                             help="Optional human-readable name shown in the console")
-    users_del_p = users_sub.add_parser("remove", help="Remove a user's stored role")
-    users_del_p.add_argument("subject", help="The user's DTC subject or email")
-    users_del_p.add_argument("--yes", action="store_true",
-                             help="Skip the confirmation prompt")
-
     tokens_p = sub.add_parser("tokens", help="Operator-issued API tokens for headless consumers")
     tokens_sub = tokens_p.add_subparsers(dest="command", required=True)
     tokens_sub.add_parser("list", help="List API tokens (no secrets)")
@@ -641,8 +626,6 @@ def main(argv=None):
             return cmd_credentials(args, api_url, debug)
         if args.group == "grants":
             return cmd_grants(args, api_url, debug)
-        if args.group == "users":
-            return cmd_users(args, api_url, debug)
         if args.group == "tokens":
             return cmd_tokens(args, api_url, debug)
         if args.group == "overview":
@@ -929,18 +912,6 @@ def cmd_grants(args, api_url, debug):
         return commands.grants_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.grants_delete(api_url, args.connection_id, args.grantee, debug)
-    return 2
-
-
-def cmd_users(args, api_url, debug):
-    if args.command == "list":
-        return commands.users_list(api_url, debug)
-    if args.command == "set-role":
-        return commands.users_set_role(api_url, args.subject, args.role,
-                                       display_name=args.display_name, debug=debug)
-    if args.command == "remove":
-        return commands.users_remove(api_url, args.subject, assume_yes=args.yes,
-                                     debug=debug)
     return 2
 
 

@@ -17,7 +17,7 @@ import pytest
 from src.dapier.api import admin
 from src.dapier.api import agent as agent_api
 from src.dapier.api import designer_store
-from src.dapier.auth import roles, session
+from src.dapier.auth import session
 from src.dapier.triggers import published_workflows
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "web"
@@ -197,8 +197,8 @@ def admin_request(method, path, body=None, query=None):
 def operator_session(monkeypatch):
     monkeypatch.setattr(session, "authenticated", lambda event: True)
     monkeypatch.setattr(session, "_csrf_ok", lambda event, method: True)
-    monkeypatch.setattr(session, "require_role",
-                        lambda event, minimum="operator": ({"sub": "op-1"}, None))
+    monkeypatch.setattr(session, "require_operator",
+                        lambda event: ({"sub": "op-1"}, None))
 
 
 DIFF_PATH = "/api/admin/designer/workflows/test-flow.yaml/versions/diff"
@@ -229,11 +229,6 @@ def test_admin_diff_serves_the_payload(two_revisions, operator_session):
     payload = json.loads(response["body"])
     assert payload["same"] is False
     assert "+  url: https://example.test/hook2" in payload["diff"]
-
-
-def test_admin_diff_is_a_viewer_route_like_the_versions_read():
-    assert roles.minimum_for_route("GET", DIFF_PATH) == "viewer"
-    assert roles.minimum_for_action("workflow.versions") == "viewer"
 
 
 def test_admin_diff_requires_a_session(monkeypatch):

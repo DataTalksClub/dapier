@@ -60,7 +60,6 @@
         <p class="nav-group-label">Administration</p>
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
-        <a class="nav-item" href="/users" data-view="users"><i data-lucide="users"></i><span>Users</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
         <a class="nav-item" href="/usage" data-view="usage"><i data-lucide="chart-no-axes-column"></i><span>Usage</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
@@ -308,19 +307,6 @@
           </table>
         </div>
       </section>
-      <section class="view" data-page="users">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Users</h2><p class="sub">Who may use the console, and at which role. <strong>Admin</strong> manages users; <strong>operator</strong> is the full console minus user management; <strong>editor</strong> also edits and tests workflows; <strong>viewer</strong> is read-only. Until a user appears here, the deployment's operator allowlist (<code>OPERATOR_EMAILS</code>/<code>OPERATOR_SUBJECTS</code>) decides; a stored role narrows or widens that fallback. Removing the last admin is refused. <code>dapier users</code> reaches the same store.</p></div>
-          <button id="new-user" class="button primary" type="button">Set role</button>
-        </div>
-        <div id="user-empty" class="empty-state" hidden><h3>No users in the roles store</h3><p>Access falls back to the operator allowlist. Assign the first role to start managing users here — with an empty store, today's operators can grant the first admin.</p></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Subject</th><th>Role</th><th>Display name</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="user-table"></tbody>
-          </table>
-        </div>
-      </section>
       <section class="view" data-page="storage">
         <div class="section-head">
           <div class="section-head-text"><h2>Browse keys</h2><p class="sub">Each workflow keeps key-value state that its <code>storage_set</code>/<code>storage_get</code> steps remember across runs — dedupe flags, counters, last-seen cursors. <code>dapier storage</code> reaches the same values from the CLI.</p></div>
@@ -397,30 +383,6 @@
 
 
 
-  <dialog id="user-role-dialog" aria-labelledby="user-role-title">
-    <form id="user-role-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
-        <h2 id="user-role-title">Set role</h2>
-        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-      </div>
-      <div class="dialog-body">
-        <label>Subject<input name="subject" class="mono-input" placeholder="user@datatalks.club or DTC subject" required><small class="field-hint">The DTC subject or email the role binds to. Fixed after the first save — remove the user to change it.</small></label>
-        <label>Role<select name="role">
-          <option value="viewer">viewer — read-only console</option>
-          <option value="editor">editor — also edit and test workflows</option>
-          <option value="operator">operator — full console minus user management</option>
-          <option value="admin">admin — also manages users</option>
-        </select></label>
-        <label>Display name<input name="display_name" placeholder="Optional, shown in this table" maxlength="200"></label>
-        <label><input type="checkbox" name="disabled"> Disabled — denied everywhere</label>
-        <p id="user-role-error" class="form-error" role="alert"></p>
-      </div>
-      <div class="dialog-actions">
-        <button class="button secondary dialog-close" type="button">Cancel</button>
-        <button class="button primary" type="submit">Save role</button>
-      </div>
-    </form>
-  </dialog>
   <dialog id="user-confirm-dialog" aria-labelledby="user-confirm-title" aria-describedby="user-confirm-message">
     <form method="dialog">
       <div class="dialog-head">

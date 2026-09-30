@@ -3,10 +3,10 @@ import re
 from urllib.parse import unquote
 
 from ... import http
-from ...auth import authz, roles, session, visibility
+from ...auth import authz, session, visibility
 from ...connections import oauth_flow
 from .. import agent, overview
-from . import login, routes, users_routes  # noqa: F401 (used via module refs)
+from . import login, routes  # noqa: F401 (used via module refs)
 
 
 def _read_scope(payload):
@@ -40,16 +40,10 @@ def route(event, method, path):
         return http._json_response(200, {
             "username": payload.get("sub"),
             "operator": authz.is_operator(payload),
-            "role": roles.effective_role(payload),
         })
     if not session._csrf_ok(event, method):
         return http._json_response(403, {"error": "Cross-site request rejected"})
-    # Roles v1: the least privilege band this route accepts (viewer reads,
-    # editor workflow-editing, operator everything else, admin user
-    # management). With no stored role assignments this answers "admin" for
-    # every route — the historical gate, unchanged.
-    operator_payload, operator_error = session.require_role(
-        event, roles.minimum_for_route(method, path))
+    operator_payload, operator_error = session.require_operator(event)
     if operator_error:
         return operator_error
     operator_subject = session.subject_fallback(operator_payload)
@@ -130,14 +124,6 @@ def route(event, method, path):
         return routes.save_grant(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/grants":
         return routes.delete_grant(event, operator_subject)
-    if method == "GET" and path == "/api/admin/users":
-        return users_routes.list_users(event)
-    if method == "POST" and path == "/api/admin/users":
-        return users_routes.set_user_role(event, operator_subject)
-    user_match = re.fullmatch(r"/api/admin/users/([^/]+)", path)
-    if method == "DELETE" and user_match:
-        return users_routes.remove_user(event, unquote(user_match.group(1)),
-                                        operator_subject)
     if method == "GET" and path == "/api/admin/tokens":
         return routes.list_api_tokens(event)
     if method == "PUT" and path == "/api/admin/tokens":
@@ -375,7 +361,6 @@ from ...connections.oauth_flow import (  # noqa: F401
     oauth_callback_url,
     oauth_start,
 )
-from .users_routes import list_users, remove_user, set_user_role  # noqa: F401
 from ...auth.session import (  # noqa: F401
     SESSION_COOKIE,
     SESSION_TTL_SECONDS,

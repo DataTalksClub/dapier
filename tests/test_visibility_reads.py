@@ -137,7 +137,7 @@ def execution(workflow_id, event_id, started, *, status="completed", **extra):
 
 
 def viewer():
-    return visibility.for_role(MINE, "viewer")
+    return visibility.Visibility(MINE)
 
 
 # --- runs.api_get ------------------------------------------------------------
@@ -300,48 +300,26 @@ def agent_identity(monkeypatch, sub):
                         lambda: {"password": "session-secret"})
 
 
-def test_agent_run_get_scopes_the_cli_viewer(monkeypatch, published, runs_env):
+def test_agent_run_get_denies_non_operators(monkeypatch, published, runs_env):
     import json as _json
 
     from src.dapier.api import agent as agent_api
 
-    agent_identity(monkeypatch, "cli-viewer")
-    monkeypatch.setenv("ROLE_ASSIGNMENTS_TABLE", "role-assignments")
-    monkeypatch.delenv("AUDIT_TABLE", raising=False)
-    roles = {}
-    roles["cli-viewer"] = {"identity": "cli-viewer", "role": "viewer"}
-    published.put_item(Item=workflow_item("mine", "cli-viewer"))
-    published.put_item(Item=workflow_item("theirs", "cli-other"))
+    # Off the operator allowlist, the gate denies before any ownership
+    # question arises — even for the caller's own workflow's runs.
+    agent_identity(monkeypatch, "cli-nobody")
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@example.test")
+    published.put_item(Item=workflow_item("mine", "cli-nobody"))
     runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
-    runs_env.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-
-    class RoleTable:
-        def get_item(self, **kwargs):
-            item = roles.get(kwargs["Key"]["identity"])
-            return {"Item": dict(item)} if item else {}
-
-    class Dynamo:
-        def Table(self, name):
-            if name == "executions":
-                return runs_env
-            if name == "role-assignments":
-                return RoleTable()
-            return type("T", (), {"get_item": lambda self, **k: {}})()
-
-    import boto3 as _boto3
-    monkeypatch.setattr(_boto3, "resource", lambda service: Dynamo())
 
     own = agent_api.route(
         agent_event("GET", "/api/agent/runs/mine%3Aevt-e1"),
         "GET", "/api/agent/runs/mine%3Aevt-e1")
-    assert _json.loads(own["body"])["run"]["workflow_id"] == "mine"
-    hidden = agent_api.route(
-        agent_event("GET", "/api/agent/runs/theirs%3Aevt-e2"),
-        "GET", "/api/agent/runs/theirs%3Aevt-e2")
-    assert _json.loads(hidden["body"]) == {"error": "Run not found"}
+    assert own["statusCode"] == 403
+    assert _json.loads(own["body"]) == {"error": "Operator authorization required"}
 
 
-def test_console_designer_get_scopes_the_viewer(monkeypatch, published):
+def test_console_designer_get_denies_non_operators(monkeypatch, published):
     import json as _json
     import time as _time
 
@@ -349,42 +327,17 @@ def test_console_designer_get_scopes_the_viewer(monkeypatch, published):
     from src.dapier.auth import session as session_mod
 
     monkeypatch.setenv("OPERATOR_EMAILS", "op@example.test")
-    monkeypatch.setenv("ROLE_ASSIGNMENTS_TABLE", "role-assignments")
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
     published.put_item(Item=workflow_item("mine", MINE))
-    published.put_item(Item=workflow_item("theirs", THEIRS))
-    roles = {"user@example.test": {"identity": "user@example.test",
-                                   "role": "viewer"}}
-
-    class RoleTable:
-        def get_item(self, **kwargs):
-            item = roles.get(kwargs["Key"]["identity"])
-            return {"Item": dict(item)} if item else {}
-
-    class Dynamo:
-        def Table(self, name):
-            if name == "published-test":
-                return published
-            if name == "role-assignments":
-                return RoleTable()
-            return type("T", (), {"get_item": lambda self, **k: {}})()
-
-    import boto3 as _boto3
-    monkeypatch.setattr(_boto3, "resource", lambda service: Dynamo())
     monkeypatch.setattr(session_mod, "_credentials",
                         lambda: {"password": "session-secret"})
+    monkeypatch.setattr(session_mod, "_audit_event",
+                        lambda *args, **kwargs: None)
     token = session_mod._sign({"sub": "user@example.test", "subject": MINE,
                                "exp": int(_time.time()) + 3600})
 
     own = admin.route(
         cookie_event(token, "GET", "/api/admin/designer/workflows/mine.yaml"),
         "GET", "/api/admin/designer/workflows/mine.yaml")
-    assert _json.loads(own["body"])["workflow"]["id"] == "mine"
-    hidden = admin.route(
-        cookie_event(token, "GET", "/api/admin/designer/workflows/theirs.yaml"),
-        "GET", "/api/admin/designer/workflows/theirs.yaml")
-    assert _json.loads(hidden["body"]) == {"error": "no such workflow: theirs.yaml"}
-
-
-# --- route-level: the threading reaches the caller ---------------------------
-
+    assert own["statusCode"] == 403
+    assert _json.loads(own["body"]) == {"error": "Operator authorization required"}

@@ -10,7 +10,6 @@ import { openDesigner, designerFromLocation, confirmDesignerLeave } from './view
 import { showOAuthResult, openEditConnection } from './views/connections.js';
 import './views/storage.js';
 import { refreshAudit } from './views/audit.js';
-import { refreshUsers } from './views/users.js';
 import { toggleTheme } from './theme.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
@@ -201,7 +200,6 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   if (target === 'agents') renderAgentTasks();
   if (target === 'workers') renderWorkers();
   if (target === 'audit') refreshAudit();
-  if (target === 'users') refreshUsers();
 }));
 $('#overview-attention').addEventListener('click', async (event) => {
   const connection = event.target.closest('.home-connection');
@@ -232,7 +230,6 @@ window.addEventListener('popstate', async () => {
     if (view === 'agents') renderAgentTasks();
     if (view === 'workers') renderWorkers();
     if (view === 'audit') refreshAudit();
-    if (view === 'users') refreshUsers();
   }
 });
 
@@ -252,7 +249,7 @@ $('#startup-retry').addEventListener('click', async () => {
   $('#startup-retry').disabled = true;
   try {
     const me = await api('/api/admin/me');
-    if (!me.operator && !me.role) { $('#startup-error').hidden = true; showForbidden(); return; }
+    if (!me.operator) { $('#startup-error').hidden = true; showForbidden(); return; }
     await refresh();
   } catch (error) {
     if ($('#forbidden-view').hidden) showStartupError(error.message);
@@ -302,9 +299,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if ($('#forbidden-view').hidden) showStartupError(error.message);
     return;
   }
-  /* Roles v1: a stored viewer/editor assignment enters the console too —
-     the server still decides, per route, what each role may do. */
-  if (!me.operator && !me.role) { showForbidden(); return; }
+  if (!me.operator) { showForbidden(); return; }
   const initialView = viewFromPath(window.location.pathname);
   await setView(initialView, false);
   if (initialView === 'designer') await designerFromLocation();
@@ -314,7 +309,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (runId) await openRun(runId);
   }
   if (initialView === 'audit') refreshAudit();
-  if (initialView === 'users') refreshUsers();
   if (initialView === 'agents') renderAgentTasks();
   if (initialView === 'workers') renderWorkers();
   const oauth = new URLSearchParams(window.location.search);

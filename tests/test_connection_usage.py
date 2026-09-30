@@ -296,8 +296,6 @@ def test_agent_delete_route_and_list_usage(monkeypatch):
     monkeypatch.setattr(agent_api, "verify_id_token",
                         lambda token, audience=None: {
                             "sub": "op-1", "email": "op@datatalks.club"})
-    monkeypatch.setattr(agent_api.roles, "effective_role",
-                        lambda payload: "operator")
 
     # the operator list stamps used_in onto every row
     monkeypatch.setattr(connection_usage, "collect", lambda: {
@@ -360,8 +358,8 @@ def test_agent_delete_route_rejects_non_operators(monkeypatch):
     monkeypatch.setattr(agent_api, "verify_id_token",
                         lambda token, audience=None: {
                             "sub": "rand-1", "email": "rand@example.test"})
-    monkeypatch.setattr(agent_api.roles, "effective_role",
-                        lambda payload: "none")
+    # The operator allowlist is the gate: rand@example.test is not on it.
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
 
     response = agent_api.route(_bearer_event(), "DELETE", "/api/agent/connections/a")
     assert response["statusCode"] == 403

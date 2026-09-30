@@ -191,7 +191,6 @@ Globals:
         PUBLISHED_WORKFLOWS_TABLE: !Ref PublishedWorkflowsTable
         API_TOKENS_TABLE: !Ref ApiTokensTable
         DEVICE_SESSIONS_TABLE: !Ref DeviceSessionsTable
-        ROLE_ASSIGNMENTS_TABLE: !Ref RoleAssignmentsTable
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
 Resources:
@@ -290,8 +289,6 @@ Resources:
             TableName: !Ref ApiTokensTable
         - DynamoDBCrudPolicy:
             TableName: !Ref DeviceSessionsTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref RoleAssignmentsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBCrudPolicy:
@@ -1138,23 +1135,6 @@ Resources:
         - {AttributeName: token_hash, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
-  # User roles (src/dapier/auth/roles.py): one row per identity (DTC subject
-  # or email) carrying viewer/editor/operator/admin, an optional display
-  # name, and a disabled flag. A stored row wins over the operator allowlist
-  # (narrowing or widening it); with no rows the allowlist is authoritative,
-  # so deployments behave exactly as before roles exist.
-  RoleAssignmentsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - {AttributeName: identity, AttributeType: S}
-      KeySchema:
-        - {AttributeName: identity, KeyType: HASH}
-      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
-
   # Per-workflow key-value state for the storage_* actions
   # (src/dapier/engine/actions/storage.py): the workflow's id is the
   # partition, the stored key the sort; optional per-item TTL on expires.
@@ -1377,8 +1357,6 @@ Outputs:
     Value: !GetAtt CredentialsTable.Arn
   GrantsTableName:
     Value: !Ref GrantsTable
-  RoleAssignmentsTableName:
-    Value: !Ref RoleAssignmentsTable
   CursorsTableName:
     Value: !Ref CursorsTable
   PollTriggersTableName:
