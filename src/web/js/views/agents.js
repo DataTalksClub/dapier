@@ -30,15 +30,13 @@ export async function renderAgentTasks() {
   empty.textContent = 'No tasks yet. An agent action enqueues one when its workflow runs.';
   wrap.hidden = tasks.length === 0;
   body.innerHTML = tasks.map((task) => `<tr>
-      <td class="cell-title mono"><span class="cell-name">${escapeHtml(wrapTokens(task.task_id || ''))}</span><span class="cell-sub">${escapeHtml(task.engine || '')}</span></td>
+      <td class="cell-title mono"><span class="cell-name">${wrapTokens(task.task_id || '')}</span><span class="cell-sub">${escapeHtml(task.engine || '')}</span></td>
       <td class="mono muted-cell" data-label="Workflow">${escapeHtml(task.workflow || '—')}</td>
       <td data-label="Status">${statusLine(task.status)}</td>
       <td class="mono muted-cell" data-label="Result"><button class="button secondary agent-task-open" type="button" data-task="${escapeHtml(task.task_id)}">View logs</button><span class="cell-sub">${escapeHtml(task.summary || task.error || '—')}</span></td>
       <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(task.finished_at || task.started_at || task.created_at) || '—')}</td>
     </tr>`).join('');
 }
-
-$('#agent-tasks-refresh')?.addEventListener('click', () => renderAgentTasks());
 
 $('#agent-tasks-refresh').addEventListener('click', renderAgentTasks);
 let taskDetailSeq = 0;
