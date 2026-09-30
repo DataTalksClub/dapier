@@ -371,15 +371,21 @@ main { min-width: 0; padding: 0 40px 64px; }
 .connection-filters select { width: 150px; }
 .token-grant-choice { margin-right: auto; min-width: 170px; }
 
-/* data store view: the browse bar shares .run-filters; the write form sits
-   under the key table with the value field taking the remaining width */
-.storage-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 20px 0 8px; margin-top: 14px; border-top: 1px solid var(--line); }
-.storage-form h3 { width: 100%; margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
-.storage-form label { min-width: 150px; }
-.storage-form .storage-value-field { flex: 1 1 260px; }
-.storage-form textarea { width: 100%; min-height: 64px; border: 1px solid var(--line-strong); background: var(--surface); padding: 8px 12px; font: inherit; font-size: 13.5px; color: var(--ink); resize: vertical; }
+/* data store view: the browse bar shares .run-filters; the write form is a
+   top-aligned grid so every label sits on one line — the value textarea
+   starts at input height and autogrows downward as it fills */
+.storage-form { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(260px, 2.2fr) minmax(170px, 1fr) auto; align-items: start; gap: 10px 14px; padding: 20px 0 8px; margin-top: 14px; border-top: 1px solid var(--line); }
+.storage-form h3 { grid-column: 1 / -1; margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.storage-form label { min-width: 0; }
+.storage-form .button { align-self: end; }
+.storage-form textarea { width: 100%; max-height: 14rem; border: 1px solid var(--line-strong); background: var(--surface); padding: 8px 12px; font: inherit; font-size: 13.5px; color: var(--ink); resize: none; overflow-y: auto; }
 .storage-form textarea:focus { outline: 2px solid var(--accent-line); outline-offset: -1px; }
-#storage-table-wrap td.muted-cell { max-width: 420px; overflow-wrap: anywhere; }
+.storage-put-target { font-weight: 400; color: var(--muted); }
+#storage-table-wrap { margin-top: 12px; }
+.storage-value-cell { max-width: 480px; }
+.storage-value-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; cursor: zoom-in; }
+.storage-value-cell.expanded .storage-value-text { display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; cursor: zoom-out; }
+@media (max-width: 860px) { .storage-form { grid-template-columns: 1fr; } .storage-form .button { justify-self: start; } }
 
 /* --- metrics --------------------------------------------------------------- */
 .metrics {

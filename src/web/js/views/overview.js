@@ -14,6 +14,7 @@ import { renderRuns, openRun } from './runs.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
+import { renderStorage } from './storage.js';
 
 const TRIGGER_TEXT = {
   'email.message.received': 'An email arrives',
@@ -157,6 +158,7 @@ function render() {
   renderInbox();
   renderSchedules();
   renderTriggers();
+  renderStorage();
   const now = new Date();
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();

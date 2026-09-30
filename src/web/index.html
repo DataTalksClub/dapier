@@ -312,15 +312,15 @@
       </section>
       <section class="view" data-page="storage">
         <div class="section-head">
-          <div class="section-head-text"><h2>Data store</h2><p class="sub">Each workflow's key-value state — what its <code>storage_set</code>/<code>storage_get</code> steps remember across runs (dedupe flags, counters, last-seen cursors). <code>dapier storage</code> reaches the same values.</p></div>
+          <div class="section-head-text"><h2>Browse keys</h2><p class="sub">Each workflow keeps key-value state that its <code>storage_set</code>/<code>storage_get</code> steps remember across runs — dedupe flags, counters, last-seen cursors. <code>dapier storage</code> reaches the same values from the CLI.</p></div>
         </div>
         <form id="storage-browse" class="run-filters">
-          <label>Workflow ID<input name="workflow" placeholder="todo-email-sheet" required></label>
-          <label>Key prefix<input name="prefix" placeholder="(every key)"></label>
+          <label>Workflow<select name="workflow" required><option value="">Choose a workflow…</option></select></label>
+          <label>Key prefix<input name="prefix" placeholder="every key"></label>
           <button class="button secondary" type="submit">List keys</button>
-          <span class="field-hint">Empty prefix lists all of the workflow's keys.</span>
         </form>
-        <div id="storage-empty" class="empty-state"><h3>No stored keys</h3><p>Keys appear here as a workflow's storage steps run. Store one below to try it, then read it back with a storage_get step.</p></div>
+        <div id="storage-idle" class="empty-state"><h3>Pick a workflow to inspect its keys</h3><p>Choose a workflow above — the keys its storage steps wrote appear here, with values and expiry.</p></div>
+        <div id="storage-empty" class="empty-state" hidden><h3 id="storage-empty-title">No stored keys</h3><p>Keys appear as this workflow's storage steps run. Store one below to try it, then read it back with a storage_get step.</p></div>
         <div id="storage-table-wrap" class="table-wrap" hidden>
           <table>
             <thead><tr><th>Key</th><th>Value</th><th>Updated</th><th>Expires</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
@@ -328,9 +328,9 @@
           </table>
         </div>
         <form id="storage-put" class="storage-form">
-          <h3>Store a value</h3>
-          <label>Key<input name="key" required></label>
-          <label class="storage-value-field">Value<textarea name="value" rows="3" required></textarea></label>
+          <h3>Store a value <span id="storage-put-target" hidden>for <code id="storage-put-workflow"></code></span></h3>
+          <label>Key<input name="key" required placeholder="dedupe:message-123"></label>
+          <label class="storage-value-field">Value<textarea name="value" rows="1" required placeholder="true"></textarea></label>
           <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="optional"></label>
           <button class="button primary" type="submit">Store</button>
         </form>
