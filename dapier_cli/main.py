@@ -478,19 +478,6 @@ def build_parser():
                              help="Folder name — sets or moves the workflow (at most one folder)")
     wf_folder_p.add_argument("--clear", action="store_true",
                              help="Remove the workflow from its folder")
-    tpl_p = sub.add_parser("templates", help="Workflow templates: browse the gallery, fork one, publish yours")
-    tpl_sub = tpl_p.add_subparsers(dest="command", required=True)
-    tpl_list_p = tpl_sub.add_parser("list", help="List the template gallery")
-    tpl_list_p.add_argument("--json", action="store_true", dest="json",
-                            help="Print the raw JSON instead of a table")
-    tpl_apply_p = tpl_sub.add_parser("apply", help="Fork a template into a new workflow and publish it live")
-    tpl_apply_p.add_argument("file", help="Template file name, e.g. template-webhook-to-slack.yaml")
-    tpl_apply_p.add_argument("--name", default=None,
-                             help="New workflow name (defaults to <template-id>-copy)")
-    tpl_publish_p = tpl_sub.add_parser("publish", help="Offer a saved workflow in the template gallery")
-    tpl_publish_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
-    tpl_unpublish_p = tpl_sub.add_parser("unpublish", help="Remove a workflow from the template gallery")
-    tpl_unpublish_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
     hook_p = sub.add_parser(
         "hooks", help="Moved to dapier webhooks",
         description="Moved to dapier webhooks.")
@@ -604,8 +591,6 @@ def main(argv=None):
             return cmd_triggers(args, api_url, debug)
         if args.group == "workflows":
             return cmd_workflows(args, api_url, debug)
-        if args.group == "templates":
-            return cmd_templates(args, api_url, debug)
         if args.group == "hooks":
             return cmd_hooks(args, api_url, debug)
         if args.group == "schedules":
@@ -878,18 +863,6 @@ def workflows_diff(api_url, file, from_revision, to_revision, debug=False):
         print("Warning: the diff was truncated at the server's size cap; "
               "narrow the revision range to see more.", file=sys.stderr)
     return 0
-
-
-def cmd_templates(args, api_url, debug):
-    if args.command == "list":
-        return commands.templates_list(api_url, as_json=args.json, debug=debug)
-    if args.command == "apply":
-        return commands.templates_apply(api_url, args.file, name=args.name, debug=debug)
-    if args.command == "publish":
-        return commands.templates_publish(api_url, args.file, True, debug=debug)
-    if args.command == "unpublish":
-        return commands.templates_publish(api_url, args.file, False, debug=debug)
-    return 2
 
 
 def cmd_hooks(args, api_url, debug):

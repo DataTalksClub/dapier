@@ -264,12 +264,8 @@ Platform / editor (organizational, deliberately deferred until now):
     `users.remove` audit rows, a last-admin lockout guard), `dapier users
     list|set-role|remove`, and the console's Users view; `/api/admin/me`
     carries the effective role. Tests: `tests/test_roles.py`.
-10. **Templates / marketplace** — publish, browse, fork shared workflows.
-    CLOSED (2026-09-28, v1): a `template: true` definition flag feeds a
-    gallery (console designer + `dapier templates list`), apply forks the
-    template through the save path, and publish/unpublish is one flag
-    endpoint — all on console, CLI, and API. Cross-account transfer remains
-    blocked on 9.
+10. **Templates / marketplace** — removed at the operator’s request
+    (2026-09-30). Reuse workflows with Duplicate or YAML import/export.
 11. **Runs CSV export** — CLOSED (2026-09-28): `runs_to_csv` + export on
     `api/runs.py`, `dapier runs export` (`-o` file), console Runs view
     export — all riding the same bounded-window API.

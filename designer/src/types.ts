@@ -72,8 +72,6 @@ export interface Workflow {
   actions?: Array<Record<string, unknown>>;
   flow?: string;
   flows?: Record<string, FlowSpec>;
-  /** Offered in the template gallery when true (template flag route). */
-  template?: boolean;
   description?: string;
 }
 
@@ -85,7 +83,6 @@ export interface WorkflowSummary {
   event: string;
   actionCount: number;
   description?: string;
-  template?: boolean;
   triggerCount?: number;
   tags?: string[];
   /** false: a saved draft with nothing live (it fires nothing until publish). */

@@ -216,17 +216,6 @@ def route(event, method, path):
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
     if method == "POST" and designer_duplicate_match:
         return routes.duplicate_designer_workflow(event, operator_subject, designer_duplicate_match.group(1))
-    if method == "GET" and path == "/api/admin/designer/templates":
-        return routes.templates_list(event)
-    designer_template_apply_match = re.fullmatch(
-        r"/api/admin/designer/templates/([a-z0-9][a-z0-9._-]*\.yaml)/apply", path)
-    if method == "POST" and designer_template_apply_match:
-        return routes.apply_designer_template(event, operator_subject, designer_template_apply_match.group(1))
-    designer_template_match = re.fullmatch(
-        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/template", path)
-    if method == "PUT" and designer_template_match:
-        return routes.template_flag_designer_workflow(event, operator_subject, designer_template_match.group(1),
-                                                      visible=_read_scope(operator_payload))
     designer_versions_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
@@ -322,9 +311,6 @@ from .routes import (  # noqa: F401
     folder_designer_workflow,
     discover_connection,
     duplicate_designer_workflow,
-    apply_designer_template,
-    template_flag_designer_workflow,
-    templates_list,
     errors_summary,
     send_error_digest,
     get_inbox_event,

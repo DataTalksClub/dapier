@@ -593,37 +593,6 @@ def duplicate_designer_workflow(event, operator, source):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def templates_list(event):
-    """The gallery of managed workflow templates."""
-    status, payload = designer_store.api_templates()
-    return http._json_response(status, payload)
-
-def apply_designer_template(event, operator, source):
-    """Console mirror of the CLI apply: fork a template into a new workflow."""
-    try:
-        body = http._request_json(event)
-        status, payload = designer_store.api_apply_template(source, body, operator=operator)
-    except (ValueError, json.JSONDecodeError) as exc:
-        return http._json_response(400, {"error": str(exc) or "Invalid request"})
-    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.template.apply", operator,
-                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return http._json_response(status, payload)
-
-def template_flag_designer_workflow(event, operator, source, visible=None):
-    """Console mirror of the CLI publish/unpublish: toggle template flag."""
-    denied = _write_denied(visible, str(source).removesuffix(".yaml"),
-                           "workflow.template", operator)
-    if denied:
-        return denied
-    try:
-        body = http._request_json(event)
-        status, payload = designer_store.api_template_flag(source, body, operator=operator)
-    except (ValueError, json.JSONDecodeError) as exc:
-        return http._json_response(400, {"error": str(exc) or "Invalid request"})
-    session._audit_event(str(source), "workflow.template", operator,
-                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return http._json_response(status, payload)
-
 def delete_designer_workflow(event, operator, source, visible=None):
     """Console mirror of the CLI delete: unpublish the live item (version
     records survive — history, not live state), then one atomic git

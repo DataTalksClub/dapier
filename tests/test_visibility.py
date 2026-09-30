@@ -829,22 +829,6 @@ def test_cli_duplicate_is_a_create_not_an_ownership_check(monkeypatch, published
     assert json.loads(copied["body"])["file"] == "mine-copy.yaml"
 
 
-def test_cli_template_apply_creates_under_its_operator_band(monkeypatch, published):
-    # Template apply is operator-banded on both surfaces (roles.py's
-    # default), and its write target is a new id — the fork — so no
-    # ownership check applies; this proves the route still creates.
-    template = workflow_item("tpl", "cli-other")
-    template["workflow"]["template"] = True
-    roles_env(monkeypatch, [{"identity": "cli-op", "role": "operator"}])
-    agent_identity(monkeypatch, "cli-op")
-    seed(published, template)
-    applied = agent_response(monkeypatch, "POST",
-                             "/api/agent/designer/templates/tpl.yaml/apply", {},
-                             sub="cli-op")
-    assert applied["statusCode"] == 200
-    assert json.loads(applied["body"])["file"] == "tpl-copy.yaml"
-
-
 def test_cli_storage_gate(monkeypatch, published):
     cli_editor(monkeypatch, published, workflow_item("theirs", "cli-other"))
     dynamo(monkeypatch, {"workflow-state": DictTable(("scope", "key"))})

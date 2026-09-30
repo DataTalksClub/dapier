@@ -52,7 +52,6 @@
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
-        <a class="nav-item" href="/templates" data-view="templates"><i data-lucide="layout-template"></i><span>Templates</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
         <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
@@ -94,7 +93,7 @@
       <section class="view active" data-page="overview">
         <div class="section-head page-intro home-intro">
           <div><h2>Your automations</h2><p class="sub">Build a workflow, pick up where you left off, or check its latest result.</p></div>
-          <div class="home-create-actions"><a class="button secondary view-link" href="/templates" data-target="templates">Browse templates</a><a class="button primary" href="/workflows/new" data-new-workflow><i data-lucide="plus"></i>Create workflow</a></div>
+          <div class="home-create-actions"><a class="button primary" href="/workflows/new" data-new-workflow><i data-lucide="plus"></i>Create workflow</a></div>
         </div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <div class="overview-columns">
@@ -105,7 +104,7 @@
           <section aria-labelledby="home-workflows-title">
             <div class="section-head"><div><h2 id="home-workflows-title">Your workflows</h2><p class="sub" id="home-workflow-count"></p></div><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows<i data-lucide="arrow-right"></i></a></div>
             <div id="overview-workflows" class="home-workflows"></div>
-            <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Choose a template or create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="button secondary view-link" href="/templates" data-target="templates">Choose a template</a></div>
+            <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="button secondary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
           </section>
           <section aria-labelledby="home-results-title">
             <div class="section-head"><div><h2 id="home-results-title">Latest results</h2><p class="sub">Recent executions. Open one to inspect its steps.</p></div><a class="text-link view-link" href="/runs" data-target="runs">All runs<i data-lucide="arrow-right"></i></a></div>
@@ -164,19 +163,6 @@
           <table>
             <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Runs</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="poll-table"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="view" data-page="templates">
-        <div class="section-head">
-          <div class="section-head-text"><h2>Templates</h2><p class="sub">Workflows published as reusable starting points. <strong>Use template</strong> forks one into a new workflow; the template stays in the gallery. Publish a workflow as a template from its row under <a class="view-link" href="/workflows" data-target="workflows">Workflows</a>.</p></div>
-        </div>
-        <div id="template-empty" class="empty-state" hidden><h3>No templates published yet</h3><p>Publish one of your workflows as a template from its row in the Workflows list — it appears here for one-click forking.</p><a class="button secondary view-link" href="/workflows" data-target="workflows">Open workflows</a></div>
-        <div id="template-table-wrap" class="table-wrap">
-          <table>
-            <thead><tr><th>Template</th><th>Trigger</th><th>Steps</th><th>Source</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="template-table"></tbody>
           </table>
         </div>
       </section>
@@ -925,23 +911,6 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button id="workflow-folder-save" class="button primary" type="submit">Save folder</button>
-      </div>
-    </form>
-  </dialog>
-  <dialog id="template-apply-dialog" aria-labelledby="template-apply-title">
-    <form id="template-apply-form" method="dialog">
-      <div class="dialog-head">
-        <h2 id="template-apply-title">Use template</h2>
-        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-      </div>
-      <div class="dialog-body">
-        <p class="sub" id="template-apply-blurb"></p>
-        <label>New workflow name<input id="template-apply-name" class="mono-input" type="text" placeholder="invoice-copy" autocomplete="off"><small class="field-hint">Optional — defaults to <code>&lt;template-id&gt;-copy</code>. The copy drops the template flag and its run state; the template itself stays in the gallery.</small></label>
-        <p id="template-apply-error" class="form-error" role="alert" hidden></p>
-      </div>
-      <div class="dialog-actions">
-        <button class="button secondary dialog-close" type="button">Cancel</button>
-        <button id="template-apply-save" class="button primary" type="submit">Use template</button>
       </div>
     </form>
   </dialog>

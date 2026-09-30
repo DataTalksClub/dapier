@@ -1535,33 +1535,8 @@ def test_connections_show_prints_health(capsys, monkeypatch):
     assert "token_expires_at: 2026-01-02" in out
 
 
-def test_main_templates_parsing(monkeypatch):
-    seen = {}
-
-    def fake_call(api_url, method, path, body=None, **kwargs):
-        seen["method"] = method
-        seen["path"] = path
-        seen["body"] = body
-        if path.endswith("/templates"):
-            return {"templates": []}
-        return {"file": "my-flow.yaml", "workflow_id": "my-flow",
-                "commit": "abc1234", "published": True}
-
-    monkeypatch.setattr(cli_commands.api, "call", fake_call)
-    assert main.main(["templates", "list"]) == 0
-    assert seen["method"] == "GET"
-
-    assert main.main(["templates", "apply", "template-starter.yaml",
-                      "--name", "My Flow"]) == 0
-    assert (seen["method"], seen["path"], seen["body"]) == (
-        "POST", "/api/agent/designer/templates/template-starter.yaml/apply",
-        {"name": "My Flow"})
-
-    assert main.main(["templates", "publish", "my-flow.yaml"]) == 0
-    assert (seen["method"], seen["path"], seen["body"]) == (
-        "PUT", "/api/agent/designer/workflows/my-flow.yaml/template", {"template": True})
-
-    assert main.main(["templates", "unpublish", "my-flow.yaml"]) == 0
-    assert (seen["method"], seen["path"], seen["body"]) == (
-        "PUT", "/api/agent/designer/workflows/my-flow.yaml/template", {"template": False})
+def test_templates_command_is_removed():
+    with pytest.raises(SystemExit) as exc:
+        main.main(["templates", "list"])
+    assert exc.value.code == 2
 

@@ -719,50 +719,6 @@ def workflows_duplicate(api_url, file, name=None, debug=False):
     return 0
 
 
-def templates_list(api_url, as_json=False, debug=False):
-    """The gallery of managed workflow templates."""
-    data = api.call(api_url, "GET", "/api/agent/designer/templates", debug=debug)
-    items = data.get("templates", [])
-    if as_json:
-        print(json.dumps(items, indent=2))
-        return 0
-    if not items:
-        print("No templates yet. Publish one with `dapier templates publish <file>`.")
-        return 0
-    for item in items:
-        trigger = f"{item.get('connector', '?')} · {item.get('event', '?')}"
-        extra = item.get("triggerCount", 0) - 1
-        more = f" (+{extra} more)" if extra > 0 else ""
-        print(f"{item.get('source', ''):44} {trigger:40} "
-              f"{item.get('actionCount', 0)} action(s){more}  {item.get('description', '')}")
-    return 0
-
-
-def templates_apply(api_url, file, name=None, debug=False):
-    """Fork a template into a new workflow (the server slugifies `--name`,
-    default `<template-id>-copy`) through the same publish path
-    as a save; the template stays in the gallery."""
-    body = {"name": name} if name else {}
-    data = api.call(api_url, "POST", f"/api/agent/designer/templates/{file}/apply",
-                    body, debug=debug)
-    new_file = data.get("file") or file
-    if data.get("published"):
-        print(f"Applied {file} as {new_file} and published it live.")
-    else:
-        print(f"Applied {file} as {new_file}.")
-    return 0
-
-
-def templates_publish(api_url, file, flag, debug=False):
-    """Offer a saved workflow in the template gallery (or withdraw it)."""
-    data = api.call(api_url, "PUT", f"/api/agent/designer/workflows/{file}/template",
-                    {"template": bool(flag)}, debug=debug)
-    state = "published as a template" if flag else "removed from the template gallery"
-    suffix = f" ({str(data.get('commit', ''))[:7]})" if data.get("commit") else ""
-    print(f"{data.get('workflow_id') or file} {state}{suffix}.")
-    return 0
-
-
 def workflows_versions(api_url, file, debug=False):
     """Version history for one workflow: who published what, when, and why."""
     data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}/versions", debug=debug)

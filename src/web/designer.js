@@ -21793,83 +21793,6 @@
       }
     ) });
   }
-  function TemplatesGallery({ config, onApply, onClose }) {
-    const [templates, setTemplates] = reactExports.useState(null);
-    const [error, setError] = reactExports.useState("");
-    reactExports.useEffect(() => {
-      let cancelled = false;
-      api(config, "/templates").then((data) => {
-        if (!cancelled) setTemplates(data.templates);
-      }).catch((err) => {
-        if (!cancelled) setError(String(err));
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [config]);
-    reactExports.useEffect(() => {
-      const onKey = (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
-    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "section",
-      {
-        className: "picker-panel",
-        role: "dialog",
-        "aria-modal": "true",
-        "aria-labelledby": "templates-gallery-title",
-        onClick: (event) => event.stopPropagation(),
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "templates-gallery-title", children: "Start from a template" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Applying forks a template into a new workflow that starts Off — wire up your connections, then switch it on. The template stays in the gallery." }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "picker-list", children: [
-            (templates ?? []).map((template) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: template.id }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: template.description || `${template.connector}/${template.event}` })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "template-chips", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                "button",
-                {
-                  type: "button",
-                  className: "template-chip",
-                  title: `Apply ${template.id}`,
-                  onClick: () => onApply(template),
-                  children: [
-                    connectorLabel(template.connector),
-                    "/",
-                    template.event,
-                    " · ",
-                    template.actionCount,
-                    " action",
-                    template.actionCount === 1 ? "" : "s",
-                    " — Apply"
-                  ]
-                }
-              ) })
-            ] }, template.source)),
-            templates && templates.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
-              "No templates yet — publish one with “Publish as template” or",
-              " ",
-              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "dapier templates publish" }),
-              "."
-            ] }),
-            !templates && !error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Loading…" }),
-            error && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
-              "Could not load templates: ",
-              error
-            ] })
-          ] })
-        ]
-      }
-    ) });
-  }
   function CopilotDraftDialog({ config, onLoad, onClose }) {
     const [prompt, setPrompt] = reactExports.useState("");
     const [busy, setBusy] = reactExports.useState(false);
@@ -21990,7 +21913,6 @@
     const [triggerSample, setTriggerSample] = reactExports.useState(null);
     const [copilotOpen, setCopilotOpen] = reactExports.useState(false);
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
-    const [templatesOpen, setTemplatesOpen] = reactExports.useState(false);
     const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
     const [clipboardHasStep, setClipboardHasStep] = reactExports.useState(() => readStepClipboard() !== null);
     const dirty = reactExports.useMemo(
@@ -22129,7 +22051,7 @@
           }
           return;
         }
-        if (leaveOpen || copilotOpen || stepsPickerOpen || templatesOpen || shortcutsOpen) return;
+        if (leaveOpen || copilotOpen || stepsPickerOpen || shortcutsOpen) return;
         const target = event.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
         if (target instanceof HTMLElement && target.isContentEditable) return;
@@ -22602,52 +22524,6 @@
         setStatus({
           kind: "ok",
           message: result.published === false ? `Duplicated as ${result.file}; goes live after deployment.` : `Duplicated as ${result.file}.`
-        });
-      } catch (error) {
-        setStatus({ kind: "error", message: String(error) });
-      }
-    }
-    async function applyTemplate2(summary) {
-      const name = window.prompt(`New workflow name (blank for the suggested name):`, `${summary.id}-copy`);
-      if (name === null) return;
-      setStatus({ kind: "busy", message: "Applying template…" });
-      try {
-        const result = await api(
-          config,
-          `/templates/${encodeURIComponent(summary.source)}/apply`,
-          {
-            method: "POST",
-            body: JSON.stringify(name.trim() ? { name: name.trim() } : {})
-          }
-        );
-        const workflows = await refreshList();
-        refreshGit();
-        const created = workflows.find((entry) => entry.source === result.file);
-        if (created) await openWorkflow(created);
-        setStatus({
-          kind: "ok",
-          message: result.published === false ? `Created ${result.file} from the template; it goes live after deployment.` : `Created ${result.file} from the template. It starts Off — wire it up, then switch it On.`
-        });
-      } catch (error) {
-        setStatus({ kind: "error", message: String(error) });
-      }
-    }
-    async function toggleTemplateFlag() {
-      if (!sourceName) return;
-      const next = base?.template !== true;
-      setStatus({ kind: "busy", message: next ? "Publishing as template…" : "Removing from templates…" });
-      try {
-        await api(config, `/workflows/${encodeURIComponent(sourceName)}/template`, {
-          method: "PUT",
-          body: JSON.stringify({ template: next })
-        });
-        const data = await api(config, `/workflows/${encodeURIComponent(sourceName)}`);
-        setBase(data.workflow);
-        await refreshList();
-        refreshGit();
-        setStatus({
-          kind: "ok",
-          message: next ? `Offered as a template (${workflowId}).` : `Removed from the template gallery (${workflowId}).`
         });
       } catch (error) {
         setStatus({ kind: "error", message: String(error) });
@@ -23270,27 +23146,6 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               }
             ),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: "button secondary",
-                type: "button",
-                onClick: toggleTemplateFlag,
-                disabled: status.kind === "busy" || !sourceName,
-                title: !sourceName ? "Save the workflow first — the flag rides the saved YAML" : base?.template ? "Remove this workflow from the template gallery" : "Offer this workflow in the template gallery",
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: base?.template ? "Unpublish template" : "Publish as template" })
-              }
-            ),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: "button secondary",
-                type: "button",
-                onClick: () => setTemplatesOpen(true),
-                title: "Start from a workflow template",
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Templates" })
-              }
-            ),
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
@@ -23531,17 +23386,6 @@
             void copyTemplate(template);
           },
           onClose: () => setStepsPickerOpen(false)
-        }
-      ),
-      templatesOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
-        TemplatesGallery,
-        {
-          config,
-          onApply: (template) => {
-            setTemplatesOpen(false);
-            void applyTemplate2(template);
-          },
-          onClose: () => setTemplatesOpen(false)
         }
       ),
       copilotOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(

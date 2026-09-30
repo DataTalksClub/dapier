@@ -488,83 +488,6 @@ function StepsTemplatePicker({ steps, onPick, onClose }: {
   );
 }
 
-/** Template gallery: GET /api/admin/designer/templates, one card per
-    template flagged `template: true`. Applying is the server's fork route
-    (the same commit-and-publish path the CLI's `templates apply` uses), so
-    the template itself stays in the gallery untouched. */
-function TemplatesGallery({ config, onApply, onClose }: {
-  config: DesignerConfig;
-  onApply: (template: WorkflowSummary) => void;
-  onClose: () => void;
-}) {
-  const [templates, setTemplates] = useState<WorkflowSummary[] | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    api<{ templates: WorkflowSummary[] }>(config, "/templates")
-      .then((data) => { if (!cancelled) setTemplates(data.templates); })
-      .catch((err) => { if (!cancelled) setError(String(err)); });
-    return () => { cancelled = true; };
-  }, [config]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="picker-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="picker-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="templates-gallery-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 id="templates-gallery-title">Start from a template</h2>
-        <p className="picker-status">
-          Applying forks a template into a new workflow that starts Off — wire up your
-          connections, then switch it on. The template stays in the gallery.
-        </p>
-        <div className="picker-list">
-          {(templates ?? []).map((template) => (
-            <div key={template.source} className="step-templates">
-              <p className="step-templates-head">
-                <span className="picker-item-id">{template.id}</span>
-                <span className="picker-item-name">
-                  {template.description || `${template.connector}/${template.event}`}
-                </span>
-              </p>
-              <div className="template-chips">
-                <button
-                  type="button"
-                  className="template-chip"
-                  title={`Apply ${template.id}`}
-                  onClick={() => onApply(template)}
-                >
-                  {connectorLabel(template.connector)}/{template.event} · {template.actionCount} action{template.actionCount === 1 ? "" : "s"} — Apply
-                </button>
-              </div>
-            </div>
-          ))}
-          {templates && templates.length === 0 && (
-            <p className="inspector-hint">
-              No templates yet — publish one with &ldquo;Publish as template&rdquo; or
-              {" "}<code>dapier templates publish</code>.
-            </p>
-          )}
-          {!templates && !error && <p className="inspector-hint">Loading…</p>}
-          {error && <p className="inspector-hint">Could not load templates: {error}</p>}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 /** Console copilot: a natural-language prompt becomes a DRAFT workflow from
     POST /api/admin/copilot/draft. The draft is shown read-only with its
     validation errors; nothing is saved or published here — loading it into
@@ -711,7 +634,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       insert-from-previous picker over the earlier steps' outputs. */
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [stepsPickerOpen, setStepsPickerOpen] = useState(false);
-  const [templatesOpen, setTemplatesOpen] = useState(false);
   /** "?" overlay listing the editor's keyboard shortcuts. */
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** A step sits on the cross-workflow clipboard, so Paste step can appear. */
@@ -905,7 +827,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         }
         return;
       }
-      if (leaveOpen || copilotOpen || stepsPickerOpen || templatesOpen || shortcutsOpen) return;
+      if (leaveOpen || copilotOpen || stepsPickerOpen || shortcutsOpen) return;
       const target = event.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
       // Rich-text hosts (contenteditable) keep the browser's editing keys too.
@@ -1439,60 +1361,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         message: result.published === false
           ? `Duplicated as ${result.file}; goes live after deployment.`
           : `Duplicated as ${result.file}.`
-      });
-    } catch (error) {
-      setStatus({ kind: "error", message: String(error) });
-    }
-  }
-
-  /** Forks a template into a real workflow through the server's apply route
-     (the same commit-and-publish path the CLI's `templates apply` uses),
-     then opens the copy. The template itself stays in the gallery. */
-  async function applyTemplate(summary: WorkflowSummary) {
-    const name = window.prompt(`New workflow name (blank for the suggested name):`, `${summary.id}-copy`);
-    if (name === null) return;
-    setStatus({ kind: "busy", message: "Applying template…" });
-    try {
-      const result = await api<{ file: string; published?: boolean }>(
-        config, `/templates/${encodeURIComponent(summary.source)}/apply`, {
-          method: "POST",
-          body: JSON.stringify(name.trim() ? { name: name.trim() } : {})
-        });
-      const workflows = await refreshList();
-      refreshGit();
-      const created = workflows.find((entry) => entry.source === result.file);
-      if (created) await openWorkflow(created);
-      setStatus({
-        kind: "ok",
-        message: result.published === false
-          ? `Created ${result.file} from the template; it goes live after deployment.`
-          : `Created ${result.file} from the template. It starts Off — wire it up, then switch it On.`
-      });
-    } catch (error) {
-      setStatus({ kind: "error", message: String(error) });
-    }
-  }
-
-  /** Publishes/unpublishes the saved workflow as a template through the
-     server's flag route; the flag rides the YAML like tags do. */
-  async function toggleTemplateFlag() {
-    if (!sourceName) return;
-    const next = base?.template !== true;
-    setStatus({ kind: "busy", message: next ? "Publishing as template…" : "Removing from templates…" });
-    try {
-      await api<{ template: boolean }>(config, `/workflows/${encodeURIComponent(sourceName)}/template`, {
-        method: "PUT",
-        body: JSON.stringify({ template: next })
-      });
-      const data = await api<{ workflow: Workflow }>(config, `/workflows/${encodeURIComponent(sourceName)}`);
-      setBase(data.workflow);
-      await refreshList();
-      refreshGit();
-      setStatus({
-        kind: "ok",
-        message: next
-          ? `Offered as a template (${workflowId}).`
-          : `Removed from the template gallery (${workflowId}).`
       });
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
@@ -2124,31 +1992,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && (
               <button
-                className="button secondary"
-                type="button"
-                onClick={toggleTemplateFlag}
-                disabled={status.kind === "busy" || !sourceName}
-                title={!sourceName
-                  ? "Save the workflow first — the flag rides the saved YAML"
-                  : base?.template
-                    ? "Remove this workflow from the template gallery"
-                    : "Offer this workflow in the template gallery"}
-              >
-                <span>{base?.template ? "Unpublish template" : "Publish as template"}</span>
-              </button>
-            )}
-            {config.mode === "console" && (
-              <button
-                className="button secondary"
-                type="button"
-                onClick={() => setTemplatesOpen(true)}
-                title="Start from a workflow template"
-              >
-                <span>Templates</span>
-              </button>
-            )}
-            {config.mode === "console" && (
-              <button
                 className={copilotOpen ? "button secondary active" : "button secondary"}
                 type="button"
                 onClick={() => setCopilotOpen(true)}
@@ -2397,16 +2240,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             void copyTemplate(template);
           }}
           onClose={() => setStepsPickerOpen(false)}
-        />
-      )}
-      {templatesOpen && (
-        <TemplatesGallery
-          config={config}
-          onApply={(template) => {
-            setTemplatesOpen(false);
-            void applyTemplate(template);
-          }}
-          onClose={() => setTemplatesOpen(false)}
         />
       )}
       {copilotOpen && (

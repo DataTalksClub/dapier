@@ -425,7 +425,7 @@ the discovery/replay/test work already underway.
 | Sub-zaps (call another workflow) | `run_workflow` step (`connectors/subworkflow.py`) | have |
 | Data stores (Zapier Storage API) | `storage_get/set/delete/find` + storage API + console view (`connectors/storage.py`, `api/storage.py`, `views/storage.js`) | have |
 | Outbound webhooks with signing/retry | HMAC signing + typed `HttpError` + per-step `autoretry` (`engine/actions/webhook.py`, `engine/logic.py`) | have |
-| Templates / shared zaps (marketplace) | `template: true` flag rides the workflow YAML; gallery + apply (fork) + publish/unpublish on console (Templates view + the designer gallery; Workflows rows carry Duplicate and Publish/Unpublish template), CLI (`dapier templates`), and API (`/designer/templates*`); bundled starters in `workflows/template-*.yaml` | have (v1: single-tenant gallery; cross-account transfer still needs multi-user) |
+| Templates / shared zaps (marketplace) | Removed at the operator’s request (2026-09-30); workflows can still be duplicated or imported/exported | out of scope |
 
 ## 2. Ranked gaps
 
@@ -1092,25 +1092,9 @@ Still open (ranked, from the same audit):
    entries and designer catalog mirrors; tests:
    `tests/test_mailchimp_actions.py`, `tests/test_find_slack_dropbox.py`.
 
-14. **CLOSED (2026-09-28)** — Workflow templates v1: a workflow flagged
-   `template: true` (the flag rides the workflow YAML, set through
-   `api_template_flag`) joins the gallery that `api_templates` serves —
-   the bundled starters in `workflows/template-*.yaml` plus anything an
-   operator published, the published overlay winning per id. Forking is
-   `api_apply_template`: the flagged workflow loads under a new
-   `<template-id>-copy` id and goes through the same commit-and-publish
-   path as a save. All three surfaces: the designer's "Start from a
-   template" gallery (console bundle rebuilt), `GET/POST
-   /api/admin/designer/templates*`, the operator-gated `/api/agent/designer/templates*`
-   trio, and `dapier templates list|apply|publish|unpublish`. Tests:
-   `tests/test_designer.py` (store + admin routes), `tests/test_cli.py`
-   (command surface). Cross-account transfer still needs the multi-user
-   model (item 13); marketplace-style sharing beyond this deployment
-   remains future work. Console-native surface (2026-09-28): a Templates
-   nav view (`views/templates.js` — gallery, Use template fork dialog,
-   Unpublish), Duplicate and Publish/Unpublish-template buttons on the
-   Workflows rows (the overview payload rides the `template` flag), and
-   `tests/test_console_templates_gallery.py` pinning the wiring.
+14. **REMOVED (2026-09-30)** — Workflow template galleries, publish/apply
+   routes, CLI commands, and bundled starters were removed at the operator’s
+   request. Duplicate and YAML import/export remain available.
 15. **CLOSED (2026-09-28)** — Designer editor polish: undo/redo over a
    per-session draft timeline (`designer/src/history.ts`, pure module —
    500ms sliding coalescing per editing group, 50-entry cap, reset on

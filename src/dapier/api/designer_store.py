@@ -182,9 +182,6 @@ def _summary(workflow, source):
         "tags": _tags_of(workflow),
         # Zapier-style flat folder ("" when none); set through api_folder.
         "folder": _folder_of(workflow),
-        # Offered in the templates gallery when true; set through
-        # api_template_flag. Defensive: hand-written YAML can carry anything.
-        "template": workflow.get("template") is True,
         # Paused by the engine after consecutive failed runs (cleared by
         # re-enabling — the resume verb); engine-stamped runtime state.
         "auto_paused": workflow.get("auto_paused") is True,
@@ -1422,112 +1419,6 @@ def api_duplicate(source, body=None, operator=None):
     return status, payload
 
 
-def api_templates():
-    """Browse the template gallery: summaries of managed workflows flagged
-    ``template: true``. Templates are ordinary workflows: the flag only decides
-    whether they show up here."""
-    templates = {}
-    if published_workflows.configured():
-        for item in published_workflows.load_items():
-            workflow = item.get("workflow")
-            if not isinstance(workflow, dict) or not workflow.get("id"):
-                continue
-            if workflow.get("template") is True:
-                source = item.get("file") or f"{workflow['id']}.yaml"
-                templates[str(workflow["id"])] = _summary(workflow, source)
-    ordered = sorted(templates.values(), key=lambda summary: summary["id"])
-    return 200, {"templates": ordered}
-
-
-def api_apply_template(source, body=None, operator=None):
-    """Fork a template into a new workflow: load the flagged workflow, rename
-    the id, strip the flag and run-state bookkeeping, and save through the
-    same commit-and-publish path api_save uses. The template itself — its
-    file, id, flag, and published item — is left untouched, so it stays in
-    the gallery for the next apply.
-
-    ``body`` optionally carries ``{"name": "..."}``; without it the copy is
-    named ``<template-id>-copy``. Returns api_save's response shape plus
-    ``applied_from``.
-    """
-    if not FILE_PATTERN.fullmatch(source or ""):
-        return 400, {"error": f"invalid workflow file name: {source!r}"}
-    if body is None:
-        body = {}
-    if not isinstance(body, dict):
-        return 400, {"error": "request body must be an object"}
-    new_name = body.get("name")
-    if new_name is not None and (not isinstance(new_name, str) or not new_name.strip()):
-        return 400, {"error": "name must be a non-empty string"}
-    status, payload = api_get(source)
-    if status != 200:
-        return status, payload
-    template = payload["workflow"]
-    if template.get("template") is not True:
-        return 400, {"error": f"workflow '{template['id']}' is not a template"}
-    base_name = new_name.strip() if new_name else f"{template['id']}-copy"
-    new_id = slugify_id(base_name)
-    if not new_id:
-        return 400, {"error": f"cannot derive a workflow id from {base_name!r}"}
-    if new_id == str(template["id"]) or _workflow_exists(new_id, filename_for(new_id)):
-        return 409, {"error": f"a workflow named '{new_id}' already exists"}
-    copy = {key: value for key, value in template.items()
-            if key not in RUN_STATE_KEYS and key != "template"}
-    copy["id"] = new_id
-    yaml_text = workflow_yaml_text(copy)
-    # Applying a template publishes the fork live, like duplicate — the
-    # template itself is untouched.
-    status, payload = api_save(
-        {"yaml": yaml_text}, operator=operator, live=True,
-        message=f"designer: apply template {template['id']} as {new_id}")
-    payload["applied_from"] = source
-    return status, payload
-
-
-def api_template_flag(source, body, *, operator=None):
-    """Publish or unpublish a workflow as a template (``template: true`` in
-    its YAML, so the flag travels with save/export/duplicate like any other
-    definition key). Body ``{"template": true|false}``; writing it
-    re-publishes the definition (cause "template" in the version history) and
-    commits the updated YAML best-effort, exactly like the tags endpoint."""
-    if not isinstance(body, dict) or not isinstance(body.get("template"), bool):
-        return 400, {"error": 'body must be {"template": true|false}'}
-    if not published_workflows.configured():
-        return 503, {"error": "published workflows are not configured"}
-    if not FILE_PATTERN.fullmatch(source or ""):
-        return 400, {"error": f"invalid workflow file name: {source!r}"}
-    status, payload = api_get(source)
-    if status != 200:
-        return status, payload
-    workflow = payload["workflow"]
-    flag = body["template"]
-    if flag:
-        workflow["template"] = True
-    else:
-        workflow.pop("template", None)
-    try:
-        previous = published_workflows.get_item(workflow["id"])
-        published_workflows.publish(workflow, operator=operator,
-                                    previous=previous, cause="template")
-    except Exception as exc:
-        return 502, {"error": f"publish failed: {exc}"}
-    result = {
-        "file": source,
-        "workflow_id": str(workflow["id"]),
-        "template": flag,
-        "published": True,
-    }
-    try:
-        committed = commit_workflow(
-            workflow_yaml_text(workflow),
-            message=f"designer: {'publish' if flag else 'unpublish'} template {workflow['id']}",
-        )
-        result["commit"] = committed["commit"]
-    except (SyncConfigError, SyncError) as exc:
-        result["git_sync_error"] = str(exc)
-    return 200, result
-
-
 def filename_for(workflow_id):
     return f"{workflow_id}.yaml"
 
@@ -1721,10 +1612,8 @@ def parse_workflow(yaml_text):
                 "auto_pause_after must be a positive number of consecutive "
                 "failed runs, or false to switch the auto-pause off")
 
-    # The template flag is boolean; anything falsy or malformed means "not a
-    # template", so the key is dropped rather than stored as-is.
-    if workflow.get("template") is not True:
-        workflow.pop("template", None)
+    # Retire the old gallery flag when importing or saving older definitions.
+    workflow.pop("template", None)
 
     triggers = workflow.get("triggers")
     trigger = workflow.get("trigger")

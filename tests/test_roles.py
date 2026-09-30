@@ -179,8 +179,6 @@ def test_minimum_for_route_bands():
     assert roles.minimum_for_route("PUT", "/api/admin/designer/workflows") == "editor"
     assert roles.minimum_for_route("DELETE", "/api/admin/designer/workflows/foo.yaml") == "editor"
     assert roles.minimum_for_route("POST", "/api/admin/designer/workflows/test-step") == "editor"
-    assert roles.minimum_for_route("GET", "/api/admin/designer/templates") == "viewer"
-    assert roles.minimum_for_route("POST", "/api/admin/designer/templates/t.yaml/apply") == "editor"
     assert roles.minimum_for_route("GET", "/api/admin/users") == "admin"
     assert roles.minimum_for_route("DELETE", "/api/admin/users/user@example.test") == "admin"
     assert roles.minimum_for_route("PUT", "/api/admin/grants") == "operator"

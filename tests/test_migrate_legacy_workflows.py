@@ -33,7 +33,8 @@ class Table:
 def test_catalog_inlines_every_legacy_workflow():
     root = Path(__file__).resolve().parents[1] / "migrations/legacy-workflows"
     workflows, flows = catalog(root)
-    assert len(workflows) == 10
+    assert len(workflows) == 7
+    assert not any(name.startswith("template-") for name in workflows)
     assert len(flows) == 5
     assert workflows["todo-intake"]["actions"] == flows["todo-email-sheet"]
     assert all("flow" not in workflow and "flows" not in workflow

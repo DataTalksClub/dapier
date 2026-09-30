@@ -587,16 +587,6 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
     if designer_duplicate_match and method == "POST":
         return designer_duplicate_api(event, designer_duplicate_match.group(1))
-    if path == "/api/agent/designer/templates" and method == "GET":
-        return designer_templates_api(event)
-    designer_template_apply_match = re.fullmatch(
-        r"/api/agent/designer/templates/([a-z0-9][a-z0-9._-]*\.yaml)/apply", path)
-    if designer_template_apply_match and method == "POST":
-        return designer_template_apply_api(event, designer_template_apply_match.group(1))
-    designer_template_flag_match = re.fullmatch(
-        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/template", path)
-    if designer_template_flag_match and method == "PUT":
-        return designer_template_flag_api(event, designer_template_flag_match.group(1))
     designer_versions_match = re.fullmatch(
         r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if designer_versions_match and method == "GET":
@@ -836,53 +826,6 @@ def designer_duplicate_api(event, source):
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.duplicate", subject,
-               outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return _json_response(status, payload)
-
-
-def designer_templates_api(event):
-    """Operator-only template gallery: workflows flagged template:true.
-    Mirrors the console's templates endpoint."""
-    subject, error = require_operator(event, "workflow.template")
-    if error:
-        return error
-    status, payload = designer_store.api_templates()
-    return _json_response(status, payload)
-
-
-def designer_template_apply_api(event, source):
-    """Operator-only template apply: fork a template into a new workflow
-    through the same commit-and-publish path as a save; the template itself
-    is untouched. Mirrors the console's apply endpoint."""
-    subject, error = require_operator(event, "workflow.template")
-    if error:
-        return error
-    try:
-        body = json.loads(event.get("body") or "{}")
-        status, payload = designer_store.api_apply_template(source, body, operator=subject)
-    except (ValueError, json.JSONDecodeError) as exc:
-        return _json_response(400, {"error": str(exc) or "Invalid request"})
-    audit.emit(str(payload.get("file", source or "unknown")), "workflow.template.apply", subject,
-               outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return _json_response(status, payload)
-
-
-def designer_template_flag_api(event, source):
-    """Operator-only template publish/unpublish: toggle the template flag.
-    Mirrors the console's template-flag endpoint."""
-    subject, error = require_operator(event, "workflow.template")
-    if error:
-        return error
-    denied = _write_denied(event, subject, str(source).removesuffix(".yaml"),
-                           "workflow.template")
-    if denied:
-        return denied
-    try:
-        body = json.loads(event.get("body") or "{}")
-        status, payload = designer_store.api_template_flag(source, body, operator=subject)
-    except (ValueError, json.JSONDecodeError) as exc:
-        return _json_response(400, {"error": str(exc) or "Invalid request"})
-    audit.emit(str(source), "workflow.template", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
 
