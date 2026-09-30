@@ -53,14 +53,17 @@ def checkin(owner, meta, *, task_id=None, finished=None, table_ref=None, now=Non
     current = int(now or time.time())
     names, values, assignments = {}, {}, [
         "#kind = :kind", "#seen = :seen", "expires_at = :expires",
-        "#owner = :owner", "started_at = if_not_exists(started_at, :now)",
+        "#owner = :owner", "#worker = :wid",
+        "started_at = if_not_exists(started_at, :now)",
     ]
     values.update({":kind": "worker", ":seen": current,
                    ":expires": current + TTL_SECONDS,
-                   ":owner": str(owner or ""), ":now": current})
-    # owner is a DynamoDB reserved word; kind and last_seen ride names for
-    # symmetry with the mapped keys below.
-    names.update({"#kind": "kind", "#seen": "last_seen", "#owner": "owner"})
+                   ":owner": str(owner or ""), ":now": current,
+                   ":wid": meta["worker_id"]})
+    # owner (and, defensively, worker_id) are DynamoDB reserved words; kind
+    # and last_seen ride names for symmetry with the mapped keys below.
+    names.update({"#kind": "kind", "#seen": "last_seen", "#owner": "owner",
+                  "#worker": "worker_id"})
     for key in ("hostname", "pid", "workspace_root"):
         if meta.get(key) is not None:
             names[f"#{key}"] = key

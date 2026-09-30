@@ -138,6 +138,8 @@ def test_checkin_creates_row_then_refreshes_without_resetting_started(workers_ta
     host_workers.checkin("token:host", meta(), table_ref=workers_table, now=1000)
     row = workers_table.get_item(Key={"task_id": "worker:ip-10-0-0-7-4242-deadbeef"})["Item"]
     assert row["kind"] == "worker"
+    # The id is more than the row key: the projection reads the attribute.
+    assert row["worker_id"] == "ip-10-0-0-7-4242-deadbeef"
     assert row["started_at"] == 1000 and row["last_seen"] == 1000
     assert row["hostname"] == "ip-10-0-0-7" and row["pid"] == 4242
     assert row["owner"] == "token:host"
