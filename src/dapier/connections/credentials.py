@@ -43,6 +43,12 @@ def get_credential_record(credential_id):
     return _table().get_item(Key={"credential_id": credential_id}).get("Item") or {}
 
 
+def delete_credential(credential_id):
+    """Remove the record outright, secret and all — the delete-a-connection
+    path uses this so no orphaned credential outlives its connection."""
+    _table().delete_item(Key={"credential_id": credential_id})
+
+
 def get_credential(credential_id):
     item = get_credential_record(credential_id)
     if not item or not isinstance(item.get("value"), dict):

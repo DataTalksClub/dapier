@@ -286,6 +286,9 @@ def route(event, method, path):
     revoke_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/tokens", path)
     if method == "DELETE" and revoke_match:
         return routes.revoke_connection_tokens(revoke_match.group(1), operator_subject)
+    connection_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)", path)
+    if method == "DELETE" and connection_match:
+        return routes.delete_connection(event, connection_match.group(1), operator_subject)
     token_issue_match = re.fullmatch(r"/api/admin/connections/([a-z0-9_-]+)/token", path)
     if method == "POST" and token_issue_match:
         return routes.issue_connection_token(unquote(token_issue_match.group(1)), operator_subject)

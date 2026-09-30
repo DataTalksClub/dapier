@@ -50,8 +50,10 @@ class Table:
         key = kwargs["Key"]
         if "token_hash" in key:
             self.items.pop(key["token_hash"], None)
-        else:
+        elif "grantee" in key:
             self.items.pop((key["connection_id"], key["grantee"]), None)
+        else:
+            self.items.pop(key.get("connection_id"), None)
 
     def query(self, **kwargs):
         value = kwargs["ExpressionAttributeValues"][":connection"]

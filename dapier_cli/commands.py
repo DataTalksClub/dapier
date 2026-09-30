@@ -32,13 +32,25 @@ def _local_expiry(item):
 
 
 def print_connections(items):
-    print(f"{'CONNECTION':24} {'PROVIDER':10} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'ACCOUNT'}")
+    print(f"{'CONNECTION':24} {'PROVIDER':10} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'USED IN':24} ACCOUNT")
     for item in items:
         account = item.get("account_title") or item.get("verified_account_id") or "-"
         scopes = ",".join((item.get("granted_scopes") or item.get("scopes") or [])[:2])
         extra = f" [{scopes}]" if scopes else ""
         print(f"{item.get('connection_id', ''):24} {item.get('provider', ''):10} "
-              f"{item.get('status', ''):10} {item.get('health') or '-':8} {_local_expiry(item):17} {account}{extra}")
+              f"{item.get('status', ''):10} {item.get('health') or '-':8} {_local_expiry(item):17} "
+              f"{_used_in_label(item):24} {account}{extra}")
+
+
+def _used_in_label(item):
+    """The USED IN column: up to two referencing workflows/hooks, then +N."""
+    refs = sorted({str(entry.get("ref")) for entry in item.get("used_in") or []})
+    if not refs:
+        return "-"
+    shown = ", ".join(refs[:2])
+    if len(refs) > 2:
+        shown += f" +{len(refs) - 2}"
+    return shown
 
 
 def print_connection(item):
@@ -1433,6 +1445,28 @@ def connections_revoke(api_url, connection_id, debug=False):
                     f"/api/agent/connections/{connection_id}/tokens", debug=debug)
     print(f"Revoked tokens for {data.get('connection_id', connection_id)}; "
           f"status is now {data.get('status')}.")
+    return 0
+
+
+def connections_delete(api_url, connection_id, force=False, debug=False):
+    """`dapier connections delete`: remove a connection outright. The API
+    refuses (409) while workflows or hook triggers still reference it; the
+    error names them, and --force accepts breaking those references."""
+    path = f"/api/agent/connections/{connection_id}"
+    if force:
+        path += "?force=true"
+    try:
+        data = api.call(api_url, "DELETE", path, debug=debug)
+    except api.ApiError as exc:
+        if exc.status == 409:
+            print(f"Not deleted: {exc}")
+            print("Pass --force to delete it anyway and leave those references dangling.")
+            return 1
+        raise
+    grants = data.get("grants_removed") or 0
+    print(f"Deleted {data.get('connection_id', connection_id)}"
+          + (f" ({grants} grant{'s' if grants != 1 else ''} removed)" if grants else "")
+          + ". Its stored credential went with it.")
     return 0
 
 

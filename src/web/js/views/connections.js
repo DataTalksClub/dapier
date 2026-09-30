@@ -339,8 +339,9 @@ export function openEditConnection(connectionId) {
   form.reset();
   form.dataset.connectionId = connection.connection_id;
   form.dataset.provider = connection.provider;
+  const refs = usageRefs(connection);
   $('#edit-connection-title').textContent = `Manage ${connection.display_name || connection.connection_id}`;
-  $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}`;
+  $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}${refs.length ? ` · used by ${refs.length === 1 ? '1 flow/trigger' : `${refs.length} flows/triggers`}` : ' · unused'}`;
   form.display_name.value = connection.display_name || connection.connection_id;
   form.scopes.value = (connection.scopes || []).join(' ');
   $('#edit-scopes-field').hidden = TOKEN_PROVIDERS.includes(connection.provider);
@@ -417,7 +418,8 @@ function renderConnections(connections) {
     if (statusFilter === 'attention' && !needsAttention(connection)) return false;
     if (!query) return true;
     return [connection.display_name, connection.connection_id, connection.provider,
-      connection.account_title, connection.verified_account_id].some((value) => String(value || '').toLowerCase().includes(query));
+      connection.account_title, connection.verified_account_id,
+      ...(connection.used_in || []).map((entry) => entry.ref)].some((value) => String(value || '').toLowerCase().includes(query));
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
   const withinGroup = (a, b) =>
@@ -441,6 +443,21 @@ function renderConnections(connections) {
   bindOAuthLinks();
 }
 
+/* Which live workflows and hook triggers reference the connection — the
+   API computes used_in (workflow definitions + hook bindings) so every
+   surface, not just the console, agrees on what a connection is for and
+   whether deleting it would break something. */
+function usageRefs(connection) {
+  return [...new Set((connection.used_in || []).map((entry) => String(entry.ref)))];
+}
+
+function usageLabel(connection) {
+  const refs = usageRefs(connection);
+  if (!refs.length) return 'Not used by any flow';
+  const shown = refs.slice(0, 3).join(', ');
+  return `Used in: ${shown}${refs.length > 3 ? ` +${refs.length - 3}` : ''}`;
+}
+
 function connectionRow(connection) {
     /* health is computed by the API from the stored token expiry; an expired
        token turns a connected row into "needs reconnection" (the label the
@@ -456,7 +473,7 @@ function connectionRow(connection) {
     const identity = connection.account_title || connection.verified_account_id;
     const expires = formatTimestamp(connection.token_expires_at);
     return `<tr>
-    <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span></td>
+    <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span><span class="cell-sub muted-cell">${escapeHtml(usageLabel(connection))}</span></td>
     <td data-label="Provider"><span class="provider-cell">${providerMark(connection.provider)}<span class="mono muted-cell">${escapeHtml(connection.provider)}</span></span></td>
     <td data-label="Status">${statusLine(status, CONNECTION_STATUS_LABELS)}${expires && status !== 'expired' ? `<span class="cell-sub muted-cell">token expires ${escapeHtml(expires)}</span>` : ''}</td>
     <td class="action-cell">${nextAction}${tokenAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
@@ -500,6 +517,49 @@ $('#edit-connection-reconnect').addEventListener('click', (event) => {
   $('#edit-connection-dialog').close();
   event.preventDefault();
   openOAuthWindow(event.currentTarget.href, $('#edit-connection-form').dataset.connectionId);
+});
+
+/* Delete removes the connection record outright — revoke only clears the
+   tokens and leaves the row. Built here rather than in index.html because
+   only this view needs it (the same call as the token-result dialog). The
+   confirm names the referencing flows; the API re-checks server-side and
+   answers 409 with the same list, so a stale view cannot delete a
+   connection that just gained a reference. */
+const editDeleteButton = document.getElementById('edit-connection-delete')
+  || (() => {
+    const button = document.createElement('button');
+    button.id = 'edit-connection-delete';
+    button.className = 'button danger';
+    button.type = 'button';
+    button.textContent = 'Delete';
+    $('#edit-connection-revoke').after(button);
+    return button;
+  })();
+
+editDeleteButton.addEventListener('click', async () => {
+  const form = $('#edit-connection-form');
+  const connectionId = form.dataset.connectionId;
+  if (!connectionId) return;
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  const refs = usageRefs(connection || {});
+  const message = refs.length
+    ? `${connectionId} is still used by: ${refs.join(', ')}. Delete it anyway? Those flows and triggers lose access.`
+    : `Delete ${connectionId}? Its stored credential and access grants go with it. This cannot be undone.`;
+  if (!await confirmRevoke('Delete connection', message)) return;
+  editDeleteButton.disabled = true;
+  editDeleteButton.textContent = 'Deleting…';
+  $('#edit-connection-error').textContent = '';
+  try {
+    await api(`/api/admin/connections/${encodeURIComponent(connectionId)}${refs.length ? '?force=1' : ''}`, { method: 'DELETE' });
+    $('#edit-connection-dialog').close();
+    notice(`Deleted ${connectionId}`);
+    await refreshConnections();
+  } catch (error) {
+    $('#edit-connection-error').textContent = error.message;
+  } finally {
+    editDeleteButton.disabled = false;
+    editDeleteButton.textContent = 'Delete';
+  }
 });
 
 $('#edit-connection-revoke').addEventListener('click', async (event) => {

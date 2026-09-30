@@ -77,6 +77,10 @@ def build_parser():
                           help="Dropbox only: folder webhook resolution lists (empty lists everything)")
     revoke_p = conn_sub.add_parser("revoke", help="Revoke a connection's stored tokens")
     revoke_p.add_argument("connection_id")
+    delete_p = conn_sub.add_parser("delete", help="Delete a connection outright (operator)")
+    delete_p.add_argument("connection_id")
+    delete_p.add_argument("--force", action="store_true",
+                          help="Delete even when workflows or hook triggers still reference it")
     discover_p = conn_sub.add_parser(
         "discover", help="List a connection's discovery resources, or one resource's items")
     discover_p.add_argument("connection_id")
@@ -722,6 +726,9 @@ def cmd_connections(args, api_url, debug):
         )
     if args.command == "revoke":
         return commands.connections_revoke(api_url, args.connection_id, debug)
+    if args.command == "delete":
+        return commands.connections_delete(api_url, args.connection_id,
+                                           force=args.force, debug=debug)
     if args.command == "discover":
         return commands.connections_discover(
             api_url, args.connection_id, args.resource,

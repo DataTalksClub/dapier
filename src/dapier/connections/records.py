@@ -355,3 +355,67 @@ def api_list_connections(table, limit=None, next_token=None):
             "limit": limit,
         },
     }
+
+
+def api_delete_connection(table, connection_id, *, grants_table_ref=None,
+                          usage=None, force=False):
+    """Delete a connection outright: ``(status, payload)``.
+
+    The record goes away together with its stored provider credential
+    (provider-side revoke, best effort — a never-consented stub has no
+    token) and every access grant on it, so no dangling grant or orphaned
+    credential survives the delete. A connection that live workflow
+    definitions or hook triggers still reference is a 409 naming the
+    references — the same usage map the console displays — unless ``force``
+    says the caller accepted breaking them. 404 for an unknown id; unlike
+    revoke, there is no record left behind to clean up later.
+    """
+    try:
+        connection_id = validate_connection_id(connection_id)
+    except ConnectionError:
+        return 400, {"error": "Invalid connection id"}
+    connection = get_connection(table, connection_id)
+    if not connection:
+        return 404, {"error": "Connection not found"}
+    if usage is None:
+        from ..triggers import connection_usage
+        usage = connection_usage.collect()
+    refs = usage.get(connection_id) or []
+    if refs and not force:
+        names = ", ".join(sorted({str(entry.get("ref")) for entry in refs}))
+        return 409, {
+            "error": (f"Connection {connection_id} is still used by: {names}. "
+                      "Remove those references first, or delete with force."),
+            "used_in": refs,
+        }
+    from . import credentials as credential_store
+    from . import tokens as token_lifecycle
+    credential_id = credential_id_for(connection_id)
+    try:
+        stored = credential_store.get_credential_record(credential_id).get("value") or {}
+    except Exception:  # noqa: BLE001 — an unwired store only skips the revoke
+        stored = {}
+    if isinstance(stored, dict) and (stored.get("access_token") or stored.get("refresh_token")):
+        try:
+            token_lifecycle.revoke_connection(connection)
+        except Exception:  # noqa: BLE001 — provider-side revoke is best effort
+            pass
+    try:
+        credential_store.delete_credential(credential_id)
+    except Exception:  # noqa: BLE001 — the record is already gone or unwired
+        pass
+    if grants_table_ref is not None:
+        from ..auth import authz
+        grants = authz.list_grants(grants_table_ref, connection_id=connection_id)
+        for grant in grants:
+            authz.delete_grant(grants_table_ref, connection_id=connection_id,
+                               grantee_id=grant.get("grantee"))
+        payload_grants_removed = len(grants)
+    else:
+        payload_grants_removed = 0
+    table.delete_item(Key={"connection_id": connection_id})
+    return 200, {
+        "connection_id": connection_id,
+        "deleted": True,
+        "grants_removed": payload_grants_removed,
+    }

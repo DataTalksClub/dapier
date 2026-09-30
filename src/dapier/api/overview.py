@@ -5,7 +5,7 @@ import boto3
 
 from ..auth import api_tokens, visibility
 from .. import http
-from ..triggers import email_from, email_triggers, published_workflows
+from ..triggers import connection_usage, email_from, email_triggers, published_workflows
 from ..engine import usage
 from . import runs
 from ..connections import records as connection_records
@@ -226,7 +226,11 @@ def overview(event=None, visible=None):
                           str(item.get("execution_id") or "")),
         reverse=True,
     )
-    connections = _connection_views(_scan(os.environ["CONNECTIONS_TABLE"]))
+    # ``used_in`` (which workflows and hook triggers reference each
+    # connection) rides along so the console snapshot matches the paged
+    # list — that map is also what flags a connection as safe to delete.
+    connections = connection_usage.attach(
+        _connection_views(_scan(os.environ["CONNECTIONS_TABLE"])))
     return http._json_response(200, {
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),

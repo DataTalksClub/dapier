@@ -388,7 +388,9 @@ def list_connections(event):
     connection, not just the overview snapshot's first scan page, with
     ``limit``/``next`` paging behind the console's Load more and
     `dapier connections list --all`. Rows carry the same public metadata
-    plus token health the overview's connections block renders."""
+    plus token health the overview's connections block renders, and the
+    ``used_in`` map saying which workflows and hook triggers reference
+    each one."""
     query = event.get("queryStringParameters") or {}
     connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
     status, payload = connection_model.api_list_connections(
@@ -397,6 +399,8 @@ def list_connections(event):
     )
     if status == 200:
         payload["connections"] = overview._connection_views(payload["connections"])
+        from ...triggers import connection_usage
+        connection_usage.attach(payload["connections"])
     return http._json_response(status, payload)
 
 def list_grants(event):
@@ -926,6 +930,22 @@ def revoke_connection_tokens(connection_id, operator):
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     session._audit_event(connection_id, audit_log.REVOKE, operator, outcome="ok")
     return http._json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+def delete_connection(event, connection_id, operator):
+    """DELETE /api/admin/connections/{id}: remove the connection, its stored
+    credential, and its grants outright — the console mirror of the CLI's
+    `dapier connections delete`. A 409 names the workflows and hook triggers
+    still referencing it; ``?force=1`` accepts breaking those."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = connection_model.api_delete_connection(
+        boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]),
+        connection_id,
+        grants_table_ref=authz.grants_table(),
+        force=query.get("force") in ("1", "true", "yes"),
+    )
+    if status == 200:
+        session._audit_event(connection_id, "connections.delete", operator, outcome="ok")
+    return http._json_response(status, payload)
 
 def issue_connection_token(connection_id, operator):
     """Console mirror of the CLI's fresh provider access token (same domain call).

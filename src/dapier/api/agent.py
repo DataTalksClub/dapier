@@ -252,6 +252,8 @@ def list_for_caller(event):
         )
         if status == 200:
             payload["connections"] = overview._connection_views(payload["connections"])
+            from ..triggers import connection_usage
+            connection_usage.attach(payload["connections"])
         return _no_store(_json_response(status, payload))
     try:
         items = authz.list_grants(grants_table)
@@ -450,6 +452,8 @@ def route(event, method, path):
     match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)", path)
     if match and method == "GET":
         return show_connection(event, match.group(1))
+    if match and method == "DELETE":
+        return delete_connection(event, match.group(1))
     if match and method == "PUT":
         return update_connection_metadata(event, match.group(1))
     scopes_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/scopes", path)
@@ -1780,6 +1784,26 @@ def revoke_connection_tokens(event, connection_id):
     connections.put_connection(connections_table, updated)
     audit.emit(connection_id, audit.REVOKE, subject, outcome="ok")
     return _json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+
+def delete_connection(event, connection_id):
+    """Operator-only connection delete: the record, its stored credential,
+    and its grants go together. A 409 names the workflows and hook triggers
+    still referencing the connection (the same usage map the connections
+    list displays); ``?force=1`` deletes anyway."""
+    subject, error = require_operator(event, "connections.delete")
+    if error:
+        return error
+    connections_table, grants_table = _tables()
+    query = event.get("queryStringParameters") or {}
+    status, payload = connections.api_delete_connection(
+        connections_table, connection_id,
+        grants_table_ref=grants_table,
+        force=query.get("force") in ("1", "true", "yes"),
+    )
+    if status == 200:
+        audit.emit(connection_id, "connections.delete", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
 
 
 def _operator_connection(event, connection_id, action):
