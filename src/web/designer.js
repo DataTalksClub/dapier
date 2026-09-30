@@ -21965,6 +21965,7 @@
     const [summaries, setSummaries] = reactExports.useState([]);
     const [sourceName, setSourceName] = reactExports.useState(null);
     const [workflowId, setWorkflowId] = reactExports.useState("new-workflow");
+    const [initialWorkflowLoaded, setInitialWorkflowLoaded] = reactExports.useState(false);
     const [enabled, setEnabled] = reactExports.useState(true);
     const [shapes, setShapes] = reactExports.useState(EMPTY_SHAPES);
     const [selectedId, setSelectedId] = reactExports.useState(null);
@@ -22231,7 +22232,7 @@
       return () => window.removeEventListener("keydown", onKey);
     }, [leaveOpen]);
     reactExports.useEffect(() => {
-      if (!config.embedded || window.parent === window) return;
+      if (!initialWorkflowLoaded || !config.embedded || window.parent === window) return;
       window.parent.postMessage(
         {
           type: "designer:meta",
@@ -22243,7 +22244,7 @@
         },
         window.location.origin
       );
-    }, [config.embedded, workflowId, enabled, sourceName, view, dirty]);
+    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
     reactExports.useEffect(() => {
       if (!config.embedded) return;
       const onLeaveRequest = async (event) => {
@@ -22327,7 +22328,7 @@
         const match = requested ? workflows.find((summary) => summary.source === requested || summary.id === requested) : null;
         if (match) return openWorkflow(match);
         if (config.mode === "console") newWorkflow();
-      }).catch((error) => setStatus({ kind: "error", message: String(error) }));
+      }).catch((error) => setStatus({ kind: "error", message: String(error) })).finally(() => setInitialWorkflowLoaded(true));
       refreshGit();
     }, [refreshGit, refreshList]);
     async function openWorkflow(summary) {

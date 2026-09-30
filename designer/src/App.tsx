@@ -638,6 +638,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [summaries, setSummaries] = useState<WorkflowSummary[]>([]);
   const [sourceName, setSourceName] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState("new-workflow");
+  const [initialWorkflowLoaded, setInitialWorkflowLoaded] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [shapes, setShapes] = useState<DiagramShape[]>(EMPTY_SHAPES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -987,7 +988,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   /** Tells the framing console what the title bar should show and edit.
      The console owns the h1 rename affordance; it answers with set-id. */
   useEffect(() => {
-    if (!config.embedded || window.parent === window) return;
+    // Keep the requested console URL until its workflow has loaded. Reporting
+    // the initial blank canvas can otherwise replace the deep link mid-load.
+    if (!initialWorkflowLoaded || !config.embedded || window.parent === window) return;
     window.parent.postMessage(
       {
         type: "designer:meta",
@@ -999,7 +1002,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       },
       window.location.origin
     );
-  }, [config.embedded, workflowId, enabled, sourceName, view, dirty]);
+  }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
 
   useEffect(() => {
     if (!config.embedded) return;
@@ -1095,7 +1098,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         // with the same seeded trigger the sidebar's New-workflow used to add.
         if (config.mode === "console") newWorkflow();
       })
-      .catch((error) => setStatus({ kind: "error", message: String(error) }));
+      .catch((error) => setStatus({ kind: "error", message: String(error) }))
+      .finally(() => setInitialWorkflowLoaded(true));
     refreshGit();
   }, [refreshGit, refreshList]);
 
