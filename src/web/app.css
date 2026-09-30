@@ -276,8 +276,12 @@ input:focus-visible, select:focus-visible, select:focus { outline: 2px solid var
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* the rail never paints outside itself: a short window scrolls the nav
+     inside the rail (nav below) instead of spilling items onto the paper */
+  overflow: hidden;
   background: var(--rail);
   color: var(--rail-ink);
   border-right: 1px solid var(--rail-line);
@@ -286,7 +290,7 @@ input:focus-visible, select:focus-visible, select:focus { outline: 2px solid var
 .sidebar-backdrop { display: none; }
 .brand { display: flex; align-items: center; justify-content: space-between; padding: 25px 20px 24px; border-bottom: 1px solid var(--rail-line); font-size: 23px; letter-spacing: -.045em; }
 .sidebar-close { display: none; }
-nav { display: grid; align-content: start; gap: 0; padding: 17px 0; }
+nav { display: grid; align-content: start; gap: 0; padding: 17px 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rail-line) transparent; }
 .nav-group-label { margin: 20px 20px 7px; color: var(--rail-muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .nav-group-label:first-child { margin-top: 2px; }
 .nav-item {
