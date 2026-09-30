@@ -301,9 +301,12 @@ event. It starts as `alexey.s.grigoriev@gmail.com` and
 runs no actions. An empty list ignores everyone. Extra `subject` or `body`
 filters on an address AND with its route. `from` is not a per-address filter.
 
-An `agent` action queues a prompt for `dapier worker`, which runs a headless
-Claude Code process on a host and reports its terminal result through the
-authenticated API. It can sit on an email, a webhook, a schedule, or a poll.
+An `agent` action queues a prompt for a Dapier worker — a machine running
+`dapier worker`, which picks the task up and runs a headless Claude Code
+process there, reporting the terminal result through the authenticated API.
+Tasks stay queued until a worker is running; the console's **Workers** tab
+and `dapier workers list` show which workers are active. An agent action can
+sit on an email, a webhook, a schedule, or a poll.
 The host needs a dedicated Dapier token, not AWS credentials or Aplexer; see
 [headless worker setup](docs/headless-worker.md). Webhooks are managed with
 `dapier webhooks`. A sample of what a flow receives is `dapier workflows sample`.

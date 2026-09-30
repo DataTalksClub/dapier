@@ -1,4 +1,5 @@
 import { renderAgentTasks } from './views/agents.js';
+import { renderWorkers } from './views/workers.js';
 /* Console bootstrap: global event wiring and the first fetch. */
 import { $, $$, icons, notice, hardenSecretInputs, showForbidden, showStartupError } from './ui.js';
 import { api } from './api.js';
@@ -198,6 +199,7 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   const target = link.dataset.view || link.dataset.target;
   if (!await setView(target)) return;
   if (target === 'agents') renderAgentTasks();
+  if (target === 'workers') renderWorkers();
   if (target === 'audit') refreshAudit();
   if (target === 'users') refreshUsers();
 }));
@@ -228,6 +230,7 @@ window.addEventListener('popstate', async () => {
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
     if (view === 'agents') renderAgentTasks();
+    if (view === 'workers') renderWorkers();
     if (view === 'audit') refreshAudit();
     if (view === 'users') refreshUsers();
   }
@@ -312,6 +315,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (initialView === 'audit') refreshAudit();
   if (initialView === 'users') refreshUsers();
+  if (initialView === 'agents') renderAgentTasks();
+  if (initialView === 'workers') renderWorkers();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

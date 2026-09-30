@@ -18002,7 +18002,7 @@
       type: "agent",
       label: "Agent",
       icon: Bot,
-      description: "Queue a prompt for the host worker, which starts an Aplexer session. The step returns as soon as the job is queued.",
+      description: "Queue a prompt for a Dapier worker — a machine running `dapier worker`, listed on the console's Workers tab. The worker runs the prompt as a headless Claude session in its workspace; the step returns as soon as the task is queued. With no worker running, tasks stay queued until one starts.",
       fields: [
         { key: "prompt", label: "Prompt", type: "textarea", required: true, placeholder: "{subject}\n\n{text}" },
         { key: "workspace", label: "Workspace", required: true, placeholder: "/home/alexey/git/dapier" },

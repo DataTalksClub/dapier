@@ -109,6 +109,25 @@ async function selectTask(id, { updateUrl = true } = {}) {
     $('#agent-run-detail').innerHTML = `<div class="agent-detail-empty"><button class="agent-back button secondary" type="button">Back to runs</button><h3>Could not load this run</h3><p>${escapeHtml(error.message)}</p><button class="button secondary" id="agent-detail-retry" type="button">Try again</button></div>`;
   }
 }
+/* Tasks run on a worker — a machine running `dapier worker`. When work is
+   waiting and none has checked in recently, say so: nothing will move until
+   one starts. */
+async function renderWorkerNote(tasks, seq) {
+  const note = $('#agent-worker-note');
+  if (!note) return;
+  if (!tasks.some(task => ACTIVE.has(task.status))) { note.hidden = true; note.innerHTML = ''; return; }
+  try {
+    const data = await api('/api/admin/workers');
+    if (seq !== listSeq) return;
+    const active = (data.workers || []).some(worker => worker.active);
+    note.hidden = active;
+    note.innerHTML = active ? '' :
+      'No worker is running — tasks stay queued until you start one with <code>dapier worker</code>. See the <a href="/workers" data-view="workers" class="view-link">Workers</a> tab.';
+  } catch (error) {
+    if (seq === listSeq) note.hidden = true;
+  }
+}
+
 export async function renderAgentTasks({ quiet = false } = {}) {
   const seq = ++listSeq;
   const refresh = $('#agent-tasks-refresh');
@@ -117,6 +136,7 @@ export async function renderAgentTasks({ quiet = false } = {}) {
     const data = await api('/api/admin/agent-tasks?limit=200');
     if (seq !== listSeq) return;
     tasks = data.tasks || []; fetched = true; renderList();
+    renderWorkerNote(tasks, seq);
     $('#agent-refresh-note').textContent = 'Updated just now';
     if (state.view !== 'agents') return;
     const fromUrl = state.view === 'agents' ? new URLSearchParams(window.location.search).get('task') : null;

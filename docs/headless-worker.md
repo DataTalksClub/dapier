@@ -2,7 +2,12 @@
 
 Dapier's `agent` action enqueues one headless job. A host worker claims it
 through `/api/agent/host-jobs/*`, runs Claude Code in print mode, and reports
-`succeeded`, `failed`, `timed_out`, or `interrupted`. The console's **Agents** tab and `dapier agent-tasks list` show jobs from
+`succeeded`, `failed`, `timed_out`, or `interrupted`. Tasks stay queued
+until a worker claims them, so something must run `dapier worker` for agent
+actions to make progress. The console's **Workers** tab and
+`dapier workers list` show which workers checked in, which are active (last
+check-in under two minutes — claim polls and task heartbeats both count),
+and what each is running. The console's **Agents** tab and `dapier agent-tasks list` show jobs from
 every trigger type. Filter active runs or failures, search by title or workflow,
 and select a run to read its result. Email runs use their message subject as the
 title; other runs use the workflow name. Active runs refresh every 15 seconds.
@@ -56,6 +61,18 @@ records the final status before acknowledging the queue message, and never
 automatically reruns work that lost its lease after starting. An interrupted
 run needs operator review before retrying, because a coding task may already
 have changed files or called external services.
+
+## Worker presence
+
+Every `dapier worker` process registers itself under a stable id
+(`hostname-pid-random`), sent with each claim, heartbeat, and finish call.
+Dapier records the check-ins in the host task table (rows keyed
+`worker:<id>`); a row says where the worker runs (hostname, pid, workspace
+root), when it started, which task it is running now, and the last task it
+finished. Rows expire through the table's TTL about two weeks after a
+worker's last check-in. A worker is **active** while its last check-in is
+under two minutes old; beyond that it shows as offline and queued tasks will
+not move until a worker is running again.
 
 ## Forward a task
 
