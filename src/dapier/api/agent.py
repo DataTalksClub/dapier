@@ -1401,8 +1401,11 @@ def agent_tasks_api(event):
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = host_tasks.api_list(
-        limit=query.get("limit"), status=query.get("status"))
+    if query.get("task_id"):
+        status, payload = host_tasks.api_get(query["task_id"])
+    else:
+        status, payload = host_tasks.api_list(
+            limit=query.get("limit"), status=query.get("status"))
     return _no_store(_json_response(status, payload))
 
 

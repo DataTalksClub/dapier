@@ -553,6 +553,8 @@ def build_parser():
                                   help="How many to show (default 50, max 200)")
     agent_tasks_list.add_argument("--status", default=None,
                                   help="Only rows with this status: queued, running, succeeded, failed, timed_out, interrupted")
+    agent_tasks_show = agent_tasks_sub.add_parser("show", help="Show one agent task and its recorded logs")
+    agent_tasks_show.add_argument("task_id")
     worker_p = sub.add_parser(
         "worker",
         help="Run headless host jobs over HTTPS until interrupted.")
@@ -614,6 +616,8 @@ def main(argv=None):
         if args.group == "webhooks":
             return cmd_hooks(args, api_url, debug)
         if args.group == "agent-tasks":
+            if args.command == "show":
+                return commands.agent_tasks_show(api_url, args.task_id, debug)
             return commands.agent_tasks_list(api_url, debug,
                                              limit=getattr(args, "limit", None),
                                              status=getattr(args, "status", None))

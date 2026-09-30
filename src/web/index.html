@@ -50,6 +50,7 @@
         <p class="nav-group-label">Monitor</p>
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Home</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span></a>
+        <a class="nav-item" href="/agents" data-view="agents"><i data-lucide="bot"></i><span>Agents</span></a>
         <p class="nav-group-label">Automate</p>
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
@@ -242,8 +243,11 @@
         </form>
         <ul id="email-from-list" class="sender-list"></ul>
 
+      </section>
+      <section class="view" data-page="agents">
         <div class="section-head">
-          <div class="section-head-text"><h2>Headless runs</h2><p class="sub">Jobs the <code>agent</code> action enqueued and <code>dapier worker</code> ran to completion. <code>dapier agent-tasks list</code> shows the same results.</p></div>
+          <div class="section-head-text"><h2>Agent runs</h2><p class="sub">Agent actions from any workflow, including email, webhook, and scheduled triggers. Open a task for its result and recorded logs.</p></div>
+          <button id="agent-tasks-refresh" class="button secondary" type="button">Refresh</button>
         </div>
         <p id="agent-tasks-empty" class="sub">No tasks yet. An agent action enqueues one when its workflow runs.</p>
         <div id="agent-tasks-wrap" class="table-wrap" hidden>
@@ -365,6 +369,12 @@
       </section>
     </main>
   </div>
+
+  <dialog id="agent-task-dialog" aria-labelledby="agent-task-title">
+    <div class="dialog-head"><h2 id="agent-task-title">Agent run</h2><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+    <div id="agent-task-detail" class="dialog-body"></div>
+    <div class="dialog-actions"><button class="button secondary dialog-close" type="button">Close</button></div>
+  </dialog>
 
   <dialog id="user-role-dialog" aria-labelledby="user-role-title">
     <form id="user-role-form" method="dialog" autocomplete="off">

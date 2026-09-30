@@ -366,6 +366,9 @@ Resources:
         ConsoleEmails:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /emails, Method: GET}
+        ConsoleAgents:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /agents, Method: GET}
         ConsoleCredentials:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /credentials, Method: GET}

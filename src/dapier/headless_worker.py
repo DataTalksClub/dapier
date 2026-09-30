@@ -94,6 +94,7 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
             popen=subprocess.Popen, clock=time.monotonic, sleep=time.sleep):
     task_id, lease_id = job["task_id"], job["lease_id"]
     status, code, summary = "failed", None, ""
+    output_path = error_path = None
     try:
         workspace = workspace_for(workspace_root, job.get("workspace"))
         argv = harness_argv(job.get("engine"))
@@ -140,6 +141,18 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
         summary = str(exc)[:2000]
     result = {"task_id": task_id, "lease_id": lease_id, "status": status,
               "exit_code": code, "summary": summary}
+    from .host_jobs import MAX_LOG_CHARS
+
+    logs = {"stdout": "", "stderr": "", "truncated": False}
+    for key, path in (("stdout", output_path), ("stderr", error_path)):
+        if path is not None and path.exists():
+            with path.open("rb") as handle:
+                size = path.stat().st_size
+                handle.seek(max(0, size - MAX_LOG_CHARS * 4))
+                value = handle.read().decode("utf-8", errors="replace")
+            logs[key] = value[-MAX_LOG_CHARS:]
+            logs["truncated"] |= size > MAX_LOG_CHARS * 4 or len(value) > MAX_LOG_CHARS
+    result["logs"] = logs
     api.call("finish", result)
     return result
 

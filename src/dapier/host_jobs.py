@@ -15,6 +15,8 @@ from .host_tasks import tasks_table
 
 VISIBILITY_SECONDS = 120
 WAIT_SECONDS = 10
+MAX_LOG_CHARS = 12000
+
 TERMINAL = frozenset({"succeeded", "failed", "timed_out", "interrupted"})
 
 
@@ -174,8 +176,19 @@ def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=N
         code = body.get("exit_code")
         if code is not None and (not isinstance(code, int) or isinstance(code, bool)):
             return 400, {"error": "Invalid exit code"}
+        logs = body.get("logs")
+        if logs is not None:
+            if (not isinstance(logs, dict) or
+                    any(not isinstance(logs.get(key, ""), str) for key in ("stdout", "stderr"))):
+                return 400, {"error": "Invalid agent logs"}
+            logs = {"stdout": logs.get("stdout", "")[-MAX_LOG_CHARS:],
+                    "stderr": logs.get("stderr", "")[-MAX_LOG_CHARS:],
+                    "truncated": bool(logs.get("truncated")) or any(
+                        len(logs.get(key, "")) > MAX_LOG_CHARS for key in ("stdout", "stderr"))}
         fields = {"status": status, "finished_at": int(now or time.time()),
                   "summary": summary, "error": "" if status == "succeeded" else summary[:500]}
+        if logs is not None:
+            fields["logs"] = logs
         if code is not None:
             fields["exit_code"] = code
         _set(table, body["task_id"], fields,

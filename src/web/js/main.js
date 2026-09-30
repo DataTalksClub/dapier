@@ -1,3 +1,4 @@
+import { renderAgentTasks } from './views/agents.js';
 /* Console bootstrap: global event wiring and the first fetch. */
 import { $, $$, icons, notice, hardenSecretInputs, showForbidden, showStartupError } from './ui.js';
 import { api } from './api.js';
@@ -196,6 +197,7 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   closeMobileMenu(true);
   const target = link.dataset.view || link.dataset.target;
   if (!await setView(target)) return;
+  if (target === 'agents') renderAgentTasks();
   if (target === 'audit') refreshAudit();
   if (target === 'users') refreshUsers();
 }));
@@ -225,6 +227,7 @@ window.addEventListener('popstate', async () => {
   closeMobileMenu(true);
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
+    if (view === 'agents') renderAgentTasks();
     if (view === 'audit') refreshAudit();
     if (view === 'users') refreshUsers();
   }

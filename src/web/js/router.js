@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'usage', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'users', 'storage', 'audit', 'runs'];
+const VIEWS = ['overview', 'usage', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'users', 'storage', 'audit', 'runs', 'agents'];
 let viewGuard = null;
 let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 

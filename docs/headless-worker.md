@@ -2,8 +2,9 @@
 
 Dapier's `agent` action enqueues one headless job. A host worker claims it
 through `/api/agent/host-jobs/*`, runs Claude Code in print mode, and reports
-`succeeded`, `failed`, `timed_out`, or `interrupted`. The console's **Headless
-runs** section and `dapier agent-tasks list` show the result. For email
+`succeeded`, `failed`, `timed_out`, or `interrupted`. The console's **Agents** tab and `dapier agent-tasks list` show jobs from
+every trigger type. Open a job or use `dapier agent-tasks show <task_id>`
+for its result, error, exit code, and recorded stdout/stderr. For email
 triggers, Dapier also emails the sender a short completion report. An action
 can override that address with `notify_to` or set it to an empty string to
 disable the mail.
@@ -41,7 +42,11 @@ with no persisted Claude session. It supplies the prompt on stdin and does
 not pass the Dapier token to the child. It runs noninteractively with Claude's
 permission checks bypassed, so the host account and sender allow-list must
 be trusted. Each run's stdout and stderr are owner-only files under
-`<workspace-root>/.dapier-runs/`.
+`<workspace-root>/.dapier-runs/`. After completion the worker uploads the
+last 12,000 characters of each stream to the task record; the Agents detail
+marks truncated output. Earlier workers recorded only a result summary.
+Task reads require operator access and never return the stored prompt or lease
+credentials.
 
 The worker heartbeats while the child runs. Dapier extends the SQS lease,
 records the final status before acknowledging the queue message, and never
@@ -55,12 +60,14 @@ Send from an address in `dapier emails from list` to `agents@dtcdev.click`.
 Put your task instructions above the forwarded message, for example, "Write a
 Telegram article from this Zoom conversation." Include the Zoom shared
 recording URL and passcode in the email body. The stored route is defined in
-[`agents-email-trigger.json`](agents-email-trigger.json); apply changes with
-`dapier emails save docs/agents-email-trigger.json` or the console's Emails
-view. It uses the configured worker root, with no project pinned. The worker
+[`agents-workflow.json`](agents-workflow.json), a JSON-compatible YAML
+workflow. Apply changes with `dapier workflows save docs/agents-workflow.json`
+and `dapier workflows publish email-trigger-agents.yaml`, or edit it in
+**Workflows**. Its internal id remains `email-trigger-agents` so earlier runs
+and agent tasks stay associated with it. It uses the configured worker root, with no project pinned. The worker
 reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`
-or the console's **Headless runs** section.
+or the console's **Agents** tab.
 If the instruction above the forwarded message says `zoom calls recording`,
 the agent works in `~/git/zoom-calls` and follows that repository's
 `zoom-recording` skill, script, and summary templates. The forwarded Zoom
@@ -78,8 +85,9 @@ recording pipeline handles S3 uploads. The agent can refresh Zoom metadata or
 retry an upload through the authenticated event API, then checks the event
 again. It reports an ambiguous event match instead of selecting one by guess.
 It does not notify registrants unless the operator asks for that action.
-Open **Emails** in the console and select **Flow** on the `agents@dtcdev.click`
-row to see the route, headless action, and completion email. This route sends
+Open **Workflows → email-trigger-agents** in the console to see the email
+trigger, agent action, and completion email. Agent actions can also run
+from webhook, schedule, and other workflow triggers. This route sends
 the report from `agents@dtcdev.click`, so replies return to the same address.
 
 The route inserts Datamailer's inline plain-text body, `{body.text.value}`,

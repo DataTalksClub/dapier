@@ -29,10 +29,21 @@ def workflow_of(task_id):
     return ""
 
 
+def api_get(task_id, table_ref=None):
+    """One task with recorded output; credentials and the prompt stay private."""
+    item = tasks_table(table_ref).get_item(Key={"task_id": str(task_id)}).get("Item")
+    if not item:
+        return 404, {"error": "Agent task not found"}
+    task = {key: item.get(key) for key in PUBLIC_FIELDS}
+    task["workflow"] = workflow_of(task_id)
+    task["logs"] = item.get("logs")
+    return 200, {"task": task}
+
+
 def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None):
     """Recent host tasks, newest first: ``(status_code, payload)``.
 
-    A bounded scan; ``status`` narrows to one stored state and
+    A paginated scan; ``status`` narrows to one stored state and
     ``limit`` clips the newest rows. Rows project to PUBLIC_FIELDS only.
     """
     try:
@@ -40,7 +51,13 @@ def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None):
     except (TypeError, ValueError):
         size = DEFAULT_LIMIT
     table = tasks_table(table_ref)
-    items = table.scan(Limit=MAX_LIMIT).get("Items", [])
+    items, start = [], None
+    while True:
+        page = table.scan(**({"ExclusiveStartKey": start} if start else {}))
+        items.extend(page.get("Items", []))
+        start = page.get("LastEvaluatedKey")
+        if not start:
+            break
     items.sort(key=lambda item: (int(item.get("created_at") or 0),
                                  str(item.get("task_id") or "")), reverse=True)
     wanted = str(status or "").strip().lower()

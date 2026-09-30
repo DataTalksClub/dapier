@@ -1,7 +1,7 @@
 /* Emails view: app-managed email triggers — reserve an address, bind actions. */
 import { $, $$, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, formatTimestamp, wrapTokens } from '../format.js';
+import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
 
 const ACTION_TEMPLATE = JSON.stringify([
@@ -178,41 +178,6 @@ $('#email-from-add')?.addEventListener('submit', async (event) => {
     await refresh();
   } catch (error) { notice(error.message, true); }
 });
-
-/* Agent tasks: the host jobs the `agent` action enqueued, as `dapier worker`
-   leaves them. Not part of the overview payload — the view fetches
-   /api/admin/agent-tasks itself (like the Runs view) and Refresh re-reads it. */
-let agentTasksSeq = 0;
-
-export async function renderAgentTasks() {
-  const empty = $('#agent-tasks-empty');
-  const wrap = $('#agent-tasks-wrap');
-  const body = $('#agent-tasks');
-  if (!empty || !wrap || !body) return;
-  const seq = ++agentTasksSeq;
-  let tasks = [];
-  try {
-    const data = await api('/api/admin/agent-tasks?limit=10');
-    if (seq !== agentTasksSeq) return; // a newer fetch superseded this one
-    tasks = data.tasks || [];
-  } catch (error) {
-    if (seq !== agentTasksSeq) return;
-    empty.hidden = false;
-    empty.textContent = 'Agent tasks are unavailable.';
-    wrap.hidden = true;
-    return;
-  }
-  empty.hidden = tasks.length > 0;
-  empty.textContent = 'No tasks yet. An agent action enqueues one when its workflow runs.';
-  wrap.hidden = tasks.length === 0;
-  body.innerHTML = tasks.map((task) => `<tr>
-      <td class="cell-title mono"><span class="cell-name">${escapeHtml(wrapTokens(task.task_id || ''))}</span><span class="cell-sub">${escapeHtml(task.engine || '')}</span></td>
-      <td class="mono muted-cell" data-label="Workflow">${escapeHtml(task.workflow || '—')}</td>
-      <td data-label="Status">${statusLine(task.status)}</td>
-      <td class="mono muted-cell" data-label="Result">${escapeHtml(task.summary || task.error || '—')}</td>
-      <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(task.finished_at || task.started_at || task.created_at) || '—')}</td>
-    </tr>`).join('');
-}
 
 export function renderEmails(data) {
   current = {

@@ -42,10 +42,11 @@ def test_claim_heartbeat_finish_and_no_second_execution():
                                  "exit_code": 0}, "token:wrong", table_ref=table,
                                 queue_ref=queue, queue_url=url, now=1030)[0] == 409
         assert host_jobs.finish({**job, "status": "succeeded", "summary": "Draft saved",
-                                 "exit_code": 0}, "token:host", table_ref=table,
+                                 "exit_code": 0, "logs": {"stdout": "x" * 13000, "stderr": "warning"}}, "token:host", table_ref=table,
                                 queue_ref=queue, queue_url=url, now=1030)[0] == 200
         row = table.get_item(Key={"task_id": job["task_id"]})["Item"]
         assert row["status"] == "succeeded" and row["summary"] == "Draft saved"
+        assert row["logs"] == {"stdout": "x" * 12000, "stderr": "warning", "truncated": True}
         assert host_jobs.claim("token:host", table_ref=table, queue_ref=queue,
                                queue_url=url)[1]["job"] is None
 
@@ -137,6 +138,9 @@ def test_worker_runs_foreground_harness_and_reports_result(tmp_path):
     assert result["status"] == "succeeded"
     assert result["summary"] == "Draft ready"
     assert calls[-1][0] == "finish"
+    assert json.loads(result["logs"]["stdout"])["result"] == "Draft ready"
+    assert result["logs"]["stderr"] == ""
+    assert result["logs"]["truncated"] is False
 
 
 def test_host_api_requires_the_dedicated_machine_token(monkeypatch):

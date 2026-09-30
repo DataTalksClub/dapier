@@ -1,7 +1,16 @@
 {
-  "name": "agents",
+  "id": "email-trigger-agents",
   "description": "Run instructions in forwarded mail with the headless worker",
   "enabled": true,
+  "trigger": {
+    "connector": "email",
+    "event": "message.received",
+    "filters": {
+      "route": {
+        "equals": "agents"
+      }
+    }
+  },
   "actions": [
     {
       "id": "run",

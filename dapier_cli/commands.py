@@ -1997,6 +1997,13 @@ def agent_tasks_list(api_url, debug=False, limit=None, status=None):
     return 0
 
 
+def agent_tasks_show(api_url, task_id, debug=False):
+    data = api.call(api_url, "GET", "/api/agent/agent-tasks?task_id=" + quote(task_id, safe=""),
+                    debug=debug)
+    print(json.dumps(data["task"], indent=2, ensure_ascii=False))
+    return 0
+
+
 def worker_run(api_url=None, *, token_file=None, workspace_root=None,
                max_runtime=3600, once=False):
     """Run headless jobs through the authenticated HTTPS host API."""

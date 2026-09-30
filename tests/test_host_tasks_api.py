@@ -21,6 +21,10 @@ class Table:
     def __init__(self, items=None):
         self.items = list(items or [])
 
+    def get_item(self, Key):
+        item = next((item for item in self.items if item["task_id"] == Key["task_id"]), None)
+        return {"Item": item} if item else {}
+
     def scan(self, **_kwargs):
         return {"Items": [dict(item) for item in self.items]}
 
@@ -188,3 +192,44 @@ def test_cli_agent_tasks_list_calls_the_agent_route(monkeypatch, capsys):
     assert "STATUS" in out and "orders" in out and "agent:orders:e9:wake" in out
     assert "result Draft ready" in out
     assert "No host tasks yet" in out
+
+
+@pytest.mark.parametrize("surface", ["admin", "agent"])
+def test_task_detail_shares_projection_and_keeps_credentials_private(
+        tasks_table, operator_session, agent_identity, surface):
+    task_id = "agent:webhook-flow:event:run"
+    tasks_table.items = [task_row(task_id, 100, status="succeeded", summary="Done",
+                                logs={"stdout": "done", "stderr": "", "truncated": False},
+                                lease_id="secret", receipt_handle="private")]
+    path = f"/api/{surface}/agent-tasks"
+    request = (admin_request if surface == "admin" else agent_request)(
+        "GET", path, query={"task_id": task_id})
+    response = (admin if surface == "admin" else agent_api).route(request, "GET", path)
+    assert response["statusCode"] == 200
+    task = json.loads(response["body"])["task"]
+    assert task["workflow"] == "webhook-flow" and task["logs"]["stdout"] == "done"
+    assert not {"prompt", "lease_id", "receipt_handle"} & task.keys()
+    assert host_tasks.api_get("missing")[0] == 404
+    assert "logs" not in host_tasks.api_list()[1]["tasks"][0]
+
+
+def test_list_walks_all_pages_before_sorting():
+    class Pages:
+        def scan(self, **kwargs):
+            if not kwargs:
+                return {"Items": [task_row("agent:old:e:r", 1)],
+                        "LastEvaluatedKey": {"task_id": "agent:old:e:r"}}
+            assert kwargs["ExclusiveStartKey"] == {"task_id": "agent:old:e:r"}
+            return {"Items": [task_row("agent:new:e:r", 999)]}
+    assert host_tasks.api_list(table_ref=Pages(), limit=1)[1]["tasks"][0]["workflow"] == "new"
+
+
+def test_cli_show_fetches_one_task_with_logs(monkeypatch, capsys):
+    calls = []
+    def call(url, method, path, **kwargs):
+        calls.append((method, path))
+        return {"task": {"task_id": "agent:f:e:r", "logs": {"stdout": "Done"}}}
+    monkeypatch.setattr(cli_commands.api, "call", call)
+    assert cli_main.main(["agent-tasks", "show", "agent:f:e:r"]) == 0
+    assert calls == [("GET", "/api/agent/agent-tasks?task_id=agent%3Af%3Ae%3Ar")]
+    assert json.loads(capsys.readouterr().out)["logs"]["stdout"] == "Done"
