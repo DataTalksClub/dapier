@@ -1,0 +1,31 @@
+id: invoice-filing
+enabled: true
+description: File emailed invoice attachments and rendered PDFs in the invoice Dropbox
+  folder.
+triggers:
+- connector: email
+  event: message.received
+  filters:
+    route:
+      equals: invoice-attachment
+- connector: renderer
+  event: job.completed
+  filters: {}
+actions:
+- id: choose-file-source
+  type: condition
+  when:
+    output:
+      exists: true
+  then:
+  - id: file-rendered-pdf-to-dropbox
+    source: output
+    folder: _dtc_paperwork/income-invoices
+    type: dropbox_upload
+    connection_id: dropbox
+  else:
+  - id: file-invoice-to-dropbox
+    source: attachment
+    folder: _dtc_paperwork/income-invoices
+    type: dropbox_upload
+    connection_id: dropbox

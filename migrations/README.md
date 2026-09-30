@@ -42,3 +42,21 @@ publish`, and `dapier hooks save`. Hook edits preserve the webhook token
 unless explicitly asked to rotate it. Keep a private export of the old
 definitions for rollback and avoid overlapping the old hook action chain
 with the new managed Telegram triggers during cutover.
+
+## Multi-trigger invoice filing cutover
+
+`multi-trigger-workflows/invoice-filing.yaml` combines email route
+`invoice-attachment` and renderer `job.completed`. Its condition uploads
+renderer output when present, otherwise the stored email attachments, to
+the existing invoice Dropbox folder. It preserves the original input types
+and renderer completion scope.
+
+Save and publish this configuration through the workflow CLI. Turn off
+`email-attachment-dataops.yaml` and `rendered-invoice-dataops.yaml` during
+cutover so each event uploads once. Keep those workflows disabled for
+rollback. `email-render-invoice.yaml`, `dropbox_on_upload.yaml`, and the
+standalone `invoice` email trigger keep their existing behavior.
+
+The cutover tests run the real matching and condition machinery with
+connector side effects stubbed. The live per-step test API can also verify
+branch selection without sending email, writing rows, or uploading files.
