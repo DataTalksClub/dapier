@@ -17,9 +17,12 @@ function addressOf(trigger) {
   return trigger.address || `${trigger.name}@${current.domain}`;
 }
 
-function actionSummary(trigger) {
-  if (trigger.flow) return `flow: ${trigger.flow}`;
-  return (trigger.actions || []).map((action) => action.type).join(' → ') || '—';
+/* The Actions column renders as tag chips — one per action type, dashed for a
+   shared flow (a reference, not inline actions), matching the workflow list. */
+function actionChips(trigger) {
+  if (trigger.flow) return `<span class="tag-chip folder-chip">flow: ${escapeHtml(trigger.flow)}</span>`;
+  const chips = (trigger.actions || []).map((action) => `<span class="tag-chip">${escapeHtml(action.type || 'unknown')}</span>`);
+  return chips.join(' ') || '<span class="muted-cell">—</span>';
 }
 
 function flowStep(number, title, detail) {
@@ -150,11 +153,11 @@ export function renderEmailFrom(addresses) {
   const list = $('#email-from-list');
   if (!list) return;
   const items = addresses || [];
-  list.innerHTML = items.map((address) => `<li>
+  list.innerHTML = items.map((address) => `<li class="sender-chip">
       <span class="mono">${escapeHtml(address)}</span>
-      <button class="button secondary email-from-remove" type="button" data-address="${escapeHtml(address)}">Remove</button>
-    </li>`).join('') || '<li class="muted-cell">No senders. Every message is ignored.</li>';
-  $$('.email-from-remove').forEach((button) => button.addEventListener('click', async () => {
+      <button class="sender-remove" type="button" data-address="${escapeHtml(address)}" aria-label="Remove ${escapeHtml(address)}">&times;</button>
+    </li>`).join('') || '<li class="sender-empty">No senders — every message is ignored until one is added above.</li>';
+  $$('.sender-remove').forEach((button) => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
       await api(`/api/admin/email-from?address=${encodeURIComponent(button.dataset.address)}`, { method: 'DELETE' });
@@ -211,8 +214,6 @@ export async function renderAgentTasks() {
     </tr>`).join('');
 }
 
-$('#agent-tasks-refresh')?.addEventListener('click', () => renderAgentTasks());
-
 export function renderEmails(data) {
   current = {
     domain: (data && data.domain) || '',
@@ -221,18 +222,25 @@ export function renderEmails(data) {
   $('#email-domain-hint').textContent = current.domain;
   $('#email-empty').hidden = current.triggers.length > 0;
   $('.table-wrap', $('[data-page=emails]')).hidden = current.triggers.length === 0;
-  $('#email-table').innerHTML = current.triggers.map((trigger) => `<tr>
-      <td class="cell-title"><span class="cell-name mono">${escapeHtml(addressOf(trigger))}</span><span class="cell-sub">${escapeHtml(trigger.description || '')}</span></td>
-      <td class="mono muted-cell" data-label="Actions">${escapeHtml(actionSummary(trigger))}</td>
+  $('#email-table').innerHTML = current.triggers.map((trigger) => {
+    const watcher = Boolean(trigger.event && trigger.event !== 'message.received');
+    const title = watcher
+      ? `<span class="email-addr-row"><span class="cell-name mono">${escapeHtml(trigger.name)}</span><span class="tag-chip" title="SES feedback watcher — matches domain-wide, not a reserved address">${escapeHtml(trigger.event)}</span></span>`
+      : `<span class="cell-name mono">${escapeHtml(addressOf(trigger))}</span>`;
+    const description = trigger.description ? `<span class="cell-sub">${escapeHtml(trigger.description)}</span>` : '';
+    return `<tr>
+      <td class="cell-title">${title}${description}</td>
+      <td data-label="Actions"><span class="cell-tags">${actionChips(trigger)}</span></td>
       <td data-label="Status">${statusLine(trigger.enabled ? 'enabled' : 'disabled')}</td>
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(trigger.updated_at) || '—'}</td>
-      <td class="action-cell">
+      <td class="action-cell workflow-actions" data-label="Manage">
         <button class="button secondary email-flow" data-name="${escapeHtml(trigger.name)}" type="button">Flow</button>
         <button class="button secondary email-edit" data-name="${escapeHtml(trigger.name)}" type="button">Edit</button>
         <button class="button secondary email-toggle" data-name="${escapeHtml(trigger.name)}" type="button">${trigger.enabled ? 'Disable' : 'Enable'}</button>
-        <button class="button secondary email-delete" data-name="${escapeHtml(trigger.name)}" type="button">Delete</button>
+        <button class="button danger email-delete" data-name="${escapeHtml(trigger.name)}" type="button">Delete</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   const yamlRoutes = (data && data.yaml_routes) || [];
   $('#email-yaml-routes').hidden = yamlRoutes.length === 0;
   $('#email-yaml-list').textContent = yamlRoutes.map((route) => `${route}@${current.domain}`).join(', ');

@@ -128,24 +128,29 @@ def delete(token_id, table_ref=None, grants_table_ref=None):
 
     Removal is for cleaning old revoked entries out of the list: an active
     token must be revoked first, and a removed ID's grants go with it so no
-    orphaned grantee lingers on connection panels. The payload carries
-    ``grants_removed`` alongside the final public view.
+    orphaned grantee lingers on connection panels. Every entry with the ID
+    goes — legacy tables hold duplicate IDs (revoked and active created in
+    the same second), and an active twin refuses the purge for the whole ID
+    because both share the ``token:<id>`` subject and its grants. The
+    payload carries ``grants_removed`` alongside the final public view.
     """
     token_id = str(token_id or "").strip()
     if not token_id:
         return 400, {"error": "Token ID is required"}
     table_ref = table_ref or table()
-    for item in list_all(table_ref):
-        if item.get("token_id") == token_id:
-            if not item.get("revoked_at"):
-                return 409, {"error": f"API token {token_id} is still active — revoke it before removing"}
-            table_ref.delete_item(Key={"token_hash": item["token_hash"]})
-            grants_removed = 0
-            if grants_table_ref is not None:
-                grants_removed = authz.delete_subject_grants(
-                    grants_table_ref, item.get("subject") or subject_for(token_id))
-            return 200, {**public_view(item), "grants_removed": grants_removed}
-    return 404, {"error": f"No API token named {token_id}"}
+    matches = [item for item in list_all(table_ref) if item.get("token_id") == token_id]
+    if not matches:
+        return 404, {"error": f"No API token named {token_id}"}
+    if any(not item.get("revoked_at") for item in matches):
+        return 409, {"error": f"API token {token_id} is still active — revoke it before removing"}
+    for item in matches:
+        table_ref.delete_item(Key={"token_hash": item["token_hash"]})
+    subject = next((item.get("subject") for item in matches if item.get("subject")),
+                   subject_for(token_id))
+    grants_removed = 0
+    if grants_table_ref is not None:
+        grants_removed = authz.delete_subject_grants(grants_table_ref, subject)
+    return 200, {**public_view(matches[0]), "grants_removed": grants_removed}
 
 
 def list_all(table_ref=None):

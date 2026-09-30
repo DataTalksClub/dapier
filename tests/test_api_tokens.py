@@ -143,6 +143,40 @@ def test_delete_removes_only_revoked_tokens():
     assert api_tokens.delete("", table_ref=table)[0] == 400
 
 
+def test_delete_refuses_while_any_entry_with_the_id_is_active():
+    """Legacy tables hold duplicate IDs (a revoked and an active entry created
+    in the same second); both share the token subject, so the active twin
+    blocks the purge and the grants of neither are touched."""
+    table = TokenTable()
+    grants = GrantsTable()
+    _, first = make(table)
+    second = dict(first)
+    second["token_hash"] = "b" * 64
+    second["revoked_at"] = "2026-09-24T21:38:00+00:00"
+    table.put_item(Item=second)
+    grants.put_item(Item={
+        "connection_id": "yt-one",
+        "grantee": "token:personal-scheduler#personal-scheduler",
+        "subject": "token:personal-scheduler",
+        "agent": "personal-scheduler",
+        "operations": ["use"],
+    })
+
+    status, error = api_tokens.delete("personal-scheduler", table_ref=table,
+                                      grants_table_ref=grants)
+    assert status == 409
+    assert "revoke" in error["error"]
+    assert len(table.items) == 2
+    assert grants.items
+
+    api_tokens.revoke("personal-scheduler", table_ref=table)
+    status, view = api_tokens.delete("personal-scheduler", table_ref=table,
+                                     grants_table_ref=grants)
+    assert status == 200
+    assert not table.items
+    assert view["grants_removed"] == 1
+
+
 def test_delete_removes_the_token_subject_grants():
     table = TokenTable()
     grants = GrantsTable()

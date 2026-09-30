@@ -654,6 +654,49 @@ dialog form { display: contents; }
 #email-flow-description { margin-bottom: 18px; }
 .email-flow-detail { font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
 .email-flow-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin-top: 10px; }
+
+/* emails view: the triggers table owns the page; the allowed-senders gate is a
+   compact chip row under its own section head; headless runs is history. The
+   manage column reuses .workflow-actions sizing so every list reads alike. */
+/* Checkboxes opt out of the text-input sizing above — otherwise the dialog
+   "Enabled" control renders as a full-width 38px browser-blue box. */
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.email-addr-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.table-footnote { margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--muted); }
+/* The manage cell stays a real table cell on desktop — display:flex would
+   paint its bottom rule at button height, split from the row's own rule. */
+[data-page="emails"] td.workflow-actions { display: table-cell; vertical-align: middle; }
+[data-page="emails"] td.workflow-actions .button + .button { margin-left: 6px; }
+.sender-add { display: flex; gap: 10px; align-items: center; max-width: 440px; }
+.sender-add input { flex: 1; min-width: 0; }
+.sender-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; }
+.sender-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  padding: 3px 4px 3px 10px;
+  font-size: 12.5px;
+}
+.sender-chip .mono { font-size: 12px; }
+.sender-remove {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+}
+.sender-remove:hover { color: var(--red); background: var(--red-soft); }
+.sender-empty { color: var(--muted); font-size: 12.5px; }
+@media (max-width: 560px) {
+  .sender-add { flex-wrap: wrap; }
+  .sender-add input { flex: 1 1 100%; }
+  .sender-add .button { flex: 1; }
+}
 #poll-sample-data { max-height: 50vh; overflow: auto; }
 .flow-link {
   width: 1px;
