@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime, timezone
 
 from src.dapier.api import agent as agent_api
 from src.dapier.connections import tokens
@@ -1196,7 +1197,18 @@ def test_errors_summary_requires_operator(monkeypatch):
 
 def test_usage_endpoint_serves_the_rollup_over_bearer(monkeypatch):
     _operator(monkeypatch)
+
+    class September2026(datetime):
+        """Stands in for the clock: the endpoint derives its month key
+        from ``datetime.now`` and has no ``now`` seam."""
+
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 15, tzinfo=timezone.utc)
+
     from src.dapier.api import agent as agent_api
+
+    monkeypatch.setattr(agent_api.usage, "datetime", September2026)
 
     class UsageTable:
         def query(self, **kwargs):

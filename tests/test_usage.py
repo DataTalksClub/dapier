@@ -21,6 +21,16 @@ EVENT = {
 NOW = datetime(2026, 9, 15, tzinfo=timezone.utc)
 
 
+class September2026(datetime):
+    """Stands in for the module clock on paths without a ``now`` seam —
+    the worker's internal gate and the API endpoints derive their month
+    keys from ``datetime.now``."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW
+
+
 class FakeUsageTable:
     def __init__(self):
         self.updates = []
@@ -254,7 +264,8 @@ def test_enforce_opens_the_gate_when_the_read_fails(usage_table):
 
 # --- the worker gate ---
 
-def test_worker_gate_fails_the_step_when_the_budget_is_spent(usage_table):
+def test_worker_gate_fails_the_step_when_the_budget_is_spent(usage_table, monkeypatch):
+    monkeypatch.setattr(usage_rollup, "datetime", September2026)
     usage_rollup.api_quota_set(2)
     usage_table.by_month = {"202609": {"_total": 2}}
 
@@ -274,6 +285,7 @@ def test_worker_gate_delegates_when_budget_remains(usage_table, monkeypatch):
 
 
 def test_resume_path_gates_through_the_same_hook(usage_table, monkeypatch):
+    monkeypatch.setattr(usage_rollup, "datetime", September2026)
     usage_rollup.api_quota_set(2)
     usage_table.by_month = {"202609": {"_total": 2}}
 
@@ -432,6 +444,7 @@ def test_agent_quota_put_requires_an_operator(usage_table):
 def test_agent_usage_payload_carries_the_quota_block(usage_table, monkeypatch):
     from src.dapier.api import agent as agent_api
 
+    monkeypatch.setattr(usage_rollup, "datetime", September2026)
     usage_table.by_month = {"202609": {"wf-2": 5}}
     monkeypatch.setattr(agent_api, "require_operator", lambda event, action: (None, None))
 

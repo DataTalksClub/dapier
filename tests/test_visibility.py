@@ -13,6 +13,7 @@ identity is denied before any of it applies.
 """
 import json
 import time
+from datetime import datetime, timezone
 
 import boto3
 import pytest
@@ -508,11 +509,14 @@ def test_usage_operator_sees_all_and_scopes_apply(monkeypatch, published):
     table.put_item(Item={"month": "202609", "workflow_id": usage_rollup.TOTAL_WORKFLOW_ID,
                          "tasks": 9})
 
-    operator = usage_rollup.api_usage(1)
+    operator = usage_rollup.api_usage(
+        1, now=datetime(2026, 9, 15, tzinfo=timezone.utc))
     assert [row["workflow_id"] for row in operator[1]["usage"]] == [
         "theirs", "mine", "gone-wf"]
 
-    scoped = usage_rollup.api_usage(1, visible=visibility.Visibility(MINE))
+    scoped = usage_rollup.api_usage(
+        1, now=datetime(2026, 9, 15, tzinfo=timezone.utc),
+        visible=visibility.Visibility(MINE))
     assert [row["workflow_id"] for row in scoped[1]["usage"]] == ["mine", "gone-wf"]
 
 
