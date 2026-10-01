@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$E = [
+  const __iconNode$H = [
     ["path", { d: "M12 8V4H8", key: "hb8ula" }],
     ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
     ["path", { d: "M2 14h2", key: "vft8re" }],
@@ -14320,8 +14320,8 @@
     ["path", { d: "M15 13v2", key: "1xurst" }],
     ["path", { d: "M9 13v2", key: "rq6x2g" }]
   ];
-  const Bot = createLucideIcon("bot", __iconNode$E);
-  const __iconNode$D = [
+  const Bot = createLucideIcon("bot", __iconNode$H);
+  const __iconNode$G = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14334,61 +14334,65 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$D);
-  const __iconNode$C = [
+  const Braces = createLucideIcon("braces", __iconNode$G);
+  const __iconNode$F = [
     ["path", { d: "M8 2v4", key: "1cmpym" }],
     ["path", { d: "M16 2v4", key: "4m81vk" }],
     ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
     ["path", { d: "M3 10h18", key: "8toen8" }]
   ];
-  const Calendar = createLucideIcon("calendar", __iconNode$C);
-  const __iconNode$B = [
+  const Calendar = createLucideIcon("calendar", __iconNode$F);
+  const __iconNode$E = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
+  const ChevronDown = createLucideIcon("chevron-down", __iconNode$E);
+  const __iconNode$D = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
+  const ChevronRight = createLucideIcon("chevron-right", __iconNode$D);
+  const __iconNode$C = [
     ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
     ["path", { d: "M21 14H11", key: "1bme5i" }],
     ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
   ];
-  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$B);
-  const __iconNode$A = [
+  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$C);
+  const __iconNode$B = [
     ["path", { d: "M11 14h10", key: "1w8e9d" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
     ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
     ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
   ];
-  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$A);
-  const __iconNode$z = [
+  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$B);
+  const __iconNode$A = [
     ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
   ];
-  const Clock = createLucideIcon("clock", __iconNode$z);
-  const __iconNode$y = [
+  const Clock = createLucideIcon("clock", __iconNode$A);
+  const __iconNode$z = [
     ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
     ["path", { d: "m12 21 4-4", key: "1lfcce" }],
     ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
   ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$y);
-  const __iconNode$x = [
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$z);
+  const __iconNode$y = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$x);
-  const __iconNode$w = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$y);
+  const __iconNode$x = [
     ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
     ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
   ];
-  const Copy = createLucideIcon("copy", __iconNode$w);
-  const __iconNode$v = [
+  const Copy = createLucideIcon("copy", __iconNode$x);
+  const __iconNode$w = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$v);
-  const __iconNode$u = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$w);
+  const __iconNode$v = [
     [
       "path",
       {
@@ -14401,8 +14405,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$u);
-  const __iconNode$t = [
+  const FileText = createLucideIcon("file-text", __iconNode$v);
+  const __iconNode$u = [
     [
       "path",
       {
@@ -14413,8 +14417,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$t);
-  const __iconNode$s = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$u);
+  const __iconNode$t = [
     [
       "path",
       {
@@ -14423,8 +14427,8 @@
       }
     ]
   ];
-  const Folder = createLucideIcon("folder", __iconNode$s);
-  const __iconNode$r = [
+  const Folder = createLucideIcon("folder", __iconNode$t);
+  const __iconNode$s = [
     [
       "path",
       {
@@ -14433,21 +14437,21 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$r);
-  const __iconNode$q = [
+  const Funnel = createLucideIcon("funnel", __iconNode$s);
+  const __iconNode$r = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$q);
-  const __iconNode$p = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$r);
+  const __iconNode$q = [
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
     ["path", { d: "M2 12h20", key: "9i4pu4" }]
   ];
-  const Globe = createLucideIcon("globe", __iconNode$p);
-  const __iconNode$o = [
+  const Globe = createLucideIcon("globe", __iconNode$q);
+  const __iconNode$p = [
     ["path", { d: "M10 8h.01", key: "1r9ogq" }],
     ["path", { d: "M12 12h.01", key: "1mp3jc" }],
     ["path", { d: "M14 8h.01", key: "1primd" }],
@@ -14458,8 +14462,8 @@
     ["path", { d: "M8 12h.01", key: "czm47f" }],
     ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
   ];
-  const Keyboard = createLucideIcon("keyboard", __iconNode$o);
-  const __iconNode$n = [
+  const Keyboard = createLucideIcon("keyboard", __iconNode$p);
+  const __iconNode$o = [
     [
       "path",
       {
@@ -14482,7 +14486,15 @@
       }
     ]
   ];
-  const Layers = createLucideIcon("layers", __iconNode$n);
+  const Layers = createLucideIcon("layers", __iconNode$o);
+  const __iconNode$n = [
+    ["path", { d: "M16 5H3", key: "m91uny" }],
+    ["path", { d: "M11 12H3", key: "51ecnj" }],
+    ["path", { d: "M16 19H3", key: "zzsher" }],
+    ["path", { d: "M18 9v6", key: "1twb98" }],
+    ["path", { d: "M21 12h-6", key: "bt1uis" }]
+  ];
+  const ListPlus = createLucideIcon("list-plus", __iconNode$n);
   const __iconNode$m = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
@@ -14525,40 +14537,35 @@
     [
       "path",
       {
-        d: "M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z",
-        key: "edeuup"
-      }
-    ]
-  ];
-  const MousePointer2 = createLucideIcon("mouse-pointer-2", __iconNode$g);
-  const __iconNode$f = [
-    [
-      "path",
-      {
         d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
         key: "10ikf1"
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$f);
-  const __iconNode$e = [
+  const Play = createLucideIcon("play", __iconNode$g);
+  const __iconNode$f = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$e);
-  const __iconNode$d = [
+  const Plus = createLucideIcon("plus", __iconNode$f);
+  const __iconNode$e = [
     ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
     ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
     ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
     ["path", { d: "M8 16H3v5", key: "1cv678" }]
   ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$d);
-  const __iconNode$c = [
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$e);
+  const __iconNode$d = [
     ["path", { d: "M4 11a9 9 0 0 1 9 9", key: "pv89mb" }],
     ["path", { d: "M4 4a16 16 0 0 1 16 16", key: "k0647b" }],
     ["circle", { cx: "5", cy: "19", r: "1", key: "bfqh0e" }]
   ];
-  const Rss = createLucideIcon("rss", __iconNode$c);
+  const Rss = createLucideIcon("rss", __iconNode$d);
+  const __iconNode$c = [
+    ["path", { d: "m21 21-4.34-4.34", key: "14j7rj" }],
+    ["circle", { cx: "11", cy: "11", r: "8", key: "4ej97u" }]
+  ];
+  const Search = createLucideIcon("search", __iconNode$c);
   const __iconNode$b = [
     [
       "path",
@@ -20225,6 +20232,67 @@
     default: "halt"
   };
   const errorHandlingFields = [onErrorField, onFailField, errorActionsField];
+  const stepCategories = {
+    agent: "ai",
+    ai_complete: "ai",
+    filter: "flow",
+    condition: "flow",
+    paths: "flow",
+    delay: "flow",
+    for_each: "flow",
+    digest: "flow",
+    digest_add: "flow",
+    digest_flush: "flow",
+    run_workflow: "flow",
+    code: "data",
+    js: "data",
+    csv_parse: "data",
+    csv_format: "data",
+    storage_get: "data",
+    storage_set: "data",
+    storage_delete: "data",
+    storage_find: "data",
+    http_request: "data",
+    webhook: "data",
+    render_html_to_pdf: "data",
+    dataops: "data"
+  };
+  const appPrefixes = [
+    [/^slack(_|$)/, "slack"],
+    [/^telegram(_|$)/, "telegram"],
+    [/^gmail(_|$)/, "gmail"],
+    [/^email(_|$)/, "email"],
+    [/^dropbox(_|$)/, "dropbox"],
+    [/^s3(_|$)/, "s3"],
+    [/^mailchimp(_|$)/, "mailchimp"],
+    [/^drive(_|$)/, "google-drive"],
+    [/^youtube(_|$)/, "youtube"],
+    [/^calendar(_|$)/, "google-calendar"],
+    [/^sheets(_|$)/, "google-sheets"],
+    [/^zoom(_|$)/, "zoom"]
+  ];
+  function actionConnector(type2) {
+    const hit = appPrefixes.find(([pattern]) => pattern.test(type2));
+    return hit ? connectorCatalog.find((entry) => entry.name === hit[1]) : void 0;
+  }
+  function stepSection(type2) {
+    return stepCategories[type2] ?? (actionConnector(type2) ? "app" : "data");
+  }
+  const verbRanks = [
+    [/^(send|post|create|add|upload|append|invite|share|schedule|quick add)\b/i, 0],
+    [/^(find|list|read|look ?up|get|search|download)\b/i, 1]
+  ];
+  function actionVerbRank(type2) {
+    const entry = actionCatalog.find((candidate) => candidate.type === type2);
+    let verb = entry?.label ?? "";
+    const app = actionConnector(type2)?.label;
+    if (app && verb.toLowerCase().startsWith(app.toLowerCase())) {
+      verb = verb.slice(app.length).replace(/^[\s:()]+/, "").replace(/\)$/, "");
+    }
+    if (!verb.trim()) return 0;
+    const hit = verbRanks.find(([pattern]) => pattern.test(verb));
+    return hit ? hit[1] : 2;
+  }
   const NODE_WIDTH = 264;
   const NODE_HEIGHT = 96;
   const NODE_GAP_Y = 130;
@@ -20582,6 +20650,199 @@
     }
     return actionNodeSubtitle(shape.data ?? {});
   }
+  const RECENTS_KEY = "dapier-designer-recent-steps";
+  const RECENTS_MAX = 5;
+  function loadRecents() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((kind) => typeof kind === "string").slice(0, RECENTS_MAX) : [];
+    } catch {
+      return [];
+    }
+  }
+  function saveRecent(kind) {
+    const next = [kind, ...loadRecents().filter((entry) => entry !== kind)].slice(0, RECENTS_MAX);
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+    } catch {
+    }
+  }
+  const sectionOrder = { Recent: 0, "Flow control": 1, AI: 2, "Developer & data": 3, Triggers: 4 };
+  function sectionRank(name) {
+    return sectionOrder[name] ?? 99;
+  }
+  const sectionNames = {
+    flow: "Flow control",
+    ai: "AI",
+    data: "Developer & data"
+  };
+  function StepPicker({ mode, title, onPick, onClose }) {
+    const [query, setQuery] = reactExports.useState("");
+    const [expanded, setExpanded] = reactExports.useState(/* @__PURE__ */ new Set());
+    const recents = reactExports.useRef(loadRecents());
+    const inputRef = reactExports.useRef(null);
+    reactExports.useEffect(() => {
+      inputRef.current?.focus();
+      const onKey = (event) => {
+        if (event.key === "Escape") onClose();
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    const rows = reactExports.useMemo(() => {
+      if (mode === "trigger") {
+        return triggerPalette.map((entry) => {
+          const connector = connectorCatalog.find((candidate) => `trigger:${candidate.name}` === entry.kind);
+          return {
+            kind: entry.kind,
+            label: entry.label,
+            icon: entry.icon,
+            detail: connector && connector.events.length ? `Fires on: ${connector.events.join(", ")}` : "Custom event payload",
+            section: "Triggers"
+          };
+        });
+      }
+      return actionCatalog.map((entry) => {
+        const connector = actionConnector(entry.type);
+        const section = connector?.label ?? sectionNames[stepSection(entry.type)];
+        return {
+          kind: entry.type,
+          label: entry.label,
+          icon: entry.icon ?? FileText,
+          detail: entry.description ?? "",
+          section
+        };
+      });
+    }, [mode]);
+    const filtered = reactExports.useMemo(() => {
+      const needle = query.trim().toLowerCase();
+      if (!needle) return rows;
+      return rows.filter((row) => row.label.toLowerCase().includes(needle) || String(row.kind).toLowerCase().includes(needle) || row.section.toLowerCase().includes(needle) || row.detail.toLowerCase().includes(needle));
+    }, [query, rows]);
+    const groups = reactExports.useMemo(() => {
+      if (query.trim()) return [];
+      const byName = /* @__PURE__ */ new Map();
+      for (const row of filtered) {
+        const bucket = byName.get(row.section) ?? [];
+        bucket.push(row);
+        byName.set(row.section, bucket);
+      }
+      const recentKinds = new Set(recents.current);
+      const recentRows = rows.filter((row) => recentKinds.has(String(row.kind))).sort((a, b) => recents.current.indexOf(String(a.kind)) - recents.current.indexOf(String(b.kind)));
+      const appGroups = [...byName.entries()].filter(([name]) => sectionOrder[name] === void 0).sort((a, b) => a[0].localeCompare(b[0])).map(([name, groupRows]) => ({ name, rows: groupRows, collapsible: true }));
+      const fixedGroups = [...byName.entries()].filter(([name]) => sectionOrder[name] !== void 0).sort((a, b) => sectionRank(a[0]) - sectionRank(b[0])).map(([name, groupRows]) => ({ name, rows: groupRows, collapsible: false }));
+      const result = [];
+      if (recentRows.length) result.push({ name: "Recent", rows: recentRows, collapsible: false });
+      result.push(...fixedGroups);
+      result.push(...appGroups.map((group) => ({
+        ...group,
+        rows: [...group.rows].sort((a, b) => actionVerbRank(String(a.kind)) - actionVerbRank(String(b.kind)))
+      })));
+      return result;
+    }, [filtered, query, rows]);
+    const firstKind = filtered[0]?.kind;
+    function pick(kind) {
+      if (mode !== "trigger") saveRecent(String(kind));
+      onPick(kind);
+    }
+    function toggle(name) {
+      setExpanded((current) => {
+        const next = new Set(current);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+    }
+    function onListKeyDown(event) {
+      if (event.key === "Enter" && firstKind !== void 0 && event.target === inputRef.current) {
+        event.preventDefault();
+        pick(firstKind);
+      }
+    }
+    const groupIcon = (name) => {
+      const connector = connectorCatalog.find((entry) => entry.label === name);
+      return connector?.logo;
+    };
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "step-picker-overlay", onPointerDown: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        className: "step-picker",
+        role: "dialog",
+        "aria-label": title,
+        onPointerDown: (event) => event.stopPropagation(),
+        onKeyDown: onListKeyDown,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "step-picker-head", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 15 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                ref: inputRef,
+                value: query,
+                onChange: (event) => setQuery(event.target.value),
+                placeholder: `${title} — search ${mode === "trigger" ? "triggers" : "steps"}`,
+                "aria-label": "Search steps",
+                spellCheck: false
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 15 }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-picker-body", children: [
+            filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-picker-empty", children: [
+              "Nothing matches “",
+              query.trim(),
+              "”."
+            ] }),
+            groups.map((group) => {
+              const isOpen = !group.collapsible || expanded.has(group.name);
+              const GroupIcon = group.icon ?? groupIcon(group.name);
+              const countNoun = mode === "trigger" ? "trigger" : "step";
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "step-group", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "button",
+                  {
+                    className: group.collapsible ? "step-group-head toggle" : "step-group-head",
+                    onClick: group.collapsible ? () => toggle(group.name) : void 0,
+                    "aria-expanded": group.collapsible ? isOpen : void 0,
+                    type: "button",
+                    children: [
+                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 14 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 14 })),
+                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 14 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: group.name }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: group.rows.length === 1 ? `1 ${countNoun}` : `${group.rows.length} ${countNoun}s` })
+                    ]
+                  }
+                ),
+                isOpen && group.rows.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "button",
+                  {
+                    className: "step-row",
+                    onClick: () => pick(row.kind),
+                    type: "button",
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
+                        row.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.detail })
+                      ] })
+                    ]
+                  },
+                  String(row.kind)
+                ))
+              ] }, group.name);
+            }),
+            query.trim() && filtered.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "step-row", onClick: () => pick(row.kind), type: "button", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
+                !row.label.toLowerCase().includes(row.section.toLowerCase()) && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.section })
+              ] })
+            ] }, `search-${row.kind}`))
+          ] })
+        ]
+      }
+    ) });
+  }
   function WorkflowBoard({
     shapes,
     setShapes,
@@ -20595,13 +20856,11 @@
     onPasteStep,
     sessionControls
   }) {
-    const [tool, setTool] = reactExports.useState("select");
-    const [paletteKind, setPaletteKind] = reactExports.useState("webhook");
+    const [picker, setPicker] = reactExports.useState(null);
     const [dragStart, setDragStart] = reactExports.useState(null);
     const [panStart, setPanStart] = reactExports.useState(null);
     const [connectorDrag, setConnectorDrag] = reactExports.useState(null);
     const [reattachDrag, setReattachDrag] = reactExports.useState(null);
-    const [draggingKind, setDraggingKind] = reactExports.useState(null);
     const [contextMenu, setContextMenu] = reactExports.useState(null);
     const [editingId, setEditingId] = reactExports.useState(null);
     const [editingLabel, setEditingLabel] = reactExports.useState("");
@@ -20618,12 +20877,7 @@
     const didFitRef = reactExports.useRef(false);
     const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
     const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
-    const canvasClass = reactExports.useMemo(() => [
-      "drawing-surface",
-      tool === "select" ? "selecting" : "",
-      panStart ? "panning" : "",
-      draggingKind ? "component-dropping" : ""
-    ].filter(Boolean).join(" "), [draggingKind, panStart, tool]);
+    const canvasClass = reactExports.useMemo(() => ["drawing-surface", panStart ? "panning" : ""].filter(Boolean).join(" "), [panStart]);
     const zoomedViewBox = reactExports.useMemo(() => {
       const width = canvasViewBox.width / zoom;
       const height = canvasViewBox.height / zoom;
@@ -20661,10 +20915,11 @@
     function commitShapes(updater) {
       editShapes(updater);
     }
-    function addShape(point, kind) {
+    function addShape(point, kind, connect) {
+      const id = crypto.randomUUID();
       if (kind === "note") {
         const next = {
-          id: crypto.randomUUID(),
+          id,
           type: "note",
           x: point.x - 110,
           y: point.y - 44,
@@ -20673,10 +20928,9 @@
           label: "Note"
         };
         commitShapes((currentShapes) => [...currentShapes, next]);
-        setSelectedId(next.id);
       } else {
         const next = {
-          id: crypto.randomUUID(),
+          id,
           type: "node",
           x: point.x - NODE_WIDTH / 2,
           y: point.y - NODE_HEIGHT / 2,
@@ -20685,10 +20939,29 @@
           label: paletteLabel(kind),
           data: nodeDataForKind(kind)
         };
-        commitShapes((currentShapes) => [...currentShapes, next]);
-        setSelectedId(next.id);
+        commitShapes((currentShapes) => {
+          if (!connect) return [...currentShapes, next];
+          const source = currentShapes.find((shape) => shape.id === connect.sourceId);
+          if (!isNodeShape(source) || next.data?.nodeKind === "trigger") return [...currentShapes, next];
+          const sourceHandle = connectionHandleById(source, connect.handleId) ?? nearestConnectionHandle(source, point);
+          const targetHandle = nearestConnectionHandle(next, point);
+          const arrow = {
+            id: crypto.randomUUID(),
+            type: "arrow",
+            x: sourceHandle.x,
+            y: sourceHandle.y,
+            width: targetHandle.x - sourceHandle.x,
+            height: targetHandle.y - sourceHandle.y,
+            sourceId: source.id,
+            targetId: next.id,
+            sourceHandleId: sourceHandle.id,
+            targetHandleId: targetHandle.id
+          };
+          return [...currentShapes, next, arrow];
+        });
       }
-      setTool("select");
+      setSelectedId(id);
+      return id;
     }
     function addConnector(sourceId, sourceHandleId, target, targetPoint) {
       const source = shapes.find((shape) => shape.id === sourceId);
@@ -20711,7 +20984,30 @@
       commitShapes((currentShapes) => [...currentShapes, next]);
       setSelectedId(next.id);
       setConnectorDrag(null);
-      setTool("select");
+    }
+    function canvasCenter() {
+      return {
+        x: zoomedViewBox.x + zoomedViewBox.width / 2,
+        y: zoomedViewBox.y + zoomedViewBox.height / 2
+      };
+    }
+    function pickStep(kind) {
+      const request = picker;
+      setPicker(null);
+      if (!request) return;
+      if (request.mode === "change" && request.shapeId) {
+        changeActionType(request.shapeId, kind);
+        return;
+      }
+      let point = request.point;
+      if (!point) {
+        const cascade = shapes.length % 6;
+        point = {
+          x: canvasCenter().x + cascade * 26,
+          y: canvasCenter().y + cascade * 20
+        };
+      }
+      addShape(point, kind, request.connect);
     }
     function onPointerDown(event) {
       pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -20731,11 +21027,6 @@
       const point = toCanvasPoint(event);
       const hit = findNodeAt(shapes, point);
       const connectorHit = hit ? void 0 : findConnectorAt(shapes, point);
-      if (tool !== "select") {
-        event.stopPropagation();
-        addShape(point, paletteKind);
-        return;
-      }
       const draggableHit = hit && hit.type !== "arrow";
       setSelectedId(hit?.id ?? connectorHit?.id ?? null);
       setDragStart(draggableHit ? point : null);
@@ -20788,7 +21079,7 @@
         setConnectorDrag({ ...connectorDrag, current: toCanvasPoint(event) });
         return;
       }
-      if (tool !== "select" || !selectedId || !dragStart) return;
+      if (!selectedId || !dragStart) return;
       const point = toCanvasPoint(event);
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
@@ -20831,7 +21122,16 @@
       if (connectorDrag) {
         const point = toCanvasPoint(event);
         const target = findNodeAt(shapes, point);
-        if (isNodeShape(target)) addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+        if (isNodeShape(target)) {
+          addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+        } else {
+          setPicker({
+            mode: "action",
+            title: "Add a step",
+            point,
+            connect: { sourceId: connectorDrag.sourceId, handleId: connectorDrag.sourceHandleId }
+          });
+        }
         setConnectorDrag(null);
         return;
       }
@@ -20842,31 +21142,6 @@
       dragSnapshotRef.current = null;
       didDragRef.current = false;
       setDragStart(null);
-    }
-    function selectTool(nextTool) {
-      setTool(nextTool);
-      setConnectorDrag(null);
-      setPanStart(null);
-      setContextMenu(null);
-    }
-    function startChipDrag(event, kind) {
-      setPaletteKind(kind);
-      setDraggingKind(kind);
-      event.dataTransfer.effectAllowed = "copy";
-      event.dataTransfer.setData("application/x-dapier-node", kind);
-      event.dataTransfer.setData("text/plain", kind);
-    }
-    function onCanvasDragOver(event) {
-      if (!draggingKind) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "copy";
-    }
-    function onCanvasDrop(event) {
-      const droppedKind = event.dataTransfer.getData("application/x-dapier-node") || draggingKind;
-      if (!droppedKind) return;
-      event.preventDefault();
-      addShape(toCanvasPoint(event), droppedKind);
-      setDraggingKind(null);
     }
     function changeZoom(delta) {
       setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
@@ -20927,7 +21202,6 @@
       setConnectorDrag(null);
       setReattachDrag(null);
       setContextMenu(null);
-      setTool("select");
     }
     function openEditor(shape) {
       setSelectedId(shape.id);
@@ -20963,9 +21237,9 @@
     }
     function onCanvasDoubleClick(event) {
       const point = toCanvasPoint(event);
-      if (findNodeAt(shapes, point) || findConnectorAt(shapes, point) || tool !== "select") return;
+      if (findNodeAt(shapes, point) || findConnectorAt(shapes, point)) return;
       event.preventDefault();
-      addShape(point, paletteKind);
+      setPicker({ mode: "action", title: "Add a step", point });
     }
     function startConnectorDrag(event, sourceId, start) {
       event.stopPropagation();
@@ -21057,49 +21331,48 @@
     const editorFontSize = toViewportFontSize();
     const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
     const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
-    const renderChip = ({ kind, label, icon: Icon2 }) => {
-      const isTrigger = kind.startsWith("trigger:");
-      const classes = [
-        "component-chip",
-        isTrigger ? "trigger" : "",
-        kind === "note" ? "note" : "",
-        tool === "component" && paletteKind === kind ? "active" : ""
-      ].filter(Boolean).join(" ");
-      return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          "aria-grabbed": draggingKind === kind,
-          className: classes,
-          draggable: true,
-          onClick: () => {
-            setPaletteKind(kind);
-            selectTool("component");
-          },
-          onDragEnd: () => setDraggingKind(null),
-          onDragStart: (event) => startChipDrag(event, kind),
-          title: isTrigger ? `${label} trigger` : label,
-          type: "button",
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Icon2, { size: 14 }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "component-chip-label", children: label })
-          ]
-        },
-        kind
-      );
-    };
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "board-panel", "aria-label": "Workflow board", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "board-toolbar", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "tool-strip", "aria-label": "Board actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: tool === "select" ? "icon-button active" : "icon-button", onClick: () => selectTool("select"), title: "Pointer", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(MousePointer2, { size: 18 }) }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "component-toolbar", "aria-label": "Node types", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chip-group", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Triggers" }),
-            triggerPalette.map(renderChip)
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chip-group", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chip-group-label", children: "Actions" }),
-            actionPalette.map(renderChip),
-            notePalette.map(renderChip)
-          ] })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "palette-actions", "aria-label": "Add nodes", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button",
+              onClick: () => setPicker({ mode: "trigger", title: "When should this run?" }),
+              title: "Add a trigger — when the workflow runs",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Trigger" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button accent",
+              onClick: () => setPicker({ mode: "action", title: "Add a step" }),
+              title: "Add a step — flow control, AI, developer tools, or an app",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Step" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button",
+              onClick: () => addShape(canvasCenter(), "note"),
+              title: "Add a note",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Note" })
+              ]
+            }
+          )
         ] }),
         sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({ clearCanvas: clearShapes }) })
       ] }),
@@ -21126,8 +21399,6 @@
           onPointerUp,
           onPointerCancel: onPointerUp,
           onDoubleClick: onCanvasDoubleClick,
-          onDragOver: onCanvasDragOver,
-          onDrop: onCanvasDrop,
           onContextMenu,
           preserveAspectRatio: "none",
           children: [
@@ -21303,6 +21574,13 @@
         }
       ),
       contextMenu && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-context-menu", style: { left: contextMenu.x, top: contextMenu.y }, onPointerDown: (event) => event.stopPropagation(), children: [
+        !contextMenu.shapeId && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+          setPicker({ mode: "action", title: "Add a step", point: contextMenu.point });
+          setContextMenu(null);
+        }, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ListPlus, { size: 16 }),
+          "Add step…"
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
           addShape(contextMenu.point, "note");
           setContextMenu(null);
@@ -21311,6 +21589,13 @@
           "Add note"
         ] }),
         contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            setPicker({ mode: "change", title: "Change action type", shapeId: contextMenu.shapeId });
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(ListRestart, { size: 16 }),
+            "Change action type…"
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
             onDuplicateStep(contextMenu.shapeId);
             setContextMenu(null);
@@ -21333,33 +21618,20 @@
           /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardPaste, { size: 16 }),
           "Paste step"
         ] }),
-        contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-group", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-label", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(ListRestart, { size: 14 }),
-            "Change action type"
-          ] }),
-          actionCatalog.map(({ type: type2, label }) => {
-            const EntryIcon = actionIcon(type2);
-            return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "button",
-              {
-                className: contextShape.data?.actionType === type2 ? "active" : "",
-                onClick: () => changeActionType(contextMenu.shapeId, type2),
-                type: "button",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(EntryIcon, { size: 16 }),
-                  label
-                ]
-              },
-              type2
-            );
-          })
-        ] }),
         contextMenu.shapeId && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "danger", onClick: deleteSelected, disabled: selectedId !== contextMenu.shapeId, type: "button", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16 }),
           "Delete"
         ] })
-      ] })
+      ] }),
+      picker && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        StepPicker,
+        {
+          mode: picker.mode,
+          title: picker.title,
+          onPick: pickStep,
+          onClose: () => setPicker(null)
+        }
+      )
     ] });
   }
   const localConfig = { apiBase: "/api", mode: "local" };

@@ -26,8 +26,12 @@ import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, You
  * (errorHandlingFields, consumed by workflows.ts).
  *
  * Connectors are the products workflows hook into; each entry in
- * `connectorCatalog` renders as one trigger chip in the palette's Triggers
- * group (logo + label) and contributes the events its trigger suggests.
+ * `connectorCatalog` is one trigger row in the step picker (logo + label)
+ * and contributes the events its trigger suggests.
+ *
+ * The step picker browses `actionCatalog` grouped by the job a step is hired
+ * for — flow control, AI, developer/data plumbing, and per-app verb lists
+ * (see `stepSection` at the bottom of this file).
  *
  * Action types that are not in the catalog are still safe: the designer keeps
  * them as opaque nodes and round-trips their YAML untouched, so hand-written
@@ -1765,3 +1769,91 @@ export const onFailField: CatalogField = {
 };
 
 export const errorHandlingFields: CatalogField[] = [onErrorField, onFailField, errorActionsField];
+
+/**
+ * Step-picker grouping — the palette organized by the job a step is hired
+ * for, not one flat list:
+ *   - "flow" — shape the run itself: branch, filter, loop, wait, digest;
+ *   - "ai"   — delegate thinking: copilot completions and worker agents;
+ *   - "data" — developer plumbing: HTTP, code, CSV, storage, rendering;
+ *   - "app"  — everything else is a product verb; the app comes from the
+ *     action type's prefix (slack_* → the Slack connector), reusing its
+ *     label and logo. A new prefixed action lands in its app automatically;
+ *     a new app-agnostic action must be added to `stepCategories` below —
+ *     unlisted ones fall back to "data" so they never vanish from the picker.
+ */
+export type StepSection = "flow" | "ai" | "data" | "app";
+
+const stepCategories: Record<string, Exclude<StepSection, "app">> = {
+  agent: "ai",
+  ai_complete: "ai",
+  filter: "flow",
+  condition: "flow",
+  paths: "flow",
+  delay: "flow",
+  for_each: "flow",
+  digest: "flow",
+  digest_add: "flow",
+  digest_flush: "flow",
+  run_workflow: "flow",
+  code: "data",
+  js: "data",
+  csv_parse: "data",
+  csv_format: "data",
+  storage_get: "data",
+  storage_set: "data",
+  storage_delete: "data",
+  storage_find: "data",
+  http_request: "data",
+  webhook: "data",
+  render_html_to_pdf: "data",
+  dataops: "data"
+};
+
+/** Action type prefix → connector name; drives the picker's per-app groups. */
+const appPrefixes: Array<[RegExp, string]> = [
+  [/^slack(_|$)/, "slack"],
+  [/^telegram(_|$)/, "telegram"],
+  [/^gmail(_|$)/, "gmail"],
+  [/^email(_|$)/, "email"],
+  [/^dropbox(_|$)/, "dropbox"],
+  [/^s3(_|$)/, "s3"],
+  [/^mailchimp(_|$)/, "mailchimp"],
+  [/^drive(_|$)/, "google-drive"],
+  [/^youtube(_|$)/, "youtube"],
+  [/^calendar(_|$)/, "google-calendar"],
+  [/^sheets(_|$)/, "google-sheets"],
+  [/^zoom(_|$)/, "zoom"]
+];
+
+/** The connector an action belongs to (slack_… → Slack), or undefined for
+    app-agnostic steps. */
+export function actionConnector(type: string): ConnectorEntry | undefined {
+  const hit = appPrefixes.find(([pattern]) => pattern.test(type));
+  return hit ? connectorCatalog.find((entry) => entry.name === hit[1]) : undefined;
+}
+
+export function stepSection(type: string): StepSection {
+  return stepCategories[type] ?? (actionConnector(type) ? "app" : "data");
+}
+
+/** Inside one app, most-wanted verbs first: the app's primary action (its
+    bare-named post/send), then writes, then reads, then manage. Ranked off
+    the verb after the app prefix — labels read "Slack: find user…",
+    "Google Sheets (find row)" — and catalog order breaks ties. */
+const verbRanks: Array<[RegExp, number]> = [
+  [/^(send|post|create|add|upload|append|invite|share|schedule|quick add)\b/i, 0],
+  [/^(find|list|read|look ?up|get|search|download)\b/i, 1]
+];
+
+export function actionVerbRank(type: string): number {
+  const entry = actionCatalog.find((candidate) => candidate.type === type);
+  let verb = entry?.label ?? "";
+  const app = actionConnector(type)?.label;
+  if (app && verb.toLowerCase().startsWith(app.toLowerCase())) {
+    verb = verb.slice(app.length).replace(/^[\s:()]+/, "").replace(/\)$/, "");
+  }
+  if (!verb.trim()) return 0;
+  const hit = verbRanks.find(([pattern]) => pattern.test(verb));
+  return hit ? hit[1] : 2;
+}

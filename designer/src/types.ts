@@ -1,4 +1,3 @@
-export type Tool = "select" | "component";
 export type NodeKind = "trigger" | "action" | "note";
 export type ShapeType = "node" | "note" | "arrow";
 /** Open set — the known actions and their fields live in catalog.ts. */

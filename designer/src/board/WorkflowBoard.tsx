@@ -2,20 +2,32 @@ import {
   ClipboardCopy,
   ClipboardPaste,
   Copy,
+  ListPlus,
+  ListRestart,
   Maximize,
   Minus,
-  MousePointer2,
   Plus,
   StickyNote,
   Trash2,
-  ListRestart
+  Zap
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt } from "./geometry";
-import { PaletteKind, actionIcon, nodeIcon, PaletteEntry, paletteLabel, nodeDataForKind, nodeTitle, nodeSubtitle, triggerPalette, actionPalette, notePalette } from "./nodes";
-import { actionCatalog, actionMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "../workflows";
-import type { ActionType, DiagramShape, Point, Tool } from "../types";
+import { PaletteKind, paletteLabel, nodeDataForKind, nodeIcon, nodeTitle, nodeSubtitle } from "./nodes";
+import { PickerMode, StepPicker } from "./StepPicker";
+import { actionMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "../workflows";
+import type { ActionType, DiagramShape, Point } from "../types";
+
+/** An open step picker: what it offers, and what a pick does — place at
+    `point`, auto-connect from a dropped handle, or retype `shapeId` in place. */
+interface PickerRequest {
+  mode: PickerMode;
+  title: string;
+  point?: Point;
+  connect?: { sourceId: string; handleId: string };
+  shapeId?: string;
+}
 
 interface WorkflowBoardProps {
   shapes: DiagramShape[];
@@ -50,13 +62,11 @@ export function WorkflowBoard({
   onPasteStep,
   sessionControls
 }: WorkflowBoardProps) {
-  const [tool, setTool] = useState<Tool>("select");
-  const [paletteKind, setPaletteKind] = useState<PaletteKind>("webhook");
+  const [picker, setPicker] = useState<PickerRequest | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [panStart, setPanStart] = useState<{ clientX: number; clientY: number; origin: Point } | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; sourceHandleId: string; start: Point; current: Point } | null>(null);
   const [reattachDrag, setReattachDrag] = useState<{ arrowId: string; endpoint: "source" | "target"; fixed: Point; current: Point } | null>(null);
-  const [draggingKind, setDraggingKind] = useState<PaletteKind | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
@@ -75,13 +85,8 @@ export function WorkflowBoard({
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
   const canvasClass = useMemo(() => (
-    [
-      "drawing-surface",
-      tool === "select" ? "selecting" : "",
-      panStart ? "panning" : "",
-      draggingKind ? "component-dropping" : ""
-    ].filter(Boolean).join(" ")
-  ), [draggingKind, panStart, tool]);
+    ["drawing-surface", panStart ? "panning" : ""].filter(Boolean).join(" ")
+  ), [panStart]);
   const zoomedViewBox = useMemo(() => {
     const width = canvasViewBox.width / zoom;
     const height = canvasViewBox.height / zoom;
@@ -126,10 +131,14 @@ export function WorkflowBoard({
     editShapes(updater);
   }
 
-  function addShape(point: Point, kind: PaletteKind) {
+  /** Places a node (or note) at `point`; with `connect`, the same history
+      step adds an arrow from that handle so "drop a handle, pick a step"
+      costs one undo. Returns the new shape's id. */
+  function addShape(point: Point, kind: PaletteKind, connect?: { sourceId: string; handleId: string }): string {
+    const id = crypto.randomUUID();
     if (kind === "note") {
       const next: DiagramShape = {
-        id: crypto.randomUUID(),
+        id,
         type: "note",
         x: point.x - 110,
         y: point.y - 44,
@@ -138,10 +147,9 @@ export function WorkflowBoard({
         label: "Note"
       };
       commitShapes((currentShapes) => [...currentShapes, next]);
-      setSelectedId(next.id);
     } else {
       const next: DiagramShape = {
-        id: crypto.randomUUID(),
+        id,
         type: "node",
         x: point.x - NODE_WIDTH / 2,
         y: point.y - NODE_HEIGHT / 2,
@@ -150,10 +158,29 @@ export function WorkflowBoard({
         label: paletteLabel(kind),
         data: nodeDataForKind(kind)
       };
-      commitShapes((currentShapes) => [...currentShapes, next]);
-      setSelectedId(next.id);
+      commitShapes((currentShapes) => {
+        if (!connect) return [...currentShapes, next];
+        const source = currentShapes.find((shape) => shape.id === connect.sourceId);
+        if (!isNodeShape(source) || next.data?.nodeKind === "trigger") return [...currentShapes, next];
+        const sourceHandle = connectionHandleById(source, connect.handleId) ?? nearestConnectionHandle(source, point);
+        const targetHandle = nearestConnectionHandle(next, point);
+        const arrow: DiagramShape = {
+          id: crypto.randomUUID(),
+          type: "arrow",
+          x: sourceHandle.x,
+          y: sourceHandle.y,
+          width: targetHandle.x - sourceHandle.x,
+          height: targetHandle.y - sourceHandle.y,
+          sourceId: source.id,
+          targetId: next.id,
+          sourceHandleId: sourceHandle.id,
+          targetHandleId: targetHandle.id
+        };
+        return [...currentShapes, next, arrow];
+      });
     }
-    setTool("select");
+    setSelectedId(id);
+    return id;
   }
 
   function addConnector(sourceId: string, sourceHandleId: string, target: DiagramShape, targetPoint: Point) {
@@ -177,7 +204,36 @@ export function WorkflowBoard({
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(next.id);
     setConnectorDrag(null);
-    setTool("select");
+  }
+
+  function canvasCenter(): Point {
+    return {
+      x: zoomedViewBox.x + zoomedViewBox.width / 2,
+      y: zoomedViewBox.y + zoomedViewBox.height / 2
+    };
+  }
+
+  /** What a picker pick does: place at the request's point (or the canvas
+      center), auto-connect when it came from a dropped handle, or retype the
+      node in place for "change action type". Center placements cascade a
+      little so consecutive adds don't stack exactly on top of each other. */
+  function pickStep(kind: PaletteKind) {
+    const request = picker;
+    setPicker(null);
+    if (!request) return;
+    if (request.mode === "change" && request.shapeId) {
+      changeActionType(request.shapeId, kind as ActionType);
+      return;
+    }
+    let point = request.point;
+    if (!point) {
+      const cascade = shapes.length % 6;
+      point = {
+        x: canvasCenter().x + cascade * 26,
+        y: canvasCenter().y + cascade * 20
+      };
+    }
+    addShape(point, kind, request.connect);
   }
 
   function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
@@ -199,12 +255,6 @@ export function WorkflowBoard({
     const point = toCanvasPoint(event);
     const hit = findNodeAt(shapes, point);
     const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
-
-    if (tool !== "select") {
-      event.stopPropagation();
-      addShape(point, paletteKind);
-      return;
-    }
 
     const draggableHit = hit && hit.type !== "arrow";
     setSelectedId(hit?.id ?? connectorHit?.id ?? null);
@@ -259,7 +309,7 @@ export function WorkflowBoard({
       setConnectorDrag({ ...connectorDrag, current: toCanvasPoint(event) });
       return;
     }
-    if (tool !== "select" || !selectedId || !dragStart) return;
+    if (!selectedId || !dragStart) return;
     const point = toCanvasPoint(event);
     const dx = point.x - dragStart.x;
     const dy = point.y - dragStart.y;
@@ -305,7 +355,18 @@ export function WorkflowBoard({
     if (connectorDrag) {
       const point = toCanvasPoint(event);
       const target = findNodeAt(shapes, point);
-      if (isNodeShape(target)) addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+      if (isNodeShape(target)) {
+        addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+      } else {
+        // Dropped on empty canvas: the most common job is "add the next
+        // step" — offer the picker and wire whatever lands to this handle.
+        setPicker({
+          mode: "action",
+          title: "Add a step",
+          point,
+          connect: { sourceId: connectorDrag.sourceId, handleId: connectorDrag.sourceHandleId }
+        });
+      }
       setConnectorDrag(null);
       return;
     }
@@ -316,35 +377,6 @@ export function WorkflowBoard({
     dragSnapshotRef.current = null;
     didDragRef.current = false;
     setDragStart(null);
-  }
-
-  function selectTool(nextTool: Tool) {
-    setTool(nextTool);
-    setConnectorDrag(null);
-    setPanStart(null);
-    setContextMenu(null);
-  }
-
-  function startChipDrag(event: React.DragEvent<HTMLButtonElement>, kind: PaletteKind) {
-    setPaletteKind(kind);
-    setDraggingKind(kind);
-    event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData("application/x-dapier-node", kind);
-    event.dataTransfer.setData("text/plain", kind);
-  }
-
-  function onCanvasDragOver(event: React.DragEvent<SVGSVGElement>) {
-    if (!draggingKind) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  }
-
-  function onCanvasDrop(event: React.DragEvent<SVGSVGElement>) {
-    const droppedKind = (event.dataTransfer.getData("application/x-dapier-node") || draggingKind) as PaletteKind | "";
-    if (!droppedKind) return;
-    event.preventDefault();
-    addShape(toCanvasPoint(event), droppedKind);
-    setDraggingKind(null);
   }
 
   function changeZoom(delta: number) {
@@ -415,7 +447,6 @@ export function WorkflowBoard({
     setConnectorDrag(null);
     setReattachDrag(null);
     setContextMenu(null);
-    setTool("select");
   }
 
   function openEditor(shape: DiagramShape) {
@@ -458,9 +489,9 @@ export function WorkflowBoard({
 
   function onCanvasDoubleClick(event: React.MouseEvent<SVGSVGElement>) {
     const point = toCanvasPoint(event);
-    if (findNodeAt(shapes, point) || findConnectorAt(shapes, point) || tool !== "select") return;
+    if (findNodeAt(shapes, point) || findConnectorAt(shapes, point)) return;
     event.preventDefault();
-    addShape(point, paletteKind);
+    setPicker({ mode: "action", title: "Add a step", point });
   }
 
   function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: ConnectionHandle) {
@@ -573,52 +604,40 @@ export function WorkflowBoard({
   const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
-  const renderChip = ({ kind, label, icon: Icon }: PaletteEntry) => {
-    const isTrigger = kind.startsWith("trigger:");
-    const classes = [
-      "component-chip",
-      isTrigger ? "trigger" : "",
-      kind === "note" ? "note" : "",
-      tool === "component" && paletteKind === kind ? "active" : ""
-    ].filter(Boolean).join(" ");
-    return (
-      <button
-        key={kind}
-        aria-grabbed={draggingKind === kind}
-        className={classes}
-        draggable
-        onClick={() => { setPaletteKind(kind); selectTool("component"); }}
-        onDragEnd={() => setDraggingKind(null)}
-        onDragStart={(event) => startChipDrag(event, kind)}
-        title={isTrigger ? `${label} trigger` : label}
-        type="button"
-      >
-        <Icon size={14} />
-        <span className="component-chip-label">{label}</span>
-      </button>
-    );
-  };
-
   return (
     <section className="board-panel" aria-label="Workflow board">
       <div className="board-toolbar">
-        <div className="tool-strip" aria-label="Board actions">
-          <button className={tool === "select" ? "icon-button active" : "icon-button"} onClick={() => selectTool("select")} title="Pointer" type="button">
-            <MousePointer2 size={18} />
+        {/* The palette collapsed into three intents: when the workflow runs
+            (trigger), what it does (step), and a free-form note. Everything
+            else lives in the searchable picker those buttons open. */}
+        <div className="palette-actions" aria-label="Add nodes">
+          <button
+            className="palette-button"
+            onClick={() => setPicker({ mode: "trigger", title: "When should this run?" })}
+            title="Add a trigger — when the workflow runs"
+            type="button"
+          >
+            <Zap size={15} />
+            <span>Trigger</span>
           </button>
-        </div>
-        <div className="component-toolbar" aria-label="Node types">
-          <div className="chip-group">
-            <span className="chip-group-label">Triggers</span>
-            {triggerPalette.map(renderChip)}
-          </div>
-          <div className="chip-group">
-            <span className="chip-group-label">Actions</span>
-            {actionPalette.map(renderChip)}
-            {/* Notes flow with the actions so the chip never orphans on its
-                own wrapped row; the dashed border sets it apart. */}
-            {notePalette.map(renderChip)}
-          </div>
+          <button
+            className="palette-button accent"
+            onClick={() => setPicker({ mode: "action", title: "Add a step" })}
+            title="Add a step — flow control, AI, developer tools, or an app"
+            type="button"
+          >
+            <Plus size={15} />
+            <span>Step</span>
+          </button>
+          <button
+            className="palette-button"
+            onClick={() => addShape(canvasCenter(), "note")}
+            title="Add a note"
+            type="button"
+          >
+            <StickyNote size={15} />
+            <span>Note</span>
+          </button>
         </div>
         {sessionControls && (
           <div className="canvas-session-controls">
@@ -651,8 +670,6 @@ export function WorkflowBoard({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onDoubleClick={onCanvasDoubleClick}
-        onDragOver={onCanvasDragOver}
-        onDrop={onCanvasDrop}
         onContextMenu={onContextMenu}
         preserveAspectRatio="none"
       >
@@ -811,12 +828,22 @@ export function WorkflowBoard({
 
       {contextMenu && (
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
+          {!contextMenu.shapeId && (
+            <button onClick={() => { setPicker({ mode: "action", title: "Add a step", point: contextMenu.point }); setContextMenu(null); }} type="button">
+              <ListPlus size={16} />
+              Add step…
+            </button>
+          )}
           <button onClick={() => { addShape(contextMenu.point, "note"); setContextMenu(null); }} type="button">
             <StickyNote size={16} />
             Add note
           </button>
           {contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && (
             <div className="context-menu-group">
+              <button onClick={() => { setPicker({ mode: "change", title: "Change action type", shapeId: contextMenu.shapeId }); setContextMenu(null); }} type="button">
+                <ListRestart size={16} />
+                Change action type…
+              </button>
               <button onClick={() => { onDuplicateStep(contextMenu.shapeId!); setContextMenu(null); }} type="button">
                 <Copy size={16} />
                 Duplicate
@@ -833,28 +860,6 @@ export function WorkflowBoard({
               Paste step
             </button>
           )}
-          {contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && (
-            <div className="context-menu-group">
-              <div className="context-menu-label">
-                <ListRestart size={14} />
-                Change action type
-              </div>
-              {actionCatalog.map(({ type, label }) => {
-                const EntryIcon = actionIcon(type);
-                return (
-                  <button
-                    key={type}
-                    className={contextShape.data?.actionType === type ? "active" : ""}
-                    onClick={() => changeActionType(contextMenu.shapeId!, type)}
-                    type="button"
-                  >
-                    <EntryIcon size={16} />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
           {contextMenu.shapeId && (
             <button className="danger" onClick={deleteSelected} disabled={selectedId !== contextMenu.shapeId} type="button">
               <Trash2 size={16} />
@@ -862,6 +867,15 @@ export function WorkflowBoard({
             </button>
           )}
         </div>
+      )}
+
+      {picker && (
+        <StepPicker
+          mode={picker.mode}
+          title={picker.title}
+          onPick={pickStep}
+          onClose={() => setPicker(null)}
+        />
       )}
     </section>
   );
