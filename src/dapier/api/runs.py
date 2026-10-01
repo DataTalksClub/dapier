@@ -55,9 +55,10 @@ CSV_COLUMNS = (
 
 # The list row's "what actually arrived" line: keys that carry the event's
 # human payload, best first — an email subject outranks a telegram message,
-# which outranks an arbitrary webhook string. Ids and timestamps never win.
+# which outranks naming metadata (titles, senders) and arbitrary webhook
+# strings. Ids and timestamps never win.
 _SUMMARY_FIELDS = (
-    "subject", "title", "text", "body", "preview", "message",
+    "subject", "text", "body", "title", "preview", "message",
     "name", "from", "sender", "channel", "query", "command", "url",
 )
 
@@ -223,7 +224,10 @@ def event_summary(step):
                 visit(child, key)
         elif isinstance(node, str):
             text = " ".join(node.split())
-            if not 4 <= len(text) <= 400:
+            # Long is fine (a telegram channel post) — it gets truncated at
+            # the end; only blobs (embedded attachments, huge payloads) are
+            # skipped outright.
+            if not 4 <= len(text) <= 5000:
                 return
             if key in ("id", "update_id") or key.endswith(("_id", "_at", "_time")):
                 return

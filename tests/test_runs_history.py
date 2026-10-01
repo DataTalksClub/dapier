@@ -456,8 +456,9 @@ def test_cli_passes_next_token_back(isolated_home, monkeypatch, capsys):
 
 
 def test_list_rows_carry_an_event_summary(monkeypatch):
+    long_post = "👌 Module 3 is complete! Great to see 10 new members joining us " + "over the past ten days. " * 8
     telegram = _run("wf-telegram", "evt-1")
-    telegram["input"] = {"message": {"text": "👌 Module 3 is complete! Great to see 10 new members."},
+    telegram["input"] = {"message": {"text": long_post, "chat": {"title": "Analytics Zoomcamp"}},
                          "update_id": 803099412}
     email = _run("wf-email", "evt-2")
     email["input"] = {"subject": "Weekly digest", "body": "x" * 300}
@@ -467,10 +468,10 @@ def test_list_rows_carry_an_event_summary(monkeypatch):
 
     _, payload = runs.api_list()
     rows = {row["run_id"]: row for row in payload["runs"]}
-    # The message text outranks the id bookkeeping; a subject outranks the
-    # longer anonymous body; nothing readable reads None.
-    assert rows["wf-telegram:evt-1"]["event_summary"] == \
-        "👌 Module 3 is complete! Great to see 10 new members."
+    # The message text outranks the id bookkeeping and the shorter chat
+    # title, however long the post is; a subject outranks the longer
+    # anonymous body; nothing readable reads None.
+    assert rows["wf-telegram:evt-1"]["event_summary"] == long_post[:117] + "…"
     assert rows["wf-email:evt-2"]["event_summary"] == "Weekly digest"
     assert rows["wf-bare:evt-3"]["event_summary"] is None
 
