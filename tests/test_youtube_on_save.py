@@ -205,7 +205,7 @@ def test_cli_save_prints_warnings(monkeypatch, capsys):
     monkeypatch.setattr(cli_api, "call", _fake_api({
         "file": "yt-flow.yaml", "commit": "cafe123", "published": True,
         "warnings": ["YouTube subscribe for channel UCabc123 failed: hub down"]}))
-    assert cli_commands._save_workflow_yaml("https://api.example.test", "id: x", None) == 0
+    assert cli_commands.workflows._save_workflow_yaml("https://api.example.test", "id: x", None) == 0
     out, _ = capsys.readouterr()
     assert "Warning: YouTube subscribe for channel UCabc123 failed: hub down" in out
 

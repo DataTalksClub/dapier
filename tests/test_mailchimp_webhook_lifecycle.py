@@ -334,7 +334,7 @@ class CliOutputTests(unittest.TestCase):
         response = {"created": True, "hook_id": "newsletter", "kind": "mailchimp",
                     "url": HOOK_URL, "list_id": LIST_ID, "token": "tok"}
         body = {"name": "newsletter", "kind": "mailchimp", "list_id": LIST_ID}
-        with patch("dapier_cli.commands._read_json_file",
+        with patch("dapier_cli.commands.hooks.read_json_file",
                    lambda path: (dict(body), None)), \
              self._patch_call(response), \
              redirect_stdout(StringIO()) as out:
@@ -351,7 +351,7 @@ class CliOutputTests(unittest.TestCase):
                     "warnings": ["the trigger saved, but Mailchimp webhook "
                                  "registration failed: boom"]}
         body = {"name": "newsletter", "kind": "mailchimp", "list_id": LIST_ID}
-        with patch("dapier_cli.commands._read_json_file",
+        with patch("dapier_cli.commands.hooks.read_json_file",
                    lambda path: (dict(body), None)), \
              self._patch_call(response), \
              redirect_stdout(StringIO()) as out:

@@ -1,4 +1,8 @@
 import base64
+import subprocess
+import sys
+import time
+import webbrowser
 import io
 import json
 import os
@@ -295,7 +299,7 @@ def test_token_exec_child_env_only(monkeypatch, capsys):
 
         return Done()
 
-    monkeypatch.setattr(commands.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     fake_api(monkeypatch)
     code = commands.token_exec("https://api.example.test", "youtube-personal",
                                "buildcamp-uploader", ["printenv"])
@@ -435,8 +439,8 @@ def test_connect_prints_provider_webhook_setup(monkeypatch, capsys):
          "account_title": "My channel"},
     ]
     monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: responses.pop(0))
-    monkeypatch.setattr(commands.webbrowser, "open", lambda url: True)
-    monkeypatch.setattr(commands.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
     assert commands.connections_connect("https://api.example.test", "yt", "agent-1") == 0
     out, _ = capsys.readouterr()
     assert "/hooks/youtube" in out
@@ -535,7 +539,7 @@ def test_credentials_set_reads_stdin(monkeypatch, capsys):
         return {"provider": "mailchimp", "configured": True}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("a" * 20 + "-us1\n"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("a" * 20 + "-us1\n"))
     assert commands.credentials_set("https://api.example.test", "mailchimp", "-") == 0
     assert posted == {"path": "/api/agent/credentials/mailchimp",
                       "body": {"api_key": "a" * 20 + "-us1"}}
@@ -904,13 +908,13 @@ def test_oauth_clients_set_reads_stdin_and_rejects_empty_or_missing(monkeypatch,
         return {"provider": "google", "client_id": "g-id", "source": "config", "configured": True}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("s3cret\n"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("s3cret\n"))
     assert commands.oauth_clients_set("https://api.example.test", "google", "g-id", "-") == 0
     assert calls == [{"path": "/api/agent/oauth-clients/google",
                       "body": {"client_id": "g-id", "client_secret": "s3cret"}}]
 
-    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
-    monkeypatch.setattr(commands.sys, "stdin", io.StringIO("ignored\n"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("ignored\n"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("ignored\n"))
     assert commands.oauth_clients_set("https://api.example.test", "google", "  ", "-") == 2
     assert commands.oauth_clients_set("https://api.example.test", "google", "g-id",
                                       str(tmp_path / "missing")) == 2
