@@ -28,16 +28,6 @@ function frameSrc(source) {
   return `/designer/app?${params}`;
 }
 
-function syncGithub(source) {
-  const github = $('#designer-github');
-  if (source && state.data?.workflows_edit_base) {
-    github.href = `${state.data.workflows_edit_base}/${encodeURIComponent(source)}`;
-    github.hidden = false;
-  } else {
-    github.hidden = true;
-  }
-}
-
 /* Paints the topbar from the iframe's live meta (id, file, renamable) and
    keeps /workflows/<id> in step so the view stays deep-linkable — a rename
    moves the URL with it. */
@@ -53,7 +43,6 @@ function applyMeta() {
   } else {
     title.title = '';
   }
-  syncGithub(meta ? meta.source : null);
   const url = workflowUrl(meta && meta.id);
   if (`${window.location.pathname}${window.location.search}` !== url) {
     history.replaceState(null, '', url);
@@ -77,7 +66,6 @@ function syncHead(ref) {
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
   $('#designer-rename').hidden = true;
-  syncGithub(workflow ? workflow.source : null);
 }
 
 /* Swaps the h1 for an input; Enter or blur accepts, Escape restores. The

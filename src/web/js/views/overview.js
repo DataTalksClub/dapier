@@ -115,13 +115,6 @@ export function openWorkflow(id) {
   } else {
     designer.hidden = true;
   }
-  const edit = $('#workflow-edit-github');
-  if (workflow.source && state.data.workflows_edit_base) {
-    edit.href = `${state.data.workflows_edit_base}/${encodeURIComponent(workflow.source)}`;
-    edit.hidden = false;
-  } else {
-    edit.hidden = true;
-  }
   /* Export: the canonical YAML the API renders from the stored definition
      (the same bytes `dapier workflows export` writes). */
   const download = $('#workflow-download-yaml');

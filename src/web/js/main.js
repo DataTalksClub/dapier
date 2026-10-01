@@ -316,6 +316,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));
   }
   /* The deep-link header sync above ran before the overview data arrived;
-     now the workflow name and GitHub link can be filled in. */
+     now the workflow name can be filled in. */
   if (initialView === 'designer') await designerFromLocation();
 });

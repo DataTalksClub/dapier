@@ -786,8 +786,6 @@ body[data-view="designer"] .topbar h1.renamable:hover {
   padding: 0;
   width: 320px;
 }
-.top-actions #designer-github { display: none; }
-body[data-view="designer"] .top-actions #designer-github { display: inline-flex; }
 #designer-back { display: none; }
 body[data-view="designer"] #designer-back { display: inline-flex; }
 .designer-embed {

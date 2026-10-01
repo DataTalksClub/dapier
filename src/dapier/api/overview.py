@@ -99,11 +99,6 @@ def _action_views(actions):
         for index, action in enumerate(actions or [])
     ]
 
-def _workflows_edit_base():
-    return os.environ.get(
-        "WORKFLOWS_REPO_URL", "https://github.com/DataTalksClub/dapier"
-    ).rstrip("/") + "/edit/main/workflows"
-
 def _scan(table_name, limit=50):
     table = boto3.resource("dynamodb").Table(table_name)
     return table.scan(Limit=limit).get("Items", [])
@@ -237,7 +232,6 @@ def overview(event=None, visible=None):
         "workflows": workflows,
         "workflow_tags": workflow_tags,
         "workflow_folders": workflow_folders,
-        "workflows_edit_base": _workflows_edit_base(),
         "executions": executions[:25],
         "runs": runs.recent(25, visible=visible),
         "usage": _usage(visible, owners),
