@@ -375,7 +375,7 @@ def test_console_versions_dialog_wires_the_diff_button():
 
 def test_both_dispatchers_expose_the_diff_route():
     agent_source = (Path(__file__).resolve().parents[1]
-                    / "src" / "dapier" / "api" / "agent.py").read_text()
+                    / "src" / "dapier" / "api" / "agent" / "__init__.py").read_text()
     assert "versions/diff" in agent_source
     admin_source = (Path(__file__).resolve().parents[1]
                     / "src" / "dapier" / "api" / "admin" / "__init__.py").read_text()
