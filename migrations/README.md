@@ -42,24 +42,3 @@ publish`, and `dapier hooks save`. Hook edits preserve the webhook token
 unless explicitly asked to rotate it. Keep a private export of the old
 definitions for rollback and avoid overlapping the old hook action chain
 with the new managed Telegram triggers during cutover.
-
-## Retired invoice email routes (2026-09-30)
-
-The combined invoice-filing cutover was never applied; its design record is
-reverted. The operator retired the two routes instead: the published
-workflows `email-attachment-dataops` (invoice-attachment@) and
-`email-render-invoice` (invoice-pdf@) were deleted, and the never-published
-`invoice-filing` draft was discarded. Both addresses are gone from the
-Emails console and `dapier emails list`; mail to them now matches no
-workflow.
-
-Inbound invoice filing continues on the surviving addresses: `invoice@`
-(stored trigger — attachment to the invoice Dropbox folder, then DataOps
-intake) and `dropbox-inbox@` for general attachments.
-`rendered-invoice-dataops` stays enabled and files any completed renderer
-job from whatever source.
-
-Rollback: `dapier workflows save` then `dapier workflows publish` from
-`legacy-workflows/email-attachment-dataops.yaml` and
-`legacy-workflows/email-render-invoice.yaml`, which match the deleted
-published versions aside from key order.
