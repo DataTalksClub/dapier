@@ -90,7 +90,11 @@ function renderDetail() {
     </dl></details>`;
 }
 async function selectTask(id, { updateUrl = true } = {}) {
+  /* A newly picked run opens at its head; the 15s quiet refresh of the same
+     run must not yank a reader back to the top of a long result. */
+  const changed = selected !== id;
   selected = id; detail = null;
+  if (changed) $('#agent-run-detail').scrollTop = 0;
   const seq = ++detailSeq;
   renderList(); renderDetail();
   if (updateUrl) setTaskUrl(id);
