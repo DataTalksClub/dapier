@@ -4,7 +4,7 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, formatTimestamp, jsonBlock } from '../format.js';
+import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
 
 let events = null;
 let fetching = false;
@@ -81,7 +81,7 @@ async function openEvent(inboxId) {
       <p>Matched workflows: ${matched.length ? matched.map((id) => `<span class="mono">${escapeHtml(id)}</span>`).join(', ') : '<em>none — no workflow picked this up</em>'}</p>
       ${event.error ? `<p class="dialog-feedback error">${escapeHtml(event.error)}</p>` : ''}
       <h3 class="sub-head">Envelope</h3>
-      ${jsonBlock(event.data ?? event)}`;
+      ${dataBlock(event.data ?? event)}`;
     $('#inbox-replay-button').dataset.inbox = inboxId;
     $('#inbox-event-dialog').showModal();
   } catch (error) {

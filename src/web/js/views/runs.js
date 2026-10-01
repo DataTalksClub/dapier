@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, wrapTokens, formatTimestamp, formatDuration, jsonBlock } from '../format.js';
+import { escapeHtml, statusLine, wrapTokens, formatTimestamp, formatDuration, dataBlock } from '../format.js';
 
 const STEP_ICONS = {
   webhook: 'webhook',
@@ -200,7 +200,7 @@ $('#runs-export').addEventListener('click', async (event) => {
 function stepCard({ icon, title, badge, status, duration, at, data, error, replayFrom, stepId }) {
   const sections = Object.entries(data || {})
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${jsonBlock(value) || '<p class="detail-muted">Empty</p>'}</div>`)
+    .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${dataBlock(value, { openRaw: Boolean(error) }) || '<p class="detail-muted">Empty</p>'}</div>`)
     .join('');
   const replayFromHere = replayFrom && stepId
     ? `<button class="button secondary run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
@@ -239,6 +239,8 @@ function flow(data) {
        step — offer it exactly there. */
     const replayable = step.status === 'failed' &&
       step.action_id && !String(step.action_id).includes('.');
+    /* Input is the run's trigger envelope on every step — the Trigger card
+       shows it once; the action card carries what the step added. */
     cards.push(stepCard({
       icon: STEP_ICONS[step.action_type] || 'arrow-right',
       title: step.action_id || `Step ${index + 1}`,
@@ -246,7 +248,7 @@ function flow(data) {
       status: step.status,
       duration: formatDuration(step.duration_ms),
       at: formatTimestamp(step.finished_at),
-      data: { Input: step.input, Output: step.output },
+      data: { Output: step.output },
       error: step.error,
       replayFrom: replayable ? replayFrom : '',
       stepId: step.action_id,

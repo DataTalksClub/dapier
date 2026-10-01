@@ -740,6 +740,32 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
   max-height: 220px;
   overflow-y: auto;
 }
+.j-key { color: var(--accent); }
+.j-lit { color: var(--muted); font-style: italic; }
+
+/* The readable layer of a data block: one row per informative field, dotted
+   path left, value right; long text stays on one line and truncates. */
+.json-digest { margin: 0 0 8px; display: grid; gap: 3px; }
+.json-digest > div { display: grid; grid-template-columns: minmax(80px, 45%) minmax(0, 1fr); gap: 2px 12px; align-items: baseline; }
+.json-digest dt { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.json-digest dd { margin: 0; font-size: 12.5px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.json-digest-solo dd, .json-digest-rest dd { grid-column: 1 / -1; }
+.json-digest-rest dd { font-size: 11.5px; color: var(--muted); }
+
+/* Raw JSON folded away until asked for; the summary reads like the h4 labels. */
+.json-raw summary {
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.json-raw summary:hover { color: var(--ink); }
+.json-raw[open] summary { margin-bottom: 6px; }
+.json-raw .json-block { max-height: 300px; }
 
 /* --- embedded designer -------------------------------------------------------- */
 /* The canvas is the view: main becomes a flex column pinned to the dynamic
@@ -1034,7 +1060,27 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-detail-date { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.6; }
 .agent-result { margin: 28px 0; border-top: 1px solid var(--line); padding-top: 24px; }
 .agent-result h3 { font-size: 16px; font-weight: 600; margin: 0 0 16px; }
-.agent-result-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.75 var(--sans); max-width: 70ch; }
+.agent-result-text { overflow-wrap: anywhere; font: 15px/1.75 var(--sans); max-width: 70ch; }
+.agent-result-text > :first-child { margin-top: 0; }
+.agent-result-text > :last-child { margin-bottom: 0; }
+.agent-result-text p { margin: 0 0 14px; }
+.agent-result-text h1, .agent-result-text h2, .agent-result-text h3, .agent-result-text h4, .agent-result-text h5, .agent-result-text h6 { font-weight: 600; line-height: 1.4; margin: 22px 0 10px; }
+.agent-result-text h1 { font-size: 18px; }
+.agent-result-text h2 { font-size: 16px; }
+.agent-result-text h3, .agent-result-text h4, .agent-result-text h5, .agent-result-text h6 { font-size: 15px; }
+.agent-result-text ul, .agent-result-text ol { margin: 0 0 14px; padding-left: 24px; }
+.agent-result-text li { margin: 0 0 6px; }
+.agent-result-text li > ul, .agent-result-text li > ol { margin: 6px 0 0; }
+.agent-result-text li::marker { color: var(--muted); }
+.agent-result-text pre { margin: 0 0 14px; padding: 14px 16px; background: var(--code-bg); overflow-x: auto; white-space: pre; }
+.agent-result-text pre code { background: transparent; padding: 0; font-size: 12.5px; line-height: 1.6; white-space: pre; }
+.agent-result-text blockquote { margin: 0 0 14px; border-left: 3px solid var(--line-strong); padding: 2px 0 2px 16px; color: var(--muted); }
+.agent-result-text table { border-collapse: collapse; margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; max-width: 100%; display: block; overflow-x: auto; }
+.agent-result-text th, .agent-result-text td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.agent-result-text th { background: var(--wash); font-weight: 600; }
+.agent-result-text hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+.agent-result-text img { max-width: 100%; }
+.agent-result-text a { overflow-wrap: anywhere; }
 .agent-progress p { margin: 0 0 12px; }
 .agent-list-empty, .agent-detail-empty { padding: 32px 20px; color: var(--muted); }
 .agent-list-empty h3, .agent-detail-empty h3 { color: var(--ink); font-size: 18px; margin: 0 0 10px; }

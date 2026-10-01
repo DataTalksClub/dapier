@@ -57,7 +57,8 @@ export function formatDuration(ms) {
   return value < 1000 ? `${Math.round(value)}ms` : `${(value / 1000).toFixed(value < 10000 ? 2 : 1)}s`;
 }
 
-/* Machine data (step input/output) as one escaped JSON block. */
+/* Machine data (step input/output) as one escaped JSON block, keys picked
+   out so the eye can follow structure. */
 export function jsonBlock(value) {
   if (value == null || value === '') return '';
   let text;
@@ -66,7 +67,82 @@ export function jsonBlock(value) {
   } catch (_) {
     text = String(value);
   }
-  return `<pre class="json-block">${escapeHtml(text)}</pre>`;
+  const html = escapeHtml(text).replace(/("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b/g, (match, str, colon, literal) => {
+    if (str) return colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`;
+    return `<span class="j-lit">${literal}</span>`;
+  });
+  return `<pre class="json-block">${html}</pre>`;
+}
+
+/* Human layer over machine data: the informative fields flattened to dotted
+   paths (nested objects become one row each), long strings collapsed to one
+   line and truncated — the untouched JSON stays one click away below. */
+const DIGEST_ROWS = 10;
+const DIGEST_DEPTH = 3;
+const DIGEST_TEXT = 160;
+
+/* Fields that only add noise at digest level: nulls, empty strings, empty
+   objects. Zero and false stay — they usually are the answer. */
+function emptyish(value) {
+  return value === null || value === undefined || value === '' ||
+    (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length);
+}
+
+/* Most informative first: real text and meaningful flags outrank numbers,
+   id-shaped keys (`*_id`, `id`) sink — they are machine bookkeeping. Depth
+   nudges toward near-root fields; equal scores keep their natural order. */
+const ID_KEY = /(^|_)(id|ids)$|_id$/;
+
+function leafScore(path, value, text) {
+  let score;
+  if (typeof value === 'boolean') score = value ? 26 : 18;
+  else if (typeof value === 'number') score = 12;
+  else score = 30 + Math.min(20, text.length / 12);
+  if (typeof value !== 'object' && ID_KEY.test(path.split('.').pop())) score -= 25;
+  return score - path.split('.').length * 2;
+}
+
+function digestRows(value) {
+  const rows = [];
+  const walk = (node, path, depth) => {
+    if (node === null || typeof node !== 'object') {
+      const text = typeof node === 'string'
+        ? node.replace(/\s+/g, ' ').trim().slice(0, DIGEST_TEXT) + (node.length > DIGEST_TEXT ? '…' : '')
+        : String(node);
+      rows.push([path, text, leafScore(path, node, text)]);
+      return;
+    }
+    const entries = Array.isArray(node)
+      ? node.map((item, index) => [String(index), item])
+      : Object.entries(node);
+    if (depth >= DIGEST_DEPTH || !entries.some(([, item]) => !emptyish(item))) {
+      const text = Array.isArray(node) ? `[${entries.length} items]` : `{${entries.length} keys}`;
+      rows.push([path, text, 16]);
+      return;
+    }
+    for (const [key, item] of entries) {
+      if (!emptyish(item)) walk(item, path ? `${path}.${key}` : key, depth + 1);
+    }
+  };
+  walk(value, '', 0);
+  return rows.sort((a, b) => b[2] - a[2]).map(([key, text]) => [key, text]);
+}
+
+/* Render one data payload: digest first, raw JSON in a collapsed <details>
+   (open for failed steps, where the detail is the point). '' when there is
+   nothing to show, so callers can fall back to their Empty note. */
+export function dataBlock(value, { openRaw = false } = {}) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length) return '';
+  const rows = digestRows(value);
+  const digest = rows.slice(0, DIGEST_ROWS).map(([key, text]) => key
+    ? `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(text)}</dd></div>`
+    : `<div class="json-digest-solo"><dd>${escapeHtml(text)}</dd></div>`).join('') +
+    (rows.length > DIGEST_ROWS
+      ? `<div class="json-digest-rest"><dd>+ ${rows.length - DIGEST_ROWS} more fields — see raw JSON</dd></div>`
+      : '');
+  return `${digest ? `<dl class="json-digest">${digest}</dl>` : ''}
+    <details class="json-raw"${openRaw ? ' open' : ''}><summary>Raw JSON</summary>${jsonBlock(value)}</details>`;
 }
 
 export function emptyRow(columns) {
