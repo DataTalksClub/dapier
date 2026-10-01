@@ -1552,6 +1552,14 @@ def print_runs(items):
         started = (item.get("started_at") or "-")[:19]
         print(f"{item.get('run_id', ''):42} {item.get('status', ''):12} "
               f"{item.get('steps', 0):<5} {started}")
+        # The same what-actually-happened line the console row carries:
+        # trigger type plus the API's event summary, indented under the run.
+        trigger = " · ".join(str(part) for part in
+                             (item.get("connector"), item.get("event_type")) if part)
+        summary = str(item.get("event_summary") or "")
+        detail = " — ".join(part for part in (trigger, summary) if part)
+        if detail:
+            print(f"    {detail}")
 
 
 def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,

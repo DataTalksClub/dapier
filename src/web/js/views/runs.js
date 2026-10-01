@@ -27,7 +27,8 @@ function runRow(run) {
     ? ` <span class="muted-cell mono">(until ${escapeHtml(formatTimestamp(run.delayed_until))})</span>` : '';
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(run.workflow_id || 'Run')}</span></td>
-    <td class="mono muted-cell" data-label="Trigger">${escapeHtml(triggerLabel(run))}</td>
+    <td class="mono muted-cell" data-label="Trigger"><div>${escapeHtml(triggerLabel(run))}</div>${run.event_summary
+      ? `<div class="run-event-summary">${escapeHtml(run.event_summary)}</div>` : ''}</td>
     <td data-label="Status">${statusLine(run.status)}${failed}${delayedUntil}</td>
     <td class="mono muted-cell" data-label="Steps">${run.steps ?? '—'}</td>
     <td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td>

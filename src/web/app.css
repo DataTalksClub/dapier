@@ -767,6 +767,17 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
 .json-raw[open] summary { margin-bottom: 6px; }
 .json-raw .json-block { max-height: 300px; }
 
+/* The runs list row's second Trigger line: what actually arrived (an email
+   subject, a telegram post). Sans so it reads like content under the mono
+   connector label; one clipped line keeps the table row height steady. */
+.run-event-summary {
+  font-family: var(--sans);
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- embedded designer -------------------------------------------------------- */
 /* The canvas is the view: main becomes a flex column pinned to the dynamic
    viewport so the frame gets exactly what the real topbar leaves — no page
@@ -1039,11 +1050,15 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-filters span { margin-left: 5px; font: 12px var(--mono); color: var(--muted); }
 .agent-refresh { display: flex; align-items: center; gap: 12px; }
 .agent-refresh .sub { font-size: 12px; white-space: nowrap; }
-.agent-workspace { display: grid; grid-template-columns: minmax(300px, 36%) minmax(0, 1fr); border-top: 1px solid var(--line-strong); min-height: 560px; }
-.agent-run-sidebar { min-width: 0; border-right: 1px solid var(--line); padding: 20px 0; }
-.agent-run-sidebar > input { width: calc(100% - 24px); margin-right: 24px; }
-#agent-runs-note { margin: 12px 24px 12px 0; font-size: 12px; }
-#agent-runs-list { max-height: 680px; overflow-y: auto; }
+/* The workspace fills the viewport below its chrome — topbar (92) + toolbar
+   (~64) above, main's bottom padding (64) below — so the run list and the
+   run detail each scroll inside their own column instead of stretching the
+   page. min-height keeps a short window scrolling the page normally. */
+.agent-workspace { display: grid; grid-template-columns: minmax(300px, 36%) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); border-top: 1px solid var(--line-strong); height: calc(100dvh - 220px); min-height: 560px; }
+.agent-run-sidebar { min-width: 0; min-height: 0; border-right: 1px solid var(--line); padding: 20px 0; display: flex; flex-direction: column; }
+.agent-run-sidebar > input { width: calc(100% - 24px); margin-right: 24px; flex: none; }
+#agent-runs-note { margin: 12px 24px 12px 0; font-size: 12px; flex: none; }
+#agent-runs-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .agent-run-item { width: 100%; display: block; text-align: left; padding: 18px 20px 18px 12px; background: transparent; color: var(--ink); border: 0; border-top: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer; font-family: var(--sans); }
 .agent-run-item:hover { background: var(--wash); }
 .agent-run-item.selected { border-left-color: var(--accent); background: var(--surface); }
@@ -1053,7 +1068,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-run-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .agent-run-meta > span { overflow-wrap: anywhere; }
 .agent-run-meta time { font-size: 11px; }
-#agent-run-detail { min-width: 0; padding: 28px 32px 40px; background: var(--surface); }
+#agent-run-detail { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: 28px 32px 40px; background: var(--surface); }
 .agent-detail-head h2 { font-size: 25px; line-height: 1.3; margin: 12px 0 8px; font-weight: 600; overflow-wrap: anywhere; }
 .agent-detail-status { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--muted); }
 .agent-workflow-link { font-size: 13px; }
@@ -1098,7 +1113,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 @media (max-width: 1000px) {
   .agent-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; }
   .agent-refresh { align-self: flex-end; }
-  .agent-workspace { display: block; min-height: 360px; }
+  .agent-workspace { display: block; height: auto; min-height: 360px; }
   .agent-run-sidebar { border-right: 0; }
   .agent-run-sidebar > input { width: 100%; margin: 0; }
   #agent-runs-list { max-height: none; }

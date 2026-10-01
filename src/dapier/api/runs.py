@@ -53,6 +53,14 @@ CSV_COLUMNS = (
     "started_at", "finished_at", "duration_ms", "error",
 )
 
+# The list row's "what actually arrived" line: keys that carry the event's
+# human payload, best first — an email subject outranks a telegram message,
+# which outranks an arbitrary webhook string. Ids and timestamps never win.
+_SUMMARY_FIELDS = (
+    "subject", "title", "text", "body", "preview", "message",
+    "name", "from", "sender", "channel", "query", "command", "url",
+)
+
 # The bulk replay-failed cap: one call re-runs at most the latest 50 failed
 # runs of the workflow, so a poison workflow cannot fan out unbounded work.
 MAX_REPLAY_FAILED = 50
@@ -176,6 +184,7 @@ def run_summary(run_id, items):
         "workflow_id": first.get("workflow_id") or run_id.split(":")[0],
         "connector": first.get("connector"),
         "event_type": first.get("event_type"),
+        "event_summary": event_summary(first),
         "status": status,
         # A step absorbed by ``on_fail: continue`` reads ``skipped``: the run
         # still rolls up completed (the failure was absorbed), so the flag —
@@ -192,6 +201,42 @@ def run_summary(run_id, items):
         "duration_ms": _sum_duration(items),
         "error": errors[0] if errors else None,
     }
+
+
+def event_summary(step):
+    """One glanceable line for the list row: the event's informative text —
+    an email subject, a telegram channel post, a webhook payload's title.
+    Subject-shaped keys win over long anonymous strings; id and timestamp
+    keys never win. None when the recorded data carries nothing readable."""
+    data = step.get("input")
+    if not isinstance(data, dict) or data.get("truncated"):
+        return None
+    best = None  # (rank, capped length, text) — key rank first, length breaks ties
+
+    def visit(node, key):
+        nonlocal best
+        if isinstance(node, dict):
+            for child_key, child in node.items():
+                visit(child, str(child_key).strip().lower())
+        elif isinstance(node, list):
+            for child in node[:5]:
+                visit(child, key)
+        elif isinstance(node, str):
+            text = " ".join(node.split())
+            if not 4 <= len(text) <= 400:
+                return
+            if key in ("id", "update_id") or key.endswith(("_id", "_at", "_time")):
+                return
+            rank = 40 - _SUMMARY_FIELDS.index(key) if key in _SUMMARY_FIELDS else 0
+            candidate = (rank, min(len(text), 120))
+            if best is None or candidate > best[:2]:
+                best = (*candidate, text)
+
+    visit(data, "")
+    if best is None:
+        return None
+    text = best[2]
+    return text[:117] + "…" if len(text) > 120 else text
 
 
 def _sum_duration(items):

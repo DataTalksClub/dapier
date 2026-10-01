@@ -455,5 +455,35 @@ def test_cli_passes_next_token_back(isolated_home, monkeypatch, capsys):
     assert "next page: tok-3" in capsys.readouterr().out
 
 
+def test_list_rows_carry_an_event_summary(monkeypatch):
+    telegram = _run("wf-telegram", "evt-1")
+    telegram["input"] = {"message": {"text": "👌 Module 3 is complete! Great to see 10 new members."},
+                         "update_id": 803099412}
+    email = _run("wf-email", "evt-2")
+    email["input"] = {"subject": "Weekly digest", "body": "x" * 300}
+    bare = _run("wf-bare", "evt-3")
+
+    _configure(monkeypatch, [telegram, email, bare])
+
+    _, payload = runs.api_list()
+    rows = {row["run_id"]: row for row in payload["runs"]}
+    # The message text outranks the id bookkeeping; a subject outranks the
+    # longer anonymous body; nothing readable reads None.
+    assert rows["wf-telegram:evt-1"]["event_summary"] == \
+        "👌 Module 3 is complete! Great to see 10 new members."
+    assert rows["wf-email:evt-2"]["event_summary"] == "Weekly digest"
+    assert rows["wf-bare:evt-3"]["event_summary"] is None
+
+
+def test_cli_print_runs_shows_trigger_and_summary(capsys):
+    commands.print_runs([{"run_id": "wf-telegram:evt-1", "status": "completed", "steps": 2,
+                          "started_at": "2026-09-25T10:00:00+00:00",
+                          "connector": "telegram", "event_type": "channel_post.received",
+                          "event_summary": "Module 3 is complete!"}])
+
+    out = capsys.readouterr().out
+    assert "telegram · channel_post.received — Module 3 is complete!" in out
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
