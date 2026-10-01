@@ -12,6 +12,7 @@ from urllib.parse import unquote
 
 from ... import http
 from ...auth import authz, session, visibility
+from ...connections import oauth_flow
 from ...connections.oauth_flow import oauth_start
 from .. import agent, overview
 from . import login, routes  # noqa: F401 (resolved via the module ref)
