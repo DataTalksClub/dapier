@@ -80,10 +80,11 @@ export function renderAudit() {
   fillSelect($('#audit-log-outcome-filter'), events.map((item) => item.outcome));
   const note = $('#audit-log-note');
   if (auditPage.events === null) {
-    note.textContent = 'Showing up to 25 events.';
+    note.textContent = 'Up to 25 events';
   } else {
-    note.textContent = `Showing ${events.length} events${auditPage.nextToken ? ' · more history available' : ''}`;
+    note.textContent = `${events.length} events${auditPage.nextToken ? ' · more' : ''}`;
   }
+  note.title = 'Records are kept for 90 days.';
   $('#audit-log-table').innerHTML = events.map(eventRow).join('') ||
     '<tr><td colspan="7" class="muted-cell">No audit events match these filters</td></tr>';
   $('#audit-log-load-more').hidden = !auditPage.nextToken;

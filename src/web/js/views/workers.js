@@ -4,9 +4,8 @@ import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, wrapTokens } from '../format.js';
 
 /* Not part of the overview payload — the view fetches /api/admin/workers
-   itself (like the Agents view) and Refresh re-reads it. A worker is active
-   while its last check-in (every claim poll, every task heartbeat) is inside
-   the API's active window; the API makes that call so both surfaces agree. */
+   itself (like the Agents view). The top-bar Refresh re-reads it. A worker
+   is active while its last check-in is inside the API's active window. */
 let workersSeq = 0;
 
 export async function renderWorkers() {
@@ -45,5 +44,3 @@ export async function renderWorkers() {
     </tr>`;
   }).join('');
 }
-
-$('#workers-refresh').addEventListener('click', renderWorkers);

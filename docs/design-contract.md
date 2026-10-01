@@ -42,7 +42,7 @@ No gradients. No colored status chips. A dot and a word carry state; a rule or s
 ### Geometry and spacing
 
 - Navigation width: 204px desktop; drawer on narrow screens. Navigation and content share the paper color; a 1px strong rule separates them.
-- Content gutters: 40px desktop, 24px tablet, 18px mobile. Major section rhythm: 40px; table rows: at least 52px.
+- Content gutters: 40px desktop, 24px tablet, 18px mobile. The top bar is one band: 8px of vertical padding around the 32px title, with that page's filters and primary action in the middle and refresh on the right. Content starts within 12px of the band. Later sections: 20px. Table rows: at least 52px.
 - Controls are square (`0px` radius), 38px tall. Dialogs also have square corners. The only circles are status dots and the environment indicator.
 - One-pixel rules provide structure. No drop shadows on cards, buttons, or tables. A dialog uses a single hard `4px 4px 0` offset shadow.
 - Provider choices are ruled rows, not equal-height cards. The connection table is the first content block.
@@ -50,7 +50,7 @@ No gradients. No colored status chips. A dot and a word carry state; a rule or s
 
 ### Components
 
-- Page title: one 32px title in the top bar. Sections get a distinct heading only when they introduce a new task; no duplicate “Connections” heading.
+- Page title: one 32px title in the top bar. That bar also holds the page's filters and primary action. Sections get a distinct heading only when they introduce a new task; no duplicate page title, and no second refresh for the same data. Helper copy is one line in the bar, or omitted when it only restates the page.
 - Primary button: solid signal green. Secondary: transparent with a strong rule. Destructive actions are text/rule and visually separated from routine save.
 - Status: 7px dot plus plain text. “Setup incomplete” and “Needs reconnection” use alert ink; connected uses signal green.
 - Table: one hairline per record, no zebra tint. Name and verified account identity share the first cell; internal ID lives in Manage.

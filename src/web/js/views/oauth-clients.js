@@ -6,7 +6,12 @@ import { refresh } from './overview.js';
 
 function renderOAuthClients(clients) {
   const names = { google: 'Google (also YouTube)', dropbox: 'Dropbox' };
-  $('#oauth-client-list').innerHTML = clients.map((client) => `<tr>
+  const list = clients || [];
+  const empty = $('#oauth-client-empty');
+  const wrap = $('#oauth-client-wrap');
+  if (empty) empty.hidden = list.length > 0;
+  if (wrap) wrap.hidden = list.length === 0;
+  $('#oauth-client-list').innerHTML = list.map((client) => `<tr>
       <td class="cell-title"><span class="cell-name">${names[client.provider] || escapeHtml(client.provider)}</span><span class="cell-sub">oauth client: ${escapeHtml(client.provider)}</span></td>
       <td class="mono muted-cell" data-label="Client ID">${client.client_id ? wrapTokens(client.client_id) : '—'}</td>
       <td class="mono muted-cell" data-label="Source">${escapeHtml(client.source)}</td>

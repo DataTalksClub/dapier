@@ -128,14 +128,11 @@ async function renderWorkerNote(tasks, seq) {
 
 export async function renderAgentTasks({ quiet = false } = {}) {
   const seq = ++listSeq;
-  const refresh = $('#agent-tasks-refresh');
-  if (!quiet) refresh.disabled = true;
   try {
     const data = await api('/api/admin/agent-tasks?limit=200');
     if (seq !== listSeq) return;
     tasks = data.tasks || []; fetched = true; renderList();
     renderWorkerNote(tasks, seq);
-    $('#agent-refresh-note').textContent = 'Updated just now';
     if (state.view !== 'agents') return;
     const fromUrl = state.view === 'agents' ? new URLSearchParams(window.location.search).get('task') : null;
     const id = fromUrl || selected || (window.matchMedia('(min-width: 1001px)').matches ? (tasks.find(t => ACTIVE.has(t.status)) || tasks[0])?.task_id : null);
@@ -143,12 +140,10 @@ export async function renderAgentTasks({ quiet = false } = {}) {
     else renderDetail();
   } catch (error) {
     if (seq !== listSeq) return;
-    $('#agent-refresh-note').textContent = 'Could not refresh · try again';
     if (!fetched) $('#agent-runs-list').innerHTML = '<div class="agent-list-empty"><h3>Runs are unavailable</h3><p>Use Refresh to try again.</p></div>';
     if (!quiet) notice(error.message, true);
-  } finally { if (seq === listSeq) refresh.disabled = false; }
+  }
 }
-$('#agent-tasks-refresh').addEventListener('click', () => renderAgentTasks());
 $('#agent-runs-search').addEventListener('input', event => { search = event.target.value.trim().toLowerCase(); renderList(); });
 document.addEventListener('click', event => {
   const filterButton = event.target.closest('[data-agent-filter]');

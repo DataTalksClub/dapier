@@ -11,6 +11,7 @@ import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
 import { renderEmails, renderEmailFrom } from './emails.js';
 import { renderAgentTasks } from './agents.js';
+import { renderWorkers } from './workers.js';
 import { renderRuns, openRun } from './runs.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
@@ -148,6 +149,7 @@ function render() {
   renderEmails(data.email_triggers);
   renderEmailFrom(data.email_from);
   renderAgentTasks();
+  renderWorkers();
   renderRuns();
   renderInbox();
   renderSchedules();
@@ -200,7 +202,6 @@ export function renderWorkflows() {
     (status === 'all' || workflow.enabled === (status === 'enabled')) &&
     (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
     (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
-  $('#workflow-library-summary').textContent = `${all.length} workflow${all.length === 1 ? '' : 's'}`;
   $('#workflow-count').textContent = `${shown.length} of ${all.length} shown`;
   const runs = state.data?.runs || [];
   $('#workflow-table').innerHTML = shown.map((workflow, index) => {
@@ -309,10 +310,8 @@ function renderAttention(data) {
   </article>`);
   if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="button secondary view-link" href="/usage" data-target="usage">Review limit</a></article>');
   $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
-  $('#overview-attention').hidden = !items.length && !data.workflows.length;
-  $('#overview-attention').innerHTML = items.length
-    ? `<h3>Needs attention</h3>${items.join('')}`
-    : '<p class="sub">No paused workflows or latest-run failures in the loaded records.</p>';
+  $('#overview-attention').hidden = items.length === 0;
+  $('#overview-attention').innerHTML = items.length ? `<h3>Needs attention</h3>${items.join('')}` : '';
 }
 
 function renderErrors() {

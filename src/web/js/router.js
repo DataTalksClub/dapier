@@ -9,6 +9,23 @@ let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 export function setViewGuard(guard) { viewGuard = guard; }
 export function rememberViewUrl(url) { rememberedUrl = url; }
 
+/* The title row has an empty middle. Each view's .page-tools fills it, and
+   comes back to the view before the next one is mounted so inactive pages
+   keep their controls. */
+let mountedTools = null;
+function mountPageTools() {
+  if (mountedTools) {
+    mountedTools.home.prepend(mountedTools.node);
+    mountedTools = null;
+  }
+  const view = document.querySelector('.view.active');
+  const tools = view?.querySelector(':scope > .page-tools');
+  const slot = $('#topbar-tools');
+  if (!tools || !slot) return;
+  mountedTools = { node: tools, home: view };
+  slot.replaceChildren(tools);
+}
+
 export function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');
   if (name === 'inbox') return 'runs'; // compatibility with saved inbox links
@@ -35,6 +52,7 @@ export async function setView(view, push = true) {
   if (!push && window.location.pathname === '/inbox') history.replaceState(null, '', `/runs${window.location.search}`);
   if (push) history.pushState(null, '', view === 'overview' ? '/' : `/${view}`);
   rememberedUrl = `${window.location.pathname}${window.location.search}`;
+  mountPageTools();
   window.scrollTo(0, 0);
   return true;
 }

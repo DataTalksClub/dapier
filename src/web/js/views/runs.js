@@ -145,8 +145,9 @@ export function renderRuns() {
   $('#run-table').innerHTML = shown.map(runRow).join('') ||
     `<tr><td colspan="5" class="muted-cell">${emptyText}</td></tr>`;
   $('#runs-sample-note').textContent = serverPaged
-    ? `Showing ${shown.length} of ${runs.length} loaded runs${runsPage.nextToken ? ' · more history available' : ''}`
-    : `Showing ${shown.length} of ${runs.length} loaded runs · recent sample, up to 25`;
+    ? `${shown.length} of ${runs.length}${runsPage.nextToken ? ' · more' : ''}`
+    : `${shown.length} of ${runs.length} · sample of 25`;
+  $('#runs-sample-note').title = 'Records are kept for 90 days.';
   $('#runs-load-more').hidden = !(serverPaged && runsPage.nextToken);
   /* Bulk replay names one workflow (the API's requirement), so the button
      only shows with a workflow picked and failures actually in sight. */
