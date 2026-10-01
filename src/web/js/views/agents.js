@@ -2,6 +2,7 @@
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
+import { renderMarkdown } from '../md.js';
 import { state } from '../state.js';
 
 const ACTIVE = new Set(['queued', 'running', 'claimed', 'starting', 'started']);
@@ -52,13 +53,6 @@ function resultText(task) {
   } catch (_) { /* Raw output remains available in Logs. */ }
   return task.summary || task.error || '';
 }
-function readableResult(text) {
-  return String(text).split(/(https?:\/\/[^\s<>"']+)/g).map(part => {
-    if (!/^https?:\/\//.test(part)) return escapeHtml(part);
-    const link = part.replace(/[.,;]+$/, '');
-    return `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link)}</a>${escapeHtml(part.slice(link.length))}`;
-  }).join('');
-}
 
 function renderDetail() {
   const panel = $('#agent-run-detail');
@@ -80,7 +74,7 @@ function renderDetail() {
     </div>
     <section class="agent-result" aria-labelledby="agent-result-heading">
       <h3 id="agent-result-heading">${failed ? 'What went wrong' : active ? 'Progress' : 'Result'}</h3>
-      ${result ? `<div class="agent-result-text">${readableResult(result)}</div>` : `<div class="agent-progress"><p>${task.status === 'queued' ? 'Waiting for a worker.' : active ? 'The agent is working on this task.' : 'This run finished without a recorded result.'}</p>${active ? '<p class="sub">This screen checks for updates every 15 seconds. Output is available when the run finishes.</p>' : ''}</div>`}
+      ${result ? `<div class="agent-result-text">${renderMarkdown(result)}</div>` : `<div class="agent-progress"><p>${task.status === 'queued' ? 'Waiting for a worker.' : active ? 'The agent is working on this task.' : 'This run finished without a recorded result.'}</p>${active ? '<p class="sub">This screen checks for updates every 15 seconds. Output is available when the run finishes.</p>' : ''}</div>`}
     </section>
     <details class="agent-log-section"><summary>Logs ${logs?.stderr ? '<span class="agent-log-hint">Error output available</span>' : ''}</summary>
       ${logs ? `${logs.truncated ? '<p class="sub">Only the end of the output was retained.</p>' : ''}
