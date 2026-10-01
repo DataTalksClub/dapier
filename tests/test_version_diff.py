@@ -381,5 +381,5 @@ def test_both_dispatchers_expose_the_diff_route():
                     / "src" / "dapier" / "api" / "admin" / "__init__.py").read_text()
     assert "versions/diff" in admin_source
     cli_source = (Path(__file__).resolve().parents[1]
-                  / "dapier_cli" / "main.py").read_text()
+                  / "dapier_cli" / "cli" / "workflows.py").read_text()
     assert '"diff"' in cli_source

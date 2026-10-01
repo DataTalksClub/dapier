@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_discard", "workflows_draft", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_step", "workflows_versions"]
+__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_step", "workflows_versions"]
 
 
 def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
@@ -578,4 +578,22 @@ def workflows_test_step(api_url, path, action_id, event_spec, steps_spec=None,
         print(f"Run error: {data['error']}")
     return 0 if data.get("ok") else 1
 
+
+
+
+def workflows_diff(api_url, file, from_revision, to_revision, debug=False):
+    """Unified diff between two published versions (the server builds it;
+    the raw text goes to stdout so it pipes into `less` or `patch`)."""
+    data = api.call(api_url, "GET",
+                    f"/api/agent/designer/workflows/{file}/versions/diff"
+                    f"?from={from_revision}&to={to_revision}", debug=debug)
+    diff = data.get("diff") or ""
+    if diff:
+        sys.stdout.write(diff if diff.endswith("\n") else diff + "\n")
+    if data.get("same"):
+        print(f"v{from_revision} and v{to_revision} are identical.")
+    if data.get("truncated"):
+        print("Warning: the diff was truncated at the server's size cap; "
+              "narrow the revision range to see more.", file=sys.stderr)
+    return 0
 

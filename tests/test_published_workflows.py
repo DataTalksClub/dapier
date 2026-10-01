@@ -301,12 +301,13 @@ def test_cli_on_and_off_use_the_bulk_endpoint(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "test-flow.yaml is On" in out and "test-flow.yaml is Off" in out
 
-    from dapier_cli.main import build_parser, cmd_workflows
+    from dapier_cli.cli import workflows as cli_workflows
+    from dapier_cli.main import build_parser
     parser = build_parser()
     for command in ("on", "off", "enable", "disable"):
         args = parser.parse_args(["workflows", command, "test-flow.yaml"])
         assert (args.group, args.command, args.file) == ("workflows", command, ["test-flow.yaml"])
-        assert cmd_workflows(args, "https://api.test", False) == 0
+        assert cli_workflows.run(args, "https://api.test", False) == 0
     assert [body["action"] for _, _, body in calls[2:]] == [
         "enable", "disable", "enable", "disable"]
 

@@ -12,6 +12,7 @@ import zipfile
 import pytest
 
 from dapier_cli import auth, commands, config, main
+from dapier_cli.cli import auth as cli_auth
 from dapier_cli import commands as cli_commands
 from dapier_cli.api import ApiError
 
@@ -241,7 +242,7 @@ def test_login_falls_back_when_device_flow_unavailable(isolated_home, monkeypatc
     monkeypatch.setattr(auth, "login", lambda api_url, timeout=180: {"email": "op@x"})
 
     import argparse
-    code = main.cmd_auth(argparse.Namespace(command="login", timeout=10, browser=False),
+    code = cli_auth.run(argparse.Namespace(command="login", timeout=10, browser=False),
                          "https://api.example.test")
 
     assert code == 0
@@ -256,7 +257,7 @@ def test_logout_revokes_device_session(isolated_home, monkeypatch):
                         lambda api_url, session: revoked.append(session["token"]))
 
     import argparse
-    code = main.cmd_auth(argparse.Namespace(command="logout"), "https://api.example.test")
+    code = cli_auth.run(argparse.Namespace(command="logout"), "https://api.example.test")
 
     assert code == 0
     assert revoked == ["dapd_bye"]

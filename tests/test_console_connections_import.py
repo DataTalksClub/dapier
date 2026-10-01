@@ -47,5 +47,5 @@ def test_the_import_dialog_posts_to_the_admin_import_route():
 
 
 def test_the_cli_still_offers_import_for_the_same_outcome():
-    cli = (Path(__file__).resolve().parents[1] / "dapier_cli" / "main.py").read_text()
+    cli = (Path(__file__).resolve().parents[1] / "dapier_cli" / "cli" / "connections.py").read_text()
     assert 'add_parser("import"' in cli, "the dapier connections import subcommand went missing"
