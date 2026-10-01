@@ -6,11 +6,15 @@ register(Action(
     type="agent",
     label="Agent",
     icon="bot",
-    description="Queue a prompt for a headless host worker run.",
+    description=("Queue a prompt for a headless host worker run. The trigger's "
+                 "stored attachments (an email's files) are staged into the "
+                 "agent's workspace under attachments/ and the run is told "
+                 "where they landed; attachments: off skips them."),
     run=lambda action, event, workflow_id, steps=None: run_agent(
         action, event, workflow_id, steps),
     required=frozenset({"prompt"}),
-    optional=frozenset({"workspace", "engine", "tag_prefix", "notify_to", "notify_from", "id"}),
+    optional=frozenset({"workspace", "engine", "tag_prefix", "attachments",
+                        "notify_to", "notify_from", "id"}),
     fields=(
         {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
          "placeholder": "{subject}\n\n{text}"},
@@ -18,6 +22,9 @@ register(Action(
          "placeholder": "defaults to the host worker's workspace root"},
         {"key": "engine", "label": "Engine", "placeholder": "claude"},
         {"key": "tag_prefix", "label": "Tag prefix", "placeholder": "agent"},
+        {"key": "attachments", "label": "Pass trigger attachments",
+         "type": "select", "options": ["default", "off"], "default": "default",
+         "description": "off keeps the trigger's files out of the workspace"},
         {"key": "notify_to", "label": "Completion email (optional)",
          "placeholder": "defaults to the sender for email triggers"},
         {"key": "notify_from", "label": "Completion email From (optional)",

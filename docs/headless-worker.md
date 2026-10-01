@@ -114,8 +114,13 @@ from webhook, schedule, and other workflow triggers. This route sends
 the report from `agents@dtcdev.click`, so replies return to the same address.
 
 The route inserts Datamailer's inline plain-text body, `{body.text.value}`,
-into the agent prompt. Email attachments and messages whose body exceeds the
-inline limit are not passed to the agent yet; provide a Zoom link in the body
-for this first workflow. Completion emails use SES in the configured
+into the agent prompt. Trigger attachments are handled too: an email's stored
+files ride the agent task as S3 pointers, and the worker stages them into the
+workspace under `attachments/` (downloading them through the worker-token-gated
+`/api/agent/host-jobs/attachment` endpoint in chunks that clear the API payload
+cap), then prepends a notice line to the prompt saying where they landed.
+`attachments: off` on the agent action keeps the files out. Bodies longer than
+the inline limit are still not passed; provide a Zoom link in the body for this
+first workflow. Completion emails use SES in the configured
 `EmailSendRegion` (currently `us-east-1`), where the sender identity is
 verified.

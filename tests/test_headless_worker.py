@@ -1,5 +1,6 @@
 """Host jobs complete under an HTTPS lease, without host AWS credentials."""
 
+import base64
 import json
 import subprocess
 import sys
@@ -157,7 +158,133 @@ def test_host_api_requires_the_dedicated_machine_token(monkeypatch):
     assert agent_api.route({"machine": "host-worker"}, "POST", path)["statusCode"] == 200
 
 
-def test_explicit_workspace_cannot_escape_root(tmp_path):
+def test_attachment_route_shares_the_machine_token_gate(monkeypatch):
+    def authenticate(event):
+        if event.get("machine"):
+            event["_api_token"] = {"agent": event["machine"]}
+        return "token:worker", None
+
+    monkeypatch.setattr(agent_api, "authenticate", authenticate)
+    monkeypatch.setattr(host_jobs, "attachment",
+                        lambda body, owner: (200, {"ok": True}))
+    path = "/api/agent/host-jobs/attachment"
+    assert agent_api.route({}, "POST", path)["statusCode"] == 403
+    assert agent_api.route({"machine": "some-agent"}, "POST", path)["statusCode"] == 403
+    assert agent_api.route({"machine": "host-worker"}, "POST", path)["statusCode"] == 200
+
+
+def test_claim_serves_attachments_only_to_the_live_lease():
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="eu-west-1")
+        s3.create_bucket(Bucket="mail", CreateBucketConfiguration={
+            "LocationConstraint": "eu-west-1"})
+        s3.put_object(Bucket="mail", Key="raw/invoice.pdf", Body=b"%PDF-bytes!",
+                      ContentType="application/pdf")
+        table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
+            TableName="host-tasks",
+            KeySchema=[{"AttributeName": "task_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
+        )
+        queue = boto3.client("sqs", region_name="eu-west-1")
+        url = queue.create_queue(QueueName="host-jobs")["QueueUrl"]
+        attachments = [{"filename": "invoice.pdf", "size": 11,
+                        "content_type": "application/pdf",
+                        "s3": {"bucket": "mail", "key": "raw/invoice.pdf"}}]
+        message = {"kind": "agent", "task_id": "agent:flow:event:run",
+                   "engine": "claude", "workspace": "", "prompt": "summarize",
+                   "attachments": attachments}
+        table.put_item(Item={**message, "status": "queued", "created_at": 1,
+                             "notify_to": ""})
+        queue.send_message(QueueUrl=url, MessageBody=json.dumps(message))
+        job = host_jobs.claim("token:host", table_ref=table, queue_ref=queue,
+                              queue_url=url, now=1000)[1]["job"]
+        assert job["attachments"] == attachments
+
+        def fetch(**overrides):
+            body = {k: v for k, v in overrides.items() if v is not None}
+            return host_jobs.attachment(
+                {**job, "index": 0, "offset": 0, **body}, "token:host",
+                table_ref=table, now=1010)[1]
+
+        first = fetch(length=4)
+        assert base64.b64decode(first["b64"]) == b"%PDF" and first["done"] is False
+        middle = fetch(offset=4, length=4)
+        assert middle["done"] is False
+        last = fetch(offset=8, length=4)
+        assert last["done"] is True
+        # Chunks decode separately (padding lands mid-stream if concatenated).
+        assert b"".join(base64.b64decode(c["b64"]) for c in (first, middle, last)) == b"%PDF-bytes!"
+        assert last["size"] == 11 and last["filename"] == "invoice.pdf"
+        # A stale, foreign, or finished lease gets nothing.
+        assert host_jobs.attachment({**job, "index": 0}, "token:other",
+                                    table_ref=table, now=1010)[0] == 409
+        assert host_jobs.attachment({**job, "index": 0}, "token:host",
+                                    table_ref=table, now=2000)[0] == 409
+        assert host_jobs.attachment({**job, "index": 3}, "token:host",
+                                    table_ref=table, now=1010)[0] == 404
+        assert host_jobs.attachment({**job, "index": 0, "length": 5_000_001},
+                                    "token:host", table_ref=table, now=1010)[0] == 400
+        assert host_jobs.attachment({**job, "index": 0, "length": 0},
+                                    "token:host", table_ref=table, now=1010)[0] == 400
+
+
+def test_worker_stages_attachments_and_tells_the_agent(tmp_path):
+    chunk_a = base64.b64encode(b"%PDF-inv").decode()
+    chunk_b = base64.b64encode(b"oice body").decode()
+
+    class Api:
+        def call(self, operation, body=None):
+            if operation != "attachment":
+                return {}
+            calls.append(body)
+            if body["offset"] == 0:
+                return {"b64": chunk_a, "done": False, "size": 15}
+            return {"b64": chunk_b, "done": True, "size": 15}
+
+    calls = []
+
+    def fake_popen(_argv, **kwargs):
+        return subprocess.Popen(
+            [sys.executable, "-c",
+             "import json,sys; print(json.dumps({'result': sys.stdin.read()}))"],
+            **kwargs)
+
+    job = {"task_id": "agent:flow:event:run", "lease_id": "lease-1",
+           "engine": "claude", "workspace": "", "prompt": "summarize this",
+           "attachments": [
+               {"filename": "../escape/report.pdf", "s3": {"bucket": "m", "key": "r"}},
+               {"filename": "report.pdf", "s3": {"bucket": "m", "key": "r2"}},
+           ]}
+    result = headless_worker.run_job(
+        job, Api(), workspace_root=tmp_path, popen=fake_popen, sleep=lambda _: None)
+
+    assert result["status"] == "succeeded"
+    root = tmp_path / "attachments"
+    assert sorted(p.name for p in root.iterdir()) == ["report-1.pdf", "report.pdf"]
+    assert (root / "report.pdf").read_bytes() == b"%PDF-invoice body"
+    assert (root / "report-1.pdf").read_bytes() == b"%PDF-invoice body"
+    # Each attachment walks the chunks from offset 0.
+    assert [c["offset"] for c in calls] == [0, 8, 0, 8]
+    assert calls[0]["length"] == headless_worker.CHUNK_BYTES
+    notice, _, prompt = result["summary"].partition("\n\n")
+    assert notice.startswith("[Dapier] Trigger attachments saved to: ")
+    assert "attachments/report.pdf" in notice and "attachments/report-1.pdf" in notice
+    assert prompt == "summarize this"
+
+
+def test_worker_fails_the_job_when_a_download_dries_up(tmp_path):
+    class Api:
+        def call(self, operation, body=None):
+            return {"b64": "", "done": False}
+
+    result = headless_worker.run_job(
+        {"task_id": "agent:flow:event:run", "lease_id": "lease-1",
+         "engine": "claude", "workspace": "", "prompt": "p",
+         "attachments": [{"filename": "x.pdf", "s3": {"bucket": "m", "key": "k"}}]},
+        Api(), workspace_root=tmp_path, popen=lambda *a, **k: None, sleep=lambda _: None)
+    assert result["status"] == "failed"
+    assert "empty chunk" in result["summary"]
     root = tmp_path / "root"
     root.mkdir()
     assert headless_worker.workspace_for(root, "") == root

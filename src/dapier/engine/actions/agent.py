@@ -3,8 +3,40 @@ import json
 import os
 import time
 from ...triggers.email_from import bare_address, sender_addresses
+from .base import _safe_filename
 
 from .templating import render
+
+# The trigger event's stored attachments ride the host job as s3 pointers so
+# the worker can stage the files into the agent's workspace. Pointers are a
+# few hundred bytes each; the cap keeps a pathological event from bloating
+# the task row and queue message.
+MAX_ATTACHMENTS = 10
+
+
+def collect_attachments(action, event):
+    """The stored attachments to hand the worker, as pointer descriptors.
+
+    On by default for events that carry stored attachments (an inbound email
+    with files); ``attachments: off`` on the action opts out. Entries without
+    a stored s3 body (inline-only attachment stubs) are skipped.
+    """
+    if str(action.get("attachments", "")).strip().lower() in ("off", "false", "no"):
+        return []
+    descriptors = []
+    for entry in (event.get("data") or {}).get("attachments") or []:
+        s3 = entry.get("s3") if isinstance(entry, dict) else None
+        if not (isinstance(s3, dict) and s3.get("bucket") and s3.get("key")):
+            continue
+        descriptors.append({
+            "filename": _safe_filename(entry.get("filename")),
+            "size": entry.get("size"),
+            "content_type": entry.get("content_type"),
+            "s3": {"bucket": s3["bucket"], "key": s3["key"]},
+        })
+        if len(descriptors) >= MAX_ATTACHMENTS:
+            break
+    return descriptors
 
 
 def build_message(action, event, workflow_id, steps=None):
@@ -38,6 +70,7 @@ def build_message(action, event, workflow_id, steps=None):
         "notify_to": notify_to,
         "notify_from": notify_from,
         "email_subject": str((event.get("data") or {}).get("subject") or "")[:200],
+        "attachments": collect_attachments(action, event),
     }
 
 

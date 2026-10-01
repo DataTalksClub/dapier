@@ -1,5 +1,6 @@
 """Run one headless harness process per Dapier host job over HTTPS."""
 
+import base64
 import json
 import os
 import signal
@@ -16,6 +17,58 @@ DEFAULT_ROOT = "~/dapier-ws"
 DEFAULT_TOKEN_FILE = "~/.config/dapier/host-worker.token"
 HEARTBEAT_SECONDS = 40
 MAX_RUNTIME_SECONDS = 3600
+# Matches host_jobs.MAX_ATTACHMENT_CHUNK: one download call moves at most
+# this many raw bytes so each response clears the API payload cap.
+CHUNK_BYTES = 4_000_000
+
+
+def _safe_name(name):
+    name = str(name or "").replace("\\", "/").split("/")[-1].strip()
+    return (name or "attachment")[:255]
+
+
+def fetch_attachments(api, job, workspace, *, chunk=CHUNK_BYTES):
+    """Stage the job's trigger attachments into ``workspace/attachments``.
+
+    Returns the paths relative to the workspace. A failed or truncated
+    download raises, which fails the job like any other worker error.
+    """
+    descriptors = job.get("attachments") or []
+    if not descriptors:
+        return []
+    target = workspace / "attachments"
+    target.mkdir(mode=0o700, exist_ok=True)
+    staged = []
+    for index, descriptor in enumerate(descriptors):
+        name = _safe_name(descriptor.get("filename") if isinstance(descriptor, dict) else None)
+        path = target / name
+        stem, suffix = path.stem, path.suffix
+        serial = 0
+        while path.exists():
+            serial += 1
+            path = target / f"{stem}-{serial}{suffix}"
+        with path.open("wb") as sink:
+            offset = 0
+            while True:
+                response = api.call("attachment", {
+                    "task_id": job["task_id"], "lease_id": job["lease_id"],
+                    "index": index, "offset": offset, "length": chunk,
+                })
+                data = base64.b64decode(response.get("b64") or "")
+                if not data and not response.get("done"):
+                    raise RuntimeError(f"attachment {name}: empty chunk at offset {offset}")
+                sink.write(data)
+                offset += len(data)
+                if response.get("done"):
+                    break
+        staged.append(str(path.relative_to(workspace)))
+    return staged
+
+
+def _prompt_with_attachments(prompt, staged):
+    """One notice line so the agent sees files its template may not name."""
+    listed = ", ".join(staged)
+    return f"[Dapier] Trigger attachments saved to: {listed}\n\n{prompt}"
 
 
 class WorkerApi:
@@ -109,6 +162,10 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
     try:
         workspace = workspace_for(workspace_root, job.get("workspace"))
         argv = harness_argv(job.get("engine"))
+        prompt = job.get("prompt") or ""
+        staged = fetch_attachments(api, job, workspace)
+        if staged:
+            prompt = _prompt_with_attachments(prompt, staged)
         log_dir = Path(workspace_root).expanduser().resolve() / ".dapier-runs"
         log_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         safe_name = __import__("hashlib").sha256(task_id.encode()).hexdigest()[:24]
@@ -125,7 +182,7 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
                 stdout=output, stderr=errors, start_new_session=True,
             )
             try:
-                process.stdin.write((job.get("prompt") or "").encode())
+                process.stdin.write(prompt.encode())
                 process.stdin.close()
                 started = clock()
                 next_heartbeat = started + HEARTBEAT_SECONDS

@@ -101,3 +101,46 @@ def test_agent_rejects_display_name_in_completion_sender():
             {"id": "e1", "connector": "email", "data": {}},
             "email-trigger-agents",
         )
+
+
+STORED = {"filename": "../../etc/in voice.pdf", "size": 12,
+          "content_type": "application/pdf", "s3": {"bucket": "mail", "key": "a/b"}}
+
+
+def test_trigger_attachments_ride_the_host_job():
+    sent = []
+
+    class Queue:
+        def send_message(self, **kwargs):
+            sent.append(kwargs)
+
+    class Tasks:
+        def put_item(self, Item, ConditionExpression=None):
+            Tasks.item = dict(Item)
+
+    event = {"id": "email:1", "connector": "email", "data": {
+        "subject": "Invoice", "attachments": [STORED, "junk", {"filename": "stub.pdf"}]}}
+    result = run_agent({"id": "wake", "type": "agent", "prompt": "{subject}"},
+                       event, "wf", queue=Queue(), tasks=Tasks(), queue_url="q")
+    body = json.loads(sent[0]["MessageBody"])
+    assert body["attachments"] == Tasks.item["attachments"] == [{
+        "filename": "in voice.pdf", "size": 12,
+        "content_type": "application/pdf", "s3": {"bucket": "mail", "key": "a/b"},
+    }]
+    assert result == {"task_id": body["task_id"], "status": "queued"}
+
+
+def test_attachments_are_skipped_when_off_and_capped_at_ten():
+    off = build_message({"type": "agent", "prompt": "p", "attachments": "off"},
+                        {"id": "e", "data": {"attachments": [STORED]}}, "wf")
+    assert off["attachments"] == []
+    many = build_message(
+        {"type": "agent", "prompt": "p"},
+        {"id": "e", "data": {"attachments": [
+            {"filename": f"f{i}.pdf", "s3": {"bucket": "mail", "key": str(i)}}
+            for i in range(15)]}}, "wf")
+    assert [a["filename"] for a in many["attachments"]] == [
+        f"f{i}.pdf" for i in range(10)]
+    none = build_message({"type": "agent", "prompt": "p"},
+                         {"id": "h", "connector": "webhook", "data": {}}, "wf")
+    assert none["attachments"] == []

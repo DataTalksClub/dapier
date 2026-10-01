@@ -115,7 +115,7 @@ def route(event, method, path):
         return workers_api(event)
     if method == "POST" and path in (
         "/api/agent/host-jobs/claim", "/api/agent/host-jobs/heartbeat",
-        "/api/agent/host-jobs/finish",
+        "/api/agent/host-jobs/finish", "/api/agent/host-jobs/attachment",
     ):
         return host_jobs_api(event, path.rsplit("/", 1)[-1])
     if path == "/api/agent/runs/export" and method == "GET":

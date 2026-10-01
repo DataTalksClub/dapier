@@ -122,6 +122,8 @@ def host_jobs_api(event, operation):
     else:
         if operation == "heartbeat":
             status, payload = host_jobs.heartbeat(body, subject)
+        elif operation == "attachment":
+            status, payload = host_jobs.attachment(body, subject)
         else:
             status, payload = host_jobs.finish(body, subject)
     return _no_store(_json_response(status, payload))

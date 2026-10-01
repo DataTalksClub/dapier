@@ -5,6 +5,7 @@ API token and never receives AWS credentials. A task lease fences stale hosts;
 the SQS receipt stays in DynamoDB rather than crossing the HTTP boundary.
 """
 
+import base64
 import json
 import os
 import time
@@ -17,6 +18,9 @@ from .host_workers import checkin, meta_of
 VISIBILITY_SECONDS = 120
 WAIT_SECONDS = 10
 MAX_LOG_CHARS = 12000
+# One attachment download returns at most this many raw bytes (base64 in the
+# JSON envelope) so the response stays under API Gateway's 10 MB payload cap.
+MAX_ATTACHMENT_CHUNK = 4_000_000
 
 TERMINAL = frozenset({"succeeded", "failed", "timed_out", "interrupted"})
 
@@ -139,7 +143,8 @@ def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, n
     return 200, {"job": {"task_id": task_id, "lease_id": lease_id,
                           "engine": message.get("engine") or "claude",
                           "workspace": message.get("workspace") or "",
-                          "prompt": message.get("prompt") or ""}}
+                          "prompt": message.get("prompt") or "",
+                          "attachments": message.get("attachments") or []}}
 
 
 def _owned(table, task_id, lease_id, owner):
@@ -172,6 +177,77 @@ def heartbeat(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, no
          "lease_id = :lease AND lease_owner = :owner AND #status = :running",
          {":lease": body["lease_id"], ":owner": owner, ":running": "running"})
     return 200, {"lease_until": now + VISIBILITY_SECONDS}
+
+
+def attachment(body, owner, *, table_ref=None, now=None, s3_ref=None):
+    """One chunk of a claimed job's stored attachment.
+
+    Serves only the lease owner while the lease is live, so a stale or
+    foreign worker can never pull a trigger event's files. The bytes stay in
+    S3; this reads them straight from the recorded s3 pointer in chunks that
+    fit the HTTPS response cap.
+    """
+    if not isinstance(body, dict) or not body.get("task_id") or not body.get("lease_id"):
+        return 400, {"error": "Task ID and lease ID are required"}
+    table = tasks_table(table_ref)
+    row = _owned(table, body["task_id"], body["lease_id"], owner)
+    if not row or row.get("status") != "running":
+        return 409, {"error": "Task lease is no longer active"}
+    if int(row.get("lease_until") or 0) < int(now or time.time()):
+        return 409, {"error": "Task lease expired"}
+    try:
+        index = int(body.get("index"))
+    except (TypeError, ValueError):
+        return 400, {"error": "Invalid attachment index"}
+    attachments = row.get("attachments") or []
+    if not 0 <= index < len(attachments):
+        return 404, {"error": "No such attachment"}
+    ref = (attachments[index].get("s3") or {}) if isinstance(attachments[index], dict) else {}
+    if not (ref.get("bucket") and ref.get("key")):
+        return 404, {"error": "Attachment has no stored file"}
+    try:
+        offset = max(0, int(body.get("offset") or 0))
+    except (TypeError, ValueError):
+        return 400, {"error": "Invalid chunk offset"}
+    length = MAX_ATTACHMENT_CHUNK
+    if body.get("length") is not None:
+        try:
+            length = int(body["length"])
+        except (TypeError, ValueError):
+            return 400, {"error": "Invalid chunk length"}
+        if not 0 < length <= MAX_ATTACHMENT_CHUNK:
+            return 400, {"error": "Invalid chunk length"}
+    if s3_ref is None:
+        import boto3
+
+        s3_ref = boto3.client("s3")
+    from botocore.exceptions import ClientError
+
+    try:
+        obj = s3_ref.get_object(
+            Bucket=ref["bucket"], Key=ref["key"],
+            Range=f"bytes={offset}-{offset + length - 1}")
+        chunk = obj["Body"].read()
+    except ClientError as exc:
+        code = str(exc.response.get("Error", {}).get("Code") or "")
+        if "NoSuchKey" in code or code == "404":
+            return 404, {"error": "Attachment file is gone"}
+        if "InvalidRange" in code:
+            return 400, {"error": "Chunk offset is past the end of the file"}
+        raise
+    size = attachments[index].get("size")
+    content_range = obj.get("ContentRange") or ""
+    if content_range.rsplit("/", 1)[-1].isdigit():
+        size = int(content_range.rsplit("/", 1)[-1])
+    done = len(chunk) < length or (size is not None and offset + len(chunk) >= size)
+    return 200, {
+        "filename": attachments[index].get("filename") or "attachment",
+        "content_type": obj.get("ContentType") or attachments[index].get("content_type"),
+        "size": size,
+        "offset": offset,
+        "b64": base64.b64encode(chunk).decode(),
+        "done": done,
+    }
 
 
 def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=None,

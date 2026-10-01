@@ -312,6 +312,11 @@ Resources:
             Resource:
               - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
               - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-poll-*
+        # host-jobs/attachment streams a claimed job's stored trigger
+        # attachments to the lease-holding worker over HTTPS, straight from
+        # the inbound mail bucket.
+        - S3ReadPolicy:
+            BucketName: !Ref DatamailerInboundBucketName
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
