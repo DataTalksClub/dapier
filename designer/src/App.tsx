@@ -601,6 +601,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** Mobile: the workflow sidebar opens as a modal drawer (scrim, one pane). */
   const [navOpen, setNavOpen] = useState(false);
+  const navSidebarRef = useRef<HTMLElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
   /** A step sits on the cross-workflow clipboard, so Paste step can appear. */
   const [clipboardHasStep, setClipboardHasStep] = useState(() => readStepClipboard() !== null);
 
@@ -884,6 +886,53 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+
+  /** While the mobile drawer is open the aside is a modal dialog (role and
+     aria-modal are set declaratively on the element) and the main pane is
+     inert. Opening moves focus into the drawer — the first workflow row, or
+     the New-workflow button when there is none — Tab stays trapped inside,
+     and closing returns focus to the topbar toggle, mirroring the console's
+     drawer. Escape is handled by the editor key handler above. */
+  useEffect(() => {
+    if (!navOpen) return;
+    const aside = navSidebarRef.current;
+    if (!aside) return;
+    const initial =
+      aside.querySelector<HTMLElement>(".workflow-item") ??
+      aside.querySelector<HTMLElement>(".sidebar-action");
+    initial?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = [...aside.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)")]
+        .filter((item) => !item.hidden && getComputedStyle(item).display !== "none");
+      if (!items.length) return;
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === firstItem) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && document.activeElement === lastItem) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    };
+    aside.addEventListener("keydown", onKey);
+    return () => {
+      aside.removeEventListener("keydown", onKey);
+      navToggleRef.current?.focus();
+    };
+  }, [navOpen]);
+
+  /** Growing back past the drawer's 720px breakpoint closes it, so the
+     static desktop sidebar never carries the modal-dialog semantics. */
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 721px)");
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setNavOpen(false);
+    };
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (!leaveOpen) return;
@@ -1875,7 +1924,14 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         <div className="sidebar-scrim" role="presentation" onClick={() => setNavOpen(false)} />
       )}
       {!config.embedded && (
-        <aside className={navOpen ? "designer-sidebar open" : "designer-sidebar"}>
+        <aside
+          id="workflow-sidebar"
+          ref={navSidebarRef}
+          className={navOpen ? "designer-sidebar open" : "designer-sidebar"}
+          role={navOpen ? "dialog" : undefined}
+          aria-modal={navOpen || undefined}
+          aria-label={navOpen ? "Workflows" : undefined}
+        >
         {config.mode === "console" ? (
           <a className="brand brand-link" href="/"><span className="workspace-mark" aria-hidden="true">D</span><span>← Console · Designer</span></a>
         ) : (
@@ -1921,14 +1977,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         </aside>
       )}
 
-      <main className="designer-main">
+      <main className="designer-main" inert={navOpen || undefined}>
         <header className="designer-topbar">
           {!config.embedded && (
             <button
               className="icon-button nav-toggle"
               type="button"
+              ref={navToggleRef}
               aria-label="Toggle workflow list"
               aria-expanded={navOpen}
+              aria-controls="workflow-sidebar"
               onClick={() => setNavOpen((open) => !open)}
             >
               <Menu size={16} strokeWidth={2.25} />
