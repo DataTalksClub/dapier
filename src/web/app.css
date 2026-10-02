@@ -517,6 +517,8 @@ tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 2px solid v
 .status.run .status-dot { background: var(--dk-info-text); }
 .status.err { color: var(--dk-danger-text); }
 .status.err .status-dot { background: var(--dk-danger-text); }
+.status.warn { color: var(--dk-warning-text); }
+.status.warn .status-dot { background: var(--dk-warning-text); }
 .status.off { color: var(--dk-text-muted); }
 
 /* --- empty state --------------------------------------------------------------- */
@@ -1073,6 +1075,7 @@ body[data-view="workflows"] .workflow-page-actions .dk-button { height: var(--dk
 .home-needs-attention .home-problem:last-child { border-bottom: 0; }
 .home-problem:last-child { border-bottom: 0; padding-bottom: 0; }
 .home-problem strong { font-size: var(--dk-text-body); overflow-wrap: anywhere; }
+.home-problem-title { display: flex; align-items: center; gap: 8px; margin: 0; }
 .home-problem .sub { margin-top: 6px; max-width: 70ch; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .home-intro .home-create-actions { width: 100%; }

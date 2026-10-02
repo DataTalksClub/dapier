@@ -325,16 +325,20 @@ function renderBulkBar(shown) {
 
 function renderAttention(data) {
   const model = homeModel(data);
+  /* The panel frame stays neutral (family recipe); the row's own dot carries
+     the severity — danger for failed/auto-paused, warning for accounts and
+     quota. */
+  const alarm = (kind) => `<span class="status ${kind}" aria-hidden="true"><span class="status-dot"></span></span>`;
   const items = model.problems.map(({ workflow, run }) => `<article class="home-problem">
-    <div><strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong>
+    <div><p class="home-problem-title">${alarm('err')}<strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong></p>
       <p class="sub">${escapeHtml(workflow.auto_paused_reason || (run?.failed_step ? `Failed at ${run.failed_step}` : 'Open the run to see what went wrong.'))}</p></div>
     <div class="home-create-actions">${run ? `<button class="dk-button dk-button--secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
   </article>`);
   for (const connection of model.connections) items.push(`<article class="home-problem">
-    <div><strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
+    <div><p class="home-problem-title">${alarm('warn')}<strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong></p><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
     <button class="dk-button dk-button--secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
   </article>`);
-  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
+  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><p class="home-problem-title"><span class="status warn" aria-hidden="true"><span class="status-dot"></span></span><strong>Monthly task limit reached</strong></p><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
   $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
   $('#overview-attention').hidden = items.length === 0;
   $('#overview-attention').innerHTML = items.length ? `<h3>Needs attention</h3>${items.join('')}` : '';
