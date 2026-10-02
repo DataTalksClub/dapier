@@ -8,6 +8,12 @@ from ... import http
 from . import routes  # noqa: F401 (resolved via the module ref)
 from .dispatch import _read_scope
 
+# A workflow ref: the managed file name, or a bare id — hook-backed
+# workflows (webhook/telegram/... triggers) have no file and are addressed
+# by id on the read/duplicate/test routes. The store gates every verb, so
+# the id form still refuses writes with its own error.
+_WORKFLOW_REF = r"([a-z0-9][a-z0-9._-]*\.yaml|[a-z0-9][a-z0-9_-]{0,62})"
+
 
 def _route_designer_all(event, method, path, operator_payload,
                          operator_subject):
@@ -54,7 +60,7 @@ bulk, export, and the copilot draft."""
 def _route_designer_item(event, method, path, operator_payload, operator_subject):
     """Per-workflow designer endpoints: read, toggle, delete, tags,
 folder, test, test-step, duplicate."""
-    designer_match = re.fullmatch(r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
+    designer_match = re.fullmatch(r"/api/admin/designer/workflows/" + _WORKFLOW_REF, path)
     if method == "GET" and designer_match:
         return routes.designer_get(designer_match.group(1),
                                    visible=_read_scope(operator_payload))
@@ -75,7 +81,7 @@ folder, test, test-step, duplicate."""
         return routes.folder_designer_workflow(event, operator_subject, designer_folder_match.group(1),
                                                visible=_read_scope(operator_payload))
     designer_test_match = re.fullmatch(
-        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+        r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/test", path)
     if method == "POST" and designer_test_match:
         return routes.test_designer_workflow(event, operator_subject, designer_test_match.group(1),
                                              visible=_read_scope(operator_payload))
@@ -85,12 +91,12 @@ folder, test, test-step, duplicate."""
 def _route_designer_versions(event, method, path, operator_payload, operator_subject):
     """Per-workflow history endpoints: versions, diff, rollback."""
     designer_test_step_match = re.fullmatch(
-        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test-step", path)
+        r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/test-step", path)
     if method == "POST" and designer_test_step_match:
         return routes.test_designer_step(event, operator_subject, designer_test_step_match.group(1),
                                          visible=_read_scope(operator_payload))
     designer_duplicate_match = re.fullmatch(
-        r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
+        r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/duplicate", path)
     if method == "POST" and designer_duplicate_match:
         return routes.duplicate_designer_workflow(event, operator_subject, designer_duplicate_match.group(1))
     designer_versions_match = re.fullmatch(
