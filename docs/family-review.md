@@ -1,6 +1,6 @@
 # Family resemblance review — dapier vs dataops (dakit family spec)
 
-**Verdict: PASS** (reviewed 2026-10-02, judge-verified in two rounds against
+**Verdict: PASS** (reviewed 2026-10-02, judge-verified in three rounds against
 `dakit/docs/family.md` with dataops' rendered home as the canonical reference).
 
 ## What this branch carries
@@ -48,6 +48,21 @@ provider registry):
   form, designer switch/rail dots, mobile 44px targets and single-row
   strip). The one miss — no danger dot on the attention rows — was fixed
   (severity dots via the `.status` triplet roles) and re-verified.
+- Round 5 (delta at the pushed tip, after the round-4 repairs and the four
+  later commits): 22 fresh captures from the stub harness — public/legal
+  dark mode, console views + sidebar close-ups + 390px, designer list and
+  390px, light and dark. Verdict: PASS with no blocking issues. The four
+  later commits verified: the designer mobile drawer is a modal dialog with
+  scrim and focus trap (code-verified; drawer closed in shots), "New
+  workflow" reads secondary below the single primary, the vendored dakit
+  bundle carries the form-actions primitive, favicon committed. Designer
+  list meta shot as "undefined/undefined" was traced to the harness stub
+  missing the backend `_summary()` flat fields — stub now serves the
+  contract shape (plus a no-trigger row exercising "No trigger yet") and
+  the list was re-shot. Non-blocking notes kept: quota form verified in
+  source only (capture next round), console mobile keeps the h1 below the
+  64px bar, 32px nav rows and 2px focus ring are deliberate round-2
+  decisions.
 
 ## Deliberate remainders
 
