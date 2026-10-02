@@ -277,3 +277,7 @@ Authenticated webhook retry claims and poll deletion use the cursor table.
 The API role can write only `poll#*`, `seen#poll#*` and `seen#hook#*` keys.
 Poll deletion retains its trigger record when cursor cleanup fails, so the
 operator can retry deletion after fixing the failure.
+
+Webhook request-ID claims initialize their DynamoDB parent map atomically
+before inserting a nested claim; this preserves other IDs in the same scope.
+Deleting a hook also removes its retry-state scope.

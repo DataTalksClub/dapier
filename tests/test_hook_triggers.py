@@ -596,6 +596,23 @@ class ListAndDeleteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(stub.items, {})
 
+    def test_delete_removes_the_hooks_retry_state(self):
+        from src.dapier.triggers import seen
+
+        class CursorTable:
+            items = {"seen#hook#orders": {"seen": {"request-1": 123}}}
+
+            def delete_item(self, Key):
+                self.items.pop(Key["cursor_id"], None)
+
+        cursors = CursorTable()
+        hooks = StubTable([{"hook_id": "orders", "kind": "webhook"}])
+        with patch.object(seen, "get_table", return_value=cursors):
+            status, _ = hook_triggers.api_delete("orders", "op", table_ref=hooks)
+        self.assertEqual(status, 200)
+        self.assertEqual(cursors.items, {})
+        self.assertEqual(hooks.items, {})
+
 
 class WorkflowMergeTests(unittest.TestCase):
     def test_webhook_workflow_matches_its_own_delivery_and_no_other(self):

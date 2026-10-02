@@ -48,6 +48,10 @@ class FakeStateTable:
         key = Key["cursor_id"]
         names = ExpressionAttributeNames or {}
         values = ExpressionAttributeValues or {}
+        if UpdateExpression == "SET #m = if_not_exists(#m, :empty)":
+            entry = self.items.setdefault(key, dict(Key))
+            entry.setdefault(names["#m"], dict(values[":empty"]))
+            return {}
         map_attr = names.get("#m", "seen")
         claimed = names.get("#k")
         entry = dict(self.items.get(key) or {})

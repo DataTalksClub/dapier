@@ -30,6 +30,11 @@ class FakeTable:
         # seen.claim's shape: SET seen.#k = :expires, expires_at = :expires,
         # updated_at = :at with attribute_not_exists(#m.#k).
         names, values = ExpressionAttributeNames or {}, ExpressionAttributeValues or {}
+        if UpdateExpression == "SET #m = if_not_exists(#m, :empty)":
+            scope = self._hash(Key)
+            item = self.items.setdefault(scope, dict(Key))
+            item.setdefault(names["#m"], dict(values[":empty"]))
+            return {}
         scope, map_name, key_name = self._hash(Key), names["#m"], names["#k"]
         item = self.items.get(scope) or {}
         if key_name in (item.get(map_name) or {}):
@@ -120,3 +125,22 @@ def test_unconfigured_store_raises(table, monkeypatch):
     monkeypatch.delenv("CURSORS_TABLE", raising=False)
     with pytest.raises(seen.StoreError):
         seen.claim("hook#orders", "orders-1")
+
+
+def test_fresh_scope_claims_use_real_dynamodb_nested_map_semantics():
+    import boto3
+    from moto import mock_aws
+
+    with mock_aws():
+        resource = boto3.resource("dynamodb", region_name="eu-west-1")
+        table = resource.create_table(
+            TableName="test-seen-cursors",
+            KeySchema=[{"AttributeName": "cursor_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "cursor_id", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
+        )
+        assert seen.claim("hook#fresh", "first", table_ref=table) is True
+        assert seen.claim("hook#fresh", "first", table_ref=table) is False
+        assert seen.claim("hook#fresh", "second", table_ref=table) is True
+        assert seen.claim("hook#fresh", "first", table_ref=table) is False
+        assert set(seen.load("hook#fresh", table_ref=table)) == {"first", "second"}

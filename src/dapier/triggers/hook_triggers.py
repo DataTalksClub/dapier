@@ -978,6 +978,9 @@ def api_delete(name, operator, kind=None, *, table_ref=None,
         if warning:
             warnings.append(warning)
     get_table(table_ref).delete_item(Key={"hook_id": item["hook_id"]})
+    from . import seen
+
+    seen.drop(f"hook#{item['hook_id']}")
     payload = {"ok": True, "hook_id": item["hook_id"], "kind": item["kind"]}
     if warnings:
         payload["warnings"] = warnings
