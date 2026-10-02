@@ -1,0 +1,42 @@
+# Invoice intake: vendor invoice emails to `invoice@mailer.dtcdev.click`
+# are parsed and staged for bookkeeping review.
+#
+# The route is dedicated to invoices, so every step assumes an invoice
+# attachment is present — a text-only mail fails the run loudly (the
+# failure notify) instead of silently staging nothing.
+#
+# Live setup (workflows are operator config; this file is the canonical
+# definition):
+#   dapier workflows save workflows/invoice-intake.yaml
+#   dapier workflows publish invoice-intake
+#   dapier workflows on invoice-intake
+# Requires the `dropbox` connection (filing) and the copilot LLM key
+# (COPILOT_LLM_API_KEY on the Worker) for the AI fallback tier.
+id: invoice-intake
+enabled: true
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route:
+      equals: invoice
+actions:
+  # Deterministic parsers for AWS and the Stripe-receipt family (OpenAI,
+  # Anthropic); unknown vendors go to gpt-4o-mini. The entry carries a
+  # source flag so the reviewer knows which rows to double-check.
+  - id: parse
+    type: invoice_parse
+    ai_fallback: true
+  # Nothing reaches the ledger here: the entry lands pending in the
+  # review queue (console Bookkeeping view / `dapier bookkeeping`).
+  # Redelivered invoices dedupe into the existing entry.
+  - id: stage
+    type: bookkeeping_stage
+    entry_from: parse
+  # File the original PDF with the paperwork. The reviewer re-files it
+  # into the YYYY month folders when confirming, per the bookkeeping SOP.
+  - id: file-pdf
+    type: dropbox_upload
+    connection_id: dropbox
+    source: attachment
+    folder: _dtc_paperwork/invoices/auto

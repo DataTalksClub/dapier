@@ -195,3 +195,29 @@ def test_stage_without_a_parse_output_fails_loudly():
     with pytest.raises(ValueError):
         bookkeeping.run_bookkeeping_stage({"type": "bookkeeping_stage"}, EVENT,
                                           "invoice-intake", steps={})
+
+
+def test_the_shipped_invoice_intake_workflow_validates():
+    # The canonical workflow file: its action chain and trigger filters
+    # must satisfy the same save-time validation the API enforces, so the
+    # file cannot rot away from what a live workflow would accept.
+    import yaml
+
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[1] /
+                               "workflows" / "invoice-intake.yaml").read_text())
+    assert workflow["trigger"]["connector"] == "email"
+    assert workflow["trigger"]["filters"]["route"]["equals"] == "invoice"
+    validate_action_chain(workflow["actions"])
+
+
+def test_the_shipped_invoice_intake_workflow_validates():
+    # The canonical workflow file: its action chain and trigger filters
+    # must satisfy the same save-time validation the API enforces, so the
+    # file cannot rot away from what a live workflow would accept.
+    import yaml
+
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[1] /
+                               "workflows" / "invoice-intake.yaml").read_text())
+    assert workflow["trigger"]["connector"] == "email"
+    assert workflow["trigger"]["filters"]["route"]["equals"] == "invoice"
+    validate_action_chain(workflow["actions"])
