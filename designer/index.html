@@ -3,6 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    /* Apply the stored theme before first paint; with no stored choice the
+       OS preference decides. ?theme= forces one view without persisting.
+       Same key and script as the console-hosted designer (src/web/designer.html);
+       the pre-dakit "dapier-theme" key is still honored. */
+    (function () {
+      var theme = null;
+      try { theme = localStorage.getItem('dakit-theme'); } catch (_) {}
+      if (theme !== 'dark' && theme !== 'light') {
+        try { theme = localStorage.getItem('dapier-theme'); } catch (_) {}
+      }
+      if (theme !== 'dark' && theme !== 'light') {
+        theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      var forced = new URLSearchParams(location.search).get('theme');
+      if (forced === 'dark' || forced === 'light') theme = forced;
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
   <title>Dapier workflow designer</title>
 </head>
 <body>
