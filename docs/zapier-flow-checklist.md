@@ -107,6 +107,8 @@ Native Telegram evidence (2026-10-02): Alexey sent `/todo SYNTHETIC TEST Dapier 
 
 A subsequent private voice message was not our test. The user screenshot showed a blank-task confirmation. No audio was fetched, transcribed or replayed. Published TODO v7 On with a guard shared by native append and confirmation: missing, empty, whitespace or command-only text creates no task and sends no success confirmation. Voice/document deliveries remain available to other handlers; this flow does not add media processing. A synthetic missing-text CLI execution produced zero sheet/intake/send actions, and regression tests preserve the existing text and email mappings.
 
+Real v7 text retest: Chrome privately sent `/todo SYNTHETIC TEST Dapier Chrome text guard v7 2026-10-02 02`. Run `todo-intake:todo-2fbf739c077c1977` completed at 20:06:35 UTC. Direct Sheets read found exactly one matching row, `todo!A109:D109`, with `2026-10-02`, the command-stripped task, blank Notes and `NEW`. Telegram returned confirmation message `7216`. This verifies the guard preserves the real native text path; no private audio was opened.
+
 ## 3. Invoice email
 
 Source: Zap `153562936`; draft: `invoice-intake`.
@@ -116,11 +118,16 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 - [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
 - [ ] Verify sender acceptance by sending to the confirmed route `invoice@dtcdev.click`.
 - [ ] Confirm single/multiple/inline attachment selection and filename conflict behavior.
-- [ ] With authorization, send one test invoice; verify date conversion, exact filename, matching bytes and DataOps receipt.
+- [ ] Send an actual invoice email; verify receipt, date conversion, exact filename, matching bytes and DataOps intake.
+- [x] Verify the clearly labelled synthetic CLI fallback: exact archive bytes and accepted DataOps receipt, without claiming email delivery.
 - [ ] Verify required bookkeeping output in DataOps (legacy sheet references are in the migration plan).
 - [ ] Agree on cutover and verify one new invoice completes without duplicate archival/intake.
 
-Invoice preparation (2026-10-02): Dropbox account verification passed for Alexey Grigorev. Provider metadata confirmed `/_dtc_paperwork/invoices` exists with `read_only: false` and `no_access: false`. Published invoice v5 On: UTC email date, exactly one attachment, overwrite/autorename disabled, then DataOps. No invoice email has been sent and no archive file has been created by this test. Chrome draft subject is `Dapier synthetic invoice Chrome 2026-10-02 01`; synthetic PDF is 1,855 bytes, SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`. Browser attachment upload is pending.
+Invoice preparation (2026-10-02): Dropbox account verification passed for Alexey Grigorev. Provider metadata confirmed `/_dtc_paperwork/invoices` exists with `read_only: false` and `no_access: false`. Published invoice v5 On: UTC email date, exactly one attachment, overwrite/autorename disabled, then DataOps. Actual invoice email remains unsent; the CLI fallback archive and receipt evidence are recorded below. Chrome draft subject is `Dapier synthetic invoice Chrome 2026-10-02 01`; synthetic PDF is 1,855 bytes, SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`. Browser attachment upload is pending.
+
+Invoice fallback evidence: the original Chrome PDF was copied locally, verified as 1,855 bytes with SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`, and staged under `/dapier-integration-tests/`. Dapier SES sending failed before delivery with `AccessDenied ses:SendRawEmail`. The Gmail draft remains unsent; no inbound invoice email is claimed. A synthetic CLI email-shaped event archived exactly one file at `/_dtc_paperwork/invoices/2026-10-02-Dapier synthetic invoice fallback 2026-10-02 01.pdf`. Direct Dropbox download matched every original byte. API execution then failed on missing `secretsmanager:GetSecretValue` permission. An isolated worker fallback forwarded the same attachment and DataOps accepted intake `email-e572719789afd8f9e5f9b29d559f6a90`, artifact `email-document-4d519a4bce17ab855060e39e17417b9e`, status `needs-review`. This is CLI/archive/worker evidence, not Chrome email delivery or completed bookkeeping.
+
+After deployment, an API/CLI intake-only retry returned `status: duplicate` with the same `email-e572719789afd8f9e5f9b29d559f6a90` and artifact; no archive action ran again and no second intake was created. The missing API permissions were fixed with `ses:SendRawEmail`, read access only to `dapier/dataops`, and writes only to the configured documents bucket `transfer/*` prefix. Actual email delivery remains pending; the failed SES send was not retried.
 
 ## 4. Telegram TODO catch hook
 
@@ -148,9 +155,9 @@ Source: Zap `110871466`; draft: `youtube-slack`.
 - [ ] Verify custom display name `YouTube`: provider currently shows `Au-Tomator` despite the requested username.
 - [ ] Agree on cutover and verify a new video notification once.
 
-Provider checks (2026-10-02): Slack token verification passed for DataTalks.Club (`T01ATQK62F8`); real message/channel/custom-name checks are pending the Chrome action test. YouTube live identity verification passed for DataTalksClub (`UCDvErgK0j5ur3aLgn6U-LqQ`) using the stored readonly connection. Chrome renewal outcome is unconfirmed: the UI still requests reconnection and no recent callback audit record was returned. No account binding was changed.
+Provider checks (2026-10-02): Slack token verification passed for DataTalks.Club (`T01ATQK62F8`); posting and preview were verified by the CLI fallback below; custom-name verification remains failed. YouTube live identity verification passed for DataTalksClub (`UCDvErgK0j5ur3aLgn6U-LqQ`) using the stored readonly connection. Chrome renewal outcome is unconfirmed: the UI still requests reconnection and no recent callback audit record was returned. No account binding was changed.
 
-Slack action evidence: Chrome strict dry-run passed, but its confirmation dialog timed out. Audit showed only the 19:46 UTC dry-run, and a direct channel-history read found no browser synthetic message. The authorized CLI fallback posted exactly one `SYNTHETIC TEST — Dapier CLI Slack 2026-10-02 01` message to `C01BQC114P2`, Slack timestamp `1790970539.954079`. Independent channel-history reads confirmed the text, channel URL and a YouTube preview attachment. The custom display-name check failed: no message `username` override was present and bot profile name remained `Au-Tomator`. No retry was sent. The migrated action was tested independently; its managed draft remains unpublished and disabled, while the earlier live workflow remains On.
+Slack action evidence: Chrome strict dry-run passed, but its confirmation dialog timed out. Audit showed only the 19:46 UTC dry-run, and a direct channel-history read found no browser synthetic message. The authorized CLI fallback posted exactly one `SYNTHETIC TEST — Dapier CLI Slack 2026-10-02 01` message to `C01BQC114P2`, Slack timestamp `1790970539.954079`. Independent channel-history reads confirmed the text, channel URL and a YouTube preview attachment. The custom display-name check failed: no message `username` override was present and bot profile name remained `Au-Tomator`. No retry was sent. Alexey subsequently deleted the test message; the collected provider evidence and browser screenshot remain the historical evidence. No further public-channel posts are authorized for these tests. Slack response headers show `chat:write` but no `chat:write.customize`, explaining the missing display-name override. Reinstalling the Slack app with that permission and renewing the stored token is the required user action; do not send another public test message to verify it. The migrated action was tested independently; its managed draft remains unpublished and disabled, while the earlier live workflow remains On.
 
 ## 6. Dropbox invoice landing
 
@@ -158,12 +165,20 @@ Source: Zap `155120966`; draft: `dropbox_on_upload`.
 
 - [x] Configure `/_dtc_paperwork/invoices-landing`, every 2 minutes, all file types.
 - [x] Configure processing-date prefix, original extension once, move to `/_dtc_paperwork/invoices`, then DataOps intake.
-- [ ] Verify Dropbox access to both folders and DataOps intake availability.
+- [x] Verify Dropbox access to both folders and accepted DataOps intake via the isolated test.
 - [ ] Confirm processing-date timezone; draft currently uses UTC.
 - [ ] Confirm filename collisions and already-prefixed filename behavior.
-- [ ] With authorization, upload one test file; verify exact destination name, matching bytes, removal from landing and DataOps receipt.
+- [x] Upload one test-only file; verify exact destination name, matching bytes, removal from landing and DataOps receipt using the isolated worker/CLI fallback.
 - [ ] Verify required bookkeeping output in DataOps.
 - [ ] Agree on cutover, enable the workflow/poll, upload a fresh file and verify one complete run.
+
+Dropbox landing fallback (2026-10-02): uploaded only `dapier-synthetic-invoice-landing-20261002-01.pdf` using the same 1,855-byte fixture. An isolated worker workflow restricted to that exact test path performed both moves, ending at `/_dtc_paperwork/invoices/2026-10-02-dapier-synthetic-invoice-landing-20261002-01.pdf`. Provider metadata confirmed both original and intermediate landing paths absent; a direct archived download matched the original SHA256 above. DataOps initially returned HTTP 400 because Dapier used unsupported route `dropbox-upload` and document kind `dropbox-file`. The adapter fix uses a configurable `recipient_route` (default `invoice`) and supported kind `attachment`. After deployment, an intake-only API/CLI execution against the already archived path returned `accepted`, item `email-12d01cd72b823cd547ceaf5bc4de4e05`, artifact `email-document-303c85e3150060b66c543afe1eb0f191`, status `needs-review`. No rename/move was replayed. The actual production landing workflow and disabled poll were retained; automatic two-minute polling is not claimed as tested.
+
+Cleanup: the isolated `invoice-receipt-integration-test` hook and the two managed test workflows were deleted after runs finished. The temporary Dropbox grant for the current operator and agent `integration-test` was revoked. The existing `dataops-invoice-publication` grant remains. Existing production hooks were retained. Synthetic archived files remain as test evidence; no real invoice was overwritten or deleted.
+
+Integration fix deployment: [CI/deploy run 37057902392](https://github.com/DataTalksClub/dapier/actions/runs/37057902392), commit `5218b08`, passed tests, designer checks and deployed before the successful intake-only verifications above. Domain bookkeeping/review remains in DataOps.
+
+Next user actions: send the retained Gmail draft once attachment upload works; authorize/configure the real Dropbox landing cutover and verify a fresh file through its two-minute poll; reinstall the Slack app with `chat:write.customize` and renew its token without further public test posts. Original Zapier timezone semantics and actual catch-hook sender/retry contract remain separate checks.
 
 For implementation details and unresolved source semantics, see
 [the migration plan](zapier-migration-plan.md#adjustments-and-remaining-source-provider-checks).
