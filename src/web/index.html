@@ -91,25 +91,23 @@
       <div id="notice" class="notice" role="status" hidden></div>
 
       <section class="view active" data-page="overview">
-        <div class="page-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
+        <div class="page-tools primary-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
-        <div class="overview-columns">
-          <section aria-labelledby="home-workflows-title" class="home-panel">
-            <div class="section-head"><h2 id="home-workflows-title">Your workflows</h2><p class="sub" id="home-workflow-count"></p><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows</a></div>
-            <div id="overview-workflows" class="home-workflows"></div>
-            <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="dk-button dk-button--secondary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
-          </section>
-          <section aria-labelledby="home-results-title" class="home-panel">
-            <div class="section-head"><h2 id="home-results-title">Latest results</h2><a class="text-link view-link" href="/runs" data-target="runs">All runs</a></div>
-            <div id="overview-runs" class="home-results"></div>
-            <div id="overview-runs-empty" class="empty-state" hidden><h3>Waiting for the first run</h3><p>Results appear when a published workflow receives a matching trigger.</p></div>
-          </section>
-        </div>
+        <div id="overview-stats" class="status-strip" hidden></div>
+        <section class="home-panel" aria-labelledby="home-workflows-title">
+          <div class="section-head"><h2 id="home-workflows-title">Your workflows</h2><p class="sub" id="home-workflow-count"></p><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows</a></div>
+          <div id="overview-workflows" class="home-workflows"></div>
+          <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="dk-button dk-button--secondary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
+        </section>
+        <section class="home-panel" aria-labelledby="home-results-title">
+          <div class="section-head"><h2 id="home-results-title">Latest results</h2><a class="text-link view-link" href="/runs" data-target="runs">All runs</a></div>
+          <div id="overview-runs" class="home-results"></div>
+          <div id="overview-runs-empty" class="empty-state" hidden><h3>Waiting for the first run</h3><p>Results appear when a published workflow receives a matching trigger.</p></div>
+        </section>
       </section>
 
       <section class="view" data-page="workflows">
-        <div class="page-tools">
-          <div class="list-tools workflow-filters"><label class="workflow-search-field"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
+        <div class="page-tools primary-tools">
           <div class="workflow-page-actions">
           <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
           <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
@@ -117,6 +115,9 @@
           <a id="new-workflow" class="dk-button dk-button--primary" href="/workflows/new">New workflow</a>
           </div>
         </div>
+        <div class="page-tools">
+          <div class="list-tools workflow-filters"><label class="workflow-search-field"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
+          </div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="dk-button dk-button--sm dk-button--secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="dk-button dk-button--sm dk-button--secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Resume shown</button></div>
@@ -127,7 +128,7 @@
             <tbody id="workflow-table"></tbody>
           </table>
         </div>
-        <section class="workflow-trigger-section" aria-labelledby="workflow-hooks-title">
+        <section class="workflow-trigger-section data-panel" aria-labelledby="workflow-hooks-title">
         <div class="section-head">
           <h2 id="workflow-hooks-title" class="sub-head">Hooks</h2>
           <button id="new-hook" class="dk-button dk-button--secondary" type="button">New hook</button>
@@ -140,7 +141,7 @@
           </table>
         </div>
         </section>
-        <section class="workflow-trigger-section" aria-labelledby="workflow-polls-title">
+        <section class="workflow-trigger-section data-panel" aria-labelledby="workflow-polls-title">
         <div class="section-head">
           <h2 id="workflow-polls-title" class="sub-head">API polls</h2>
           <button id="new-poll" class="dk-button dk-button--secondary" type="button">New poll</button>
@@ -210,7 +211,7 @@
       </section>
 
       <section class="view" data-page="emails">
-        <div class="page-tools">
+        <div class="page-tools primary-tools">
           <button id="new-email" class="dk-button dk-button--primary" type="button">New email</button>
         </div>
         <p class="sub">Email addresses are triggers in workflows. Create or edit their actions in Workflows, then publish the changes.</p>
@@ -284,7 +285,7 @@
         </div>
       </section>
       <section class="view" data-page="schedules">
-        <div class="page-tools">
+        <div class="page-tools primary-tools">
           <button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
@@ -296,7 +297,7 @@
         </div>
       </section>
       <section class="view" data-page="tokens">
-        <div class="page-tools">
+        <div class="page-tools primary-tools">
           <button id="new-token" class="dk-button dk-button--primary" type="button">New token</button>
         </div>
         <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
@@ -331,7 +332,8 @@
       </section>
 
       <section class="view" data-page="runs">
-        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="runs-search-filter" type="search" placeholder="Search runs" title="Text in a run's data, or its id"></label><label><span class="visually-hidden">Workflow</span><select id="runs-workflow-filter" aria-label="Workflow"><option value="">All workflows</option></select></label><label><span class="visually-hidden">Status</span><select id="runs-status-filter" aria-label="Status"><option value="">All statuses</option></select></label><label><span class="visually-hidden">Date</span><select id="runs-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 runs</span><button id="runs-replay-failed" class="dk-button dk-button--secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="dk-button dk-button--secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
+        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="runs-search-filter" type="search" placeholder="Search runs" title="Text in a run's data, or its id"></label><label><span class="visually-hidden">Workflow</span><select id="runs-workflow-filter" aria-label="Workflow"><option value="">All workflows</option></select></label><label><span class="visually-hidden">Status</span><select id="runs-status-filter" aria-label="Status"><option value="">All statuses</option></select></label><label><span class="visually-hidden">Date</span><select id="runs-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 runs</span></div>
+        <div class="page-tools primary-tools"><button id="runs-replay-failed" class="dk-button dk-button--secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="dk-button dk-button--secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
@@ -339,14 +341,14 @@
           </table>
         </div>
         <button id="runs-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
-      <section aria-labelledby="runs-usage-title">
+      <section class="data-panel" aria-labelledby="runs-usage-title">
           <div class="section-head"><h2 id="runs-usage-title">Task usage</h2></div>
           <div class="list-tools"><p class="sub" id="overview-quota-line" hidden></p><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="dk-button dk-button--secondary" type="submit">Set limit</button></form></div>
           <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
           <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
       </section>
 
-      <section aria-labelledby="runs-events-title">
+      <section class="data-panel" aria-labelledby="runs-events-title">
         <div class="section-head">
           <h2 id="runs-events-title">Incoming events</h2>
         </div>
@@ -359,7 +361,7 @@
         </div>
         <button id="inbox-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
       </section>
-          <section>
+          <section class="data-panel">
             <div class="section-head"><h2>Failed runs</h2><button id="overview-errors-send-digest" class="dk-button dk-button--secondary" type="button">Send digest now</button></div>
             <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
             <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow, newest first.</p></div>
@@ -367,7 +369,8 @@
       </section>
 
       <section class="view" data-page="audit">
-        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="audit-log-search" type="search" placeholder="Search the audit log" title="Action, connection, actor, or error"></label><label><span class="visually-hidden">Action</span><select id="audit-log-action-filter" aria-label="Action" data-blank="All actions"><option value="">All actions</option></select></label><label><span class="visually-hidden">Outcome</span><select id="audit-log-outcome-filter" aria-label="Outcome" data-blank="All outcomes"><option value="">All outcomes</option></select></label><label><span class="visually-hidden">Date</span><select id="audit-log-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="audit-log-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 events</span><button id="audit-log-export" class="dk-button dk-button--secondary" type="button">Export CSV</button></div>
+        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="audit-log-search" type="search" placeholder="Search the audit log" title="Action, connection, actor, or error"></label><label><span class="visually-hidden">Action</span><select id="audit-log-action-filter" aria-label="Action" data-blank="All actions"><option value="">All actions</option></select></label><label><span class="visually-hidden">Outcome</span><select id="audit-log-outcome-filter" aria-label="Outcome" data-blank="All outcomes"><option value="">All outcomes</option></select></label><label><span class="visually-hidden">Date</span><select id="audit-log-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="audit-log-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 events</span></div>
+        <div class="page-tools primary-tools"><button id="audit-log-export" class="dk-button dk-button--secondary" type="button">Export CSV</button></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>When</th><th>Action</th><th>Resource</th><th>Actor</th><th>Agent</th><th>Outcome</th><th>Error</th></tr></thead>

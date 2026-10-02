@@ -19,7 +19,10 @@ function mountPageTools() {
     mountedTools = null;
   }
   const view = document.querySelector('.view.active');
-  const tools = view?.querySelector(':scope > .page-tools');
+  /* Only a page's primary actions join the topbar (the family's header
+     pattern: title left, actions right). Filter and search bars stay in the
+     content column, above the register they control. */
+  const tools = view?.querySelector(':scope > .page-tools.primary-tools');
   const slot = $('#topbar-tools');
   if (!tools || !slot) return;
   mountedTools = { node: tools, home: view };
