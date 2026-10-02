@@ -1,4 +1,4 @@
-# Invoice intake: vendor invoice emails to `invoice@mailer.dtcdev.click`
+# Invoice intake: vendor invoice emails to `invoice@dtcdev.click`
 # are filed straight into the DataOps document intake.
 #
 # Dapier is only the pipe here — trigger plus one action. Parsing and
