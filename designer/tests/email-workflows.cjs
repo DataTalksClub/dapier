@@ -11,14 +11,15 @@ const root = path.resolve(__dirname, '..');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'dapier-email-workflows-'));
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 'junction');
 after(() => fs.rmSync(output, { recursive: true, force: true }));
-for (const name of ['catalog', 'workflows', 'logos']) {
-  const source = fs.readFileSync(path.join(root, 'src', name + (name === 'logos' ? '.tsx' : '.ts')), 'utf8');
+for (const name of ['catalog', 'workflows', 'logos', 'icons']) {
+  const source = fs.readFileSync(path.join(root, 'src', name + (name === 'catalog' || name === 'workflows' ? '.ts' : '.tsx')), 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022, jsx: ts.JsxEmit.ReactJSX }
   }).outputText;
   fs.writeFileSync(path.join(output, name + '.mjs'), compiled
     .replaceAll('"./catalog"', '"./catalog.mjs"')
-    .replaceAll('"./logos"', '"./logos.mjs"'));
+    .replaceAll('"./logos"', '"./logos.mjs"')
+    .replaceAll('"./icons"', '"./icons.mjs"'));
 }
 const converters = import(pathToFileURL(path.join(output, 'workflows.mjs')).href);
 
