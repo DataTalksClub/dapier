@@ -16,9 +16,9 @@ message and attachments to DataOps; DataOps handles their contents and the
 bookkeeping lifecycle.
 
 Do not add or expand domain-specific processing or business data stores here.
-Implement the integration with the owning service instead. Existing
-bookkeeping code is being moved to DataOps and is not a precedent for new
-features in this repository.
+Implement the integration with the owning service instead. The bookkeeping
+code that used to live here has been deleted; do not resurrect it from
+history.
 
 ## UI/CLI parity (required)
 

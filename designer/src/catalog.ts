@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, Receipt, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
+import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -189,31 +189,6 @@ export const actionCatalog: ActionEntry[] = [
       { key: "temperature", label: "Temperature", type: "number" },
       { key: "model", label: "Model" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
-    ]
-  },
-  {
-    type: "invoice_parse",
-    label: "Invoices: parse PDF",
-    icon: Receipt,
-    description: "Parse the message's invoice PDF attachment into bookkeeping fields. Known vendor templates (AWS, OpenAI, Anthropic) parse deterministically; other layouts go to the AI (gpt-4o-mini) when ai_fallback is on. Output: {ok, matched, source: deterministic|ai, entry, pdf} — matched: false stages nothing.",
-    fields: [
-      { key: "attachment_index", label: "Attachment index", type: "number",
-        help: "0-based index into the message's attachments; omitted parses the first PDF attachment" },
-      { key: "ai_fallback", label: "AI fallback", type: "boolean", default: "false",
-        help: "Extract unknown vendors with gpt-4o-mini (ai_complete) when no deterministic parser claims the PDF" },
-      { key: "ai_system", label: "AI system message", type: "textarea",
-        help: "Optional override of the extraction prompt's system half" },
-      { key: "timeout_seconds", label: "AI timeout (s)", type: "number" }
-    ]
-  },
-  {
-    type: "bookkeeping_stage",
-    label: "Bookkeeping: stage for review",
-    icon: Receipt,
-    description: "File a parsed invoice as a pending bookkeeping entry. Nothing reaches the ledger until a human confirms the entry in the review queue; a redelivered invoice dedupes into the existing entry. Reads the entry from the parse step (entry_from). Output: {entry_id, status, deduped, provider, invoice_number}.",
-    fields: [
-      { key: "entry_from", label: "Parse step id", placeholder: "parse",
-        help: "The invoice_parse step whose output.entry to stage" }
     ]
   },
   {
@@ -1833,9 +1808,7 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   http_request: "data",
   webhook: "data",
   render_html_to_pdf: "data",
-  dataops: "data",
-  invoice_parse: "data",
-  bookkeeping_stage: "data"
+  dataops: "data"
 };
 
 /** Action type prefix → connector name; drives the picker's per-app groups. */
