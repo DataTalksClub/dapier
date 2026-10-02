@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import yaml
 
 from ...auth import visibility
-from ...triggers import published_workflows
+from ...triggers import hook_triggers, published_workflows
 from .github import sync_status
 from .validation import FILE_PATTERN, ordered_workflow, parse_workflow
 
@@ -136,6 +136,10 @@ def api_list(q=None, tag=None, folder=None, visible=None):
             # owner_of_item) — exposed informationally like the live rows.
             summaries[str(workflow["id"])] = {**summary, "published": False,
                                               "owner": visibility.owner_of_item(item)}
+    for workflow, owner in hook_triggers.listed_workflows(visible):
+        summaries.setdefault(str(workflow["id"]), {
+            **_summary(workflow, None), "published": True, "owner": owner,
+        })
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
     search = str(q or "").strip().lower()
     if search:
@@ -209,5 +213,4 @@ def api_get(source, visible=None):
         return 200, {"workflow": item["workflow"], "published": True,
                      "yaml": workflow_yaml_text(item["workflow"])}
     return 404, {"error": f"no such workflow: {source}"}
-
 

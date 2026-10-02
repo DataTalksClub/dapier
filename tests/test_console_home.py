@@ -69,7 +69,12 @@ def test_home_has_one_workflow_list_and_one_results_feed():
     parser = Elements()
     parser.feed(html)
     assert not [key for key, count in Counter(parser.ids).items() if count > 1]
-    home = html.split('data-page="overview">', 1)[1].split('<section class="view" data-page="usage">', 1)[0]
+    home = html.split('data-page="overview">', 1)[1].split('<section class="view" data-page="workflows">', 1)[0]
     assert 'id="overview-runs-table"' not in home
     assert home.count('<section ') == 2
     assert home.count('</section>') == 3  # two panels and the home view
+    assert 'data-page="usage"' not in html
+    assert 'data-view="usage"' not in html
+    runs = html.split('data-page="runs">', 1)[1]
+    assert 'id="overview-usage"' in runs
+    assert 'id="quota-form"' in runs

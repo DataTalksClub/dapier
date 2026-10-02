@@ -62,7 +62,6 @@
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
         <a class="nav-item" href="/bookkeeping" data-view="bookkeeping"><i data-lucide="receipt"></i><span>Bookkeeping</span></a>
-        <a class="nav-item" href="/usage" data-view="usage"><i data-lucide="chart-no-axes-column"></i><span>Usage</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
       </nav>
       <div class="sidebar-foot">
@@ -106,12 +105,6 @@
             <div id="overview-runs-empty" class="empty-state" hidden><h3>Waiting for the first run</h3><p>Results appear when a published workflow receives a matching trigger.</p></div>
           </section>
         </div>
-      </section>
-
-      <section class="view" data-page="usage">
-          <div class="page-tools"><p class="sub" id="overview-quota-line" hidden></p><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="button secondary" type="submit">Set limit</button></form></div>
-          <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
-          <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
       </section>
 
       <section class="view" data-page="workflows">
@@ -346,6 +339,13 @@
           </table>
         </div>
         <button id="runs-load-more" class="button secondary" type="button" hidden>Load more</button>
+      <section aria-labelledby="runs-usage-title">
+          <div class="section-head"><h2 id="runs-usage-title">Task usage</h2></div>
+          <div class="list-tools"><p class="sub" id="overview-quota-line" hidden></p><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="button secondary" type="submit">Set limit</button></form></div>
+          <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
+          <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
+      </section>
+
       <section aria-labelledby="runs-events-title">
         <div class="section-head">
           <h2 id="runs-events-title">Incoming events</h2>

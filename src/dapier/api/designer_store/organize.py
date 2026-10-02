@@ -207,7 +207,7 @@ def api_bulk(body, operator=None, visible=None):
         if status != 200:
             return status, payload
         targets = [(row.get("source") or filename_for(row["id"]), row["id"])
-                   for row in payload["workflows"]]
+                   for row in payload["workflows"] if row.get("source")]
     enabled = action == "enable"
     results = []
     for source, label in targets:

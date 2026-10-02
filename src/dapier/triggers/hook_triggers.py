@@ -819,6 +819,25 @@ def load_workflows(table_ref=None):
     ]
 
 
+def listed_workflows(visible=None):
+    """Hook-backed workflows for Console and CLI, including disabled hooks.
+
+    Project through the engine definition so tokens and provider setup never
+    escape into workflow lists. Stored hooks remain managed by the trigger API.
+    """
+    if not os.environ.get("HOOK_TRIGGERS_TABLE"):
+        return []
+    result = []
+    for item in load_items():
+        owner = str(item.get("created_by") or "")
+        if visible is not None and not visible.owner_visible(owner):
+            continue
+        workflow = workflow_for(item)
+        if workflow is not None:
+            result.append(({**workflow, "enabled": item.get("enabled", True)}, owner))
+    return result
+
+
 def public_view(item):
     """Operator-facing view. The token is included on purpose: it is the
     credential callers must present, so it has to be retrievable to keep the

@@ -40,7 +40,7 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
             trigger = f"{trigger} +{extra}"
         tags = item.get("tags") or []
         item_folder = item.get("folder") or ""
-        print(f"{item.get('source', ''):36} {trigger:34} "
+        print(f"{item.get('source') or item['id']:36} {trigger:34} "
               f"{item.get('actionCount', 0)} action(s) {state}"
               + (f" [folder: {item_folder}]" if item_folder else "")
               + (f" [{' '.join(tags)}]" if tags else ""))
