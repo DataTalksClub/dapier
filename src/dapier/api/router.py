@@ -93,6 +93,12 @@ def _static(path):
         "/assets/vendor/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
         "/assets/vendor/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
         "/assets/vendor/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
+        # dakit.css references its fonts as url("../fonts/…"), which resolves
+        # against /assets/vendor/ to /assets/fonts/… — alias the same files so
+        # the vendored bundle's own @font-faces resolve.
+        "/assets/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
+        "/assets/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
+        "/assets/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
     }
     if path not in assets:
         # Workflow deep links (/workflows/<id>) load the same console shell;
