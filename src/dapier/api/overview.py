@@ -34,9 +34,12 @@ def _workflows(visible=None, owners=None):
                 workflow, item.get("file"), published=True,
                 failures=counts.get(str(workflow["id"]), 0))
     for workflow, _owner in hook_triggers.listed_workflows(visible):
-        result.setdefault(str(workflow["id"]), _workflow_view(
+        result.setdefault(str(workflow["id"]), {**_workflow_view(
             workflow, None, published=True,
-            failures=counts.get(str(workflow["id"]), 0)))
+            failures=counts.get(str(workflow["id"]), 0)),
+            # Run by its trigger (hooks), no source file: the console opens
+            # these in the designer read-only (the API serves them by id).
+            "hook_backed": True})
     return sorted(result.values(), key=lambda workflow: str(workflow["id"]))
 
 

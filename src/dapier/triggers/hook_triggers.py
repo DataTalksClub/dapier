@@ -819,6 +819,49 @@ def load_workflows(table_ref=None):
     ]
 
 
+def _item_for_workflow_id(workflow_id, table_ref=None):
+    """The stored hook projecting ``workflow_id`` (``<kind>-trigger-<hook>``), or None."""
+    if not os.environ.get(TABLE_ENV):
+        return None
+    items = load_items() if table_ref is None else load_items(table_ref=table_ref)
+    for item in items:
+        if workflow_id_for(item) == workflow_id:
+            return item
+    return None
+
+
+def workflow_by_id(workflow_id, visible=None, table_ref=None):
+    """One hook-backed engine workflow by its workflow id, or None.
+
+    The single-workflow mirror of listed_workflows: the designer and CLI
+    read a trigger-run workflow through it, projected exactly as the list
+    projects it (enabled state included, tokens never). ``visible`` (an
+    auth.visibility.Visibility, None = unrestricted) scopes the read by the
+    trigger's creator — a workflow the caller may not see answers None,
+    like the list hiding the row.
+    """
+    item = _item_for_workflow_id(str(workflow_id or ""), table_ref)
+    if item is None:
+        return None
+    if visible is not None and not visible.owner_visible(str(item.get("created_by") or "")):
+        return None
+    workflow = workflow_for(item)
+    if workflow is None:
+        return None
+    return {**workflow, "enabled": item.get("enabled", True)}
+
+
+def owns_workflow_id(workflow_id, table_ref=None):
+    """The kind of the hook trigger projecting ``workflow_id``, or None.
+
+    The engine prefers managed workflows — a published definition under a
+    trigger's id silently takes over its routing (matching.all_workflows
+    drops the hook duplicate). Saves refuse such an id so a designer save
+    cannot rewire a live trigger by accident."""
+    item = _item_for_workflow_id(workflow_id, table_ref)
+    return str(item.get("kind") or "hook") if item else None
+
+
 def listed_workflows(visible=None):
     """Hook-backed workflows for Console and CLI, including disabled hooks.
 
