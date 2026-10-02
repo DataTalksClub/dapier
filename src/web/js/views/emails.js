@@ -10,9 +10,7 @@ function handlerDetails(handler) {
   const name = escapeHtml(handler.workflow);
   const actions = (handler.action_types || []).map(escapeHtml).join(' → ') || 'No actions';
   const pending = handler.has_draft && handler.status !== 'draft' ? ' · unpublished changes' : '';
-  const manage = handler.legacy
-    ? `<button class="dk-button dk-button--secondary email-migrate" data-name="${escapeHtml(handler.legacy_name)}" type="button">Convert to workflow</button>`
-    : `<button class="dk-button dk-button--secondary email-workflow" data-workflow="${name}" type="button">Edit workflow</button>`;
+  const manage = `<button class="dk-button dk-button--secondary email-workflow" data-workflow="${name}" type="button">Edit workflow</button>`;
   return { name, actions, pending, manage };
 }
 
@@ -53,16 +51,6 @@ export function renderEmails(data) {
   $('#email-watchers').hidden = watchers.length === 0;
   $('#email-watcher-table').innerHTML = watchers.map((h) => row(h.event, h)).join('');
   $$('.email-workflow').forEach((button) => button.addEventListener('click', () => openDesigner(button.dataset.workflow)));
-  $$('.email-migrate').forEach((button) => button.addEventListener('click', async () => {
-    button.disabled = true;
-    try {
-      const result = await api('/api/admin/email-triggers/migrate', { method: 'POST', body: JSON.stringify({ name: button.dataset.name }) });
-      notice('Converted to a workflow. The same address and actions remain live.');
-      await refresh();
-      await openDesigner(result.workflow);
-    } catch (error) { notice(error.message, true); }
-    finally { button.disabled = false; }
-  }));
 }
 
 export function renderEmailFrom(addresses) {
