@@ -92,7 +92,8 @@ reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`
 or the console's **Agents** tab.
 If the instruction above the forwarded Zoom recording or meeting-assets message
-says `Zoom`, `zoom calls`, `zoom-calls`, or `zoom calls recording` (case insensitive),
+is simply `Zoom` (allowing surrounding whitespace and punctuation), or explicitly
+names `zoom calls`, `zoom-calls`, or `zoom calls recording` (case insensitive),
 the agent works in `~/git/zoom-calls` and follows that repository's
 `zoom-recording` skill, script, and summary templates. The forwarded Zoom
 message must include a share link and passcode. This instruction is evaluated
@@ -102,7 +103,9 @@ private `zoom-calls` GitHub repository. Short personal meetings with Alexey and
 one other participant (typically under 30 minutes) default to `1x1`; group
 meetings use `discussion`, and an explicit meeting type takes precedence.
 An existing downloaded transcript can be reused, but scratch files alone do
-not complete the task.
+not complete the task. Mentioning Zoom in a different explicit request, such as
+"write an article from this Zoom conversation," follows that requested task
+instead of selecting the Zoom calls route.
 
 If the instruction says `AI Shipping Labs` above a forwarded Zoom recording,
 that route takes priority over the Zoom calls aliases. By default, the agent
