@@ -541,17 +541,18 @@ a.brand:hover span:last-child {
   gap: 2px;
 }
 
-/* Nav rows: icon + text, min-height 32px, the filled row is the only
-   selection signal — no border, rail, or stripe (family.md). */
+/* Nav rows: icon + text at the family sidebar recipe's geometry
+   (min-height 36px, 6px 10px), the filled row is the only selection
+   signal — no border, rail, or stripe (family.md). */
 .workflow-item {
   background: transparent;
   border: 0;
   border-radius: var(--dk-radius-md);
   color: var(--dk-text-primary);
   display: flex;
-  gap: var(--dk-space-2);
-  min-height: 32px;
-  padding: var(--dk-space-1) var(--dk-space-3);
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
   position: relative;
   text-align: left;
 }
@@ -844,8 +845,8 @@ a.brand:hover span:last-child {
 /* The trigger-run (hook-backed) notice: a slim strip under the topbar
    explaining why the canvas is read-only. */
 .read-only-note {
-  background: var(--muted-bg);
-  color: var(--text-muted);
+  background: var(--dk-bg-muted);
+  color: var(--dk-text-muted);
   font-size: 12px;
   padding: 6px 16px;
 }
@@ -919,12 +920,24 @@ select { cursor: pointer; }
 select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
 select:disabled { opacity: .5; cursor: default; }
 
+/* The family's keyboard indicator: 3px --dk-focus-ring outline on
+   :focus-visible; text controls additionally swap to the accent border with a
+   3px halo while focused (family.md; dataops styles.css is the reference). */
+button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--dk-focus-ring);
+  outline-offset: 2px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--dk-accent-default);
-  outline: 2px solid var(--dk-focus-ring);
-  outline-offset: 0;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dk-focus-ring);
 }
 input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 
@@ -1284,7 +1297,8 @@ input[type="checkbox"], input[type="radio"] {
 .canvas-context-menu {
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
+  /* Overlays (popovers included) round at radius-lg over the overlay shadow. */
+  border-radius: var(--dk-radius-lg);
   box-shadow: var(--dk-shadow-overlay);
   max-height: min(520px, calc(100vh - 32px));
   overflow: auto;
@@ -1562,7 +1576,8 @@ input[type="checkbox"], input[type="radio"] {
 .test-panel {
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
+  /* Overlays round at radius-lg over the overlay shadow (family.md). */
+  border-radius: var(--dk-radius-lg);
   box-shadow: var(--dk-shadow-overlay);
   display: flex;
   flex-direction: column;
@@ -1707,6 +1722,8 @@ input[type="checkbox"], input[type="radio"] {
   width: min(100%, 440px);
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);
+  /* Overlays round at radius-lg over the overlay shadow (family.md). */
+  border-radius: var(--dk-radius-lg);
   box-shadow: var(--dk-shadow-overlay);
   padding: 24px;
 }
@@ -1737,6 +1754,8 @@ input[type="checkbox"], input[type="radio"] {
   width: min(100%, 480px);
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);
+  /* Overlays round at radius-lg over the overlay shadow (family.md). */
+  border-radius: var(--dk-radius-lg);
   box-shadow: var(--dk-shadow-overlay);
   display: flex;
   flex-direction: column;
@@ -1827,7 +1846,7 @@ input[type="checkbox"], input[type="radio"] {
   text-align: left;
 }
 .node-jump-item:hover, .node-jump-item.selected { background: var(--dk-accent-soft); border-color: var(--dk-accent-default); color: var(--dk-accent-default); }
-.node-jump-item:focus-visible { outline: 2px solid var(--dk-accent-default); outline-offset: 1px; }
+.node-jump-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
 
 /* {trigger.*} sample chips in the trigger inspector: click copies the
    template for pasting into an action field. */
@@ -1935,7 +1954,7 @@ input[type="checkbox"], input[type="radio"] {
 .prompt-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
 .prompt-expand { padding: 0; border: 0; background: transparent; color: var(--dk-accent-default); font: 500 var(--dk-text-sm) var(--dk-font-sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .inspector .prompt-inline { min-height: 240px; width: 100%; font: var(--dk-text-body)/1.65 var(--dk-font-sans); padding: 12px; resize: vertical; }
-.prompt-editor-dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 28px; margin: auto; color: var(--dk-text-primary); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); overflow: auto; }
+.prompt-editor-dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 28px; margin: auto; color: var(--dk-text-primary); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); overflow: auto; }
 .prompt-editor-dialog::backdrop { background: var(--dk-bg-backdrop); }
 .prompt-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .prompt-editor-head h2 { font: 600 var(--dk-text-xl) var(--dk-font-sans); margin: 0; }
