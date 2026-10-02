@@ -383,7 +383,7 @@ a.brand:hover span:last-child {
 .check-label.enabled-toggle input {
   appearance: none;
   background: var(--dk-border-strong);
-  border-radius: 999px;
+  border-radius: var(--dk-radius-full);
   cursor: pointer;
   flex: 0 0 34px;
   height: 20px;
@@ -439,9 +439,9 @@ a.brand:hover span:last-child {
 /* The trigger-run (hook-backed) notice: a slim strip under the topbar
    explaining why the canvas is read-only. */
 .read-only-note {
-  background: var(--muted-bg);
-  color: var(--text-muted);
-  font-size: 12px;
+  background: var(--dk-bg-muted);
+  color: var(--dk-text-muted);
+  font-size: var(--dk-text-sm);
   padding: 6px 16px;
 }
 
@@ -987,7 +987,9 @@ input[type="checkbox"], input[type="radio"] {
   .topbar-actions { row-gap: 6px; }
   .topbar-actions .dk-button { min-height: 44px; }
   .topbar-actions .check-label { min-height: 44px; }
-  .topbar-title .id-input { flex: 1; min-width: 0; width: auto; }
+  /* The name input keeps a real typing width: when the view switch leaves
+     less than its 220px basis, it wraps to its own row and grows to fill. */
+  .topbar-title .id-input { flex: 1 1 220px; min-width: 0; width: auto; }
   .test-panel {
     inset: 10px;
     max-height: none;
