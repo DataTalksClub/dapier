@@ -255,6 +255,14 @@ Resources:
             SecretArn: !Ref YouTubeWebhookSecret
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DapierAdminSecret
+        - Statement:
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
+        - Statement:
+            Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*'
         - !If
           - HasGithubWorkflowsToken
           - Statement:
@@ -287,7 +295,7 @@ Resources:
             Resource: !GetAtt HostQueue.Arn
         - Statement:
             Effect: Allow
-            Action: [ses:SendEmail]
+            Action: [ses:SendEmail, ses:SendRawEmail]
             Resource: '*'
         - DynamoDBCrudPolicy:
             TableName: !Ref HookTriggersTable
@@ -622,7 +630,7 @@ Resources:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
             Effect: Allow
-            Action: [ses:SendEmail]
+            Action: [ses:SendEmail, ses:SendRawEmail]
             Resource: '*'
         - Statement:
             Effect: Allow
