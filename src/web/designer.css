@@ -1459,6 +1459,10 @@ input[type="checkbox"], input[type="radio"] {
   }
   .canvas-zoom-controls .icon-button,
   .canvas-zoom-controls .zoom-button { height: 44px; }
+  .canvas-zoom-controls .icon-button { width: 44px; }
+  .add-row { min-height: 44px; }
+  .sidebar-action { min-height: 44px; }
+  .node-jump-item { min-height: 44px; }
   .canvas-zoom-controls .zoom-button { min-width: 48px; }
 }
 

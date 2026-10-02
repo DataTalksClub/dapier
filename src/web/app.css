@@ -863,6 +863,8 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .dk-input, .dk-select, .dk-textarea { min-height: var(--dk-size-touch); }
   .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .sidebar-close { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  /* the drawer's own controls outrank the generic bump — re-assert here */
+  .sidebar .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .workflow-state-control .dk-button, .workflow-menu .dk-button,
   .workflow-actions .dk-button, .workflow-actions .workflow-more { height: var(--dk-size-touch); }
   .sidebar-backdrop:not([hidden]) { position: fixed; display: block; inset: 0; z-index: 19; width: 100%; height: 100dvh; border: 0; background: var(--dk-bg-backdrop); cursor: pointer; }
@@ -881,7 +883,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     visibility: visible;
     transform: translateX(0);
     transition-delay: 0s;
-    box-shadow: none;
+    box-shadow: var(--dk-shadow-overlay);
   }
   .sidebar-close { display: inline-grid; width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); }
   main { padding: 0 24px 48px; }
