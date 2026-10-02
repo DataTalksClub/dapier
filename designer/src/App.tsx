@@ -3,7 +3,7 @@ import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, 
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
-import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -102,7 +102,7 @@ async function api<T>(config: DesignerConfig, path: string, init?: RequestInit, 
 }
 
 function workflowYaml(workflow: Workflow): string {
-  return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
+  return dump(orderedWorkflow(workflow), { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
 }
 
 /** A prose editor with room to read long prompts without changing their text. */

@@ -126,11 +126,11 @@ def filename_for(workflow_id):
 # Top-level key order for workflow YAML the server writes; the designer
 # client emits the same order. Stored dicts keep whatever order they were
 # parsed in — this only applies at dump time.
-WORKFLOW_KEY_ORDER = ("id", "enabled", "actions", "flows", "flow", "trigger", "triggers")
+WORKFLOW_KEY_ORDER = ("id", "enabled", "trigger", "triggers", "actions", "flows", "flow")
 
 
 def ordered_workflow(workflow):
-    """The workflow mapping in canonical key order (actions before trigger),
+    """The workflow mapping in canonical key order (trigger before actions),
     with keys outside the canon kept at the end in their original order."""
     ordered = {key: workflow[key] for key in WORKFLOW_KEY_ORDER if key in workflow}
     ordered.update(

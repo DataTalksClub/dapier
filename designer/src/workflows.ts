@@ -55,6 +55,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Top-level key order for workflow YAML dumps — the server's
+    WORKFLOW_KEY_ORDER: identity, state, trigger, then the action graph.
+    Keys outside the canon keep their relative order at the end. */
+const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+
+export function orderedWorkflow(workflow: Workflow): Workflow {
+  const source = workflow as Record<string, unknown>;
+  const ordered: Record<string, unknown> = {};
+  for (const key of WORKFLOW_KEY_ORDER) {
+    if (source[key] !== undefined) ordered[key] = source[key];
+  }
+  for (const [key, value] of Object.entries(source)) {
+    if (!(key in ordered)) ordered[key] = value;
+  }
+  return ordered as Workflow;
+}
+
 /** Every entry point of a workflow: its `triggers` list or single `trigger`. */
 export function workflowTriggers(workflow: Workflow): TriggerSpec[] {
   if (Array.isArray(workflow.triggers) && workflow.triggers.length) return workflow.triggers;

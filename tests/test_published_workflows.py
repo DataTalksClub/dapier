@@ -185,8 +185,8 @@ def test_toggle_publishes_and_commits(github_ready, published):
     assert published.items["test-flow"]["enabled"] is False
 
 
-def test_toggle_commits_actions_before_trigger(github_ready, published, monkeypatch):
-    # The toggle commits the stored dict (here: trigger before actions); the
+def test_toggle_commits_trigger_before_actions(github_ready, published, monkeypatch):
+    # The toggle commits the stored dict (here: actions before trigger); the
     # dumped YAML still gets the canonical order the designer writes.
     published_workflows.publish(seeded_workflow())
     captured = {}
@@ -199,7 +199,7 @@ def test_toggle_commits_actions_before_trigger(github_ready, published, monkeypa
     monkeypatch.setattr(designer_store, "_github", github)
     status, _ = designer_store.api_toggle("test-flow.yaml", {"enabled": False})
     assert status == 200
-    assert list(yaml.safe_load(captured["blob"])) == ["id", "enabled", "actions", "trigger"]
+    assert list(yaml.safe_load(captured["blob"])) == ["id", "enabled", "trigger", "actions"]
 
 
 def test_toggle_survives_a_git_failure(github_ready, published, monkeypatch):

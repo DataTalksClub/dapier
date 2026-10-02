@@ -20352,6 +20352,18 @@
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
+  const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+  function orderedWorkflow(workflow) {
+    const source = workflow;
+    const ordered = {};
+    for (const key of WORKFLOW_KEY_ORDER) {
+      if (source[key] !== void 0) ordered[key] = source[key];
+    }
+    for (const [key, value] of Object.entries(source)) {
+      if (!(key in ordered)) ordered[key] = value;
+    }
+    return ordered;
+  }
   function workflowTriggers(workflow) {
     if (Array.isArray(workflow.triggers) && workflow.triggers.length) return workflow.triggers;
     return workflow.trigger ? [workflow.trigger] : [];
@@ -21799,7 +21811,7 @@
     return body;
   }
   function workflowYaml(workflow) {
-    return dump(workflow, { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
+    return dump(orderedWorkflow(workflow), { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
   }
   function PromptField({ field, value, onChange }) {
     const id = reactExports.useId();
