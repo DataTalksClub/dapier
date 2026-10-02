@@ -1424,6 +1424,8 @@ input[type="checkbox"], input[type="radio"] {
     position: absolute;
     top: 10px;
     right: 10px;
+    /* keep the whole 44px target tappable over the sheet heading */
+    z-index: 1;
   }
   .inspector select, .inspector input { min-height: 44px; }
   /* mirror the base selector so specificity cannot keep text inputs at 36px */
