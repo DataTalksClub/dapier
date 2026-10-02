@@ -549,8 +549,7 @@
         <label>Name<input name="name" class="mono-input" placeholder="morning-digest" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. The name is fixed after creation — it names the EventBridge rule.</small></label>
         <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(1 day)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> — use <code>?</code> for day-or-weekday, e.g. <code>cron(0 7 * * ? *)</code> for 07:00 UTC daily — or <code>rate(&lt;number&gt; minutes|hours|days)</code>.</small></label>
         <label>Description<input name="description" placeholder="What runs and why" maxlength="200"></label>
-        <label>Run<select name="flow" id="schedule-flow"></select><small class="field-hint">The workflow to start. Pick “(inline actions JSON)” to edit the action list instead of starting a whole workflow.</small></label>
-        <label id="schedule-actions-field" hidden>Actions (JSON)<textarea name="actions" rows="8" class="mono-input"></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
+        <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input"></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
         <p id="schedule-error" class="form-error" role="alert"></p>
       </div>

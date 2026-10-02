@@ -5,16 +5,11 @@ import { $, $$, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 
-/* Sentinel flow value: edit the action list inline instead of starting a
-   shared workflow. resolve_actions_flow on the server enforces the pairing. */
-const INLINE_ACTIONS = '__actions__';
-
-let current = { schedules: [], flows: [] };
+let current = { schedules: [] };
 let fetching = false;
 let editing = null; // schedule being edited, or null when creating
 
 function runsLabel(item) {
-  if (item.flow) return `flow: ${item.flow}`;
   return (item.actions || []).map((action) => action.type).join(' → ') || '—';
 }
 
@@ -77,35 +72,15 @@ function bindRowButtons() {
 }
 
 /* The PUT body is the full item: toggling or editing must restate the
-   expression and the flow/actions binding, exactly like `schedules save`. */
+   expression and actions, exactly like `schedules save`. */
 function saveBody(item, enabled) {
-  const body = {
+  return {
     name: item.schedule_id,
     expression: item.expression,
     description: item.description || '',
     enabled: Boolean(enabled),
+    actions: item.actions || [],
   };
-  if (item.flow) body.flow = item.flow;
-  else body.actions = item.actions || [];
-  return body;
-}
-
-function renderFlowChoices(selected) {
-  const select = $('#schedule-flow');
-  const options = current.flows.map((flow) =>
-    `<option value="${escapeHtml(flow.name)}">${escapeHtml(flow.name)}${flow.actions ? ` (${flow.actions} actions)` : ''}</option>`);
-  if (selected && selected !== INLINE_ACTIONS && !current.flows.some((flow) => flow.name === selected)) {
-    // A retired shared flow may still be referenced by an unmigrated schedule.
-    // keep it selectable so the binding survives an unrelated edit.
-    options.push(`<option value="${escapeHtml(selected)}">${escapeHtml(selected)} (missing)</option>`);
-  }
-  options.push(`<option value="${INLINE_ACTIONS}">(inline actions JSON)</option>`);
-  select.innerHTML = options.join('');
-  // Every truthy `selected` has an option with that exact value above (in
-  // the catalog, the always-present inline sentinel, or the missing-flow
-  // entry); falsy falls back to the first flow.
-  select.value = selected || (current.flows.length ? current.flows[0].name : INLINE_ACTIONS);
-  $('#schedule-actions-field').hidden = select.value !== INLINE_ACTIONS;
 }
 
 function openDialog(item) {
@@ -119,16 +94,11 @@ function openDialog(item) {
   form.expression.value = item ? (item.expression || '') : '';
   form.description.value = item ? (item.description || '') : '';
   form.enabled.checked = item ? Boolean(item.enabled) : true;
-  renderFlowChoices(item ? (item.flow || INLINE_ACTIONS) : (current.flows.length ? current.flows[0].name : INLINE_ACTIONS));
   form.actions.value = item && Array.isArray(item.actions)
     ? JSON.stringify(item.actions, null, 2) : '';
   $('#schedule-dialog').showModal();
   if (!item) form.name.focus();
 }
-
-$('#schedule-flow').addEventListener('change', (event) => {
-  $('#schedule-actions-field').hidden = event.currentTarget.value !== INLINE_ACTIONS;
-});
 
 $('#new-schedule').addEventListener('click', () => openDialog(null));
 
@@ -140,21 +110,16 @@ $('#schedule-form').addEventListener('submit', async (event) => {
   submit.disabled = true;
   $('#schedule-error').textContent = '';
   try {
-    const flow = form.flow.value;
+    let actions;
+    try { actions = JSON.parse(form.actions.value); } catch (_) { throw new Error('Actions must be valid JSON'); }
+    if (!Array.isArray(actions)) throw new Error('Actions must be a JSON list');
     const body = {
       name: form.name.value.trim(),
       expression: form.expression.value.trim(),
       description: form.description.value.trim(),
       enabled: form.enabled.checked,
+      actions,
     };
-    if (flow === INLINE_ACTIONS) {
-      let actions;
-      try { actions = JSON.parse(form.actions.value); } catch (_) { throw new Error('Actions must be valid JSON'); }
-      if (!Array.isArray(actions)) throw new Error('Actions must be a JSON list');
-      body.actions = actions;
-    } else {
-      body.flow = flow;
-    }
     await api('/api/admin/schedule-triggers', { method: 'PUT', body: JSON.stringify(body) });
     $('#schedule-dialog').close();
     notice(editing ? `Schedule ${body.name} saved` : `Schedule ${body.name} created`);
@@ -171,7 +136,7 @@ export async function fetchSchedules() {
   fetching = true;
   try {
     const data = await api('/api/admin/schedule-triggers');
-    current = { schedules: data.schedules || [], flows: data.flows || [] };
+    current = { schedules: data.schedules || [] };
   } catch (error) {
     notice(error.message, true);
   } finally {
