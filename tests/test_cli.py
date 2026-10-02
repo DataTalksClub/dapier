@@ -477,27 +477,6 @@ def test_triggers_list_and_show(monkeypatch, capsys):
     assert commands.triggers_show("https://api.example.test", "missing") == 4
 
 
-def test_legacy_email_writes_direct_users_to_workflows(monkeypatch, capsys):
-    def unexpected_call(*args, **kwargs):
-        raise AssertionError("Retired commands must not mutate state")
-    monkeypatch.setattr(commands.api, "call", unexpected_call)
-    assert commands.triggers_save("https://api.example.test", "email.json") == 2
-    assert commands.triggers_delete("https://api.example.test", "consulting") == 2
-    assert "owning workflow" in capsys.readouterr().out
-
-
-def test_main_triggers_parsing(monkeypatch):
-    seen = {}
-
-    def fake_save(api_url, path, debug=False):
-        seen["file"] = path
-        return 0
-
-    monkeypatch.setattr(commands, "triggers_save", fake_save)
-    assert main.main(["triggers", "save", "/tmp/trigger.json"]) == 0
-    assert seen["file"] == "/tmp/trigger.json"
-
-
 def test_credentials_set_posts_value_without_echoing(monkeypatch, tmp_path, capsys):
     posted = {}
 

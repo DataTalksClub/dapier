@@ -29,14 +29,10 @@ def workflows():
 def all_workflows():
     """Managed workflows and operator-created triggers, read per invocation."""
     extra = []
-    if os.environ.get("EMAIL_TRIGGERS_TABLE"):
-        from ..triggers import email_triggers
-
-        extra = email_triggers.load_workflows()
     if os.environ.get("HOOK_TRIGGERS_TABLE"):
         from ..triggers import hook_triggers
 
-        extra = extra + hook_triggers.load_workflows()
+        extra = hook_triggers.load_workflows()
     if os.environ.get("SCHEDULE_TRIGGERS_TABLE"):
         from ..triggers import schedule_triggers
 

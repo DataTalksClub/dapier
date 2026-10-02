@@ -341,7 +341,7 @@ def real_engine(monkeypatch, tmp_path):
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))  # empty: only the hook's workflow
     for unused in ("TASK_USAGE_TABLE", "PUBLISHED_WORKFLOWS_TABLE",
-                   "EMAIL_TRIGGERS_TABLE", "SCHEDULE_TRIGGERS_TABLE",
+                   "SCHEDULE_TRIGGERS_TABLE",
                    "POLL_TRIGGERS_TABLE", "TRIGGER_INBOX_TABLE"):
         monkeypatch.delenv(unused, raising=False)
     state = {"published": [], "sent": [], "table": _Table(), "runs": []}

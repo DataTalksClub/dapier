@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from src.dapier.engine import all_workflows
 from src.dapier.triggers import (
-    email_triggers, hook_triggers, poll_triggers, schedule_triggers,
+    hook_triggers, poll_triggers, schedule_triggers,
 )
 
 
@@ -80,15 +80,15 @@ class PagedTableSanityTests(unittest.TestCase):
     def test_stub_pages_like_dynamodb_and_hides_the_rest(self):
         table = PagedTable(
             [{"name": name_for(index)} for index in range(COUNT)], key="name")
-        page = table.scan(Limit=email_triggers.SCAN_LIMIT)
-        self.assertEqual(len(page["Items"]), email_triggers.SCAN_LIMIT)
+        page = table.scan(Limit=hook_triggers.SCAN_LIMIT)
+        self.assertEqual(len(page["Items"]), hook_triggers.SCAN_LIMIT)
         self.assertEqual([item["name"] for item in page["Items"]],
-                         [name_for(index) for index in range(email_triggers.SCAN_LIMIT)])
+                         [name_for(index) for index in range(hook_triggers.SCAN_LIMIT)])
         self.assertIn("LastEvaluatedKey", page)
-        follow_up = table.scan(Limit=email_triggers.SCAN_LIMIT,
+        follow_up = table.scan(Limit=hook_triggers.SCAN_LIMIT,
                                ExclusiveStartKey=page["LastEvaluatedKey"])
         self.assertEqual([item["name"] for item in follow_up["Items"]],
-                         [name_for(index) for index in range(email_triggers.SCAN_LIMIT, COUNT)])
+                         [name_for(index) for index in range(hook_triggers.SCAN_LIMIT, COUNT)])
         self.assertNotIn("LastEvaluatedKey", follow_up)
 
 
@@ -153,18 +153,6 @@ class StoreWalkContract:
         self.assertEqual([item[self.key] for item in loaded],
                          [name_for(index) for index in range(5)])
         self.assertEqual(table.scans, 1)
-
-
-class EmailStoreWalkTests(StoreWalkContract, unittest.TestCase):
-    key = "name"
-    env = email_triggers.TABLE_ENV
-    prefix = "email"
-
-    def store(self):
-        return email_triggers
-
-    def item(self, index):
-        return {"name": name_for(index), "enabled": True, "actions": [dict(ACTIONS[0])]}
 
 
 class HookStoreWalkTests(StoreWalkContract, unittest.TestCase):

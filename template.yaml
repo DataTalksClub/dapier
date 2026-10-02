@@ -179,7 +179,6 @@ Globals:
         OPERATOR_EMAILS: !Ref OperatorEmails
         OPERATOR_SUBJECTS: !Ref OperatorSubjects
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
-        EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         EMAIL_FROM_TABLE: !Ref EmailFromTable
         HOST_TASKS_TABLE: !Ref HostTasksTable
         HOST_QUEUE_URL: !Ref HostQueue
@@ -267,8 +266,6 @@ Resources:
             TableName: !Ref GrantsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AuditTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EmailTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EmailFromTable
         - DynamoDBCrudPolicy:
@@ -619,8 +616,6 @@ Resources:
             Resource: !GetAtt DigestsTable.Arn
         - DynamoDBReadPolicy:
             TableName: !Ref ConnectionsTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref EmailTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref HookTriggersTable
         - DynamoDBCrudPolicy:
@@ -1040,16 +1035,6 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
-      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
-
-  EmailTriggersTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - {AttributeName: name, AttributeType: S}
-      KeySchema:
-        - {AttributeName: name, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   EmailFromTable:
