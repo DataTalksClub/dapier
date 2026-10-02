@@ -166,18 +166,20 @@ nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-spa
   color: var(--dk-text-muted);
   font-size: var(--dk-text-xs);
   font-weight: var(--dk-weight-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 .nav-group-label:first-child { margin-top: 0; }
-/* Icon + text rows; the filled row is the only selection signal — no rail. */
+/* Icon + text rows; the filled row is the only selection signal — no rail.
+   gap 10px / padding 6px 10px ported verbatim from the family sidebar
+   recipe (dakit/docs/family.md); the 32px row height holds. */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: var(--dk-space-2);
+  gap: 10px;
   height: 32px;
   flex: none;
-  padding: 0 var(--dk-space-3);
+  padding: 6px 10px;
   border-radius: var(--dk-radius-md);
   color: var(--dk-text-primary);
   font-size: var(--dk-text-body);
