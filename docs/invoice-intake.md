@@ -17,6 +17,10 @@ SES (invoice@mailer.dtcdev.click) → email connector → invoice-intake workflo
 ```
 
 Each email is one SQS message, so concurrent invoices file concurrently.
+Dapier uses stable transfer keys for each message and document, so a retry
+after a lost response submits the same source manifest. Changed document
+content gets a separate source key and remains subject to the intake's
+immutable-message conflict checks.
 The intake is idempotent per (recipientRoute, messageId), checksum- and
 size-verifies every staged object, and files each attachment as a
 DataOps artifact — review and bookkeeping happen in the DataOps console

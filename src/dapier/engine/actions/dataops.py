@@ -5,7 +5,6 @@ import mimetypes
 import os
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from uuid import uuid4
 
 from ...connections import tokens
 from . import base, dropbox
@@ -117,17 +116,32 @@ def _dropbox_intake_body(action, event):
         }],
     }
 
+def _email_transfer_key(route, message_id, kind, index, filename, body, content_type, checksum):
+    # DataOps fingerprints source URIs: retrying after a lost response must
+    # submit the same manifest. Include the bytes so changed content cannot
+    # overwrite a source object already accepted under this message identity.
+    identity = [route.lower(), message_id.strip(), kind, index, filename,
+                content_type, checksum, hashlib.sha256(body).hexdigest()]
+    digest = hashlib.sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()
+    return f"email/{digest}/{filename}"
+
+
 def _email_intake_body(action, event):
     data = event.get("data", {})
+    source_data = data.get("source_event", {}).get("data", data)
+    message_id = data.get("message_id") or source_data["message_id"]
+    route = data.get("route") or source_data["route"]
     documents = []
-    for attachment in data.get("attachments", []):
+    for index, attachment in enumerate(data.get("attachments", [])):
         ref = attachment.get("s3") or {}
         if ref.get("bucket") and ref.get("key"):
             body = _s3_bytes(ref["bucket"], ref["key"])
             filename = base._safe_filename(attachment.get("filename") or "attachment")
             content_type = attachment.get("content_type") or "application/octet-stream"
             storage_uri = _stage_document(
-                f"{uuid4().hex}/{filename}", body, content_type, attachment["checksum"])
+                _email_transfer_key(route, message_id, "attachment", index, filename,
+                                    body, content_type, attachment["checksum"]),
+                body, content_type, attachment["checksum"])
             documents.append({
                 "kind": "attachment",
                 "storageUri": storage_uri,
@@ -143,7 +157,9 @@ def _email_intake_body(action, event):
         content_type = data.get("content_type", "application/pdf")
         checksum = f"sha256:{data['checksum']}"
         storage_uri = _stage_document(
-            f"{uuid4().hex}/{filename}", body, content_type, checksum)
+            _email_transfer_key(route, message_id, "rendered-email-pdf", 0, filename,
+                                body, content_type, checksum),
+            body, content_type, checksum)
         documents.append({
             "kind": "rendered-email-pdf",
             "storageUri": storage_uri,
@@ -152,13 +168,12 @@ def _email_intake_body(action, event):
             "sizeBytes": len(body),
             "checksum": checksum,
         })
-    source_data = data.get("source_event", {}).get("data", data)
     sender = source_data.get("sender", {})
     sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
     return {
         "version": "2026-07-01",
-        "messageId": data.get("message_id") or source_data["message_id"],
-        "recipientRoute": data.get("route") or source_data["route"],
+        "messageId": message_id,
+        "recipientRoute": route,
         "from": sender_value,
         "subject": source_data.get("subject") or "Inbound email",
         "receivedAt": _received_at(source_data.get("date") or event["occurred_at"]),

@@ -397,6 +397,42 @@ class EmailIntakeTests(unittest.TestCase):
         self.assertEqual(body["messageId"], "<invoice-e2e-20260926-2210@dtcdev.click>")
         self.assertEqual(body["from"], "no-reply@dtcdev.click")
 
+    def test_retry_reuses_the_same_manifest_even_with_a_new_event_id(self):
+        event = self.event("Sat, 26 Sep 2026 22:10:40 +0000")
+        first, first_s3 = self.run_intake_body(event)
+        event["id"] = "inbox-replay-new-id"
+        second, second_s3 = self.run_intake_body(event)
+        self.assertEqual(first, second)
+        self.assertEqual(first_s3.put_object.call_args.kwargs["Key"],
+                         second_s3.put_object.call_args.kwargs["Key"])
+
+    def test_changed_document_gets_a_distinct_source_manifest(self):
+        event = self.event("")
+        first, _ = self.run_intake_body(event)
+        event["data"]["attachments"][0]["checksum"] = "sha256:changed"
+        second, _ = self.run_intake_body(event)
+        self.assertEqual(first["messageId"], second["messageId"])
+        self.assertNotEqual(first["documents"][0]["storageUri"],
+                            second["documents"][0]["storageUri"])
+
+    def test_identical_attachment_names_remain_distinct(self):
+        event = self.event("")
+        event["data"]["attachments"].append(deepcopy(event["data"]["attachments"][0]))
+        body, _ = self.run_intake_body(event)
+        self.assertNotEqual(body["documents"][0]["storageUri"],
+                            body["documents"][1]["storageUri"])
+
+    def test_rendered_pdf_retry_reuses_source_uri(self):
+        event = self.event("")
+        source = deepcopy(event["data"])
+        event["data"] = {"source_event": {"data": source},
+                         "output": {"bucket": "rendered", "key": "output.pdf"},
+                         "checksum": "abc"}
+        first, _ = self.run_intake_body(event)
+        second, _ = self.run_intake_body(event)
+        self.assertEqual(first, second)
+        self.assertEqual(first["documents"][0]["kind"], "rendered-email-pdf")
+
     def test_stages_attachments_into_the_intake_bucket(self):
         body, s3 = self.run_intake_body(self.event("Sat, 26 Sep 2026 22:10:40 +0000"))
 
