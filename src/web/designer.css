@@ -83,6 +83,7 @@
   --dk-bg-surface: #ffffff;
   --dk-bg-muted: #f6f8fa;
   --dk-bg-hover: #eef1f4;
+  --dk-bg-raised: #ffffff;
   --dk-bg-inset: rgba(36, 41, 47, 0.06);
   --dk-bg-backdrop: rgba(15, 23, 42, 0.5);
   --dk-text-primary: #24292f;
@@ -124,6 +125,7 @@
   --dk-bg-surface: #161b22;
   --dk-bg-muted: #21262d;
   --dk-bg-hover: #293038;
+  --dk-bg-raised: #32383f;
   --dk-bg-inset: rgba(230, 237, 243, 0.07);
   --dk-bg-backdrop: rgba(1, 4, 9, 0.7);
   --dk-text-primary: #e6edf3;
@@ -163,21 +165,21 @@
 
 @font-face {
   font-family: "Inter";
-  src: url("/assets/vendor/fonts/inter-var.woff2") format("woff2");
+  src: url("/assets/fonts/inter-var.woff2") format("woff2");
   font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "IBM Plex Mono";
-  src: url("/assets/vendor/fonts/ibm-plex-mono-400.woff2") format("woff2");
+  src: url("/assets/fonts/ibm-plex-mono-400.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "IBM Plex Mono";
-  src: url("/assets/vendor/fonts/ibm-plex-mono-500.woff2") format("woff2");
+  src: url("/assets/fonts/ibm-plex-mono-500.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;

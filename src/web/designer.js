@@ -23795,13 +23795,21 @@
       ) })
     ] });
   }
-  function applyStoredTheme() {
-    let theme = null;
+  const THEME_KEY = "dakit-theme";
+  const LEGACY_THEME_KEY = "dapier-theme";
+  function storedTheme() {
     try {
-      theme = localStorage.getItem("dapier-theme");
+      const theme = localStorage.getItem(THEME_KEY);
+      if (theme === "dark" || theme === "light") return theme;
+      const legacy = localStorage.getItem(LEGACY_THEME_KEY);
+      return legacy === "dark" || legacy === "light" ? legacy : null;
     } catch {
+      return null;
     }
-    if (theme !== "dark" && theme !== "light") {
+  }
+  function applyStoredTheme() {
+    let theme = storedTheme();
+    if (theme === null) {
       const applied = document.documentElement.dataset.theme;
       theme = applied === "dark" || applied === "light" ? applied : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
@@ -23809,7 +23817,7 @@
   }
   applyStoredTheme();
   window.addEventListener("storage", (event) => {
-    if (event.key === "dapier-theme" || event.key === null) applyStoredTheme();
+    if (event.key === THEME_KEY || event.key === LEGACY_THEME_KEY || event.key === null) applyStoredTheme();
   });
   const root = document.getElementById("designer-root");
   if (root) {

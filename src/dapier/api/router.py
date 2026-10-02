@@ -90,12 +90,9 @@ def _static(path):
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),
         # The dakit design system, vendored (make sync-dakit refreshes it).
         "/assets/vendor/dakit.css": ("vendor/dakit.css", "text/css; charset=utf-8"),
-        "/assets/vendor/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
-        "/assets/vendor/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
-        "/assets/vendor/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
         # dakit.css references its fonts as url("../fonts/…"), which resolves
-        # against /assets/vendor/ to /assets/fonts/… — alias the same files so
-        # the vendored bundle's own @font-faces resolve.
+        # against /assets/vendor/ to /assets/fonts/… — alias the vendored
+        # files there so the bundle's own @font-faces resolve.
         "/assets/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
         "/assets/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
         "/assets/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
