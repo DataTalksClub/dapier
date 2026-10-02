@@ -1,21 +1,17 @@
-@font-face {
-  font-family: "IBM Plex Sans";
-  src: url("/assets/fonts/IBMPlexSans-VF.woff2") format("woff2");
-  font-weight: 100 700;
-  font-style: normal;
-  font-display: swap;
-}
-
+/* Public pages, dressed by the shared dakit design system (vendor/dakit.css
+   ships the tokens and the fonts). The :root block is a compat shim —
+   dapier's old variable names, now defined by dakit tokens; these pages are
+   light-only, so no dark remap is needed. */
 :root {
   color-scheme: light;
-  --paper: #eeede6;
-  --surface: #faf9f4;
-  --ink: #202820;
-  --muted: #536354;
-  --line: #c4cabf;
-  --line-strong: #879688;
-  --accent: #0b6745;
-  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --paper: var(--dk-bg-page);
+  --surface: var(--dk-bg-surface);
+  --ink: var(--dk-text-primary);
+  --muted: var(--dk-text-muted);
+  --line: var(--dk-border-default);
+  --line-strong: var(--dk-border-strong);
+  --accent: var(--dk-accent-default);
+  font-family: var(--dk-font-sans);
   color: var(--ink);
   background: var(--paper);
   font-synthesis: none;
@@ -32,7 +28,7 @@ body {
 }
 
 a { color: var(--accent); text-underline-offset: 3px; }
-a:hover { color: #074e33; }
+a:hover { color: var(--dk-accent-hover); }
 
 .site-header,
 .site-footer,

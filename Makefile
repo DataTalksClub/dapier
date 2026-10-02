@@ -1,4 +1,4 @@
-.PHONY: build deploy test validate layer designer-install designer designer-build designer-console
+.PHONY: build deploy test validate layer sync-dakit designer-install designer designer-build designer-console
 
 build: layer
 	scripts/build-sam.sh
@@ -36,6 +36,14 @@ designer: designer-install
 
 designer-build:
 	cd designer && npm run build
+
+# Refresh the vendored dakit design system (src/web/vendor/) from the dakit
+# checkout next to this repo. Run after changing dakit tokens/styles, then
+# commit the result — the console serves the vendored copy, never ../dakit.
+sync-dakit:
+	mkdir -p src/web/vendor/fonts
+	cp ../dakit/dist/dakit.css src/web/vendor/dakit.css
+	cp ../dakit/fonts/*.woff2 src/web/vendor/fonts/
 
 # Rebuild the bundle vendored into the console (src/web/designer.js/.css,
 # served at /designer). Run after changing designer sources.

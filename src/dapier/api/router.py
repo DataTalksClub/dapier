@@ -88,9 +88,11 @@ def _static(path):
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),
-        "/assets/fonts/IBMPlexSans-VF.woff2": ("assets/fonts/IBMPlexSans-VF.woff2", "font/woff2"),
-        "/assets/fonts/IBMPlexMono-Regular.woff2": ("assets/fonts/IBMPlexMono-Regular.woff2", "font/woff2"),
-        "/assets/fonts/IBMPlexMono-Medium.woff2": ("assets/fonts/IBMPlexMono-Medium.woff2", "font/woff2"),
+        # The dakit design system, vendored (make sync-dakit refreshes it).
+        "/assets/vendor/dakit.css": ("vendor/dakit.css", "text/css; charset=utf-8"),
+        "/assets/vendor/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
+        "/assets/vendor/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
+        "/assets/vendor/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
     }
     if path not in assets:
         # Workflow deep links (/workflows/<id>) load the same console shell;

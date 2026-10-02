@@ -7,10 +7,14 @@
   <script>
     /* Apply the stored theme before first paint; with no stored choice the
        OS preference decides. ?theme= forces one view without persisting.
-       Same key and script as the console. */
+       Same key and script as the console; the pre-dakit "dapier-theme" key
+       is still honored (see js/theme-init.js). */
     (function () {
       var theme = null;
-      try { theme = localStorage.getItem('dapier-theme'); } catch (_) {}
+      try { theme = localStorage.getItem('dakit-theme'); } catch (_) {}
+      if (theme !== 'dark' && theme !== 'light') {
+        try { theme = localStorage.getItem('dapier-theme'); } catch (_) {}
+      }
       if (theme !== 'dark' && theme !== 'light') {
         theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
@@ -21,6 +25,7 @@
   </script>
   <title>Workflow designer · Dapier</title>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/assets/vendor/dakit.css">
   <link rel="stylesheet" href="/assets/designer.css">
   <script defer src="/assets/designer.js"></script>
 </head>

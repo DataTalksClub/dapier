@@ -1,14 +1,19 @@
 /* Dark mode: a purely presentational preference, so it lives only in the UI.
    The head boot script applies the stored choice before first paint; this
-   module toggles it, persists it under "dapier-theme", and follows the OS
-   preference until the operator picks a side. The designer app reads the same
-   key (same origin), so its iframe follows the toggle via the storage event. */
-const KEY = 'dapier-theme';
+   module toggles it, persists it under "dakit-theme" (the shared design
+   system's key), and follows the OS preference until the operator picks a
+   side. The designer app reads the same key (same origin), so its iframe
+   follows the toggle via the storage event. */
+const KEY = 'dakit-theme';
+const LEGACY_KEY = 'dapier-theme';
 
 function storedTheme() {
   try {
     const theme = localStorage.getItem(KEY);
-    return theme === 'dark' || theme === 'light' ? theme : null;
+    if (theme === 'dark' || theme === 'light') return theme;
+    /* Pre-dakit choice: honored until the operator toggles again. */
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    return legacy === 'dark' || legacy === 'light' ? legacy : null;
   } catch (_) {
     return null;
   }
