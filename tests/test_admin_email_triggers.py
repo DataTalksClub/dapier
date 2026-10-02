@@ -47,62 +47,25 @@ class StubTable:
 
 
 class AdminEmailTriggerRouteTests(unittest.TestCase):
-    def test_save_list_delete_round_trip(self):
-        stub = StubTable()
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub):
-            saved = routes.save_email_trigger(request("PUT", BODY), "op")
-            self.assertEqual(saved["statusCode"], 200)
-            self.assertTrue(json.loads(saved["body"])["created"])
+    def test_legacy_writes_are_retired_without_touching_storage(self):
+        with patch.object(email_triggers, "get_table") as table:
+            for response in (routes.save_email_trigger(request("PUT", BODY), "op"),
+                             routes.delete_email_trigger(request("DELETE", query={"name": "invoice"}), "op")):
+                self.assertEqual(response["statusCode"], 410)
+                self.assertIn("workflow", json.loads(response["body"])["error"].lower())
+            table.assert_not_called()
 
-            listed = json.loads(routes.list_email_triggers(request("GET"))["body"])
-            self.assertEqual([t["name"] for t in listed["triggers"]], ["invoice"])
-            self.assertEqual(listed["triggers"][0]["address"], "invoice@dtcdev.click")
+    def test_list_is_the_workflow_inventory(self):
+        payload = {"domain": "dtcdev.click", "addresses": [{"name": "invoice", "handlers": []}]}
+        with patch("src.dapier.triggers.email_routes.inventory", return_value=payload):
+            listed = routes.list_email_triggers(request("GET"))
+        self.assertEqual(json.loads(listed["body"]), payload)
 
-            deleted = routes.delete_email_trigger(
-                request("DELETE", query={"name": "invoice"}), "op")
-            self.assertEqual(deleted["statusCode"], 200)
-        self.assertEqual(stub.items, {})
+    def test_migration_uses_shared_domain_behavior(self):
+        with patch("src.dapier.triggers.email_routes.migrate", return_value=(200, {"migrated": True})) as migrate:
+            response = routes.migrate_email_trigger(request("POST", {"name": "invoice"}), "op")
+        self.assertEqual(response["statusCode"], 200)
+        migrate.assert_called_once_with("invoice", "op")
 
-    def test_update_keeps_created_provenance(self):
-        stub = StubTable()
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub):
-            routes.save_email_trigger(request("PUT", BODY), "op1")
-            update = dict(BODY, enabled=False, description="changed")
-            updated = json.loads(routes.save_email_trigger(request("PUT", update), "op2")["body"])
-        self.assertFalse(updated["created"])
-        self.assertFalse(updated["enabled"])
-        self.assertEqual(updated["description"], "changed")
-
-    def test_infrastructure_names_stay_rejected(self):
-        stub = StubTable()
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub):
-            response = routes.save_email_trigger(
-                request("PUT", dict(BODY, name="postmaster")), "op")
-        self.assertEqual(response["statusCode"], 400)
-        self.assertIn("reserved", json.loads(response["body"])["error"])
-
-    def test_route_claimed_by_managed_workflow_is_rejected(self):
-        stub = StubTable()
-        claimed = {"trigger": {"connector": "email", "event": "message.received",
-                               "filters": {"route": {"equals": "invoice-attachment"}}}}
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub), \
-                patch("src.dapier.engine.workflows", return_value=[claimed]):
-            response = routes.save_email_trigger(
-                request("PUT", dict(BODY, name="invoice-attachment")), "op")
-        self.assertEqual(response["statusCode"], 400)
-
-    def test_delete_missing_is_404(self):
-        stub = StubTable()
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-                patch.object(email_triggers, "get_table", return_value=stub):
-            response = routes.delete_email_trigger(
-                request("DELETE", query={"name": "nope"}), "op")
-        self.assertEqual(response["statusCode"], 404)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_migration_rejects_non_object_body(self):
+        self.assertEqual(routes.migrate_email_trigger(request("POST", []), "op")["statusCode"], 400)

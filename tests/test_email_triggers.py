@@ -15,7 +15,7 @@ class StubTable:
     def __init__(self, items=None):
         self.items = {item["name"]: dict(item) for item in (items or [])}
 
-    def scan(self, Limit=200):
+    def scan(self, Limit=200, **kwargs):
         return {"Items": [dict(value) for value in self.items.values()]}
 
     def get_item(self, Key):
@@ -95,95 +95,6 @@ class TriggerItemTests(unittest.TestCase):
                 email_triggers.build_item({"name": "taken", "actions": self.body["actions"]}, "op")
         self.assertIn("YAML workflow", str(ctx.exception))
 
-
-class TriggerApiTests(unittest.TestCase):
-    def setUp(self):
-        self.body = {"name": "income-2026-08", "actions": [{"type": "slack", "credential_id": "slack", "channel": "C1"}]}
-
-    def test_save_creates_then_updates_preserving_created_fields(self):
-        stub = StubTable()
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}):
-            created_status, created = email_triggers.api_save(self.body, "op", table_ref=stub)
-            self.assertEqual(created_status, 200)
-            self.assertTrue(created["created"])
-            self.assertEqual(created["address"], "income-2026-08@dtcdev.click")
-
-            update = dict(self.body, description="renewals", enabled=False)
-            _status, updated = email_triggers.api_save(update, "op2", table_ref=stub)
-        self.assertFalse(updated["created"])
-        self.assertEqual(updated["description"], "renewals")
-        self.assertFalse(updated["enabled"])
-        self.assertEqual(updated["created_by"], "op")
-
-    def test_list_reports_triggers_domain_and_managed_routes(self):
-        stub = StubTable([email_triggers.build_item(self.body, "op")])
-        claimed = {"id": "invoice-pipeline", "trigger": {"connector": "email", "event": "message.received",
-                                                         "filters": {"route": {"equals": "invoice-attachment"}}}}
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-             patch("src.dapier.engine.workflows", return_value=[claimed]):
-            status, payload = email_triggers.api_list(stub)
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["domain"], "dtcdev.click")
-        self.assertEqual([t["name"] for t in payload["triggers"]], ["income-2026-08"])
-        self.assertEqual(payload["managed_routes"],
-                         [{"name": "invoice-attachment", "workflow": "invoice-pipeline", "status": "enabled"}])
-
-    def test_managed_routes_carry_workflow_state_and_dedupe(self):
-        paused = {"id": "todo-sheet", "enabled": True, "auto_paused": True,
-                  "triggers": [{"connector": "email", "filters": {"route": {"equals": "Todo"}}}]}
-        off = {"id": "agents", "enabled": False,
-               "trigger": {"connector": "email", "filters": {"route": {"equals": "agents"}}}}
-        doubled = {"id": "todo-sheet", "enabled": True,
-                   "triggers": [{"connector": "email", "filters": {"route": {"equals": "todo"}}}]}
-        with patch("src.dapier.engine.workflows", return_value=[paused, off, doubled]):
-            routes = email_triggers.managed_routes()
-            self.assertEqual(routes, [
-                {"name": "agents", "workflow": "agents", "status": "disabled"},
-                {"name": "todo", "workflow": "todo-sheet", "status": "auto-paused"},
-            ])
-            self.assertEqual(email_triggers.yaml_email_routes(), {"agents", "todo"})
-
-    def test_delete_missing_is_404_and_existing_is_removed(self):
-        stub = StubTable([email_triggers.build_item(self.body, "op")])
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}):
-            with self.assertRaises(email_triggers.TriggerError):
-                email_triggers.api_delete("nope", "op", table_ref=stub)
-            delete_status, _payload = email_triggers.api_delete("income-2026-08", "op", table_ref=stub)
-        self.assertEqual(delete_status, 200)
-        self.assertEqual(stub.items, {})
-
-
-class WorkflowMergeTests(unittest.TestCase):
-    def setUp(self):
-        self.item = {
-            "name": "income-2026-08",
-            "address": "income-2026-08@dtcdev.click",
-            "actions": [{"type": "webhook", "url": "https://hooks.test/x", "timeout_seconds": Decimal(7)}],
-            "enabled": True,
-        }
-
-    def test_load_builds_route_workflow_and_decodes_decimals(self):
-        workflow = email_triggers.load_workflows(table_ref=StubTable([dict(self.item)]))[0]
-        self.assertEqual(workflow["id"], "email-trigger-income-2026-08")
-        self.assertEqual(workflow["actions"][0]["timeout_seconds"], 7)
-
-        event = {"connector": "email", "event": "message.received", "data": {"route": "income-2026-08"}}
-        self.assertTrue(matches(workflow, event))
-        self.assertFalse(matches(workflow, {"connector": "email", "event": "message.received", "data": {"route": "other"}}))
-
-    def test_disabled_triggers_do_not_run(self):
-        self.assertEqual(email_triggers.load_workflows(table_ref=StubTable([dict(self.item, enabled=False)])), [])
-
-    def test_all_workflows_includes_stored_triggers(self):
-        stub = StubTable([dict(self.item)])
-        with patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}), \
-             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub):
-            merged = all_workflows()
-        self.assertEqual(len(merged), 1)
-        self.assertEqual(merged[-1]["id"], "email-trigger-income-2026-08")
-
-
-FLOW_BODY = {"name": "invoice-copy", "flow": "invoice-dataops"}
 
 WATCHER_BODY = {"name": "bounce-alert", "event": "bounce.received",
                 "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
@@ -278,82 +189,15 @@ class WatcherEventTests(unittest.TestCase):
             {"name": "income", "actions": WATCHER_BODY["actions"]}, "op")
         self.assertEqual(email_triggers.public_view(legacy)["event"], "message.received")
 
-    def test_api_save_rejects_unknown_events_and_persists_watchers(self):
-        stub = StubTable()
-        with self.assertRaises(email_triggers.TriggerError):
-            email_triggers.api_save(dict(WATCHER_BODY, event="nope"), "op", table_ref=stub)
-        status, payload = email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["event"], "bounce.received")
-        stored = stub.items["bounce-alert"]
-        self.assertEqual(stored["event"], "bounce.received")
-        self.assertEqual(stored["filters"], {})
-        workflow = email_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(workflow["trigger"]["event"], "bounce.received")
 
-    def test_update_omitting_event_keeps_the_stored_watcher(self):
-        stub = StubTable()
-        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
-        # the console toggle's exact body shape: no event, no filters
-        _status, payload = email_triggers.api_save(
-            {"name": "bounce-alert", "description": "d", "enabled": False,
-             "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
-        self.assertEqual(payload["event"], "bounce.received")
-        stored = stub.items["bounce-alert"]
-        self.assertEqual(stored["event"], "bounce.received")
-        self.assertEqual(stored["filters"], {})
-        self.assertEqual(stored["address"], "")
-        self.assertFalse(stored["enabled"])
 
-    def test_update_keeps_stored_filters_unless_supplied(self):
-        stub = StubTable()
-        email_triggers.api_save(
-            dict(WATCHER_BODY, filters={"bounce_type": {"equals": "Permanent"}}),
-            "op", table_ref=stub)
-        email_triggers.api_save(
-            {"name": "bounce-alert", "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
-        self.assertEqual(stub.items["bounce-alert"]["filters"],
-                         {"bounce_type": {"equals": "Permanent"}})
-        email_triggers.api_save(
-            {"name": "bounce-alert", "actions": WATCHER_BODY["actions"], "filters": {}},
-            "op", table_ref=stub)
-        self.assertEqual(stub.items["bounce-alert"]["filters"], {})
 
-    def test_update_rejects_non_dict_filters_on_a_watcher(self):
-        stub = StubTable()
-        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
-        with self.assertRaises(email_triggers.TriggerError):
-            email_triggers.api_save(
-                {"name": "bounce-alert", "actions": WATCHER_BODY["actions"],
-                 "filters": "gone"}, "op", table_ref=stub)
 
-    def test_explicit_message_received_demotes_a_watcher(self):
-        stub = StubTable()
-        email_triggers.api_save(dict(WATCHER_BODY), "op", table_ref=stub)
-        email_triggers.api_save(
-            {"name": "bounce-alert", "event": "message.received",
-             "actions": WATCHER_BODY["actions"]}, "op", table_ref=stub)
-        stored = stub.items["bounce-alert"]
-        self.assertNotIn("event", stored)
-        self.assertNotIn("filters", stored)
-        self.assertEqual(stored["address"], "bounce-alert@dtcdev.click")
 
 
 class FlowBindingTests(unittest.TestCase):
     """Stored triggers use inline actions after the migration."""
 
-    def test_save_uses_inline_actions(self):
-        stub = StubTable()
-        body = {"name": "invoice-copy", "actions": [
-            {"type": "webhook", "url": "https://intake.test/x"}]}
-        _status, payload = email_triggers.api_save(body, "op", table_ref=stub)
-        self.assertEqual(payload["flow"], "")
-        self.assertEqual(payload["actions"], body["actions"])
-
-        workflow = email_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(workflow["actions"], [{"type": "webhook", "url": "https://intake.test/x"}])
-        event = {"connector": "email", "event": "message.received", "data": {"route": "invoice-copy"}}
-        self.assertTrue(matches(workflow, event))
 
     def test_rejects_flow_plus_actions_and_unknown_flows(self):
         with self.assertRaises(email_triggers.TriggerError) as both:
@@ -365,10 +209,6 @@ class FlowBindingTests(unittest.TestCase):
             email_triggers.build_item({"name": "invoice-x", "flow": "nope"}, "op")
         self.assertIn("no shared flow", str(missing.exception))
 
-    def test_list_has_no_shared_flow_catalog(self):
-        stub = StubTable()
-        _status, payload = email_triggers.api_list(table_ref=stub)
-        self.assertEqual(payload["flows"], [])
 
     def test_unmigrated_flow_bound_trigger_fails_closed(self):
         stub = StubTable([{"name": "invoice-copy", "flow": "invoice-dataops",
@@ -431,28 +271,15 @@ class ExecuteEndToEndTests(unittest.TestCase):
 
 
 class AgentApiTests(unittest.TestCase):
-    def test_operator_can_create_and_list_triggers_over_bearer_auth(self):
-        stub = StubTable()
-        event = {
-            "headers": {},
-            "body": json.dumps({
-                "name": "receipts",
-                "actions": [{"type": "webhook", "url": "https://hooks.test/x"}],
-            }),
-        }
+    def test_operator_reads_inventory_but_cannot_write_legacy_flows(self):
+        payload = {"domain": "dtcdev.click", "addresses": []}
         with patch("src.dapier.api.agent.authenticate", return_value=("sub-1", None)), \
              patch("src.dapier.api.agent.authz.is_operator", return_value=True), \
-             patch("src.dapier.triggers.email_triggers.get_table", return_value=stub), \
-             patch.dict(os.environ, {"EMAIL_TRIGGERS_TABLE": "triggers"}):
-            created = agent_api.email_triggers_api(event, "PUT")
+             patch("src.dapier.triggers.email_routes.inventory", return_value=payload):
+            created = agent_api.email_triggers_api({"headers": {}, "body": "{}"}, "PUT")
             listed = agent_api.email_triggers_api({"headers": {}}, "GET")
-
-        self.assertEqual(created["statusCode"], 200)
-        self.assertTrue(json.loads(created["body"])["created"])
-        self.assertEqual(
-            [t["name"] for t in json.loads(listed["body"])["triggers"]],
-            ["receipts"],
-        )
+        self.assertEqual(created["statusCode"], 410)
+        self.assertEqual(json.loads(listed["body"]), payload)
 
     def test_non_operator_is_rejected(self):
         with patch("src.dapier.api.agent.authenticate", return_value=("sub-2", None)), \

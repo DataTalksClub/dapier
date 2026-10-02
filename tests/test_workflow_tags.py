@@ -23,6 +23,7 @@ from src.dapier.triggers import published_workflows
 REAL_API_BULK = designer_store.api_bulk
 
 WORKFLOW_YAML = """\
+allow_email_overlap: true
 id: test-flow
 enabled: true
 trigger:

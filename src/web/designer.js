@@ -20390,11 +20390,26 @@
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
     return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
   }
-  function filterRulesToYaml(rules) {
+  function filterRulesToYaml(rules, problems) {
     const filters = {};
     for (const rule of rules ?? []) {
-      if (!rule.field.trim()) continue;
-      filters[rule.field.trim()] = rule.operator === "equals" && rule.value !== "" ? { equals: rule.value } : { [rule.operator]: rule.value };
+      const field = rule.field.trim();
+      if (!field) continue;
+      let value = rule.value;
+      if (rule.operator === "in") {
+        try {
+          value = JSON.parse(rule.value);
+          if (!Array.isArray(value)) throw new Error("not a list");
+        } catch {
+          problems.push(`Filter ${field}: in needs a JSON list, such as ["invoice", "receipts"].`);
+        }
+      } else if (rule.operator === "exists" || rule.operator === "empty") {
+        if (rule.value !== "true" && rule.value !== "false") {
+          problems.push(`Filter ${field}: ${rule.operator} needs true or false.`);
+        }
+        value = rule.value === "true";
+      }
+      filters[field] = { ...filters[field], [rule.operator]: value };
     }
     return filters;
   }
@@ -20447,11 +20462,11 @@
     }
     return merged;
   }
-  function triggerToYaml(data) {
+  function triggerToYaml(data, problems) {
     return {
       connector: data.connector ?? "custom",
       event: data.event?.trim() || "received",
-      filters: filterRulesToYaml(data.filters)
+      filters: filterRulesToYaml(data.filters, problems)
     };
   }
   function workflowFromShapes(shapes, workflowId, enabled, base) {
@@ -20461,9 +20476,12 @@
     const { actions, lost, problems: chainProblems } = triggerNodes.length ? orderedActions(shapes, triggerNodes) : { actions: [], lost: [], problems: [] };
     if (triggerNodes.length && actions.length === 0) problems.push("Connect at least one action to the trigger.");
     const workflow = {
+      ...base,
       id: workflowId.trim() || "untitled-workflow",
       enabled
     };
+    delete workflow.trigger;
+    delete workflow.triggers;
     if (base?.flow) {
       const flows = isRecord(base.flows) ? base.flows : {};
       const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
@@ -20473,9 +20491,9 @@
       workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
     }
     if (triggerNodes.length === 1) {
-      workflow.trigger = triggerToYaml(triggerNodes[0].data);
+      workflow.trigger = triggerToYaml(triggerNodes[0].data, problems);
     } else if (triggerNodes.length > 1) {
-      workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data));
+      workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data, problems));
     }
     return { workflow, problems: [...problems, ...chainProblems], lost };
   }
@@ -20485,7 +20503,7 @@
       return Object.entries(rule).map(([operator, value]) => ({
         field,
         operator: filterOperators.includes(operator) ? operator : "equals",
-        value: String(value ?? "")
+        value: Array.isArray(value) ? JSON.stringify(value) : String(value ?? "")
       }));
     });
   }
@@ -22654,7 +22672,7 @@
         width: 232,
         height: 96,
         label: "email · message.received",
-        data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] }
+        data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
       };
       setSourceName(null);
       setInvalidRawDrafts({});
@@ -22669,7 +22687,7 @@
       setYamlText("");
       setSavedYaml("");
       setDraftInfo(null);
-      setSelectedId(null);
+      setSelectedId("trigger");
       setStepTest({ nodeId: null, busy: false, result: null });
       setStepOutputs({});
       resetHistory();
@@ -23120,6 +23138,7 @@
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Filters" }),
+            data.connector === "email" && data.event === "message.received" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Use route equals with the address name, such as invoice, or route in with a JSON list of names. Actions belong to this workflow. To deliberately share addresses with another workflow, set allow_email_overlap: true in YAML." }),
             (data.filters ?? []).map((rule, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "filter-row", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "input",
@@ -23161,7 +23180,7 @@
                 "input",
                 {
                   className: "mono-input filter-value",
-                  placeholder: "value",
+                  placeholder: rule.operator === "in" ? '["invoice", "receipts"]' : "value",
                   value: rule.value,
                   onChange: (event) => updateSelected((current) => ({
                     ...current,

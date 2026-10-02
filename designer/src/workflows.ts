@@ -133,13 +133,26 @@ export function orderedActionNodes(shapes: DiagramShape[]): DiagramShape[] {
   return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
 }
 
-function filterRulesToYaml(rules: FilterRule[] | undefined): Record<string, Record<string, unknown>> {
+function filterRulesToYaml(rules: FilterRule[] | undefined, problems: string[]): Record<string, Record<string, unknown>> {
   const filters: Record<string, Record<string, unknown>> = {};
   for (const rule of rules ?? []) {
-    if (!rule.field.trim()) continue;
-    filters[rule.field.trim()] = rule.operator === "equals" && rule.value !== ""
-      ? { equals: rule.value }
-      : { [rule.operator]: rule.value };
+    const field = rule.field.trim();
+    if (!field) continue;
+    let value: unknown = rule.value;
+    if (rule.operator === "in") {
+      try {
+        value = JSON.parse(rule.value);
+        if (!Array.isArray(value)) throw new Error("not a list");
+      } catch {
+        problems.push(`Filter ${field}: in needs a JSON list, such as ["invoice", "receipts"].`);
+      }
+    } else if (rule.operator === "exists" || rule.operator === "empty") {
+      if (rule.value !== "true" && rule.value !== "false") {
+        problems.push(`Filter ${field}: ${rule.operator} needs true or false.`);
+      }
+      value = rule.value === "true";
+    }
+    filters[field] = { ...filters[field], [rule.operator]: value };
   }
   return filters;
 }
@@ -205,11 +218,11 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
   return merged;
 }
 
-function triggerToYaml(data: NodeData): TriggerSpec {
+function triggerToYaml(data: NodeData, problems: string[]): TriggerSpec {
   return {
     connector: data.connector ?? "custom",
     event: data.event?.trim() || "received",
-    filters: filterRulesToYaml(data.filters)
+    filters: filterRulesToYaml(data.filters, problems)
   };
 }
 
@@ -231,9 +244,12 @@ export function workflowFromShapes(
   if (triggerNodes.length && actions.length === 0) problems.push("Connect at least one action to the trigger.");
 
   const workflow: Workflow = {
+    ...base,
     id: workflowId.trim() || "untitled-workflow",
     enabled
   };
+  delete workflow.trigger;
+  delete workflow.triggers;
   if (base?.flow) {
     // The chain lives in the shared `flows:` block; write it back there and
     // keep every other flow (and the binding) exactly as they were. Never
@@ -246,9 +262,9 @@ export function workflowFromShapes(
     workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
   }
   if (triggerNodes.length === 1) {
-    workflow.trigger = triggerToYaml(triggerNodes[0].data!);
+    workflow.trigger = triggerToYaml(triggerNodes[0].data!, problems);
   } else if (triggerNodes.length > 1) {
-    workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data!));
+    workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data!, problems));
   }
   return { workflow, problems: [...problems, ...chainProblems], lost };
 }
@@ -261,7 +277,7 @@ function yamlFiltersToRules(filters: Record<string, Record<string, unknown>> | u
       operator: (filterOperators as readonly string[]).includes(operator)
         ? operator as FilterRule["operator"]
         : "equals" as const,
-      value: String(value ?? "")
+      value: Array.isArray(value) ? JSON.stringify(value) : String(value ?? "")
     }));
   });
 }

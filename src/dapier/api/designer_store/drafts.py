@@ -41,7 +41,7 @@ def save_gate_ids(body):
     return ids
 
 
-def api_save(body, operator=None, cause="save", message=None, live=False):
+def api_save(body, operator=None, cause="save", message=None, live=False, only_if_absent=False):
     """Validate a workflow and store it; a save drafts, a publish goes live.
 
     The designer's save (the default) writes a *draft*: the parsed definition
@@ -86,10 +86,16 @@ def api_save(body, operator=None, cause="save", message=None, live=False):
                 "stale": False,
             },
         }
+    from ...triggers.email_routes import RouteConflict, validate_ownership
+    try:
+        validate_ownership(workflow, rename_from=rename_from)
+    except RouteConflict as exc:
+        return 409, {"error": str(exc)}
     try:
         previous = published_workflows.get_item(workflow["id"])
+        options = {"only_if_absent": True} if only_if_absent else {}
         item = published_workflows.publish(workflow, operator=operator,
-                                           previous=previous, cause=cause)
+                                           previous=previous, cause=cause, **options)
         if rename_from and rename_from != f"{workflow['id']}.yaml":
             published_workflows.unpublish(rename_from.removesuffix(".yaml"))
     except Exception as exc:

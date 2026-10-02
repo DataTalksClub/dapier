@@ -204,7 +204,7 @@ def _scan_all(table):
     """Read every page; the managed table is the complete runtime catalog."""
     items, start = [], None
     while True:
-        kwargs = {"Limit": SCAN_LIMIT}
+        kwargs = {"Limit": SCAN_LIMIT, "ConsistentRead": True}
         if start:
             kwargs["ExclusiveStartKey"] = start
         page = table.scan(**kwargs)

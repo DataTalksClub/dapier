@@ -575,6 +575,8 @@ def test_disabling_leaves_the_pause_bookkeeping_alone(counter, live):
 
 
 def test_a_duplicate_starts_fresh(live):
+    # This test exercises pause state; deliberate fan-out is explicit.
+    live.items["flaky-flow"]["workflow"]["allow_email_overlap"] = True
     designer_store.api_auto_pause("flaky-flow", error="boom")
 
     status, _payload = designer_store.api_duplicate("flaky-flow.yaml", {})

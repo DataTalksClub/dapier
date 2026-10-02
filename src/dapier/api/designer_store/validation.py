@@ -161,6 +161,9 @@ def parse_workflow(yaml_text):
         raise WorkflowError("workflow needs an id: letters, digits, hyphens or underscores (max 63 chars)")
     workflow_id = workflow_id.strip()
 
+    if "allow_email_overlap" in workflow and not isinstance(workflow["allow_email_overlap"], bool):
+        raise WorkflowError("allow_email_overlap must be true or false")
+
     tags = workflow.get("tags")
     if tags is not None:
         _validate_tags(tags)

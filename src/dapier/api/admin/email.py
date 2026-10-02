@@ -7,26 +7,29 @@ from ...auth import session
 
 
 def list_email_triggers(event):
-    status, payload = email_triggers.api_list()
-    return http._json_response(status, payload)
+    from ...triggers.email_routes import inventory
+    return http._json_response(200, inventory())
+
 
 def save_email_trigger(event, operator):
-    try:
-        body = http._request_json(event)
-        status, payload = email_triggers.api_save(body, operator)
-    except (ValueError, json.JSONDecodeError) as exc:
-        return http._json_response(400, {"error": str(exc) or "Invalid request"})
-    session._audit_event(payload.get("name", "unknown"), "email-trigger.save", operator,
-                 outcome="created" if payload.get("created") else "updated")
-    return http._json_response(status, payload)
+    return http._json_response(410, {"error": "Email flows are defined only in Workflows. Save and publish a workflow with an email trigger."})
+
 
 def delete_email_trigger(event, operator):
-    query = event.get("queryStringParameters") or {}
+    return http._json_response(410, {"error": "Edit or delete the owning workflow. Email addresses have no separate flow definition."})
+
+
+def migrate_email_trigger(event, operator):
+    from ...triggers.email_routes import migrate
     try:
-        status, payload = email_triggers.api_delete(query.get("name", ""), operator)
-    except email_triggers.TriggerError as exc:
-        return http._json_response(404, {"error": str(exc)})
-    session._audit_event(payload.get("name", "unknown"), "email-trigger.delete", operator, outcome="deleted")
+        body = http._request_json(event)
+        if not isinstance(body, dict):
+            raise ValueError("request body must be an object")
+        status, payload = migrate(body.get("name"), operator)
+    except ValueError as exc:
+        return http._json_response(400, {"error": str(exc)})
+    session._audit_event(str(body.get("name") or "unknown"), "email-trigger.migrate", operator,
+                         outcome="migrated" if status == 200 else "error")
     return http._json_response(status, payload)
 
 

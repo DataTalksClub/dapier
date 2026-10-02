@@ -137,21 +137,14 @@ def _oauth_client_status(provider):
     return oauth_clients.status(provider)
 
 def _email_triggers():
-    """Stored email triggers plus the routes managed workflows handle.
-
-    Best-effort: the console's startup fetch must survive a triggers-table
-    problem, so a failure renders as an empty list rather than an error.
-    """
+    """Email entry points projected from workflows, with explicit read failures."""
+    from ..triggers.email_routes import inventory
     try:
-        triggers = [email_triggers.public_view(item) for item in email_triggers.load_items()]
-        managed_routes = email_triggers.managed_routes()
-    except Exception:  # noqa: BLE001 — degrade to an empty view, never block the console
-        return {"domain": "", "triggers": [], "managed_routes": []}
-    return {
-        "domain": email_triggers.trigger_domain(),
-        "triggers": triggers,
-        "managed_routes": managed_routes,
-    }
+        return inventory()
+    except Exception:
+        return {"domain": email_triggers.trigger_domain(), "addresses": [],
+                "subscriptions": [], "watchers": [],
+                "error": "Email configuration could not be loaded. Refresh to retry."}
 
 def _email_from():
     """The shared sender list. Empty when the table is not configured."""

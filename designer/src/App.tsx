@@ -1157,7 +1157,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       width: 232,
       height: 96,
       label: "email · message.received",
-      data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [] }
+      data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
     };
     setSourceName(null);
     setInvalidRawDrafts({});
@@ -1172,7 +1172,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setYamlText("");
     setSavedYaml("");
     setDraftInfo(null);
-    setSelectedId(null);
+    setSelectedId("trigger");
     setStepTest({ nodeId: null, busy: false, result: null });
     setStepOutputs({});
     resetHistory();
@@ -1682,6 +1682,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           )}
           <section className="inspector-group">
             <h3>Filters</h3>
+            {data.connector === "email" && data.event === "message.received" && (
+              <p className="inspector-hint">Use route equals with the address name, such as invoice, or route in with a JSON list of names. Actions belong to this workflow. To deliberately share addresses with another workflow, set allow_email_overlap: true in YAML.</p>
+            )}
             {(data.filters ?? []).map((rule, index) => (
               <div key={index} className="filter-row">
                 <input
@@ -1717,7 +1720,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 </button>
                 <input
                   className="mono-input filter-value"
-                  placeholder="value"
+                  placeholder={rule.operator === "in" ? '["invoice", "receipts"]' : "value"}
                   value={rule.value}
                   onChange={(event) => updateSelected((current) => ({
                     ...current,

@@ -184,4 +184,14 @@ def test_address_keeps_route_and_ands_subject_and_rejects_from(monkeypatch):
             "filters": {"from": {"equals": "a@b.co"}},
         }),
     }, "op")
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 410
+
+
+def test_delivery_feedback_is_not_blocked_by_the_inbound_sender_gate(monkeypatch):
+    table = _bind(monkeypatch)
+    for address in SEED:
+        email_from.api_remove(address)
+    for event in ("bounce.received", "complaint.received"):
+        assert not email_from.rejected({"connector": "email", "event": event,
+                                        "data": {"source": "no-reply@dtcdev.click"}})
+    assert email_from.rejected({"connector": "email", "event": "message.received", "data": {}})

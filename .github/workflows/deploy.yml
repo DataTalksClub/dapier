@@ -24,6 +24,16 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - uses: aws-actions/setup-sam@v2
       - run: make test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: designer/package-lock.json
+      - run: npm ci --prefix designer
+      - run: npm --prefix designer run typecheck
+      - run: npm --prefix designer run test:email
+      - run: npm --prefix designer run build:console
+      - run: git diff --exit-code -- src/web/designer.js src/web/designer.css
       - run: make layer
       - run: sam validate --lint
       - run: sam build --config-env sandbox

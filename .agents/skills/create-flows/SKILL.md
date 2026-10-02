@@ -6,8 +6,9 @@ description: Author, validate, test, and publish Dapier flows (workflow YAML) th
 # Create Dapier flows
 
 A flow is one workflow YAML document: a trigger plus a chain of actions.
-It lives in the managed workflows store (the API commits it to git on every
-save), and the engine runs it live once published and enabled. Author the YAML
+It lives in the managed workflows store. Saves create drafts; publishing
+promotes a definition live, with optional Git sync. The engine runs the
+published definition once enabled. Author the YAML
 and drive everything through the `dapier` CLI or the HTTP API — the console
 designer is a convenience layer over the same API, never a separate path.
 
@@ -20,7 +21,7 @@ schema below plus the sources of truth are the contract.
   (mirrors the engine's `run_*` dispatch in `src/dapier/engine/`).
 - **Trigger connectors and events**: `connectorCatalog` in the same file.
 - **Filter/logic operators**: `filterOperators` / `logicOperators` there too.
-- **What a save rejects**: `src/dapier/api/designer_store.py` → `parse_workflow`.
+- **What a save rejects**: `src/dapier/api/designer_store/validation.py` → `parse_workflow`.
 - **Runtime semantics** (templating, error policies, sandboxed code):
   `src/dapier/engine/` (`logic.py`, `matching.py`, `actions/`).
 - **Provider setup, connection recipes, scope lists**: `docs/connectors/*.md`.
@@ -72,7 +73,7 @@ trigger:                      # exactly one of trigger / triggers
   filters:                    # optional; see Filter rules
     subject:
       contains: invoice
-actions:                      # non-empty, run in order; XOR with `flow`
+actions:                      # non-empty, run in order
   - id: save-pdf              # unique within the workflow
     type: dropbox_upload
     connection_id: dropbox
@@ -86,8 +87,14 @@ actions:                      # non-empty, run in order; XOR with `flow`
 
 - `triggers:` is a list of trigger mappings that share the same actions
   (multi-trigger flow). Every trigger needs `connector` and `event`.
-- `flow: <name>` binds the trigger to a shared flow instead of inline actions;
-  never both.
+- Email triggers and their actions live only in workflow definitions.
+  `dapier emails list|show` is an inventory, not another flow editor.
+  `dapier emails migrate <name>` converts a remaining legacy record unchanged.
+- Legacy shared `flow:` references are retired. Put actions in the workflow;
+  reuse another managed workflow with `run_workflow`.
+- Publishing refuses overlapping email routes with 409. To deliberately fan
+  out to several workflows, set `allow_email_overlap: true` explicitly; the
+  designer YAML view supports this same workflow setting.
 - Write `actions` before `trigger` (house style: `id`, `enabled`, then
   actions, then trigger last).
 
@@ -209,7 +216,7 @@ through `dapier connections scopes`; provider setup lives in
 3. Test before publishing: dry-run with `--strict` against a sample from
    `dapier workflows sample`; reserve `--execute` for deliberate live checks.
 4. One flow, one purpose: prefer a new flow over piling branches into an
-   existing one; reuse via `run_workflow` or `flow:` binding.
+   existing one; reuse via `run_workflow`.
 5. The console designer drives the same API (admin routes vs the CLI's agent
    routes) — parity is repo law (AGENTS.md). A flow change that touches code
    ships its API/CLI/console pieces and tests together.

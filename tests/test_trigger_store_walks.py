@@ -34,7 +34,7 @@ class PagedTable:
         self.key = key
         self.scans = 0
 
-    def scan(self, Limit=200, ExclusiveStartKey=None):
+    def scan(self, Limit=200, ExclusiveStartKey=None, ConsistentRead=False):
         self.scans += 1
         keys = sorted(self.items)
         start = 0
@@ -61,7 +61,7 @@ class SinglePageTable(PagedTable):
     """A table that always returns everything in one page (the shape the
     per-store test stubs and small real tables have) — the walk must cope."""
 
-    def scan(self, Limit=200, ExclusiveStartKey=None):
+    def scan(self, Limit=200, ExclusiveStartKey=None, ConsistentRead=False):
         self.scans += 1
         return {"Items": [dict(item) for item in self.items.values()]}
 

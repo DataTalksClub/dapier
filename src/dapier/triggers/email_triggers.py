@@ -1,19 +1,10 @@
-"""Zapier-style email triggers: reserve an address and bind actions to it.
+"""Read-only compatibility for legacy email-trigger records.
 
-Creating a trigger reserves a local part at the trigger domain and stores the
-actions to run for every message sent to that address. The address itself
-works without per-address provisioning: SES accepts the whole trigger domain
-(catch-all receipt rule) and the datamailer routes the local part as-is.
-The worker merges stored triggers with the YAML workflows on every
-invocation, so a created trigger is live without a deploy. Only reserved
-names run actions; anything else at the domain matches no workflow.
-
-Besides the reserved address, a trigger can watch SES feedback: events
-``bounce.received`` and ``complaint.received`` fire from the SNS intake
-(triggers.intake.ses_notifications) for every address at the domain, so
-watchers reserve nothing — the name is identity only, no yaml-route shadow
-check applies, and the stored ``filters`` (default match-all) are handed to
-the engine verbatim.
+Email flows are now authored only as managed workflows. This module reads old
+records until explicit API/CLI migration converts them, and retains the shared
+name/action validation helpers used by the other trigger adapters. No email
+CRUD writer is exposed; historical record construction exists only for legacy
+validation. The receiving domain is accepted by upstream Datamailer/SES.
 """
 
 import logging
@@ -243,7 +234,7 @@ def _scan_all(table):
     Same walk as published_workflows._scan_all (the managed-store loader)."""
     items, start = [], None
     while True:
-        kwargs = {"Limit": SCAN_LIMIT}
+        kwargs = {"Limit": SCAN_LIMIT, "ConsistentRead": True}
         if start:
             kwargs["ExclusiveStartKey"] = start
         page = table.scan(**kwargs)
@@ -308,49 +299,3 @@ def public_view(item):
     if item.get("filters") or (item.get("event") and item["event"] != ADDRESS_EVENT):
         view["filters"] = item.get("filters") or {}
     return view
-
-
-def api_list(table_ref=None):
-    triggers = [public_view(item) for item in load_items(table_ref=table_ref)]
-    return 200, {
-        "domain": trigger_domain(),
-        "triggers": triggers,
-        "managed_routes": managed_routes(),
-        "flows": flow_catalog(),
-    }
-
-
-def api_save(body, operator, table_ref=None):
-    if not isinstance(body, dict):
-        raise TriggerError("request body must be an object")
-    item = build_item(body, operator)
-    previous = get_table(table_ref).get_item(Key={"name": item["name"]}).get("Item")
-    created = previous is None
-    if previous:
-        item["created_by"] = previous.get("created_by", item["created_by"])
-        item["created_at"] = previous.get("created_at", item["created_at"])
-        if "event" not in body and previous.get("event"):
-            # An update that omits the event — the console's toggle and edit
-            # round-trips — keeps the stored watcher: build_item defaulted to
-            # an address trigger, which would silently demote it. Explicit
-            # filters win; absent ones carry over.
-            filters = body.get("filters")
-            if filters is not None and not isinstance(filters, dict):
-                raise TriggerError("filters must be an object")
-            item["event"] = previous["event"]
-            item["address"] = ""
-            item["filters"] = (filters if isinstance(filters, dict)
-                               else previous.get("filters") or {})
-    elif previous and previous.get("filters") and "filters" not in body:
-        item["filters"] = previous.get("filters") or {}
-    get_table(table_ref).put_item(Item=item)
-    return 200, {"created": created, **public_view(item)}
-
-
-def api_delete(name, operator, table_ref=None):
-    name = validate_name(name)
-    existing = get_table(table_ref).get_item(Key={"name": name}).get("Item")
-    if not existing:
-        raise TriggerError(f"no trigger named '{name}'")
-    get_table(table_ref).delete_item(Key={"name": name})
-    return 200, {"ok": True, "name": name, "address": existing.get("address") or address_for(name)}

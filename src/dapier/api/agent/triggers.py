@@ -91,18 +91,17 @@ def email_triggers_api(event, method):
     subject, error = require_operator(event, "email-trigger")
     if error:
         return error
-    table_ref = email_triggers.get_table()
+    from ...triggers.email_routes import inventory, migrate
     try:
         if method == "GET":
-            status, payload = email_triggers.api_list(table_ref)
-        elif method == "PUT":
+            status, payload = 200, inventory()
+        elif method == "POST":
             body = json.loads(event.get("body") or "{}")
-            status, payload = email_triggers.api_save(body, subject, table_ref=table_ref)
+            if not isinstance(body, dict):
+                raise ValueError("request body must be an object")
+            status, payload = migrate(body.get("name"), subject)
         else:
-            query = event.get("queryStringParameters") or {}
-            status, payload = email_triggers.api_delete(
-                query.get("name", ""), subject, table_ref=table_ref,
-            )
+            status, payload = 410, {"error": "Email flows are defined only in Workflows. Save, publish, edit or delete the owning workflow."}
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(payload.get("name", "unknown"), "email-trigger", subject,

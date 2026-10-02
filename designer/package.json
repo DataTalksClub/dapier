@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "build:console": "vite build --config vite.console.config.ts",
     "start": "node server.mjs",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:email": "node tests/email-workflows.cjs"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

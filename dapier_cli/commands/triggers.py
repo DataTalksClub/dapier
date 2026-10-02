@@ -20,54 +20,42 @@ def print_trigger(item):
 
 def triggers_list(api_url, debug=False):
     data = api.call(api_url, "GET", "/api/agent/email-triggers", debug=debug)
-    domain = data.get("domain", "")
-    # Workflow-claimed routes sit in the same list: every address the domain
-    # answers is one row, and each row says what runs when mail arrives.
-    entries = [
-        (item.get("name", ""), item.get("address", ""),
-         "yes" if item.get("enabled", True) else "no", entry_label(item))
-        for item in data.get("triggers", [])
-    ]
-    entries += [
-        (route.get("name", ""), f"{route.get('name', '')}@{domain}",
-         "yes" if route.get("status", "enabled") == "enabled" else "no",
-         f"workflow={route.get('workflow', '')} (edit: dapier workflows)")
-        for route in data.get("managed_routes") or []
-    ]
-    if not entries:
-        print("No email triggers yet. Create one with `dapier triggers save`.")
-    for name, address, enabled, label in sorted(entries):
-        print(f"{name:20} {address:34} enabled={enabled:3} {label}")
-    print_flows(data.get("flows") or [])
+    addresses = data.get("addresses") or []
+    if not addresses and not data.get("subscriptions") and not data.get("watchers"):
+        print("No email entry points. Create one with `dapier workflows save` and publish it.")
+    for row in addresses:
+        for handler in row.get("handlers") or []:
+            print(f"{row['address']:34} {handler['status']:12} workflow={handler['workflow']} "
+                  + " → ".join(handler.get("action_types") or [])
+                  + (" [unpublished changes]" if handler.get("has_draft") else "")
+                  + (" [convert: dapier emails migrate " + handler['legacy_name'] + "]" if handler.get("legacy") else ""))
+    for handler in data.get("subscriptions") or []:
+        print(f"Address rule: {json.dumps(handler['filters'].get('route', 'all'))} "
+              f"{handler['status']} workflow={handler['workflow']}")
+    for handler in data.get("watchers") or []:
+        print(f"Feedback: {handler['event']} {handler['status']} workflow={handler['workflow']}")
     return 0
 
 
 def triggers_show(api_url, name, debug=False):
     data = api.call(api_url, "GET", "/api/agent/email-triggers", debug=debug)
-    item = next((t for t in data.get("triggers", []) if t.get("name") == name), None)
+    item = next((row for row in data.get("addresses", [])
+                 if name in (row.get("name"), row.get("address"))), None)
     if item is None:
-        print(f"No trigger named '{name}'.")
+        print(f"No email address named '{name}'.")
         return 4
-    print_trigger(item)
+    print(json.dumps(item, indent=2))
     return 0
 
 
 def triggers_save(api_url, path, debug=False):
-    body, error = read_json_file(path)
-    if error:
-        print(error)
-        return 2
-    data = api.call(api_url, "PUT", "/api/agent/email-triggers", body, debug=debug)
-    verb = "Created" if data.get("created") else "Updated"
-    print(f"{verb} {data.get('address') or data.get('name')}. "
-          "It is live immediately; no deploy needed.")
-    return 0
+    print("Email flows are defined only in Workflows. Use `dapier workflows save flow.yaml`, then `dapier workflows publish <id>`.")
+    return 2
 
 
 def triggers_delete(api_url, name, debug=False):
-    data = api.call(api_url, "DELETE", f"/api/agent/email-triggers?name={name}", debug=debug)
-    print(f"Deleted {data.get('address') or name}.")
-    return 0
+    print("Edit or delete the owning workflow with `dapier workflows`. Email addresses have no separate flow definition.")
+    return 2
 
 
 def triggers_sample(api_url, connector, event=None, connection_id=None, limit=None,

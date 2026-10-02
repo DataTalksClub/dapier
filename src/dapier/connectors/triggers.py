@@ -77,9 +77,9 @@ _RENDERER_SYNTHETIC_DATA = {
     "checksum": "sha256:1f3ac2",
     "source_event": {"connector": "email", "event": "message.received",
                      "data": {"subject": "Invoice #4137 - September",
-                              "route": "todo@dtcdev.click"}},
+                              "route": "todo"}},
     "message_id": "<discover-00000000@dtcdev.click>",
-    "route": "todo@dtcdev.click",
+    "route": "todo",
 }
 
 register_trigger_discovery(TriggerDiscovery(

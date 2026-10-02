@@ -47,9 +47,9 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
-        print(f"Workflow saves publish live and sync to {target}.")
+        print(f"Workflow saves create drafts; publishing makes them live and syncs to {target}.")
     else:
-        print("Workflow saves publish live; Git sync is not configured.")
+        print("Workflow saves create drafts; publishing makes them live. Git sync is not configured.")
     return 0
 
 

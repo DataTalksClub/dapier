@@ -135,6 +135,10 @@ def rejected(event):
     """
     if not isinstance(event, dict) or event.get("connector") != "email":
         return False
+    if event.get("event", "message.received") != "message.received":
+        # Authenticated SES delivery feedback describes outgoing mail; it has
+        # no inbound sender and must reach its workflow watchers.
+        return False
     if not os.environ.get(TABLE_ENV):
         return False
     allowed = set(_read(_table(None)))

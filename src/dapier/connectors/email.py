@@ -62,7 +62,7 @@ from .trigger_discovery import (
 # invoice-style message so template previews render true field shapes, not
 # {"key": "value"} stubs.
 _EMAIL_SYNTHETIC_DATA = {
-    "route": "todo@dtcdev.click",
+    "route": "todo",
     "message_id": "<discover-00000000@dtcdev.click>",
     "sender": {"addresses": ["billing@example.test"],
                "header": "Acme Billing <billing@example.test>"},

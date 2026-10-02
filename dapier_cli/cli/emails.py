@@ -11,10 +11,12 @@ def register(sub):
     emails_sub.add_parser("list", help="List email addresses")
     emails_show = emails_sub.add_parser("show", help="Show one email address")
     emails_show.add_argument("name")
-    emails_save = emails_sub.add_parser("save", help="Create or update an email address from a JSON file")
+    emails_save = emails_sub.add_parser("save", help="Retired: use dapier workflows save/publish")
     emails_save.add_argument("file", help="Path to the email JSON, or - for stdin")
-    emails_del = emails_sub.add_parser("delete", help="Delete an email address")
+    emails_del = emails_sub.add_parser("delete", help="Retired: edit or delete the owning workflow")
     emails_del.add_argument("name")
+    migrate = emails_sub.add_parser("migrate", help="Convert a legacy email trigger into a published workflow without changing its behavior")
+    migrate.add_argument("name")
     emails_from = emails_sub.add_parser("from", help="The shared sender allow-list for every inbound email")
     emails_from_sub = emails_from.add_subparsers(dest="from_command", required=True)
     emails_from_sub.add_parser("list", help="List allowed senders")
@@ -33,6 +35,8 @@ def run(args, api_url, debug, child=None):
         return commands.triggers_save(api_url, args.file, debug)
     if args.command == "delete":
         return commands.triggers_delete(api_url, args.name, debug)
+    if args.command == "migrate":
+        return commands.emails_migrate(api_url, args.name, debug)
     if args.command == "from":
         if args.from_command == "list":
             return commands.emails_from_list(api_url, debug)

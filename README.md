@@ -282,24 +282,46 @@ never prints it. `token write` creates a `0600` file and refuses to overwrite
 without `--force`. Both commands verify the returned provider account ID
 against the connection's bound account before handing anything out.
 
-Email addresses reserve `name@dtcdev.click` and run actions for every message
-sent to that address. They are live immediately — no deploy. Operators manage
-them with:
+Email flows are defined only in **Workflows**. The Emails console page and
+`dapier emails` show the receiving addresses, their workflow handlers, actions,
+state, and last update. Exact `route.equals` and `route.in` rules appear as
+addresses; broad rules and delivery feedback watchers are listed separately.
 
 ```bash
 dapier emails list
-dapier emails show consulting
-dapier emails save email.json
-dapier emails delete consulting
+dapier emails show invoice                 # also accepts invoice@dtcdev.click
+dapier workflows export invoice-intake     # edit the workflow YAML
+dapier workflows save flow.yaml            # save a draft; live stays unchanged
+dapier workflows publish invoice-intake    # promote the draft
 dapier emails from list
 dapier emails from add alexey@datatalks.club
 ```
 
-One sender list applies to every inbound email, including a Datamailer SNS
-event. It starts as `alexey.s.grigoriev@gmail.com` and
-`alexey@datatalks.club`. An address that is not on the list is ignored and
-runs no actions. An empty list ignores everyone. Extra `subject` or `body`
-filters on an address AND with its route. `from` is not a per-address filter.
+In the console, **New email** opens the workflow designer with an email trigger
+and an address filter. **Edit workflow** opens the same editor used by Workflows.
+There is no separate email action editor. The old `emails save|delete` commands
+(and their `triggers` aliases) explain the replacement commands; the old PUT and
+DELETE `/api/{admin,agent}/email-triggers` endpoints return 410 without writing.
+
+Existing legacy records remain readable and executable during conversion:
+`dapier emails migrate <name>` (or **Convert to workflow** in Emails) explicitly
+publishes their unchanged configuration as a workflow, retaining the workflow
+and step identities, filters, enabled state, and actions. Published definitions
+take precedence during an interrupted conversion; retry completes cleanup.
+All later edits use the ordinary workflow draft and publish lifecycle.
+
+Publishing checks route ownership across workflows and any remaining legacy
+records, including disabled workflows. Overlap returns 409 and leaves the draft
+available to edit. Deliberate fan-out requires `allow_email_overlap: true` on the
+workflow being published; set it in the designer's YAML view or workflow YAML.
+The Emails list then shows all handlers for the address. Broad subscriptions
+require the same explicit choice when they overlap existing routes.
+
+One sender list applies to every incoming message, including Datamailer SNS
+events. It starts as `alexey.s.grigoriev@gmail.com` and
+`alexey@datatalks.club`. A sender outside the list runs no actions; an empty list
+ignores everyone. Additional workflow filters AND with the address rule. Sender
+admission is separate from receiving-address configuration and outbound senders.
 
 An `agent` action queues a prompt for a Dapier worker — a machine running
 `dapier worker`, which picks the task up and runs a headless Claude Code
@@ -311,19 +333,21 @@ The host needs a dedicated Dapier token, not AWS credentials or Aplexer; see
 [headless worker setup](docs/headless-worker.md). Webhooks are managed with
 `dapier webhooks`. A sample of what a flow receives is `dapier workflows sample`.
 
-`emails save` takes a JSON file (or `-` for stdin) with a name, an optional
-description, and one or more actions, e.g.:
+A receiving address is a workflow trigger, for example:
 
-```json
-{
-  "name": "consulting",
-  "description": "consulting invoices",
-  "actions": [
-    {"type": "dropbox_upload", "connection_id": "dropbox",
-     "folder": "_dtc_paperwork/income-invoices"},
-    {"type": "dataops", "auth_secret_id": "dataops/auth"}
-  ]
-}
+```yaml
+id: consulting-intake
+enabled: true
+actions:
+  - id: forward
+    type: dataops
+    auth_secret_id: dapier/dataops
+    url_env: DATAOPS_INTAKE_URL
+trigger:
+  connector: email
+  event: message.received
+  filters:
+    route: {equals: consulting}
 ```
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
@@ -340,17 +364,15 @@ earlier step in the same run. A `|` pipes the value through formatters —
 formatters are rejected when the workflow or trigger is saved.
 `email_send` sends through SES from the configured sender
 (the `EmailSender` deployment parameter, default `no-reply@` the trigger
-domain) to one or more comma-separated `to` addresses. Some
-local parts are reserved (`invoice`, `no-reply`, ...), and routes already
-claimed by YAML workflows cannot be shadowed.
+domain) to one or more comma-separated `to` addresses. Receiving addresses use route filters in workflows; outbound sender identities
+are configured independently.
 
-Besides messages, an email trigger can watch SES feedback: `"event":
-"bounce.received"` or `"complaint.received"` fires when SES reports a bounce
+Besides messages, a workflow can watch SES feedback: `event: bounce.received`
+or `event: complaint.received` fires when SES reports a bounce
 or a complaint for any address at the trigger domain. Watchers need no
 reserved address — the name is identity only — and match the whole domain's
 feedback; an optional `filters` object scopes them (e.g.
-`{"bounce_type": {"equals": "Permanent"}}`; `route` filters are rejected
-because feedback carries no route). Feedback arrives through the
+`bounce_type: {equals: Permanent}`; feedback carries no receiving route). Feedback arrives through the
 `/hooks/ses-notifications` SNS endpoint: point the SES configuration set's
 feedback destination at `https://<domain>/hooks/ses-notifications`, set the
 `SesConfigurationSet` deployment parameter to that set's name — every

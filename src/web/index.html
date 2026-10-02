@@ -212,12 +212,31 @@
         <div class="page-tools">
           <button id="new-email" class="button primary" type="button">New email</button>
         </div>
-        <div id="email-empty" class="empty-state" hidden><h3>No email addresses</h3><p>Reserve an address, then bind actions — for example, save every attachment to Dropbox.</p></div>
-        <div class="table-wrap">
+        <p class="sub">Email addresses are triggers in workflows. Create or edit their actions in Workflows, then publish the changes.</p>
+        <p class="sub">Receiving domain: <span id="email-domain-hint" class="mono"></span>. Status shows workflow configuration, not delivery health.</p>
+        <p id="email-load-error" class="form-error" role="alert"></p>
+        <div id="email-empty" class="empty-state" hidden><h3>No email addresses</h3><p>Create a workflow with an email trigger and an address filter.</p></div>
+        <div id="email-addresses" class="table-wrap">
           <table>
-            <thead><tr><th>Address</th><th>Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Manage</span></th></tr></thead>
+            <thead><tr><th>Address</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Manage</span></th></tr></thead>
             <tbody id="email-table"></tbody>
           </table>
+        </div>
+        <div id="email-subscriptions" hidden>
+          <h2>Broad email subscriptions</h2>
+          <p class="sub">These workflows match address patterns or all incoming addresses.</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Address rule</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th>Manage</th></tr></thead>
+            <tbody id="email-subscription-table"></tbody>
+          </table></div>
+        </div>
+        <div id="email-watchers" hidden>
+          <h2>Delivery feedback watchers</h2>
+          <p class="sub">Bounce and complaint events are workflow triggers, without a receiving address.</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Event</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th>Manage</th></tr></thead>
+            <tbody id="email-watcher-table"></tbody>
+          </table></div>
         </div>
 
         <div class="section-head">
@@ -516,53 +535,6 @@
       <div class="dialog-actions">
         <button class="button secondary dialog-close" type="button">Cancel</button>
         <button class="button primary" type="submit">Create token</button>
-      </div>
-    </form>
-  </dialog>
-  <dialog id="email-dialog" aria-label="Configure email">
-    <form id="email-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
-        <h2 id="email-dialog-title">New email</h2>
-        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-      </div>
-      <div class="dialog-body">
-        <label>Event<select name="event"><option value="message.received">Mail received (reserved address)</option><option value="bounce.received">Bounce received (SES feedback)</option><option value="complaint.received">Complaint received (SES feedback)</option></select><small class="field-hint">Mail received reserves <code>&lt;name&gt;@&lt;domain&gt;</code>. The SES feedback watchers match domain-wide; point SES feedback at <code>/hooks/ses-notifications</code> (see the README).</small></label>
-        <label id="email-address-field">Address<input name="name" class="mono-input" placeholder="invoice" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" required><small class="field-hint">Lowercase letters, numbers, dashes. Mail to <code>&lt;address&gt;@<span id="email-domain-hint"></span></code> runs the actions.</small></label>
-        <label id="email-filters-field" hidden>Filters (JSON)<textarea name="filters" rows="3" class="mono-input" placeholder='{"bounce_type": {"equals": "Permanent"}}'></textarea><small class="field-hint">Watchers only: match on the published data (<code>bounce_type</code>, <code>feedback_type</code>, recipients). Empty matches every bounce or complaint.</small></label>
-        <label>Description<input name="description" placeholder="What happens when mail arrives" maxlength="200"></label>
-        <label><input type="checkbox" name="enabled" checked> Enabled</label>
-        <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input" required></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
-        <p id="email-error" class="form-error" role="alert"></p>
-      </div>
-      <div class="dialog-actions">
-        <button class="button secondary dialog-close" type="button">Cancel</button>
-        <button class="button primary" type="submit">Save</button>
-      </div>
-    </form>
-  </dialog>
-  <dialog id="email-flow-dialog" aria-labelledby="email-flow-title">
-    <div class="dialog-head">
-      <h2 id="email-flow-title">Email flow</h2>
-      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-    </div>
-    <div class="dialog-body">
-      <p id="email-flow-description" class="sub"></p>
-      <div id="email-flow-steps" class="flow"></div>
-    </div>
-    <div class="dialog-actions">
-      <button class="button secondary dialog-close" type="button">Close</button>
-    </div>
-  </dialog>
-  <dialog id="email-confirm-dialog" aria-label="Delete email trigger">
-    <form id="email-confirm-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
-        <h2 id="email-confirm-title"></h2>
-        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-      </div>
-      <div class="dialog-body"><p id="email-confirm-message"></p></div>
-      <div class="dialog-actions">
-        <button class="button secondary dialog-close" type="button">Cancel</button>
-        <button class="button primary" value="confirm" type="submit">Delete</button>
       </div>
     </form>
   </dialog>

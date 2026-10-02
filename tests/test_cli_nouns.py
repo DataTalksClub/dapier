@@ -4,7 +4,7 @@ import json
 from dapier_cli import commands, main
 
 
-def test_emails_save_and_triggers_save_post_the_same_body(monkeypatch, tmp_path):
+def test_emails_save_and_triggers_save_are_both_retired(monkeypatch, tmp_path):
     seen = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
@@ -15,9 +15,9 @@ def test_emails_save_and_triggers_save_post_the_same_body(monkeypatch, tmp_path)
     path = tmp_path / "email.json"
     body = {"name": "agent", "actions": [{"type": "agent", "prompt": "{subject}", "workspace": "/work"}]}
     path.write_text(json.dumps(body))
-    assert main.main(["emails", "save", str(path)]) == 0
-    assert main.main(["triggers", "save", str(path)]) == 0
-    assert seen[0] == seen[1] == ("PUT", "/api/agent/email-triggers", body)
+    assert main.main(["emails", "save", str(path)]) == 2
+    assert main.main(["triggers", "save", str(path)]) == 2
+    assert seen == []
 
 
 def test_webhooks_list_and_hooks_list_call_the_hook_route(monkeypatch):

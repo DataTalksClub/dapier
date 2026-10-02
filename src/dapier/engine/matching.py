@@ -68,9 +68,6 @@ def resolve_workflow(workflow):
 
 def all_workflows():
     """Managed workflows and operator-created triggers, read per invocation."""
-    resolved = [workflow for workflow in
-                (resolve_workflow(doc) for doc in workflows())
-                if workflow is not None]
     extra = []
     if os.environ.get("EMAIL_TRIGGERS_TABLE"):
         from ..triggers import email_triggers
@@ -88,7 +85,11 @@ def all_workflows():
         from ..triggers import poll_triggers
 
         extra = extra + poll_triggers.load_workflows()
-    return resolved + extra
+    resolved = [workflow for workflow in
+                (resolve_workflow(doc) for doc in workflows())
+                if workflow is not None]
+    managed_ids = {workflow["id"] for workflow in resolved}
+    return resolved + [workflow for workflow in extra if workflow["id"] not in managed_ids]
 
 def _ordered(left, right):
     """A three-way compare for the ordering operators: numeric when BOTH

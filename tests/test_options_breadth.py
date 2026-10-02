@@ -205,7 +205,7 @@ def test_email_sample_keeps_the_inbound_contract(monkeypatch):
     sample = _sample("email")
     assert sample["event"] == "message.received"
     data = sample["data"]
-    assert "@" in data["route"]
+    assert data["route"] == "todo"  # route is the local part, as in recorded deliveries
     assert data["message_id"].startswith("<")
     assert data["sender"]["addresses"] and data["sender"]["header"]
     assert data["recipients"]["matched"]

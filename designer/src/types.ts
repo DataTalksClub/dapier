@@ -62,6 +62,7 @@ export interface FlowSpec {
 }
 
 export interface Workflow {
+  allow_email_overlap?: boolean;
   id: string;
   enabled: boolean;
   /** Exactly one of trigger / triggers is set. */

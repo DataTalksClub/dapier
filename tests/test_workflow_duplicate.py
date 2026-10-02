@@ -10,6 +10,7 @@ from src.dapier.api import designer_store
 from src.dapier.triggers import published_workflows
 
 WORKFLOW_YAML = """\
+allow_email_overlap: true
 id: test-flow
 enabled: true
 trigger:
@@ -29,6 +30,7 @@ actions:
 """
 
 RUN_STATE_YAML = """\
+allow_email_overlap: true
 id: test-flow
 enabled: true
 last_run: 2026-01-01T00:00:00Z

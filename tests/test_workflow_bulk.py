@@ -20,6 +20,7 @@ from src.dapier.auth import session
 from src.dapier.triggers import published_workflows
 
 WORKFLOW_YAML = """\
+allow_email_overlap: true
 id: {id}
 enabled: true
 trigger:
