@@ -96,6 +96,7 @@
   --dk-text-on-accent: #ffffff;
   --dk-text-on-deep: #ffffff;
   --dk-border-default: #d0d7de;
+  --dk-border-control-hover: #d0d7de;
   --dk-border-strong: #afb8c1;
   --dk-accent-default: #315f8f;
   --dk-accent-hover: #244d78;
@@ -138,6 +139,7 @@
   --dk-text-on-accent: #0d1117;
   --dk-text-on-deep: #ffffff;
   --dk-border-default: #30363d;
+  --dk-border-control-hover: #8b949e;
   --dk-border-strong: #6e7681;
   --dk-accent-default: #58a6ff;
   --dk-accent-hover: #79b8ff;
