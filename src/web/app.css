@@ -105,7 +105,12 @@ input:hover:not(:disabled):not([type="checkbox"]), select:hover:not(:disabled) {
 input::placeholder { color: var(--dk-text-muted); opacity: 1; }
 /* Chevron, offset and clearance come from the dakit bundle's base layer. */
 select:disabled { opacity: .5; cursor: default; }
-input:focus-visible, select:focus-visible, select:focus { outline: 2px solid var(--dk-focus-ring); outline-offset: 0; border-color: var(--dk-accent-default); }
+/* The family's keyboard indicator: 3px --dk-focus-ring outline on
+   :focus-visible; text controls additionally swap to the accent border with a
+   3px halo while focused (family.md; dataops styles.css is the reference). */
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
+input:focus, select:focus, textarea:focus { border-color: var(--dk-accent-default); outline: none; box-shadow: 0 0 0 3px var(--dk-focus-ring); }
 .mono-input { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
 /* Masked secret input: bullets like type=password, but the browser's password
    manager never sees a password field (see hardenSecretInputs in app.js). */
@@ -292,7 +297,7 @@ body[data-view="agents"] .view.active { padding-top: 0; width: auto; }
 .storage-form label { min-width: 0; }
 .storage-form .dk-button { align-self: end; }
 .storage-form textarea { width: 100%; max-height: 14rem; border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); background: var(--dk-bg-page); padding: 8px 12px; font: inherit; font-size: var(--dk-text-md); color: var(--dk-text-primary); resize: none; overflow-y: auto; }
-.storage-form textarea:focus { outline: 2px solid var(--dk-focus-ring); outline-offset: -1px; }
+.storage-form textarea:focus { border-color: var(--dk-accent-default); outline: none; box-shadow: 0 0 0 3px var(--dk-focus-ring); }
 .storage-put-target { font-weight: 400; color: var(--dk-text-muted); }
 #storage-table-wrap { margin-top: 12px; }
 .storage-value-cell { max-width: 480px; }
@@ -509,7 +514,8 @@ td[data-label="Retention"] { white-space: nowrap; }
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }
 tr.workflow-open:hover td, tr.run-open:hover td { background: var(--dk-bg-hover); }
-tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 2px solid var(--dk-focus-ring); outline-offset: -2px; }
+/* Full-bleed rows inset the ring so it stays inside the row. */
+tr.workflow-open:focus-visible, tr.run-open:focus-visible { position: relative; z-index: 1; outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
 
 /* --- status (dot + word, one language everywhere) ----------------------------- */
 .status { display: inline-flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: nowrap; }
