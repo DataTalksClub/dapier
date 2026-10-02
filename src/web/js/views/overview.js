@@ -87,8 +87,10 @@ export function openWorkflow(id) {
   if (!workflow) return;
   /* The designer canvas is the workflow view at /workflows/<id>; the
      plain-steps dialog below remains only for workflows without a source
-     file in workflows/*.yaml. */
-  if (workflow.source) return openDesigner(workflow.id);
+     file that no trigger runs either. Hook-backed workflows (run by a
+     stored webhook/telegram/... trigger, no source file) open in the
+     designer too — the API serves them by id and the canvas is read-only. */
+  if (workflow.source || workflow.hook_backed) return openDesigner(workflow.id);
   const many = (workflow.triggerCount || 1) > 1;
   $('#workflow-title').textContent = workflow.id;
   $('#workflow-detail').innerHTML = `
@@ -211,10 +213,11 @@ export function renderWorkflows() {
     const recent = runs.find((run) => run.workflow_id === workflow.id);
     const actions = (workflow.actions || []).map((action) => escapeHtml(workflowActionText(action))).join(' <span class="workflow-separator" aria-hidden="true">→</span> ');
     const id = escapeHtml(workflow.id);
-    const detail = workflow.source
+    const opensDesigner = workflow.source || workflow.hook_backed;
+    const detail = opensDesigner
       ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${id}</a>`
       : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${id}</button>`;
-    const edit = workflow.source
+    const edit = opensDesigner
       ? `<a class="button secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="button secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
     const tags = (workflow.tags || []).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join(' ');

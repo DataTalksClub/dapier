@@ -196,12 +196,20 @@ def test_duplicate_missing_source_is_404(published, github_ready, bundle):
     ("test-flow.yaml", {"name": 5}, "non-empty string"),
     ("test-flow.yaml", ["not", "an", "object"], "request body"),
     ("../escape.yaml", None, "invalid workflow file name"),
-    ("no-extension", None, "invalid workflow file name"),
+    ("has.dots", None, "invalid workflow file name"),
 ])
 def test_duplicate_rejects_bad_input(published, github_ready, bundle, source, body, fragment):
     status, payload = designer_store.api_duplicate(source, body)
     assert status == 400
     assert fragment in payload["error"]
+
+
+def test_duplicate_treats_an_id_shaped_ref_as_a_lookup(published, github_ready, bundle):
+    # A bare id is a valid duplicate source since hook-backed workflows are
+    # addressed by id — an unknown one answers 404 like an unknown file.
+    status, payload = designer_store.api_duplicate("no-extension")
+    assert status == 404
+    assert "no such workflow" in payload["error"]
 
 
 @pytest.mark.parametrize("text,expected", [

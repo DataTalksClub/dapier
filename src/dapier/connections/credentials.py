@@ -116,6 +116,35 @@ def api_save_credential(provider, body):
         if not token.startswith(("xoxb-", "xapp-")) or len(token) < 20:
             return 400, {"error": "Enter a valid Slack bot token"}
         secret_value = {"token": token}
+    elif provider == "aws" and body.get("role_arn"):
+        from .aws import allowed_role_arns
+
+        role_arn = str(body["role_arn"]).strip()
+        if not re.fullmatch(r"arn:aws(?:-us-gov|-cn)?:iam::\d{12}:role/[A-Za-z0-9+=,.@_/-]+", role_arn):
+            return 400, {"error": "Enter a valid IAM role ARN"}
+        if role_arn not in allowed_role_arns():
+            return 400, {"error": "AWS role is not in the deployment's allowed role list"}
+        if body.get("access_key_id") or body.get("secret_access_key"):
+            return 400, {"error": "Choose an IAM role or access keys"}
+        secret_value = {"role_arn": role_arn}
+        for field in ("external_id", "region"):
+            value = body.get(field)
+            if value:
+                if not isinstance(value, str):
+                    return 400, {"error": f"{field} must be a string"}
+                secret_value[field] = value.strip()
+        if secret_value.get("region") and not re.fullmatch(r"[a-z]{2}(?:-[a-z]+)+-\d+", secret_value["region"]):
+            return 400, {"error": "Enter a valid AWS region"}
+        if secret_value.get("external_id") and not re.fullmatch(r"[A-Za-z0-9_+=,.@:/-]{2,1224}", secret_value["external_id"]):
+            return 400, {"error": "Enter a valid STS external ID"}
+        buckets = body.get("buckets")
+        if buckets is not None:
+            if not isinstance(buckets, list) or not all(
+                isinstance(bucket, str) and re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket)
+                for bucket in buckets
+            ):
+                return 400, {"error": "buckets must be a list of S3 bucket names"}
+            secret_value["buckets"] = buckets
     elif provider == "aws":
         access_key_id = str(body.get("access_key_id", "")).strip()
         secret_access_key = str(body.get("secret_access_key", "")).strip()
