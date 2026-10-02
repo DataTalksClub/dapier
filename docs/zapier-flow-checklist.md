@@ -52,16 +52,40 @@ future export naming and Zapier's MIME behavior, not the verified delivery.
 
 ## 2. Email TODO
 
-Source: Zap `153709869`; draft: `todo-intake`.
+Source: Zap `153709869`; workflow: `todo-intake` (v5 published and enabled after the first live test).
 
 - [x] Configure workbook `1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw`, worksheet ID `0`.
 - [x] Configure Task `Process email "<Subject>" from <From>`, Notes blank, Status `NEW`.
-- [ ] Verify workbook access and worksheet columns/order.
-- [ ] Confirm processing-time timezone; draft uses `America/Chicago`, source CST semantics remain unverified.
-- [ ] Confirm email route and accepted senders.
+- [x] Verify workbook access and columns `Date`, `Task`, `Notes`, `Status`.
+- [ ] Confirm source processing-time timezone; live v5 uses `America/Chicago`, while original Zapier CST semantics remain unverified.
+- [x] Verify route `todo@dtcdev.click` accepts `alexey@datatalks.club` (live receipt). Other sender policies remain outside this test.
 - [ ] With authorization, send one test email; verify the exact row, timestamp and sender text, plus DataOps delivery.
 - [ ] Verify existing native Telegram task creation and confirmation still work.
-- [ ] Agree on cutover and verify a new email creates exactly one intended row.
+- [x] Publish the prepared sender/timestamp fix as v5 and confirm the workflow is On.
+- [ ] Retest with unique subject `Dapier TODO test v2`; verify exactly one correctly populated row and DataOps receipt.
+
+
+First live test (2026-10-02): source email Date was 19:32:01 UTC, Dapier
+received it at 19:32:15.479192 UTC and completed run
+`todo-intake:0c9b0e82a04900efeeccc65b856003d9da8496adb042e513c1492efedc2a921e`
+at 19:32:21 UTC. A direct Sheets API read found exactly one matching row,
+`todo!A104:D104`:
+
+- Date: `2026-10-02` — fails the full processing-timestamp requirement.
+- Task: `Process email "Dapier TODO test" from ` — sender missing; fails.
+- Notes: blank — passes.
+- Status: `NEW` — passes.
+
+The actual DataOps intake response was `status: accepted`, item
+`email-63f0da2c166fb52b1b815e3cfe2d87e7`. This proves receipt, not downstream
+bookkeeping completion. The browser's approximate reported send time (19:39)
+differs from the email/provider timestamps above; provider times are recorded.
+
+V5 reads the sender header from the structured email event, writes an ISO
+processing timestamp and selects worksheet ID `0`. The draft's disabled flag
+was briefly published and then immediately corrected to On. Do not mark the
+email test passed until the v2 email is verified against Sheets and DataOps.
+The first test row was retained; it was not replayed or edited.
 
 ## 3. Invoice email
 
