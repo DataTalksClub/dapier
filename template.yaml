@@ -3,6 +3,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: Code-configured serverless automation runner
 
 Parameters:
+  AwsAssumableRoleArns:
+    Type: CommaDelimitedList
+    Default: arn:aws:iam::387546586013:role/dapier-mailchimp-backup
+    AllowedPattern: 'arn:aws(-us-gov|-cn)?:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+'
+    Description: IAM roles operators may configure for provider access
+
   DomainName:
     Type: String
     Default: dapier.dtcdev.click
@@ -151,6 +157,7 @@ Globals:
     Tracing: Active
     Environment:
       Variables:
+        AWS_ASSUMABLE_ROLE_ARNS: !Join [",", !Ref AwsAssumableRoleArns]
         EVENT_QUEUE_URL: !Ref EventQueue
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         CREDENTIALS_TABLE: !Ref CredentialsTable
@@ -237,6 +244,10 @@ Resources:
       Layers:
         - Ref: JsRuntimeLayer
       Policies:
+        - Statement:
+            Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !Ref AwsAssumableRoleArns
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
         - SQSSendMessagePolicy:
@@ -596,6 +607,10 @@ Resources:
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable
       Policies:
+        - Statement:
+            Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !Ref AwsAssumableRoleArns
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
             Effect: Allow

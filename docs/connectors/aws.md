@@ -1,46 +1,69 @@
 # Amazon S3 connector (the `aws` credential)
 
-S3 actions run on a stored IAM access key pair — the key/secret approach,
-not the stack's own identity — so workflows can write to any bucket the key
-can reach. There is no OAuth client and no connection record by design: the
-names `aws` and `s3` act as pseudo connections that resolve the stored
-`aws` credential.
+S3 actions use the configured `aws` credential. Operators can select an IAM
+role that Dapier assumes with its Lambda execution identity, or retain a legacy
+access key pair. The names `aws` and `s3` are pseudo connections backed by the
+same provider configuration; there is no OAuth client.
 
-## Connect it
+## Configure an IAM role
 
-1. In the AWS IAM console, create an access key for a user whose
-   permissions cover the buckets the workflows will target. The S3
-   operations Dapier issues are ListBuckets, ListObjectsV2, PutObject,
-   GetObject, and DeleteObject; the health check calls STS
-   `get_caller_identity`. Temporary (ASIA…) and long-lived (AKIA…) keys
-   both pass validation — the access key ID is 16–128 letters/digits and
-   the secret is the 40-character value AWS shows once.
-2. Store the pair. The CLI takes a JSON file with exactly the two fields:
-
-   ```sh
-   uv run dapier credentials set aws --file aws-keys.json
-   ```
+1. Deploy a role that trusts the Dapier ingress and worker execution roles.
+   Give it only the bucket/object permissions needed by your workflows.
+   Cross-account access requires both the target trust and Dapier's
+   `sts:AssumeRole` identity permission; see
+   [AWS cross-account access](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html).
+2. Include the role ARN in the Dapier stack's `AwsAssumableRoleArns` parameter.
+   This supplies both the runtime permission and the API's operator allowlist.
+   The default is `arn:aws:iam::387546586013:role/dapier-mailchimp-backup`.
+3. In **Console → Credentials → AWS**, select **Assume IAM role** and enter
+   the role ARN. Optional fields are external ID, region and comma-separated
+   bucket names. The CLI accepts the same configuration through a JSON file:
 
    ```json
-   {"access_key_id": "AKIA…", "secret_access_key": "…"}
+   {
+     "role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup",
+     "region": "eu-west-1",
+     "buckets": ["datatalks-mailchimp-backup"]
+   }
    ```
 
-   In the console, use **Credentials → AWS keys** and fill both fields.
-   The values are write-only and live immediately.
-3. Verify it:
-
    ```sh
+   uv run dapier credentials set aws --file aws-role.json
    uv run dapier connections test aws
    ```
 
-   The check runs STS `get_caller_identity` and answers with the key's ARN,
-   account, and user id. `s3` is an alias for the same check, and the
-   console's **Credentials** view has the same test button.
+   The console and CLI call the shared credential API. Configuration is live
+   immediately. The API rejects unapproved roles and mixed role/key fields.
+   The connection test reports the effective assumed-role ARN/account; it
+   does not prove permissions on a particular bucket.
 
-Discovery works on either pseudo connection:
-`dapier connections discover aws` lists `buckets` and `objects` (one
-bucket's keys, up to 100, optional `prefix` param — pass the bucket as
-`--param bucket=<name>`).
+Dapier requests 15-minute STS sessions and supplies the returned session token
+when creating provider clients. Temporary credentials stay in memory and are
+reacquired for subsequent operations. Actions, S3 polls, object discovery and
+connection testing use the same resolver. `external_id` is passed to STS when
+specified; the configured region defaults to the Lambda region or `eu-west-1`.
+
+An optional `buckets` list populates the picker without requiring account-wide
+`ListBuckets` permissions. Without that list, discovery asks S3 for all buckets
+visible to the AWS identity. Object discovery still checks real bucket access.
+`dapier connections discover aws` exposes `buckets` and `objects`; the latter
+accepts `--param bucket=<name>` and an optional prefix.
+
+## Existing access key configuration
+
+Existing key pairs remain supported. Choose **Access keys** in the Console,
+enter the access key ID and secret, or use:
+
+```json
+{"access_key_id": "AKIA…", "secret_access_key": "…"}
+```
+
+```sh
+uv run dapier credentials set aws --file aws-keys.json
+```
+
+Values are write-only. A role configuration replaces the previous key pair;
+Dapier does not retain keys or fall back to them if role assumption fails.
 
 ## Triggers: file events from a bucket (`s3`, `s3.updates`, `s3.deletions`)
 
@@ -60,7 +83,7 @@ configure:
 ```
 
 `bucket` is required; `prefix` narrows the watch; `credential_id` defaults
-to the shared `aws` keys. Each fire lists the bucket (following continuation
+to the shared `aws` configuration. Each fire lists the bucket (following continuation
 pages up to 1,000 keys) and objects with a `last_modified` strictly newer
 than the stored watermark fire as `s3` / `file.created` events carrying
 `{bucket, key, size, last_modified, etag}`. The first fire only seeds the
@@ -118,13 +141,13 @@ disk), so keep sources modest.
 
 ## Gotchas
 
-- The key pair, not the stack's identity, writes the target bucket — grants
-  on Dapier connections do not apply here; IAM permissions do.
+- Target bucket permissions come from the selected assumed role or legacy
+  keys. Internal staging still uses Dapier's own execution identity.
 - `s3_upload` takes exactly one source; naming `source_url` and `source_s3`
   together fails the step.
-- Target keys are normalized per path segment (safe filenames); read,
-  presign, and delete address the key exactly as rendered — no
-  normalization.
+- Upload keys use safe filename normalization by default. `key_mode: exact`
+  preserves the original title and removes a leading slash; read, presign and
+  delete address the rendered key directly.
 - The first fire of any `s3`-family poll never emits: the watermark/snapshot
   seeds only. Push the trigger schedule tighter than your patience while
   testing.
