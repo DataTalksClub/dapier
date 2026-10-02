@@ -514,12 +514,21 @@ select { cursor: pointer; }
 select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
 select:disabled { opacity: .5; cursor: default; }
 
+/* Family focus recipe (family.md / dataops): 3px ring on :focus-visible,
+   plus the accent border + halo on :focus for text controls. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   border-color: var(--dk-accent-default);
-  outline: 2px solid var(--dk-focus-ring);
-  outline-offset: 0;
+  outline: 3px solid var(--dk-focus-ring);
+  outline-offset: 2px;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--dk-accent-default);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dk-focus-ring);
 }
 input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 
