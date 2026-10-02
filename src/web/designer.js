@@ -23457,7 +23457,7 @@
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
               summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 "button",
