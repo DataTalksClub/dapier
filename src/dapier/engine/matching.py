@@ -26,46 +26,6 @@ def workflows():
     return [workflow for workflow in published_workflows.load_workflows()
             if workflow_triggers(workflow)]
 
-def flows():
-    """Legacy shared flows are retired; stored triggers carry their actions."""
-    return {}
-
-def flow_actions(name):
-    """The actions of a named shared flow, or None when it is undefined or empty."""
-    spec = flows().get(str(name or "").strip())
-    if spec is None:
-        return None
-    actions = spec.get("actions")
-    if not isinstance(actions, list) or not actions:
-        logger.warning("flow '%s' has no actions", name)
-        return None
-    return actions
-
-def flow_catalog():
-    """Shared flows for list endpoints: name, description, action count."""
-    return [
-        {
-            "name": name,
-            "description": spec.get("description") or "",
-            "actions": len(spec.get("actions") or []),
-        }
-        for name, spec in sorted(flows().items())
-    ]
-
-def resolve_workflow(workflow):
-    """Fill in the actions of a ``flow``-bound workflow; None when the flow
-    is undefined, so a removed flow fails its trigger closed (it stops
-    matching) instead of running an empty action chain."""
-    flow = str(workflow.get("flow") or "").strip()
-    if not flow:
-        return workflow
-    actions = flow_actions(flow)
-    if actions is None:
-        logger.warning("workflow '%s' binds undefined flow '%s'; skipped",
-                       workflow.get("id"), flow)
-        return None
-    return {**workflow, "actions": actions}
-
 def all_workflows():
     """Managed workflows and operator-created triggers, read per invocation."""
     extra = []
@@ -85,11 +45,9 @@ def all_workflows():
         from ..triggers import poll_triggers
 
         extra = extra + poll_triggers.load_workflows()
-    resolved = [workflow for workflow in
-                (resolve_workflow(doc) for doc in workflows())
-                if workflow is not None]
-    managed_ids = {workflow["id"] for workflow in resolved}
-    return resolved + [workflow for workflow in extra if workflow["id"] not in managed_ids]
+    managed = workflows()
+    managed_ids = {workflow["id"] for workflow in managed}
+    return managed + [workflow for workflow in extra if workflow["id"] not in managed_ids]
 
 def _ordered(left, right):
     """A three-way compare for the ordering operators: numeric when BOTH

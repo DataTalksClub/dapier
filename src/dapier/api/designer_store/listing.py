@@ -37,14 +37,12 @@ def _folder_of(workflow):
 
 
 def _summary(workflow, source):
-    """One list row: primary trigger, how many there are, and the effective actions."""
+    """One list row: primary trigger, how many there are, and the actions."""
     from ...engine import matching
 
     triggers = matching.workflow_triggers(workflow)
     primary = triggers[0] if triggers else {}
     actions = workflow.get("actions")
-    if workflow.get("flow"):
-        actions = matching.flow_actions(workflow["flow"])
     return {
         "id": str(workflow["id"]),
         "enabled": workflow.get("enabled", True),
@@ -54,7 +52,7 @@ def _summary(workflow, source):
         "event": str(primary.get("event", "?")),
         "triggerCount": len(triggers),
         "actionCount": len(actions or []),
-        # Step types (flow-resolved) for the list's ?q= search and clients.
+        # Step types for the list's ?q= search and clients.
         "actionTypes": [str(action.get("type") or "") for action in (actions or [])
                         if isinstance(action, dict)],
         # Zapier-style organization labels; set through api_tags.

@@ -40,9 +40,7 @@ from decimal import Decimal
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from . import poll_sources, seen
-from .email_triggers import (
-    NAME_PATTERN, TriggerError, flow_catalog, resolve_actions_flow,
-)
+from .email_triggers import NAME_PATTERN, TriggerError, resolve_actions
 from .schedule_triggers import validate_expression
 
 logger = logging.getLogger(__name__)
@@ -70,7 +68,7 @@ URL_PATTERN = re.compile(r"^https?://\S+$")
 # build_item pops those out of the extras to validate source-provided
 # defaults; everything else a source returns merges into the item verbatim.
 SOURCE_LOCKED_KEYS = frozenset({
-    "poll_id", "source", "expression", "description", "actions", "flow",
+    "poll_id", "source", "expression", "description", "actions",
     "enabled", "created_by", "created_at", "updated_at",
 })
 
@@ -151,7 +149,7 @@ def build_item(body, operator, previous=None):
         raise TriggerError("dedupe_ttl_days must be a number") from None
     if not 1 <= dedupe_ttl_days <= 365:
         raise TriggerError("dedupe_ttl_days must be 1-365")
-    actions, flow = resolve_actions_flow(body)
+    actions = resolve_actions(body)
     list_path = extras.pop("list_path", body.get("list_path"))
     if list_path is not None and str(list_path).strip():
         list_path = _validate_path(list_path, "list_path")
@@ -185,7 +183,6 @@ def build_item(body, operator, previous=None):
         "dedupe_ttl_days": dedupe_ttl_days,
         "description": str(body.get("description") or "")[:200],
         "actions": actions or [],
-        "flow": flow,
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -571,17 +568,8 @@ def _raw_id(item, raw):
 
 
 def workflow_for(item):
-    """The engine workflow for a stored poll trigger, or None when its flow is gone."""
+    """The engine workflow for a stored poll trigger."""
     actions = item.get("actions") or []
-    flow = str(item.get("flow") or "").strip()
-    if flow:
-        from ..engine import matching
-
-        actions = matching.flow_actions(flow)
-        if actions is None:
-            logger.warning("poll trigger '%s' binds undefined flow '%s'; skipped",
-                           item.get("poll_id"), flow)
-            return None
     spec = poll_sources.stored_source(item)
     return {
         "id": workflow_id_for(item),
@@ -641,7 +629,6 @@ def api_list(table_ref=None, cursor_table_ref=None):
             public_view(item, cursor=get_cursor(item["poll_id"], table=cursor_table_ref))
             for item in load_items(table_ref=table_ref)
         ],
-        "flows": flow_catalog(),
     }
 
 

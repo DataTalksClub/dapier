@@ -118,11 +118,6 @@ def test_dry_run_uses_inline_actions(no_runners):
     assert report["steps"][0]["rendered_input"]["url"] == "https://x.test/Dry-run demo"
 
 
-def test_dry_run_undefined_flow_is_an_error(no_runners):
-    with pytest.raises(dryrun.TestRunError, match="no shared flow"):
-        dryrun.dry_run({**WORKFLOW, "flow": "nope", "actions": None}, SAMPLE)
-
-
 # ---- engine: execute ----
 
 def test_execute_runs_the_chain_through_the_real_engine(monkeypatch):

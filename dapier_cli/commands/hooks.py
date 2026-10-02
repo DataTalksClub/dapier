@@ -3,14 +3,14 @@
 import json
 
 from .. import api
-from .shared import entry_label, print_flows, read_json_file
+from .shared import entry_label, read_json_file
 
 __all__ = ["hooks_delete", "hooks_list", "hooks_save", "hooks_show", "print_hook"]
 
 
 def print_hook(item):
     for key in ("hook_id", "kind", "url", "connection_id", "list_id", "description",
-                "dedupe_path", "flow", "enabled", "created_by", "created_at",
+                "dedupe_path", "enabled", "created_by", "created_at",
                 "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
@@ -38,7 +38,6 @@ def hooks_list(api_url, kind=None, debug=False):
         enabled = "yes" if item.get("enabled", True) else "no"
         print(f"{item.get('hook_id', ''):20} {item.get('kind', ''):9} "
               f"enabled={enabled:3} {item.get('url', '')} {entry_label(item)}")
-    print_flows(data.get("flows") or [])
     return 0
 
 

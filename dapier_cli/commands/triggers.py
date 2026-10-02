@@ -4,7 +4,7 @@ import json
 from urllib.parse import quote
 
 from .. import api
-from .shared import entry_label, print_flows, read_json_file
+from .shared import entry_label, read_json_file
 
 __all__ = ["print_trigger", "triggers_delete", "triggers_list", "triggers_sample", "triggers_save", "triggers_show", "triggers_workflow_sample"]
 

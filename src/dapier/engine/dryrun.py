@@ -93,13 +93,6 @@ def normalize_sample_event(sample, workflow):
     }
 
 
-def _resolved_or_error(workflow):
-    resolved = matching.resolve_workflow(workflow)
-    if resolved is None:
-        raise TestRunError(f"no shared flow named '{workflow.get('flow')}'")
-    return resolved
-
-
 def _report(resolved, envelope, steps, *, mode, error=None):
     return {
         "mode": mode,
@@ -155,7 +148,7 @@ def dry_run(workflow, sample, *, strict=False):
     ``warnings``; with ``strict`` those warnings fail the step (``ok`` false,
     ``error`` carrying the first warning) instead of riding along.
     """
-    resolved = _resolved_or_error(workflow)
+    resolved = workflow
     envelope = normalize_sample_event(sample, resolved)
     step_outputs = {}
     steps = []
@@ -213,7 +206,7 @@ def execute_once(workflow, sample):
     """
     from . import execute as engine_execute
 
-    resolved = _resolved_or_error(workflow)
+    resolved = workflow
     envelope = normalize_sample_event(sample, resolved)
     forced = {
         **resolved,
@@ -280,7 +273,7 @@ def test_step(workflow, action_id, sample, *, execute=False, step_outputs=None):
     """
     from ..connectors import registry
 
-    resolved = _resolved_or_error(workflow)
+    resolved = workflow
     envelope = normalize_sample_event(sample, resolved)
     wanted = str(action_id or "").strip()
     if not wanted:
@@ -551,7 +544,7 @@ def _iter_steps(steps, prefix=""):
 
 def find_step(workflow, action_id):
     """The step a run would record under ``action_id``, or None."""
-    resolved = _resolved_or_error(workflow)
+    resolved = workflow
     wanted = str(action_id or "").strip()
     for candidate, step in _iter_steps(resolved.get("actions") or []):
         if candidate == wanted:

@@ -196,24 +196,16 @@ class WatcherEventTests(unittest.TestCase):
 
 
 class FlowBindingTests(unittest.TestCase):
-    """Stored triggers use inline actions after the migration."""
+    """Stored triggers use inline actions; flow references are retired."""
 
 
-    def test_rejects_flow_plus_actions_and_unknown_flows(self):
-        with self.assertRaises(email_triggers.TriggerError) as both:
-            email_triggers.build_item(
-                {"name": "invoice-x", "flow": "invoice-dataops",
-                 "actions": [{"type": "webhook", "url": "https://x"}]}, "op")
-        self.assertIn("not both", str(both.exception))
-        with self.assertRaises(email_triggers.TriggerError) as missing:
-            email_triggers.build_item({"name": "invoice-x", "flow": "nope"}, "op")
-        self.assertIn("no shared flow", str(missing.exception))
-
-
-    def test_unmigrated_flow_bound_trigger_fails_closed(self):
-        stub = StubTable([{"name": "invoice-copy", "flow": "invoice-dataops",
-                           "actions": [], "enabled": True}])
-        self.assertEqual(email_triggers.load_workflows(table_ref=stub), [])
+    def test_rejects_flow_references(self):
+        for body in ({"name": "invoice-x", "flow": "invoice-dataops",
+                      "actions": [{"type": "webhook", "url": "https://x"}]},
+                     {"name": "invoice-x", "flow": "nope"}):
+            with self.assertRaises(email_triggers.TriggerError) as refused:
+                email_triggers.build_item(body, "op")
+            self.assertIn("shared flows are retired", str(refused.exception))
 
 
 class FakeResponse:

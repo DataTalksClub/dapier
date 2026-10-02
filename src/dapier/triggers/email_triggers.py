@@ -41,15 +41,6 @@ BOUNCE_EVENT = "bounce.received"
 COMPLAINT_EVENT = "complaint.received"
 EVENTS = (ADDRESS_EVENT, BOUNCE_EVENT, COMPLAINT_EVENT)
 
-# Required and optional keys per action type live in the connector registry
-# (src/dapier/connectors/registry.py); ACTION_SPECS reads them from there.
-def __getattr__(name):
-    if name == "ACTION_SPECS":
-        from ..connectors import registry
-
-        return registry.action_specs()
-    raise AttributeError(name)
-
 
 class TriggerError(ValueError):
     """Invalid or conflicting trigger definition."""
@@ -83,30 +74,15 @@ def validate_actions(actions):
         raise TriggerError(str(exc)) from None
 
 
-def resolve_actions_flow(body):
-    """Inline actions or a named shared flow — exactly one of the two.
+def resolve_actions(body):
+    """The trigger's inline action chain, validated against the registry.
 
-    Shared flow references are retired. An unmigrated reference fails closed
-    until the one-time migration embeds its actions in the trigger.
+    Shared flow references are retired: a ``flow`` key fails the save with
+    the retirement error instead of resolving to anything.
     """
-    flow = str(body.get("flow") or "").strip()
-    actions = body.get("actions")
-    if flow and actions:
-        raise TriggerError("bind either inline actions or a flow, not both")
-    if flow:
-        from ..engine import matching
-
-        if matching.flow_actions(flow) is None:
-            raise TriggerError(f"no shared flow named '{flow}'")
-        return None, flow
-    return validate_actions(actions), ""
-
-
-def flow_catalog():
-    """No shared flows are offered after the managed-store cutover."""
-    from ..engine import matching
-
-    return matching.flow_catalog()
+    if body.get("flow"):
+        raise TriggerError("shared flows are retired; give the trigger inline actions")
+    return validate_actions(body.get("actions"))
 
 
 def managed_routes():
@@ -149,7 +125,7 @@ def build_item(body, operator):
     event = str(body.get("event") or ADDRESS_EVENT).strip()
     if event not in EVENTS:
         raise TriggerError(f"unknown email trigger event '{event}'; known: {', '.join(EVENTS)}")
-    actions, flow = resolve_actions_flow(body)
+    actions = resolve_actions(body)
     if event == ADDRESS_EVENT:
         # Only address triggers claim a route; watchers match SES feedback
         # for the whole domain and never shadow a YAML workflow's address.
@@ -190,7 +166,6 @@ def build_item(body, operator):
         "address": address,
         "description": str(body.get("description") or "")[:200],
         "actions": actions or [],
-        "flow": flow,
         "enabled": bool(body.get("enabled", True)),
         "created_by": str(operator or ""),
         "created_at": now,
@@ -253,17 +228,8 @@ def load_items(table_ref=None):
 
 
 def workflow_for(item):
-    """The engine workflow for a stored trigger, or None when its flow is gone."""
+    """The engine workflow for a stored trigger."""
     actions = item.get("actions") or []
-    flow = str(item.get("flow") or "").strip()
-    if flow:
-        from ..engine import matching
-
-        actions = matching.flow_actions(flow)
-        if actions is None:
-            logger.warning("email trigger '%s' binds undefined flow '%s'; skipped",
-                           item["name"], flow)
-            return None
     return {
         "id": f"email-trigger-{item['name']}",
         "enabled": True,
@@ -292,7 +258,7 @@ def load_workflows(table_ref=None):
 
 def public_view(item):
     view = {key: item.get(key) for key in (
-        "name", "address", "description", "actions", "flow", "enabled",
+        "name", "address", "description", "actions", "enabled",
         "created_by", "created_at", "updated_at",
     )}
     view["event"] = item.get("event") or ADDRESS_EVENT

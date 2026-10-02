@@ -2,7 +2,7 @@
 
 
 from .. import api
-from .shared import print_flows, read_json_file
+from .shared import read_json_file
 
 __all__ = ["polls_delete", "polls_list", "polls_save"]
 
@@ -25,7 +25,6 @@ def polls_list(api_url, debug=False):
         state = "enabled" if item.get("enabled", True) else "disabled"
         print(f"{item.get('poll_id', ''):20} {item.get('expression', ''):40} "
               f"{state:9} {_poll_target(item)}")
-    print_flows(data.get("flows") or [])
     return 0
 
 
