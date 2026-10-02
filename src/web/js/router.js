@@ -19,7 +19,10 @@ function mountPageTools() {
     mountedTools = null;
   }
   const view = document.querySelector('.view.active');
-  const tools = view?.querySelector(':scope > .page-tools');
+  /* Only a page's primary actions join the topbar (the family's header
+     pattern: title left, actions right). Filter and search bars stay in the
+     content column, above the register they control. */
+  const tools = view?.querySelector(':scope > .page-tools.primary-tools');
   const slot = $('#topbar-tools');
   if (!tools || !slot) return;
   mountedTools = { node: tools, home: view };
@@ -46,7 +49,23 @@ export async function setView(view, push = true) {
     else item.removeAttribute('aria-current');
   });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
-  $('#view-title').textContent = ({ overview: 'Home', runs: 'Runs', tokens: 'API tokens', emails: 'Emails', storage: 'Data store', schedules: 'Schedules', audit: 'Audit log' })[view] || view[0].toUpperCase() + view.slice(1);
+  const VIEW_META = {
+    overview: ['Home', 'Automations and their latest results at a glance.'],
+    workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
+    runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
+    connections: ['Connections', 'The connected accounts workflows act through.'],
+    agents: ['Agents', 'Agent tasks and the runs behind them.'],
+    workers: ['Workers', 'Worker check-ins and capacity.'],
+    credentials: ['Credentials', 'Provider keys and OAuth clients.'],
+    tokens: ['API tokens', 'Machine tokens for API access.'],
+    storage: ['Data store', 'Key-value data shared with workflows.'],
+    schedules: ['Schedules', 'Cron schedules that run workflows on a clock.'],
+    emails: ['Emails', 'Email addresses that trigger workflows.'],
+    audit: ['Audit log', 'Who changed what — newest first.'],
+  };
+  const [title, description] = VIEW_META[view] || [view[0].toUpperCase() + view.slice(1), ''];
+  $('#view-title').textContent = title;
+  $('#view-description').textContent = description;
   $('.sidebar').classList.remove('open');
   $('#menu-toggle')?.setAttribute('aria-expanded', 'false');
   if (!push && ['/inbox', '/usage'].includes(window.location.pathname)) history.replaceState(null, '', `/runs${window.location.search}`);

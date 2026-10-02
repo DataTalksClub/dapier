@@ -128,6 +128,25 @@ export function openWorkflow(id) {
   icons();
 }
 
+/* The home status strip (dataops' segmented summary row): one dominant
+   inventory count plus the states that change what the operator does next.
+   Dots use the status language's triplet roles only. */
+function renderStatsStrip(workflows) {
+  const count = (predicate) => workflows.filter(predicate).length;
+  const strip = (dot, label, value) =>
+    `<div class="status-item"><span class="status-item-label">${dot}<span>${label}</span></span><span class="status-item-value">${value}</span></div>`;
+  const dot = (kind) => `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span></span>`;
+  const none = '<span class="status off"></span>';
+  const items = [
+    strip(none, 'Workflows', workflows.length),
+    strip(dot('ok'), 'On', count((w) => w.enabled && !w.auto_paused)),
+    strip(dot('err'), 'Auto-paused', count((w) => w.auto_paused)),
+    strip(dot('off'), 'Off', count((w) => !w.enabled && !w.auto_paused)),
+  ];
+  $('#overview-stats').innerHTML = items.join('');
+  $('#overview-stats').hidden = workflows.length === 0;
+}
+
 function render(section) {
   const data = state.data;
   if (!data) return;
@@ -136,6 +155,7 @@ function render(section) {
     $('#home-workflow-count').textContent = `${data.workflows.length} workflow${data.workflows.length === 1 ? '' : 's'} · ${model.running} on`;
     $('#overview-workflows').innerHTML = model.workflows.slice(0, 5).map(workflowRow).join('');
     $('#overview-workflows-empty').hidden = data.workflows.length > 0;
+    renderStatsStrip(data.workflows);
   }
   if (section === 'activity') {
     $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
@@ -305,16 +325,20 @@ function renderBulkBar(shown) {
 
 function renderAttention(data) {
   const model = homeModel(data);
+  /* The panel frame stays neutral (family recipe); the row's own dot carries
+     the severity — danger for failed/auto-paused, warning for accounts and
+     quota. */
+  const alarm = (kind) => `<span class="status ${kind}" aria-hidden="true"><span class="status-dot"></span></span>`;
   const items = model.problems.map(({ workflow, run }) => `<article class="home-problem">
-    <div><strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong>
+    <div><p class="home-problem-title">${alarm('err')}<strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong></p>
       <p class="sub">${escapeHtml(workflow.auto_paused_reason || (run?.failed_step ? `Failed at ${run.failed_step}` : 'Open the run to see what went wrong.'))}</p></div>
     <div class="home-create-actions">${run ? `<button class="dk-button dk-button--secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
   </article>`);
   for (const connection of model.connections) items.push(`<article class="home-problem">
-    <div><strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
+    <div><p class="home-problem-title">${alarm('warn')}<strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong></p><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
     <button class="dk-button dk-button--secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
   </article>`);
-  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
+  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><p class="home-problem-title"><span class="status warn" aria-hidden="true"><span class="status-dot"></span></span><strong>Monthly task limit reached</strong></p><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
   $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
   $('#overview-attention').hidden = items.length === 0;
   $('#overview-attention').innerHTML = items.length ? `<h3>Needs attention</h3>${items.join('')}` : '';
@@ -353,6 +377,14 @@ function renderUsage() {
   renderQuota();
 }
 
+/* "202610" reads as machine output; operators get "October 2026". */
+function humanMonth(code) {
+  const m = /^(\d{4})(\d{2})$/.exec(String(code || ''));
+  if (!m) return String(code || 'this month');
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))
+    .toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 /* The monthly task quota (the budget the worker enforces on action steps):
    a status line plus an inline limit editor. Absent payload = metering is
    not wired, so the editor stays hidden rather than pretending to work. */
@@ -365,12 +397,13 @@ function renderQuota() {
   form.hidden = !quota;
   if (!quota) return;
   const used = Number(quota.used) || 0;
+  const period = humanMonth(quota.month);
   if (quota.enabled) {
     const left = quota.remaining;
     line.textContent = `Monthly limit ${quota.limit} — ${used} used`
-      + (left != null ? `, ${left} left this month (${quota.month}).` : ` (${quota.month}).`);
+      + (left != null ? `, ${left} left for ${period}.` : ` for ${period}.`);
   } else {
-    line.textContent = `No monthly limit — ${used} tasks used this month (${quota.month}).`;
+    line.textContent = `No monthly limit — ${used} tasks used in ${period}.`;
   }
   $('#quota-limit').value = quota.enabled ? quota.limit : '';
 }

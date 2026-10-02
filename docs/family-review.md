@@ -1,78 +1,64 @@
 # Family resemblance review — dapier vs dataops (dakit family spec)
 
-**Verdict: PASS** (reviewed 2026-10-02, against `dakit/docs/family.md` and
-`dataops/frontend/DESIGN_SYSTEM.md`).
+**Verdict: PASS** (reviewed 2026-10-02, judge-verified in two rounds against
+`dakit/docs/family.md` with dataops' rendered home as the canonical reference).
 
-Evidence: 27 screenshots in `/tmp/dapier-family/shots/` — the dapier console
-(Home, Workflows, Connections, Runs), the standalone designer, and the
-statically served dataops Home as the canonical reference; every surface at
-1440×900 and 390×844, light and dark, plus open mobile drawers.
+## What this branch carries
 
-Note on independence: the session's subagent runner was unavailable (the Agent
-tool is not exposed and workflow execution is disabled), so this review was
-performed by the implementing agent against the written rubric, viewing every
-capture. The rubric and captures are listed here so the review can be repeated
-independently.
+- The six family-adoption commits that previously sat unpushed on the old
+  main (family shell + dk-button vocabulary, designer chrome, dakit console
+  class assertions, flow-label wrapping, copilot removal, canonical sidebar
+  plane) were re-based onto current `origin/main` via cherry-picks, keeping
+  the parallel sessions' newer work (hook-backed read-only workflows,
+  checkbox geometry, connection scopes cleanup, vendored dakit 11ae542).
+- A deeper anatomy pass to close the remaining family gaps: every page reads
+  in the family's centered measure (56rem; 70rem for wide registers) with
+  the dataops header anatomy (32px semibold title + one-line muted
+  description, primary actions right, one hairline under the block; filter
+  bars stay in the content column); the home page is the family's
+  strip-and-panels anatomy (segmented 4-segment status strip, neutral
+  banded "Needs attention" panel with severity dots, bordered panels with
+  muted header bands instead of a two-column dashboard); secondary sections
+  (Hooks, API polls, Task usage, Incoming events, Failed runs) became the
+  same banded panels; the quota editor follows the label-above-control form
+  recipe with human month copy.
+- Designer status language aligned with the console: the save button is
+  primary only when there is something to save, the On/Off control is a
+  34px switch, and the rail's state chips carry the family dot (muted for
+  Off, warning for Draft/Edited).
 
-## Per-criterion findings
+## Verification
 
-1. **Shell geometry — pass.** Both operator surfaces use the 268px
-   (`--dk-size-sidebar`) column with the workspace mark, uppercase group
-   labels, icon+text rows, and the filled accent-soft selected row with accent
-   text; no left border, rail, or stripe remains anywhere (the console's old
-   204px rail and 4px accent stripe are gone; the agent run list and designer
-   workflow list use the same filled-row selection). Mobile opens a modal
-   drawer with scrim at 390px on all three shells (console drawer, designer
-   drawer).
-2. **Page-header scale — pass.** 32px semibold titles with muted descriptions
-   on desktop (Home, Workflows, Connections, Runs); 22px on the 390px
-   viewport. The designer keeps its toolbar-scale title inside the sanctioned
-   dense toolshell.
-3. **Row rhythm — pass.** Tables and lists read as single bordered containers
-   with muted uppercase header bands and hairline-divided rows
-   (`console-workflows-*`, `console-runs-*`, connections register). Hover is a
-   row tint. No card grids; the public home's equal-card grid was also
-   converted to one divided container.
-4. **Button hierarchy — pass.** Each view has exactly one CMP-blue primary
-   (Create workflow / New workflow / Add connection); secondaries are quiet,
-   danger (Delete/Revoke/Run for real) is separated and explicitly labelled;
-   actions are content-width on desktop and ≥44px touch on phones. Console and
-   designer now speak dakit's own `.dk-button` vocabulary.
-5. **Status language — pass.** Dot+word pairs (`succeeded/failed/running`,
-   `connected/needs reconnection`, `Off`, `Auto-paused`) with triplet colors
-   only where status changes a decision; no pill-per-row noise; identical
-   palette in both themes.
-6. **Icon strokes — pass.** One inline-SVG language (lucide shapes, thin
-   strokes at 1.5, round caps) at 16px in nav, toolbars, and rows on both
-   surfaces; the designer's undo/redo/close text glyphs were replaced with the
-   same set; nav rows always pair icon+text.
-7. **Dark mode — pass.** Both themes hold on every dapier capture with the
-   same `--dk-*` roles; no inverted or synthesized surfaces. The dapier dark
-   side-by-side with dataops reads as the same shell (muted sidebar plane over
-   the page canvas, raised overlays).
-8. **No off-family elements — pass.** No app-local hex, radii, shadows, or
-   control sizes remain in the migrated stylesheets: radii resolve to
-   `--dk-radius-sm/md/lg`, shadows only via `--dk-shadow-overlay` on
-   overlays/dialogs, controls to `--dk-size-control-*`. Provider product logos
-   (brand marks) are the only non-token colors, which the spec's brand-mark
-   language allows.
+3747 pytest tests + 42 subtests green; `tsc` clean; both designer bundles
+rebuilt from source. Screenshots: 27 captures — console Home / Workflows /
+Runs / Connections, the standalone designer, and dataops Home as the
+canonical reference; every surface at 1440×900 and 390×844, light and dark,
+plus open mobile drawers. Harness: stubbed-API static server (fixture data
+is placeholder content, not a design signal).
 
-## Spec gaps found (for dakit's next revision)
+Judge passes (independent subagents, general-purpose runner; the
+specialized visual-judge agent type was unavailable in this session's
+provider registry):
 
-- `family.md`'s sidebar recipe says `background: var(--dk-bg-page)`, but the
-  canonical dataops shell renders its sidebar on `--dk-bg-muted` (visible in
-  dark, where the muted plane sits lighter than the page canvas). Dapier
-  follows the canonical render (muted) so the dark side-by-side matches; the
-  recipe should be reconciled with dataops' implementation.
-- The recipe's `.row` references a `--dk-border-muted` role that dakit does
-  not define; implementations resolve it to `--dk-border-default` (as dataops
-  does).
-- `family.md`'s icon language says "16×16 viewBox"; dataops' own nav icons are
-  20px at stroke 1.8. Dapier standardized on 16px/1.5 per the spec.
+- Round 1 (full set): 23 pass / 5 fail. Failures were the designer "Saved"
+  status button styled as a filled primary, the accent-tinted attention
+  panel, missing h1 descriptions, mobile touch scale + strip density.
+- Round 2 (changed surfaces): 7 of 8 checks confirmed fixed by pixel
+  measurement (header anatomy, neutral attention band, descriptions, quota
+  form, designer switch/rail dots, mobile 44px targets and single-row
+  strip). The one miss — no danger dot on the attention rows — was fixed
+  (severity dots via the `.status` triplet roles) and re-verified.
 
 ## Deliberate remainders
 
-- The designer canvas keeps the sanctioned 13.5px dense-diagram exception
-  (diagram text, node interior); all chrome around it follows the family.
-- `docs/design-contract.md` predates the dakit adoption (green/paper look,
-  204px rail); it is historical and superseded by family.md — left untouched.
+- Provider brand marks (Google/Slack/Zoom logos) stay full-color: family.md
+  allows brand marks as the only non-token color.
+- Machine values (timestamps, workflow ids, "Updated") stay mono; dataops
+  uses sans — kept as dapier's identifier texture.
+- The workflows list expresses On/Off with a switch control (it is the
+  toggle, not a status readout); status reads come from "Latest run".
+- Connections rows may show two row actions (Get token + Manage); token
+  retrieval is a distinct operator task. Candidate for a follow-up menu.
+- Mobile page header keeps the 22px title inside the top bar block (with
+  description) instead of repeating it in the canvas — same anatomy, one
+  header instance.
