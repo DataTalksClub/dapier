@@ -26,9 +26,9 @@ Dapier has three surfaces, and every state-changing action must be reachable
 from all of them:
 
 - **Console (UI)** — static files in `src/web/`, talking to `/api/admin/*`
-  (dispatched by `src/dapier/api/admin/`; `src/admin.py` is a compatibility shim).
+  (dispatched by `src/dapier/api/admin/`).
 - **CLI** — the `dapier` command in `dapier_cli/`, talking to `/api/agent/*`
-  (handled in `src/dapier/api/agent.py`; `src/agent_api.py` is a compatibility shim).
+  (handled in `src/dapier/api/agent/`).
 - **HTTP API** — the Lambda handlers; the single source of truth for behavior.
 
 **Rule: any action a user can perform in the console must also be performable
@@ -86,8 +86,9 @@ the same domain behavior rather than duplicate business rules.
 None. The gaps this rule started with — console Credentials, Grants, Overview,
 and token revoke — were closed with operator-gated `/api/agent/*` endpoints
 and matching CLI commands. Connection setup and maintenance use
-`dapier connections create|edit|scopes|import|connect|revoke`; OAuth client
-values use `dapier oauth-clients set`. When a change touches one of the three
+`dapier connections create|edit|import|connect|revoke` (scope changes go
+through `connections edit --scopes`); OAuth client values use
+`dapier oauth-clients set`. When a change touches one of the three
 surfaces, re-run the parity audit above before merging so the list stays empty.
 
 ## Landing work (required)
