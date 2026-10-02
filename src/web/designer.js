@@ -20861,7 +20861,7 @@
         onKeyDown: onListKeyDown,
         children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "step-picker-head", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 16, strokeWidth: 1.5 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 16, strokeWidth: 2.25 }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -20873,7 +20873,7 @@
                 spellCheck: false
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-picker-body", children: [
             filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-picker-empty", children: [
@@ -20894,8 +20894,8 @@
                     "aria-expanded": group.collapsible ? isOpen : void 0,
                     type: "button",
                     children: [
-                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 16, strokeWidth: 1.5 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 16, strokeWidth: 1.5 })),
-                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 16, strokeWidth: 1.5 }),
+                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 16, strokeWidth: 2.25 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 16, strokeWidth: 2.25 })),
+                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 16, strokeWidth: 2.25 }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: group.name }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: group.rows.length === 1 ? `1 ${countNoun}` : `${group.rows.length} ${countNoun}s` })
                     ]
@@ -20908,7 +20908,7 @@
                     onClick: () => pick(row.kind),
                     type: "button",
                     children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 1.5 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 2.25 }),
                       /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
                         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
                         row.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.detail })
@@ -20920,7 +20920,7 @@
               ] }, group.name);
             }),
             query.trim() && filtered.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "step-row", onClick: () => pick(row.kind), type: "button", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 1.5 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 2.25 }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
                 !row.label.toLowerCase().includes(row.section.toLowerCase()) && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.section })
@@ -21430,7 +21430,7 @@
               title: "Add a trigger — when the workflow runs",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Trigger" })
               ]
             }
@@ -21443,7 +21443,7 @@
               title: "Add a step — flow control, AI, developer tools, or an app",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Step" })
               ]
             }
@@ -21456,7 +21456,7 @@
               title: "Add a note",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Note" })
               ]
             }
@@ -21465,7 +21465,7 @@
         sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({ clearCanvas: clearShapes }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-zoom-controls", "aria-label": "Canvas zoom controls", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 16, strokeWidth: 1.5 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 16, strokeWidth: 2.25 }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "zoom-button", onClick: () => {
           setZoom(1);
           setPan({ x: 0, y: 0 });
@@ -21473,8 +21473,8 @@
           Math.round(zoom * 100),
           "%"
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 1.5 }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 16, strokeWidth: 1.5 }) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 2.25 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 16, strokeWidth: 2.25 }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "svg",
@@ -21885,7 +21885,7 @@
                 "Edit ",
                 field.label.toLowerCase()
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "dk-button dk-button--secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "dk-button dk-button--secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
@@ -23350,7 +23350,7 @@
                 disabled: stepTest.busy,
                 onClick: () => testSelectedStep(false),
                 children: [
-                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
+                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 2.25 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
                 ]
               }
@@ -23363,7 +23363,7 @@
                 disabled: stepTest.busy,
                 onClick: () => testSelectedStep(true),
                 children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 1.5 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 2.25 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run step" })
                 ]
               }
@@ -23425,7 +23425,7 @@
               },
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-text", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
@@ -23447,7 +23447,7 @@
           summaries.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "No workflows found." })
         ] }),
         config.mode === "local" && git && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "git-foot", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 16, strokeWidth: 1.5 }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 16, strokeWidth: 2.25 }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: git.branch }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: git.dirty ? "git-dirty" : "git-clean", children: git.dirty ? "unsaved changes" : "clean" }),
           (git.ahead > 0 || git.behind > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
@@ -23468,7 +23468,7 @@
               "aria-label": "Toggle workflow list",
               "aria-expanded": navOpen,
               onClick: () => setNavOpen((open) => !open),
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx(Menu, { size: 16, strokeWidth: 1.5 })
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx(Menu, { size: 16, strokeWidth: 2.25 })
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
@@ -23532,8 +23532,8 @@
             ),
             enabled !== savedEnabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "state-save-hint", children: "Save to apply" }),
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
-              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }),
-              status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 16, strokeWidth: 1.5 }),
+              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }),
+              status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 16, strokeWidth: 2.25 }),
               status.message
             ] }),
             config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
@@ -23640,17 +23640,17 @@
               onCopyStep: copyStep,
               onPasteStep: pasteStep,
               sessionControls: (actions) => /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 16, strokeWidth: 1.5 }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCw, { size: 16, strokeWidth: 1.5 }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 16, strokeWidth: 1.5 }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCw, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
               ] })
             }
           ),
           testOpen && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "test-panel", "aria-label": "Test run", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "test-panel-head", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Test run" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run for real” executes the actions with live side effects." }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
@@ -23668,11 +23668,11 @@
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
-                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
+                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -23684,7 +23684,7 @@
                   onClick: pullSample,
                   title: "Pull a real sample event for this workflow's trigger connector",
                   children: [
-                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 1.5 }),
+                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 2.25 }),
                     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
                   ]
                 }
@@ -23761,15 +23761,15 @@
             ] }),
             selected?.type === "node" && selected.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => copyStep(selected.id), title: "Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copy step" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", onClick: deleteSelectedShape, title: "Delete this step (Delete)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16, strokeWidth: 2.25 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Delete" })
               ] })
             ] }),

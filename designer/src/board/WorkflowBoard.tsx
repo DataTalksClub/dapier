@@ -617,7 +617,7 @@ export function WorkflowBoard({
             title="Add a trigger — when the workflow runs"
             type="button"
           >
-            <Zap size={16} strokeWidth={1.5} />
+            <Zap size={16} strokeWidth={2.25} />
             <span>Trigger</span>
           </button>
           <button
@@ -626,7 +626,7 @@ export function WorkflowBoard({
             title="Add a step — flow control, AI, developer tools, or an app"
             type="button"
           >
-            <Plus size={16} strokeWidth={1.5} />
+            <Plus size={16} strokeWidth={2.25} />
             <span>Step</span>
           </button>
           <button
@@ -635,7 +635,7 @@ export function WorkflowBoard({
             title="Add a note"
             type="button"
           >
-            <StickyNote size={16} strokeWidth={1.5} />
+            <StickyNote size={16} strokeWidth={2.25} />
             <span>Note</span>
           </button>
         </div>
@@ -648,16 +648,16 @@ export function WorkflowBoard({
 
       <div className="canvas-zoom-controls" aria-label="Canvas zoom controls">
         <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
-          <Minus size={16} strokeWidth={1.5} />
+          <Minus size={16} strokeWidth={2.25} />
         </button>
         <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
           {Math.round(zoom * 100)}%
         </button>
         <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
-          <Plus size={16} strokeWidth={1.5} />
+          <Plus size={16} strokeWidth={2.25} />
         </button>
         <button className="icon-button" onClick={fitToContent} title="Fit to view" type="button">
-          <Maximize size={16} strokeWidth={1.5} />
+          <Maximize size={16} strokeWidth={2.25} />
         </button>
       </div>
 

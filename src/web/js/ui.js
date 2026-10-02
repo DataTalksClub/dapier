@@ -3,7 +3,10 @@ export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 export function icons() {
-  if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.5 } });
+  /* Lucide draws on a 24-unit grid but the family renders icons at 16px;
+     stroke-width 2.25 scales down to the family's 1.5px visual stroke
+     (24/16 × 1.5) — 1.5 here reads as a ~1px hairline next to the spec. */
+  if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 2.25 } });
 }
 
 export function showLogin() {
