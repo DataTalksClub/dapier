@@ -246,7 +246,6 @@ body[data-view="agents"] .view.active { padding-top: 0; width: auto; }
 .page-tools .sub { margin: 0; flex: 1 1 160px; min-width: 0; font-size: var(--dk-text-md); font-weight: 400; color: var(--dk-text-muted); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .dk-button { flex: none; }
 .page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; }
 .page-tools .inline-form input { width: 140px; }
 .page-tools .run-filters,
