@@ -2,8 +2,9 @@
  *  Normal-code source of truth: designer/src/ (entry: src/console.tsx).
  *  Rebuild into src/web/ with: make designer-console */
 /* Dapier "Operator's Ledger", dressed by the shared dakit design system.
-   The tokens come straight from the dakit checkout (build-time @import —
-   no runtime dependency); the console-origin font files serve the faces.
+   The tokens come from the vendored dakit copy (build-time @import of
+   src/web/vendor/dakit-tokens.css — in-repo, so CI builds it; refresh with
+   make sync-dakit); the console-origin font files serve the faces.
    The :root blocks below are a compat shim: the designer's old variable
    names, now defined by dakit tokens (see dakit/docs/adoption.md for the
    mapping and the deliberate remaps — white page, one blue accent, neutral
