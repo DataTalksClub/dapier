@@ -4,7 +4,6 @@ One module per domain (runs, insights, storage, inbox, connections, email,
 ops, designer, triggers, tokens, samples); the dispatcher resolves every
 handler through this namespace, so the names below are the stable surface.
 """
-from .bookkeeping import *  # noqa: F401
 from .connections import *  # noqa: F401
 from .designer import *  # noqa: F401
 from .email import *  # noqa: F401

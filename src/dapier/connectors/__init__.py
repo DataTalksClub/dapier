@@ -23,7 +23,6 @@ from . import (  # noqa: F401  (import = registration)
     email,
     gmail,
     ingress,
-    invoices,
     logic,
     mailchimp,
     poll,

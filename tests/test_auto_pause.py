@@ -331,7 +331,7 @@ def test_a_redelivered_failed_record_never_counts_twice(counter, live, monkeypat
     assert failure_counts.count("flaky-flow") == 2
 
 
-def test_bookkeeping_failure_never_breaks_the_failure_path(counter, live, monkeypatch):
+def test_failure_count_store_error_never_breaks_the_failure_path(counter, live, monkeypatch):
     monkeypatch.setattr(worker, "all_workflows", lambda: [dict(WORKFLOW)])
     def broken(*args, **kwargs):
         raise failure_counts.StoreError("no cursors table")

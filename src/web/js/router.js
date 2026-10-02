@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'storage', 'bookkeeping', 'audit', 'runs', 'agents', 'workers'];
+const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'storage', 'audit', 'runs', 'agents', 'workers'];
 let viewGuard = null;
 let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 
@@ -46,7 +46,7 @@ export async function setView(view, push = true) {
     else item.removeAttribute('aria-current');
   });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
-  $('#view-title').textContent = ({ overview: 'Home', runs: 'Runs', tokens: 'API tokens', emails: 'Emails', storage: 'Data store', bookkeeping: 'Bookkeeping', schedules: 'Schedules', audit: 'Audit log' })[view] || view[0].toUpperCase() + view.slice(1);
+  $('#view-title').textContent = ({ overview: 'Home', runs: 'Runs', tokens: 'API tokens', emails: 'Emails', storage: 'Data store', schedules: 'Schedules', audit: 'Audit log' })[view] || view[0].toUpperCase() + view.slice(1);
   $('.sidebar').classList.remove('open');
   $('#menu-toggle')?.setAttribute('aria-expanded', 'false');
   if (!push && ['/inbox', '/usage'].includes(window.location.pathname)) history.replaceState(null, '', `/runs${window.location.search}`);

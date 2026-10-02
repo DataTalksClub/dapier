@@ -7,11 +7,11 @@ commands.<handler>.
 
 import argparse
 
-from . import access, audit, auth, bookkeeping, connections, emails, hooks, ops, \
+from . import access, audit, auth, connections, emails, hooks, ops, \
     polls, runs, schedules, storage, triggers, workflows
 
 MODULES = (auth, connections, access, ops, runs, audit, storage, triggers,
-           workflows, hooks, schedules, polls, emails, bookkeeping)
+           workflows, hooks, schedules, polls, emails)
 
 
 def build_parser():

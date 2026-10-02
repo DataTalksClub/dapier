@@ -108,10 +108,10 @@ class TriggerApiTests(unittest.TestCase):
             self.assertTrue(created["created"])
             self.assertEqual(created["address"], "income-2026-08@dtcdev.click")
 
-            update = dict(self.body, description="bookkeeping", enabled=False)
+            update = dict(self.body, description="renewals", enabled=False)
             _status, updated = email_triggers.api_save(update, "op2", table_ref=stub)
         self.assertFalse(updated["created"])
-        self.assertEqual(updated["description"], "bookkeeping")
+        self.assertEqual(updated["description"], "renewals")
         self.assertFalse(updated["enabled"])
         self.assertEqual(updated["created_by"], "op")
 

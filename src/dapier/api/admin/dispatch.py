@@ -203,24 +203,6 @@ def _route_ops_email(event, method, path, operator_payload, operator_subject):
     return None
 
 
-def _route_bookkeeping(event, method, path, operator_payload, operator_subject):
-    """The bookkeeping review queue: list, one entry, confirm, reject."""
-    if method == "GET" and path == "/api/admin/bookkeeping":
-        return routes.list_bookkeeping(event)
-    entry_match = re.fullmatch(r"/api/admin/bookkeeping/([^/]+)", path)
-    if method == "GET" and entry_match:
-        return routes.get_bookkeeping(unquote(entry_match.group(1)))
-    confirm_match = re.fullmatch(r"/api/admin/bookkeeping/([^/]+)/confirm", path)
-    if method == "POST" and confirm_match:
-        return routes.confirm_bookkeeping(event, unquote(confirm_match.group(1)),
-                                          operator_subject)
-    reject_match = re.fullmatch(r"/api/admin/bookkeeping/([^/]+)/reject", path)
-    if method == "POST" and reject_match:
-        return routes.reject_bookkeeping(event, unquote(reject_match.group(1)),
-                                         operator_subject)
-    return None
-
-
 def _route_storage(event, method, path, operator_payload, operator_subject):
     """Per-workflow key/value storage."""
     storage_match = re.fullmatch(r"/api/admin/storage/([^/]+)", path)
@@ -286,8 +268,7 @@ def route(event, method, path):
         return response
     for router in (_route_overview_runs, _route_usage_errors, _route_inbox,
                    _route_connections, _route_grants_tokens, _route_ops_email,
-                   _route_storage, _route_triggers, _route_connection_tokens,
-                   _route_bookkeeping):
+                   _route_storage, _route_triggers, _route_connection_tokens):
         response = router(event, method, path, operator_payload, operator_subject)
         if response is not None:
             return response

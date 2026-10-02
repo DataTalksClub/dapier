@@ -1,17 +1,17 @@
-# Invoice intake: vendor invoice emails to `invoice@dtcdev.click`
-# are parsed and staged for bookkeeping review.
+# Invoice intake: vendor invoice emails to `invoice@mailer.dtcdev.click`
+# are filed straight into the DataOps document intake.
 #
-# The route is dedicated to invoices, so every step assumes an invoice
-# attachment is present — a text-only mail fails the run loudly (the
-# failure notify) instead of silently staging nothing.
+# Dapier is only the pipe here — trigger plus one action. Parsing and
+# confirmation live on the DataOps side (the intake endpoint verifies
+# checksums and files each attachment as a DataOps artifact).
 #
 # Live setup (workflows are operator config; this file is the canonical
 # definition):
 #   dapier workflows save workflows/invoice-intake.yaml
 #   dapier workflows publish invoice-intake
 #   dapier workflows on invoice-intake
-# Requires the `dropbox` connection (filing) and the copilot LLM key
-# (COPILOT_LLM_API_KEY on the Worker) for the AI fallback tier.
+# Requires the `dapier/dataops` secret (the DataOps intake token) and
+# DATAOPS_INTAKE_URL / DATAOPS_EMAIL_DOCUMENTS_BUCKET on the Worker.
 id: invoice-intake
 enabled: true
 trigger:
@@ -21,22 +21,9 @@ trigger:
     route:
       equals: invoice
 actions:
-  # Deterministic parsers for AWS and the Stripe-receipt family (OpenAI,
-  # Anthropic); unknown vendors go to gpt-4o-mini. The entry carries a
-  # source flag so the reviewer knows which rows to double-check.
-  - id: parse
-    type: invoice_parse
-    ai_fallback: true
-  # Nothing reaches the ledger here: the entry lands pending in the
-  # review queue (console Bookkeeping view / `dapier bookkeeping`).
-  # Redelivered invoices dedupe into the existing entry.
-  - id: stage
-    type: bookkeeping_stage
-    entry_from: parse
-  # File the original PDF with the paperwork. The reviewer re-files it
-  # into the YYYY month folders when confirming, per the bookkeeping SOP.
-  - id: file-pdf
-    type: dropbox_upload
-    connection_id: dropbox
-    source: attachment
-    folder: _dtc_paperwork/invoices/auto
+  # Stage the original PDF into the DataOps documents bucket and post it
+  # to the intake endpoint; DataOps owns extraction and review from there.
+  - id: file-to-dataops
+    type: dataops
+    auth_secret_id: dapier/dataops
+    url_env: DATAOPS_INTAKE_URL
