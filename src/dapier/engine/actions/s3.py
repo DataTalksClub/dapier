@@ -5,11 +5,10 @@ read, delete, or mint download links for single objects.
 (optionally authorized by a connection's bearer token) or ``source_s3`` (a
 staged ``{bucket, key}`` object, like an email attachment, a render output,
 or an earlier dropbox_read_file's output — bucket/key take templates). The
-target bucket is written with a credential's access key pair —
-the key/secret approach, not the stack's own identity — so backups can land
-in any bucket.
+target bucket is written with the configured assumed role or legacy access
+key pair. Internal staging uses the stack's execution identity.
 
-``s3_find`` lists the bucket with the same stored keys and returns the
+``s3_find`` lists the bucket with the same AWS configuration and returns the
 objects whose key (or basename) match a pattern — the first match keeps the
 single-object output, the full list (capped at 25) rides in ``matches`` with
 ``next_token`` chaining a truncated listing; a miss is a ``found: False``

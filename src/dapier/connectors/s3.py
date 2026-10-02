@@ -1,6 +1,6 @@
 """Amazon S3 connector: upload files to and find objects in a bucket with
-stored AWS keys, plus bucket/object discovery, the stored-keys health
-check, the new/updated/deleted-file poll sources, and the trigger chip's
+an assumed IAM role or legacy AWS keys, plus bucket/object discovery, the
+identity health check, the new/updated/deleted-file poll sources, and the trigger chip's
 sample pull."""
 import json
 
