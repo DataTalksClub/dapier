@@ -59,6 +59,10 @@ provider registry):
   toggle, not a status readout); status reads come from "Latest run".
 - Connections rows may show two row actions (Get token + Manage); token
   retrieval is a distinct operator task. Candidate for a follow-up menu.
+- Home needs-attention workflow rows may show two row actions (Inspect
+  failure + Open workflow) where family.md allows one next action; the
+  failure path is the row's next action and opening the workflow is the
+  escape hatch. Candidate for a follow-up menu.
 - Mobile page header keeps the 22px title inside the top bar block (with
   description) instead of repeating it in the canvas — same anatomy, one
   header instance.
