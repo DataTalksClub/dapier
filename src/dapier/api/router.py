@@ -9,6 +9,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import boto3
 
@@ -275,8 +276,11 @@ def _bearer_token(event):
 
 
 def _webhook_payload(body, content_type):
-    """Parsed JSON when the body is JSON, otherwise ``{"raw": text}``."""
+    """Parse JSON or URL-encoded fields; retain raw text for other bodies."""
     text = body.decode(errors="replace")
+    if content_type.split(";", 1)[0].strip().lower() == "application/x-www-form-urlencoded":
+        return {key: values[0] if len(values) == 1 else values
+                for key, values in parse_qs(text, keep_blank_values=True).items()}
     if "json" in content_type or text.lstrip().startswith(("{", "[")):
         try:
             parsed = json.loads(text)

@@ -281,3 +281,10 @@ operator can retry deletion after fixing the failure.
 Webhook request-ID claims initialize their DynamoDB parent map atomically
 before inserting a nested claim; this preserves other IDs in the same scope.
 Deleting a hook also removes its retry-state scope.
+
+
+Generic webhook intake parses JSON and `application/x-www-form-urlencoded`
+fields, preserving field case and blank values. Repeated form keys become
+arrays. A scalar `request_id` configured as `dedupe_path` identifies the same
+retry across JSON and form encoding; without that field, deliveries remain
+separate. HTTP 202 acknowledges intake, not downstream workflow completion.
