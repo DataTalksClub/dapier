@@ -140,10 +140,13 @@ Source: Zap `110871466`; draft: `youtube-slack`.
 - [x] Configure display name `YouTube`, unfurling/name linking enabled, reply broadcast disabled.
 - [ ] Verify Slack channel access and `chat:write.customize` permission.
 - [ ] Confirm exact message spacing and approve WebSub delivery as the adjustment from polling.
-- [ ] With authorization, post one test message; verify channel, name, title, URL and previews.
+- [x] Post exactly one synthetic message; verify channel, title, URL and link preview against Slack history.
+- [ ] Verify custom display name `YouTube`: provider currently shows `Au-Tomator` despite the requested username.
 - [ ] Agree on cutover and verify a new video notification once.
 
 Provider checks (2026-10-02): Slack token verification passed for DataTalks.Club (`T01ATQK62F8`); real message/channel/custom-name checks are pending the Chrome action test. YouTube live identity verification passed for DataTalksClub (`UCDvErgK0j5ur3aLgn6U-LqQ`) using the stored readonly connection. Chrome renewal outcome is unconfirmed: the UI still requests reconnection and no recent callback audit record was returned. No account binding was changed.
+
+Slack action evidence: Chrome strict dry-run passed, but its confirmation dialog timed out. Audit showed only the 19:46 UTC dry-run, and a direct channel-history read found no browser synthetic message. The authorized CLI fallback posted exactly one `SYNTHETIC TEST — Dapier CLI Slack 2026-10-02 01` message to `C01BQC114P2`, Slack timestamp `1790970539.954079`. Independent channel-history reads confirmed the text, channel URL and a YouTube preview attachment. The custom display-name check failed: no message `username` override was present and bot profile name remained `Au-Tomator`. No retry was sent. The migrated action was tested independently; its managed draft remains unpublished and disabled, while the earlier live workflow remains On.
 
 ## 6. Dropbox invoice landing
 
