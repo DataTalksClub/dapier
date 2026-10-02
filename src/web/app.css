@@ -75,7 +75,7 @@ td.select-col { padding-top: 10px; }
   color: var(--dk-text-primary);
 }
 .icon-button:hover { border-color: var(--dk-text-muted); background: var(--dk-bg-muted); color: var(--dk-text-primary); }
-.icon-button svg { width: 16px; height: 16px; }
+.icon-button svg { width: 20px; height: 20px; }
 
 .text-link {
   display: inline-flex;
@@ -187,7 +187,7 @@ nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-spa
 }
 .nav-item:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
 .nav-item.active, .nav-item[aria-current="page"] { background: var(--dk-accent-soft); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); }
-.nav-item svg { width: 16px; height: 16px; flex: none; }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
 .sidebar-foot {
   margin-top: auto;
   display: flex;
@@ -627,7 +627,7 @@ dialog form { display: contents; }
   color: var(--dk-danger-text);
   font-size: var(--dk-text-md);
 }
-.detail-error svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.detail-error svg { width: 20px; height: 20px; flex: none; margin-top: 1px; }
 
 /* audit view: outcome cells for error/denied rows */
 .audit-problem { color: var(--dk-danger-text); }
@@ -706,7 +706,7 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
   background: var(--dk-bg-page);
   color: var(--dk-text-primary);
 }
-.flow-icon svg { width: 16px; height: 16px; }
+.flow-icon svg { width: 20px; height: 20px; }
 .flow-title { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
 .flow-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .flow-total { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
@@ -973,7 +973,7 @@ body[data-view="workflows"] .workflow-page-actions .dk-button { height: var(--dk
 }
 
 .workflow-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.workflow-page-actions svg { width: 16px; height: 16px; }
+.workflow-page-actions svg { width: 20px; height: 20px; }
 [data-page="workflows"] .workflow-filters { gap: 10px; margin: 0; padding: 0; background: transparent; border: 0; align-items: center; }
 [data-page="workflows"] .workflow-filters label { min-width: 110px; flex: 0 1 140px; }
 [data-page="workflows"] .workflow-filters label:first-child { flex: 1 1 220px; max-width: none; }
