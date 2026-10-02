@@ -101,7 +101,9 @@ input, select {
   font-size: var(--dk-text-md);
   color: var(--dk-text-primary);
 }
-input:hover:not(:disabled):not([type="checkbox"]), select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
+/* Hover must not mask the focused control's accent border+halo. */
+input:hover:not(:focus):not(:disabled):not([type="checkbox"]),
+select:hover:not(:focus):not(:disabled) { border-color: var(--dk-border-strong); }
 input::placeholder { color: var(--dk-text-muted); opacity: 1; }
 /* Chevron, offset and clearance come from the dakit bundle's base layer. */
 select:disabled { opacity: .5; cursor: default; }
