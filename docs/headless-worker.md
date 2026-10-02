@@ -91,16 +91,21 @@ and agent tasks stay associated with it. It uses the configured worker root, wit
 reads the shared `fetch-zoom` skill when a Zoom link is present and emails a
 completion report to the sender. Inspect runs with `dapier agent-tasks list`
 or the console's **Agents** tab.
-If the instruction above the forwarded message says `zoom calls recording`,
+If the instruction above the forwarded Zoom recording or meeting-assets message
+says `Zoom`, `zoom calls`, `zoom-calls`, or `zoom calls recording` (case insensitive),
 the agent works in `~/git/zoom-calls` and follows that repository's
 `zoom-recording` skill, script, and summary templates. The forwarded Zoom
 message must include a share link and passcode. This instruction is evaluated
 by the agent; the headless process still starts in the configured worker root.
 The agent commits the resulting transcript and summary and pushes them to the
-private `zoom-calls` GitHub repository.
+private `zoom-calls` GitHub repository. Short personal meetings with Alexey and
+one other participant (typically under 30 minutes) default to `1x1`; group
+meetings use `discussion`, and an explicit meeting type takes precedence.
+An existing downloaded transcript can be reused, but scratch files alone do
+not complete the task.
 
 If the instruction says `AI Shipping Labs` above a forwarded Zoom recording,
-that route takes priority over `zoom calls recording`. By default, the agent
+that route takes priority over the Zoom calls aliases. By default, the agent
 uses the `ai-shipping-labs` event and recap skills to identify the exact
 existing event, ensure its video reaches S3, and create the recap through the
 event's source of truth. The site's Zoom
@@ -108,6 +113,11 @@ recording pipeline handles S3 uploads. The agent can refresh Zoom metadata or
 retry an upload through the authenticated event API, then checks the event
 again. It reports an ambiguous event match instead of selecting one by guess.
 It does not notify registrants unless the operator asks for that action.
+For any task that changes a Git repository, the agent stages only its intended
+files, runs the repository's required checks, commits in focused commits, pushes
+to the configured remote branch, and verifies the push. It preserves unrelated
+work and reports any check or push blocker in the completion report.
+
 Open **Workflows → email-trigger-agents** in the console to see the email
 trigger, agent action, and completion email. Agent actions can also run
 from webhook, schedule, and other workflow triggers. This route sends
