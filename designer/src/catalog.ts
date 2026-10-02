@@ -56,7 +56,7 @@ export interface CatalogField {
   placeholder?: string;
   required?: boolean;
   /** Inspector widget and YAML coercion; default "text". "yaml" edits a list/object as YAML text. */
-  type?: "text" | "number" | "textarea" | "boolean" | "select" | "yaml";
+  type?: "text" | "number" | "textarea" | "boolean" | "select" | "yaml" | "json";
   /** Choices for type: "select". */
   options?: string[];
   /** Value assumed when absent; prefills new nodes and YAML round-trips. */
@@ -192,6 +192,15 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "date_time", label: "Date / time", icon: Clock,
+    description: "Format a timestamp, or current processing time when Timestamp is omitted. Output: {iso, formatted, timezone}.",
+    fields: [
+      { key: "value", label: "Timestamp", placeholder: "{date}", help: "ISO or email Date with offset; omit for current processing time" },
+      { key: "timezone", label: "Timezone", placeholder: "America/Chicago", default: "UTC" },
+      { key: "format", label: "Format", default: "%Y-%m-%d" }
+    ]
+  },
+  {
     type: "slack",
     label: "Slack",
     icon: SlackLogo,
@@ -201,6 +210,9 @@ export const actionCatalog: ActionEntry[] = [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", placeholder: "#alerts", required: true,
         discover: { resource: "channels" } },
+      { key: "username", label: "Bot display name", help: "Requires chat:write.customize on modern Slack apps" },
+      { key: "link_names", label: "Link names", type: "boolean" },
+      { key: "reply_broadcast", label: "Broadcast thread reply", type: "boolean" },
       { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
       { key: "thread_ts", label: "Thread ts", placeholder: "{ts} — replies into that thread",
         discover: { resource: "messages", params: { channel: "channel" } } },
@@ -439,6 +451,9 @@ export const actionCatalog: ActionEntry[] = [
         discover: { resource: "chats" } },
       { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.pdf" },
       { key: "filename", label: "Filename override" },
+      { key: "attachment_selection", label: "Attachment selection", type: "select", options: ["all", "single", "first"], default: "all" },
+      { key: "overwrite", label: "Overwrite existing file", type: "boolean", default: "false" },
+      { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "true" },
       { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
@@ -571,6 +586,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
       { key: "url", label: "URL (overrides env)" },
       { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
+      { key: "path", label: "Dropbox file path", placeholder: "{steps.move.output.item.path}" },
       { key: "filename", label: "Filename override" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
@@ -686,7 +702,10 @@ export const actionCatalog: ActionEntry[] = [
       { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media",
         discover: { resource: "files", from: "source_connection_id", value: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" } },
       { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
-      { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
+      { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" },
+      { key: "key_mode", label: "Object key mode", type: "select", options: ["safe", "exact"], default: "safe" },
+      { key: "omit_content_type", label: "Omit Content-Type", type: "boolean", default: "false" },
+      { key: "source_s3", label: "Stored source (bucket/key)", type: "json" }
     ]
   },
   {
@@ -1137,9 +1156,10 @@ export const actionCatalog: ActionEntry[] = [
       { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
       { key: "spreadsheet_id", label: "Spreadsheet ID", placeholder: "from the sheet URL", required: true,
         discover: { resource: "spreadsheets" } },
+      { key: "sheet_id", label: "Worksheet ID", type: "number", help: "Numeric gid from the sheet URL; overrides Worksheet name" },
       { key: "sheet_name", label: "Worksheet", placeholder: "todo (default Sheet1)",
         discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" } },
-      { key: "values", label: "Row values (JSON)", type: "textarea", required: true,
+      { key: "values", label: "Row values (JSON)", type: "json", required: true,
         placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]' },
       { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
     ]

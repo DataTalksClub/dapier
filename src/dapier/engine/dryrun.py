@@ -166,7 +166,7 @@ def _render_warnings(action, rendered):
 
 def dry_run(workflow, sample, *, strict=False):
     """Walk the resolved action chain, rendering each step. No side effects:
-    the real runners are never imported for execution, let alone invoked.
+    provider runners are never executed. Date/time formatting is previewed locally.
 
     Steps whose rendered inputs trip the registry's field rules collect
     ``warnings``; with ``strict`` those warnings fail the step (``ok`` false,
@@ -174,7 +174,7 @@ def dry_run(workflow, sample, *, strict=False):
     """
     resolved = _resolved_or_error(workflow)
     envelope = normalize_sample_event(sample, resolved)
-    context = dict(envelope["data"])
+    step_outputs = {}
     steps = []
     for index, action in enumerate(resolved.get("actions") or []):
         if not isinstance(action, dict):
@@ -186,7 +186,7 @@ def dry_run(workflow, sample, *, strict=False):
             "action_type": str(action.get("type") or ""),
         }
         try:
-            rendered = _render_value(action, context)
+            rendered = _render_step_preview(action, envelope, step_outputs)
         except Exception as exc:
             steps.append({**step, "ok": False, "rendered_input": None,
                           "error": f"template error: {exc}"})
@@ -204,9 +204,18 @@ def dry_run(workflow, sample, *, strict=False):
                 step["error"] = warnings[0]
         step["rendered_input"] = rendered
         steps.append(step)
-        # Placeholder output for later steps' context; the engine passes only
-        # the event data forward today, so real outputs never feed templates.
-        context[step["action_id"]] = {"dry_run": True}
+        if step["ok"] and step["action_type"] == "date_time":
+            # Pure formatting/clock lookup: safe to preview without provider calls.
+            from .actions.date_time import run_date_time
+            try:
+                step["output"] = run_date_time(action, envelope, steps=step_outputs)
+            except Exception as exc:
+                step["ok"] = False
+                step["error"] = str(exc)
+        step_outputs[step["action_id"]] = {
+            "status": "completed" if step["ok"] else "failed",
+            "output": step.get("output", {"dry_run": True}),
+        }
     report = _report(resolved, envelope, steps, mode="dry-run")
     return report
 

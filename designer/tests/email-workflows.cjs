@@ -63,3 +63,31 @@ test('Invalid list filters cannot silently become nonmatching strings', async ()
   const result = workflowFromShapes(shapes, original.id, true, original);
   assert.ok(result.problems.some(problem => problem.includes('JSON list')));
 });
+
+test('Structured Sheets rows and S3 source refs survive canvas editing', async () => {
+  const { workflowFromShapes, shapesFromWorkflow } = await converters;
+  const original = emailWorkflow();
+  original.actions = [
+    { id: 'row', type: 'sheets_append_row', connection_id: 'google-sheets',
+      spreadsheet_id: 'workbook', sheet_id: 0,
+      values: [['{steps.clock.output.iso}', 'Process email "{subject}" from {sender.header}', '', 'NEW']] },
+    { id: 'backup', type: 's3_upload', bucket: 'target-bucket', key: '{name}', key_mode: 'exact',
+      source_s3: { bucket: '{steps.read.output.bucket}', key: '{steps.read.output.key}' } }
+  ];
+  const result = workflowFromShapes(shapesFromWorkflow(original), original.id, original.enabled, original);
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.workflow, original);
+});
+
+test('Invalid JSON rows are rejected before saving', async () => {
+  const { workflowFromShapes, shapesFromWorkflow } = await converters;
+  const original = emailWorkflow();
+  original.actions = [{ id: 'row', type: 'sheets_append_row', connection_id: 'google-sheets',
+    spreadsheet_id: 'workbook', values: [['task']] }];
+  const shapes = shapesFromWorkflow(original);
+  const step = shapes.find(shape => shape.data?.actionType === 'sheets_append_row');
+  assert.ok(step);
+  step.data.fields.values = '[invalid';
+  const result = workflowFromShapes(shapes, original.id, true, original);
+  assert.ok(result.problems.some(problem => problem.includes('valid JSON')));
+});

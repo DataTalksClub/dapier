@@ -1,0 +1,17 @@
+{
+  "name": "mailchimp-drive-backup",
+  "source": "google-drive.files",
+  "connection_id": "google-sheets",
+  "folder_id": "1-MAoAuQbny7FK9UQuk8800zT8M8TOQ59",
+  "drive_id": "0AJbu0ZbG97XkUk9PVA",
+  "expression": "rate(2 minutes)",
+  "enabled": false,
+  "description": "Zapier 157386985: seed without replay; watch all file types",
+  "actions": [
+    {
+      "id": "ingress-only",
+      "type": "code",
+      "code": "None"
+    }
+  ]
+}

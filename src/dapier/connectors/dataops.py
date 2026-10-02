@@ -6,15 +6,16 @@ register(Action(
     type="dataops",
     label="DataOps intake",
     icon="database-zap",
-    run=lambda action, event, workflow_id, steps=None: run_dataops(action, event),
+    run=lambda action, event, workflow_id, steps=None: run_dataops(action, event, steps=steps),
     required=frozenset({"auth_secret_id"}),
-    optional=frozenset({"url", "url_env", "timeout_seconds", "connection_id", "filename"}),
+    optional=frozenset({"url", "url_env", "timeout_seconds", "connection_id", "filename", "path"}),
     fields=(
         {"key": "auth_secret_id", "label": "Auth secret ID", "placeholder": "dapier/dataops", "required": True},
         {"key": "url_env", "label": "URL env var", "placeholder": "DATAOPS_INTAKE_URL"},
         {"key": "url", "label": "URL (overrides env)", "type": "url"},
         {"key": "connection_id", "label": "Dropbox connection ID", "placeholder": "dropbox — for file-event intakes"},
         {"key": "filename", "label": "Filename override"},
+        {"key": "path", "label": "Dropbox file path", "placeholder": "{steps.move.output.item.path}"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
 ))

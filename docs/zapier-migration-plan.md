@@ -12,14 +12,14 @@ or browser-rendering runtime.
 | Workflow | Decision | Replacement |
 | --- | --- | --- |
 | YouTube channel to Slack | Keep | YouTube WebSub -> Dapier -> Slack API using the existing bot token |
-| Telegram TODO | Keep, modify | Existing Telegram bot -> DataOps intake directly |
-| Invoice email attachment | Keep, modify | Datamailer inbound -> Dapier -> DataOps artifact |
-| TODO email | Keep, modify | Datamailer inbound -> Dapier -> DataOps intake |
+| Telegram TODO | Keep, modify | Native bot extension plus Date/Text webhook -> TODO sheet |
+| Invoice email attachment | Keep, modify | Datamailer -> Dapier -> Dropbox archive and DataOps artifact |
+| TODO email | Keep, modify | Datamailer -> Dapier -> TODO sheet and DataOps intake |
 | Invoice email body to PDF | Keep, modify | Datamailer -> Dapier -> HTML Renderer -> DataOps artifact |
 | Eventbrite to Google Calendar | Remove | None |
 | Edited podcast Dropbox notification | Remove | None |
-| Dropbox invoice landing folder | Remove | Upload directly to DataOps |
-| Google Drive mailing-list backup to S3 | Remove | DataOps-managed provider export |
+| Dropbox invoice landing folder | Keep, modify | Date-prefix and archive, then forward to DataOps |
+| Google Drive mailing-list backup to S3 | Keep | Copy exported files from the shared folder to S3 |
 
 Disabled YouTube-to-Twitter, invoice-picture conversion, and Finom workflows remain
 out of scope.
@@ -148,7 +148,10 @@ signed URLs, OAuth tokens, or raw secrets.
 - DataOps email/document intake: [DataTalksClub/dataops#109](https://github.com/DataTalksClub/dataops/issues/109)
 - DataOps mailing-list exports: [#108](https://github.com/DataTalksClub/dataops/issues/108)
 
-## Implementation Status
+## Earlier sandbox implementation status
+
+This section records the earlier implementation. Current migration definitions
+and remaining connection checks are listed below.
 
 Deployed in the sandbox AWS account:
 
@@ -165,3 +168,116 @@ Live end-to-end checks cover TODO email, invoice attachment, and rendered invoic
 PDF ingestion into DataOps. YouTube WebSub is subscribed and signature-verified;
 the Slack action remains disabled in practice until the existing Automator bot
 token is copied into the `dapier/slack` Secrets Manager secret.
+
+## Concrete configuration from the 2 October 2026 inspection
+
+The six definitions in `workflows/*.yaml` carry the original Zap IDs in their
+`zapier-<id>` tags. They are inactive migration definitions: saving through
+`dapier workflows save` creates drafts for the existing workflow IDs without
+changing their published behavior. The Telegram catch hook and mailing backup
+have their own workflow IDs. Operator trigger configuration is in
+`workflows/zapier/triggers/`; every trigger there is disabled.
+
+| Zap ID | Definition | Applied configuration |
+| --- | --- | --- |
+| 157386985 | `mailing-list-backup.yaml` | Drive `0AJbu0ZbG97XkUk9PVA`, folder `1-MAoAuQbny7FK9UQuk8800zT8M8TOQ59`, every 2 minutes; download bytes to S3 `datatalks-mailchimp-backup`, original title as exact object key, leading slash removed. No extension filter. |
+| 153709869 | `todo-intake.yaml` | Workbook `1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw`, worksheet ID `0`; Date from processing time, Task `Process email "<Subject>" from <From>`, Notes blank, Status `NEW`. Existing native Telegram tasks and confirmations remain an extension. |
+| 153562936 | `invoice-intake.yaml` | Email route `invoice`; UTC date from the email Date header; unchanged attachment bytes uploaded to `/_dtc_paperwork/invoices/<UTC date>-<Subject>.pdf`; overwrite disabled; then DataOps intake. |
+| 153485577 | `telegram-todo.yaml` | A catch hook named `telegram-todo`, using the request's `Date` and `Text` fields; same TODO workbook and worksheet ID `0`, Notes blank, Status `NEW`. Sender Date is retained. |
+| 110871466 | `youtube-slack.yaml` | Channel `UCDvErgK0j5ur3aLgn6U-LqQ` via WebSub; Slack `C01BQC114P2`, display name `YouTube`, original message segment order, link/media unfurling and name linking enabled, reply broadcast disabled. |
+| 155120966 | `dropbox_on_upload.yaml` | Poll `/_dtc_paperwork/invoices-landing` every 2 minutes; rename to `<processing date>-<original filename>` preserving the extension once; move to `/_dtc_paperwork/invoices`; forward the archived path to DataOps. No delete step or extension filter. |
+
+The folder poll identifies items by their stable Dropbox file ID. The workflow
+matches that named poll, so account webhook deliveries cannot cause a second
+execution of the same migration. Both folder polls seed their cursors without
+replaying existing files. Moving a file out of the landing folder also prevents
+it from being picked up again there.
+
+### Configurable adapter options
+
+- `date_time` accepts an optional offset-bearing ISO or email timestamp,
+  an IANA `timezone` and a strftime `format`. Omitting `value` reads processing
+  time. Outputs are `iso`, `formatted` and `timezone`.
+- `dropbox_upload` renders `folder` and `filename` from the event and previous
+  steps. `attachment_selection` accepts `all`, `single` or `first`.
+  `single` rejects ambiguous multi-attachment emails before any upload.
+  `overwrite` and `autorename` are separate options. Existing flows retain
+  their defaults: all attachments, no overwrite, autorename enabled.
+- `dataops.path` can reference the completed move step instead of attempting
+  to download the missing original path.
+- `sheets_append_row.sheet_id` selects the numeric worksheet ID and resolves
+  its current title; it overrides `sheet_name` and survives tab renames.
+- `slack.username`, `link_names` and `reply_broadcast` expose the corresponding
+  provider options. A modern Slack app needs `chat:write.customize` for a
+  display-name override, as described in the
+  [Slack posting documentation](https://docs.slack.dev/reference/methods/chat.postMessage/).
+- `s3_upload.key_mode: exact` preserves the source title rather than applying
+  filename sanitization. `omit_content_type: true` omits Content-Type;
+  otherwise `content_type` can explicitly specify a literal value.
+- `google-drive.files` polls accept a `drive_id`, include shared-drive items
+  and retain pagination. Console advanced options, CLI trigger JSON and the
+  HTTP API all preserve this setting.
+
+### Adjustments and remaining source-provider checks
+
+Invoice sheet appends remain in DataOps' domain. Dapier does not recreate the
+bookkeeping worksheet or price placeholders. The original downstream mappings
+were workbook `1jIBou5XvBY3uy7dsxDUVM4yiPZAgXUN5AZJN3bDJgHU`, worksheet ID
+`819898795` (2022), email prices `-TODO`, landing-folder prices `TODO`.
+Those values are reference requirements for DataOps if the legacy sheet remains
+part of its output; this change does not claim that output is configured there.
+
+Email TODO drafts explicitly use `America/Chicago`, consistent with the observed
+summer offset of -05:00. That is a configurable candidate, not verified Zapier
+CST semantics. Landing-folder drafts explicitly use UTC; the original sandbox
+zone is unknown. Confirm both before activation. Tests cover midnight offsets
+and seasonal DST changes.
+
+Invoice uploads require one stored attachment. Multiple/inline-attachment
+selection needs source-provider evidence before choosing `first` or another
+contract. Conflict autorename is disabled in the invoice draft, so an existing
+filename fails rather than silently overwriting it; Zapier's exact duplicate-name
+behavior is still unverified.
+
+The backup draft preserves `content_type: none` as a literal, matching the
+visible configuration. Verify whether Zapier actually omitted Content-Type or
+sent a default/literal before activation, and use `omit_content_type` if needed.
+Google-native Drive documents use the existing download adapter's export behavior,
+which also needs comparison if that folder contains native documents.
+
+The Telegram bridge's HTTP method, capitalization and content type need checking
+against its sender. Its hook has no text/date dedupe: repeated tasks remain
+separate events. Agree on a sender-supplied request ID, then configure
+`dedupe_path: request_id` to distinguish intentional repeats from retries.
+This contract is separate from the existing native Telegram bot's update-ID
+identity.
+
+Slack blank-line spacing is retained from the current Dapier flow because the
+source inspection did not establish exact line breaks. YouTube WebSub remains
+the intentional replacement for 2-minute polling. Dapier's default pause after
+five consecutive failures is its own policy; it is not presented as Zapier's
+undisclosed error-ratio threshold.
+
+### Validation and activation checklist
+
+Synthetic events live in `workflows/zapier/fixtures/`. Acceptance tests cover
+filenames, unchanged bytes, exact resource IDs, dates, Slack request options,
+worksheet rename handling, CLI/API draft saving and failure recovery after file
+moves.
+
+Before cutover:
+
+1. Verify access to the exact shared Drive folder and TODO workbook. The current
+   Google connection identifies `alexey@datatalks.club`; the source used
+   `alexey.s.grigoriev@gmail.com`. Resource IDs, rather than account labels,
+   define the destination, but access must be checked.
+2. Connect Dropbox and Slack, grant the display-name scope, and configure the
+   target S3 credential through the Console or CLI. Verify DataOps intake.
+3. Resolve the timezone, attachment, collision, MIME and Telegram contracts
+   above; verify downstream bookkeeping behavior separately in DataOps.
+4. Inspect each draft against live with `dapier workflows draft-diff <id>`.
+   Use strict dry-runs and per-step tests with synthetic prior outputs for
+   dependencies. Dry-runs cannot verify provider defaults or permissions.
+5. With separate cutover authorization, publish the reviewed workflows, enable
+   their polls/hook and verify new events. Existing Zapier senders and Zaps
+   are not changed by saving these drafts.

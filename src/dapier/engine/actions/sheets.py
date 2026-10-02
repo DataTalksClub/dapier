@@ -80,6 +80,22 @@ def _append_rows(access_token, spreadsheet_id, sheet_name, rows, value_input_opt
     return result if isinstance(result, dict) else {}
 
 
+def _sheet_title(access_token, spreadsheet_id, sheet_id, *, transport=None):
+    transport = transport or base._default_transport
+    url = ("https://sheets.googleapis.com/v4/spreadsheets/"
+           f"{urllib.parse.quote(spreadsheet_id, safe='')}?fields=sheets.properties")
+    status, response = transport("GET", url, headers={"authorization": f"Bearer {access_token}"},
+                                 body=None, timeout=15)
+    if status >= 300:
+        raise RuntimeError(f"google sheets metadata returned HTTP {status}")
+    for sheet in json.loads(response).get("sheets", []):
+        props = sheet.get("properties", {})
+        if str(props.get("sheetId")) == sheet_id:
+            # Quote the title as an A1 range, so spaces, quotes and named ranges cannot alter selection.
+            return "'" + props["title"].replace("'", "''") + "'"
+    raise ValueError(f"worksheet id {sheet_id} does not exist in spreadsheet")
+
+
 def run_sheets_append_row(action, event, *, transport=None, steps=None):
     """Append rows to a worksheet via the Sheets API ``values.append``.
 
@@ -93,6 +109,11 @@ def run_sheets_append_row(action, event, *, transport=None, steps=None):
     if not spreadsheet_id:
         raise ValueError("sheets_append_row requires a spreadsheet_id")
     sheet_name = str(action.get("sheet_name") or "").strip() or "Sheet1"
+    if "sheet_id" in action:
+        sheet_id = render(str(action["sheet_id"]), event, steps).strip()
+        if not sheet_id.isdigit():
+            raise ValueError("sheets_append_row sheet_id must be a non-negative integer")
+        sheet_name = _sheet_title(access_token, spreadsheet_id, sheet_id, transport=transport)
     option = str(action.get("value_input_option") or "USER_ENTERED").strip().upper()
     if option not in VALUE_INPUT_OPTIONS:
         raise ValueError("value_input_option must be one of: USER_ENTERED, RAW")

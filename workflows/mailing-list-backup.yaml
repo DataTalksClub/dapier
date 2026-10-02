@@ -1,0 +1,29 @@
+# Migration draft; save through dapier workflows save. No cutover is authorized.
+id: mailing-list-backup
+enabled: false
+description: 'Zapier 157386985: Shared Drive mailchimp folder to S3 with the original
+  title as key and unchanged bytes.'
+tags:
+- zapier-migration
+- zapier-157386985
+actions:
+- id: download-file
+  type: drive_read_file
+  connection_id: google-sheets
+  file_id: '{id}'
+- id: upload-backup
+  type: s3_upload
+  credential_id: aws
+  bucket: datatalks-mailchimp-backup
+  key: '{name}'
+  key_mode: exact
+  content_type: none
+  source_s3:
+    bucket: '{steps.download-file.output.bucket}'
+    key: '{steps.download-file.output.key}'
+trigger:
+  connector: google-drive
+  event: file.created
+  filters:
+    poll:
+      equals: mailchimp-drive-backup

@@ -23,7 +23,7 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
    list_id, calendar_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
   'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days', 'actions', 'flow',
-  'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'for_email',
+  'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'drive_id', 'for_email',
   'path', 'channel_id', 'list_id', 'calendar_id'];
 
 /* Sources that poll a connected account and so require connection_id on

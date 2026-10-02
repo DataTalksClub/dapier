@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "id": "synthetic-email",
+  "connector": "email",
+  "event": "message.received",
+  "occurred_at": "2026-09-30T22:30:00Z",
+  "data": {
+    "route": "invoice",
+    "message_id": "<synthetic@example.com>",
+    "date": "Thu, 01 Oct 2026 00:30:00 +0200",
+    "subject": "Example",
+    "sender": {
+      "header": "Alice <alice@example.com>",
+      "addresses": [
+        "alice@example.com"
+      ]
+    },
+    "attachments": [
+      {
+        "filename": "original.png",
+        "s3": {
+          "bucket": "synthetic",
+          "key": "image.png"
+        },
+        "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "content_type": "image/png"
+      }
+    ]
+  }
+}

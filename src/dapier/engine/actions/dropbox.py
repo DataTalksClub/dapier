@@ -40,12 +40,14 @@ def _upload_files(action, data):
         raise ValueError("email has no stored attachments to upload")
     return files
 
-def _dropbox_upload(access_token, path, payload, *, transport=None):
+def _dropbox_upload(access_token, path, payload, *, transport=None,
+                    overwrite=False, autorename=True):
     transport = transport or base._default_transport
     headers = {
         "authorization": f"Bearer {access_token}",
         "dropbox-api-arg": json.dumps(
-            {"path": path, "mode": "add", "autorename": True, "mute": False},
+            {"path": path, "mode": "overwrite" if overwrite else "add",
+             "autorename": autorename, "mute": False},
             separators=(",", ":"),
         ),
         "content-type": "application/octet-stream",
@@ -68,17 +70,46 @@ def _dropbox_upload(access_token, path, payload, *, transport=None):
         except (ValueError, UnicodeDecodeError):
             pass
         raise RuntimeError(f"dropbox upload returned HTTP {status}{f' ({tag})' if tag else ''}")
+    try:
+        return json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise RuntimeError("dropbox upload returned an unreadable body") from None
 
-def run_dropbox_upload(action, event, transport=None):
+
+def _boolean(action, key, default=False):
+    value = action.get(key, default)
+    if isinstance(value, str):
+        if value.strip().lower() not in ("true", "false"):
+            raise ValueError(f"{key} must be true or false")
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
+def run_dropbox_upload(action, event, transport=None, steps=None):
     connection = _dropbox_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection, transport=transport)
-    stripped = str(action.get("folder") or "").strip("/")
+    stripped = render(str(action.get("folder") or ""), event, steps).strip("/")
     folder = f"/{stripped}" if stripped else ""
     uploaded = []
-    for file in _upload_files(action, event.get("data", {})):
-        path = f"{folder}/{base._safe_filename(file['filename'])}"
-        _dropbox_upload(access_token, path, base._s3_body(file["s3"]), transport=transport)
-        uploaded.append(path)
+    files = _upload_files(action, event.get("data", {}))
+    selection = action.get("attachment_selection", "all")
+    if selection not in ("all", "single", "first"):
+        raise ValueError("attachment_selection must be all, single or first")
+    if selection == "single" and len(files) != 1:
+        raise ValueError("single attachment selection requires exactly one stored attachment")
+    if selection == "first":
+        files = files[:1]
+    override = render(str(action.get("filename") or ""), event, steps)
+    if "filename" in action and not override.strip():
+        raise ValueError("dropbox_upload filename rendered empty")
+    if override and len(files) > 1:
+        raise ValueError("filename override requires selecting a single file")
+    for file in files:
+        path = f"{folder}/{base._safe_filename(override or file['filename'])}"
+        metadata = _dropbox_upload(access_token, path, base._s3_body(file["s3"]), transport=transport,
+                                   overwrite=_boolean(action, "overwrite"),
+                                   autorename=_boolean(action, "autorename", True))
+        uploaded.append(metadata.get("path_display") or metadata.get("path_lower") or path)
     return {"uploaded": uploaded}
 
 def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dropbox call unreachable"):
@@ -375,7 +406,7 @@ def _run_dropbox_transfer(action, event, *, url, verb, transport, steps):
     raw = _dropbox_rpc(
         url, access_token,
         {"from_path": from_path, "to_path": to_path,
-         "autorename": bool(action.get("autorename"))},
+         "autorename": _boolean(action, "autorename")},
         transport=transport, unreachable=f"dropbox {verb} unreachable",
     )
     try:

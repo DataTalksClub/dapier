@@ -18073,6 +18073,17 @@
       ]
     },
     {
+      type: "date_time",
+      label: "Date / time",
+      icon: Clock,
+      description: "Format a timestamp, or current processing time when Timestamp is omitted. Output: {iso, formatted, timezone}.",
+      fields: [
+        { key: "value", label: "Timestamp", placeholder: "{date}", help: "ISO or email Date with offset; omit for current processing time" },
+        { key: "timezone", label: "Timezone", placeholder: "America/Chicago", default: "UTC" },
+        { key: "format", label: "Format", default: "%Y-%m-%d" }
+      ]
+    },
+    {
       type: "slack",
       label: "Slack",
       icon: SlackLogo,
@@ -18087,6 +18098,9 @@
           required: true,
           discover: { resource: "channels" }
         },
+        { key: "username", label: "Bot display name", help: "Requires chat:write.customize on modern Slack apps" },
+        { key: "link_names", label: "Link names", type: "boolean" },
+        { key: "reply_broadcast", label: "Broadcast thread reply", type: "boolean" },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
         {
           key: "thread_ts",
@@ -18387,6 +18401,9 @@
         },
         { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.pdf" },
         { key: "filename", label: "Filename override" },
+        { key: "attachment_selection", label: "Attachment selection", type: "select", options: ["all", "single", "first"], default: "all" },
+        { key: "overwrite", label: "Overwrite existing file", type: "boolean", default: "false" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "true" },
         { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
@@ -18547,6 +18564,7 @@
         { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
         { key: "url", label: "URL (overrides env)" },
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
+        { key: "path", label: "Dropbox file path", placeholder: "{steps.move.output.item.path}" },
         { key: "filename", label: "Filename override" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
@@ -18712,7 +18730,10 @@
           discover: { resource: "files", from: "source_connection_id", value: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" }
         },
         { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
-        { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" }
+        { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" },
+        { key: "key_mode", label: "Object key mode", type: "select", options: ["safe", "exact"], default: "safe" },
+        { key: "omit_content_type", label: "Omit Content-Type", type: "boolean", default: "false" },
+        { key: "source_s3", label: "Stored source (bucket/key)", type: "json" }
       ]
     },
     {
@@ -19418,6 +19439,7 @@
           required: true,
           discover: { resource: "spreadsheets" }
         },
+        { key: "sheet_id", label: "Worksheet ID", type: "number", help: "Numeric gid from the sheet URL; overrides Worksheet name" },
         {
           key: "sheet_name",
           label: "Worksheet",
@@ -19427,7 +19449,7 @@
         {
           key: "values",
           label: "Row values (JSON)",
-          type: "textarea",
+          type: "json",
           required: true,
           placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
         },
@@ -20432,6 +20454,21 @@
         fieldTarget(written, field)[field.key] = raw === "true";
         continue;
       }
+      if (field.type === "json") {
+        const text = (data.fields?.[field.key] ?? "").trim();
+        if (text === "") continue;
+        try {
+          const parsed2 = JSON.parse(text);
+          if (!isRecord(parsed2) && !Array.isArray(parsed2)) {
+            problems.push(`"${node.label ?? type2}": ${field.label} must be a JSON object or array.`);
+            continue;
+          }
+          fieldTarget(written, field)[field.key] = parsed2;
+        } catch {
+          problems.push(`"${node.label ?? type2}": ${field.label} is not valid JSON.`);
+        }
+        continue;
+      }
       if (field.type === "yaml") {
         const text = (data.fields?.[field.key] ?? "").trim();
         if (text === "") continue;
@@ -20456,7 +20493,7 @@
     }
     const merged = { ...action, ...data.raw ?? {}, ...written };
     for (const field of [...meta.fields, ...errorHandlingFields]) {
-      if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
+      if ((field.type === "yaml" || field.type === "json") && !(data.fields?.[field.key] ?? "").trim()) {
         delete merged[field.key];
       }
     }
@@ -20514,6 +20551,10 @@
     for (const field of [...meta.fields, ...errorHandlingFields]) {
       const holder = field.group ? action[field.group] : action;
       const value = isRecord(holder) ? holder[field.key] : void 0;
+      if (field.type === "json") {
+        if (value !== void 0) fields[field.key] = JSON.stringify(value, null, 2);
+        continue;
+      }
       if (field.type === "yaml") {
         if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();
         continue;
@@ -21880,7 +21921,7 @@
         )
       ] });
     }
-    if (field.type === "textarea") {
+    if (field.type === "textarea" || field.type === "json") {
       if (field.key === "prompt" || field.key === "system") {
         return /* @__PURE__ */ jsxRuntimeExports.jsx(PromptField, { field, value, onChange });
       }

@@ -353,22 +353,26 @@ def _drive_poll_validate(body):
             "connection_id is required: pick the Google connection to poll as")
     return {
         "folder_id": folder_id,
+        "drive_id": str(body.get("drive_id") or "").strip(),
         "cursor_mode": "next_cursor",
         "id_path": "id",
         "url": "",
     }
 
 
-def _list_folder_files(token, folder_id, *, transport=None):
+def _list_folder_files(token, folder_id, *, drive_id=None, transport=None):
     """The folder's files (up to ~300: three pages of 100), newest created
     first, with the fields the events and pickers share."""
     page_params = {
         "q": f"'{folder_id}' in parents and trashed=false",
         "orderBy": "createdTime desc",
         "pageSize": DRIVE_POLL_PAGE_SIZE,
-        "fields": "files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink)",
+        "fields": "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink)",
         "supportsAllDrives": "true",
+        "includeItemsFromAllDrives": "true",
     }
+    if drive_id:
+        page_params.update({"corpora": "drive", "driveId": drive_id})
     files = []
     for _page in range(DRIVE_POLL_PAGES):
         url = (provider.GOOGLE_DRIVE_FILES_URL + "?"
@@ -414,7 +418,7 @@ def _drive_poll_fetch(item, cursor=None, *, transport=None):
         raise RuntimeError("poll source 'google-drive.files' needs a stored folder_id")
     token = poll_triggers._bearer_token(item["connection_id"])
     try:
-        files = _list_folder_files(token, folder_id, transport=transport)
+        files = _list_folder_files(token, folder_id, drive_id=item.get("drive_id"), transport=transport)
     except provider.DiscoveryError as exc:
         raise RuntimeError(f"drive poll failed: {exc}") from None
     if cursor is None:
@@ -430,7 +434,7 @@ def _drive_poll_fetch(item, cursor=None, *, transport=None):
 
 def _drive_poll_view(item):
     """The provider params ``public_view`` shows beside ``source``."""
-    return {"folder_id": item.get("folder_id")}
+    return {"folder_id": item.get("folder_id"), "drive_id": item.get("drive_id")}
 
 
 register_source(PollSource(

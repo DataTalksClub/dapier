@@ -200,7 +200,7 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
       </label>
     );
   }
-  if (field.type === "textarea") {
+  if (field.type === "textarea" || field.type === "json") {
     if (field.key === "prompt" || field.key === "system") {
       return <PromptField field={field} value={value} onChange={onChange} />;
     }

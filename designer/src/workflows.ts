@@ -181,6 +181,21 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
       fieldTarget(written, field)[field.key] = raw === "true";
       continue;
     }
+    if (field.type === "json") {
+      const text = (data.fields?.[field.key] ?? "").trim();
+      if (text === "") continue;
+      try {
+        const parsed: unknown = JSON.parse(text);
+        if (!isRecord(parsed) && !Array.isArray(parsed)) {
+          problems.push(`"${node.label ?? type}": ${field.label} must be a JSON object or array.`);
+          continue;
+        }
+        fieldTarget(written, field)[field.key] = parsed;
+      } catch {
+        problems.push(`"${node.label ?? type}": ${field.label} is not valid JSON.`);
+      }
+      continue;
+    }
     if (field.type === "yaml") {
       const text = (data.fields?.[field.key] ?? "").trim();
       if (text === "") continue;
@@ -211,7 +226,7 @@ function actionToYaml(node: DiagramShape, index: number, problems: string[]): Re
   const merged: Record<string, unknown> = { ...action, ...(data.raw ?? {}), ...written };
   for (const field of [...meta.fields, ...errorHandlingFields]) {
     // A cleared yaml field removes the key (and any stale extra under it).
-    if (field.type === "yaml" && !(data.fields?.[field.key] ?? "").trim()) {
+    if ((field.type === "yaml" || field.type === "json") && !(data.fields?.[field.key] ?? "").trim()) {
       delete merged[field.key];
     }
   }
@@ -290,6 +305,10 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
   for (const field of [...meta.fields, ...errorHandlingFields]) {
     const holder = field.group ? action[field.group] : action;
     const value = isRecord(holder) ? holder[field.key] : undefined;
+    if (field.type === "json") {
+      if (value !== undefined) fields[field.key] = JSON.stringify(value, null, 2);
+      continue;
+    }
     if (field.type === "yaml") {
       // Sub-step lists (condition branches, loop bodies) edit as YAML text.
       if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();

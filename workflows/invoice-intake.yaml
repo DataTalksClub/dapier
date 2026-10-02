@@ -1,29 +1,33 @@
-# Invoice intake: vendor invoice emails to `invoice@dtcdev.click`
-# are filed straight into the DataOps document intake.
-#
-# Dapier is only the pipe here — trigger plus one action. Parsing and
-# confirmation live on the DataOps side (the intake endpoint verifies
-# checksums and files each attachment as a DataOps artifact).
-#
-# Live setup (workflows are operator config; this file is the canonical
-# definition):
-#   dapier workflows save workflows/invoice-intake.yaml
-#   dapier workflows publish invoice-intake
-#   dapier workflows on invoice-intake
-# Requires the `dapier/dataops` secret (the DataOps intake token) and
-# DATAOPS_INTAKE_URL / DATAOPS_EMAIL_DOCUMENTS_BUCKET on the Worker.
+# Migration draft; save through dapier workflows save. No cutover is authorized.
 id: invoice-intake
-enabled: true
+enabled: false
+description: 'Zapier 153562936: Archive the single email attachment with the UTC email
+  date, then forward to DataOps.'
+tags:
+- zapier-migration
+- zapier-153562936
+actions:
+- id: email-date
+  type: date_time
+  value: '{date}'
+  timezone: UTC
+  format: '%Y-%m-%d'
+- id: archive-attachment
+  type: dropbox_upload
+  connection_id: dropbox
+  folder: /_dtc_paperwork/invoices
+  source: attachment
+  attachment_selection: single
+  filename: '{steps.email-date.output.formatted}-{subject}.pdf'
+  overwrite: false
+  autorename: false
+- id: file-to-dataops
+  type: dataops
+  auth_secret_id: dapier/dataops
+  url_env: DATAOPS_INTAKE_URL
 trigger:
   connector: email
   event: message.received
   filters:
     route:
       equals: invoice
-actions:
-  # Stage the original PDF into the DataOps documents bucket and post it
-  # to the intake endpoint; DataOps owns extraction and review from there.
-  - id: file-to-dataops
-    type: dataops
-    auth_secret_id: dapier/dataops
-    url_env: DATAOPS_INTAKE_URL

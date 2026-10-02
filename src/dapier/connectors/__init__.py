@@ -17,6 +17,7 @@ from . import (  # noqa: F401  (import = registration)
     code,
     csv,
     dataops,
+    date_time,
     digest,
     dropbox,
     drive,

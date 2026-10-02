@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 
 from ...connections import tokens
 from . import base, dropbox
+from .templating import render
 
 
 STAGING_PREFIX = "transfer/"
@@ -58,7 +59,7 @@ def _received_at(value):
     return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def run_dataops(action, event):
+def run_dataops(action, event, *, steps=None):
     value = base.secrets_value(action["auth_secret_id"])
     try:
         parsed = json.loads(value)
@@ -69,17 +70,17 @@ def run_dataops(action, event):
         raise ValueError("DataOps secret does not contain a token")
     return base._json_request(
         action.get("url") or os.environ[action.get("url_env", "DATAOPS_INTAKE_URL")],
-        _intake_body(action, event),
+        _intake_body(action, event, steps=steps),
         headers={"x-dataops-intake-secret": token},
         timeout=action.get("timeout_seconds", 15),
     )
 
-def _intake_body(action, event):
+def _intake_body(action, event, *, steps=None):
     if event.get("connector") == "dropbox":
-        return _dropbox_intake_body(action, event)
+        return _dropbox_intake_body(action, event, steps=steps)
     return _email_intake_body(action, event)
 
-def _dropbox_intake_body(action, event):
+def _dropbox_intake_body(action, event, *, steps=None):
     """Build a DataOps intake for a Dropbox file event.
 
     The intake contract references documents by S3 URI, so the file is
@@ -88,7 +89,7 @@ def _dropbox_intake_body(action, event):
     checksum is computed over the downloaded bytes.
     """
     data = event.get("data", {})
-    path = data.get("path")
+    path = render(str(action.get("path") or data.get("path") or ""), event, steps)
     if not path:
         raise ValueError("dropbox intake requires a file path")
     filename = base._safe_filename(path.split("/")[-1])

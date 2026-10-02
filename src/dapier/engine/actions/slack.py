@@ -65,6 +65,12 @@ def run_slack(action, event, *, steps=None):
         "unfurl_links": action.get("unfurl_links", True),
         "unfurl_media": action.get("unfurl_media", True),
     }
+    if action.get("username"):
+        payload["username"] = render(str(action["username"]), event, steps)
+    for key in ("link_names", "reply_broadcast"):
+        if key in action:
+            value = action[key]
+            payload[key] = value.strip().lower() == "true" if isinstance(value, str) else bool(value)
     thread_ts = render(str(action.get("thread_ts") or ""), event, steps).strip()
     if thread_ts:
         payload["thread_ts"] = thread_ts

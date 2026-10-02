@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "id": "synthetic-drive",
+  "connector": "google-drive",
+  "event": "file.created",
+  "occurred_at": "2026-10-02T12:00:00Z",
+  "data": {
+    "poll": "mailchimp-drive-backup",
+    "id": "file-1",
+    "name": "Mailchimp backup (October).zip"
+  }
+}

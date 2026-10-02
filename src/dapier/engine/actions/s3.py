@@ -109,7 +109,16 @@ def _source_body(action, event, steps, *, transport=None):
 
 
 def _object_key(action, event, steps):
-    rendered = render(str(action.get("key") or ""), event, steps).strip().strip("/")
+    rendered = render(str(action.get("key") or ""), event, steps)
+    mode = action.get("key_mode", "safe")
+    if mode not in ("safe", "exact"):
+        raise ValueError("s3_upload key_mode must be safe or exact")
+    if mode == "exact":
+        rendered = rendered.lstrip("/")
+        if not rendered:
+            raise ValueError("s3_upload requires a key")
+        return rendered
+    rendered = rendered.strip().strip("/")
     if not rendered:
         raise ValueError("s3_upload requires a key")
     return "/".join(base._safe_filename(segment) for segment in rendered.split("/"))
@@ -139,8 +148,14 @@ def run_s3_upload(action, event, *, transport=None, steps=None, s3_client=None):
         client = boto3.client(
             "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
         )
-    client.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
-    return {"bucket": bucket, "key": key, "bytes": len(body), "content_type": content_type}
+    kwargs = {"Bucket": bucket, "Key": key, "Body": body}
+    omit = action.get("omit_content_type", False)
+    if isinstance(omit, str):
+        omit = omit.strip().lower() == "true"
+    if not omit:
+        kwargs["ContentType"] = content_type
+    client.put_object(**kwargs)
+    return {"bucket": bucket, "key": key, "bytes": len(body), "content_type": None if omit else content_type}
 
 
 def _find_hit(mode, pattern, key):

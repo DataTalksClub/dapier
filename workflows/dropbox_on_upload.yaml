@@ -1,0 +1,39 @@
+# Migration draft; save through dapier workflows save. No cutover is authorized.
+id: dropbox_on_upload
+enabled: false
+description: 'Zapier 155120966: Date-prefix files in invoices-landing, move to invoices,
+  then forward the archived file to DataOps.'
+tags:
+- zapier-migration
+- zapier-155120966
+actions:
+- id: processing-date
+  type: date_time
+  timezone: UTC
+  format: '%Y-%m-%d'
+- id: rename-file
+  type: dropbox_move
+  connection_id: dropbox
+  from_path: '{path}'
+  to_path: /_dtc_paperwork/invoices-landing/{steps.processing-date.output.formatted}-{path|split:/:-1}
+  autorename: false
+- id: move-file
+  type: dropbox_move
+  connection_id: dropbox
+  from_path: '{steps.rename-file.output.item.path}'
+  to_path: /_dtc_paperwork/invoices/{steps.processing-date.output.formatted}-{path|split:/:-1}
+  autorename: false
+- id: intake-invoice
+  type: dataops
+  auth_secret_id: dapier/dataops
+  url_env: DATAOPS_INTAKE_URL
+  connection_id: dropbox
+  path: '{steps.move-file.output.item.path}'
+trigger:
+  connector: dropbox
+  event: file.created
+  filters:
+    path:
+      prefix: /_dtc_paperwork/invoices-landing/
+    poll:
+      equals: invoice-landing

@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "id": "synthetic-dropbox",
+  "connector": "dropbox",
+  "event": "file.created",
+  "occurred_at": "2026-09-30T22:30:00Z",
+  "data": {
+    "path": "/_dtc_paperwork/invoices-landing/deepseek.pdf",
+    "poll": "invoice-landing"
+  }
+}

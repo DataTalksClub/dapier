@@ -36,15 +36,18 @@ register(Action(
     label="Dropbox upload",
     icon="dropbox",
     run=lambda action, event, workflow_id, steps=None, transport=None:
-        run_dropbox_upload(action, event, transport=transport),
+        run_dropbox_upload(action, event, transport=transport, steps=steps),
     required=frozenset({"connection_id", "folder"}),
-    optional=frozenset({"source", "filename"}),
+    optional=frozenset({"source", "filename", "attachment_selection", "overwrite", "autorename"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "dropbox", "required": True},
         {"key": "source", "label": "Source", "type": "select", "options": ["attachment", "output"], "default": "attachment"},
         {"key": "folder", "label": "Folder", "placeholder": "/Invoices", "required": True,
          "discover": {"resource": "dropbox.folders"}},
         {"key": "filename", "label": "Filename override"},
+        {"key": "attachment_selection", "label": "Attachment selection", "type": "select", "options": ["all", "single", "first"], "default": "all"},
+        {"key": "overwrite", "label": "Overwrite existing file", "type": "boolean", "default": "false"},
+        {"key": "autorename", "label": "Autorename on conflict", "type": "boolean", "default": "true"},
     ),
 ))
 
@@ -392,7 +395,7 @@ def _dropbox_poll_fetch(item, cursor=None, *, transport=None):
         # First fire: seed the watermark at the folder's newest file (None
         # on an empty folder) without emitting anything.
         return [], max((str(file.get("modified") or "") for file in files),
-                       default=None)
+                       default="0000-01-01T00:00:00Z")
     watermark = str(cursor)
     fresh = sorted(
         (file for file in files if str(file.get("modified") or "") > watermark),

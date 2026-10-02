@@ -32,7 +32,7 @@ register(Action(
     required=frozenset({"bucket", "key"}),
     optional=frozenset({
         "credential_id", "connection_id",
-        "source_url", "source_connection_id", "source_s3", "content_type",
+        "source_url", "source_connection_id", "source_s3", "content_type", "key_mode", "omit_content_type",
     }),
     fields=(
         {"key": "credential_id", "label": "Credential ID", "placeholder": "aws (default)"},
@@ -46,6 +46,9 @@ register(Action(
          "help": "Browse the source connection's Drive files; picking one fills the download URL"},
         {"key": "source_connection_id", "label": "Source connection ID", "placeholder": "google — authorizes the source URL"},
         {"key": "content_type", "label": "Content type", "placeholder": "defaults to the trigger's mimeType"},
+        {"key": "key_mode", "label": "Object key mode", "type": "select", "options": ["safe", "exact"], "default": "safe"},
+        {"key": "omit_content_type", "label": "Omit Content-Type", "type": "boolean", "default": "false"},
+        {"key": "source_s3", "label": "Stored source (bucket/key)", "type": "json"},
     ),
 ))
 

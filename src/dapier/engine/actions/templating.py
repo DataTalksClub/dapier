@@ -171,16 +171,33 @@ def _expand(token, context):
 
 
 def _resolve(context, path):
-    """Walk a dotted path; numeric segments index lists. None when missing."""
+    """Walk dotted fields, including the worker's dotted branch/loop step ids."""
     value = context
-    for part in path.split("."):
-        if isinstance(value, dict) and part in value:
-            value = value[part]
-        elif isinstance(value, list) and re.fullmatch(r"-?\d+", part):
-            index = int(part)
-            if not -len(value) <= index < len(value):
+    parts = path.split(".")
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        if isinstance(value, dict):
+            if part in value:
+                value = value[part]
+                index += 1
+                continue
+            # Run-history step ids contain dots (condition.else.upload).
+            # Match the longest recorded id before walking output fields.
+            for end in range(len(parts), index, -1):
+                key = ".".join(parts[index:end])
+                if key in value:
+                    value = value[key]
+                    index = end
+                    break
+            else:
                 return None
-            value = value[index]
+        elif isinstance(value, list) and re.fullmatch(r"-?\d+", part):
+            position = int(part)
+            if not -len(value) <= position < len(value):
+                return None
+            value = value[position]
+            index += 1
         else:
             return None
     return value
