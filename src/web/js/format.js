@@ -146,7 +146,7 @@ export function dataBlock(value, { openRaw = false } = {}) {
 }
 
 export function emptyRow(columns) {
-  return `<tr><td colspan="${columns}" style="color:var(--muted)">No activity</td></tr>`;
+  return `<tr><td colspan="${columns}" style="color:var(--dk-text-muted)">No activity</td></tr>`;
 }
 
 export function configRows(config) {
