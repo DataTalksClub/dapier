@@ -914,7 +914,7 @@ body[data-view="workflows"] .workflow-page-actions .dk-button { height: var(--dk
 .workflow-list-row .cell-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .workflow-flow-line { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; font-size: var(--dk-text-sm); line-height: 1.5; }
 .workflow-flow-line + .workflow-flow-line { margin-top: 4px; }
-.workflow-flow-label { color: var(--dk-text-muted); font-size: var(--dk-text-xs); text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; }
+.workflow-flow-label { color: var(--dk-text-muted); font-size: var(--dk-text-xs); text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; white-space: nowrap; }
 .workflow-action-chain { color: var(--dk-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-list-row .status { white-space: normal; font-size: var(--dk-text-sm); }
 .workflow-list-row .muted-cell { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
