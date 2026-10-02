@@ -826,7 +826,8 @@ input[type="checkbox"], input[type="radio"] {
   align-items: center;
   background: var(--dk-bg-raised);
   border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-sm);
+  /* A floating overlay surface: the family's overlay radius, not a control radius. */
+  border-radius: var(--dk-radius-lg);
   bottom: 14px;
   box-shadow: var(--dk-shadow-overlay);
   display: flex;
@@ -854,6 +855,10 @@ input[type="checkbox"], input[type="radio"] {
   min-width: 42px;
   padding: 0 6px;
 }
+
+
+/* The sheet's dismissal is a phone affordance; desktop deselects on the canvas. */
+.inspector-close { display: none; }
 
 .canvas-zoom-controls .icon-button:hover,
 .canvas-zoom-controls .zoom-button:hover {
@@ -950,6 +955,26 @@ input[type="checkbox"], input[type="radio"] {
   .nav-toggle { display: inline-flex; }
   .nav-toggle svg { width: 16px; height: 16px; }
   .designer-shell { grid-template-columns: minmax(0, 1fr); }
+  /* The family's mobile anatomy: a 64px app bar — menu + workflow name —
+     with the view switch and actions in a toolbar row below the hairline. */
+  .designer-topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "lead title title" "switch hint hint" "actions actions actions";
+    grid-template-rows: 64px auto;
+    align-items: center;
+    row-gap: 8px;
+    padding: 0 12px 8px;
+    position: relative;
+  }
+  .designer-topbar::after { content: ""; position: absolute; top: 64px; left: -12px; right: -12px; border-bottom: 1px solid var(--dk-border-default); }
+  .nav-toggle { grid-area: lead; width: 44px; height: 44px; }
+  .topbar-title { display: contents; }
+  .view-switch { grid-area: switch; justify-self: start; }
+  .view-switch .view-option { min-height: 44px; }
+  .id-input { grid-area: title; min-height: 44px; }
+  .save-problems { grid-area: hint; justify-self: start; font-size: var(--dk-text-xs); }
+  .topbar-actions { grid-area: actions; }
   .designer-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -972,17 +997,29 @@ input[type="checkbox"], input[type="radio"] {
     background: var(--dk-bg-backdrop);
     z-index: 39;
   }
+  /* One pane at a time: the canvas fills the frame; the selected node's
+     detail opens as a full-screen sheet (family.md overlay rules). */
   .designer-body {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: minmax(0, 1fr);
   }
   .inspector {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
     border-left: 0;
-    border-top: 1px solid var(--dk-border-default);
-    max-height: 45%;
+    border-top: 0;
+    max-height: none;
     padding: 12px 14px;
   }
   .inspector.empty { display: none; }
+  .inspector-close {
+    display: inline-grid;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+  .inspector select, .inspector input { min-height: 44px; }
   .inspector-head::before { left: -14px; }
   .topbar-actions { row-gap: 6px; }
   .topbar-actions .dk-button { min-height: 44px; }
@@ -995,7 +1032,7 @@ input[type="checkbox"], input[type="radio"] {
     width: auto;
   }
   /* Phones: bigger touch targets, and the picker becomes a bottom sheet. */
-  .palette-button { height: 36px; padding: 0 12px; }
+  .palette-button { height: 44px; padding: 0 12px; }
   .palette-button span { display: inline; }
   .step-picker-overlay { align-items: flex-end; }
   .step-picker {
@@ -1010,7 +1047,7 @@ input[type="checkbox"], input[type="radio"] {
     right: 10px;
   }
   .canvas-zoom-controls .icon-button,
-  .canvas-zoom-controls .zoom-button { height: 34px; }
+  .canvas-zoom-controls .zoom-button { height: 44px; }
   .canvas-zoom-controls .zoom-button { min-width: 48px; }
 }
 
@@ -1546,9 +1583,6 @@ input[type="checkbox"], input[type="radio"] {
 }
 
 @media (max-width: 720px) {
-  .designer-body { grid-template-rows: minmax(160px, 1fr) minmax(0, 1fr); }
-  .designer-body:has(.inspector.empty) { grid-template-rows: minmax(0, 1fr); }
   .board-toolbar { flex-wrap: wrap; gap: 6px; }
-  .inspector { max-height: none; padding: 14px 16px; border-left: 0; }
   .inspector-head::before { left: -16px; }
 }
