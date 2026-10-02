@@ -858,6 +858,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   body[data-view="designer"] .topbar h1 { font-size: var(--dk-text-lg); }
   #menu-toggle { order: 0; }
   #view-title { order: 1; }
+  #view-description { order: 1; }
   .top-actions { order: 2; }
   #topbar-tools { order: 3; flex: 1 1 100%; }
   #topbar-tools > .page-tools,
