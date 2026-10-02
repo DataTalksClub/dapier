@@ -1,4 +1,4 @@
-import { FileText, StickyNote, Zap } from "lucide-react";
+import { FileText, StickyNote, Zap } from "../icons";
 import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultFields } from "../workflows";
 import type { IconComponent } from "../catalog";
 import type { ActionType, DiagramShape, NodeData } from "../types";

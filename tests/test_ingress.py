@@ -296,10 +296,7 @@ def test_every_nav_link_has_an_api_gateway_route():
 
 
 def test_console_assets_are_self_hosted():
-    lucide = ingress._static("/assets/lucide.min.js")
-    assert lucide["statusCode"] == 200
-    assert "unpkg.com" not in lucide["headers"]["content-security-policy"]
-    assert "sourceMappingURL" not in lucide["body"]
+    assert ingress._static("/assets/lucide.min.js") is None
 
     index = ingress._static("/")
     assert "https://unpkg.com" not in index["body"]

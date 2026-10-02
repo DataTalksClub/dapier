@@ -76,6 +76,7 @@ td.select-col { padding-top: 10px; }
 }
 .icon-button:hover { border-color: var(--dk-text-muted); background: var(--dk-bg-muted); color: var(--dk-text-primary); }
 .icon-button svg { width: 16px; height: 16px; }
+svg.icon { width: 16px; height: 16px; flex: none; }
 
 .text-link {
   display: inline-flex;
@@ -244,6 +245,8 @@ body[data-view="agents"] .view.active { padding-top: 0; width: auto; }
 .page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0; padding: 0; min-width: 0; }
 .page-tools .sub { margin: 0; flex: 1 1 160px; min-width: 0; font-size: var(--dk-text-md); font-weight: 400; color: var(--dk-text-muted); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .dk-button { flex: none; }
+.page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; }
 .page-tools .inline-form input { width: 140px; }
 .page-tools .run-filters,

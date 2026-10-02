@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "lucide-react";
+import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -97,7 +97,7 @@ export interface ActionEntry {
   type: string;
   label: string;
   description?: string;
-  /** Lucide icon or product logo, shown on palette chips and canvas nodes. */
+  /** Family stroke icon or product logo, shown on palette chips and canvas nodes. */
   icon?: IconComponent;
   /** Order is the order the inspector renders and the YAML is written. */
   fields: CatalogField[];

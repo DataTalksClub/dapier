@@ -14237,463 +14237,137 @@
   }
   var clientExports = requireClient();
   var reactExports = requireReact();
-  const toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-  const toCamelCase = (string) => string.replace(
-    /^([A-Z])|[\s-_]+(\w)/g,
-    (match, p1, p2) => p2 ? p2.toUpperCase() : p1.toLowerCase()
-  );
-  const toPascalCase = (string) => {
-    const camelCase = toCamelCase(string);
-    return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
+  const ICON_NODES = {
+    "arrow-left": "<path d='m 8 12.67 -4.67 -4.67 4.67 -4.67'/><path d='M 12.67 8 H 3.33'/>",
+    "arrow-right": "<path d='M 3.33 8 h 9.33'/><path d='m 8 3.33 4.67 4.67 -4.67 4.67'/>",
+    "bot": "<path d='M 8 5.33 V 2.67 H 5.33'/><rect width='10.67' height='8' x='2.67' y='5.33' rx='1.33'/><path d='M 1.33 9.33 h 1.33'/><path d='M 13.33 9.33 h 1.33'/><path d='M 10 8.67 v 1.33'/><path d='M 6 8.67 v 1.33'/>",
+    "braces": "<path d='M 5.33 2 H 4.67 a 1.33 1.33 0 0 0 -1.33 1.33 v 3.33 a 1.33 1.33 0 0 1 -1.33 1.33 1.33 1.33 0 0 1 1.33 1.33 v 3.33 c 0 0.73 0.6 1.33 1.33 1.33 h 0.67'/><path d='M 10.67 14 h 0.67 a 1.33 1.33 0 0 0 1.33 -1.33 v -3.33 c 0 -0.73 0.6 -1.33 1.33 -1.33 a 1.33 1.33 0 0 1 -1.33 -1.33 V 3.33 a 1.33 1.33 0 0 0 -1.33 -1.33 h -0.67'/>",
+    "calendar": "<path d='M 5.33 1.33 v 2.67'/><path d='M 10.67 1.33 v 2.67'/><rect width='12' height='12' x='2' y='2.67' rx='1.33'/><path d='M 2 6.67 h 12'/>",
+    "check": "<path d='M 13.33 4 6 11.33 l -3.33 -3.33'/>",
+    "chevron-down": "<path d='m 4 6 4 4 4 -4'/>",
+    "chevron-right": "<path d='m 6 12 4 -4 -4 -4'/>",
+    "clipboard-copy": "<rect width='5.33' height='2.67' x='5.33' y='1.33' rx='0.67' ry='0.67'/><path d='M 5.33 2.67 H 4 a 1.33 1.33 0 0 0 -1.33 1.33 v 9.33 a 1.33 1.33 0 0 0 1.33 1.33 h 8 a 1.33 1.33 0 0 0 1.33 -1.33 v -1.33'/><path d='M 10.67 2.67 h 1.33 a 1.33 1.33 0 0 1 1.33 1.33 v 2.67'/><path d='M 14 9.33 H 7.33'/><path d='m 10 6.67 -2.67 2.67 2.67 2.67'/>",
+    "clipboard-paste": "<path d='M 7.33 9.33 h 6.67'/><path d='M 10.67 2.67 h 1.33 a 1.33 1.33 0 0 1 1.33 1.33 v 0.9'/><path d='m 11.33 12 2.67 -2.67 -2.67 -2.67'/><path d='M 5.33 2.67 H 4 a 1.33 1.33 0 0 0 -1.33 1.33 v 9.33 a 1.33 1.33 0 0 0 1.33 1.33 h 8 a 1.33 1.33 0 0 0 1.2 -0.74'/><rect x='5.33' y='1.33' width='5.33' height='2.67' rx='0.67'/>",
+    "clock": "<path d='M 8 4 v 4 l 2.67 1.33'/><circle cx='8' cy='8' r='6.67'/>",
+    "cloud-download": "<path d='M 8 8.67 v 5.33 l -2.67 -2.67'/><path d='m 8 14 2.67 -2.67'/><path d='M 2.93 10.18 A 4.67 4.67 0 1 1 10.47 5.33 h 1.19 a 3 3 0 0 1 1.62 5.52'/>",
+    "code-2": "<path d='m 12 10.67 2.67 -2.67 -2.67 -2.67'/><path d='m 4 5.33 -2.67 2.67 2.67 2.67'/><path d='m 9.67 2.67 -3.33 10.67'/>",
+    "copy": "<rect width='9.33' height='9.33' x='5.33' y='5.33' rx='1.33' ry='1.33'/><path d='M 2.67 10.67 c -0.73 0 -1.33 -0.6 -1.33 -1.33 V 2.67 c 0 -0.73 0.6 -1.33 1.33 -1.33 h 6.67 c 0.73 0 1.33 0.6 1.33 1.33'/>",
+    "database": "<ellipse cx='8' cy='3.33' rx='6' ry='2'/><path d='M 2 3.33 V 12.67 A 6 2 0 0 0 14 12.67 V 3.33'/><path d='M 2 8 A 6 2 0 0 0 14 8'/>",
+    "database-zap": "<ellipse cx='8' cy='3.33' rx='6' ry='2'/><path d='M 2 3.33 V 12.67 A 6 2 0 0 0 10 14.56'/><path d='M 14 3.33 V 5.33'/><path d='M 14 8 L 12 11.33 H 14.67 L 12.67 14.67'/><path d='M 2 8 A 6 2 0 0 0 9.73 9.91'/>",
+    "external-link": "<path d='M 10 2 h 4 v 4'/><path d='M 6.67 9.33 14 2'/><path d='M 12 8.67 v 4 a 1.33 1.33 0 0 1 -1.33 1.33 H 3.33 a 1.33 1.33 0 0 1 -1.33 -1.33 V 5.33 a 1.33 1.33 0 0 1 1.33 -1.33 h 4'/>",
+    "file-text": "<path d='M 4 14.67 a 1.33 1.33 0 0 1 -1.33 -1.33 V 2.67 a 1.33 1.33 0 0 1 1.33 -1.33 h 5.33 a 1.6 1.6 0 0 1 1.14 0.47 l 2.39 2.39 A 1.6 1.6 0 0 1 13.33 5.33 v 8 a 1.33 1.33 0 0 1 -1.33 1.33 z'/><path d='M 9.33 1.33 v 3.33 a 0.67 0.67 0 0 0 0.67 0.67 h 3.33'/><path d='M 6.67 6 H 5.33'/><path d='M 10.67 8.67 H 5.33'/><path d='M 10.67 11.33 H 5.33'/>",
+    "filter": "<path d='M 6.67 13.33 a 0.67 0.67 0 0 0 0.37 0.6 l 1.33 0.67 A 0.67 0.67 0 0 0 9.33 14 v -4.67 a 1.33 1.33 0 0 1 0.34 -0.89 L 14.49 3.11 A 0.67 0.67 0 0 0 14 2 H 2 a 0.67 0.67 0 0 0 -0.49 1.11 l 4.82 5.33 A 1.33 1.33 0 0 1 6.67 9.33 z'/>",
+    "flask-conical": "<path d='M 9.33 1.33 v 4 a 1.33 1.33 0 0 0 0.16 0.64 l 3.67 6.72 A 1.33 1.33 0 0 1 12 14.67 H 4 a 1.33 1.33 0 0 1 -1.17 -1.97 l 3.67 -6.72 A 1.33 1.33 0 0 0 6.67 5.33 V 1.33'/><path d='M 4.3 10 h 7.4'/><path d='M 5.67 1.33 h 4.67'/>",
+    "folder": "<path d='M 13.33 13.33 a 1.33 1.33 0 0 0 1.33 -1.33 V 5.33 a 1.33 1.33 0 0 0 -1.33 -1.33 h -5.27 a 1.33 1.33 0 0 1 -1.13 -0.6 L 6.4 2.6 A 1.33 1.33 0 0 0 5.29 2 H 2.67 a 1.33 1.33 0 0 0 -1.33 1.33 v 8.67 a 1.33 1.33 0 0 0 1.33 1.33 Z'/>",
+    "git-branch": "<line x1='4' x2='4' y1='2' y2='10'/><circle cx='12' cy='4' r='2'/><circle cx='4' cy='12' r='2'/><path d='M 12 6 a 6 6 0 0 1 -6 6'/>",
+    "globe": "<circle cx='8' cy='8' r='6.67'/><path d='M 8 1.33 a 9.67 9.67 0 0 0 0 13.33 9.67 9.67 0 0 0 0 -13.33'/><path d='M 1.33 8 h 13.33'/>",
+    "keyboard": "<path d='M 6.67 5.33 h 0.01'/><path d='M 8 8 h 0.01'/><path d='M 9.33 5.33 h 0.01'/><path d='M 10.67 8 h 0.01'/><path d='M 12 5.33 h 0.01'/><path d='M 4 5.33 h 0.01'/><path d='M 4.67 10.67 h 6.67'/><path d='M 5.33 8 h 0.01'/><rect width='13.33' height='10.67' x='1.33' y='2.67' rx='1.33'/>",
+    "key-round": "<path d='M 1.72 11.61 A 1.33 1.33 0 0 0 1.33 12.55 V 14 a 0.67 0.67 0 0 0 0.67 0.67 h 2 a 0.67 0.67 0 0 0 0.67 -0.67 v -0.67 a 0.67 0.67 0 0 1 0.67 -0.67 h 0.67 a 0.67 0.67 0 0 0 0.67 -0.67 v -0.67 a 0.67 0.67 0 0 1 0.67 -0.67 h 0.11 a 1.33 1.33 0 0 0 0.94 -0.39 l 0.54 -0.54 a 4.33 4.33 0 1 0 -2.67 -2.67 z'/><circle cx='11' cy='5' r='0.33' fill='currentColor'/>",
+    "key-square": "<path d='M 8.27 1.8 a 1.67 1.67 0 0 1 2.27 0 l 3.67 3.67 a 1.67 1.67 0 0 1 0 2.27 l -2.47 2.47 a 1.67 1.67 0 0 1 -2.27 0 L 5.8 6.53 a 1.67 1.67 0 0 1 0 -2.27 z'/><path d='m 9.33 4.67 2 2'/><path d='m 6.27 7.07 -4.54 4.54 A 1.33 1.33 0 0 0 1.33 12.55 V 14 a 0.67 0.67 0 0 0 0.67 0.67 h 2 a 0.67 0.67 0 0 0 0.67 -0.67 v -0.67 a 0.67 0.67 0 0 1 0.67 -0.67 h 0.67 a 0.67 0.67 0 0 0 0.67 -0.67 v -0.67 a 0.67 0.67 0 0 1 0.67 -0.67 h 0.11 a 1.33 1.33 0 0 0 0.94 -0.39 l 0.54 -0.54'/>",
+    "layers": "<path d='M 8.55 1.45 a 1.33 1.33 0 0 0 -1.11 0 L 1.73 4.05 a 0.67 0.67 0 0 0 0 1.22 l 5.72 2.61 a 1.33 1.33 0 0 0 1.11 0 l 5.72 -2.6 a 0.67 0.67 0 0 0 0 -1.22 z'/><path d='M 1.33 8 a 0.67 0.67 0 0 0 0.39 0.61 l 5.73 2.61 a 1.33 1.33 0 0 0 1.1 0 l 5.72 -2.6 A 0.67 0.67 0 0 0 14.67 8'/><path d='M 1.33 11.33 a 0.67 0.67 0 0 0 0.39 0.61 l 5.73 2.61 a 1.33 1.33 0 0 0 1.1 0 l 5.72 -2.6 A 0.67 0.67 0 0 0 14.67 11.33'/>",
+    "list-plus": "<path d='M 10.67 3.33 H 2'/><path d='M 7.33 8 H 2'/><path d='M 10.67 12.67 H 2'/><path d='M 12 6 v 4'/><path d='M 14 8 h -4'/>",
+    "list-restart": "<path d='M 14 3.33 H 2'/><path d='M 4.67 8 H 2'/><path d='M 4.67 12.67 H 2'/><path d='M 8 12 a 3.33 3.33 0 0 0 6 -2 3 3 0 0 0 -3 -3 c -0.89 0 -1.69 0.36 -2.27 0.94 L 7.33 9.33'/><path d='M 7.33 6.67 v 2.67 h 2.67'/>",
+    "list-tree": "<path d='M 5.33 3.33 h 8.67'/><path d='M 8.67 8 h 5.33'/><path d='M 8.67 12.67 h 5.33'/><path d='M 2 6.67 a 1.33 1.33 0 0 0 1.33 1.33 h 2'/><path d='M 2 3.33 v 8 a 1.33 1.33 0 0 0 1.33 1.33 h 2'/>",
+    "loader-circle": "<path d='M 14 8 a 6 6 0 1 1 -4.15 -5.71'/>",
+    "log-out": "<path d='m 10.67 11.33 3.33 -3.33 -3.33 -3.33'/><path d='M 14 8 H 6'/><path d='M 6 14 H 3.33 a 1.33 1.33 0 0 1 -1.33 -1.33 V 3.33 a 1.33 1.33 0 0 1 1.33 -1.33 h 2.67'/>",
+    "mail": "<path d='m 14.67 4.67 -5.99 3.82 a 1.33 1.33 0 0 1 -1.34 0 L 1.33 4.67'/><rect x='1.33' y='2.67' width='13.33' height='10.67' rx='1.33'/>",
+    "maximize": "<path d='M 5.33 2 H 3.33 a 1.33 1.33 0 0 0 -1.33 1.33 v 2'/><path d='M 14 5.33 V 3.33 a 1.33 1.33 0 0 0 -1.33 -1.33 h -2'/><path d='M 2 10.67 v 2 a 1.33 1.33 0 0 0 1.33 1.33 h 2'/><path d='M 10.67 14 h 2 a 1.33 1.33 0 0 0 1.33 -1.33 v -2'/>",
+    "menu": "<path d='M 2.67 3.33 h 10.67'/><path d='M 2.67 8 h 10.67'/><path d='M 2.67 12.67 h 10.67'/>",
+    "minus": "<path d='M 3.33 8 h 9.33'/>",
+    "moon": "<path d='M 13.99 8.32 a 6 6 0 1 1 -6.32 -6.31 c 0.27 -0.01 0.41 0.31 0.27 0.54 a 4 4 0 0 0 5.51 5.51 c 0.23 -0.14 0.55 0 0.54 0.27'/>",
+    "play": "<path d='M 3.33 3.33 a 1.33 1.33 0 0 1 2.01 -1.15 l 8 4.67 a 1.33 1.33 0 0 1 0 2.31 l -8 4.67 A 1.33 1.33 0 0 1 3.33 12.67 z'/>",
+    "plus": "<path d='M 3.33 8 h 9.33'/><path d='M 8 3.33 v 9.33'/>",
+    "refresh-cw": "<path d='M 2 8 a 6 6 0 0 1 6 -6 6.5 6.5 0 0 1 4.49 1.83 L 14 5.33'/><path d='M 14 2 v 3.33 h -3.33'/><path d='M 14 8 a 6 6 0 0 1 -6 6 6.5 6.5 0 0 1 -4.49 -1.83 L 2 10.67'/><path d='M 5.33 10.67 H 2 v 3.33'/>",
+    "rotate-ccw": "<path d='M 2 8 a 6 6 0 1 0 6 -6 6.5 6.5 0 0 0 -4.49 1.83 L 2 5.33'/><path d='M 2 2 v 3.33 h 3.33'/>",
+    "rotate-cw": "<path d='M 14 8 a 6 6 0 1 1 -6 -6 c 1.68 0 3.29 0.67 4.49 1.83 L 14 5.33'/><path d='M 14 2 v 3.33 h -3.33'/>",
+    "rss": "<path d='M 2.67 7.33 a 6 6 0 0 1 6 6'/><path d='M 2.67 2.67 a 10.67 10.67 0 0 1 10.67 10.67'/><circle cx='3.33' cy='12.67' r='0.67'/>",
+    "scroll-text": "<path d='M 10 8 h -3.33'/><path d='M 10 5.33 h -3.33'/><path d='M 12.67 11.33 V 3.33 a 1.33 1.33 0 0 0 -1.33 -1.33 H 2.67'/><path d='M 5.33 14 h 8 a 1.33 1.33 0 0 0 1.33 -1.33 v -0.67 a 0.67 0.67 0 0 0 -0.67 -0.67 H 7.33 a 0.67 0.67 0 0 0 -0.67 0.67 v 0.67 a 1.33 1.33 0 1 1 -2.67 0 V 3.33 a 1.33 1.33 0 1 0 -2.67 0 v 1.33 a 0.67 0.67 0 0 0 0.67 0.67 h 2'/>",
+    "search": "<path d='m 14 14 -2.89 -2.89'/><circle cx='7.33' cy='7.33' r='5.33'/>",
+    "send": "<path d='M 9.69 14.46 a 0.33 0.33 0 0 0 0.62 -0.02 l 4.33 -12.67 a 0.33 0.33 0 0 0 -0.42 -0.42 l -12.67 4.33 a 0.33 0.33 0 0 0 -0.02 0.62 l 5.29 2.12 a 1.33 1.33 0 0 1 0.74 0.74 z'/><path d='m 14.57 1.43 -7.29 7.29'/>",
+    "server": "<rect width='13.33' height='5.33' x='1.33' y='1.33' rx='1.33' ry='1.33'/><rect width='13.33' height='5.33' x='1.33' y='9.33' rx='1.33' ry='1.33'/><line x1='4' x2='4.01' y1='4' y2='4'/><line x1='4' x2='4.01' y1='12' y2='12'/>",
+    "slack": "<rect width='2' height='5.33' x='8.67' y='1.33' rx='1'/><path d='M 12.67 5.67 V 6.67 h 1 A 1 1 0 1 0 12.67 5.67'/><rect width='2' height='5.33' x='5.33' y='9.33' rx='1'/><path d='M 3.33 10.33 V 9.33 H 2.33 A 1 1 0 1 0 3.33 10.33'/><rect width='5.33' height='2' x='9.33' y='8.67' rx='1'/><path d='M 10.33 12.67 H 9.33 v 1 a 1 1 0 1 0 1 -1'/><rect width='5.33' height='2' x='1.33' y='5.33' rx='1'/><path d='M 5.67 3.33 H 6.67 V 2.33 A 1 1 0 1 0 5.67 3.33'/>",
+    "sparkles": "<path d='M 7.34 1.88 a 0.67 0.67 0 0 1 1.31 0 l 0.7 3.71 a 1.33 1.33 0 0 0 1.06 1.06 l 3.71 0.7 a 0.67 0.67 0 0 1 0 1.31 l -3.71 0.7 a 1.33 1.33 0 0 0 -1.06 1.06 l -0.7 3.71 a 0.67 0.67 0 0 1 -1.31 0 l -0.7 -3.71 a 1.33 1.33 0 0 0 -1.06 -1.06 l -3.71 -0.7 a 0.67 0.67 0 0 1 0 -1.31 l 3.71 -0.7 a 1.33 1.33 0 0 0 1.06 -1.06 z'/><path d='M 13.33 1.33 v 2.67'/><path d='M 14.67 2.67 h -2.67'/><circle cx='2.67' cy='13.33' r='1.33'/>",
+    "sticky-note": "<path d='M 14 6 a 1.6 1.6 0 0 0 -0.47 -1.14 l -2.39 -2.39 A 1.6 1.6 0 0 0 10 2 H 3.33 a 1.33 1.33 0 0 0 -1.33 1.33 v 9.33 a 1.33 1.33 0 0 0 1.33 1.33 h 9.33 a 1.33 1.33 0 0 0 1.33 -1.33 z'/><path d='M 10 2 v 3.33 a 0.67 0.67 0 0 0 0.67 0.67 h 3.33'/>",
+    "sun": "<circle cx='8' cy='8' r='2.67'/><path d='M 8 1.33 v 1.33'/><path d='M 8 13.33 v 1.33'/><path d='m 3.29 3.29 0.94 0.94'/><path d='m 11.77 11.77 0.94 0.94'/><path d='M 1.33 8 h 1.33'/><path d='M 13.33 8 h 1.33'/><path d='m 4.23 11.77 -0.94 0.94'/><path d='m 12.71 3.29 -0.94 0.94'/>",
+    "table": "<path d='M 8 2 v 12'/><rect width='12' height='12' x='2' y='2' rx='1.33'/><path d='M 2 6 h 12'/><path d='M 2 10 h 12'/>",
+    "timer": "<line x1='6.67' x2='9.33' y1='1.33' y2='1.33'/><line x1='8' x2='10' y1='9.33' y2='7.33'/><circle cx='8' cy='9.33' r='5.33'/>",
+    "trash-2": "<path d='M 6.67 7.33 v 4'/><path d='M 9.33 7.33 v 4'/><path d='M 12.67 4 v 9.33 a 1.33 1.33 0 0 1 -1.33 1.33 H 4.67 a 1.33 1.33 0 0 1 -1.33 -1.33 V 4'/><path d='M 2 4 h 12'/><path d='M 5.33 4 V 2.67 a 1.33 1.33 0 0 1 1.33 -1.33 h 2.67 a 1.33 1.33 0 0 1 1.33 1.33 v 1.33'/>",
+    "triangle-alert": "<path d='m 14.49 12 -5.33 -9.33 a 1.33 1.33 0 0 0 -2.32 0 l -5.33 9.33 A 1.33 1.33 0 0 0 2.67 14 h 10.67 a 1.33 1.33 0 0 0 1.15 -2'/><path d='M 8 6 v 2.67'/><path d='M 8 11.33 h 0.01'/>",
+    "video": "<path d='m 10.67 8.67 3.48 2.32 a 0.33 0.33 0 0 0 0.52 -0.28 V 5.25 a 0.33 0.33 0 0 0 -0.5 -0.29 L 10.67 7'/><rect x='1.33' y='4' width='9.33' height='8' rx='1.33'/>",
+    "webhook": "<path d='M 12 11.32 h -3.99 c -0.73 0 -1.3 0.63 -1.65 1.27 A 2.67 2.67 0 0 1 1.33 11.33 c 0.01 -0.47 0.13 -0.93 0.38 -1.33'/><path d='m 4 11.33 2.09 -3.85 c 0.35 -0.65 0.07 -1.45 -0.33 -2.07 a 2.67 2.67 0 1 1 4.59 -2.71'/><path d='m 8 4 2.09 3.82 C 10.44 8.47 11.27 8.67 12 8.67 a 2.67 2.67 0 0 1 0 5.33'/>",
+    "workflow": "<rect width='5.33' height='5.33' x='2' y='2' rx='1.33'/><path d='M 4.67 7.33 v 2.67 a 1.33 1.33 0 0 0 1.33 1.33 h 2.67'/><rect width='5.33' height='5.33' x='8.67' y='8.67' rx='1.33'/>",
+    "x": "<path d='M 12 4 4 12'/><path d='m 4 4 8 8'/>",
+    "zap": "<path d='M 2.67 9.33 a 0.67 0.67 0 0 1 -0.52 -1.09 l 6.6 -6.8 a 0.33 0.33 0 0 1 0.57 0.31 l -1.28 4.01 A 0.67 0.67 0 0 0 8.67 6.67 h 4.67 a 0.67 0.67 0 0 1 0.52 1.09 l -6.6 6.8 a 0.33 0.33 0 0 1 -0.57 -0.31 l 1.28 -4.01 A 0.67 0.67 0 0 0 7.33 9.33 z'/>"
   };
-  const mergeClasses = (...classes) => classes.filter((className, index, array) => {
-    return Boolean(className) && className.trim() !== "" && array.indexOf(className) === index;
-  }).join(" ").trim();
-  const hasA11yProp = (props) => {
-    for (const prop in props) {
-      if (prop.startsWith("aria-") || prop === "role" || prop === "title") {
-        return true;
-      }
-    }
-  };
-  var defaultAttributes = {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: 24,
-    height: 24,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  };
-  const Icon = reactExports.forwardRef(
-    ({
-      color = "currentColor",
-      size = 24,
-      strokeWidth = 2,
-      absoluteStrokeWidth,
-      className = "",
-      children,
-      iconNode,
-      ...rest
-    }, ref) => reactExports.createElement(
-      "svg",
-      {
-        ref,
-        ...defaultAttributes,
-        width: size,
-        height: size,
-        stroke: color,
-        strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
-        className: mergeClasses("lucide", className),
-        ...!children && !hasA11yProp(rest) && { "aria-hidden": "true" },
-        ...rest
-      },
-      [
-        ...iconNode.map(([tag, attrs]) => reactExports.createElement(tag, attrs)),
-        ...Array.isArray(children) ? children : [children]
-      ]
-    )
-  );
-  const createLucideIcon = (iconName, iconNode) => {
-    const Component = reactExports.forwardRef(
-      ({ className, ...props }, ref) => reactExports.createElement(Icon, {
-        ref,
-        iconNode,
-        className: mergeClasses(
-          `lucide-${toKebabCase(toPascalCase(iconName))}`,
-          `lucide-${iconName}`,
-          className
-        ),
-        ...props
-      })
-    );
-    Component.displayName = toPascalCase(iconName);
-    return Component;
-  };
-  const __iconNode$K = [
-    ["path", { d: "M12 8V4H8", key: "hb8ula" }],
-    ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
-    ["path", { d: "M2 14h2", key: "vft8re" }],
-    ["path", { d: "M20 14h2", key: "4cs60a" }],
-    ["path", { d: "M15 13v2", key: "1xurst" }],
-    ["path", { d: "M9 13v2", key: "rq6x2g" }]
-  ];
-  const Bot = createLucideIcon("bot", __iconNode$K);
-  const __iconNode$J = [
-    [
-      "path",
-      { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
-    ],
-    [
-      "path",
-      {
-        d: "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",
-        key: "e1hn23"
-      }
-    ]
-  ];
-  const Braces = createLucideIcon("braces", __iconNode$J);
-  const __iconNode$I = [
-    ["path", { d: "M8 2v4", key: "1cmpym" }],
-    ["path", { d: "M16 2v4", key: "4m81vk" }],
-    ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
-    ["path", { d: "M3 10h18", key: "8toen8" }]
-  ];
-  const Calendar = createLucideIcon("calendar", __iconNode$I);
-  const __iconNode$H = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
-  const ChevronDown = createLucideIcon("chevron-down", __iconNode$H);
-  const __iconNode$G = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
-  const ChevronRight = createLucideIcon("chevron-right", __iconNode$G);
-  const __iconNode$F = [
-    ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
-    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
-    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
-    ["path", { d: "M21 14H11", key: "1bme5i" }],
-    ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
-  ];
-  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$F);
-  const __iconNode$E = [
-    ["path", { d: "M11 14h10", key: "1w8e9d" }],
-    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
-    ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
-    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
-    ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
-  ];
-  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$E);
-  const __iconNode$D = [
-    ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
-    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
-  ];
-  const Clock = createLucideIcon("clock", __iconNode$D);
-  const __iconNode$C = [
-    ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
-    ["path", { d: "m12 21 4-4", key: "1lfcce" }],
-    ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
-  ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$C);
-  const __iconNode$B = [
-    ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
-    ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
-    ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
-  ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$B);
-  const __iconNode$A = [
-    ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
-    ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
-  ];
-  const Copy = createLucideIcon("copy", __iconNode$A);
-  const __iconNode$z = [
-    ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
-    ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
-    ["path", { d: "M21 5V8", key: "1marbg" }],
-    ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
-    ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
-  ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$z);
-  const __iconNode$y = [
-    [
-      "path",
-      {
-        d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
-        key: "1oefj6"
-      }
-    ],
-    ["path", { d: "M14 2v5a1 1 0 0 0 1 1h5", key: "wfsgrz" }],
-    ["path", { d: "M10 9H8", key: "b1mrlr" }],
-    ["path", { d: "M16 13H8", key: "t4e002" }],
-    ["path", { d: "M16 17H8", key: "z1uh3a" }]
-  ];
-  const FileText = createLucideIcon("file-text", __iconNode$y);
-  const __iconNode$x = [
-    [
-      "path",
-      {
-        d: "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2",
-        key: "18mbvz"
-      }
-    ],
-    ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
-    ["path", { d: "M8.5 2h7", key: "csnxdl" }]
-  ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$x);
-  const __iconNode$w = [
-    [
-      "path",
-      {
-        d: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z",
-        key: "1kt360"
-      }
-    ]
-  ];
-  const Folder = createLucideIcon("folder", __iconNode$w);
-  const __iconNode$v = [
-    [
-      "path",
-      {
-        d: "M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z",
-        key: "sc7q7i"
-      }
-    ]
-  ];
-  const Funnel = createLucideIcon("funnel", __iconNode$v);
-  const __iconNode$u = [
-    ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
-    ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
-    ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
-    ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
-  ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$u);
-  const __iconNode$t = [
-    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
-    ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
-    ["path", { d: "M2 12h20", key: "9i4pu4" }]
-  ];
-  const Globe = createLucideIcon("globe", __iconNode$t);
-  const __iconNode$s = [
-    ["path", { d: "M10 8h.01", key: "1r9ogq" }],
-    ["path", { d: "M12 12h.01", key: "1mp3jc" }],
-    ["path", { d: "M14 8h.01", key: "1primd" }],
-    ["path", { d: "M16 12h.01", key: "1l6xoz" }],
-    ["path", { d: "M18 8h.01", key: "emo2bl" }],
-    ["path", { d: "M6 8h.01", key: "x9i8wu" }],
-    ["path", { d: "M7 16h10", key: "wp8him" }],
-    ["path", { d: "M8 12h.01", key: "czm47f" }],
-    ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
-  ];
-  const Keyboard = createLucideIcon("keyboard", __iconNode$s);
-  const __iconNode$r = [
-    [
-      "path",
-      {
-        d: "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
-        key: "zw3jo"
-      }
-    ],
-    [
-      "path",
-      {
-        d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
-        key: "1wduqc"
-      }
-    ],
-    [
-      "path",
-      {
-        d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
-        key: "kqbvx6"
-      }
-    ]
-  ];
-  const Layers = createLucideIcon("layers", __iconNode$r);
-  const __iconNode$q = [
-    ["path", { d: "M16 5H3", key: "m91uny" }],
-    ["path", { d: "M11 12H3", key: "51ecnj" }],
-    ["path", { d: "M16 19H3", key: "zzsher" }],
-    ["path", { d: "M18 9v6", key: "1twb98" }],
-    ["path", { d: "M21 12h-6", key: "bt1uis" }]
-  ];
-  const ListPlus = createLucideIcon("list-plus", __iconNode$q);
-  const __iconNode$p = [
-    ["path", { d: "M21 5H3", key: "1fi0y6" }],
-    ["path", { d: "M7 12H3", key: "13ou7f" }],
-    ["path", { d: "M7 19H3", key: "wbqt3n" }],
-    [
-      "path",
-      {
-        d: "M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14",
-        key: "qth677"
-      }
-    ],
-    ["path", { d: "M11 10v4h4", key: "172dkj" }]
-  ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$p);
-  const __iconNode$o = [
-    ["path", { d: "M8 5h13", key: "1pao27" }],
-    ["path", { d: "M13 12h8", key: "h98zly" }],
-    ["path", { d: "M13 19h8", key: "c3s6r1" }],
-    ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
-    ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
-  ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$o);
-  const __iconNode$n = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$n);
-  const __iconNode$m = [
-    ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
-    ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
-  ];
-  const Mail = createLucideIcon("mail", __iconNode$m);
-  const __iconNode$l = [
-    ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
-    ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
-    ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
-    ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
-  ];
-  const Maximize = createLucideIcon("maximize", __iconNode$l);
-  const __iconNode$k = [
-    ["path", { d: "M4 5h16", key: "1tepv9" }],
-    ["path", { d: "M4 12h16", key: "1lakjw" }],
-    ["path", { d: "M4 19h16", key: "1djgab" }]
-  ];
-  const Menu = createLucideIcon("menu", __iconNode$k);
-  const __iconNode$j = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$j);
-  const __iconNode$i = [
-    [
-      "path",
-      {
-        d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
-        key: "10ikf1"
-      }
-    ]
-  ];
-  const Play = createLucideIcon("play", __iconNode$i);
-  const __iconNode$h = [
-    ["path", { d: "M5 12h14", key: "1ays0h" }],
-    ["path", { d: "M12 5v14", key: "s699le" }]
-  ];
-  const Plus = createLucideIcon("plus", __iconNode$h);
-  const __iconNode$g = [
-    ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
-    ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
-    ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
-    ["path", { d: "M8 16H3v5", key: "1cv678" }]
-  ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$g);
-  const __iconNode$f = [
-    ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
-    ["path", { d: "M3 3v5h5", key: "1xhq8a" }]
-  ];
-  const RotateCcw = createLucideIcon("rotate-ccw", __iconNode$f);
-  const __iconNode$e = [
-    ["path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", key: "1p45f6" }],
-    ["path", { d: "M21 3v5h-5", key: "1q7to0" }]
-  ];
-  const RotateCw = createLucideIcon("rotate-cw", __iconNode$e);
-  const __iconNode$d = [
-    ["path", { d: "M4 11a9 9 0 0 1 9 9", key: "pv89mb" }],
-    ["path", { d: "M4 4a16 16 0 0 1 16 16", key: "k0647b" }],
-    ["circle", { cx: "5", cy: "19", r: "1", key: "bfqh0e" }]
-  ];
-  const Rss = createLucideIcon("rss", __iconNode$d);
-  const __iconNode$c = [
-    ["path", { d: "m21 21-4.34-4.34", key: "14j7rj" }],
-    ["circle", { cx: "11", cy: "11", r: "8", key: "4ej97u" }]
-  ];
-  const Search = createLucideIcon("search", __iconNode$c);
-  const __iconNode$b = [
-    [
-      "path",
-      {
-        d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
-        key: "1ffxy3"
-      }
-    ],
-    ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
-  ];
-  const Send = createLucideIcon("send", __iconNode$b);
-  const __iconNode$a = [
-    [
-      "path",
-      {
-        d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
-        key: "1s2grr"
-      }
-    ],
-    ["path", { d: "M20 2v4", key: "1rf3ol" }],
-    ["path", { d: "M22 4h-4", key: "gwowj6" }],
-    ["circle", { cx: "4", cy: "20", r: "2", key: "6kqj1y" }]
-  ];
-  const Sparkles = createLucideIcon("sparkles", __iconNode$a);
-  const __iconNode$9 = [
-    [
-      "path",
-      {
-        d: "M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z",
-        key: "1dfntj"
-      }
-    ],
-    ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
-  ];
-  const StickyNote = createLucideIcon("sticky-note", __iconNode$9);
-  const __iconNode$8 = [
-    ["path", { d: "M12 3v18", key: "108xh3" }],
-    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", key: "afitv7" }],
-    ["path", { d: "M3 9h18", key: "1pudct" }],
-    ["path", { d: "M3 15h18", key: "5xshup" }]
-  ];
-  const Table = createLucideIcon("table", __iconNode$8);
-  const __iconNode$7 = [
-    ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
-    ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
-    ["circle", { cx: "12", cy: "14", r: "8", key: "1e1u0o" }]
-  ];
-  const Timer = createLucideIcon("timer", __iconNode$7);
-  const __iconNode$6 = [
-    ["path", { d: "M10 11v6", key: "nco0om" }],
-    ["path", { d: "M14 11v6", key: "outv1u" }],
-    ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
-    ["path", { d: "M3 6h18", key: "d0wm0j" }],
-    ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
-  ];
-  const Trash2 = createLucideIcon("trash-2", __iconNode$6);
-  const __iconNode$5 = [
-    [
-      "path",
-      {
-        d: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
-        key: "wmoenq"
-      }
-    ],
-    ["path", { d: "M12 9v4", key: "juzpu7" }],
-    ["path", { d: "M12 17h.01", key: "p32p05" }]
-  ];
-  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$5);
-  const __iconNode$4 = [
-    [
-      "path",
-      {
-        d: "m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5",
-        key: "ftymec"
-      }
-    ],
-    ["rect", { x: "2", y: "6", width: "14", height: "12", rx: "2", key: "158x01" }]
-  ];
-  const Video = createLucideIcon("video", __iconNode$4);
-  const __iconNode$3 = [
-    [
-      "path",
-      {
-        d: "M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2",
-        key: "q3hayz"
-      }
-    ],
-    ["path", { d: "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", key: "1go1hn" }],
-    ["path", { d: "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8", key: "qlwsc0" }]
-  ];
-  const Webhook = createLucideIcon("webhook", __iconNode$3);
-  const __iconNode$2 = [
-    ["rect", { width: "8", height: "8", x: "3", y: "3", rx: "2", key: "by2w9f" }],
-    ["path", { d: "M7 11v4a2 2 0 0 0 2 2h4", key: "xkn7yn" }],
-    ["rect", { width: "8", height: "8", x: "13", y: "13", rx: "2", key: "1cgmvn" }]
-  ];
-  const Workflow = createLucideIcon("workflow", __iconNode$2);
-  const __iconNode$1 = [
-    ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
-    ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
-  ];
-  const X = createLucideIcon("x", __iconNode$1);
-  const __iconNode = [
-    [
-      "path",
-      {
-        d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
-        key: "1xq2db"
-      }
-    ]
-  ];
-  const Zap = createLucideIcon("zap", __iconNode);
+  function makeIcon(name) {
+    return function DkGlyph({ size = 16, strokeWidth = 1.5, className, x, y }) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "svg",
+        {
+          width: size,
+          height: size,
+          viewBox: "0 0 16 16",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          "aria-hidden": "true",
+          className,
+          x,
+          y,
+          dangerouslySetInnerHTML: { __html: ICON_NODES[name] ?? "" }
+        }
+      );
+    };
+  }
+  const Bot = makeIcon("bot");
+  const Braces = makeIcon("braces");
+  const Calendar = makeIcon("calendar");
+  const ChevronDown = makeIcon("chevron-down");
+  const ChevronRight = makeIcon("chevron-right");
+  const ClipboardCopy = makeIcon("clipboard-copy");
+  const ClipboardPaste = makeIcon("clipboard-paste");
+  const Clock = makeIcon("clock");
+  const CloudDownload = makeIcon("cloud-download");
+  const Code2 = makeIcon("code-2");
+  const Copy = makeIcon("copy");
+  const DatabaseZap = makeIcon("database-zap");
+  const FileText = makeIcon("file-text");
+  const Filter = makeIcon("filter");
+  const FlaskConical = makeIcon("flask-conical");
+  const Folder = makeIcon("folder");
+  const GitBranch = makeIcon("git-branch");
+  const Globe = makeIcon("globe");
+  const Keyboard = makeIcon("keyboard");
+  const Layers = makeIcon("layers");
+  const ListPlus = makeIcon("list-plus");
+  const ListRestart = makeIcon("list-restart");
+  const ListTree = makeIcon("list-tree");
+  const Loader2 = makeIcon("loader-circle");
+  const Mail = makeIcon("mail");
+  const Maximize = makeIcon("maximize");
+  const Menu = makeIcon("menu");
+  const Minus = makeIcon("minus");
+  const Play = makeIcon("play");
+  const Plus = makeIcon("plus");
+  const RefreshCw = makeIcon("refresh-cw");
+  const RotateCcw = makeIcon("rotate-ccw");
+  const RotateCw = makeIcon("rotate-cw");
+  const Rss = makeIcon("rss");
+  const Search = makeIcon("search");
+  const Send = makeIcon("send");
+  const Sparkles = makeIcon("sparkles");
+  const StickyNote = makeIcon("sticky-note");
+  const Table = makeIcon("table");
+  const Timer = makeIcon("timer");
+  const Trash2 = makeIcon("trash-2");
+  const TriangleAlert = makeIcon("triangle-alert");
+  const Video = makeIcon("video");
+  const Webhook = makeIcon("webhook");
+  const Workflow = makeIcon("workflow");
+  const X = makeIcon("x");
+  const Zap = makeIcon("zap");
   function getDefaultExportFromCjs(x) {
     return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
   }
@@ -19991,7 +19665,7 @@
     {
       type: "filter",
       label: "Filter",
-      icon: Funnel,
+      icon: Filter,
       description: "Stop the chain quietly unless the condition holds",
       fields: [
         { key: "field", label: "Field", placeholder: "subject", required: true },
@@ -20069,7 +19743,7 @@
     {
       type: "code",
       label: "Code (Python)",
-      icon: CodeXml,
+      icon: Code2,
       description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
       fields: [
         {
@@ -21526,7 +21200,7 @@
               const strokeWidth = selected ? "3" : "2";
               const color = shapeColor(shape);
               if (shape.type === "node") {
-                const Icon2 = nodeIcon(shape.data);
+                const Icon = nodeIcon(shape.data);
                 const title = nodeTitle(shape);
                 const subtitle = nodeSubtitle(shape);
                 return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { onDoubleClick: (event) => {
@@ -21548,7 +21222,7 @@
                   ),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Icon2,
+                    Icon,
                     {
                       size: 22,
                       x: shape.x + 21,
@@ -23350,7 +23024,7 @@
                 disabled: stepTest.busy,
                 onClick: () => testSelectedStep(false),
                 children: [
-                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
+                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
                 ]
               }
@@ -23534,7 +23208,7 @@
             ),
             enabled !== savedEnabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "state-save-hint", children: "Save to apply" }),
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
-              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }),
+              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 16, strokeWidth: 1.5, className: "spin" }),
               status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 16, strokeWidth: 1.5 }),
               status.message
             ] }),
@@ -23670,7 +23344,7 @@
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
-                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
+                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
@@ -23686,7 +23360,7 @@
                   onClick: pullSample,
                   title: "Pull a real sample event for this workflow's trigger connector",
                   children: [
-                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 1.5 }),
+                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 1.5 }),
                     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
                   ]
                 }

@@ -216,7 +216,7 @@ function stepCard({ icon, title, badge, status, duration, at, data, error, repla
       <span class="flow-meta">${[status ? statusLine(status) : '', duration ? escapeHtml(duration) : '', at ? escapeHtml(at) : ''].filter(Boolean).join(' ')}</span>
       ${replayFromHere}
     </div>
-    ${error ? `<div class="detail-error"><i data-lucide="alert-triangle"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${error ? `<div class="detail-error"><i data-lucide="triangle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${sections ? `<div class="flow-data">${sections}</div>` : ''}
   </div>`;
 }

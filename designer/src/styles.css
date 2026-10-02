@@ -1302,6 +1302,7 @@ input[type="checkbox"], input[type="radio"] {
   width: min(100%, 440px);
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-lg);
   box-shadow: var(--dk-shadow-overlay);
   padding: 24px;
 }
