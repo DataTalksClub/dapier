@@ -20,7 +20,7 @@ Source: Zap `157386985`; draft: `mailing-list-backup`.
 - [ ] Resolve Zapier's `mimetype=none` behavior: omitted Content-Type, provider default, or literal value.
 - [x] Copy the uploaded ZIP to `s3://datatalks-mailchimp-backup/2026-10-02-audience_export_3fc301b1e9.zip`; verify 7,664,202 bytes and MD5 `d0f8c566634fc7faa32e602ab30b31c3`, matching Drive.
 - [x] With user authorization, publish/enable `mailing-list-backup` and enable `mailchimp-drive-backup` every 2 minutes.
-- [ ] Upload a fresh file and verify one automatic poll-to-workflow run.
+- [x] Fresh upload `test.pdf` triggered one completed automatic run: `mailing-list-backup:mailchimp-drive-backup-88258f905214a58f`, 2026-10-02 16:02:38–16:02:41 UTC. Both download and S3 upload completed; destination is `s3://datatalks-mailchimp-backup/test.pdf`, 233,187 bytes, MD5 `b212c0f26d090eb0971753163839c685` matching Drive.
 
 Evidence: a Drive metadata query with `corpora=drive`, the configured drive ID
 and `includeItemsFromAllDrives=true` returned the uploaded ZIP. This proves
@@ -29,7 +29,7 @@ zero because it omitted shared-drive items.
 
 The user authorized activation and copying this file on 2026-10-02, and requested
 IAM role assumption instead of stored AWS keys. [Infrastructure PR #68](https://github.com/DataTalksClub/aws-infra/pull/68)
-defines the destination role; that PR remains open. The role became usable
+defines the destination role and has been merged. The role became usable
 while testing. Dapier's role configuration was saved through the CLI, its
 connection test reported the expected assumed role, and the ZIP was downloaded
 and uploaded through the workflow's two actual provider steps. An independent
@@ -41,9 +41,14 @@ The workflow and poll are now enabled. The deployment adding role support and
 API file staging passed, as did 3,798 tests. The default role/session
 configuration contains no stored access keys.
 
-**Next check:** upload a fresh file to verify automatic delivery. The poll
-seeds existing files without replay; the existing test ZIP was processed
-manually through its workflow steps.
+Automatic delivery is verified. `test.pdf` had a new Drive creation time even
+though its modification time was older; the poll correctly treated it as a new
+upload. A destination lookup and signed GET independently verified the object
+and matching bytes. The original ZIP was processed manually because the poll
+seeds existing files without replay.
+
+**Next flow:** email TODO. Remaining source-parity questions above concern
+future export naming and Zapier's MIME behavior, not the verified delivery.
 
 ## 2. Email TODO
 
