@@ -63,6 +63,16 @@ provider registry):
   source only (capture next round), console mobile keeps the h1 below the
   64px bar, 32px nav rows and 2px focus ring are deliberate round-2
   decisions.
+- Independent re-judge of the full set after the round-5 record (26 fresh
+  captures re-rendered from the tip with rebuilt bundles): PASS on every
+  capture. It also refutes the one blocking FAIL in the round-2 judge's
+  lineage — "dataops renders a dark charcoal light-theme sidebar" — by
+  pixel sampling: both apps' light rails measure `rgb(246,248,250)` with
+  identical 268px geometry and border hairline, both dark rails
+  `rgb(33,38,45)`; that judge's image reads had silently corrupted
+  mid-run. Cosmetic notes kept for the next pass: the mobile runs mono
+  token wraps mid-word, the Auto-paused stat cell wraps at 390px, the
+  connections mobile action-pair alignment reads improvised.
 
 ## Deliberate remainders
 
