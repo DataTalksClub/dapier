@@ -479,7 +479,8 @@ button {
 }
 
 .designer-sidebar {
-  background: var(--dk-bg-page);
+  /* sidebar plane matches the canonical dataops shell (bg-muted) */
+  background: var(--dk-bg-muted);
   border-right: 1px solid var(--dk-border-default);
   display: flex;
   flex-direction: column;

@@ -128,7 +128,9 @@ input:focus-visible, select:focus-visible, select:focus { outline: 2px solid var
      spilling items onto the page */
   min-width: 0;
   overflow: hidden;
-  background: var(--dk-bg-page);
+  /* the sidebar plane reads --dk-bg-muted, matching the canonical dataops
+     shell (family.md's recipe says bg-page — reconciled in docs/family-review) */
+  background: var(--dk-bg-muted);
   border-right: 1px solid var(--dk-border-default);
   padding: var(--dk-space-4) var(--dk-space-3);
   z-index: 20;
