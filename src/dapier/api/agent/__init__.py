@@ -180,8 +180,6 @@ def route(event, method, path):
         return designer_export_api(event)
     if path == "/api/agent/discover" and method == "POST":
         return discover_samples_api(event)
-    if path == "/api/agent/copilot/draft" and method == "POST":
-        return copilot_draft_api(event)
     designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))

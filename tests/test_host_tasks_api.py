@@ -3,7 +3,7 @@
 
 Stub-table style like the neighboring host worker tests: the DynamoDB table
 is a list behind a scan(), and the auth gates are patched at the session
-boundary exactly like test_copilot.py does.
+boundary exactly like the neighboring API tests do.
 """
 import json
 

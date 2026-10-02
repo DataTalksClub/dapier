@@ -1,7 +1,7 @@
 """ai_complete action: registry dispatch, transport, json_mode, config seam.
 
 The transport is injected (the webhook/http_request seam), so no test hits
-the network; configuration is the copilot's env (COPILOT_LLM_*), set per
+the network; configuration is the LLM_* env, set per
 test. Content problems are verdicts ({ok: false}); transport problems raise
 the engine's HttpError.
 """
@@ -20,9 +20,9 @@ from src.dapier.engine import execute
 from src.dapier.engine.actions.webhook import HttpError
 
 ENV = {
-    "COPILOT_LLM_API_KEY": "test-key",
-    "COPILOT_LLM_BASE_URL": "https://llm.example.test/v1",
-    "COPILOT_LLM_MODEL": "test-model",
+    "LLM_API_KEY": "test-key",
+    "LLM_BASE_URL": "https://llm.example.test/v1",
+    "LLM_MODEL": "test-model",
 }
 
 CATALOG_TS = Path(__file__).resolve().parents[1] / "designer" / "src" / "catalog.ts"
@@ -30,7 +30,7 @@ CATALOG_TS = Path(__file__).resolve().parents[1] / "designer" / "src" / "catalog
 
 @contextmanager
 def configured(**overrides):
-    """The copilot env, as the Worker would carry it (docs/connectors/ai.md)."""
+    """The LLM env, as the Worker would carry it (docs/connectors/ai.md)."""
     with patch.dict(os.environ, {**ENV, **overrides}):
         yield
 
@@ -39,7 +39,7 @@ def configured(**overrides):
 def unconfigured():
     """No API key anywhere in the environment."""
     with patch.dict(os.environ):
-        os.environ.pop("COPILOT_LLM_API_KEY", None)
+        os.environ.pop("LLM_API_KEY", None)
         yield
 
 
@@ -192,9 +192,9 @@ class ConfigTests(unittest.TestCase):
             except ValueError as exc:
                 message = str(exc)
                 assert "ai_complete is not configured" in message
-                assert "COPILOT_LLM_API_KEY" in message
-                assert "COPILOT_LLM_BASE_URL" in message
-                assert "COPILOT_LLM_MODEL" in message
+                assert "LLM_API_KEY" in message
+                assert "LLM_BASE_URL" in message
+                assert "LLM_MODEL" in message
             else:
                 raise AssertionError("unconfigured env must refuse the step")
 

@@ -285,7 +285,7 @@ editing now shares one timeline (`designer/src/history.ts`, wired in
 `App.tsx`): canvas ops (add/connect/delete/rename/reattach/action-type
 change/clear), inspector field edits (coalesced per node, so a typing burst
 is one undo step), workflow renames, the On/Off toggle, YAML→canvas
-materializations, copilot-draft loads, and drag moves (one step per drag).
+materializations, and drag moves (one step per drag).
 Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y work outside text fields, with toolbar
 buttons that disable at the timeline ends; opening or creating a workflow
 restarts the history. Rebuilt into the console bundle with

@@ -1,12 +1,14 @@
 """AI connector: one OpenAI-compatible LLM completion as a workflow action.
 
 ``ai_complete`` sends a templated prompt — plus an optional system message —
-to the same endpoint the copilot drafts with: copilot.py's environment config
-(COPILOT_LLM_BASE_URL / COPILOT_LLM_API_KEY / COPILOT_LLM_MODEL) and request
-shape, no new infrastructure, no connection record and no discovery. A
-deployment without the key fails the step with a setup message naming the
-env vars, loud like any other unconfigured action; template.yaml carries no
-env default for it, so enabling it is an ops step (docs/connectors/ai.md).
+to a configured OpenAI-compatible /chat/completions endpoint, with stdlib
+urllib: no new infrastructure, no connection record and no discovery.
+Configuration is environment-only on the Worker function: LLM_BASE_URL
+(default https://api.openai.com/v1), LLM_API_KEY (no default — unset fails
+the step with a setup message naming the env vars, loud like any other
+unconfigured action), and LLM_MODEL (default gpt-4o-mini). template.yaml
+carries no env default for the key, so enabling it is an ops step
+(docs/connectors/ai.md).
 
 Content problems never raise: a ``json_mode`` reply that will not parse
 comes back as ``{ok: false, error, text}`` for the chain to branch on.
@@ -26,32 +28,36 @@ from .registry import Action, Connector, connector, register
 
 connector(Connector(name="ai", label="AI", events=(), icon="sparkles"))
 
-# The copilot's request, with what its draft path pins (temperature 0, the
-# configured model, no response_format) opened up as action fields. The env
-# names, defaults and timeout come from copilot itself (imported inside
-# _copilot — copilot reaches the api package, and connector modules stay
-# import-light, see connectors.poll), so one deployment config drives both
-# surfaces and the wire format cannot drift.
+# The OpenAI chat-completions request shape, with temperature 0 and the
+# configured model as defaults opened up as action fields.
 TEMPERATURE_BOUNDS = (0.0, 2.0)
 _JSON_TRUE = frozenset({"true", "1", "yes", "on"})
-# copilot.extract_yaml's fence handling, for JSON: models wrap structured
-# replies in fences even under response_format, and the parse should not care.
+# Models wrap structured replies in code fences even under response_format,
+# and the JSON parse should not care.
 _JSON_FENCE_RE = re.compile(r"```(?:json)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
+BASE_URL_ENV = "LLM_BASE_URL"
+API_KEY_ENV = "LLM_API_KEY"
+MODEL_ENV = "LLM_MODEL"
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-4o-mini"
+LLM_TIMEOUT_SECONDS = 25
 
-def _copilot():
-    """The copilot module — the config seam this action borrows."""
-    from .. import copilot
 
-    return copilot
+def _base_url():
+    return os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL).rstrip("/")
+
+
+def _model():
+    return os.environ.get(MODEL_ENV, DEFAULT_MODEL).strip() or DEFAULT_MODEL
 
 
 register(Action(
     type="ai_complete",
     label="AI: complete",
     icon="sparkles",
-    description=("One chat completion against the copilot's OpenAI-compatible "
-                 "endpoint (COPILOT_LLM_* env on the Worker function). The "
+    description=("One chat completion against a configured OpenAI-compatible "
+                 "endpoint (LLM_* env on the Worker function). The "
                  "prompt renders from the event; JSON mode parses the reply "
                  "into `data` (an unparsable reply returns {ok: false, error} "
                  "instead of failing the step). Output: {ok, text|data, model, "
@@ -69,9 +75,9 @@ register(Action(
                   "`data`; a reply that will not parse sets ok: false and keeps "
                   "the raw text in `text`")},
         {"key": "temperature", "label": "Temperature", "type": "number",
-         "help": "0-2; the copilot's 0 default when left out"},
+         "help": "0-2; 0 when left out"},
         {"key": "model", "label": "Model",
-         "help": "Overrides the configured default (COPILOT_LLM_MODEL)"},
+         "help": "Overrides the configured default (LLM_MODEL)"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
 ))
@@ -87,7 +93,7 @@ def _json_mode(action):
 
 def _temperature(value):
     """The action's temperature, validated against OpenAI's 0-2 range; left
-    out keeps the copilot's 0 default."""
+    out keeps the 0 default."""
     if value is None or not str(value).strip():
         return 0
     if isinstance(value, bool):
@@ -104,8 +110,8 @@ def _temperature(value):
 
 
 def _unfenced(reply):
-    """The reply minus one wrapping markdown code fence, trimmed — the same
-    deterministic read as copilot.extract_yaml, for JSON."""
+    """The reply minus one wrapping markdown code fence, trimmed — models
+    wrap structured replies in fences even when asked not to."""
     text = str(reply or "").strip()
     match = _JSON_FENCE_RE.search(text)
     return match.group(1).strip() if match else text
@@ -127,18 +133,17 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     Transport is the webhook/http_request seam — an injectable
     ``(method, url, *, headers, body, timeout) -> (status, raw)`` so tests
     record the request instead of hitting the network; the default is urllib
-    against the copilot's endpoint. HTTP 4xx/5xx, timeouts and an unreadable
+    against the configured endpoint. HTTP 4xx/5xx, timeouts and an unreadable
     response all raise ``HttpError`` (Retry-After included when the server
     sent one), which is what the engine's autoretry reads; a json_mode reply
     that will not parse is a verdict, never a raise.
     """
-    copilot = _copilot()
     temperature = _temperature(action.get("temperature"))
-    key = os.environ.get(copilot.API_KEY_ENV, "").strip()
+    key = os.environ.get(API_KEY_ENV, "").strip()
     if not key:
         raise ValueError(
-            f"ai_complete is not configured (set {copilot.API_KEY_ENV} — and "
-            f"optionally {copilot.BASE_URL_ENV} and {copilot.MODEL_ENV} — on "
+            f"ai_complete is not configured (set {API_KEY_ENV} — and "
+            f"optionally {BASE_URL_ENV} and {MODEL_ENV} — on "
             "the Worker function)")
     prompt = render(action.get("prompt") or "", event, steps).strip()
     if not prompt:
@@ -148,20 +153,20 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    model = str(action.get("model") or "").strip() or copilot.model()
+    model = str(action.get("model") or "").strip() or _model()
     payload = json.dumps({
         "model": model,
         "messages": messages,
         "temperature": temperature,
         **({"response_format": {"type": "json_object"}} if _json_mode(action) else {}),
     }).encode()
-    url = f"{copilot.base_url()}/chat/completions"
+    url = f"{_base_url()}/chat/completions"
     headers = {
         "authorization": f"Bearer {key}",
         "content-type": "application/json",
         "user-agent": "dapier-ai-complete",
     }
-    timeout = action.get("timeout_seconds", copilot.LLM_TIMEOUT_SECONDS)
+    timeout = action.get("timeout_seconds", LLM_TIMEOUT_SECONDS)
     if transport is not None:
         status, raw = transport("POST", url, headers=headers, body=payload, timeout=timeout)
     else:
@@ -189,7 +194,6 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     try:
         reply = str(body["choices"][0]["message"]["content"] or "")
     except (IndexError, KeyError, TypeError) as exc:
-        # The copilot's own read of the choices array (copilot._llm_complete).
         raise HttpError(f"ai_complete returned an unexpected response: {exc}") from exc
     usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
     answered_model = str(body.get("model") or model)

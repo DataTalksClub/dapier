@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_step", "workflows_versions"]
+__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_step", "workflows_versions"]
 
 
 def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
@@ -159,7 +159,7 @@ def workflows_save(api_url, path, rename_from, debug=False):
 
 
 def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
-    """The `workflows save` wire call; also the --save tail of `workflows draft`.
+    """The `workflows save` wire call.
 
     A save writes a draft (nothing goes live); the API answers published:
     false with a draft block. Only a historical live-publish response
@@ -181,27 +181,6 @@ def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
     for warning in data.get("warnings") or []:
         print(f"Warning: {warning}")
     return 0
-
-
-def workflows_draft(api_url, prompt, save=False, debug=False):
-    """Copilot draft: print the model's YAML; --save pipes it through the
-    existing save path (the API validates again there). The draft itself is
-    never saved implicitly."""
-    data = api.call(api_url, "POST", "/api/agent/copilot/draft", {"prompt": prompt},
-                    timeout=120, debug=debug)
-    yaml_text = data.get("yaml") or ""
-    print(yaml_text)
-    errors = data.get("errors") or []
-    if errors:
-        print("\nValidation errors (a save would reject this draft):")
-        for error in errors:
-            print(f"  - {error}")
-    if not save:
-        return 0
-    if errors or not yaml_text:
-        print("Not saving: fix the errors above, then run `dapier workflows save <file>`.")
-        return 5
-    return _save_workflow_yaml(api_url, yaml_text, None, debug=debug)
 
 
 def workflows_set_enabled(api_url, files, enabled, debug=False):

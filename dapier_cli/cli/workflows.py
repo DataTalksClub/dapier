@@ -37,12 +37,6 @@ def register(sub):
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
     wf_save_p.add_argument("--rename-from", default=None,
                            help="Previous file name when the workflow was renamed")
-    wf_draft_p = wf_sub.add_parser("draft",
-                                   help="Generate a draft workflow YAML from a natural-language prompt")
-    wf_draft_p.add_argument("prompt",
-                            help='What the workflow should do, e.g. "when someone emails todo@, push it to slack"')
-    wf_draft_p.add_argument("--save", action="store_true",
-                            help="Also save the draft through the `workflows save` path (only when it validates)")
     def add_bulk_toggle_flags(parser):
         parser.add_argument("file", nargs="*", default=None,
                             help="Workflow file name(s), e.g. my-flow.yaml")
@@ -171,8 +165,6 @@ def run(args, api_url, debug, child=None):
         return commands.workflows_export_all_bundle(api_url, out=args.out, debug=debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
-    if args.command == "draft":
-        return commands.workflows_draft(api_url, args.prompt, save=args.save, debug=debug)
     if args.command in ("on", "off", "enable", "disable"):
         enabled = args.command in ("on", "enable")
         if getattr(args, "tag", None) or getattr(args, "all", False):

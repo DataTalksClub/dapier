@@ -94,21 +94,21 @@ Parameters:
       Secrets Manager secret name holding a GitHub token (Contents: read/write
       on the workflows repo). Set to let the console designer commit
       workflows/*.yaml straight to the repo; empty disables designer saves.
-  CopilotLlmBaseUrl:
+  LlmBaseUrl:
     Type: String
     Default: https://api.openai.com/v1
-    Description: OpenAI-compatible chat-completions base URL for the workflow copilot
-  CopilotLlmApiKey:
+    Description: OpenAI-compatible chat-completions base URL for the ai_complete action
+  LlmApiKey:
     Type: String
     NoEcho: true
     Default: ''
     Description: >
-      API key for the copilot's OpenAI-compatible endpoint; empty disables
-      draft generation (the endpoint answers 503 with setup instructions)
-  CopilotLlmModel:
+      API key for the ai_complete action's OpenAI-compatible endpoint; empty
+      leaves the action unconfigured (steps fail with setup instructions)
+  LlmModel:
     Type: String
     Default: gpt-4o-mini
-    Description: Model name the copilot requests from the LLM endpoint
+    Description: Default model name the ai_complete action requests
   DatamailerUrl:
     Type: String
     Default: https://datamailer.dtcdev.click
@@ -329,9 +329,9 @@ Resources:
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
-          COPILOT_LLM_BASE_URL: !Ref CopilotLlmBaseUrl
-          COPILOT_LLM_API_KEY: !Ref CopilotLlmApiKey
-          COPILOT_LLM_MODEL: !Ref CopilotLlmModel
+          LLM_BASE_URL: !Ref LlmBaseUrl
+          LLM_API_KEY: !Ref LlmApiKey
+          LLM_MODEL: !Ref LlmModel
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
           GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
@@ -595,6 +595,11 @@ Resources:
           TASK_USAGE_TABLE: !Ref TaskUsageTable
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable
+          # The ai_complete action's OpenAI-compatible endpoint; empty key
+          # leaves the action unconfigured (docs/connectors/ai.md).
+          LLM_BASE_URL: !Ref LlmBaseUrl
+          LLM_API_KEY: !Ref LlmApiKey
+          LLM_MODEL: !Ref LlmModel
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:

@@ -1,6 +1,5 @@
 """Designer workflow endpoints: the CRUD and organization
 wrappers over designer_store, plus the draft lifecycle and dry runs."""
-from ... import copilot
 from .. import designer_store
 from ... import http
 import json
@@ -34,24 +33,6 @@ def save_designer_workflow(event, operator, visible=None):
     session._audit_event(str(payload.get("file", "unknown")), "workflow.save", operator,
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
-
-def copilot_draft(event, operator):
-    """Console mirror of the agent copilot: a DRAFT workflow for a prompt.
-
-    Delegates to the same copilot.draft_workflow handler as the CLI-facing
-    /api/agent/copilot/draft; never saves or publishes.
-    """
-    try:
-        body = http._request_json(event)
-    except (ValueError, json.JSONDecodeError):
-        return http._json_response(400, {"error": "Invalid request"})
-    if not isinstance(body, dict):
-        return http._json_response(400, {"error": "Invalid request"})
-    status, payload = copilot.draft_workflow(body.get("prompt"))
-    session._audit_event("copilot", "workflow.draft", operator,
-                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return http._json_response(status, payload)
-
 
 def toggle_designer_workflow(event, operator, source, visible=None):
     denied = _write_denied(visible, str(source).removesuffix(".yaml"),

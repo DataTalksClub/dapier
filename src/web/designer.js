@@ -18072,7 +18072,7 @@
       type: "ai_complete",
       label: "AI: complete",
       icon: Sparkles,
-      description: "One chat completion against the copilot's OpenAI-compatible endpoint (COPILOT_LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+      description: "One chat completion against a configured OpenAI-compatible endpoint (LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
       fields: [
         {
           key: "prompt",
@@ -22239,88 +22239,6 @@
       }
     ) });
   }
-  function CopilotDraftDialog({ config, onLoad, onClose }) {
-    const [prompt, setPrompt] = reactExports.useState("");
-    const [busy, setBusy] = reactExports.useState(false);
-    const [draft, setDraft] = reactExports.useState(null);
-    const [error, setError] = reactExports.useState("");
-    const adminBase = config.apiBase.replace(/\/designer$/, "");
-    reactExports.useEffect(() => {
-      const onKey = (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
-    async function requestDraft() {
-      const text = prompt.trim();
-      if (!text || busy) return;
-      setBusy(true);
-      setError("");
-      setDraft(null);
-      try {
-        const payload = await api(
-          config,
-          "/copilot/draft",
-          { method: "POST", body: JSON.stringify({ prompt: text }) },
-          adminBase
-        );
-        setDraft({ yaml: payload.yaml ?? "", errors: payload.errors ?? [] });
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setBusy(false);
-      }
-    }
-    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "section",
-      {
-        className: "picker-panel copilot-panel",
-        role: "dialog",
-        "aria-modal": "true",
-        "aria-labelledby": "copilot-title",
-        onClick: (event) => event.stopPropagation(),
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "copilot-title", children: "Copilot draft" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Describe the workflow in plain words. The draft is never saved — you review it and save it yourself." }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-            "Prompt",
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "textarea",
-              {
-                className: "copilot-prompt",
-                rows: 3,
-                value: prompt,
-                autoFocus: true,
-                spellCheck: false,
-                placeholder: "e.g. When a YouTube video is published, post it to our Slack #videos channel",
-                onChange: (event) => setPrompt(event.target.value)
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: busy || !prompt.trim(), onClick: requestDraft, children: [
-              busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 16, strokeWidth: 1.5 }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Draft workflow" })
-            ] }),
-            busy && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-status", children: "Drafting…" })
-          ] }),
-          error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
-          (draft?.errors ?? []).map((problem, index) => /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: problem }, index)),
-          draft?.yaml && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "picker-yaml", children: draft.yaml }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: onClose, children: "Discard" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => onLoad(draft.yaml), children: "Load into canvas" })
-            ] })
-          ] })
-        ]
-      }
-    ) });
-  }
   function App({ config = localConfig }) {
     const [summaries, setSummaries] = reactExports.useState([]);
     const [sourceName, setSourceName] = reactExports.useState(null);
@@ -22358,7 +22276,6 @@
     });
     const [stepOutputs, setStepOutputs] = reactExports.useState({});
     const [triggerSample, setTriggerSample] = reactExports.useState(null);
-    const [copilotOpen, setCopilotOpen] = reactExports.useState(false);
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
     const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
     const [navOpen, setNavOpen] = reactExports.useState(false);
@@ -22503,7 +22420,7 @@
           }
           return;
         }
-        if (leaveOpen || copilotOpen || stepsPickerOpen || shortcutsOpen) return;
+        if (leaveOpen || stepsPickerOpen || shortcutsOpen) return;
         const target = event.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
         if (target instanceof HTMLElement && target.isContentEditable) return;
@@ -22934,27 +22851,6 @@
     async function newWorkflowSafely() {
       if (!await askToLeave()) return;
       newWorkflow();
-    }
-    function loadCopilotDraft(text) {
-      if (dirty && !window.confirm("Load the copilot draft into the canvas? Unsaved changes on the canvas are lost.")) return;
-      const parsed = parseYamlText(text);
-      if (!parsed) return;
-      allowUnload.current = false;
-      const nextShapes = shapesFromWorkflow(parsed);
-      const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
-      const nextEnabled = parsed.enabled !== false;
-      resetHistory();
-      setShapes(nextShapes);
-      setWorkflowId(nextId);
-      setEnabled(nextEnabled);
-      setCanvasExtraDirty(false);
-      setInvalidRawDrafts({});
-      setBase(parsed);
-      setSelectedId(null);
-      setStepTest({ nodeId: null, busy: false, result: null });
-      setStepOutputs({});
-      setCopilotOpen(false);
-      setStatus({ kind: "ok", message: "Copilot draft loaded — review it, then save." });
     }
     async function duplicateWorkflow() {
       if (!sourceName) return;
@@ -23618,20 +23514,6 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               }
             ),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "button",
-              {
-                className: copilotOpen ? "button secondary active" : "dk-button dk-button--secondary",
-                type: "button",
-                onClick: () => setCopilotOpen(true),
-                disabled: view === "yaml",
-                title: view === "yaml" ? "Switch to Canvas to load a draft" : "Draft a workflow from a plain-language prompt",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 16, strokeWidth: 1.5 }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copilot" })
-                ]
-              }
-            ),
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
@@ -23858,14 +23740,6 @@
             void copyTemplate(template);
           },
           onClose: () => setStepsPickerOpen(false)
-        }
-      ),
-      copilotOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
-        CopilotDraftDialog,
-        {
-          config,
-          onLoad: loadCopilotDraft,
-          onClose: () => setCopilotOpen(false)
         }
       ),
       shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: () => setShortcutsOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(

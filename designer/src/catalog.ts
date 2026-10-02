@@ -180,7 +180,7 @@ export const actionCatalog: ActionEntry[] = [
     type: "ai_complete",
     label: "AI: complete",
     icon: Sparkles,
-    description: "One chat completion against the copilot's OpenAI-compatible endpoint (COPILOT_LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+    description: "One chat completion against a configured OpenAI-compatible endpoint (LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
     fields: [
       { key: "prompt", label: "Prompt", type: "textarea", required: true,
         placeholder: "Summarize this message for the digest:\n{body}" },
@@ -1795,7 +1795,7 @@ export const errorHandlingFields: CatalogField[] = [onErrorField, onFailField, e
  * Step-picker grouping — the palette organized by the job a step is hired
  * for, not one flat list:
  *   - "flow" — shape the run itself: branch, filter, loop, wait, digest;
- *   - "ai"   — delegate thinking: copilot completions and worker agents;
+ *   - "ai"   — delegate thinking: LLM completions and worker agents;
  *   - "data" — developer plumbing: HTTP, code, CSV, storage, rendering;
  *   - "app"  — everything else is a product verb; the app comes from the
  *     action type's prefix (slack_* → the Slack connector), reusing its

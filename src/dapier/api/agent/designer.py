@@ -4,7 +4,6 @@ bearer authentication with the owner-or-operator write gate."""
 
 import json
 
-from ... import copilot
 from .. import designer_store
 
 from .common import _json_response, _no_store, _visibility, _write_denied, _save_denied
@@ -21,7 +20,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["copilot_draft_api", "designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_all_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
+__all__ = ["designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_all_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
 
 
 
@@ -97,29 +96,6 @@ def designer_export_api(event):
         return _no_store(_json_response(status, payload, headers={
             "content-disposition": f'attachment; filename="{payload["filename"]}"'}))
     return _no_store(_json_response(status, payload))
-
-
-def copilot_draft_api(event):
-    """Operator-gated copilot: a DRAFT workflow for a natural-language prompt.
-
-    Never saves or publishes; the caller reviews the YAML and commits it via
-    the designer save endpoint. Validation problems come back in ``errors[]``
-    with HTTP 200 so a coding agent can iterate on the draft. Mirrored at
-    /api/admin/copilot/draft for a future console view.
-    """
-    subject, error = require_operator(event, "workflow.draft")
-    if error:
-        return error
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (ValueError, json.JSONDecodeError):
-        return _json_response(400, {"error": "Invalid request"})
-    if not isinstance(body, dict):
-        return _json_response(400, {"error": "Invalid request"})
-    status, payload = copilot.draft_workflow(body.get("prompt"))
-    audit.emit("copilot", "workflow.draft", subject,
-               outcome="ok" if status == 200 else "error", error=payload.get("error"))
-    return _json_response(status, payload)
 
 
 def designer_toggle_api(event, source):

@@ -1376,18 +1376,6 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
   margin: 0;
 }
 
-/* Copilot draft dialog: the picker panel widened for a prompt and the
-   returned YAML; the draft is read-only until loaded into the canvas. */
-.copilot-panel {
-  width: min(100%, 640px);
-}
-
-.copilot-prompt {
-  font-family: var(--dk-font-mono);
-  font-size: var(--dk-text-sm);
-  resize: vertical;
-}
-
 .picker-yaml {
   background: var(--dk-bg-surface);
   border: 1px solid var(--dk-border-default);

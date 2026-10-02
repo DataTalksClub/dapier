@@ -963,7 +963,7 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 /* The step picker: a search-first overlay over the canvas. */
 .step-picker-overlay {
   align-items: flex-start;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--dk-bg-backdrop);
   display: flex;
   inset: 0;
   justify-content: center;
@@ -1767,18 +1767,6 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
   flex-wrap: wrap;
   gap: 8px;
   margin: 0;
-}
-
-/* Copilot draft dialog: the picker panel widened for a prompt and the
-   returned YAML; the draft is read-only until loaded into the canvas. */
-.copilot-panel {
-  width: min(100%, 640px);
-}
-
-.copilot-prompt {
-  font-family: var(--dk-font-mono);
-  font-size: var(--dk-text-sm);
-  resize: vertical;
 }
 
 .picker-yaml {

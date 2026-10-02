@@ -201,10 +201,6 @@ Still open: none — G1–G13 are all landed.
   (same `tokens.get_access_token` domain call as the CLI's `token exec|write`),
   Connections-view "Get token" dialog that shows the value once and clears it
   on close. Tests: `tests/test_admin_token_issue.py`.
-- **Designer copilot** — console-mode "Copilot" dialog over
-  `/api/admin/copilot/draft`: prompt → draft YAML preview (with save-time
-  validation errors surfaced), "Load into canvas" for review; nothing
-  auto-saves or publishes.
 - **Insert from previous steps** — the designer inspector lists prior steps
   (run order, save-time ids) with their tested output keys as click-to-copy
   `{steps.<id>.output.*}` chips, so templating no longer requires hand-typed
@@ -1196,13 +1192,11 @@ this pass, ranked:
    the streak); the flag and the live streak ride the overview and designer
    summaries. Tests: `tests/test_auto_pause.py`.
 2. **An AI action (value H, effort S).** Zapier's most-used new apps are AI
-   ones; dapier already ships an OpenAI-compatible LLM client
-   (`copilot.py:_llm_complete`, `COPILOT_LLM_BASE_URL`/`COPILOT_LLM_API_KEY`)
-   but nothing a workflow can call. An `ai_complete` connector action
-   (templated prompt + input → text, optional JSON mode) behind the same
-   env config closes the biggest per-app gap with no new infra. Landed
+   ones; an OpenAI-compatible LLM client is all an `ai_complete` connector
+   action (templated prompt + input → text, optional JSON mode) needs, so
+   it closes the biggest per-app gap with no new infra. Landed
    (2026-09-28, round 29): `ai_complete` (connectors/ai.py) sends a
-   rendered prompt (plus an optional system message) to the copilot's
+   rendered prompt (plus an optional system message) to the configured
    endpoint — `json_mode` parses the reply into `data` (an unparsable reply
    is `{ok: false, error, text}` the chain branches on, never a step
    failure), `temperature`/`model`/`timeout_seconds` ride along, and
@@ -1210,8 +1204,10 @@ this pass, ranked:
    so `autoretry` paces a rate-limited endpoint like any other HTTP call.
    A palette **AI** chip (no connection, no discovery — the env is the
    config) makes it findable; the designer bundle is rebuilt. Setup is the
-   Worker function's `COPILOT_LLM_*` env (docs/connectors/ai.md). Tests:
-   `tests/test_ai_action.py`.
+   `LLM_*` env (docs/connectors/ai.md). Tests:
+   `tests/test_ai_action.py`. (The copilot draft feature this originally
+   borrowed its env config from was removed on 2026-10-02; the connector
+   now owns its `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL` config.)
 3. **Draft vs live (value M, effort M/L).** Every save publishes instantly;
    versions and rollback soften it, but there is no draft state and no
    publish moment. Zapier's editor loop is draft-then-publish — a draft

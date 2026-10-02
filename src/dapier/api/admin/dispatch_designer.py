@@ -23,7 +23,7 @@ def _route_designer_all(event, method, path, operator_payload,
 
 def _route_designer(event, method, path, operator_payload, operator_subject):
     """The designer collection endpoints: list, catalog, save, test,
-bulk, export, and the copilot draft."""
+bulk, and export."""
     if method == "GET" and path == "/api/admin/designer/workflows":
         return routes.designer_list(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/catalog":
@@ -46,8 +46,6 @@ bulk, export, and the copilot draft."""
     if method == "GET" and path == "/api/admin/designer/export":
         return routes.export_designer_workflows(event, operator_subject,
                                                 visible=_read_scope(operator_payload))
-    if method == "POST" and path == "/api/admin/copilot/draft":
-        return routes.copilot_draft(event, operator_subject)
     return None
 
 

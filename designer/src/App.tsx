@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
-import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Sparkles, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "lucide-react";
+import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
@@ -539,101 +539,6 @@ function StepsTemplatePicker({ steps, onPick, onClose }: {
   );
 }
 
-/** Console copilot: a natural-language prompt becomes a DRAFT workflow from
-    POST /api/admin/copilot/draft. The draft is shown read-only with its
-    validation errors; nothing is saved or published here — loading it into
-    the canvas goes through the normal YAML load path, and saving stays the
-    operator's explicit act. */
-function CopilotDraftDialog({ config, onLoad, onClose }: {
-  config: DesignerConfig;
-  onLoad: (yaml: string) => void;
-  onClose: () => void;
-}) {
-  const [prompt, setPrompt] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState<{ yaml: string; errors: string[] } | null>(null);
-  const [error, setError] = useState("");
-  // Drafting answers on /api/admin, not /api/admin/designer — the same base
-  // override the discovery picker and the sample pull use.
-  const adminBase = config.apiBase.replace(/\/designer$/, "");
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  async function requestDraft() {
-    const text = prompt.trim();
-    if (!text || busy) return;
-    setBusy(true);
-    setError("");
-    setDraft(null);
-    try {
-      const payload = await api<{ yaml?: string; errors?: string[] }>(
-        config, "/copilot/draft", { method: "POST", body: JSON.stringify({ prompt: text }) }, adminBase);
-      setDraft({ yaml: payload.yaml ?? "", errors: payload.errors ?? [] });
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="picker-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="picker-panel copilot-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="copilot-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 id="copilot-title">Copilot draft</h2>
-        <p className="picker-status">
-          Describe the workflow in plain words. The draft is never saved — you
-          review it and save it yourself.
-        </p>
-        <label>Prompt
-          <textarea
-            className="copilot-prompt"
-            rows={3}
-            value={prompt}
-            autoFocus
-            spellCheck={false}
-            placeholder="e.g. When a YouTube video is published, post it to our Slack #videos channel"
-            onChange={(event) => setPrompt(event.target.value)}
-          />
-        </label>
-        <div className="test-actions">
-          <button className="dk-button dk-button--primary" type="button" disabled={busy || !prompt.trim()} onClick={requestDraft}>
-            {busy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <Sparkles size={16} strokeWidth={1.5} />}
-            <span>Draft workflow</span>
-          </button>
-          {busy && <span className="picker-status">Drafting…</span>}
-        </div>
-        {error && <p className="picker-error" role="alert">{error}</p>}
-        {(draft?.errors ?? []).map((problem, index) => (
-          <p key={index} className="picker-error" role="alert">{problem}</p>
-        ))}
-        {draft?.yaml && (
-          <>
-            <pre className="picker-yaml">{draft.yaml}</pre>
-            <div className="leave-actions">
-              <button className="dk-button dk-button--secondary" type="button" onClick={onClose}>Discard</button>
-              <button className="dk-button dk-button--primary" type="button" onClick={() => onLoad(draft.yaml)}>Load into canvas</button>
-            </div>
-          </>
-        )}
-      </section>
-    </div>
-  );
-}
-
 export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [summaries, setSummaries] = useState<WorkflowSummary[]>([]);
   const [sourceName, setSourceName] = useState<string | null>(null);
@@ -682,9 +587,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       the {trigger.*} names action templates can rely on. Null = not fetched
       (local mode has no admin API, or the workflow has no sample yet). */
   const [triggerSample, setTriggerSample] = useState<{ source?: string; fields: string[] } | null>(null);
-  /** Console copilot (POST /api/admin/copilot/draft): dialog open, and the
-      insert-from-previous picker over the earlier steps' outputs. */
-  const [copilotOpen, setCopilotOpen] = useState(false);
+  /** The insert-from-previous picker over the earlier steps' outputs. */
   const [stepsPickerOpen, setStepsPickerOpen] = useState(false);
   /** "?" overlay listing the editor's keyboard shortcuts. */
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -885,7 +788,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         }
         return;
       }
-      if (leaveOpen || copilotOpen || stepsPickerOpen || shortcutsOpen) return;
+      if (leaveOpen || stepsPickerOpen || shortcutsOpen) return;
       const target = event.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
       // Rich-text hosts (contenteditable) keep the browser's editing keys too.
@@ -1372,32 +1275,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   async function newWorkflowSafely() {
     if (!(await askToLeave())) return;
     newWorkflow();
-  }
-
-  /** Loads a copilot draft through the normal load path — parsed like YAML-view
-     text, shaped into canvas nodes, marked unsaved. Never saves or publishes:
-     the draft goes live only when the operator runs the ordinary save. */
-  function loadCopilotDraft(text: string) {
-    if (dirty && !window.confirm("Load the copilot draft into the canvas? Unsaved changes on the canvas are lost.")) return;
-    const parsed = parseYamlText(text);
-    if (!parsed) return;
-    allowUnload.current = false;
-    const nextShapes = shapesFromWorkflow(parsed);
-    const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
-    const nextEnabled = parsed.enabled !== false;
-    // A draft load is a baseline: the fresh timeline starts at the loaded draft.
-    resetHistory();
-    setShapes(nextShapes);
-    setWorkflowId(nextId);
-    setEnabled(nextEnabled);
-    setCanvasExtraDirty(false);
-    setInvalidRawDrafts({});
-    setBase(parsed);
-    setSelectedId(null);
-    setStepTest({ nodeId: null, busy: false, result: null });
-    setStepOutputs({});
-    setCopilotOpen(false);
-    setStatus({ kind: "ok", message: "Copilot draft loaded — review it, then save." });
   }
 
   /** Copies the saved workflow under a new id (server slugifies the name,
@@ -2074,17 +1951,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && (
               <button
-                className={copilotOpen ? "button secondary active" : "dk-button dk-button--secondary"}
-                type="button"
-                onClick={() => setCopilotOpen(true)}
-                disabled={view === "yaml"}
-                title={view === "yaml" ? "Switch to Canvas to load a draft" : "Draft a workflow from a plain-language prompt"}
-              >
-                <Sparkles size={16} strokeWidth={1.5} /><span>Copilot</span>
-              </button>
-            )}
-            {config.mode === "console" && (
-              <button
                 className={testOpen ? "button secondary active" : "dk-button dk-button--secondary"}
                 type="button"
                 onClick={() => setTestOpen(!testOpen)}
@@ -2322,13 +2188,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             void copyTemplate(template);
           }}
           onClose={() => setStepsPickerOpen(false)}
-        />
-      )}
-      {copilotOpen && (
-        <CopilotDraftDialog
-          config={config}
-          onLoad={loadCopilotDraft}
-          onClose={() => setCopilotOpen(false)}
         />
       )}
       {shortcutsOpen && (

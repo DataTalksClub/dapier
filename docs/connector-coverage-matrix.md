@@ -140,8 +140,8 @@ webhook — used by trigger setup flows.
 - Fresh provider token on the console: Connections-view "Get token" over
   `POST /api/admin/connections/{id}/token` (same domain call as
   `dapier token exec|write`).
-- Designer: Copilot draft dialog (`/api/admin/copilot/draft`) and the
-  "Insert from previous steps" output picker (`{steps.<id>.output.*}` chips).
+- Designer: the "Insert from previous steps" output picker
+  (`{steps.<id>.output.*}` chips).
 - Actions: `http_request` auth variety (`auth_type: basic|bearer|api_key`),
   `webhook` optional templated `payload`.
 - Remaining known gap: per-connector trigger *variety* (more event types per
