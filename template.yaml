@@ -328,6 +328,12 @@ Resources:
         # the inbound mail bucket.
         - S3ReadPolicy:
             BucketName: !Ref DatamailerInboundBucketName
+        # Designer/CLI execution tests run file-read steps in the API process.
+        # Stage and read their bytes just as the worker does.
+        - Statement:
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject]
+            Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret

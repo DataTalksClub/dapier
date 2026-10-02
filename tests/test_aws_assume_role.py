@@ -1,7 +1,9 @@
 import json
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+import yaml
 
 from dapier_cli import commands
 from src.dapier.api import admin
@@ -15,6 +17,30 @@ CONFIG = {
     "region": "eu-west-1",
     "buckets": ["datatalks-mailchimp-backup"],
 }
+
+
+def test_api_can_stage_file_bytes_and_assume_only_configured_roles():
+    source = Path(__file__).resolve().parents[1] / "template.yaml"
+    document = yaml.load(source.read_text(), Loader=yaml.BaseLoader)
+    resources = document["Resources"]
+    api_policies = resources["IngressFunction"]["Properties"]["Policies"]
+    assert any(
+        isinstance(policy, dict) and policy.get("Statement") == {
+            "Effect": "Allow",
+            "Action": ["s3:GetObject", "s3:PutObject"],
+            "Resource": "${RenderArtifactsBucket.Arn}/*",
+        }
+        for policy in api_policies
+    )
+    for name in ("IngressFunction", "WorkerFunction"):
+        policies = resources[name]["Properties"]["Policies"]
+        assert any(
+            isinstance(policy, dict) and policy.get("Statement") == {
+                "Effect": "Allow", "Action": "sts:AssumeRole",
+                "Resource": "AwsAssumableRoleArns",
+            }
+            for policy in policies
+        )
 
 
 @pytest.fixture
