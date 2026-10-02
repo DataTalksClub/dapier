@@ -485,3 +485,48 @@ def test_cli_and_console_api_save_same_configuration_as_draft(name, monkeypatch)
     )
     assert status == 200 and response["published"] is False
     assert published_workflows.get_draft(name)["workflow"] == parse_workflow(text)
+
+
+@pytest.mark.parametrize("native", [False, True])
+def test_todo_chain_selects_email_intake_and_native_confirmation(native):
+    event = fixture("email")
+    event["data"]["route"] = "todo"
+    if native:
+        event["connector"] = "telegram"
+        event["data"] = {"hook": "todo", "text": "/todo Example task"}
+    calls = []
+
+    def runner(action, event, workflow_id, steps=None):
+        if action["type"] == "date_time":
+            return {"iso": "2026-10-02T10:00:00-05:00"}
+        if action["type"] == "code":
+            return run_code(action, event)
+        if action["type"] == "sheets_append_row":
+            calls.append(("sheet", sheets._rows_from_action(action, event, steps)))
+        elif action["type"] == "dataops":
+            calls.append(("dataops", None))
+        elif action["type"] == "telegram_send":
+            calls.append(("confirmation", render(action["text"], event, steps)))
+        return {"ok": True}
+
+    logic.run_chain("todo-intake", workflow("todo-intake")["actions"], event, runner)
+    if native:
+        assert calls == [
+            ("sheet", [["2026-09-30", "Example task", "", "NEW"]]),
+            ("confirmation", 'Done! Saved "Example task" to the todo list.'),
+        ]
+    else:
+        assert calls == [
+            (
+                "sheet",
+                [
+                    [
+                        "2026-10-02T10:00:00-05:00",
+                        'Process email "Example" from Alice <alice@example.com>',
+                        "",
+                        "NEW",
+                    ]
+                ],
+            ),
+            ("dataops", None),
+        ]

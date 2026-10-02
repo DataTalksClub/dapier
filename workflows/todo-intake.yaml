@@ -50,8 +50,8 @@ actions:
 - id: forward-email
   type: condition
   when:
-    trigger.connector:
-      equals: email
+    route:
+      equals: todo
   then:
   - id: create-intake
     type: dataops
