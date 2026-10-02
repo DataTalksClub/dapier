@@ -15,6 +15,14 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = process.env.DAPIER_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, "workflows");
 const DIST_DIR = path.join(import.meta.dirname, "dist");
+// dakit's @font-faces (designer/src/styles.css) request /assets/fonts/…; the
+// files live in the console's vendored copy, so alias them there the same way
+// src/dapier/api/router.py does for the console.
+const FONT_ALIASES = {
+  "/assets/fonts/inter-var.woff2": "src/web/vendor/fonts/inter-var.woff2",
+  "/assets/fonts/ibm-plex-mono-400.woff2": "src/web/vendor/fonts/ibm-plex-mono-400.woff2",
+  "/assets/fonts/ibm-plex-mono-500.woff2": "src/web/vendor/fonts/ibm-plex-mono-500.woff2"
+};
 const PORT = Number(process.env.DESIGNER_PORT ?? 8787);
 const HOST = process.env.DESIGNER_HOST ?? "127.0.0.1";
 // Alternative to TCP for fully local setups: DESIGNER_UNIX_SOCKET=/run/user/1000/dapier-designer.sock
@@ -161,13 +169,23 @@ async function handleApi(req, res, url) {
 }
 
 function serveStatic(req, res, url) {
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
+  const font = FONT_ALIASES[url.pathname];
+  if (font) {
+    const full = path.join(REPO_ROOT, font);
+    if (!existsSync(full)) {
+      res.writeHead(404);
+      return res.end("not found");
+    }
+    res.writeHead(200, { "content-type": types[path.extname(full)] });
+    return createReadStream(full).pipe(res);
+  }
   const rel = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
   const full = path.normalize(path.join(DIST_DIR, rel));
   if (!full.startsWith(DIST_DIR) || !existsSync(full)) {
     res.writeHead(404);
     return res.end("not found");
   }
-  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
   res.writeHead(200, { "content-type": types[path.extname(full)] ?? "application/octet-stream" });
   createReadStream(full).pipe(res);
 }
