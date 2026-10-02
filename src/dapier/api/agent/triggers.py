@@ -87,26 +87,14 @@ def email_from_api(event, method):
 
 
 def email_triggers_api(event, method):
-    """Operator-only trigger management over the CLI's bearer authentication."""
+    """Operator-only email inventory over the CLI's bearer authentication."""
     subject, error = require_operator(event, "email-trigger")
     if error:
         return error
-    from ...triggers.email_routes import inventory, migrate
-    try:
-        if method == "GET":
-            status, payload = 200, inventory()
-        elif method == "POST":
-            body = json.loads(event.get("body") or "{}")
-            if not isinstance(body, dict):
-                raise ValueError("request body must be an object")
-            status, payload = migrate(body.get("name"), subject)
-        else:
-            status, payload = 410, {"error": "Email flows are defined only in Workflows. Save, publish, edit or delete the owning workflow."}
-    except (ValueError, json.JSONDecodeError) as exc:
-        return _json_response(400, {"error": str(exc) or "Invalid request"})
-    audit.emit(payload.get("name", "unknown"), "email-trigger", subject,
-               outcome="ok" if status == 200 else "error")
-    return _json_response(status, payload)
+    from ...triggers.email_routes import inventory
+    payload = inventory()
+    audit.emit("email-triggers", "email-trigger", subject, outcome="ok")
+    return _json_response(200, payload)
 
 
 def hook_triggers_api(event, method):

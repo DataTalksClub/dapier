@@ -149,7 +149,6 @@ class SaveTests(unittest.TestCase):
             _status, payload = schedule_triggers.api_save(
                 {"name": "morning-digest", "expression": "cron(0 8 * * ? *)",
                  "actions": actions}, "op", table_ref=table, events_client=events)
-            self.assertEqual(payload["flow"], "")
             self.assertEqual(schedule_triggers.load_workflows(table_ref=table)[0]["actions"], actions)
             with self.assertRaises(schedule_triggers.TriggerError):
                 schedule_triggers.api_save(

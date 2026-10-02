@@ -153,40 +153,6 @@ def test_datamailer_sns_uses_the_same_sender_list(monkeypatch):
     assert inbox_table.items["sns-2"]["matched"] == []
 
 
-def test_address_keeps_route_and_ands_subject_and_rejects_from(monkeypatch):
-    monkeypatch.setenv("TRIGGER_EMAIL_DOMAIN", "dtcdev.click")
-    monkeypatch.setattr(email_triggers, "yaml_email_routes", lambda: set())
-    item = email_triggers.build_item({
-        "name": "agent",
-        "actions": [{"type": "webhook", "url": "https://example.test"}],
-        "filters": {"subject": {"contains": "invoice"}},
-    }, "op")
-    workflow = email_triggers.workflow_for(item)
-    assert workflow["trigger"]["filters"]["route"] == {"equals": "agent"}
-    assert workflow["trigger"]["filters"]["subject"] == {"contains": "invoice"}
-    try:
-        email_triggers.build_item({
-            "name": "agent",
-            "actions": [{"type": "webhook", "url": "https://example.test"}],
-            "filters": {"from": {"equals": "a@b.co"}},
-        }, "op")
-    except email_triggers.TriggerError as exc:
-        assert "from" in str(exc)
-    else:
-        raise AssertionError("from filter was accepted")
-
-    # The console route rejects the same body.
-    monkeypatch.setattr(email_triggers, "get_table", lambda table_ref=None: Table())
-    response = routes.save_email_trigger({
-        "body": json.dumps({
-            "name": "agent",
-            "actions": [{"type": "webhook", "url": "https://example.test"}],
-            "filters": {"from": {"equals": "a@b.co"}},
-        }),
-    }, "op")
-    assert response["statusCode"] == 410
-
-
 def test_delivery_feedback_is_not_blocked_by_the_inbound_sender_gate(monkeypatch):
     table = _bind(monkeypatch)
     for address in SEED:

@@ -213,16 +213,10 @@ def parse_workflow(yaml_text):
     else:
         raise WorkflowError("workflow needs a trigger (or a triggers list)")
 
-    flow = str(workflow.get("flow") or "").strip()
     actions = workflow.get("actions")
-    if flow and actions:
-        raise WorkflowError("bind either inline actions or a flow, not both")
-    if flow:
-        from ...engine import matching
-
-        if matching.flow_actions(flow) is None:
-            raise WorkflowError(f"no shared flow named '{flow}'")
-    elif not isinstance(actions, list) or not actions:
+    if workflow.get("flow"):
+        raise WorkflowError("shared flows are retired; give the workflow inline actions")
+    if not isinstance(actions, list) or not actions:
         raise WorkflowError("connect at least one action to the trigger")
     for action in (actions or []):
         if not isinstance(action, dict) or not str(action.get("type") or "").strip():

@@ -4,13 +4,13 @@ import json
 from urllib.parse import quote
 
 from .. import api
-from .shared import entry_label, print_flows, read_json_file
+from .shared import entry_label, read_json_file
 
-__all__ = ["print_trigger", "triggers_delete", "triggers_list", "triggers_sample", "triggers_save", "triggers_show", "triggers_workflow_sample"]
+__all__ = ["print_trigger", "triggers_list", "triggers_sample", "triggers_show", "triggers_workflow_sample"]
 
 
 def print_trigger(item):
-    for key in ("name", "address", "description", "flow", "enabled", "created_by",
+    for key in ("name", "address", "description", "enabled", "created_by",
                 "created_at", "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
@@ -27,8 +27,7 @@ def triggers_list(api_url, debug=False):
         for handler in row.get("handlers") or []:
             print(f"{row['address']:34} {handler['status']:12} workflow={handler['workflow']} "
                   + " → ".join(handler.get("action_types") or [])
-                  + (" [unpublished changes]" if handler.get("has_draft") else "")
-                  + (" [convert: dapier emails migrate " + handler['legacy_name'] + "]" if handler.get("legacy") else ""))
+                  + (" [unpublished changes]" if handler.get("has_draft") else ""))
     for handler in data.get("subscriptions") or []:
         print(f"Address rule: {json.dumps(handler['filters'].get('route', 'all'))} "
               f"{handler['status']} workflow={handler['workflow']}")
@@ -46,16 +45,6 @@ def triggers_show(api_url, name, debug=False):
         return 4
     print(json.dumps(item, indent=2))
     return 0
-
-
-def triggers_save(api_url, path, debug=False):
-    print("Email flows are defined only in Workflows. Use `dapier workflows save flow.yaml`, then `dapier workflows publish <id>`.")
-    return 2
-
-
-def triggers_delete(api_url, name, debug=False):
-    print("Edit or delete the owning workflow with `dapier workflows`. Email addresses have no separate flow definition.")
-    return 2
 
 
 def triggers_sample(api_url, connector, event=None, connection_id=None, limit=None,

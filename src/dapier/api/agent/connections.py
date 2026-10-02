@@ -32,7 +32,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "import_connection", "issue_token", "list_for_caller", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata", "update_connection_scopes"]
+__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "import_connection", "issue_token", "list_for_caller", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
 
 
 
@@ -250,7 +250,7 @@ def create_connection(event):
     return _json_response(200, connections.public_view(item))
 
 
-def update_connection_metadata(event, connection_id, *, scopes_only=False):
+def update_connection_metadata(event, connection_id):
     """Operator-only edit of a connection's display name, scopes, or Dropbox path."""
     subject, error = require_operator(event, audit.CONNECT)
     if error:
@@ -259,11 +259,9 @@ def update_connection_metadata(event, connection_id, *, scopes_only=False):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    allowed = {"scopes"} if scopes_only else {"display_name", "scopes", "root_path"}
+    allowed = {"display_name", "scopes", "root_path"}
     if not isinstance(body, dict) or not body or set(body) - allowed:
         return _json_response(400, {"error": "Provide supported connection fields"})
-    if scopes_only and set(body) != {"scopes"}:
-        return _json_response(400, {"error": "Provide only the requested scopes"})
     if "scopes" in body and (
         not isinstance(body["scopes"], list)
         or not all(isinstance(scope, str) for scope in body["scopes"])
@@ -294,11 +292,6 @@ def update_connection_metadata(event, connection_id, *, scopes_only=False):
     connections.put_connection(connections_table, item)
     audit.emit(connection_id, audit.CONNECT, subject, outcome="ok")
     return _json_response(200, connections.public_view(item))
-
-
-def update_connection_scopes(event, connection_id):
-    """Backward-compatible focused route for replacing requested scopes."""
-    return update_connection_metadata(event, connection_id, scopes_only=True)
 
 
 def revoke_connection_tokens(event, connection_id):

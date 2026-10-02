@@ -477,27 +477,6 @@ def test_triggers_list_and_show(monkeypatch, capsys):
     assert commands.triggers_show("https://api.example.test", "missing") == 4
 
 
-def test_legacy_email_writes_direct_users_to_workflows(monkeypatch, capsys):
-    def unexpected_call(*args, **kwargs):
-        raise AssertionError("Retired commands must not mutate state")
-    monkeypatch.setattr(commands.api, "call", unexpected_call)
-    assert commands.triggers_save("https://api.example.test", "email.json") == 2
-    assert commands.triggers_delete("https://api.example.test", "consulting") == 2
-    assert "owning workflow" in capsys.readouterr().out
-
-
-def test_main_triggers_parsing(monkeypatch):
-    seen = {}
-
-    def fake_save(api_url, path, debug=False):
-        seen["file"] = path
-        return 0
-
-    monkeypatch.setattr(commands, "triggers_save", fake_save)
-    assert main.main(["triggers", "save", "/tmp/trigger.json"]) == 0
-    assert seen["file"] == "/tmp/trigger.json"
-
-
 def test_credentials_set_posts_value_without_echoing(monkeypatch, tmp_path, capsys):
     posted = {}
 
@@ -664,14 +643,6 @@ def test_main_operator_command_parsing(monkeypatch):
     assert main.main(["connections", "revoke", "youtube-personal"]) == 0
     assert seen["revoked"] == "youtube-personal"
 
-    monkeypatch.setattr(commands, "connections_scopes",
-                        lambda api_url, connection_id, scopes, debug=False:
-                        seen.update(scoped=connection_id, scopes=scopes) or 0)
-    assert main.main(["connections", "scopes", "dropbox", "--scopes",
-                      "account_info.read", "files.metadata.read"]) == 0
-    assert seen["scoped"] == "dropbox"
-    assert seen["scopes"] == ["account_info.read", "files.metadata.read"]
-
     monkeypatch.setattr(commands, "connections_create",
                         lambda api_url, connection_id, provider, scopes, **kwargs:
                         seen.update(created=connection_id, provider=provider, create_scopes=scopes) or 0)
@@ -816,25 +787,6 @@ def test_connections_import_passes_root_path(monkeypatch, tmp_path):
 
     assert code == 0
     assert seen["body"]["root_path"] == "/incoming"
-
-
-def test_connections_scopes_posts_replacement_scopes(monkeypatch, capsys):
-    seen = {}
-
-    def fake_call(api_url, method, path, body=None, **kwargs):
-        seen.update(method=method, path=path, body=body)
-        return {"connection_id": "dropbox"}
-
-    monkeypatch.setattr(commands.api, "call", fake_call)
-    scopes = ["account_info.read", "files.metadata.read", "files.content.write"]
-    assert commands.connections_scopes("https://api.example.test", "dropbox", scopes) == 0
-    assert seen == {
-        "method": "PUT",
-        "path": "/api/agent/connections/dropbox/scopes",
-        "body": {"scopes": scopes},
-    }
-    out, _ = capsys.readouterr()
-    assert "Reconnect" in out
 
 
 def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):

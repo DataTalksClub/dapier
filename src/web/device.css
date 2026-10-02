@@ -11,7 +11,6 @@ body {
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-lg);
   background: var(--dk-bg-surface);
-  box-shadow: var(--dk-shadow-card);
   color: var(--dk-text-primary);
 }
 

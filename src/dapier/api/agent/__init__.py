@@ -78,9 +78,6 @@ def route(event, method, path):
         return delete_connection(event, match.group(1))
     if match and method == "PUT":
         return update_connection_metadata(event, match.group(1))
-    scopes_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/scopes", path)
-    if scopes_match and method == "PUT":
-        return update_connection_scopes(event, scopes_match.group(1))
     connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
     if connect_match and method == "POST":
         return start_connect(event, connect_match.group(1))
@@ -97,9 +94,7 @@ def route(event, method, path):
         return connections_test_api(event, test_connection_match.group(1))
     if method == "POST" and path == "/api/agent/connections/import":
         return import_connection(event)
-    if path == "/api/agent/email-triggers/migrate" and method == "POST":
-        return email_triggers_api(event, method)
-    if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
+    if path == "/api/agent/email-triggers" and method == "GET":
         return email_triggers_api(event, method)
     if path == "/api/agent/email-from" and method in ("GET", "POST", "DELETE"):
         return email_from_api(event, method)
