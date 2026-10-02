@@ -60,7 +60,7 @@ Source: Zap `153709869`; workflow: `todo-intake` (v5 published and enabled after
 - [ ] Confirm source processing-time timezone; live v5 uses `America/Chicago`, while original Zapier CST semantics remain unverified.
 - [x] Verify route `todo@dtcdev.click` accepts `alexey@datatalks.club` (live receipt). Other sender policies remain outside this test.
 - [x] Retest verified one correctly populated row and DataOps receipt; initial failed test and successful v5 evidence are recorded below.
-- [ ] Verify existing native Telegram task creation and confirmation still work.
+- [x] Verify existing native Telegram task creation and confirmation through the real private bot.
 - [x] Publish the prepared sender/timestamp fix as v5 and confirm the workflow is On.
 - [x] Retest unique subject `Dapier TODO retest 2026-10-02 Chrome v5`: one row, correct sender/subject/Notes/Status, processing timestamp and accepted DataOps receipt.
 
@@ -102,6 +102,10 @@ completed all 7 steps at 19:35:59 UTC. The DataOps API returned
 `status: accepted`, item `email-d0de9a5657f075cfb7cb697f8010f8cd`.
 Email mapping and intake receipt pass; native Telegram and original Zapier CST
 semantics remain separate checks.
+
+Native Telegram evidence (2026-10-02): Alexey sent `/todo SYNTHETIC TEST Dapier Chrome native Telegram 2026-10-02 01` privately to `@dtc_todo_bot`. Run `todo-intake:todo-446915fcc743d237` completed at 19:57:38 UTC. Direct Sheets read found exactly one row, `todo!A107:D107`: `2026-10-02`, command-stripped task text, blank Notes, `NEW`. Telegram returned confirmation message ID `7212`; the browser tester confirmed receipt. This is real Telegram delivery, separate from the catch-hook test.
+
+A subsequent private voice message was not our test. The user screenshot showed a blank-task confirmation. No audio was fetched, transcribed or replayed. Published TODO v7 On with a guard shared by native append and confirmation: missing, empty, whitespace or command-only text creates no task and sends no success confirmation. Voice/document deliveries remain available to other handlers; this flow does not add media processing. A synthetic missing-text CLI execution produced zero sheet/intake/send actions, and regression tests preserve the existing text and email mappings.
 
 ## 3. Invoice email
 
