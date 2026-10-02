@@ -149,8 +149,8 @@ function PromptField({ field, value, onChange }: {
         <textarea id={`${id}-expanded`} ref={expanded} className="prompt-expanded" value={draft}
           placeholder={field.placeholder} spellCheck onChange={event => setDraft(event.target.value)} />
         <footer className="prompt-editor-actions">
-          <button className="dk-button dk-button--secondary" type="button" onClick={close}>Cancel</button>
           <button className="dk-button dk-button--primary" type="button" onClick={() => { onChange(draft); close(); }}>Apply to step</button>
+          <button className="dk-button dk-button--secondary" type="button" onClick={close}>Cancel</button>
         </footer>
       </dialog>
     </div>
@@ -2256,9 +2256,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <p id="leave-description">Save this draft before opening another workflow?</p>
             {status.kind === "error" && <p className="leave-error" role="alert">{status.message}</p>}
             <div className="leave-actions">
+              <button className="dk-button dk-button--primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
               <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
               <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
-              <button className="dk-button dk-button--primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
             </div>
           </section>
         </div>

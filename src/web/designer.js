@@ -21902,11 +21902,11 @@
               }
             ),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "prompt-editor-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: close, children: "Cancel" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => {
                 onChange(draft);
                 close();
-              }, children: "Apply to step" })
+              }, children: "Apply to step" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: close, children: "Cancel" })
             ] })
           ]
         }
@@ -23785,9 +23785,9 @@
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
         status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: status.message }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" })
         ] })
       ] }) }),
       stepsPickerOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
