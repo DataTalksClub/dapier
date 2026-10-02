@@ -66,7 +66,7 @@ function renderDetail() {
   const active = ACTIVE.has(task.status), failed = FAILED.has(task.status), result = resultText(task);
   const logs = task.logs;
   panel.innerHTML = `<div class="agent-detail-head">
-      <button class="agent-back button secondary" type="button">Back to runs</button>
+      <button class="agent-back dk-button dk-button--secondary" type="button">Back to runs</button>
       <div class="agent-detail-status">${badge(task)}<span>${escapeHtml(task.engine || 'Agent')} · ${escapeHtml(duration(task))}</span></div>
       <h2 tabindex="-1">${escapeHtml(title(task))}</h2>
       <a class="agent-workflow-link" href="/workflows/${encodeURIComponent(task.workflow || '')}">${escapeHtml(task.workflow || 'Workflow')}</a>
@@ -104,7 +104,7 @@ async function selectTask(id, { updateUrl = true } = {}) {
     detail = data.task; renderDetail();
   } catch (error) {
     if (seq !== detailSeq) return;
-    $('#agent-run-detail').innerHTML = `<div class="agent-detail-empty"><button class="agent-back button secondary" type="button">Back to runs</button><h3>Could not load this run</h3><p>${escapeHtml(error.message)}</p><button class="button secondary" id="agent-detail-retry" type="button">Try again</button></div>`;
+    $('#agent-run-detail').innerHTML = `<div class="agent-detail-empty"><button class="agent-back dk-button dk-button--secondary" type="button">Back to runs</button><h3>Could not load this run</h3><p>${escapeHtml(error.message)}</p><button class="dk-button dk-button--secondary" id="agent-detail-retry" type="button">Try again</button></div>`;
   }
 }
 /* Tasks run on a worker — a machine running `dapier worker`. When work is

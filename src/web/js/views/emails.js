@@ -11,8 +11,8 @@ function handlerDetails(handler) {
   const actions = (handler.action_types || []).map(escapeHtml).join(' → ') || 'No actions';
   const pending = handler.has_draft && handler.status !== 'draft' ? ' · unpublished changes' : '';
   const manage = handler.legacy
-    ? `<button class="button secondary email-migrate" data-name="${escapeHtml(handler.legacy_name)}" type="button">Convert to workflow</button>`
-    : `<button class="button secondary email-workflow" data-workflow="${name}" type="button">Edit workflow</button>`;
+    ? `<button class="dk-button dk-button--secondary email-migrate" data-name="${escapeHtml(handler.legacy_name)}" type="button">Convert to workflow</button>`
+    : `<button class="dk-button dk-button--secondary email-workflow" data-workflow="${name}" type="button">Edit workflow</button>`;
   return { name, actions, pending, manage };
 }
 

@@ -26,9 +26,9 @@ function scheduleRow(item) {
     <td data-label="Status">${statusLine(item.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' })}</td>
     <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(item.updated_at) || '—')}</td>
     <td class="action-cell">
-      <button class="button secondary schedule-edit" data-name="${escapeHtml(item.schedule_id)}" type="button">Edit</button>
-      <button class="button secondary schedule-toggle" data-name="${escapeHtml(item.schedule_id)}" type="button">${item.enabled ? 'Turn off' : 'Turn on'}</button>
-      <button class="button secondary schedule-delete" data-name="${escapeHtml(item.schedule_id)}" type="button">Delete</button>
+      <button class="dk-button dk-button--secondary schedule-edit" data-name="${escapeHtml(item.schedule_id)}" type="button">Edit</button>
+      <button class="dk-button dk-button--secondary schedule-toggle" data-name="${escapeHtml(item.schedule_id)}" type="button">${item.enabled ? 'Turn off' : 'Turn on'}</button>
+      <button class="dk-button dk-button--secondary schedule-delete" data-name="${escapeHtml(item.schedule_id)}" type="button">Delete</button>
     </td>
   </tr>`;
 }

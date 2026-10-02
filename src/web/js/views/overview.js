@@ -66,7 +66,7 @@ function workflowRow(workflow) {
       <p class="sub">${escapeHtml(workflow.description || workflowTriggerText(workflow))}</p>
       <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : `<span class="sub">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading recent runs…'}</span>`}</div>
     </div>
-    <button type="button" class="button secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
+    <button type="button" class="dk-button dk-button--secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
   </article>`;
 }
 
@@ -215,8 +215,8 @@ export function renderWorkflows() {
       ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${id}</a>`
       : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${id}</button>`;
     const edit = workflow.source
-      ? `<a class="button secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
-      : `<button class="button secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
+      ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
+      : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
     const tags = (workflow.tags || []).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join(' ');
     const folderChip = String(workflow.folder || '').trim()
       ? `<span class="tag-chip folder-chip" title="Folder">${escapeHtml(String(workflow.folder).trim())}</span>` : '';
@@ -228,19 +228,19 @@ export function renderWorkflows() {
       <td class="workflow-flow" data-label="Flow"><div class="workflow-flow-line"><span class="workflow-flow-label">When</span><span>${escapeHtml(workflowTriggerText(workflow))}</span></div><div class="workflow-flow-line"><span class="workflow-flow-label">Then</span><span class="workflow-action-chain" title="${escapeHtml((workflow.actions || []).map(workflowActionText).join(' → '))}">${actions || '—'}</span></div></td>
       <td data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run for ${id}" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading recent runs…'}</span>`}</td>
       <td data-label="State"><div class="workflow-state-control">${workflow.auto_paused
-          ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
+          ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="dk-button dk-button--secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
           : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${id}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
       </div></td>
       <td class="action-cell workflow-actions" data-label="Manage">
-        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}"><span aria-hidden="true">⋯</span></button>
+        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
         <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${id}">
         ${edit}
-        <button type="button" class="button secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
-        <button type="button" class="button secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
-        <button type="button" class="button secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
-        <button type="button" class="button secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
-        <button type="button" class="button secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
-        <button type="button" class="button danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
+        <button type="button" class="dk-button dk-button--danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
         </div>
       </td>
     </tr>`;
@@ -305,13 +305,13 @@ function renderAttention(data) {
   const items = model.problems.map(({ workflow, run }) => `<article class="home-problem">
     <div><strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong>
       <p class="sub">${escapeHtml(workflow.auto_paused_reason || (run?.failed_step ? `Failed at ${run.failed_step}` : 'Open the run to see what went wrong.'))}</p></div>
-    <div class="home-create-actions">${run ? `<button class="button secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="button secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
+    <div class="home-create-actions">${run ? `<button class="dk-button dk-button--secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
   </article>`);
   for (const connection of model.connections) items.push(`<article class="home-problem">
     <div><strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
-    <button class="button secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
+    <button class="dk-button dk-button--secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
   </article>`);
-  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="button secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
+  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><strong>Monthly task limit reached</strong><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
   $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
   $('#overview-attention').hidden = items.length === 0;
   $('#overview-attention').innerHTML = items.length ? `<h3>Needs attention</h3>${items.join('')}` : '';
@@ -501,7 +501,7 @@ async function loadVersions(file) {
     <td data-label="Change">${escapeHtml(version.cause || 'save')}</td>
     <td data-label="By" class="mono muted-cell">${escapeHtml(version.published_by || '—')}</td>
     <td data-label="State">${version.enabled ? 'On' : 'Off'}</td>
-    <td class="action-cell" data-label="Manage">${version.current ? '' : `<button type="button" class="button secondary version-restore" data-revision="${version.revision}">Restore</button>`}</td>
+    <td class="action-cell" data-label="Manage">${version.current ? '' : `<button type="button" class="dk-button dk-button--secondary version-restore" data-revision="${version.revision}">Restore</button>`}</td>
   </tr>`).join('');
   // The rollback half of the list: pick any two revisions and see what
   // changed before restoring one (`dapier workflows diff` prints the same).
@@ -515,7 +515,7 @@ async function loadVersions(file) {
         →
         <select class="mono version-diff-to">${revisionOptions(ascending[ascending.length - 1])}</select>
       </label>
-      <button type="button" class="button secondary version-diff">Diff…</button>
+      <button type="button" class="dk-button dk-button--secondary version-diff">Diff…</button>
     </div>
     <pre class="mono version-diff-output" hidden></pre>` : '';
   $('#versions-detail').innerHTML = (rows

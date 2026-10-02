@@ -60,8 +60,8 @@ function hookRow(hook) {
       <td data-label="Status">${statusLine(hook.enabled ? 'enabled' : 'disabled')}</td>
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(hook.updated_at) || '—'}</td>
       <td class="action-cell">
-        <button class="button secondary trigger-edit" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Edit</button>
-        <button class="button secondary trigger-delete" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Delete</button>
+        <button class="dk-button dk-button--secondary trigger-edit" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Edit</button>
+        <button class="dk-button dk-button--secondary trigger-delete" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Delete</button>
       </td>
     </tr>`;
 }
@@ -86,9 +86,9 @@ function pollRow(poll) {
       <td class="mono muted-cell" data-label="Runs">${escapeHtml(actionSummary(poll))}</td>
       <td data-label="Status">${statusLine(poll.enabled ? 'enabled' : 'disabled')}</td>
       <td class="action-cell">
-        <button class="button secondary trigger-sample" data-name="${escapeHtml(poll.poll_id)}" type="button">Sample</button>
-        <button class="button secondary trigger-edit" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Edit</button>
-        <button class="button secondary trigger-delete" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Delete</button>
+        <button class="dk-button dk-button--secondary trigger-sample" data-name="${escapeHtml(poll.poll_id)}" type="button">Sample</button>
+        <button class="dk-button dk-button--secondary trigger-edit" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Edit</button>
+        <button class="dk-button dk-button--secondary trigger-delete" data-kind="poll" data-name="${escapeHtml(poll.poll_id)}" type="button">Delete</button>
       </td>
     </tr>`;
 }

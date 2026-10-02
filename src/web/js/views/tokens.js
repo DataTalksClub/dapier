@@ -53,8 +53,8 @@ function renderTokens(tokens) {
         ? `<span class="status off"><span class="status-dot" aria-hidden="true"></span>revoked ${formatTimestamp(token.revoked_at) || ''}</span>`
         : statusLine('active')}</td>
       <td class="action-cell">${token.revoked_at
-        ? `<button class="button secondary token-remove" data-token="${escapeHtml(token.token_id)}" type="button">Remove</button>`
-        : `<button class="button secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
+        ? `<button class="dk-button dk-button--secondary token-remove" data-token="${escapeHtml(token.token_id)}" type="button">Remove</button>`
+        : `<button class="dk-button dk-button--secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
     </tr>`).join('');
   $$('.token-revoke').forEach((button) => button.addEventListener('click', async () => {
     const token = tokens.find((item) => item.token_id === button.dataset.token);

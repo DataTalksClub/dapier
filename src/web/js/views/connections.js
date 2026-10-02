@@ -150,7 +150,7 @@ function connectionsLoadMoreButton() {
   if (existing) return existing;
   const button = document.createElement('button');
   button.id = 'connections-load-more';
-  button.className = 'button secondary';
+  button.className = 'dk-button dk-button--secondary';
   button.type = 'button';
   button.hidden = true;
   button.textContent = 'Load more';
@@ -220,9 +220,9 @@ function renderConnectCards(connections) {
       ? connections.find((connection) => connection.provider === provider && connection.status === 'ready') : null;
     const accounts = connections.filter((connection) => connection.provider === provider);
     const action = pending
-      ? `<a class="button primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
-         <button class="button secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
-      : `<button class="button secondary connect-button" data-provider="${provider}" type="button">${provider === 'zoom' ? 'Add Zoom app' : 'Add account'}</button>`;
+      ? `<a class="dk-button dk-button--primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
+         <button class="dk-button dk-button--secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
+      : `<button class="dk-button dk-button--secondary connect-button" data-provider="${provider}" type="button">${provider === 'zoom' ? 'Add Zoom app' : 'Add account'}</button>`;
     return `
     <div class="connect-card">
       <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span>${accounts.length > 1 ? `<span class="connect-count">${accounts.length} accounts</span>` : ''}</div>
@@ -467,18 +467,18 @@ function connectionRow(connection) {
        status map already carried) without rewriting the stored record. */
     const status = effectiveStatus(connection);
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && status !== 'connected'
-      ? `<a class="button ${status === 'ready' ? 'primary' : 'secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+      ? `<a class="dk-button ${status === 'ready' ? 'dk-button--primary' : 'dk-button--secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     /* Console mirror of `dapier token exec`: only OAuth connections hold a
        refreshable provider access token — token providers (slack, telegram,
        zoom) keep a pasted secret, and the shared domain call 502s for them. */
     const tokenAction = status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
-      ? `<button class="button secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
+      ? `<button class="dk-button dk-button--secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
     const identity = connection.account_title || connection.verified_account_id;
     const expires = formatTimestamp(connection.token_expires_at);
     return `<tr>
     <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span><span class="cell-sub muted-cell">${escapeHtml(usageLabel(connection))}</span></td>
     <td data-label="Status">${statusLine(status, CONNECTION_STATUS_LABELS)}${expires && status !== 'expired' ? `<span class="cell-sub muted-cell">token expires ${escapeHtml(expires)}</span>` : ''}</td>
-    <td class="action-cell">${nextAction}${tokenAction}<button class="button secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
+    <td class="action-cell">${nextAction}${tokenAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
   </tr>`;
 }
 
@@ -532,7 +532,7 @@ const editDeleteButton = document.getElementById('edit-connection-delete')
   || (() => {
     const button = document.createElement('button');
     button.id = 'edit-connection-delete';
-    button.className = 'button danger';
+    button.className = 'dk-button dk-button--danger';
     button.type = 'button';
     button.textContent = 'Delete';
     $('#edit-connection-revoke').after(button);
@@ -625,13 +625,13 @@ function tokenResultElements() {
       <p class="sub">This is a live credential for the provider account — treat it like a password. It is shown once; closing this dialog clears it.</p>
       <div id="provider-token-reveal" class="token-reveal" hidden>
         <code id="provider-token-value" class="mono"></code>
-        <button id="provider-token-copy" class="button secondary" type="button">Copy</button>
+        <button id="provider-token-copy" class="dk-button dk-button--secondary" type="button">Copy</button>
       </div>
       <dl id="provider-token-details"></dl>
       <p id="provider-token-error" class="form-error" role="alert"></p>
     </div>
     <div class="dialog-actions">
-      <button class="button secondary dialog-close" type="button">Close</button>
+      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>`;
   document.body.appendChild(dialog);
   icons();
@@ -1036,7 +1036,7 @@ function renderGrants() {
   $('#connection-grant-list').innerHTML = shownGrants.length ? shownGrants.map((grant) => `
     <div class="grant-row">
       <div><strong>${escapeHtml(grant.subject)}</strong><span class="grant-meta">${escapeHtml(grant.agent)} · ${escapeHtml((grant.operations || []).join(', '))}${grant.expires_at ? ` · expires ${escapeHtml(formatTimestamp(grant.expires_at))}` : ''}</span></div>
-      <div class="grant-actions"><button class="button secondary grant-edit" data-grantee="${escapeHtml(grant.grantee)}" type="button">Edit</button><button class="button secondary grant-delete" data-grantee="${escapeHtml(grant.grantee)}" type="button">Revoke</button></div>
+      <div class="grant-actions"><button class="dk-button dk-button--secondary grant-edit" data-grantee="${escapeHtml(grant.grantee)}" type="button">Edit</button><button class="dk-button dk-button--secondary grant-delete" data-grantee="${escapeHtml(grant.grantee)}" type="button">Revoke</button></div>
     </div>`).join('') : '<p class="detail-muted">No grants yet. Only operators can use this connection until you add one.</p>';
   $$('.grant-edit').forEach((button) => button.addEventListener('click', () => {
     const grant = shownGrants.find((item) => item.grantee === button.dataset.grantee);

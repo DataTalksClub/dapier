@@ -26,7 +26,7 @@ function eventRow(event) {
     <td class="mono" data-label="Trigger">${escapeHtml(triggerLabel(event))}</td>
     <td data-label="Matched">${matchedLabel(event)}</td>
     <td class="mono muted-cell" data-label="Source">${escapeHtml(event.source || '—')}</td>
-    <td class="action-col"><button class="button secondary inbox-replay" data-inbox="${escapeHtml(event.inbox_id)}" type="button">Replay</button></td>
+    <td class="action-col"><button class="dk-button dk-button--secondary inbox-replay" data-inbox="${escapeHtml(event.inbox_id)}" type="button">Replay</button></td>
   </tr>`;
 }
 

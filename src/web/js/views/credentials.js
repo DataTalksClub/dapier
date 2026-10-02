@@ -22,13 +22,13 @@ function renderCredentials(credentials) {
     const item = PROVIDERS[credential.provider] || { name: credential.provider };
     const status = credential.configured ? 'configured' : 'missing';
     const test = TESTABLE.has(credential.provider)
-      ? `<button class="button secondary credential-test" data-provider="${escapeHtml(credential.provider)}">Test</button>`
+      ? `<button class="dk-button dk-button--secondary credential-test" data-provider="${escapeHtml(credential.provider)}">Test</button>`
       : '';
     return `<tr>
       <td class="cell-title"><span class="cell-name">${escapeHtml(item.name)}</span><span class="cell-sub">credential: ${escapeHtml(credential.provider)}</span></td>
       <td class="mono muted-cell" data-label="Updated">${credential.updated_at ? formatTimestamp(credential.updated_at) : '—'}</td>
       <td data-label="Status">${statusLine(status)}</td>
-      <td class="action-cell">${test}<button class="button secondary credential-edit" data-provider="${escapeHtml(credential.provider)}">${credential.configured ? 'Replace' : 'Add'}</button></td>
+      <td class="action-cell">${test}<button class="dk-button dk-button--secondary credential-edit" data-provider="${escapeHtml(credential.provider)}">${credential.configured ? 'Replace' : 'Add'}</button></td>
     </tr>`;
   }).join('');
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));

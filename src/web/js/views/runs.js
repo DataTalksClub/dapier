@@ -205,7 +205,7 @@ function stepCard({ icon, title, badge, status, duration, at, data, error, repla
     .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${dataBlock(value, { openRaw: Boolean(error) }) || '<p class="detail-muted">Empty</p>'}</div>`)
     .join('');
   const replayFromHere = replayFrom && stepId
-    ? `<button class="button secondary run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
+    ? `<button class="dk-button dk-button--secondary run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
         title="Re-run from this step: earlier steps do not run again, their recorded outputs seed the rerun">Replay from here</button>`
     : '';
   return `<div class="flow-step ${error ? 'failed' : ''}">
@@ -276,7 +276,7 @@ export async function openRun(runId) {
   const run = data.run || {};
   $('#run-title').textContent = run.workflow_id || 'Run';
   const cancel = run.status === 'delayed'
-    ? `<button class="button secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+    ? `<button class="dk-button dk-button--secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Drop the parked continuation: the remaining actions will never fire">Cancel</button>`
     : '';
   $('#run-detail').innerHTML = `
@@ -285,7 +285,7 @@ export async function openRun(runId) {
       <code>${wrapTokens(run.run_id || runId)}</code>
       ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
       ${cancel}
-      <button class="button secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+      <button class="dk-button dk-button--secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Re-inject this run's original trigger event">Replay</button>
     </div>
     ${flow(data)}`;

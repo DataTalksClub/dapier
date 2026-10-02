@@ -45,7 +45,7 @@ function renderItems(data) {
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(item.updated_at) || '—'}</td>
       <td class="mono muted-cell" data-label="Expires">${item.expires
         ? formatTimestamp(new Date(item.expires * 1000).toISOString()) || item.expires : '—'}</td>
-      <td class="action-cell"><button class="button secondary storage-delete" data-key="${escapeHtml(item.key)}" type="button">Delete</button></td>
+      <td class="action-cell"><button class="dk-button dk-button--secondary storage-delete" data-key="${escapeHtml(item.key)}" type="button">Delete</button></td>
     </tr>`).join('');
   /* Only overflowing values get the expand affordance; short ones stay quiet. */
   $$('#storage-table .storage-value-text').forEach((el) => {

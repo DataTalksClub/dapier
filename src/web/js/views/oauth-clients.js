@@ -16,7 +16,7 @@ function renderOAuthClients(clients) {
       <td class="mono muted-cell" data-label="Client ID">${client.client_id ? wrapTokens(client.client_id) : '—'}</td>
       <td class="mono muted-cell" data-label="Source">${escapeHtml(client.source)}</td>
       <td data-label="Status">${statusLine(client.configured ? 'configured' : 'missing')}</td>
-      <td class="action-cell"><button class="button secondary oauth-client-edit" data-provider="${escapeHtml(client.provider)}" type="button">${client.configured ? 'Replace' : 'Set up'}</button></td>
+      <td class="action-cell"><button class="dk-button dk-button--secondary oauth-client-edit" data-provider="${escapeHtml(client.provider)}" type="button">${client.configured ? 'Replace' : 'Set up'}</button></td>
     </tr>`).join('');
   $$('.oauth-client-edit').forEach((button) => button.addEventListener('click', () => openOAuthClient(button.dataset.provider)));
 }
