@@ -119,7 +119,6 @@
   --dk-info-text: #315f8f;
   --dk-info-bg: #edf5ff;
   --dk-info-border: rgba(49, 95, 143, 0.22);
-  --dk-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
   --dk-shadow-overlay: 0 8px 24px rgba(15, 23, 42, 0.16);
 }
 :root[data-theme="dark"] {
@@ -162,7 +161,6 @@
   --dk-info-text: #79b8ff;
   --dk-info-bg: rgba(88, 166, 255, 0.12);
   --dk-info-border: rgba(88, 166, 255, 0.4);
-  --dk-shadow-card: 0 1px 2px rgba(1, 4, 9, 0.4);
   --dk-shadow-overlay: 0 8px 24px rgba(1, 4, 9, 0.6);
 }
 
