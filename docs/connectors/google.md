@@ -102,7 +102,7 @@ Display name: **Google Calendar + Drive (Gmail)**. This connection keeps the
 Calendar scopes and requests Drive, Docs, and Sheets scopes as well:
 
 ```powershell
-uv run dapier connections scopes google-calendar --scopes `
+uv run dapier connections edit google-calendar --scopes `
   https://www.googleapis.com/auth/calendar.freebusy `
   https://www.googleapis.com/auth/calendar.events.owned `
   https://www.googleapis.com/auth/drive.readonly `
@@ -229,7 +229,7 @@ project does not request yet. Enabling Gmail end to end follows the same
 steps as the YouTube upload scope below: enable the Gmail API in
 `dtcdev-click`, add both scopes to the project's scope table with the owner's
 approval, grant them to the Google connection with
-`dapier connections scopes <id> --scopes …`, and re-consent the account.
+`dapier connections edit <id> --scopes …`, and re-consent the account.
 Until a connection holds the scopes, its Gmail poll and send fail with the
 API's HTTP 403. The `labels` discovery resource needs only `gmail.readonly`.
 
@@ -311,7 +311,7 @@ with the API's HTTP 403. Enabling the action end to end means adding
 currently lists only `youtube.readonly`, and scope additions need the
 project owner's approval — see the governance note under *Current
 configuration*), adding the scope to the Dapier YouTube connection with
-`dapier connections scopes`, and reconnecting the channel so consent covers
+`dapier connections edit`, and reconnecting the channel so consent covers
 it.
 
 The upload stages the whole video in memory (the Lambda has no scratch
@@ -340,7 +340,7 @@ and Dapier connections request only `youtube.readonly` today** (the same
 table that gates `youtube.upload` above). A read-only token fails with the
 API's HTTP 403; enabling them end to end follows the same steps: add
 `youtube.force-ssl` to the project's scope table, add it to the Dapier
-YouTube connection with `dapier connections scopes`, and reconnect.
+YouTube connection with `dapier connections edit`, and reconnect.
 
 ## Google OAuth publishing status
 

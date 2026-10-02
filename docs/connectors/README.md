@@ -153,7 +153,7 @@ To add or change a scope:
 2. Replace the connection's scope list in **Connectors → Edit**, or run:
 
    ```sh
-   uv run dapier connections scopes <connection-id> --scopes <scope> [<scope> ...]
+   uv run dapier connections edit <connection-id> --scopes <scope> [<scope> ...]
    ```
 
    Zoom OAuth connections currently use the CLI for scope changes; the
@@ -179,7 +179,7 @@ provider issues a token with the reduced access. Check workflows using the
 connection before removing a scope:
 
 ```sh
-uv run dapier connections scopes <connection-id> --scopes <remaining-scope> [<scope> ...]
+uv run dapier connections edit <connection-id> --scopes <remaining-scope> [<scope> ...]
 uv run dapier connections revoke <connection-id>
 uv run dapier connections connect <connection-id> --agent <agent-name>
 ```
@@ -194,7 +194,7 @@ verification. For the current required scopes by provider, see its guide.
 | Change | Update |
 |--------|--------|
 | Default scopes for newly created connections | `CONNECT_PROVIDERS` in [`src/web/js/views/connections.js`](../../src/web/js/views/connections.js) |
-| Scopes on an existing connection | Console **Connectors → Edit**, or `uv run dapier connections scopes <connection-id> --scopes ...` (`connections edit` also updates scopes) |
+| Scopes on an existing connection | Console **Connectors → Edit**, or `uv run dapier connections edit <connection-id> --scopes ...` (`connections edit` also updates scopes) |
 | Scopes allowed by Google consent | Google Cloud project `dtcdev-click` → **Google Auth Platform → Data access** |
 | Scopes allowed by Dropbox | Dropbox App Console → app **Permissions**; also check Full Dropbox vs App Folder access |
 | Scopes allowed by Zoom | Zoom App Marketplace → OAuth app **Scopes** |

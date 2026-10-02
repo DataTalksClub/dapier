@@ -88,7 +88,7 @@ When changing OAuth scopes, first add them in the Zoom app's **Scopes** page,
 then update the connection and reconnect:
 
 ```sh
-uv run dapier connections scopes zoom-api --scopes user:read:user <additional-scope>
+uv run dapier connections edit zoom-api --scopes user:read:user <additional-scope>
 uv run dapier connections connect zoom-api --agent <agent-name>
 ```
 
@@ -165,7 +165,7 @@ app and the connection (see the scope guidance above — app first, then the
 connection):
 
 ```sh
-uv run dapier connections scopes zoom-api --scopes user:read:user recording:read:recording
+uv run dapier connections edit zoom-api --scopes user:read:user recording:read:recording
 uv run dapier connections connect zoom-api --agent <agent-name>
 ```
 
@@ -242,7 +242,7 @@ Creating needs write access the find actions don't. Before using the action:
 2. Update the connection with the full scope list and reconnect:
 
    ```sh
-   uv run dapier connections scopes zoom-api --scopes user:read:user meeting:write:meeting
+   uv run dapier connections edit zoom-api --scopes user:read:user meeting:write:meeting
    uv run dapier connections connect zoom-api --agent <agent-name>
    ```
 
@@ -325,7 +325,7 @@ registrant endpoint). As with meetings, add each scope to the Zoom app's
 **Scopes** page first, then to the connection:
 
 ```sh
-uv run dapier connections scopes zoom-api --scopes user:read:user webinar:read:admin webinar:write:admin
+uv run dapier connections edit zoom-api --scopes user:read:user webinar:read:admin webinar:write:admin
 uv run dapier connections connect zoom-api --agent <agent-name>
 ```
 
