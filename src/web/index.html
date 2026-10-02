@@ -455,9 +455,9 @@
     </div>
     <div id="workflow-detail" class="dialog-body detail"></div>
     <div class="dialog-actions">
-      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
-      <button id="workflow-download-yaml" class="dk-button dk-button--secondary" type="button" hidden>Download YAML</button>
       <a id="workflow-edit" class="dk-button dk-button--primary">Edit in designer</a>
+      <button id="workflow-download-yaml" class="dk-button dk-button--secondary" type="button" hidden>Download YAML</button>
+      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
@@ -568,7 +568,7 @@
     <form method="dialog" autocomplete="off">
       <div class="dialog-head"><h2 id="schedule-confirm-title">Delete schedule</h2></div>
       <div class="dialog-body"><p id="schedule-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
+      <div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Delete</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div>
     </form>
   </dialog>
   <dialog id="hook-dialog" aria-label="Configure hook">
@@ -643,7 +643,7 @@
     <form method="dialog" autocomplete="off">
       <div class="dialog-head"><h2 id="trigger-confirm-title">Delete trigger</h2></div>
       <div class="dialog-body"><p id="trigger-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
+      <div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Delete</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div>
     </form>
   </dialog>
 
@@ -707,13 +707,13 @@
         <p id="edit-connection-test-result" class="sub" hidden></p>
       </div>
       <div class="dialog-actions">
+        <button class="dk-button dk-button--primary" type="submit">Save changes</button>
         <button id="edit-connection-access" class="dk-button dk-button--secondary" type="button">Access grants</button>
         <button id="edit-connection-test" class="dk-button dk-button--secondary" type="button">Test</button>
         <button id="edit-connection-discover" class="dk-button dk-button--secondary" type="button">Explore data</button>
         <button id="edit-connection-revoke" class="dk-button dk-button--secondary" type="button">Revoke tokens</button>
         <a id="edit-connection-reconnect" class="dk-button dk-button--secondary" target="_blank" rel="noopener" hidden>Reconnect</a>
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
-        <button class="dk-button dk-button--primary" type="submit">Save changes</button>
       </div>
     </form>
   </dialog>
@@ -782,24 +782,24 @@
         <p id="connection-grant-error" class="form-error" role="alert"></p><p id="connection-grant-status" class="inline-status" role="status"></p>
       </form>
     </div>
-    <div class="dialog-actions"><button id="connection-grant-cancel" class="dk-button dk-button--secondary" type="button" hidden>Cancel edit</button><button class="dk-button dk-button--secondary dialog-close" type="button">Done</button><button class="dk-button dk-button--primary" type="submit" form="connection-grant-form">Save grant</button></div>
+    <div class="dialog-actions"><button class="dk-button dk-button--primary" type="submit" form="connection-grant-form">Save grant</button><button id="connection-grant-cancel" class="dk-button dk-button--secondary" type="button" hidden>Cancel edit</button><button class="dk-button dk-button--secondary dialog-close" type="button">Done</button></div>
   </dialog>
 
   <dialog id="connection-confirm-dialog" aria-labelledby="connection-confirm-title">
     <form method="dialog">
       <div class="dialog-head"><h2 id="connection-confirm-title">Revoke access</h2></div>
       <div class="dialog-body"><p id="connection-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="connection-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke</button></div>
+      <div class="dialog-actions"><button id="connection-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div>
     </form>
   </dialog>
   <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke token</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button id="token-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke token</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
   <dialog id="token-remove-confirm-dialog" aria-labelledby="token-remove-confirm-title" aria-describedby="token-remove-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Remove token</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Remove token</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
 <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Replay event</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Replay event</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
   <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title">
     <div class="dialog-head">
@@ -813,13 +813,13 @@
     </div>
   </dialog>
   <dialog id="replay-confirm-dialog" aria-labelledby="replay-confirm-title" aria-describedby="replay-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="replay-confirm-yes" class="dk-button dk-button--danger" value="confirm">Replay run</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button id="replay-confirm-yes" class="dk-button dk-button--danger" value="confirm">Replay run</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
   <dialog id="versions-confirm-dialog" aria-labelledby="versions-confirm-title" aria-describedby="versions-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body"><p id="versions-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Restore version</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body"><p id="versions-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Restore version</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
   <dialog id="workflow-delete-confirm-dialog" aria-labelledby="workflow-delete-confirm-title" aria-describedby="workflow-delete-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="workflow-delete-confirm-title">Delete workflow</h2></div><div class="dialog-body"><p id="workflow-delete-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete permanently</button></div></form>
+    <form method="dialog"><div class="dialog-head"><h2 id="workflow-delete-confirm-title">Delete workflow</h2></div><div class="dialog-body"><p id="workflow-delete-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--danger" value="confirm">Delete permanently</button><button class="dk-button dk-button--secondary" value="cancel">Cancel</button></div></form>
   </dialog>
   <dialog id="workflow-tags-dialog" aria-labelledby="workflow-tags-title">
     <form id="workflow-tags-form" method="dialog">
