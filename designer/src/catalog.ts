@@ -587,6 +587,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "url", label: "URL (overrides env)" },
       { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
       { key: "path", label: "Dropbox file path", placeholder: "{steps.move.output.item.path}" },
+      { key: "recipient_route", label: "Dropbox intake route", placeholder: "invoice", help: "Use a route configured in DataOps; defaults to invoice for Dropbox file events." },
       { key: "filename", label: "Filename override" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]

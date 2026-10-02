@@ -262,3 +262,11 @@ Connection statuses:
 **Edit** can rename a connection, change requested scopes (except Slack, whose
 scopes are carried in its token), or replace a Slack token. Tokens are
 write-only; Dapier never displays or returns their values.
+
+### Dropbox files forwarded to DataOps
+
+The DataOps action stages Dropbox bytes with their SHA256 and submits the
+supported `attachment` document kind. `recipient_route` selects a configured
+DataOps route and defaults to `invoice` for Dropbox events. This setting is
+available in the designer and in workflow YAML saved through the CLI/API.
+DataOps owns invoice processing and review after accepting the document.

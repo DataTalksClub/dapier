@@ -385,6 +385,13 @@ def test_dataops_downloads_the_rendered_archived_path(monkeypatch):
     )
     assert calls == [path]
     assert body["documents"][0]["filename"] == "2026-10-02-deepseek.pdf"
+    assert body["recipientRoute"] == "invoice"
+    assert body["documents"][0]["kind"] == "attachment"
+    body = dataops._intake_body(
+        {**action, "recipient_route": "receipts"}, event,
+        steps={"move-file": {"output": {"item": {"path": path}}}},
+    )
+    assert body["recipientRoute"] == "receipts"
 
 
 def test_empty_landing_folder_seed_allows_first_future_file(monkeypatch):
