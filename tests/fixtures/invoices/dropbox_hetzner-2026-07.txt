@@ -1,0 +1,49 @@
+Hetzner Online GmbH • Industriestr. 25 • 91710 Gunzenhausen • Germany
+DataTalks.Club
+DTC Owner
+Hauptstr 1
+10115 Berlin
+Germany
+Tel.: +49 9831 505-0
+Fax: +49 9831 505-3
+info@hetzner.com
+www.hetzner.com
+Customer ID: K0283647026
+VAT Reg. No.: DE000000000
+Invoice no.: 199000000000
+Invoice date: 01/07/2026
+Invoice 199000000000
+Overview
+Service Period Total (excl. VAT) Tax Total
+Dedicated Server 06/2026 € 38.40 € 7.30A1 € 45.70
+Total € 38.40 € 7.30 € 45.70
+Tax code Tax rate Total (excl. VAT) Tax Total
+A1 19 % € 38.40 € 7.30 € 45.70
+Total € 38.40 € 7.30 € 45.70
+The invoice amount will soon be debited from your credit card.
+Due upon receipt. Payable within 10 days of the invoice date. The customer will automatically be in default no later than 30
+days after receipt of the invoice, if payment has not been received by that time.
+ Click here to see detailed usage.
+1 / 2
+Hetzner Online GmbH Industriestr. 25 Bank details:
+CEO: Martin Hetzner, 91710 Gunzenhausen | Germany Deutsche Bank AG Nuremberg
+Stephan Konvickova, Günther Müller Tel.: +49 9831 505-0 IBAN: DE92 7607 0012 0750 0077 00
+Ansbach Registration Office: HRB 6089 Fax: +49 9831 505-3 BIC: DEUTDEMM760
+VAT Reg. No.: DE812871812 info@hetzner.com | www.hetzner.com
+Customer ID: K0283647026
+VAT Reg. No.: DE000000000
+Invoice no.: 199000000000
+Invoice date: 01/07/2026
+Pos
+Product
+count Product Unit Quantity Unit Price Price (excl. VAT)
+Dedicated Server (06/2026)
+1 1 AX41-NVMe Dedicated Server Months 1 € 36.7000 € 36.7000
+2 1 Primary IPv4 Months 1 € 1.7000 € 1.7000
+Subtotal (excl. VAT) € 38.40
+2 / 2
+Hetzner Online GmbH Industriestr. 25 Bank details:
+CEO: Martin Hetzner, 91710 Gunzenhausen | Germany Deutsche Bank AG Nuremberg
+Stephan Konvickova, Günther Müller Tel.: +49 9831 505-0 IBAN: DE92 7607 0012 0750 0077 00
+Ansbach Registration Office: HRB 6089 Fax: +49 9831 505-3 BIC: DEUTDEMM760
+VAT Reg. No.: DE812871812 info@hetzner.com | www.hetzner.com

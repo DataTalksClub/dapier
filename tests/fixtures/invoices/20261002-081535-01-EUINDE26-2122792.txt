@@ -1,0 +1,202 @@
+VAT InvoiceEmail or talk to us about your AWS account or bill, visit console.aws.amazon.com/support
+More information regarding your service charges is available by accessing your Billing Management Console
+Account number:
+199000000000
+Address:
+experiments
+ATTN: DTC Owner
+Hauptstr 1
+Berlin, Berlin, 10115, DE
+Invoice Summary
+VAT Invoice Number: EUINDE26-2122792
+VAT Invoice Date: October 1, 2026
+TOTAL AMOUNT USD 70.57
+TOTAL VAT USD 11.27
+This VAT Invoice is for the billing period September 1 - September 30, 2026
+Invoice Summary
+AWS Service Charges USD 70.57
+Charges USD 59.30
+Net Charges (After Credits/Discounts, excl. Tax) USD 59.30
+VAT - 19% USD 11.27
+Detail
+AWS Lambda USD 0.00
+AWS Glue USD 0.00
+Elastic Load Balancing USD 1.20
+Charges USD 1.01
+VAT USD 0.19
+AWS X-Ray USD 0.51
+Charges USD 0.43
+VAT USD 0.08
+Amazon EC2 Container Registry (ECR) USD 0.19
+Charges USD 0.16
+VAT USD 0.03
+Amazon Elastic Compute Cloud USD 20.44
+Charges USD 17.18
+VAT USD 3.26
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+1 / 6
+Amazon Elastic Container Service USD 1.75
+Charges USD 1.47
+VAT USD 0.28
+Amazon CloudFront USD 0.00
+Amazon DynamoDB USD 0.18
+Charges USD 0.15
+VAT USD 0.03
+Amazon Route 53 USD 2.49
+Charges USD 2.09
+VAT USD 0.40
+Amazon Virtual Private Cloud USD 11.26
+Charges USD 9.46
+VAT USD 1.80
+Amazon Cognito USD 0.00
+Amazon API Gateway USD 0.26
+Charges USD 0.22
+VAT USD 0.04
+AmazonCloudWatch USD 2.87
+Charges USD 2.41
+VAT USD 0.46
+Amazon Relational Database Service USD 1.84
+Charges USD 1.55
+VAT USD 0.29
+Amazon Simple Storage Service USD 0.50
+Charges USD 0.42
+VAT USD 0.08
+AWS CloudFormation USD 0.00
+AWS Data Transfer USD 0.11
+Charges USD 0.09
+VAT USD 0.02
+Amazon Simple Email Service USD 1.67
+Charges USD 1.40
+VAT USD 0.27
+AWS Certiﬁcate Manager USD 0.00
+Amazon Simple Notiﬁcation Service USD 0.00
+AWS Key Management Service USD 18.04
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+2 / 6
+Charges USD 15.16
+VAT USD 2.88
+Amazon Simple Queue Service USD 0.21
+Charges USD 0.18
+VAT USD 0.03
+AWS Secrets Manager USD 7.05
+Charges USD 5.92
+VAT USD 1.13
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+3 / 6
+Linked Account Allocation
+Activity By Account
+experiments (199000000000) USD 70.57
+Charges USD 59.30
+VAT USD 11.27
+Total allocated for this invoice USD 70.57
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+4 / 6
+Summary for Linked Account
+experiments (199000000000) USD 70.57
+Charges USD 59.30
+VAT USD 11.27
+Detail for Linked Account
+AWS X-Ray USD 0.51
+Charges USD 0.43
+VAT USD 0.08
+Amazon Elastic Compute Cloud USD 20.44
+Charges USD 17.18
+VAT USD 3.26
+Amazon Simple Queue Service USD 0.21
+Charges USD 0.18
+VAT USD 0.03
+AWS CloudFormation USD 0.00
+AWS Lambda USD 0.00
+Amazon API Gateway USD 0.26
+Charges USD 0.22
+VAT USD 0.04
+AWS Data Transfer USD 0.11
+Charges USD 0.09
+VAT USD 0.02
+Amazon Simple Email Service USD 1.67
+Charges USD 1.40
+VAT USD 0.27
+Amazon DynamoDB USD 0.18
+Charges USD 0.15
+VAT USD 0.03
+Amazon Simple Notiﬁcation Service USD 0.00
+AWS Key Management Service USD 18.04
+Charges USD 15.16
+VAT USD 2.88
+Amazon Cognito USD 0.00
+AmazonCloudWatch USD 2.87
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+5 / 6
+Charges USD 2.41
+VAT USD 0.46
+AWS Secrets Manager USD 7.05
+Charges USD 5.92
+VAT USD 1.13
+AWS Glue USD 0.00
+Amazon Simple Storage Service USD 0.50
+Charges USD 0.42
+VAT USD 0.08
+AWS Certiﬁcate Manager USD 0.00
+Amazon CloudFront USD 0.00
+Amazon Elastic Container Service USD 1.75
+Charges USD 1.47
+VAT USD 0.28
+Amazon Route 53 USD 2.49
+Charges USD 2.09
+VAT USD 0.40
+Elastic Load Balancing USD 1.20
+Charges USD 1.01
+VAT USD 0.19
+Amazon Relational Database Service USD 1.84
+Charges USD 1.55
+VAT USD 0.29
+Amazon EC2 Container Registry (ECR) USD 0.19
+Charges USD 0.16
+VAT USD 0.03
+Amazon Virtual Private Cloud USD 11.26
+Charges USD 9.46
+VAT USD 1.80
+Amazon Web Services EMEA SARL
+38 Avenue John F. Kennedy, L-1855 Luxembourg
+Sitz der Gesellschaft: L-1855 Luxemburg
+eingetragen im Luxemburgischen Handelsregister unter R.C.S. B186284
+Amazon Web Services EMEA SARL, Niederlassung Deutschland
+Anni-Albers-Str. 21, 80807 München, Deutschland
+Sitz der Zweigniederlassung: München
+eingetragen im Handelsregister des Amtsgerichts München unter HRB 242240, USt-ID: DE317013094
+6 / 6
