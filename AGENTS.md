@@ -2,6 +2,24 @@
 
 Instructions for AI agents (and humans) working in this repository.
 
+## Product scope (required)
+
+Dapier's purpose is **orchestration, integrations, and OAuth management**.
+It receives events, routes payloads and attachments to other services,
+coordinates workflows, and manages provider connections, credentials, tokens,
+and grants.
+
+Domain processing belongs in the service that owns that domain. Invoice
+parsing, bookkeeping, review queues, ledger entries, and financial reporting
+belong in **DataOps**, not in Dapier. For invoice emails, Dapier forwards the
+message and attachments to DataOps; DataOps handles their contents and the
+bookkeeping lifecycle.
+
+Do not add or expand domain-specific processing or business data stores here.
+Implement the integration with the owning service instead. Existing
+bookkeeping code is being moved to DataOps and is not a precedent for new
+features in this repository.
+
 ## UI/CLI parity (required)
 
 Dapier has three surfaces, and every state-changing action must be reachable
