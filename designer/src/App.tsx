@@ -1881,7 +1881,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         ) : (
           <div className="brand"><span className="workspace-mark" aria-hidden="true">D</span><span>Workflow designer</span></div>
         )}
-        <button className="dk-button dk-button--primary sidebar-action" type="button" onClick={newWorkflowSafely}>
+        <button className="dk-button dk-button--secondary sidebar-action" type="button" onClick={newWorkflowSafely}>
           <span>New workflow</span>
         </button>
         <nav className="workflow-nav" aria-label="Workflows">
