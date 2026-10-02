@@ -61,6 +61,7 @@
         <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
         <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
+        <a class="nav-item" href="/bookkeeping" data-view="bookkeeping"><i data-lucide="receipt"></i><span>Bookkeeping</span></a>
         <a class="nav-item" href="/usage" data-view="usage"><i data-lucide="chart-no-axes-column"></i><span>Usage</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
       </nav>
@@ -315,6 +316,25 @@
           <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="optional"></label>
           <button class="button primary" type="submit">Store</button>
         </form>
+      </section>
+
+      <section class="view" data-page="bookkeeping">
+        <div class="page-tools">
+          <div class="inline-form" role="group" aria-label="Status filter">
+            <button class="button secondary bookkeeping-filter active" data-status="pending" type="button">Pending</button>
+            <button class="button secondary bookkeeping-filter" data-status="confirmed" type="button">Confirmed</button>
+            <button class="button secondary bookkeeping-filter" data-status="rejected" type="button">Rejected</button>
+            <button class="button secondary bookkeeping-filter" data-status="all" type="button">All</button>
+          </div>
+          <p class="sub" id="bookkeeping-counts"></p>
+        </div>
+        <div id="bookkeeping-empty" class="empty-state" hidden><h3>No invoices waiting</h3><p>The invoice workflow stages every parsed invoice here as pending. Confirm an entry to let it reach the ledger, or reject it and forward the invoice again.</p></div>
+        <div id="bookkeeping-table-wrap" class="table-wrap">
+          <table>
+            <thead><tr><th>Created</th><th>Status</th><th>Source</th><th>Provider</th><th>Invoice</th><th>What</th><th>Amount</th></tr></thead>
+            <tbody id="bookkeeping-table"></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="view" data-page="runs">
@@ -821,7 +841,19 @@
   <dialog id="token-remove-confirm-dialog" aria-labelledby="token-remove-confirm-title" aria-describedby="token-remove-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Remove token</button></div></form>
   </dialog>
-  <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
+    <dialog id="bookkeeping-entry-dialog" aria-labelledby="bookkeeping-entry-title">
+    <div class="dialog-head">
+      <h2 id="bookkeeping-entry-title">Invoice entry</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="bookkeeping-entry-detail" class="dialog-body detail"></div>
+    <div class="dialog-actions">
+      <button id="bookkeeping-confirm-button" class="button" type="button">Confirm</button>
+      <button id="bookkeeping-reject-button" class="button danger" type="button">Reject</button>
+      <button class="button secondary dialog-close" type="button">Close</button>
+    </div>
+  </dialog>
+<dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="button secondary" value="cancel">Cancel</button><button class="button danger" value="confirm">Replay event</button></div></form>
   </dialog>
   <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title">

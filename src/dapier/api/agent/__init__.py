@@ -143,6 +143,28 @@ def route(event, method, path):
     runs_cancel_match = re.fullmatch(r"/api/agent/runs/([^/]+)/cancel", path)
     if runs_cancel_match and method == "POST":
         return runs_cancel_api(event, unquote(runs_cancel_match.group(1)))
+    if path == "/api/agent/bookkeeping" and method == "GET":
+        return bookkeeping_api(event)
+    confirm_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)/confirm", path)
+    if confirm_match and method == "POST":
+        return bookkeeping_api(event, unquote(confirm_match.group(1)), action="confirm")
+    reject_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)/reject", path)
+    if reject_match and method == "POST":
+        return bookkeeping_api(event, unquote(reject_match.group(1)), action="reject")
+    entry_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)", path)
+    if entry_match and method == "GET":
+        return bookkeeping_api(event, entry_id=unquote(entry_match.group(1)))
+    if path == "/api/agent/bookkeeping" and method == "GET":
+        return bookkeeping_api(event)
+    confirm_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)/confirm", path)
+    if confirm_match and method == "POST":
+        return bookkeeping_api(event, unquote(confirm_match.group(1)), action="confirm")
+    reject_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)/reject", path)
+    if reject_match and method == "POST":
+        return bookkeeping_api(event, unquote(reject_match.group(1)), action="reject")
+    entry_match = re.fullmatch(r"/api/agent/bookkeeping/([^/]+)", path)
+    if entry_match and method == "GET":
+        return bookkeeping_api(event, entry_id=unquote(entry_match.group(1)))
     if path == "/api/agent/triggers/inbox" and method == "GET":
         return inbox_api(event)
     if path == "/api/agent/triggers/sample" and method == "GET":

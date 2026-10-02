@@ -26,7 +26,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
+__all__ = ["agent_tasks_api", "audit_api", "bookkeeping_api", "bookkeeping_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
 
 
 
@@ -127,6 +127,63 @@ def host_jobs_api(event, operation):
         else:
             status, payload = host_jobs.finish(body, subject)
     return _no_store(_json_response(status, payload))
+
+
+def bookkeeping_api(event, entry_id=None, action=None):
+    """Operator-only bookkeeping review queue, mirroring the console.
+
+    The same domain store (bookkeeping_store) behind the /api/admin
+    routes, so `dapier bookkeeping list|confirm|reject` and the console's
+    queue act on the same entries. Confirm/reject audit like the console
+    writes; the reads ride require_operator's denial records.
+    """
+    subject, error = require_operator(event, "bookkeeping")
+    if error:
+        return error
+    from ... import audit as audit_domain
+    from ... import bookkeeping_store
+
+    if entry_id is None:
+        query = event.get("queryStringParameters") or {}
+        try:
+            entries = bookkeeping_store.list_entries(
+                status=query.get("status") or None, limit=query.get("limit"))
+        except bookkeeping_store.BookkeepingError as exc:
+            return _json_response(400, {"error": str(exc)})
+        return _no_store(_json_response(200, {
+            "entries": entries, "counts": bookkeeping_store.counts()}))
+    try:
+        if action == "confirm":
+            body = _request_body(event)
+            entry = bookkeeping_store.confirm_entry(
+                entry_id, edits=body.get("edits") or {}, confirmed_by=subject or "")
+            audit_domain.record(audit_domain.audit_table(),
+                                connection_id="bookkeeping", action="entry.confirm",
+                                actor_subject=subject or "unknown", outcome="ok")
+        elif action == "reject":
+            body = _request_body(event)
+            entry = bookkeeping_store.reject_entry(
+                entry_id, rejected_by=subject or "", note=body.get("note"))
+            audit_domain.record(audit_domain.audit_table(),
+                                connection_id="bookkeeping", action="entry.reject",
+                                actor_subject=subject or "unknown", outcome="ok")
+        else:
+            entry = bookkeeping_store.get_entry(entry_id)
+            if entry is None:
+                return _json_response(404, {"error": f"no bookkeeping entry {entry_id}"})
+    except bookkeeping_store.BookkeepingError as exc:
+        message = str(exc)
+        status = 404 if message.startswith("no bookkeeping entry") else 400
+        return _json_response(status, {"error": message})
+    return _no_store(_json_response(200, entry))
+
+
+def _request_body(event):
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return body if isinstance(body, dict) else {}
 
 
 def runs_export_api(event):
