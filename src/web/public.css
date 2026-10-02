@@ -1,5 +1,11 @@
 /* Public pages, dressed by the shared dakit design system (vendor/dakit.css
-   ships the tokens and the fonts); light-only, so no dark remap is needed. */
+   ships the tokens and the fonts). Dark mode rides the same wiring as the
+   console and designer: js/theme-init.js pins data-theme on the document
+   element before first paint and persists under the shared "dakit-theme"
+   key, and dakit's [data-theme="dark"] token block remaps every --dk-* role.
+   This file speaks tokens only — no raw colors — so no separate dark
+   palette is needed here; the theme-pinned color-scheme below keeps form
+   controls and scrollbars following the tokens. */
 :root {
   color-scheme: light;
   font-family: var(--dk-font-sans);
@@ -7,6 +13,10 @@
   background: var(--dk-bg-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
