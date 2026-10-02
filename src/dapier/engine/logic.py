@@ -188,6 +188,16 @@ class QuotaExceeded(Exception):
     """
 
 
+class CompletedStep:
+    """A worker gate skipped a completed step and restored its persisted result."""
+    def __init__(self, status, output):
+        self.status = status
+        self.output = output
+
+    def __bool__(self):
+        return False
+
+
 class RunSuspended(Exception):
     """A delay step paused the run past what one invocation may sleep.
 
@@ -439,7 +449,12 @@ def _run_step(workflow_id, step, index, event, run_action, *,
             quota_gate = exc
         else:
             if not gate:
-                step_outputs[action_id] = {"status": "skipped"}
+                if isinstance(gate, CompletedStep):
+                    step_outputs[action_id] = {"status": gate.status, "output": gate.output}
+                    if gate.status == "filtered":
+                        return "filtered"
+                else:
+                    step_outputs[action_id] = {"status": "skipped"}
                 return None
     # The autoretry plan is parsed and validated before the step runs: a bad
     # config is an authoring error, loud even when on_fail would absorb the

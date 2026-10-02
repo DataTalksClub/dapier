@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from ..connectors.ingress import normalize_event
 from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
-from .logic import RunSuspended, resume_chain, run_chain
+from .logic import CompletedStep, RunSuspended, resume_chain, run_chain
 from .matching import all_workflows, matches
 from .notify import notify_auto_pause, notify_failure
 
@@ -188,8 +188,10 @@ def _is_pending(workflow_id, action_id, event, action_type=None, retry_attempt=N
     try:
         table.put_item(
             Item=item,
-            ConditionExpression="attribute_not_exists(execution_id) OR lease_until < :now",
-            ExpressionAttributeValues={":now": now},
+            ConditionExpression=("attribute_not_exists(execution_id) OR "
+                                 "(#status <> :completed AND #status <> :filtered AND lease_until < :now)"),
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={":now": now, ":completed": "completed", ":filtered": "filtered"},
         )
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
@@ -654,8 +656,17 @@ def _quota_pending(workflow_id, action_id, event, action_type=None,
     hooks, so editor tests neither burn tasks nor hit the limit.
     """
     usage.enforce(workflow_id)
-    return _is_pending(workflow_id, action_id, event, action_type,
-                       retry_attempt=retry_attempt)
+    pending = _is_pending(workflow_id, action_id, event, action_type,
+                          retry_attempt=retry_attempt)
+    if pending:
+        return True
+    import boto3
+    saved = boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).get_item(
+        Key={"execution_id": _execution_id(workflow_id, action_id, event)}, ConsistentRead=True,
+    ).get("Item") or {}
+    if saved.get("status") not in ("completed", "filtered"):
+        raise LeaseBusy(f"completed step {action_id} was not available for recovery")
+    return CompletedStep(saved.get("status", "completed"), saved.get("output"))
 
 
 def _attempt_hooks(attempt):
