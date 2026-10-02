@@ -67,7 +67,7 @@ def test_workflows_rows_show_the_paused_state():
         "the Workflows rows must read the overview payload's auto_paused flag"
     assert "'auto-paused'" in js, \
         "a paused workflow's State cell must say Auto-paused, not On"
-    assert re.search(r'button[^>]+class="button secondary workflow-resume"', js), \
+    assert re.search(r'button[^>]+class="dk-button dk-button--secondary workflow-resume"', js), \
         "each paused row needs a Resume button"
 
 
