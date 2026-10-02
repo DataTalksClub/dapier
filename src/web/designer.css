@@ -1426,6 +1426,11 @@ input[type="checkbox"], input[type="radio"] {
     right: 10px;
   }
   .inspector select, .inspector input { min-height: 44px; }
+  /* mirror the base selector so specificity cannot keep text inputs at 36px */
+  .inspector input:not([type="checkbox"]):not([type="radio"]) { min-height: var(--dk-size-touch); }
+  .inspector .dk-button { height: var(--dk-size-touch); }
+  .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  .inspector-close { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .inspector-head::before { left: -14px; }
   .topbar-actions { row-gap: 6px; }
   .topbar-actions .dk-button { min-height: 44px; }
