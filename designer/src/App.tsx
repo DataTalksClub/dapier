@@ -1898,7 +1898,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span className="workflow-name">{summary.id}</span>
                 <span className="workflow-meta">
                   <TriggerLogo connector={summary.connector} />
-                  {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
+                  {summary.connector === "?"
+                    ? "No trigger yet"
+                    : `${connectorLabel(summary.connector)}/${summary.event}`} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
                 </span>
               </span>
               {!summary.enabled && <span className="workflow-disabled state-off">Off</span>}

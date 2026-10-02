@@ -23430,9 +23430,7 @@
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
                     /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
-                    connectorLabel(summary.connector),
-                    "/",
-                    summary.event,
+                    summary.connector === "?" ? "No trigger yet" : `${connectorLabel(summary.connector)}/${summary.event}`,
                     " · ",
                     summary.actionCount,
                     " action",
