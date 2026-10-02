@@ -23417,6 +23417,7 @@
             ] })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: selected?.type === "node" ? "inspector" : "inspector empty", children: [
+            selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ") })
