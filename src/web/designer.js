@@ -14312,7 +14312,7 @@
     Component.displayName = toPascalCase(iconName);
     return Component;
   };
-  const __iconNode$H = [
+  const __iconNode$K = [
     ["path", { d: "M12 8V4H8", key: "hb8ula" }],
     ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
     ["path", { d: "M2 14h2", key: "vft8re" }],
@@ -14320,8 +14320,8 @@
     ["path", { d: "M15 13v2", key: "1xurst" }],
     ["path", { d: "M9 13v2", key: "rq6x2g" }]
   ];
-  const Bot = createLucideIcon("bot", __iconNode$H);
-  const __iconNode$G = [
+  const Bot = createLucideIcon("bot", __iconNode$K);
+  const __iconNode$J = [
     [
       "path",
       { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
@@ -14334,65 +14334,65 @@
       }
     ]
   ];
-  const Braces = createLucideIcon("braces", __iconNode$G);
-  const __iconNode$F = [
+  const Braces = createLucideIcon("braces", __iconNode$J);
+  const __iconNode$I = [
     ["path", { d: "M8 2v4", key: "1cmpym" }],
     ["path", { d: "M16 2v4", key: "4m81vk" }],
     ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
     ["path", { d: "M3 10h18", key: "8toen8" }]
   ];
-  const Calendar = createLucideIcon("calendar", __iconNode$F);
-  const __iconNode$E = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
-  const ChevronDown = createLucideIcon("chevron-down", __iconNode$E);
-  const __iconNode$D = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
-  const ChevronRight = createLucideIcon("chevron-right", __iconNode$D);
-  const __iconNode$C = [
+  const Calendar = createLucideIcon("calendar", __iconNode$I);
+  const __iconNode$H = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
+  const ChevronDown = createLucideIcon("chevron-down", __iconNode$H);
+  const __iconNode$G = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
+  const ChevronRight = createLucideIcon("chevron-right", __iconNode$G);
+  const __iconNode$F = [
     ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
     ["path", { d: "M21 14H11", key: "1bme5i" }],
     ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
   ];
-  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$C);
-  const __iconNode$B = [
+  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$F);
+  const __iconNode$E = [
     ["path", { d: "M11 14h10", key: "1w8e9d" }],
     ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
     ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
     ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
     ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
   ];
-  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$B);
-  const __iconNode$A = [
+  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$E);
+  const __iconNode$D = [
     ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
   ];
-  const Clock = createLucideIcon("clock", __iconNode$A);
-  const __iconNode$z = [
+  const Clock = createLucideIcon("clock", __iconNode$D);
+  const __iconNode$C = [
     ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
     ["path", { d: "m12 21 4-4", key: "1lfcce" }],
     ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
   ];
-  const CloudDownload = createLucideIcon("cloud-download", __iconNode$z);
-  const __iconNode$y = [
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$C);
+  const __iconNode$B = [
     ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
     ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
     ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
   ];
-  const CodeXml = createLucideIcon("code-xml", __iconNode$y);
-  const __iconNode$x = [
+  const CodeXml = createLucideIcon("code-xml", __iconNode$B);
+  const __iconNode$A = [
     ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
     ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
   ];
-  const Copy = createLucideIcon("copy", __iconNode$x);
-  const __iconNode$w = [
+  const Copy = createLucideIcon("copy", __iconNode$A);
+  const __iconNode$z = [
     ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
     ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
     ["path", { d: "M21 5V8", key: "1marbg" }],
     ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
     ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
   ];
-  const DatabaseZap = createLucideIcon("database-zap", __iconNode$w);
-  const __iconNode$v = [
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$z);
+  const __iconNode$y = [
     [
       "path",
       {
@@ -14405,8 +14405,8 @@
     ["path", { d: "M16 13H8", key: "t4e002" }],
     ["path", { d: "M16 17H8", key: "z1uh3a" }]
   ];
-  const FileText = createLucideIcon("file-text", __iconNode$v);
-  const __iconNode$u = [
+  const FileText = createLucideIcon("file-text", __iconNode$y);
+  const __iconNode$x = [
     [
       "path",
       {
@@ -14417,8 +14417,8 @@
     ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
     ["path", { d: "M8.5 2h7", key: "csnxdl" }]
   ];
-  const FlaskConical = createLucideIcon("flask-conical", __iconNode$u);
-  const __iconNode$t = [
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$x);
+  const __iconNode$w = [
     [
       "path",
       {
@@ -14427,8 +14427,8 @@
       }
     ]
   ];
-  const Folder = createLucideIcon("folder", __iconNode$t);
-  const __iconNode$s = [
+  const Folder = createLucideIcon("folder", __iconNode$w);
+  const __iconNode$v = [
     [
       "path",
       {
@@ -14437,21 +14437,21 @@
       }
     ]
   ];
-  const Funnel = createLucideIcon("funnel", __iconNode$s);
-  const __iconNode$r = [
+  const Funnel = createLucideIcon("funnel", __iconNode$v);
+  const __iconNode$u = [
     ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
     ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
     ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
   ];
-  const GitBranch = createLucideIcon("git-branch", __iconNode$r);
-  const __iconNode$q = [
+  const GitBranch = createLucideIcon("git-branch", __iconNode$u);
+  const __iconNode$t = [
     ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
     ["path", { d: "M2 12h20", key: "9i4pu4" }]
   ];
-  const Globe = createLucideIcon("globe", __iconNode$q);
-  const __iconNode$p = [
+  const Globe = createLucideIcon("globe", __iconNode$t);
+  const __iconNode$s = [
     ["path", { d: "M10 8h.01", key: "1r9ogq" }],
     ["path", { d: "M12 12h.01", key: "1mp3jc" }],
     ["path", { d: "M14 8h.01", key: "1primd" }],
@@ -14462,8 +14462,8 @@
     ["path", { d: "M8 12h.01", key: "czm47f" }],
     ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
   ];
-  const Keyboard = createLucideIcon("keyboard", __iconNode$p);
-  const __iconNode$o = [
+  const Keyboard = createLucideIcon("keyboard", __iconNode$s);
+  const __iconNode$r = [
     [
       "path",
       {
@@ -14486,16 +14486,16 @@
       }
     ]
   ];
-  const Layers = createLucideIcon("layers", __iconNode$o);
-  const __iconNode$n = [
+  const Layers = createLucideIcon("layers", __iconNode$r);
+  const __iconNode$q = [
     ["path", { d: "M16 5H3", key: "m91uny" }],
     ["path", { d: "M11 12H3", key: "51ecnj" }],
     ["path", { d: "M16 19H3", key: "zzsher" }],
     ["path", { d: "M18 9v6", key: "1twb98" }],
     ["path", { d: "M21 12h-6", key: "bt1uis" }]
   ];
-  const ListPlus = createLucideIcon("list-plus", __iconNode$n);
-  const __iconNode$m = [
+  const ListPlus = createLucideIcon("list-plus", __iconNode$q);
+  const __iconNode$p = [
     ["path", { d: "M21 5H3", key: "1fi0y6" }],
     ["path", { d: "M7 12H3", key: "13ou7f" }],
     ["path", { d: "M7 19H3", key: "wbqt3n" }],
@@ -14508,32 +14508,38 @@
     ],
     ["path", { d: "M11 10v4h4", key: "172dkj" }]
   ];
-  const ListRestart = createLucideIcon("list-restart", __iconNode$m);
-  const __iconNode$l = [
+  const ListRestart = createLucideIcon("list-restart", __iconNode$p);
+  const __iconNode$o = [
     ["path", { d: "M8 5h13", key: "1pao27" }],
     ["path", { d: "M13 12h8", key: "h98zly" }],
     ["path", { d: "M13 19h8", key: "c3s6r1" }],
     ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
     ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
   ];
-  const ListTree = createLucideIcon("list-tree", __iconNode$l);
-  const __iconNode$k = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$k);
-  const __iconNode$j = [
+  const ListTree = createLucideIcon("list-tree", __iconNode$o);
+  const __iconNode$n = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$n);
+  const __iconNode$m = [
     ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
     ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
   ];
-  const Mail = createLucideIcon("mail", __iconNode$j);
-  const __iconNode$i = [
+  const Mail = createLucideIcon("mail", __iconNode$m);
+  const __iconNode$l = [
     ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
     ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
     ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
     ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
   ];
-  const Maximize = createLucideIcon("maximize", __iconNode$i);
-  const __iconNode$h = [["path", { d: "M5 12h14", key: "1ays0h" }]];
-  const Minus = createLucideIcon("minus", __iconNode$h);
-  const __iconNode$g = [
+  const Maximize = createLucideIcon("maximize", __iconNode$l);
+  const __iconNode$k = [
+    ["path", { d: "M4 5h16", key: "1tepv9" }],
+    ["path", { d: "M4 12h16", key: "1lakjw" }],
+    ["path", { d: "M4 19h16", key: "1djgab" }]
+  ];
+  const Menu = createLucideIcon("menu", __iconNode$k);
+  const __iconNode$j = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$j);
+  const __iconNode$i = [
     [
       "path",
       {
@@ -14542,19 +14548,29 @@
       }
     ]
   ];
-  const Play = createLucideIcon("play", __iconNode$g);
-  const __iconNode$f = [
+  const Play = createLucideIcon("play", __iconNode$i);
+  const __iconNode$h = [
     ["path", { d: "M5 12h14", key: "1ays0h" }],
     ["path", { d: "M12 5v14", key: "s699le" }]
   ];
-  const Plus = createLucideIcon("plus", __iconNode$f);
-  const __iconNode$e = [
+  const Plus = createLucideIcon("plus", __iconNode$h);
+  const __iconNode$g = [
     ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
     ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
     ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
     ["path", { d: "M8 16H3v5", key: "1cv678" }]
   ];
-  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$e);
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$g);
+  const __iconNode$f = [
+    ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
+    ["path", { d: "M3 3v5h5", key: "1xhq8a" }]
+  ];
+  const RotateCcw = createLucideIcon("rotate-ccw", __iconNode$f);
+  const __iconNode$e = [
+    ["path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", key: "1p45f6" }],
+    ["path", { d: "M21 3v5h-5", key: "1q7to0" }]
+  ];
+  const RotateCw = createLucideIcon("rotate-cw", __iconNode$e);
   const __iconNode$d = [
     ["path", { d: "M4 11a9 9 0 0 1 9 9", key: "pv89mb" }],
     ["path", { d: "M4 4a16 16 0 0 1 16 16", key: "k0647b" }],
@@ -17742,10 +17758,10 @@
     safeLoadAll,
     safeDump
   } = yaml;
-  const nodeColor = "var(--diagram-component)";
-  const triggerColor = "var(--diagram-trigger)";
-  const noteColor = "var(--diagram-note)";
-  const handleColor = "var(--diagram-handle)";
+  const nodeColor = "var(--dk-accent-default)";
+  const triggerColor = "var(--dk-warning-text)";
+  const noteColor = "var(--dk-warning-text)";
+  const handleColor = "var(--dk-accent-default)";
   const shapeLabelSize = 16;
   const minZoom = 0.25;
   const maxZoom = 2;
@@ -20845,7 +20861,7 @@
         onKeyDown: onListKeyDown,
         children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "step-picker-head", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 15 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 16, strokeWidth: 1.5 }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -20857,7 +20873,7 @@
                 spellCheck: false
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 15 }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-picker-body", children: [
             filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-picker-empty", children: [
@@ -20878,8 +20894,8 @@
                     "aria-expanded": group.collapsible ? isOpen : void 0,
                     type: "button",
                     children: [
-                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 14 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 14 })),
-                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 14 }),
+                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 16, strokeWidth: 1.5 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 16, strokeWidth: 1.5 })),
+                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 16, strokeWidth: 1.5 }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: group.name }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: group.rows.length === 1 ? `1 ${countNoun}` : `${group.rows.length} ${countNoun}s` })
                     ]
@@ -20892,7 +20908,7 @@
                     onClick: () => pick(row.kind),
                     type: "button",
                     children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 1.5 }),
                       /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
                         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
                         row.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.detail })
@@ -20904,7 +20920,7 @@
               ] }, group.name);
             }),
             query.trim() && filtered.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "step-row", onClick: () => pick(row.kind), type: "button", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 1.5 }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
                 !row.label.toLowerCase().includes(row.section.toLowerCase()) && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.section })
@@ -21414,7 +21430,7 @@
               title: "Add a trigger — when the workflow runs",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Trigger" })
               ]
             }
@@ -21427,7 +21443,7 @@
               title: "Add a step — flow control, AI, developer tools, or an app",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Step" })
               ]
             }
@@ -21440,7 +21456,7 @@
               title: "Add a note",
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 15 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Note" })
               ]
             }
@@ -21449,7 +21465,7 @@
         sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({ clearCanvas: clearShapes }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-zoom-controls", "aria-label": "Canvas zoom controls", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 18 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 16, strokeWidth: 1.5 }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "zoom-button", onClick: () => {
           setZoom(1);
           setPan({ x: 0, y: 0 });
@@ -21457,8 +21473,8 @@
           Math.round(zoom * 100),
           "%"
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 18 }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 18 }) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 1.5 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 16, strokeWidth: 1.5 }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "svg",
@@ -21475,7 +21491,7 @@
           preserveAspectRatio: "none",
           children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("defs", { children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("pattern", { id: "grid", width: "28", height: "28", patternUnits: "userSpaceOnUse", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 28 0 L 0 0 0 28", fill: "none", stroke: "var(--diagram-grid)", strokeWidth: "1" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("pattern", { id: "grid", width: "28", height: "28", patternUnits: "userSpaceOnUse", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 28 0 L 0 0 0 28", fill: "none", stroke: "var(--dk-border-default)", strokeWidth: "1" }) }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("marker", { id: "connector-preview-arrowhead", markerWidth: "10", markerHeight: "10", refX: "8", refY: "3", orient: "auto", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 0 0 L 8 3 L 0 6 z", fill: nodeColor }) })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: zoomedViewBox.x, y: zoomedViewBox.y, width: zoomedViewBox.width, height: zoomedViewBox.height, fill: "url(#grid)" }),
@@ -21525,12 +21541,12 @@
                       width: shape.width,
                       height: shape.height,
                       rx: "6",
-                      fill: "var(--diagram-node-bg)",
+                      fill: "var(--dk-bg-surface)",
                       stroke: color,
                       strokeWidth
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--diagram-node-accent)" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     Icon2,
                     {
@@ -21538,14 +21554,14 @@
                       x: shape.x + 21,
                       y: shape.y + (shape.height - 36) / 2 + 7,
                       color,
-                      strokeWidth: 1.8
+                      strokeWidth: 1.5
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--text-strong)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
                     /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     displayLabel(title)
                   ] }),
-                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--text-muted)", fontSize: "12", children: displayLabel(subtitle) })
+                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--dk-text-muted)", fontSize: "12", children: displayLabel(subtitle) })
                 ] }, shape.id);
               }
               if (shape.type === "note") {
@@ -21553,8 +21569,8 @@
                   event.stopPropagation();
                   openEditor(shape);
                 }, children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--note-bg)", stroke: noteColor, strokeWidth }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--text-strong)", fontSize: shapeLabelSize, fontWeight: "500", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--dk-warning-bg)", stroke: noteColor, strokeWidth }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--dk-text-primary)", fontSize: shapeLabelSize, fontWeight: "500", children: [
                     shape.label && /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     shape.label ? displayLabel(shape.label) : ""
                   ] })
@@ -21590,7 +21606,7 @@
                       cy: endpoints.start.y,
                       r: "8",
                       fill: handleColor,
-                      stroke: "var(--diagram-node-bg)",
+                      stroke: "var(--dk-bg-surface)",
                       strokeWidth: "3",
                       onPointerDown: (event) => startReattachDrag(event, shape, "source")
                     }
@@ -21603,7 +21619,7 @@
                       cy: endpoints.end.y,
                       r: "8",
                       fill: handleColor,
-                      stroke: "var(--diagram-node-bg)",
+                      stroke: "var(--dk-bg-surface)",
                       strokeWidth: "3",
                       onPointerDown: (event) => startReattachDrag(event, shape, "target")
                     }
@@ -21620,7 +21636,7 @@
                 cy: handle.y,
                 r: "8",
                 fill: handleColor,
-                stroke: "var(--diagram-node-bg)",
+                stroke: "var(--dk-bg-surface)",
                 strokeWidth: "3",
                 onPointerDown: (event) => startConnectorDrag(event, selectedShape.id, handle)
               },
@@ -21867,7 +21883,7 @@
                 "Edit ",
                 field.label.toLowerCase()
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "button secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 18 }) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "dk-button dk-button--secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
@@ -21884,8 +21900,8 @@
               }
             ),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "prompt-editor-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: close, children: "Cancel" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: () => {
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: close, children: "Cancel" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => {
                 onChange(draft);
                 close();
               }, children: "Apply to step" })
@@ -21988,7 +22004,7 @@
                 onChange: (event) => onChange(event.target.value)
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button quiet", type: "button", disabled: !account, onClick: () => setDiscovering(true), children: "Browse…" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button quiet", type: "button", disabled: !account, onClick: () => setDiscovering(true), children: "Browse…" })
           ] }),
           !account && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint", children: [
             "Set ",
@@ -22286,8 +22302,8 @@
             )
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: busy || !prompt.trim(), onClick: requestDraft, children: [
-              busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 15 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: busy || !prompt.trim(), onClick: requestDraft, children: [
+              busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 16, strokeWidth: 1.5 }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Draft workflow" })
             ] }),
             busy && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-status", children: "Drafting…" })
@@ -22297,8 +22313,8 @@
           draft?.yaml && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "picker-yaml", children: draft.yaml }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: onClose, children: "Discard" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: () => onLoad(draft.yaml), children: "Load into canvas" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: onClose, children: "Discard" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => onLoad(draft.yaml), children: "Load into canvas" })
             ] })
           ] })
         ]
@@ -22345,6 +22361,7 @@
     const [copilotOpen, setCopilotOpen] = reactExports.useState(false);
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
     const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
+    const [navOpen, setNavOpen] = reactExports.useState(false);
     const [clipboardHasStep, setClipboardHasStep] = reactExports.useState(() => readStepClipboard() !== null);
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
@@ -22479,6 +22496,10 @@
           if (shortcutsOpen) {
             event.preventDefault();
             setShortcutsOpen(false);
+          }
+          if (navOpen) {
+            event.preventDefault();
+            setNavOpen(false);
           }
           return;
         }
@@ -23343,7 +23364,7 @@
             "{steps.*}",
             " templates — click one, paste it into any template field."
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => setStepsPickerOpen(true), children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Browse step outputs…" }) })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => setStepsPickerOpen(true), children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Browse step outputs…" }) })
         ] }),
         meta && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Error handling" }),
@@ -23390,12 +23411,12 @@
             /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
-                className: "button secondary",
+                className: "dk-button dk-button--secondary",
                 type: "button",
                 disabled: stepTest.busy,
                 onClick: () => testSelectedStep(false),
                 children: [
-                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 15 }),
+                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
                 ]
               }
@@ -23403,12 +23424,12 @@
             /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
-                className: "button danger",
+                className: "dk-button dk-button--danger",
                 type: "button",
                 disabled: stepTest.busy,
                 onClick: () => testSelectedStep(true),
                 children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 1.5 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run step" })
                 ]
               }
@@ -23448,33 +23469,41 @@
       ] });
     };
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: config.embedded ? "designer-shell embedded" : "designer-shell", children: [
-      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "designer-sidebar", children: [
+      navOpen && !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "sidebar-scrim", role: "presentation", onClick: () => setNavOpen(false) }),
+      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: navOpen ? "designer-sidebar open" : "designer-sidebar", children: [
         config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "brand-mark", children: "D" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
         ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "brand-mark", children: "D" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
           summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
             {
               className: summary.source === sourceName ? "workflow-item active" : "workflow-item",
-              onClick: () => openWorkflowSafely(summary),
+              "aria-current": summary.source === sourceName ? "page" : void 0,
+              onClick: () => {
+                setNavOpen(false);
+                openWorkflowSafely(summary);
+              },
               type: "button",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
-                  connectorLabel(summary.connector),
-                  "/",
-                  summary.event,
-                  " · ",
-                  summary.actionCount,
-                  " action",
-                  summary.actionCount === 1 ? "" : "s"
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 16, strokeWidth: 1.5 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-text", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
+                    connectorLabel(summary.connector),
+                    "/",
+                    summary.event,
+                    " · ",
+                    summary.actionCount,
+                    " action",
+                    summary.actionCount === 1 ? "" : "s"
+                  ] })
                 ] }),
                 !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Off" }),
                 summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Draft" }),
@@ -23486,7 +23515,7 @@
           summaries.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "No workflows found." })
         ] }),
         config.mode === "local" && git && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "git-foot", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 14 }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 16, strokeWidth: 1.5 }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: git.branch }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: git.dirty ? "git-dirty" : "git-clean", children: git.dirty ? "unsaved changes" : "clean" }),
           (git.ahead > 0 || git.behind > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
@@ -23499,6 +23528,17 @@
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
+          !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "icon-button nav-toggle",
+              type: "button",
+              "aria-label": "Toggle workflow list",
+              "aria-expanded": navOpen,
+              onClick: () => setNavOpen((open) => !open),
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx(Menu, { size: 16, strokeWidth: 1.5 })
+            }
+          ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "view-switch", role: "group", "aria-label": "Editor view", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23559,18 +23599,18 @@
             ),
             enabled !== savedEnabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "state-save-hint", children: "Save to apply" }),
             status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
-              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 14, className: "spin" }),
-              status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 14 }),
+              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }),
+              status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 16, strokeWidth: 1.5 }),
               status.message
             ] }),
-            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
               "Push ",
               git && git.ahead > 0 ? `(${git.ahead})` : ""
             ] }) }),
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "button secondary",
+                className: "dk-button dk-button--secondary",
                 type: "button",
                 onClick: duplicateWorkflow,
                 disabled: status.kind === "busy" || !sourceName,
@@ -23581,13 +23621,13 @@
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
-                className: copilotOpen ? "button secondary active" : "button secondary",
+                className: copilotOpen ? "button secondary active" : "dk-button dk-button--secondary",
                 type: "button",
                 onClick: () => setCopilotOpen(true),
                 disabled: view === "yaml",
                 title: view === "yaml" ? "Switch to Canvas to load a draft" : "Draft a workflow from a plain-language prompt",
                 children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 15 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { size: 16, strokeWidth: 1.5 }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copilot" })
                 ]
               }
@@ -23595,7 +23635,7 @@
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: testOpen ? "button secondary active" : "button secondary",
+                className: testOpen ? "button secondary active" : "dk-button dk-button--secondary",
                 type: "button",
                 onClick: () => setTestOpen(!testOpen),
                 disabled: status.kind === "busy" || view === "yaml",
@@ -23606,7 +23646,7 @@
             config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "button secondary",
+                className: "dk-button dk-button--secondary",
                 type: "button",
                 onClick: publishDraft,
                 disabled: status.kind === "busy" || !sourceName || !draftInfo || dirty,
@@ -23617,7 +23657,7 @@
             config.mode === "console" && draftInfo && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "button secondary",
+                className: "dk-button dk-button--secondary",
                 type: "button",
                 onClick: discardDraft,
                 disabled: status.kind === "busy",
@@ -23625,7 +23665,7 @@
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: save, disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" }) })
           ] })
         ] }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
@@ -23661,17 +23701,17 @@
               onCopyStep: copyStep,
               onPasteStep: pasteStep,
               sessionControls: (actions) => /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: "↺" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: "↻" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 18 }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: "✕" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 16, strokeWidth: 1.5 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCw, { size: 16, strokeWidth: 1.5 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 16, strokeWidth: 1.5 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
               ] })
             }
           ),
           testOpen && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "test-panel", "aria-label": "Test run", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "test-panel-head", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Test run" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 15 }) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 1.5 }) })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run for real” executes the actions with live side effects." }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
@@ -23688,24 +23728,24 @@
               )
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
-                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
+                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 "button",
                 {
-                  className: "button secondary",
+                  className: "dk-button dk-button--secondary",
                   type: "button",
                   disabled: sampleBusy || testBusy,
                   onClick: pullSample,
                   title: "Pull a real sample event for this workflow's trigger connector",
                   children: [
-                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 15 }),
+                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 1.5, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 1.5 }),
                     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
                   ]
                 }
@@ -23781,16 +23821,16 @@
               ))
             ] }),
             selected?.type === "node" && selected.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button secondary", type: "button", onClick: () => copyStep(selected.id), title: "Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => copyStep(selected.id), title: "Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copy step" })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "button danger", type: "button", onClick: deleteSelectedShape, title: "Delete this step (Delete)", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 15 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", onClick: deleteSelectedShape, title: "Delete this step (Delete)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16, strokeWidth: 1.5 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Delete" })
               ] })
             ] }),
@@ -23804,9 +23844,9 @@
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
         status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: status.message }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
         ] })
       ] }) }),
       stepsPickerOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(

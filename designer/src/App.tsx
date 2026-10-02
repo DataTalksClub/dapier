@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
-import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Play, Sparkles, Trash2, TriangleAlert, X } from "lucide-react";
+import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Sparkles, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
@@ -138,15 +138,15 @@ function PromptField({ field, value, onChange }: {
         onKeyDown={event => event.stopPropagation()}>
         <header className="prompt-editor-head">
           <h2 id={`${id}-title`}>Edit {field.label.toLowerCase()}</h2>
-          <button type="button" className="button secondary" aria-label="Close prompt editor" onClick={close}><X size={18} /></button>
+          <button type="button" className="dk-button dk-button--secondary" aria-label="Close prompt editor" onClick={close}><X size={16} strokeWidth={1.5} /></button>
         </header>
         <p id={`${id}-hint`} className="prompt-editor-hint">Changes apply to this step. Save the workflow when you’re ready.</p>
         <label className="prompt-editor-label" htmlFor={`${id}-expanded`}>{field.label}</label>
         <textarea id={`${id}-expanded`} ref={expanded} className="prompt-expanded" value={draft}
           placeholder={field.placeholder} spellCheck onChange={event => setDraft(event.target.value)} />
         <footer className="prompt-editor-actions">
-          <button className="button secondary" type="button" onClick={close}>Cancel</button>
-          <button className="button primary" type="button" onClick={() => { onChange(draft); close(); }}>Apply to step</button>
+          <button className="dk-button dk-button--secondary" type="button" onClick={close}>Cancel</button>
+          <button className="dk-button dk-button--primary" type="button" onClick={() => { onChange(draft); close(); }}>Apply to step</button>
         </footer>
       </dialog>
     </div>
@@ -263,7 +263,7 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
               placeholder={field.placeholder}
               onChange={(event) => onChange(event.target.value)}
             />
-            <button className="button quiet" type="button" disabled={!account} onClick={() => setDiscovering(true)}>
+            <button className="dk-button quiet" type="button" disabled={!account} onClick={() => setDiscovering(true)}>
               Browse…
             </button>
           </span>
@@ -610,8 +610,8 @@ function CopilotDraftDialog({ config, onLoad, onClose }: {
           />
         </label>
         <div className="test-actions">
-          <button className="button primary" type="button" disabled={busy || !prompt.trim()} onClick={requestDraft}>
-            {busy ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+          <button className="dk-button dk-button--primary" type="button" disabled={busy || !prompt.trim()} onClick={requestDraft}>
+            {busy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <Sparkles size={16} strokeWidth={1.5} />}
             <span>Draft workflow</span>
           </button>
           {busy && <span className="picker-status">Drafting…</span>}
@@ -624,8 +624,8 @@ function CopilotDraftDialog({ config, onLoad, onClose }: {
           <>
             <pre className="picker-yaml">{draft.yaml}</pre>
             <div className="leave-actions">
-              <button className="button secondary" type="button" onClick={onClose}>Discard</button>
-              <button className="button primary" type="button" onClick={() => onLoad(draft.yaml)}>Load into canvas</button>
+              <button className="dk-button dk-button--secondary" type="button" onClick={onClose}>Discard</button>
+              <button className="dk-button dk-button--primary" type="button" onClick={() => onLoad(draft.yaml)}>Load into canvas</button>
             </div>
           </>
         )}
@@ -688,6 +688,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [stepsPickerOpen, setStepsPickerOpen] = useState(false);
   /** "?" overlay listing the editor's keyboard shortcuts. */
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  /** Mobile: the workflow sidebar opens as a modal drawer (scrim, one pane). */
+  const [navOpen, setNavOpen] = useState(false);
   /** A step sits on the cross-workflow clipboard, so Paste step can appear. */
   const [clipboardHasStep, setClipboardHasStep] = useState(() => readStepClipboard() !== null);
 
@@ -876,6 +878,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         if (shortcutsOpen) {
           event.preventDefault();
           setShortcutsOpen(false);
+        }
+        if (navOpen) {
+          event.preventDefault();
+          setNavOpen(false);
         }
         return;
       }
@@ -1831,7 +1837,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               Earlier steps&rsquo; outputs as {"{steps.*}"} templates — click one,
               paste it into any template field.
             </p>
-            <button className="button secondary" type="button" onClick={() => setStepsPickerOpen(true)}>
+            <button className="dk-button dk-button--secondary" type="button" onClick={() => setStepsPickerOpen(true)}>
               <span>Browse step outputs…</span>
             </button>
           </section>
@@ -1886,14 +1892,14 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               this step — and its output feeds the next step&rsquo;s test.
             </p>
             <div className="test-actions">
-              <button className="button secondary" type="button" disabled={stepTest.busy}
+              <button className="dk-button dk-button--secondary" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(false)}>
-                {stepTest.busy ? <Loader2 size={15} className="spin" /> : <FlaskConical size={15} />}
+                {stepTest.busy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <FlaskConical size={16} strokeWidth={1.5} />}
                 <span>Dry</span>
               </button>
-              <button className="button danger" type="button" disabled={stepTest.busy}
+              <button className="dk-button dk-button--danger" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(true)}>
-                <Play size={15} /><span>Run step</span>
+                <Play size={16} strokeWidth={1.5} /><span>Run step</span>
               </button>
             </div>
             {stepTest.nodeId === selected.id && stepTest.result && (
@@ -1931,14 +1937,17 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   return (
     <div className={config.embedded ? "designer-shell embedded" : "designer-shell"}>
+      {navOpen && !config.embedded && (
+        <div className="sidebar-scrim" role="presentation" onClick={() => setNavOpen(false)} />
+      )}
       {!config.embedded && (
-        <aside className="designer-sidebar">
+        <aside className={navOpen ? "designer-sidebar open" : "designer-sidebar"}>
         {config.mode === "console" ? (
-          <a className="brand brand-link" href="/"><span className="brand-mark">D</span><span>← Console · Designer</span></a>
+          <a className="brand brand-link" href="/"><span className="workspace-mark" aria-hidden="true">D</span><span>← Console · Designer</span></a>
         ) : (
-          <div className="brand"><span className="brand-mark">D</span><span>Workflow designer</span></div>
+          <div className="brand"><span className="workspace-mark" aria-hidden="true">D</span><span>Workflow designer</span></div>
         )}
-        <button className="button primary" type="button" onClick={newWorkflowSafely}>
+        <button className="dk-button dk-button--primary sidebar-action" type="button" onClick={newWorkflowSafely}>
           <span>New workflow</span>
         </button>
         <nav className="workflow-nav" aria-label="Workflows">
@@ -1946,13 +1955,17 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <button
               key={summary.source}
               className={summary.source === sourceName ? "workflow-item active" : "workflow-item"}
-              onClick={() => openWorkflowSafely(summary)}
+              aria-current={summary.source === sourceName ? "page" : undefined}
+              onClick={() => { setNavOpen(false); openWorkflowSafely(summary); }}
               type="button"
             >
-              <span className="workflow-name">{summary.id}</span>
-              <span className="workflow-meta">
-                <TriggerLogo connector={summary.connector} />
-                {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
+              <WorkflowIcon size={16} strokeWidth={1.5} />
+              <span className="workflow-text">
+                <span className="workflow-name">{summary.id}</span>
+                <span className="workflow-meta">
+                  <TriggerLogo connector={summary.connector} />
+                  {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
+                </span>
               </span>
               {!summary.enabled && <span className="workflow-disabled">Off</span>}
               {summary.published === false && <span className="workflow-disabled">Draft</span>}
@@ -1963,7 +1976,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         </nav>
         {config.mode === "local" && git && (
           <div className="git-foot">
-            <GitBranch size={14} />
+            <GitBranch size={16} strokeWidth={1.5} />
             <span>{git.branch}</span>
             <span className={git.dirty ? "git-dirty" : "git-clean"}>{git.dirty ? "unsaved changes" : "clean"}</span>
             {(git.ahead > 0 || git.behind > 0) && <span>{git.ahead}↑ {git.behind}↓</span>}
@@ -1974,6 +1987,17 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
       <main className="designer-main">
         <header className="designer-topbar">
+          {!config.embedded && (
+            <button
+              className="icon-button nav-toggle"
+              type="button"
+              aria-label="Toggle workflow list"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen((open) => !open)}
+            >
+              <Menu size={16} strokeWidth={1.5} />
+            </button>
+          )}
           <div className="topbar-title">
             <div className="view-switch" role="group" aria-label="Editor view">
               <button
@@ -2027,19 +2051,19 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             {enabled !== savedEnabled && <span className="state-save-hint">Save to apply</span>}
             {status.message && (
               <span className={`status-message ${status.kind}`}>
-                {status.kind === "busy" && <Loader2 size={14} className="spin" />}
-                {status.kind === "error" && <TriangleAlert size={14} />}
+                {status.kind === "busy" && <Loader2 size={16} strokeWidth={1.5} className="spin" />}
+                {status.kind === "error" && <TriangleAlert size={16} strokeWidth={1.5} />}
                 {status.message}
               </span>
             )}
             {config.mode === "local" && (
-              <button className="button secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
+              <button className="dk-button dk-button--secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
                 <span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
               </button>
             )}
             {config.mode === "console" && (
               <button
-                className="button secondary"
+                className="dk-button dk-button--secondary"
                 type="button"
                 onClick={duplicateWorkflow}
                 disabled={status.kind === "busy" || !sourceName}
@@ -2050,18 +2074,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && (
               <button
-                className={copilotOpen ? "button secondary active" : "button secondary"}
+                className={copilotOpen ? "button secondary active" : "dk-button dk-button--secondary"}
                 type="button"
                 onClick={() => setCopilotOpen(true)}
                 disabled={view === "yaml"}
                 title={view === "yaml" ? "Switch to Canvas to load a draft" : "Draft a workflow from a plain-language prompt"}
               >
-                <Sparkles size={15} /><span>Copilot</span>
+                <Sparkles size={16} strokeWidth={1.5} /><span>Copilot</span>
               </button>
             )}
             {config.mode === "console" && (
               <button
-                className={testOpen ? "button secondary active" : "button secondary"}
+                className={testOpen ? "button secondary active" : "dk-button dk-button--secondary"}
                 type="button"
                 onClick={() => setTestOpen(!testOpen)}
                 disabled={status.kind === "busy" || view === "yaml"}
@@ -2072,7 +2096,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && (
               <button
-                className="button secondary"
+                className="dk-button dk-button--secondary"
                 type="button"
                 onClick={publishDraft}
                 disabled={status.kind === "busy" || !sourceName || !draftInfo || dirty}
@@ -2089,7 +2113,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {config.mode === "console" && draftInfo && (
               <button
-                className="button secondary"
+                className="dk-button dk-button--secondary"
                 type="button"
                 onClick={discardDraft}
                 disabled={status.kind === "busy"}
@@ -2098,7 +2122,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span>Discard draft</span>
               </button>
             )}
-            <button className="button primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
+            <button className="dk-button dk-button--primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
               <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? (draftInfo ? "Save draft" : "Save changes") : "Saved"}</span>
             </button>
           </div>
@@ -2133,12 +2157,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             onPasteStep={pasteStep}
             sessionControls={(actions) => (
               <>
-                <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button">↺</button>
-                <button className="icon-button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)" type="button">↻</button>
+                <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button"><RotateCcw size={16} strokeWidth={1.5} /></button>
+                <button className="icon-button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)" type="button"><RotateCw size={16} strokeWidth={1.5} /></button>
                 <button className="icon-button" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" type="button">
-                  <Keyboard size={18} />
+                  <Keyboard size={16} strokeWidth={1.5} />
                 </button>
-                <button className="icon-button" onClick={actions.clearCanvas} title="Clear canvas" type="button">✕</button>
+                <button className="icon-button" onClick={actions.clearCanvas} title="Clear canvas" type="button"><X size={16} strokeWidth={1.5} /></button>
               </>
             )}
           />
@@ -2147,7 +2171,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <header className="test-panel-head">
                 <h2>Test run</h2>
                 <button className="icon-button" type="button" title="Close" onClick={() => setTestOpen(false)}>
-                  <X size={15} />
+                  <X size={16} strokeWidth={1.5} />
                 </button>
               </header>
               <p className="test-hint">
@@ -2164,21 +2188,21 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 />
               </label>
               <div className="test-actions">
-                <button className="button primary" type="button" disabled={testBusy} onClick={() => runTest(false, testStrict)}>
-                  {testBusy ? <Loader2 size={15} className="spin" /> : <FlaskConical size={15} />}
+                <button className="dk-button dk-button--primary" type="button" disabled={testBusy} onClick={() => runTest(false, testStrict)}>
+                  {testBusy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <FlaskConical size={16} strokeWidth={1.5} />}
                   <span>Dry run</span>
                 </button>
-                <button className="button danger" type="button" disabled={testBusy} onClick={() => runTest(true, testStrict)}>
-                  <Play size={15} /><span>Run for real</span>
+                <button className="dk-button dk-button--danger" type="button" disabled={testBusy} onClick={() => runTest(true, testStrict)}>
+                  <Play size={16} strokeWidth={1.5} /><span>Run for real</span>
                 </button>
                 <button
-                  className="button secondary"
+                  className="dk-button dk-button--secondary"
                   type="button"
                   disabled={sampleBusy || testBusy}
                   onClick={pullSample}
                   title="Pull a real sample event for this workflow's trigger connector"
                 >
-                  {sampleBusy ? <Loader2 size={15} className="spin" /> : <CloudDownload size={15} />}
+                  {sampleBusy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <CloudDownload size={16} strokeWidth={1.5} />}
                   <span>Pull sample</span>
                 </button>
                 <label
@@ -2257,14 +2281,14 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {selected?.type === "node" && selected.data?.nodeKind === "action" && (
               <div className="inspector-toolbar">
-                <button className="button secondary" type="button" onClick={() => duplicateStep(selected.id)} title="Duplicate this step (Ctrl/Cmd+D)">
-                  <Copy size={15} /><span>Duplicate</span>
+                <button className="dk-button dk-button--secondary" type="button" onClick={() => duplicateStep(selected.id)} title="Duplicate this step (Ctrl/Cmd+D)">
+                  <Copy size={16} strokeWidth={1.5} /><span>Duplicate</span>
                 </button>
-                <button className="button secondary" type="button" onClick={() => copyStep(selected.id)} title="Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)">
-                  <ClipboardCopy size={15} /><span>Copy step</span>
+                <button className="dk-button dk-button--secondary" type="button" onClick={() => copyStep(selected.id)} title="Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)">
+                  <ClipboardCopy size={16} strokeWidth={1.5} /><span>Copy step</span>
                 </button>
-                <button className="button danger" type="button" onClick={deleteSelectedShape} title="Delete this step (Delete)">
-                  <Trash2 size={15} /><span>Delete</span>
+                <button className="dk-button dk-button--danger" type="button" onClick={deleteSelectedShape} title="Delete this step (Delete)">
+                  <Trash2 size={16} strokeWidth={1.5} /><span>Delete</span>
                 </button>
               </div>
             )}
@@ -2283,9 +2307,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <p id="leave-description">Save this draft before opening another workflow?</p>
             {status.kind === "error" && <p className="leave-error" role="alert">{status.message}</p>}
             <div className="leave-actions">
-              <button className="button secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
-              <button className="button secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
-              <button className="button primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
+              <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
+              <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
+              <button className="dk-button dk-button--primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
             </div>
           </section>
         </div>

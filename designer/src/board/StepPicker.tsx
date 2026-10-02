@@ -189,7 +189,7 @@ export function StepPicker({ mode, title, onPick, onClose }: StepPickerProps) {
         onKeyDown={onListKeyDown}
       >
         <header className="step-picker-head">
-          <Search size={15} />
+          <Search size={16} strokeWidth={1.5} />
           <input
             ref={inputRef}
             value={query}
@@ -199,7 +199,7 @@ export function StepPicker({ mode, title, onPick, onClose }: StepPickerProps) {
             spellCheck={false}
           />
           <button className="icon-button" onClick={onClose} title="Close" type="button">
-            <X size={15} />
+            <X size={16} strokeWidth={1.5} />
           </button>
         </header>
         <div className="step-picker-body">
@@ -218,8 +218,8 @@ export function StepPicker({ mode, title, onPick, onClose }: StepPickerProps) {
                   aria-expanded={group.collapsible ? isOpen : undefined}
                   type="button"
                 >
-                  {group.collapsible && (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                  {GroupIcon && <GroupIcon size={14} />}
+                  {group.collapsible && (isOpen ? <ChevronDown size={16} strokeWidth={1.5} /> : <ChevronRight size={16} strokeWidth={1.5} />)}
+                  {GroupIcon && <GroupIcon size={16} strokeWidth={1.5} />}
                   <span>{group.name}</span>
                   <em>{group.rows.length === 1 ? `1 ${countNoun}` : `${group.rows.length} ${countNoun}s`}</em>
                 </button>
@@ -230,7 +230,7 @@ export function StepPicker({ mode, title, onPick, onClose }: StepPickerProps) {
                     onClick={() => pick(row.kind)}
                     type="button"
                   >
-                    <row.icon size={16} />
+                    <row.icon size={16} strokeWidth={1.5} />
                     <span className="step-row-text">
                       <span className="step-row-label">{row.label}</span>
                       {row.detail && <span className="step-row-detail">{row.detail}</span>}
@@ -244,7 +244,7 @@ export function StepPicker({ mode, title, onPick, onClose }: StepPickerProps) {
               row — unless the label already says it. */}
           {query.trim() && filtered.map((row) => (
             <button key={`search-${row.kind}`} className="step-row" onClick={() => pick(row.kind)} type="button">
-              <row.icon size={16} />
+              <row.icon size={16} strokeWidth={1.5} />
               <span className="step-row-text">
                 <span className="step-row-label">{row.label}</span>
                 {!row.label.toLowerCase().includes(row.section.toLowerCase()) && (

@@ -2,10 +2,10 @@ import type { DiagramShape, Point } from "../types";
 
 export type ConnectionHandle = { id: string; x: number; y: number };
 
-export const nodeColor = "var(--diagram-component)";
-export const triggerColor = "var(--diagram-trigger)";
-export const noteColor = "var(--diagram-note)";
-export const handleColor = "var(--diagram-handle)";
+export const nodeColor = "var(--dk-accent-default)";
+export const triggerColor = "var(--dk-warning-text)";
+export const noteColor = "var(--dk-warning-text)";
+export const handleColor = "var(--dk-accent-default)";
 export const shapeLabelSize = 16;
 export const minZoom = 0.25;
 export const maxZoom = 2;

@@ -617,7 +617,7 @@ export function WorkflowBoard({
             title="Add a trigger — when the workflow runs"
             type="button"
           >
-            <Zap size={15} />
+            <Zap size={16} strokeWidth={1.5} />
             <span>Trigger</span>
           </button>
           <button
@@ -626,7 +626,7 @@ export function WorkflowBoard({
             title="Add a step — flow control, AI, developer tools, or an app"
             type="button"
           >
-            <Plus size={15} />
+            <Plus size={16} strokeWidth={1.5} />
             <span>Step</span>
           </button>
           <button
@@ -635,7 +635,7 @@ export function WorkflowBoard({
             title="Add a note"
             type="button"
           >
-            <StickyNote size={15} />
+            <StickyNote size={16} strokeWidth={1.5} />
             <span>Note</span>
           </button>
         </div>
@@ -648,16 +648,16 @@ export function WorkflowBoard({
 
       <div className="canvas-zoom-controls" aria-label="Canvas zoom controls">
         <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
-          <Minus size={18} />
+          <Minus size={16} strokeWidth={1.5} />
         </button>
         <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
           {Math.round(zoom * 100)}%
         </button>
         <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
-          <Plus size={18} />
+          <Plus size={16} strokeWidth={1.5} />
         </button>
         <button className="icon-button" onClick={fitToContent} title="Fit to view" type="button">
-          <Maximize size={18} />
+          <Maximize size={16} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -675,7 +675,7 @@ export function WorkflowBoard({
       >
         <defs>
           <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
-            <path d="M 28 0 L 0 0 0 28" fill="none" stroke="var(--diagram-grid)" strokeWidth="1" />
+            <path d="M 28 0 L 0 0 0 28" fill="none" stroke="var(--dk-border-default)" strokeWidth="1" />
           </pattern>
           <marker id="connector-preview-arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
             <path d="M 0 0 L 8 3 L 0 6 z" fill={nodeColor} />
@@ -723,24 +723,24 @@ export function WorkflowBoard({
                   width={shape.width}
                   height={shape.height}
                   rx="6"
-                  fill="var(--diagram-node-bg)"
+                  fill="var(--dk-bg-surface)"
                   stroke={color}
                   strokeWidth={strokeWidth}
                 />
-                <rect x={shape.x + 14} y={shape.y + (shape.height - 36) / 2} width="36" height="36" rx="5" fill="var(--diagram-node-accent)" />
+                <rect x={shape.x + 14} y={shape.y + (shape.height - 36) / 2} width="36" height="36" rx="5" fill="var(--dk-accent-soft)" />
                 <Icon
                   size={22}
                   x={shape.x + 21}
                   y={shape.y + (shape.height - 36) / 2 + 7}
                   color={color}
-                  strokeWidth={1.8}
+                  strokeWidth={1.5}
                 />
-                <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill="var(--text-strong)" fontSize={subtitle ? 15 : 13} fontWeight="500">
+                <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill="var(--dk-text-primary)" fontSize={subtitle ? 15 : 13} fontWeight="500">
                   <title>{shape.label}</title>
                   {displayLabel(title)}
                 </text>
                 {subtitle && (
-                  <text className="node-subtitle" x={shape.x + 62} y={shape.y + 62} fill="var(--text-muted)" fontSize="12">
+                  <text className="node-subtitle" x={shape.x + 62} y={shape.y + 62} fill="var(--dk-text-muted)" fontSize="12">
                     {displayLabel(subtitle)}
                   </text>
                 )}
@@ -751,8 +751,8 @@ export function WorkflowBoard({
           if (shape.type === "note") {
             return (
               <g key={shape.id} onDoubleClick={(event) => { event.stopPropagation(); openEditor(shape); }}>
-                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill="var(--note-bg)" stroke={noteColor} strokeWidth={strokeWidth} />
-                <text x={shape.x + 14} y={shape.y + 30} fill="var(--text-strong)" fontSize={shapeLabelSize} fontWeight="500">
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill="var(--dk-warning-bg)" stroke={noteColor} strokeWidth={strokeWidth} />
+                <text x={shape.x + 14} y={shape.y + 30} fill="var(--dk-text-primary)" fontSize={shapeLabelSize} fontWeight="500">
                   {shape.label && <title>{shape.label}</title>}
                   {shape.label ? displayLabel(shape.label) : ""}
                 </text>
@@ -785,9 +785,9 @@ export function WorkflowBoard({
               />
               {selected && (
                 <>
-                  <circle className="connection-handle" cx={endpoints.start.x} cy={endpoints.start.y} r="8" fill={handleColor} stroke="var(--diagram-node-bg)" strokeWidth="3"
+                  <circle className="connection-handle" cx={endpoints.start.x} cy={endpoints.start.y} r="8" fill={handleColor} stroke="var(--dk-bg-surface)" strokeWidth="3"
                     onPointerDown={(event) => startReattachDrag(event, shape, "source")} />
-                  <circle className="connection-handle" cx={endpoints.end.x} cy={endpoints.end.y} r="8" fill={handleColor} stroke="var(--diagram-node-bg)" strokeWidth="3"
+                  <circle className="connection-handle" cx={endpoints.end.x} cy={endpoints.end.y} r="8" fill={handleColor} stroke="var(--dk-bg-surface)" strokeWidth="3"
                     onPointerDown={(event) => startReattachDrag(event, shape, "target")} />
                 </>
               )}
@@ -803,7 +803,7 @@ export function WorkflowBoard({
             cy={handle.y}
             r="8"
             fill={handleColor}
-            stroke="var(--diagram-node-bg)"
+            stroke="var(--dk-bg-surface)"
             strokeWidth="3"
             onPointerDown={(event) => startConnectorDrag(event, selectedShape.id, handle)}
           />
