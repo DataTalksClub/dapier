@@ -223,7 +223,9 @@ main { min-width: 0; padding: 0 40px 64px; }
 .view.active[data-page="audit"],
 .view.active[data-page="inbox"],
 .view.active[data-page="triggers"] { width: min(var(--content-wide), 100%); }
-body[data-view="designer"] .view.active,
+/* Auto margins center regular views, but width:auto shrink-wraps a flex
+   child around the iframe's intrinsic width. The editor fills the main. */
+body[data-view="designer"] .view.active { padding-top: 0; width: 100%; }
 body[data-view="agents"] .view.active { padding-top: 0; width: auto; }
 .topbar {
   min-height: 0;

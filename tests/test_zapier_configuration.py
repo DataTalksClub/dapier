@@ -194,18 +194,18 @@ def test_offset_dates_convert_to_utc(source, expected):
 def test_email_todo_uses_processing_clock_and_configurable_dst(instant, expected):
     event = fixture("email")
     event["data"]["route"] = "todo"
-    clock = workflow("todo-intake")["actions"][0]["else"][0]
+    clock = workflow("todo-intake")["actions"][1]["else"][0]
     with patch.object(date_time, "datetime") as cls:
         cls.now.return_value = datetime.fromisoformat(instant)
         output = date_time.run_date_time(clock, event)
     assert output["iso"] == expected
-    normalize = run_code(workflow("todo-intake")["actions"][0]["else"][1], event)
+    normalize = run_code(workflow("todo-intake")["actions"][1]["else"][1], event)
     steps = {
         "append-task.else.processing-time": {"output": output},
         "append-task.else.email-fields": {"output": normalize},
     }
     row = sheets._rows_from_action(
-        workflow("todo-intake")["actions"][0]["else"][2], event, steps
+        workflow("todo-intake")["actions"][1]["else"][2], event, steps
     )
     assert row == [
         [expected, 'Process email "Example" from Alice <alice@example.com>', "", "NEW"]
@@ -385,6 +385,13 @@ def test_dataops_downloads_the_rendered_archived_path(monkeypatch):
     )
     assert calls == [path]
     assert body["documents"][0]["filename"] == "2026-10-02-deepseek.pdf"
+    assert body["recipientRoute"] == "invoice"
+    assert body["documents"][0]["kind"] == "attachment"
+    body = dataops._intake_body(
+        {**action, "recipient_route": "receipts"}, event,
+        steps={"move-file": {"output": {"item": {"path": path}}}},
+    )
+    assert body["recipientRoute"] == "receipts"
 
 
 def test_empty_landing_folder_seed_allows_first_future_file(monkeypatch):
@@ -530,3 +537,22 @@ def test_todo_chain_selects_email_intake_and_native_confirmation(native):
             ),
             ("dataops", None),
         ]
+
+
+@pytest.mark.parametrize("payload", [{}, {"text": ""}, {"text": "  "},
+                                    {"text": "/todo"}, {"text": "/todo   "},
+                                    {"voice": {"file_id": "synthetic-only"}},
+                                    {"document": {"file_id": "synthetic-only"}}])
+def test_native_todo_without_task_text_neither_appends_nor_confirms(payload):
+    event = {"connector": "telegram", "event": "message.received",
+             "data": {"hook": "todo", **payload}}
+    calls = []
+
+    def runner(action, event, workflow_id, steps=None):
+        if action["type"] == "code":
+            return run_code(action, event)
+        calls.append(action["type"])
+        return {"ok": True}
+
+    logic.run_chain("todo-intake", workflow("todo-intake")["actions"], event, runner)
+    assert calls == []

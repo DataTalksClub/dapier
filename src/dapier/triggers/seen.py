@@ -126,6 +126,14 @@ def claim(scope, key, *, table_ref=None, now=None, ttl_days=TTL_DAYS,
     now = _now() if now is None else now
     expires = now + ttl_days * 86400
     table = get_table(table_ref)
+    # DynamoDB cannot update a nested key until its parent map exists.
+    # if_not_exists preserves sibling claims, including concurrent ones.
+    table.update_item(
+        Key={"cursor_id": scope_id(scope)},
+        UpdateExpression="SET #m = if_not_exists(#m, :empty)",
+        ExpressionAttributeNames={"#m": "seen"},
+        ExpressionAttributeValues={":empty": {}},
+    )
     try:
         table.update_item(
             Key={"cursor_id": scope_id(scope)},

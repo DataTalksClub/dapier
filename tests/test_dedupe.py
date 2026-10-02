@@ -62,6 +62,10 @@ class FakeCursorsTable:
         values = ExpressionAttributeValues or {}
         scope = self._key(Key)
         item = self.items.get(scope) or {}
+        if ":empty" in values:
+            item = self.items.setdefault(scope, dict(Key))
+            item.setdefault(names["#m"], dict(values[":empty"]))
+            return {}
         if ConditionExpression and names["#k"] in (item.get(names["#m"]) or {}):
             from botocore.exceptions import ClientError
 

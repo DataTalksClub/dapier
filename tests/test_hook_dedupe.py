@@ -215,3 +215,31 @@ def test_telegram_update_without_update_id_is_never_deduped(hooks):
     assert response["statusCode"] == 200
     assert hooks["claim_calls"] == []
     assert hooks["published"][0]["id"] is None
+
+
+def test_json_then_form_retry_shares_identity_and_preserves_fields(hooks):
+    hooks["stub"] = {"dedupe_path": "request_id"}
+    claimed = set()
+    def claim(scope, key):
+        fresh = key not in claimed
+        claimed.add(key)
+        return fresh
+    hooks["claim"] = claim
+    payload = {"request_id": "same-1", "Date": "2026-10-02", "Text": "Task + café", "Notes": ""}
+    from urllib.parse import urlencode
+    for content_type, body in [
+        ("application/json", json.dumps(payload).encode()),
+        ("application/x-www-form-urlencoded; charset=UTF-8", urlencode(payload).encode()),
+    ]:
+        response = _post("/hooks/webhook/orders", body,
+                         {"authorization": "Bearer tok-123", "content-type": content_type})
+        assert response["statusCode"] == 202
+    assert json.loads(response["body"])["duplicate"] is True
+    assert len(hooks["published"]) == 1
+    assert hooks["published"][0]["data"]["body"] == payload
+
+
+def test_form_fields_keep_case_blank_and_repeated_values():
+    assert ingress._webhook_payload(b"Date=2026&Text=a%2Bb&Notes=&tag=x&tag=y", "application/x-www-form-urlencoded") == {
+        "Date": "2026", "Text": "a+b", "Notes": "", "tag": ["x", "y"]}
+    assert ingress._webhook_payload(b"Date=2026", "text/plain") == {"raw": "Date=2026"}

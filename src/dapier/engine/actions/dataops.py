@@ -103,12 +103,12 @@ def _dropbox_intake_body(action, event, *, steps=None):
     return {
         "version": "2026-07-01",
         "messageId": event["id"],
-        "recipientRoute": "dropbox-upload",
+        "recipientRoute": render(str(action.get("recipient_route") or "invoice"), event, steps),
         "from": "dropbox",
         "subject": filename,
         "receivedAt": _received_at(event["occurred_at"]),
         "documents": [{
-            "kind": "dropbox-file",
+            "kind": "attachment",
             "storageUri": storage_uri,
             "filename": filename,
             "contentType": content_type,

@@ -650,9 +650,11 @@ def api_delete(name, operator, *, table_ref=None, cursor_table_ref=None, events_
     if not item:
         raise TriggerError(f"no poll trigger named '{name}'")
     remove_rule(item["poll_id"], events_client=events_client)
-    get_table(table_ref).delete_item(Key={"poll_id": item["poll_id"]})
     delete_cursor(name, table=cursor_table_ref)
     # The seen-set goes too: a recreated trigger starts clean instead of
     # suppressing its old items for the rest of the dedupe window.
     seen.drop(f"poll#{name}", table_ref=cursor_table_ref)
+    # Retain the trigger record if cursor cleanup failed, so the operator
+    # can retry deletion after fixing the problem.
+    get_table(table_ref).delete_item(Key={"poll_id": item["poll_id"]})
     return 200, {"ok": True, "poll_id": item["poll_id"]}

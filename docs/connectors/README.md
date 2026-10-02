@@ -262,3 +262,29 @@ Connection statuses:
 **Edit** can rename a connection, change requested scopes (except Slack, whose
 scopes are carried in its token), or replace a Slack token. Tokens are
 write-only; Dapier never displays or returns their values.
+
+### Dropbox files forwarded to DataOps
+
+The DataOps action stages Dropbox bytes with their SHA256 and submits the
+supported `attachment` document kind. `recipient_route` selects a configured
+DataOps route and defaults to `invoice` for Dropbox events. This setting is
+available in the designer and in workflow YAML saved through the CLI/API.
+DataOps owns invoice processing and review after accepting the document.
+
+### Trigger retry state and cleanup
+
+Authenticated webhook retry claims and poll deletion use the cursor table.
+The API role can write only `poll#*`, `seen#poll#*` and `seen#hook#*` keys.
+Poll deletion retains its trigger record when cursor cleanup fails, so the
+operator can retry deletion after fixing the failure.
+
+Webhook request-ID claims initialize their DynamoDB parent map atomically
+before inserting a nested claim; this preserves other IDs in the same scope.
+Deleting a hook also removes its retry-state scope.
+
+
+Generic webhook intake parses JSON and `application/x-www-form-urlencoded`
+fields, preserving field case and blank values. Repeated form keys become
+arrays. A scalar `request_id` configured as `dedupe_path` identifies the same
+retry across JSON and form encoding; without that field, deliveries remain
+separate. HTTP 202 acknowledges intake, not downstream workflow completion.

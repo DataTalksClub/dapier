@@ -1,4 +1,4 @@
-# Migration draft; save through dapier workflows save. No cutover is authorized.
+# Migration draft; save through dapier workflows save.
 id: todo-intake
 enabled: false
 description: 'Zapier 153709869: Email tasks use processing time; retain native Telegram
@@ -7,24 +7,37 @@ tags:
 - zapier-migration
 - zapier-153709869
 actions:
+- id: native-text
+  type: code
+  code: 'text = input.get(''text'')
+
+    task = text.replace(''/todo '', '''').strip() if isinstance(text, str) else ''''
+
+    output = {''has_text'': bool(task and task != ''/todo'')}'
 - id: append-task
   type: condition
   when:
     hook:
       equals: todo
   then:
-  - id: append-row
-    type: sheets_append_row
-    connection_id: google-sheets
-    spreadsheet_id: 1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw
-    sheet_id: 0
-    sheet_name: todo
-    value_input_option: USER_ENTERED
-    values:
-    - - '{trigger.occurred_at|date_format:%Y-%m-%d}'
-      - '{text|replace:/todo :|trim}'
-      - ''
-      - NEW
+  - id: nonempty-task
+    type: condition
+    when:
+      steps.native-text.output.result.has_text:
+        equals: true
+    then:
+    - id: append-row
+      type: sheets_append_row
+      connection_id: google-sheets
+      spreadsheet_id: 1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw
+      sheet_id: 0
+      sheet_name: todo
+      value_input_option: USER_ENTERED
+      values:
+      - - '{trigger.occurred_at|date_format:%Y-%m-%d}'
+        - '{text|replace:/todo :|trim}'
+        - ''
+        - NEW
   else:
   - id: processing-time
     type: date_time
@@ -62,6 +75,8 @@ actions:
   when:
     hook:
       equals: todo
+    steps.native-text.output.result.has_text:
+      equals: true
   then:
   - id: confirm
     type: telegram_send

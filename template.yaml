@@ -255,6 +255,14 @@ Resources:
             SecretArn: !Ref YouTubeWebhookSecret
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DapierAdminSecret
+        - Statement:
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
+        - Statement:
+            Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*'
         - !If
           - HasGithubWorkflowsToken
           - Statement:
@@ -267,6 +275,15 @@ Resources:
         # The overview reads consecutive-failure counts from this table.
         - DynamoDBReadPolicy:
             TableName: !Ref CursorsTable
+        # Operator teardown and authenticated hook retry claims share this
+        # table. Keep writes within trigger cursor/seen keys.
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
+            Resource: !GetAtt CursorsTable.Arn
+            Condition:
+              ForAllValues:StringLike:
+                dynamodb:LeadingKeys: ['poll#*', 'seen#poll#*', 'seen#hook#*']
         - Statement:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]
@@ -287,7 +304,7 @@ Resources:
             Resource: !GetAtt HostQueue.Arn
         - Statement:
             Effect: Allow
-            Action: [ses:SendEmail]
+            Action: [ses:SendEmail, ses:SendRawEmail]
             Resource: '*'
         - DynamoDBCrudPolicy:
             TableName: !Ref HookTriggersTable
@@ -622,7 +639,7 @@ Resources:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
             Effect: Allow
-            Action: [ses:SendEmail]
+            Action: [ses:SendEmail, ses:SendRawEmail]
             Resource: '*'
         - Statement:
             Effect: Allow
