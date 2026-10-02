@@ -820,6 +820,36 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 /* --- drawer behaviour (≤860) --------------------------------------------------- */
 @media (max-width: 860px) {
   .app-shell { grid-template-columns: 1fr; }
+  /* Mobile page anatomy (family.md): a fixed 64px app bar — menu, title,
+     refresh — with the page description and tools in the content column
+     below the full-bleed hairline, the way the dataops reference reads. */
+  main { --page-pad: 24px; }
+  .topbar {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "lead title actions" "desc desc desc" "tools tools tools";
+    grid-template-rows: 64px auto auto;
+    align-items: center;
+    row-gap: 0;
+    width: 100%;
+  }
+  .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-pad)); right: calc(-1 * var(--page-pad)); border-bottom: 1px solid var(--dk-border-default); }
+  .topbar-title { display: contents; }
+  .topbar h1 { grid-area: title; font-size: var(--dk-text-xl); min-width: 0; overflow-wrap: anywhere; }
+  #menu-toggle, #designer-back { grid-area: lead; }
+  .top-actions { grid-area: actions; }
+  #view-description { grid-area: desc; align-self: start; margin: 10px 0 0; }
+  #topbar-tools { grid-area: tools; align-self: start; margin-top: 12px; }
+  /* Empty header rows collapse so the designer's frame keeps no dead band. */
+  #view-description:empty { display: none; }
+  /* Every phone control meets the 44px touch scale. */
+  .dk-button { height: var(--dk-size-touch); }
+  .dk-input, .dk-select, .dk-textarea { min-height: var(--dk-size-touch); }
+  .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  .sidebar-close { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  .workflow-state-control .dk-button, .workflow-menu .dk-button,
+  .workflow-actions .dk-button, .workflow-actions .workflow-more { height: var(--dk-size-touch); }
   .sidebar-backdrop:not([hidden]) { position: fixed; display: block; inset: 0; z-index: 19; width: 100%; height: 100dvh; border: 0; background: var(--dk-bg-backdrop); cursor: pointer; }
   .sidebar {
     position: fixed;
@@ -851,16 +881,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 
 /* --- mobile (≤560): stacked ledger rows ---------------------------------------- */
 @media (max-width: 560px) {
-  main { padding: 0 18px 40px; }
+  main { padding: 0 18px 40px; --page-pad: 18px; }
   .loading { margin: 0 -18px; }
-  .topbar { position: relative; flex-wrap: wrap; gap: 4px 12px; min-height: 64px; padding: 4px 0; align-content: center; }
   .topbar h1 { font-size: var(--dk-text-xl); }
   body[data-view="designer"] .topbar h1 { font-size: var(--dk-text-lg); }
-  #menu-toggle { order: 0; }
-  #view-title { order: 1; }
-  #view-description { order: 1; }
-  .top-actions { order: 2; }
-  #topbar-tools { order: 3; flex: 1 1 100%; }
   #topbar-tools > .page-tools,
   .page-tools.run-filters {
     display: grid;
@@ -878,14 +902,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .page-tools .workflow-filters {
     display: grid;
     grid-template-columns: 1fr 1fr;
-  }
-  #workflow-count {
-    position: absolute;
-    top: 8px;
-    right: 64px;
-    z-index: 1;
-    max-width: 34vw;
-    line-height: var(--dk-size-control-md);
   }
   .page-tools .workflow-page-actions { display: flex; }
   .page-tools .run-filters label,
