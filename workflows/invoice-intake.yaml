@@ -1,4 +1,4 @@
-# Invoice intake: vendor invoice emails to `invoice@mailer.dtcdev.click`
+# Invoice intake: vendor invoice emails to `invoice@dtcdev.click`
 # are parsed and staged for bookkeeping review.
 #
 # The route is dedicated to invoices, so every step assumes an invoice

@@ -1,6 +1,6 @@
 # Invoice intake: email to reviewed bookkeeping entry
 
-Vendor invoice emails forwarded to `invoice@mailer.dtcdev.click` are
+Vendor invoice emails forwarded to `invoice@dtcdev.click` are
 parsed and staged for human review. The pipeline is the canonical
 `workflows/invoice-intake.yaml`; the review queue is the console's
 **Bookkeeping** view and the `dapier bookkeeping` noun.
@@ -60,7 +60,7 @@ twice.
    fallback without it — deterministic vendors still parse).
 4. `dapier workflows save workflows/invoice-intake.yaml && dapier
    workflows publish invoice-intake && dapier workflows on invoice-intake`.
-5. Forward an AWS invoice to `invoice@mailer.dtcdev.click`, confirm the
+5. Forward an AWS invoice to `invoice@dtcdev.click`, confirm the
    entry, then revoke the parsing-era `invoice-hunt` dropbox grant if
    still present.
 
