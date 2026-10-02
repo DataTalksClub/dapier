@@ -167,22 +167,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--dk-accent-defaul
 .sidebar-close { display: none; }
 nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
 .nav-group-label {
-  margin: var(--dk-space-4) var(--dk-space-2) var(--dk-space-1);
+  margin: 18px 10px 5px;
   color: var(--dk-text-muted);
   font-size: var(--dk-text-xs);
   font-weight: var(--dk-weight-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 .nav-group-label:first-child { margin-top: 0; }
-/* Icon + text rows; the filled row is the only selection signal — no rail. */
+/* Icon + text rows; the filled row is the only selection signal — no rail.
+   Row geometry is the family recipe (family.md, dataops nav rows). */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: var(--dk-space-2);
-  height: 32px;
+  gap: 10px;
+  min-height: 36px;
   flex: none;
-  padding: 0 var(--dk-space-3);
+  padding: 6px 10px;
   border-radius: var(--dk-radius-md);
   color: var(--dk-text-primary);
   font-size: var(--dk-text-body);
@@ -842,7 +843,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     transition: transform .2s ease, visibility 0s linear .2s;
   }
   /* The drawer is a touch surface: nav rows go to 44px. */
-  .nav-item { height: var(--dk-size-touch); }
+  .nav-item { min-height: var(--dk-size-touch); }
   .sidebar.open {
     visibility: visible;
     transform: translateX(0);
