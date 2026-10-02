@@ -65,6 +65,7 @@ def _static(path):
         "/assets/js/md.js": ("js/md.js", "text/javascript; charset=utf-8"),
         "/assets/js/main.js": ("js/main.js", "text/javascript; charset=utf-8"),
         "/assets/js/router.js": ("js/router.js", "text/javascript; charset=utf-8"),
+        "/assets/js/overview-loader.js": ("js/overview-loader.js", "text/javascript; charset=utf-8"),
         "/assets/js/home-model.js": ("js/home-model.js", "text/javascript; charset=utf-8"),
         "/assets/js/state.js": ("js/state.js", "text/javascript; charset=utf-8"),
         "/assets/js/ui.js": ("js/ui.js", "text/javascript; charset=utf-8"),

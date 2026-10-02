@@ -184,7 +184,9 @@ def _quota():
 
 
 def overview(event=None, visible=None):
-    """The operator overview. ``?q=`` filters the workflows list (same match
+    """The operator overview. ``?section=`` reads only the requested block;
+    omitting it preserves the complete response. ``?q=`` filters the workflows
+    list (same match
     text as the designer list: id, description, trigger, action types, tags,
     folder), ``?tag=`` narrows to workflows carrying that tag, and
     ``?folder=`` narrows to workflows sitting in that folder (both
@@ -199,52 +201,62 @@ def overview(event=None, visible=None):
     whose workflow is gone stays visible). Connections, credentials, tokens,
     and the trigger registries are not workflow-owned and are untouched."""
     query = (event or {}).get("queryStringParameters") or {}
-    owners = visibility.owners_for(visible)
-    workflows = _workflows(visible, owners)
-    workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
-    workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
-                               if str(view.get("folder") or "").strip()})
-    search = str(query.get("q") or "").strip().lower()
-    if search:
-        workflows = [view for view in workflows if _workflow_matches(view, search)]
-    tag = str(query.get("tag") or "").strip().lower()
-    if tag:
-        workflows = [view for view in workflows
-                     if tag in {str(existing).lower() for existing in view.get("tags") or []}]
-    folder = str(query.get("folder") or "").strip().lower()
-    if folder:
-        workflows = [view for view in workflows
-                     if str(view.get("folder") or "").strip().lower() == folder]
-    # Newest first by the moment each step actually started — execution_id
-    # is ``workflow:action:event``, so its string order is not chronological.
-    executions = sorted(
-        (item for item in _scan(os.environ["EXECUTIONS_TABLE"])
-         if visible is None or visible.workflow_visible(
-             item.get("workflow_id"), owners)),
-        key=lambda item: (str(item.get("started_at") or ""),
-                          str(item.get("execution_id") or "")),
-        reverse=True,
-    )
-    # ``used_in`` (which workflows and hook triggers reference each
-    # connection) rides along so the console snapshot matches the paged
-    # list — that map is also what flags a connection as safe to delete.
-    connections = connection_usage.attach(
-        _connection_views(_scan(os.environ["CONNECTIONS_TABLE"])))
-    return http._json_response(200, {
+    sections = {"workflows", "activity", "usage", "connections", "credentials", "tokens", "emails"}
+    section = query.get("section")
+    if section is not None and section not in sections:
+        return http._json_response(400, {"error": "Unknown overview section"})
+    selected = {section} if section is not None else sections
+    payload = {
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),
-        "workflows": workflows,
-        "workflow_tags": workflow_tags,
-        "workflow_folders": workflow_folders,
-        "executions": executions[:25],
-        "runs": runs.recent(25, visible=visible),
-        "usage": _usage(visible, owners),
-        "quota": _quota(),
-        "connections": sorted(connections, key=lambda item: item.get("display_name", "")),
-        "credentials": [_credential_status(provider) for provider in CREDENTIAL_SPECS],
-        "oauth_clients": [_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
-        "api_tokens": [api_tokens.public_view(item) for item in api_tokens.list_all()],
-        "email_triggers": _email_triggers(),
-        "email_from": _email_from(),
-    })
-
+    }
+    owners = visibility.owners_for(visible) if selected & {"workflows", "activity", "usage"} else None
+    if "workflows" in selected:
+        workflows = _workflows(visible, owners)
+        workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
+        workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
+                                   if str(view.get("folder") or "").strip()})
+        search = str(query.get("q") or "").strip().lower()
+        if search:
+            workflows = [view for view in workflows if _workflow_matches(view, search)]
+        tag = str(query.get("tag") or "").strip().lower()
+        if tag:
+            workflows = [view for view in workflows
+                         if tag in {str(existing).lower() for existing in view.get("tags") or []}]
+        folder = str(query.get("folder") or "").strip().lower()
+        if folder:
+            workflows = [view for view in workflows
+                         if str(view.get("folder") or "").strip().lower() == folder]
+        payload.update(workflows=workflows, workflow_tags=workflow_tags,
+                       workflow_folders=workflow_folders)
+    if "activity" in selected:
+        # Newest first by the moment each step actually started — execution_id
+        # is ``workflow:action:event``, so its string order is not chronological.
+        executions = sorted(
+            (item for item in _scan(os.environ["EXECUTIONS_TABLE"])
+             if visible is None or visible.workflow_visible(
+                 item.get("workflow_id"), owners)),
+            key=lambda item: (str(item.get("started_at") or ""),
+                              str(item.get("execution_id") or "")),
+            reverse=True,
+        )
+        payload.update(executions=executions[:25], runs=runs.recent(25, visible=visible))
+    if "usage" in selected:
+        payload.update(usage=_usage(visible, owners), quota=_quota())
+    if "connections" in selected:
+        # ``used_in`` (which workflows and hook triggers reference each
+        # connection) rides along so the console snapshot matches the paged
+        # list — that map is also what flags a connection as safe to delete.
+        connections = connection_usage.attach(
+            _connection_views(_scan(os.environ["CONNECTIONS_TABLE"])))
+        payload["connections"] = sorted(connections, key=lambda item: item.get("display_name", ""))
+    if "credentials" in selected:
+        payload.update(
+            credentials=[_credential_status(provider) for provider in CREDENTIAL_SPECS],
+            oauth_clients=[_oauth_client_status(provider) for provider in oauth_clients.CANONICAL_PROVIDERS],
+        )
+    if "tokens" in selected:
+        payload["api_tokens"] = [api_tokens.public_view(item) for item in api_tokens.list_all()]
+    if "emails" in selected:
+        payload.update(email_triggers=_email_triggers(), email_from=_email_from())
+    return http._json_response(200, payload)

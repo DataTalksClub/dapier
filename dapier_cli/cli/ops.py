@@ -8,7 +8,9 @@ GROUPS = ("overview", "usage", "quota", "errors", "agent-tasks", "workers", "wor
 
 
 def register(sub):
-    sub.add_parser("overview", help="Operator overview: workflows, connections, credentials")
+    overview_p = sub.add_parser("overview", help="Operator overview: workflows, connections, credentials")
+    overview_p.add_argument("--section", choices=("workflows", "activity", "usage", "connections", "credentials", "tokens", "emails"),
+                            help="Fetch only this section for a faster response")
     usage_p = sub.add_parser("usage", help="Task usage rollup: tasks per workflow per month")
     usage_p.add_argument("--months", type=int, default=12,
                          help="How many months of rollup to show (default 12, max 24)")
@@ -54,7 +56,7 @@ def register(sub):
 
 def run(args, api_url, debug, child=None):
     if args.group == "overview":
-        return commands.overview(api_url, debug)
+        return commands.overview(api_url, debug, section=args.section)
     if args.group == "usage":
         return commands.usage(api_url, debug, months=args.months)
     if args.group == "quota":

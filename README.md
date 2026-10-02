@@ -423,6 +423,7 @@ the CLI — the commands drive the same operator-gated API as the console:
 
 ```bash
 dapier overview                       # workflows, connections, credentials, recent executions
+dapier overview --section workflows   # only this block; returns JSON
 dapier credentials set slack --file slack-token.txt   # or --file - for stdin
 dapier credentials set mailchimp --file mailchimp-key.txt
 dapier grants list [--connection youtube-personal]
@@ -492,3 +493,11 @@ token also deletes its grants. API tokens never qualify for operator actions.
 
 Workflow files are packaged at deployment time. A deployment is therefore the audit
 trail and rollback mechanism for configuration changes.
+
+The console opens after the operator check and loads overview sections independently.
+Workflows, recent activity, usage, connections, credentials/OAuth clients, API
+tokens, and email settings each use `GET /api/admin/overview?section=<section>`.
+Each section renders as its response arrives; failures stay local with a Refresh
+retry. The agent route accepts the same selector (`dapier overview --section
+workflows|activity|usage|connections|credentials|tokens|emails`). Omitting
+`section` preserves the full overview response for existing clients.

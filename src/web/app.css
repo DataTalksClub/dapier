@@ -1209,3 +1209,8 @@ body[data-view="agents"] .agent-workspace { flex: 1; height: auto; min-height: 0
   .agent-technical dl { grid-template-columns: 1fr; gap: 6px; }
   .agent-technical dd { margin-bottom: 12px; }
 }
+
+/* Keep pending views navigable without presenting unloaded data as empty. */
+.view[data-pending="true"] > :not(.section-loading):not(.page-tools) { display: none; }
+section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loading) { visibility: hidden; }
+.section-loading { padding: 12px 0; }

@@ -1,7 +1,8 @@
 /* Overview view: metrics, workflow/run tables, and the detail dialogs. */
+import { createOverviewLoader } from '../overview-loader.js';
 import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
-import { $, icons, showApp, showStartupError, notice } from '../ui.js';
+import { $, icons, showApp, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { openDesigner, postConnectionsToDesigner } from './designer.js';
@@ -63,7 +64,7 @@ function workflowRow(workflow) {
   return `<article class="home-workflow">
     <div><button type="button" class="cell-name workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${escapeHtml(workflow.id)}</button>
       <p class="sub">${escapeHtml(workflow.description || workflowTriggerText(workflow))}</p>
-      <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : '<span class="sub">No recent runs</span>'}</div>
+      <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : `<span class="sub">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading recent runs…'}</span>`}</div>
     </div>
     <button type="button" class="button secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
   </article>`;
@@ -125,36 +126,38 @@ export function openWorkflow(id) {
   icons();
 }
 
-function render() {
+function render(section) {
   const data = state.data;
   if (!data) return;
   const model = homeModel(data);
-  $('#home-workflow-count').textContent = `${data.workflows.length} workflow${data.workflows.length === 1 ? '' : 's'} · ${model.running} on`;
-  $('#overview-workflows').innerHTML = model.workflows.slice(0, 5).map(workflowRow).join('');
-  $('#overview-workflows-empty').hidden = data.workflows.length > 0;
-  $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
-    `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}">
-      <span class="home-result-title">${escapeHtml(run.workflow_id || 'Run')}${statusLine(run.status)}</span>
-      <span class="sub">${escapeHtml(formatTimestamp(run.started_at) || '—')}${run.failed_step ? ` · Failed at ${escapeHtml(run.failed_step)}` : ''}</span>
-    </button>`).join('');
-  $('#overview-runs-empty').hidden = model.runs.length > 0;
+  if (['workflows', 'activity'].includes(section) && data.workflows) {
+    $('#home-workflow-count').textContent = `${data.workflows.length} workflow${data.workflows.length === 1 ? '' : 's'} · ${model.running} on`;
+    $('#overview-workflows').innerHTML = model.workflows.slice(0, 5).map(workflowRow).join('');
+    $('#overview-workflows-empty').hidden = data.workflows.length > 0;
+  }
+  if (section === 'activity') {
+    $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
+      `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}">
+        <span class="home-result-title">${escapeHtml(run.workflow_id || 'Run')}${statusLine(run.status)}</span>
+        <span class="sub">${escapeHtml(formatTimestamp(run.started_at) || '—')}${run.failed_step ? ` · Failed at ${escapeHtml(run.failed_step)}` : ''}</span>
+      </button>`).join('');
+    $('#overview-runs-empty').hidden = model.runs.length > 0;
+  }
   renderAttention(data);
-  renderErrors();
-  renderUsage();
-  renderWorkflows();
-  renderConnections(data.connections);
-  renderCredentials(data.credentials);
-  renderOAuthClients(data.oauth_clients || []);
-  renderTokens(data.api_tokens || []);
-  renderEmails(data.email_triggers);
-  renderEmailFrom(data.email_from);
-  renderAgentTasks();
-  renderWorkers();
-  renderRuns();
-  renderInbox();
-  renderSchedules();
-  renderTriggers();
-  renderStorage();
+  if (section === 'usage') renderUsage();
+  if (['workflows', 'activity'].includes(section) && data.workflows) renderWorkflows();
+  if (section === 'connections') renderConnections(data.connections);
+  if (section === 'credentials') {
+    renderCredentials(data.credentials);
+    renderOAuthClients(data.oauth_clients || []);
+  }
+  if (section === 'tokens') renderTokens(data.api_tokens || []);
+  if (section === 'emails') {
+    renderEmails(data.email_triggers);
+    renderEmailFrom(data.email_from);
+  }
+  if (data.runs && ['workflows', 'activity'].includes(section)) renderRuns();
+  if (section === 'workflows') renderStorage();
   const now = new Date();
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();
@@ -223,7 +226,7 @@ export function renderWorkflows() {
       <td class="select-col" data-label="Select"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></td>
       <td class="cell-title">${detail}${(folderChip || tags) ? `<div class="cell-tags">${folderChip} ${tags}</div>` : ''}</td>
       <td class="workflow-flow" data-label="Flow"><div class="workflow-flow-line"><span class="workflow-flow-label">When</span><span>${escapeHtml(workflowTriggerText(workflow))}</span></div><div class="workflow-flow-line"><span class="workflow-flow-label">Then</span><span class="workflow-action-chain">${actions || '—'}</span></div></td>
-      <td data-label="Latest run"><button type="button" class="button secondary workflow-runs" data-workflow="${id}">Runs</button> ${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : '<span class="muted-cell">No runs yet</span>'}</td>
+      <td data-label="Latest run"><button type="button" class="button secondary workflow-runs" data-workflow="${id}">Runs</button> ${recent ? `<button class="workflow-run-link" type="button" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading recent runs…'}</span>`}</td>
       <td data-label="State"><div class="workflow-state-control">${workflow.auto_paused
           ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="button secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
           : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${id}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
@@ -398,7 +401,7 @@ async function searchWorkflows() {
     return;
   }
   try {
-    const data = await api(`/api/admin/overview?q=${encodeURIComponent(query)}`);
+    const data = await api(`/api/admin/overview?section=workflows&q=${encodeURIComponent(query)}`);
     if (stamp !== searchSequence) return; // a newer keystroke superseded this
     state.workflowSearchIds = new Set((data.workflows || []).map((workflow) => workflow.id));
   } catch (error) {
@@ -416,32 +419,68 @@ $('#workflow-filter').addEventListener('change', renderWorkflows);
 $('#workflow-tag-filter').addEventListener('change', renderWorkflows);
 $('#workflow-folder-filter').addEventListener('change', renderWorkflows);
 
-export async function refresh() {
-  $('#loading').hidden = false;
-  try {
-    state.data = await api('/api/admin/overview');
-    render();
-    showApp();
-    // Failed runs by workflow trails the overview fetch so it never delays
-    // the page; a miss leaves the section quietly empty.
-    try {
-      state.errors = await api('/api/admin/errors/summary?days=7');
-    } catch (summaryError) {
-      state.errors = null;
+const sectionTargets = {
+  workflows: ['.view[data-page="workflows"]', '[aria-labelledby="home-workflows-title"]'],
+  activity: ['[aria-labelledby="home-results-title"]', '.view[data-page="runs"]'],
+  usage: ['[aria-labelledby="runs-usage-title"]'],
+  connections: ['.view[data-page="connections"]'],
+  credentials: ['.view[data-page="credentials"]'],
+  tokens: ['.view[data-page="tokens"]'],
+  emails: ['.view[data-page="emails"]'],
+};
+
+function sectionStatus(section, message = '') {
+  for (const selector of sectionTargets[section]) {
+    const target = $(selector);
+    let status = target.querySelector(':scope > .section-loading');
+    if (!status?.classList.contains('section-loading')) {
+      status = document.createElement('p');
+      status.className = 'section-loading sub';
+      status.setAttribute('role', 'status');
+      target.prepend(status);
     }
-    renderErrors();
-    // Fresh connections data for an open designer: the iframe may have
-    // mounted before this fetch answered.
-    if (state.view === 'designer') postConnectionsToDesigner();
-    return true;
-  } catch (error) {
-    if (!$('#forbidden-view').hidden) return;
-    if ($('#app').hidden) showStartupError(error.message);
-    else notice(error.message, true);
-    return false;
-  } finally {
-    $('#loading').hidden = true;
+    status.textContent = message;
+    status.hidden = !message;
+    target.dataset.pending = String(Boolean(message) && !state.loadedSections.has(section));
+    target.setAttribute('aria-busy', String(message.startsWith('Loading')));
   }
+}
+
+const loadOverview = createOverviewLoader(api, (section, data) => {
+  Object.assign(state.data, data);
+  state.loadedSections.add(section);
+  sectionStatus(section);
+  render(section);
+  if (section === 'connections' && state.view === 'designer') postConnectionsToDesigner();
+}, (section, error) => {
+  sectionStatus(section, `Could not load ${section}: ${error.message}. Use Refresh to retry.`);
+});
+
+let refreshSequence = 0;
+export async function refresh() {
+  const sequence = ++refreshSequence;
+  state.data ||= {};
+  for (const section of Object.keys(sectionTargets)) sectionStatus(section, `Loading ${section}…`);
+  $('#loading').hidden = false;
+  if ($('#forbidden-view').hidden) showApp();
+  renderAgentTasks();
+  renderWorkers();
+  renderInbox();
+  renderSchedules();
+  renderTriggers();
+  // Error history is independent of both startup and the other reads.
+  api('/api/admin/errors/summary?days=7').then((data) => {
+    if (sequence !== refreshSequence) return;
+    state.errors = data;
+    renderErrors();
+  }).catch(() => {
+    if (sequence !== refreshSequence) return;
+    state.errors = null;
+    renderErrors();
+  });
+  const success = await loadOverview();
+  if (sequence === refreshSequence) $('#loading').hidden = true;
+  return success;
 }
 
 /* Version history: every save, toggle, and rollback publishes a version

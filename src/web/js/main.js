@@ -304,7 +304,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const initialView = viewFromPath(window.location.pathname);
   await setView(initialView, false);
   if (initialView === 'designer') await designerFromLocation();
-  await refresh();
+  const initialRefresh = refresh();
   if (initialView === 'runs') {
     const runId = new URLSearchParams(window.location.search).get('run');
     if (runId) await openRun(runId);
@@ -318,5 +318,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   /* The deep-link header sync above ran before the overview data arrived;
      now the workflow name can be filled in. */
+  await initialRefresh;
   if (initialView === 'designer') await designerFromLocation();
 });

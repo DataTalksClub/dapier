@@ -672,7 +672,7 @@ def test_main_operator_command_parsing(monkeypatch):
     assert main.main(["credentials", "set", "mailchimp", "--file", "-"]) == 0
     assert seen["provider"] == "mailchimp" and seen["path"] == "-"
 
-    monkeypatch.setattr(commands, "overview", lambda api_url, debug=False: 0)
+    monkeypatch.setattr(commands, "overview", lambda api_url, debug=False, section=None: 0)
     assert main.main(["overview"]) == 0
 
     monkeypatch.setattr(commands, "connections_revoke",

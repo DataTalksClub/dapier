@@ -1,6 +1,8 @@
 """Implementation of the `dapier overview` command."""
 
 
+import json
+
 from .. import api
 
 __all__ = ["overview", "print_overview"]
@@ -39,9 +41,15 @@ def print_overview(data):
                   f"{item.get('status', ''):12} {item.get('started_at', '')}")
 
 
-def overview(api_url, debug=False):
-    data = api.call(api_url, "GET", "/api/agent/overview", debug=debug)
-    print_overview(data)
+def overview(api_url, debug=False, section=None):
+    path = "/api/agent/overview"
+    if section:
+        path += f"?section={section}"
+    data = api.call(api_url, "GET", path, debug=debug)
+    if section:
+        print(json.dumps(data, indent=2))
+    else:
+        print_overview(data)
     return 0
 
 
