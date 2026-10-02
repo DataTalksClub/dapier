@@ -161,7 +161,6 @@ a.brand:hover span:last-child {
 
 .workflow-item > svg {
   flex: none;
-  margin-top: 2px;
 }
 
 .workflow-text {
@@ -486,7 +485,7 @@ a.brand:hover span:last-child {
   padding: 0;
   width: var(--dk-size-control-md);
 }
-.icon-button svg { width: 16px; height: 16px; flex: none; }
+.icon-button svg { width: 20px; height: 20px; flex: none; }
 
 .icon-button.active,
 .icon-button:hover:not(:disabled) {
@@ -948,7 +947,7 @@ input[type="checkbox"], input[type="radio"] {
 
 @media (max-width: 720px) {
   .nav-toggle { display: inline-flex; }
-  .nav-toggle svg { width: 16px; height: 16px; }
+  .nav-toggle svg { width: 20px; height: 20px; }
   .designer-shell { grid-template-columns: minmax(0, 1fr); }
   .designer-sidebar {
     position: fixed;
