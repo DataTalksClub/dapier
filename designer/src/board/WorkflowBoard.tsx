@@ -10,7 +10,7 @@ import {
   StickyNote,
   Trash2,
   Zap
-} from "lucide-react";
+} from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt } from "./geometry";

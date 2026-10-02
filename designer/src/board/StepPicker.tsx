@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, FileText, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Search, X } from "../icons";
 import { actionCatalog, actionConnector, actionVerbRank, connectorCatalog, stepSection } from "../catalog";
 import type { IconComponent } from "../catalog";
 import { triggerPalette } from "./nodes";
