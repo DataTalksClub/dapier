@@ -59,10 +59,10 @@ Source: Zap `153709869`; workflow: `todo-intake` (v5 published and enabled after
 - [x] Verify workbook access and columns `Date`, `Task`, `Notes`, `Status`.
 - [ ] Confirm source processing-time timezone; live v5 uses `America/Chicago`, while original Zapier CST semantics remain unverified.
 - [x] Verify route `todo@dtcdev.click` accepts `alexey@datatalks.club` (live receipt). Other sender policies remain outside this test.
-- [ ] With authorization, send one test email; verify the exact row, timestamp and sender text, plus DataOps delivery.
+- [x] Retest verified one correctly populated row and DataOps receipt; initial failed test and successful v5 evidence are recorded below.
 - [ ] Verify existing native Telegram task creation and confirmation still work.
 - [x] Publish the prepared sender/timestamp fix as v5 and confirm the workflow is On.
-- [ ] Retest with unique subject `Dapier TODO test v2`; verify exactly one correctly populated row and DataOps receipt.
+- [x] Retest unique subject `Dapier TODO retest 2026-10-02 Chrome v5`: one row, correct sender/subject/Notes/Status, processing timestamp and accepted DataOps receipt.
 
 
 First live test (2026-10-02): source email Date was 19:32:01 UTC, Dapier
@@ -78,14 +78,30 @@ at 19:32:21 UTC. A direct Sheets API read found exactly one matching row,
 
 The actual DataOps intake response was `status: accepted`, item
 `email-63f0da2c166fb52b1b815e3cfe2d87e7`. This proves receipt, not downstream
-bookkeeping completion. The browser's approximate reported send time (19:39)
-differs from the email/provider timestamps above; provider times are recorded.
+bookkeeping completion. The browser tester corrected the first send time to 19:32 UTC, matching the
+provider timestamps.
 
 V5 reads the sender header from the structured email event, writes an ISO
 processing timestamp and selects worksheet ID `0`. The draft's disabled flag
-was briefly published and then immediately corrected to On. Do not mark the
-email test passed until the v2 email is verified against Sheets and DataOps.
+was briefly published and then immediately corrected to On. The unique Chrome v5 retest below verified the updated mapping against Sheets
+and DataOps.
 The first test row was retained; it was not replayed or edited.
+
+
+Successful v5 retest: subject `Dapier TODO retest 2026-10-02 Chrome v5`, from
+`alexey@datatalks.club`, produced exactly one matching row `todo!A105:D105` in
+a direct Sheets API read:
+
+- Date: `2026-10-02T14:35:56-05:00` (19:35:56 UTC, processing time).
+- Task: `Process email "Dapier TODO retest 2026-10-02 Chrome v5" from Alexey Grigorev <alexey@datatalks.club>`.
+- Notes: blank.
+- Status: `NEW`.
+
+Run `todo-intake:1774d0306c420e34c55a0f9adcea64b643c47e838542fb3b6b614546925b520d`
+completed all 7 steps at 19:35:59 UTC. The DataOps API returned
+`status: accepted`, item `email-d0de9a5657f075cfb7cb697f8010f8cd`.
+Email mapping and intake receipt pass; native Telegram and original Zapier CST
+semantics remain separate checks.
 
 ## 3. Invoice email
 
