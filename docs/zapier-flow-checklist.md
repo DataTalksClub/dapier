@@ -110,7 +110,7 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 - [x] Configure archive `/_dtc_paperwork/invoices/<UTC email date>-<Subject>.pdf`, unchanged attachment bytes, overwrite disabled.
 - [x] Forward archived invoice intake to DataOps.
 - [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
-- [x] Confirm invoice route `invoice@dtcdev.click`; actual sender acceptance remains pending the email test.
+- [ ] Verify sender acceptance by sending to the confirmed route `invoice@dtcdev.click`.
 - [ ] Confirm single/multiple/inline attachment selection and filename conflict behavior.
 - [ ] With authorization, send one test invoice; verify date conversion, exact filename, matching bytes and DataOps receipt.
 - [ ] Verify required bookkeeping output in DataOps (legacy sheet references are in the migration plan).
