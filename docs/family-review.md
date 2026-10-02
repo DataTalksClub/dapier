@@ -63,6 +63,38 @@ latest recorded below).
   64px top bar, single-row strip, stacked labelled rows, and drawer
   treatment; the designer reads as family chrome around the dense canvas.
 
+## Independent judge rounds — integration + phone chrome (2026-10-02 night)
+
+The icon-set branch (family 16-grid on console + designer), the anatomy
+branch, and origin/main were integrated on `redesign/family-integrated`,
+then the phone chrome was brought to the family spec and re-reviewed by
+independent judge agents (general-purpose runners; every round ran against
+fresh captures in `/tmp/dapier-judge-final/shots` — console Home /
+Workflows / Connections / Runs + the designer, 1440×900 and 390×844, light
+and dark, drawers and the designer sheet — with dakit's
+`docs/family-reference` as the canonical side-by-side):
+
+- **Desktop: PASS (round 2).** Pixel-verified exact family values: 268px
+  sidebar with identical fills in both themes, 32px header scale,
+  #D0D7DE hairlines, #315F8F primary, #CF222E danger, identical dark-role
+  flip (#58A6FF accent), no off-family hex/radii/shadows.
+- **Mobile: PASS (round 4)** after three fix rounds: a fixed 64px app bar
+  (menu + title over a full-bleed hairline) with the page description and
+  tools in the content column; every console and designer-chrome control at
+  `--dk-size-touch` (44px) — including filter rows, workflow header and row
+  actions, drawer footer, the designer tool row, zoom pill, sheet controls,
+  and an 18px checkbox visual inside a 44px padded hit area; the designer
+  node detail opens as a full-screen sheet with a close button (one pane at
+  a time); the open drawer carries `--dk-shadow-overlay`; the zoom overlay
+  uses the 10px overlay radius.
+
+Fix-round findings, kept for the record: desktop-density pins
+(`--dk-size-control-md/sm`) outranked the phone bumps until they moved
+behind `min-width: 861px` queries; bare `input, select` filters needed
+their own bump; the designer page loads only `designer.css`, so its touch
+scale must live there; `.add-row`, `.node-jump-item`, `.sidebar-action`
+and the zoom icon-buttons needed explicit 44px rules.
+
 ## Deliberate remainders
 
 - Provider brand marks (Google/Slack/Zoom logos) stay full-color: family.md
