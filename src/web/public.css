@@ -1,7 +1,8 @@
 /* Public pages, dressed by the shared dakit design system (vendor/dakit.css
-   ships the tokens and the fonts); light-only, so no dark remap is needed. */
+   ships the tokens and the fonts). Theming follows the family: the head boot
+   script (js/theme-init.js) applies data-theme before first paint, and the
+   tokens do the dark remap — nothing here is light-only. */
 :root {
-  color-scheme: light;
   font-family: var(--dk-font-sans);
   color: var(--dk-text-primary);
   background: var(--dk-bg-page);
