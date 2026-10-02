@@ -116,7 +116,12 @@ It does not notify registrants unless the operator asks for that action.
 For any task that changes a Git repository, the agent stages only its intended
 files, runs the repository's required checks, commits in focused commits, pushes
 to the configured remote branch, and verifies the push. It preserves unrelated
-work and reports any check or push blocker in the completion report.
+work and reports any check or push blocker in the completion report. When files
+were pushed, the reply includes direct HTTPS links to the primary files at the
+verified commit and to the commit itself, derived from the actual Git remote.
+Each full URL appears on its own line so it is clickable in plain-text email.
+Private repository links keep their existing access controls. A local path or
+commit hash alone is not a sufficient result link.
 
 Open **Workflows → email-trigger-agents** in the console to see the email
 trigger, agent action, and completion email. Agent actions can also run
