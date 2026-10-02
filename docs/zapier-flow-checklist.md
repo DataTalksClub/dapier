@@ -155,7 +155,7 @@ Source: Zap `110871466`; draft: `youtube-slack`.
 - [x] Verify Slack channel access and `chat:write.customize` permission through read-only provider requests.
 - [ ] Confirm exact message spacing and approve WebSub delivery as the adjustment from polling.
 - [x] Post exactly one synthetic message; verify channel, title, URL and link preview against Slack history.
-- [ ] Verify a safe future message displays `YouTube`; scope is now present, but no new message was posted to prove rendering.
+- [x] Verify a synthetic message displays `YouTube` in the explicitly authorized `#integration_test` channel; production destination unchanged.
 - [ ] Agree on cutover and verify a new video notification once.
 
 Provider checks (2026-10-02): Slack token verification passed for DataTalks.Club (`T01ATQK62F8`); posting and preview were verified by the CLI fallback below; custom-name verification remains failed. YouTube live identity verification passed for DataTalksClub (`UCDvErgK0j5ur3aLgn6U-LqQ`) using the stored readonly connection. Chrome renewal outcome is unconfirmed: the UI still requests reconnection and no recent callback audit record was returned. No account binding was changed.
@@ -186,7 +186,7 @@ Cleanup: the isolated `invoice-receipt-integration-test` hook and the two manage
 
 Integration fix deployment: [CI/deploy run 37057902392](https://github.com/DataTalksClub/dapier/actions/runs/37057902392), commit `5218b08`, passed tests, designer checks and deployed before the successful intake-only verifications above. Domain bookkeeping/review remains in DataOps.
 
-Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery and custom Slack-name rendering await a safe future event. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Original Zapier timezone, attachment/collision and MIME semantics remain separate comparisons.
+Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery awaits a future event; the authorized isolated custom-name smoke passed. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Original Zapier timezone, attachment/collision and MIME semantics remain separate comparisons.
 
 For implementation details and unresolved source semantics, see
 [the migration plan](zapier-migration-plan.md#adjustments-and-remaining-source-provider-checks).
@@ -240,7 +240,35 @@ No public Slack post or additional invoice archive/move was performed.
 Current outcome: mailing backup, email TODO, native Telegram text/empty-text
 handling, actual Gmail invoice ingress and isolated automatic Dropbox polling
 have provider evidence. Catch-hook compatibility and retry mechanics were
-verified synthetically. Slack custom-name permission is present; future rendered
-name and actual new-video trigger remain pending. Production Dropbox migration
+verified synthetically. Slack custom-name permission is present; custom-name rendering passed in the authorized test channel, while the actual
+new-video trigger remains pending. Production Dropbox migration
 and source-semantic comparisons remain unchecked above. DataOps accepted the
 invoice receipts as `needs-review`; bookkeeping completion is not claimed.
+
+
+Authorized Slack display-name smoke (2026-10-02): read-only provider calls
+resolved `#integration_test` to `C01S3EGKMJP`, confirmed the existing bot is a
+member and the channel is active. The tester used an unpublished, unsaved
+workflow with the same YouTube Slack action and `username: YouTube`, changing
+only the synthetic workflow identity and channel destination. Strict dry-run
+passed. Chrome's Run for real confirmation timed out during focus emulation;
+the browser did not provide an execution result. Before fallback, provider
+history contained zero matches for the exact unique title and the run query
+was empty. The initial small-page audit query missed entries; a subsequent
+200-row scan recovered the test entries, so that initial empty audit result
+is not treated as proof of no browser execution.
+
+One explicitly authorized CLI fallback returned Slack timestamp
+`1790975250.233089`. Repeated read-only history checks found exactly one message
+with title `SYNTHETIC TEST Dapier YouTube display name 2026-10-02 02`, username
+`YouTube`, bot `B01S9G1UZJQ`, app `A01S395330A`, channel `C01S3EGKMJP`.
+[Provider permalink](https://datatalks-club.slack.com/archives/C01S3EGKMJP/p1790975250233089).
+Chrome also confirmed the visible YouTube sender, title, link and attachment.
+The audit action in this deployment is `workflow.test` (not `designer_test`);
+its 21:07:30 UTC entry matches the CLI provider receipt. Earlier 21:04:05 and
+21:05:45 entries correspond to dry-run preparation; audit rows do not expose
+request surface or execute mode, so CLI attribution rests on the exact returned
+provider timestamp as well as audit timing. No additional send occurred.
+Production `youtube-slack.yaml` still targets `C01BQC114P2`; no workflow was saved
+or published for the test, and no test grant or managed resource was created.
+Actual new-video-trigger verification remains pending.
