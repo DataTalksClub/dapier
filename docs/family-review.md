@@ -87,3 +87,91 @@ provider registry):
 - Mobile page header keeps the 22px title inside the top bar block (with
   description) instead of repeating it in the canvas — same anatomy, one
   header instance.
+
+## Re-judge (2026-10-03, independent, focus states added)
+
+The independent re-judge at 2adf21a predated the last two commits (the
+standalone-bundle rebuild 187c0a6 and the vendored dakit refresh 45b5721),
+and no earlier round captured keyboard focus. This round re-ran the full
+27-capture matrix (console Home/Workflows/Runs/Connections + standalone
+designer + statically served dataops reference; 1440×900 and 390×844, light
+and dark, open drawers) against tip 45b5721 with freshly verified served
+bytes, plus dedicated focus captures with DOM/pixel evidence.
+
+Harness corrections (screenshot rig only, not the app): the stub server
+double-wrapped the designer-workflows and connections payloads — the real
+API returns `{"workflows": [...]}` / `{"connections": [...]}` (see
+`designer_store.listing.api_list` and `api/overview.py`), so the designer
+now mounts in captures and 187c0a6's claim holds; the rig also gained the
+`/assets/fonts/*` + `/fonts/*` aliases mirroring `api/router.py`, so
+captures render the family typefaces.
+
+Findings, all fixed in this round:
+
+- **Nav-row focus ring was invisible** — computed style said 3px/2px, but
+  the ring's outer band clipped against the zero-padding scroll nav inside
+  the `overflow: hidden` sidebar; dataops renders its ring fully. Nav rows
+  now inset the family ring (`outline-offset: -2px`, family.md's row
+  recipe); pixel-scans confirm the band renders in both themes.
+- **Text controls used a 2px outline with no halo** — replaced with the
+  dataops pair: 3px ring on `:focus-visible`, accent border + `0 0 0 3px`
+  halo on `:focus`; the storage-form textarea's private exception folded
+  into the shared recipe; open-row outlines went 2px → 3px.
+- **The designer bundle still embedded the pre-dea377c dakit base** (2px
+  focus rules overriding the refreshed vendor copy) — 45b5721 refreshed
+  `vendor/dakit.css` without rebuilding; `make designer-console` now
+  rebuilds it (designer.js reproduces byte-for-byte; css carries the 3px
+  recipe), and the designer source's own input rules match the pair above.
+
+Verification: `make test` 3747 passed + 42 subtests; rebuilt bundle clean;
+focus states re-captured with computed-style, DOM-probe, and pixel-scan
+evidence (ring band inside the row in both themes, halo band around the
+focused input); the matrix re-read against the dataops reference confirms
+shell geometry, header anatomy, strips, banded panels, row rhythm, button
+hierarchy, status language, icon strokes, and both palettes unchanged.
+
+**Re-judge verdict: PASS.**
+
+## Re-judge (2026-10-03, independent, focus states added)
+
+The independent re-judge at 2adf21a predated the last two commits (the
+standalone-bundle rebuild 187c0a6 and the vendored dakit refresh 45b5721),
+and no earlier round captured keyboard focus. This round re-ran the full
+27-capture matrix (console Home/Workflows/Runs/Connections + standalone
+designer + statically served dataops reference; 1440×900 and 390×844, light
+and dark, open drawers) against tip 45b5721 with freshly verified served
+bytes, plus dedicated focus captures with DOM/pixel evidence.
+
+Harness corrections (screenshot rig only, not the app): the stub server
+double-wrapped the designer-workflows and connections payloads — the real
+API returns `{"workflows": [...]}` / `{"connections": [...]}` (see
+`designer_store.listing.api_list` and `api/overview.py`), so the designer
+now mounts in captures and 187c0a6's claim holds; the rig also gained the
+`/assets/fonts/*` + `/fonts/*` aliases mirroring `api/router.py`, so
+captures render the family typefaces.
+
+Findings, all fixed in this round:
+
+- **Nav-row focus ring was invisible** — computed style said 3px/2px, but
+  the ring's outer band clipped against the zero-padding scroll nav inside
+  the `overflow: hidden` sidebar; dataops renders its ring fully. Nav rows
+  now inset the family ring (`outline-offset: -2px`, family.md's row
+  recipe); pixel-scans confirm the band renders in both themes.
+- **Text controls used a 2px outline with no halo** — replaced with the
+  dataops pair: 3px ring on `:focus-visible`, accent border + `0 0 0 3px`
+  halo on `:focus`; the storage-form textarea's private exception folded
+  into the shared recipe; open-row outlines went 2px → 3px.
+- **The designer bundle still embedded the pre-dea377c dakit base** (2px
+  focus rules overriding the refreshed vendor copy) — 45b5721 refreshed
+  `vendor/dakit.css` without rebuilding; `make designer-console` now
+  rebuilds it (designer.js reproduces byte-for-byte; css carries the 3px
+  recipe), and the designer source's own input rules match the pair above.
+
+Verification: `make test` 3747 passed + 42 subtests; rebuilt bundle clean;
+focus states re-captured with computed-style, DOM-probe, and pixel-scan
+evidence (ring band inside the row in both themes, halo band around the
+focused input); the matrix re-read against the dataops reference confirms
+shell geometry, header anatomy, strips, banded panels, row rhythm, button
+hierarchy, status language, icon strokes, and both palettes unchanged.
+
+**Re-judge verdict: PASS.**
