@@ -373,6 +373,14 @@ function renderUsage() {
   renderQuota();
 }
 
+/* "202610" reads as machine output; operators get "October 2026". */
+function humanMonth(code) {
+  const m = /^(\d{4})(\d{2})$/.exec(String(code || ''));
+  if (!m) return String(code || 'this month');
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))
+    .toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 /* The monthly task quota (the budget the worker enforces on action steps):
    a status line plus an inline limit editor. Absent payload = metering is
    not wired, so the editor stays hidden rather than pretending to work. */
@@ -385,12 +393,13 @@ function renderQuota() {
   form.hidden = !quota;
   if (!quota) return;
   const used = Number(quota.used) || 0;
+  const period = humanMonth(quota.month);
   if (quota.enabled) {
     const left = quota.remaining;
     line.textContent = `Monthly limit ${quota.limit} — ${used} used`
-      + (left != null ? `, ${left} left this month (${quota.month}).` : ` (${quota.month}).`);
+      + (left != null ? `, ${left} left for ${period}.` : ` for ${period}.`);
   } else {
-    line.textContent = `No monthly limit — ${used} tasks used this month (${quota.month}).`;
+    line.textContent = `No monthly limit — ${used} tasks used in ${period}.`;
   }
   $('#quota-limit').value = quota.enabled ? quota.limit : '';
 }

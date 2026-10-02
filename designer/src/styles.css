@@ -201,6 +201,34 @@ a.brand:hover span:last-child {
   right: var(--dk-space-2);
   top: var(--dk-space-1);
 }
+/* The rail's state chip speaks the family status language: a dot carries the
+   state, the word names it. Off = muted (stopped, safe); Draft/Edited =
+   warning (an unpublished change is waiting). */
+.workflow-disabled::before {
+  border-radius: 50%;
+  content: "";
+  display: inline-block;
+  height: 7px;
+  margin-right: 5px;
+  width: 7px;
+}
+.workflow-disabled.state-off::before { background: var(--dk-text-faint); }
+.workflow-disabled.state-draft { color: var(--dk-warning-text); }
+.workflow-disabled.state-draft::before { background: var(--dk-warning-text); }
+/* The rail's state chip speaks the family status language: a dot carries the
+   state, the word names it. Off = muted (stopped, safe); Draft/Edited =
+   warning (an unpublished change is waiting). */
+.workflow-disabled::before {
+  border-radius: 50%;
+  content: "";
+  display: inline-block;
+  height: 7px;
+  margin-right: 5px;
+  width: 7px;
+}
+.workflow-disabled.state-off::before { background: var(--dk-text-faint); }
+.workflow-disabled.state-draft { color: var(--dk-warning-text); }
+.workflow-disabled.state-draft::before { background: var(--dk-warning-text); }
 
 .git-foot {
   align-items: center;
@@ -361,7 +389,63 @@ a.brand:hover span:last-child {
   gap: 6px;
   margin-right: 4px;
   white-space: nowrap;
+
+
+/* The workflow's On/Off reads as the console's switch: same 34px track,
+   token colors, knob slides. */
+.check-label.enabled-toggle input {
+  appearance: none;
+  background: var(--dk-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  transition: background .15s ease;
+  width: 34px;
+
+
+/* The workflow's On/Off reads as the console's switch: same 34px track,
+   token colors, knob slides. */
+.check-label.enabled-toggle input {
+  appearance: none;
+  background: var(--dk-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  transition: background .15s ease;
+  width: 34px;
 }
+.check-label.enabled-toggle input::before {
+  background: var(--dk-bg-surface);
+  border-radius: 50%;
+  content: "";
+  height: 16px;
+  left: 2px;
+  position: absolute;
+  top: 2px;
+  transition: transform .15s ease;
+  width: 16px;
+}
+.check-label.enabled-toggle input:checked { background: var(--dk-accent-default); }
+.check-label.enabled-toggle input:checked::before { transform: translateX(14px); }
+.check-label.enabled-toggle input:disabled { cursor: default; opacity: .5; }}
+.check-label.enabled-toggle input::before {
+  background: var(--dk-bg-surface);
+  border-radius: 50%;
+  content: "";
+  height: 16px;
+  left: 2px;
+  position: absolute;
+  top: 2px;
+  transition: transform .15s ease;
+  width: 16px;
+}
+.check-label.enabled-toggle input:checked { background: var(--dk-accent-default); }
+.check-label.enabled-toggle input:checked::before { transform: translateX(14px); }
+.check-label.enabled-toggle input:disabled { cursor: default; opacity: .5; }}
 
 .status-message {
   align-items: center;

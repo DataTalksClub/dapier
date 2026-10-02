@@ -23439,9 +23439,9 @@
                     summary.actionCount === 1 ? "" : "s"
                   ] })
                 ] }),
-                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Off" }),
-                summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Draft" }),
-                summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled", children: "Edited" })
+                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-off", children: "Off" }),
+                summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Draft" }),
+                summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Edited" })
               ]
             },
             summary.source
@@ -23600,7 +23600,7 @@
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "dk-button dk-button--primary",
+                className: dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary",
                 type: "button",
                 onClick: save,
                 disabled: hookBacked || status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,

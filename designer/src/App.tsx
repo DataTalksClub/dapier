@@ -1901,9 +1901,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                   {connectorLabel(summary.connector)}/{summary.event} · {summary.actionCount} action{summary.actionCount === 1 ? "" : "s"}
                 </span>
               </span>
-              {!summary.enabled && <span className="workflow-disabled">Off</span>}
-              {summary.published === false && <span className="workflow-disabled">Draft</span>}
-              {summary.published !== false && summary.has_draft && <span className="workflow-disabled">Edited</span>}
+              {!summary.enabled && <span className="workflow-disabled state-off">Off</span>}
+              {summary.published === false && <span className="workflow-disabled state-draft">Draft</span>}
+              {summary.published !== false && summary.has_draft && <span className="workflow-disabled state-draft">Edited</span>}
             </button>
           ))}
           {summaries.length === 0 && <p className="inspector-hint">No workflows found.</p>}
@@ -2058,7 +2058,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <span>Revert</span>
             </button>
             <button
-              className="dk-button dk-button--primary"
+              className={dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary"}
               type="button"
               onClick={save}
               disabled={hookBacked || status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}
