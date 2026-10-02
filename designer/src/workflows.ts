@@ -61,7 +61,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
 
 export function orderedWorkflow(workflow: Workflow): Workflow {
-  const source = workflow as Record<string, unknown>;
+  const source = workflow as unknown as Record<string, unknown>;
   const ordered: Record<string, unknown> = {};
   for (const key of WORKFLOW_KEY_ORDER) {
     if (source[key] !== undefined) ordered[key] = source[key];
@@ -69,7 +69,7 @@ export function orderedWorkflow(workflow: Workflow): Workflow {
   for (const [key, value] of Object.entries(source)) {
     if (!(key in ordered)) ordered[key] = value;
   }
-  return ordered as Workflow;
+  return ordered as unknown as Workflow;
 }
 
 /** Every entry point of a workflow: its `triggers` list or single `trigger`. */
