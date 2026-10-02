@@ -95,7 +95,7 @@ def test_dry_run_reports_filter_mismatch(no_runners):
     assert [step["ok"] for step in report["steps"]] == [True, True]
 
 
-def test_dry_run_flags_unsupported_actions_and_bad_templates(no_runners):
+def test_dry_run_flags_unsupported_actions_and_matches_runtime_missing_fields(no_runners):
     workflow = {**WORKFLOW, "actions": [
         {"id": "weird", "type": "mystery_action", "x": "{title}"},
         {"id": "broken", "type": "slack", "channel": "#c", "text": "{title.missing}"},
@@ -105,8 +105,9 @@ def test_dry_run_flags_unsupported_actions_and_bad_templates(no_runners):
     assert report["steps"][0]["ok"] is False
     assert report["steps"][0]["error"] == "unsupported action: mystery_action"
     assert report["steps"][0]["rendered_input"]["x"] == "Dry-run demo"
-    assert report["steps"][1]["ok"] is False
-    assert "template error" in report["steps"][1]["error"]
+    # Runtime dotted-path resolution renders missing values empty; preview must agree.
+    assert report["steps"][1]["ok"] is True
+    assert report["steps"][1]["rendered_input"]["text"] == ""
 
 
 def test_dry_run_uses_inline_actions(no_runners):

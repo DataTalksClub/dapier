@@ -306,7 +306,7 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
     const holder = field.group ? action[field.group] : action;
     const value = isRecord(holder) ? holder[field.key] : undefined;
     if (field.type === "json") {
-      if (value !== undefined) fields[field.key] = JSON.stringify(value, null, 2);
+      if (value !== undefined) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
       continue;
     }
     if (field.type === "yaml") {

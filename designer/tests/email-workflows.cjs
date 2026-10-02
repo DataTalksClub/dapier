@@ -91,3 +91,13 @@ test('Invalid JSON rows are rejected before saving', async () => {
   const result = workflowFromShapes(shapes, original.id, true, original);
   assert.ok(result.problems.some(problem => problem.includes('valid JSON')));
 });
+
+test('Legacy JSON-text rows remain editable as structured rows', async () => {
+  const { workflowFromShapes, shapesFromWorkflow } = await converters;
+  const original = emailWorkflow();
+  original.actions = [{ id: 'row', type: 'sheets_append_row', connection_id: 'google-sheets',
+    spreadsheet_id: 'workbook', values: '[["task", "NEW"]]' }];
+  const result = workflowFromShapes(shapesFromWorkflow(original), original.id, true, original);
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.workflow.actions[0].values, [['task', 'NEW']]);
+});

@@ -20552,7 +20552,7 @@
       const holder = field.group ? action[field.group] : action;
       const value = isRecord(holder) ? holder[field.key] : void 0;
       if (field.type === "json") {
-        if (value !== void 0) fields[field.key] = JSON.stringify(value, null, 2);
+        if (value !== void 0) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
         continue;
       }
       if (field.type === "yaml") {

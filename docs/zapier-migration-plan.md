@@ -207,6 +207,8 @@ it from being picked up again there.
   to download the missing original path.
 - `sheets_append_row.sheet_id` selects the numeric worksheet ID and resolves
   its current title; it overrides `sheet_name` and survives tab renames.
+- Structured Sheets rows and S3 source references can be edited as JSON in
+  the designer and remain objects/arrays when saved through the shared API.
 - `slack.username`, `link_names` and `reply_broadcast` expose the corresponding
   provider options. A modern Slack app needs `chat:write.customize` for a
   display-name override, as described in the
@@ -263,7 +265,8 @@ undisclosed error-ratio threshold.
 Synthetic events live in `workflows/zapier/fixtures/`. Acceptance tests cover
 filenames, unchanged bytes, exact resource IDs, dates, Slack request options,
 worksheet rename handling, CLI/API draft saving and failure recovery after file
-moves.
+moves. Successful file steps stay deduplicated after their leases expire,
+and retries restore saved outputs for downstream path templates.
 
 Before cutover:
 

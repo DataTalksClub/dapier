@@ -16,9 +16,9 @@ reserved for real trigger traffic.
 
 Templating mirrors the action runners: ``{token}`` fields format against the
 sample event's data (missing tokens render empty, like ``_SafeFormat``).
-Accumulated outputs are exposed under each step's action id; the engine
-today passes only the event data forward, so the event data is the faithful
-template source. Because missing tokens render empty, the dry-run re-checks
+Templates use the same event and previous-step context as execution. Pure
+date/time outputs are previewed; outputs requiring provider calls remain
+unresolved until supplied through a per-step test. Because missing tokens render empty, the dry-run re-checks
 each rendered step against the registry's field rules (save time only sees
 the literal): required fields that render empty and typed fields that render
 implausible values are reported as step ``warnings`` — fatal under
@@ -91,23 +91,6 @@ def normalize_sample_event(sample, workflow):
         "occurred_at": str(sample.get("occurred_at") or datetime.now(timezone.utc).isoformat()),
         "data": data,
     }
-
-
-class _SafeContext(dict):
-    """format_map context: unknown tokens render empty, like the runners."""
-
-    def __missing__(self, key):
-        return ""
-
-
-def _render_value(value, context):
-    if isinstance(value, str):
-        return value.format_map(_SafeContext(context))
-    if isinstance(value, dict):
-        return {key: _render_value(item, context) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_render_value(item, context) for item in value]
-    return value
 
 
 def _resolved_or_error(workflow):
