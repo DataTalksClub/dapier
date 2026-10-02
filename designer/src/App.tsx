@@ -1288,6 +1288,30 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
   }
 
+  /** Revert: throw unsaved edits away and reload the workflow as the server
+      has it — the saved draft when one exists, else the live version. A
+      never-saved workflow goes back to the blank new canvas. A client-side
+      reload only: no server state changes, unlike Discard draft. */
+  async function revertChanges() {
+    if (!dirty || status.kind === "busy") return;
+    if (!sourceName) {
+      newWorkflow();
+      return;
+    }
+    if (!window.confirm("Revert unsaved changes? The canvas goes back to the last saved state.")) return;
+    const summary = summaries.find((item) => item.source === sourceName) ?? {
+      id: workflowId,
+      enabled: true,
+      source: sourceName,
+      connector: "",
+      event: "",
+      actionCount: 0,
+      published: !draftInfo,
+      has_draft: !!draftInfo,
+    };
+    await openWorkflow(summary);
+  }
+
   async function leaveAfterSave() {
     if (await save()) resolveLeave(true);
   }
@@ -2024,6 +2048,15 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span>Discard draft</span>
               </button>
             )}
+            <button
+              className="dk-button dk-button--secondary"
+              type="button"
+              onClick={revertChanges}
+              disabled={hookBacked || status.kind === "busy" || !dirty}
+              title={hookBacked ? "Runs from its trigger — read-only" : "Throw unsaved changes away — back to the last saved state"}
+            >
+              <span>Revert</span>
+            </button>
             <button
               className="dk-button dk-button--primary"
               type="button"

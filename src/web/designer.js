@@ -22858,6 +22858,25 @@
         setStatus({ kind: "error", message: String(error) });
       }
     }
+    async function revertChanges() {
+      if (!dirty || status.kind === "busy") return;
+      if (!sourceName) {
+        newWorkflow();
+        return;
+      }
+      if (!window.confirm("Revert unsaved changes? The canvas goes back to the last saved state.")) return;
+      const summary = summaries.find((item) => item.source === sourceName) ?? {
+        id: workflowId,
+        enabled: true,
+        source: sourceName,
+        connector: "",
+        event: "",
+        actionCount: 0,
+        published: !draftInfo,
+        has_draft: !!draftInfo
+      };
+      await openWorkflow(summary);
+    }
     async function leaveAfterSave() {
       if (await save()) resolveLeave(true);
     }
@@ -23565,6 +23584,17 @@
                 disabled: status.kind === "busy",
                 title: "Throw the saved draft away — the live workflow is untouched",
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                onClick: revertChanges,
+                disabled: hookBacked || status.kind === "busy" || !dirty,
+                title: hookBacked ? "Runs from its trigger — read-only" : "Throw unsaved changes away — back to the last saved state",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Revert" })
               }
             ),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
