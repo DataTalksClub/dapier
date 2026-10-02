@@ -675,10 +675,13 @@ select {
 
 select {
   appearance: none;
-  padding-right: 30px;
+  /* Dakit's shared dropdown geometry (css/base.css): the chevron sits one
+     --dk-space-3 off the edge, text clears it. The designer reads tokens
+     only, so it carries the values rather than the base rule. */
+  padding-right: calc(2 * var(--dk-space-3) + 10px);
   background-image: var(--select-chevron);
   background-repeat: no-repeat;
-  background-position: right 10px center;
+  background-position: right var(--dk-space-3) center;
   cursor: pointer;
 }
 

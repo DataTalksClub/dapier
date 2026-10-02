@@ -4,15 +4,14 @@
    --dk-* tokens only; app-specific layout stays here, shared look comes
    from the tokens (see dakit/docs/adoption.md for the dapier remap). */
 
-/* The select chevron is an image, so its ink color tracks the theme here. */
+/* color-scheme is pinned here so form controls follow the theme even
+   before dakit's token remap; the dropdown chevron ships in the bundle. */
 :root {
   color-scheme: light;
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2357606a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239198a1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .mono { font-family: var(--dk-font-mono); }
@@ -112,14 +111,7 @@ input, select {
   color: var(--dk-text-primary);
 }
 input::placeholder { color: var(--dk-text-muted); opacity: 1; }
-select {
-  appearance: none;
-  padding-right: 34px;
-  background-image: var(--select-chevron);
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  cursor: pointer;
-}
+/* Chevron, offset and clearance come from the dakit bundle's base layer. */
 select:hover:not(:disabled) { border-color: var(--dk-text-muted); }
 select:disabled { opacity: .5; cursor: default; }
 input:focus-visible, select:focus-visible, select:focus { outline: 2px solid var(--dk-focus-ring); outline-offset: 0; border-color: var(--dk-accent-default); }
