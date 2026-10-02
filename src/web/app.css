@@ -67,6 +67,7 @@ td.select-col { padding-top: 10px; }
 }
 .icon-button:hover { border-color: var(--dk-text-muted); background: var(--dk-bg-muted); color: var(--dk-text-primary); }
 .icon-button svg { width: 16px; height: 16px; }
+svg.icon { width: 16px; height: 16px; flex: none; }
 
 .text-link {
   display: inline-flex;

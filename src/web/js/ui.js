@@ -1,9 +1,10 @@
 /* DOM helpers, screens, notices, and brand marks. */
+import { mountIcons } from './icons.js';
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 export function icons() {
-  if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.5 } });
+  mountIcons();
 }
 
 export function showLogin() {
