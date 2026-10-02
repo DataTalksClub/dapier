@@ -270,3 +270,10 @@ supported `attachment` document kind. `recipient_route` selects a configured
 DataOps route and defaults to `invoice` for Dropbox events. This setting is
 available in the designer and in workflow YAML saved through the CLI/API.
 DataOps owns invoice processing and review after accepting the document.
+
+### Trigger retry state and cleanup
+
+Authenticated webhook retry claims and poll deletion use the cursor table.
+The API role can write only `poll#*`, `seen#poll#*` and `seen#hook#*` keys.
+Poll deletion retains its trigger record when cursor cleanup fails, so the
+operator can retry deletion after fixing the failure.

@@ -275,6 +275,15 @@ Resources:
         # The overview reads consecutive-failure counts from this table.
         - DynamoDBReadPolicy:
             TableName: !Ref CursorsTable
+        # Operator teardown and authenticated hook retry claims share this
+        # table. Keep writes within trigger cursor/seen keys.
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
+            Resource: !GetAtt CursorsTable.Arn
+            Condition:
+              ForAllValues:StringLike:
+                dynamodb:LeadingKeys: ['poll#*', 'seen#poll#*', 'seen#hook#*']
         - Statement:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]

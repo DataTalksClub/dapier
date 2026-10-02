@@ -408,6 +408,20 @@ class PollApiTests(unittest.TestCase):
             poll_triggers.api_delete("missing", "op@example.test",
                                      table_ref=self.polls, events_client=self.events)
 
+    def test_failed_cursor_cleanup_keeps_trigger_for_retry(self):
+        self.save(trigger_body())
+        with patch.object(self.cursors, "delete_item", side_effect=RuntimeError("denied")):
+            with self.assertRaisesRegex(RuntimeError, "denied"):
+                poll_triggers.api_delete(
+                    "drive-updates", "op@example.test", table_ref=self.polls,
+                    cursor_table_ref=self.cursors, events_client=self.events)
+        self.assertIn("drive-updates", self.polls.items)
+        status, _ = poll_triggers.api_delete(
+            "drive-updates", "op@example.test", table_ref=self.polls,
+            cursor_table_ref=self.cursors, events_client=self.events)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.polls.items, {})
+
     def test_list_reports_cursor_state(self):
         self.save(trigger_body())
         poll_triggers.put_cursor("drive-updates", "42", table=self.cursors)
