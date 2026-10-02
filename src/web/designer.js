@@ -11212,4 +11212,12703 @@
           if ("function" === typeof value) {
             domElement.setAttribute(
               key,
-              "javascript:throw new Error('A React form was u
+              "javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"
+            );
+            break;
+          } else
+            "function" === typeof prevValue && ("formAction" === key ? ("input" !== tag && setProp(domElement, tag, "name", props.name, props, null), setProp(
+              domElement,
+              tag,
+              "formEncType",
+              props.formEncType,
+              props,
+              null
+            ), setProp(
+              domElement,
+              tag,
+              "formMethod",
+              props.formMethod,
+              props,
+              null
+            ), setProp(
+              domElement,
+              tag,
+              "formTarget",
+              props.formTarget,
+              props,
+              null
+            )) : (setProp(domElement, tag, "encType", props.encType, props, null), setProp(domElement, tag, "method", props.method, props, null), setProp(domElement, tag, "target", props.target, props, null)));
+          if (null == value || "symbol" === typeof value || "boolean" === typeof value) {
+            domElement.removeAttribute(key);
+            break;
+          }
+          value = sanitizeURL(value);
+          domElement.setAttribute(key, value);
+          break;
+        case "onClick":
+          null != value && (domElement.onclick = noop$1);
+          return;
+        case "onScroll":
+          null != value && listenToNonDelegatedEvent("scroll", domElement);
+          return;
+        case "onScrollEnd":
+          null != value && listenToNonDelegatedEvent("scrollend", domElement);
+          return;
+        case "dangerouslySetInnerHTML":
+          if (null != value) {
+            if ("object" !== typeof value || !("__html" in value))
+              throw Error(formatProdErrorMessage(61));
+            key = value.__html;
+            if (null != key) {
+              if (null != props.children) throw Error(formatProdErrorMessage(60));
+              (null != prevValue ? prevValue.__html : void 0) !== key && (domElement.innerHTML = key);
+            }
+          }
+          break;
+        case "multiple":
+          domElement.multiple = value && "function" !== typeof value && "symbol" !== typeof value;
+          break;
+        case "muted":
+          domElement.muted = value && "function" !== typeof value && "symbol" !== typeof value;
+          break;
+        case "suppressContentEditableWarning":
+        case "suppressHydrationWarning":
+        case "defaultValue":
+        case "defaultChecked":
+        case "innerHTML":
+        case "ref":
+          break;
+        case "autoFocus":
+          break;
+        case "xlinkHref":
+          if (null == value || "function" === typeof value || "boolean" === typeof value || "symbol" === typeof value) {
+            domElement.removeAttribute("xlink:href");
+            break;
+          }
+          key = sanitizeURL(value);
+          domElement.setAttributeNS(
+            "http://www.w3.org/1999/xlink",
+            "xlink:href",
+            key
+          );
+          break;
+        case "contentEditable":
+        case "spellCheck":
+        case "draggable":
+        case "value":
+        case "autoReverse":
+        case "externalResourcesRequired":
+        case "focusable":
+        case "preserveAlpha":
+          null != value && "function" !== typeof value && "symbol" !== typeof value ? domElement.setAttribute(key, value) : domElement.removeAttribute(key);
+          break;
+        case "inert":
+        case "allowFullScreen":
+        case "async":
+        case "autoPlay":
+        case "controls":
+        case "credentialless":
+        case "default":
+        case "defer":
+        case "disabled":
+        case "disablePictureInPicture":
+        case "disableRemotePlayback":
+        case "formNoValidate":
+        case "hidden":
+        case "loop":
+        case "noModule":
+        case "noValidate":
+        case "open":
+        case "playsInline":
+        case "readOnly":
+        case "required":
+        case "reversed":
+        case "scoped":
+        case "seamless":
+        case "itemScope":
+          value && "function" !== typeof value && "symbol" !== typeof value ? domElement.setAttribute(key, "") : domElement.removeAttribute(key);
+          break;
+        case "capture":
+        case "download":
+          true === value ? domElement.setAttribute(key, "") : false !== value && null != value && "function" !== typeof value && "symbol" !== typeof value ? domElement.setAttribute(key, value) : domElement.removeAttribute(key);
+          break;
+        case "cols":
+        case "rows":
+        case "size":
+        case "span":
+          null != value && "function" !== typeof value && "symbol" !== typeof value && !isNaN(value) && 1 <= value ? domElement.setAttribute(key, value) : domElement.removeAttribute(key);
+          break;
+        case "rowSpan":
+        case "start":
+          null == value || "function" === typeof value || "symbol" === typeof value || isNaN(value) ? domElement.removeAttribute(key) : domElement.setAttribute(key, value);
+          break;
+        case "popover":
+          listenToNonDelegatedEvent("beforetoggle", domElement);
+          listenToNonDelegatedEvent("toggle", domElement);
+          setValueForAttribute(domElement, "popover", value);
+          break;
+        case "xlinkActuate":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:actuate",
+            value
+          );
+          break;
+        case "xlinkArcrole":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:arcrole",
+            value
+          );
+          break;
+        case "xlinkRole":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:role",
+            value
+          );
+          break;
+        case "xlinkShow":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:show",
+            value
+          );
+          break;
+        case "xlinkTitle":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:title",
+            value
+          );
+          break;
+        case "xlinkType":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/1999/xlink",
+            "xlink:type",
+            value
+          );
+          break;
+        case "xmlBase":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/XML/1998/namespace",
+            "xml:base",
+            value
+          );
+          break;
+        case "xmlLang":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/XML/1998/namespace",
+            "xml:lang",
+            value
+          );
+          break;
+        case "xmlSpace":
+          setValueForNamespacedAttribute(
+            domElement,
+            "http://www.w3.org/XML/1998/namespace",
+            "xml:space",
+            value
+          );
+          break;
+        case "is":
+          setValueForAttribute(domElement, "is", value);
+          break;
+        case "innerText":
+        case "textContent":
+          return;
+        default:
+          if (!(2 < key.length) || "o" !== key[0] && "O" !== key[0] || "n" !== key[1] && "N" !== key[1])
+            key = aliases.get(key) || key, setValueForAttribute(domElement, key, value);
+          else return;
+      }
+      viewTransitionMutationContext = true;
+    }
+    function setPropOnCustomElement(domElement, tag, key, value, props, prevValue) {
+      switch (key) {
+        case "style":
+          setValueForStyles(domElement, value, prevValue);
+          return;
+        case "dangerouslySetInnerHTML":
+          if (null != value) {
+            if ("object" !== typeof value || !("__html" in value))
+              throw Error(formatProdErrorMessage(61));
+            key = value.__html;
+            if (null != key) {
+              if (null != props.children) throw Error(formatProdErrorMessage(60));
+              (null != prevValue ? prevValue.__html : void 0) !== key && (domElement.innerHTML = key);
+            }
+          }
+          break;
+        case "children":
+          if ("string" === typeof value) setTextContent(domElement, value);
+          else if ("number" === typeof value || "bigint" === typeof value)
+            setTextContent(domElement, "" + value);
+          else return;
+          break;
+        case "onScroll":
+          null != value && listenToNonDelegatedEvent("scroll", domElement);
+          return;
+        case "onScrollEnd":
+          null != value && listenToNonDelegatedEvent("scrollend", domElement);
+          return;
+        case "onClick":
+          null != value && (domElement.onclick = noop$1);
+          return;
+        case "suppressContentEditableWarning":
+        case "suppressHydrationWarning":
+        case "innerHTML":
+        case "ref":
+          return;
+        case "innerText":
+        case "textContent":
+          return;
+        default:
+          if (!registrationNameDependencies.hasOwnProperty(key))
+            a: {
+              if ("o" === key[0] && "n" === key[1] && (props = key.endsWith("Capture"), prevValue = key.slice(2, props ? key.length - 7 : void 0), tag = domElement[internalPropsKey] || null, tag = null != tag ? tag[key] : null, "function" === typeof tag && domElement.removeEventListener(prevValue, tag, props), "function" === typeof value)) {
+                "function" !== typeof tag && null !== tag && (key in domElement ? domElement[key] = null : domElement.hasAttribute(key) && domElement.removeAttribute(key));
+                domElement.addEventListener(prevValue, value, props);
+                break a;
+              }
+              viewTransitionMutationContext = true;
+              key in domElement ? domElement[key] = value : true === value ? domElement.setAttribute(key, "") : setValueForAttribute(domElement, key, value);
+            }
+          return;
+      }
+      viewTransitionMutationContext = true;
+    }
+    function setInitialProperties(domElement, tag, props) {
+      switch (tag) {
+        case "div":
+        case "span":
+        case "svg":
+        case "path":
+        case "a":
+        case "g":
+        case "p":
+        case "li":
+          break;
+        case "img":
+          listenToNonDelegatedEvent("error", domElement);
+          listenToNonDelegatedEvent("load", domElement);
+          var hasSrc = false, hasSrcSet = false, propKey;
+          for (propKey in props)
+            if (props.hasOwnProperty(propKey)) {
+              var propValue = props[propKey];
+              if (null != propValue)
+                switch (propKey) {
+                  case "src":
+                    hasSrc = true;
+                    break;
+                  case "srcSet":
+                    hasSrcSet = true;
+                    break;
+                  case "children":
+                  case "dangerouslySetInnerHTML":
+                    throw Error(formatProdErrorMessage(137, tag));
+                  default:
+                    setProp(domElement, tag, propKey, propValue, props, null);
+                }
+            }
+          hasSrcSet && setProp(domElement, tag, "srcSet", props.srcSet, props, null);
+          hasSrc && setProp(domElement, tag, "src", props.src, props, null);
+          return;
+        case "input":
+          listenToNonDelegatedEvent("invalid", domElement);
+          var defaultValue = propKey = propValue = hasSrcSet = null, checked = null, defaultChecked = null;
+          for (hasSrc in props)
+            if (props.hasOwnProperty(hasSrc)) {
+              var propValue$204 = props[hasSrc];
+              if (null != propValue$204)
+                switch (hasSrc) {
+                  case "name":
+                    hasSrcSet = propValue$204;
+                    break;
+                  case "type":
+                    propValue = propValue$204;
+                    break;
+                  case "checked":
+                    checked = propValue$204;
+                    break;
+                  case "defaultChecked":
+                    defaultChecked = propValue$204;
+                    break;
+                  case "value":
+                    propKey = propValue$204;
+                    break;
+                  case "defaultValue":
+                    defaultValue = propValue$204;
+                    break;
+                  case "children":
+                  case "dangerouslySetInnerHTML":
+                    if (null != propValue$204)
+                      throw Error(formatProdErrorMessage(137, tag));
+                    break;
+                  default:
+                    setProp(domElement, tag, hasSrc, propValue$204, props, null);
+                }
+            }
+          initInput(
+            domElement,
+            propKey,
+            defaultValue,
+            checked,
+            defaultChecked,
+            propValue,
+            hasSrcSet,
+            false
+          );
+          return;
+        case "select":
+          listenToNonDelegatedEvent("invalid", domElement);
+          hasSrc = propValue = propKey = null;
+          for (hasSrcSet in props)
+            if (props.hasOwnProperty(hasSrcSet) && (defaultValue = props[hasSrcSet], null != defaultValue))
+              switch (hasSrcSet) {
+                case "value":
+                  propKey = defaultValue;
+                  break;
+                case "defaultValue":
+                  propValue = defaultValue;
+                  break;
+                case "multiple":
+                  hasSrc = defaultValue;
+                default:
+                  setProp(domElement, tag, hasSrcSet, defaultValue, props, null);
+              }
+          tag = propKey;
+          props = propValue;
+          domElement.multiple = !!hasSrc;
+          null != tag ? updateOptions(domElement, !!hasSrc, tag, false) : null != props && updateOptions(domElement, !!hasSrc, props, true);
+          return;
+        case "textarea":
+          listenToNonDelegatedEvent("invalid", domElement);
+          propKey = hasSrcSet = hasSrc = null;
+          for (propValue in props)
+            if (props.hasOwnProperty(propValue) && (defaultValue = props[propValue], null != defaultValue))
+              switch (propValue) {
+                case "value":
+                  hasSrc = defaultValue;
+                  break;
+                case "defaultValue":
+                  hasSrcSet = defaultValue;
+                  break;
+                case "children":
+                  propKey = defaultValue;
+                  break;
+                case "dangerouslySetInnerHTML":
+                  if (null != defaultValue) throw Error(formatProdErrorMessage(91));
+                  break;
+                default:
+                  setProp(domElement, tag, propValue, defaultValue, props, null);
+              }
+          initTextarea(domElement, hasSrc, hasSrcSet, propKey);
+          return;
+        case "option":
+          for (checked in props)
+            if (props.hasOwnProperty(checked) && (hasSrc = props[checked], null != hasSrc))
+              switch (checked) {
+                case "selected":
+                  domElement.selected = hasSrc && "function" !== typeof hasSrc && "symbol" !== typeof hasSrc;
+                  break;
+                default:
+                  setProp(domElement, tag, checked, hasSrc, props, null);
+              }
+          return;
+        case "dialog":
+          listenToNonDelegatedEvent("beforetoggle", domElement);
+          listenToNonDelegatedEvent("toggle", domElement);
+          listenToNonDelegatedEvent("cancel", domElement);
+          listenToNonDelegatedEvent("close", domElement);
+          break;
+        case "iframe":
+        case "object":
+          listenToNonDelegatedEvent("load", domElement);
+          break;
+        case "video":
+        case "audio":
+          for (hasSrc = 0; hasSrc < mediaEventTypes.length; hasSrc++)
+            listenToNonDelegatedEvent(mediaEventTypes[hasSrc], domElement);
+          break;
+        case "image":
+          listenToNonDelegatedEvent("error", domElement);
+          listenToNonDelegatedEvent("load", domElement);
+          break;
+        case "details":
+          listenToNonDelegatedEvent("toggle", domElement);
+          break;
+        case "embed":
+        case "source":
+        case "link":
+          listenToNonDelegatedEvent("error", domElement), listenToNonDelegatedEvent("load", domElement);
+        case "area":
+        case "base":
+        case "br":
+        case "col":
+        case "hr":
+        case "keygen":
+        case "meta":
+        case "param":
+        case "track":
+        case "wbr":
+        case "menuitem":
+          for (defaultChecked in props)
+            if (props.hasOwnProperty(defaultChecked) && (hasSrc = props[defaultChecked], null != hasSrc))
+              switch (defaultChecked) {
+                case "children":
+                case "dangerouslySetInnerHTML":
+                  throw Error(formatProdErrorMessage(137, tag));
+                default:
+                  setProp(domElement, tag, defaultChecked, hasSrc, props, null);
+              }
+          return;
+        default:
+          if (isCustomElement(tag)) {
+            for (propValue$204 in props)
+              props.hasOwnProperty(propValue$204) && (hasSrc = props[propValue$204], void 0 !== hasSrc && setPropOnCustomElement(
+                domElement,
+                tag,
+                propValue$204,
+                hasSrc,
+                props,
+                void 0
+              ));
+            return;
+          }
+      }
+      for (defaultValue in props)
+        props.hasOwnProperty(defaultValue) && (hasSrc = props[defaultValue], null != hasSrc && setProp(domElement, tag, defaultValue, hasSrc, props, null));
+    }
+    var emptyProps = {};
+    function updateProperties(domElement, tag, lastProps, nextProps) {
+      switch (tag) {
+        case "div":
+        case "span":
+        case "svg":
+        case "path":
+        case "a":
+        case "g":
+        case "p":
+        case "li":
+          break;
+        case "input":
+          var name = null, type2 = null, value = null, defaultValue = null, lastDefaultValue = null, checked = null, defaultChecked = null;
+          for (propKey in lastProps) {
+            var lastProp = lastProps[propKey];
+            if (lastProps.hasOwnProperty(propKey) && null != lastProp)
+              switch (propKey) {
+                case "checked":
+                  break;
+                case "value":
+                  break;
+                case "defaultValue":
+                  lastDefaultValue = lastProp;
+                default:
+                  nextProps.hasOwnProperty(propKey) || setProp(domElement, tag, propKey, null, nextProps, lastProp);
+              }
+          }
+          for (var propKey$221 in nextProps) {
+            var propKey = nextProps[propKey$221];
+            lastProp = lastProps[propKey$221];
+            if (nextProps.hasOwnProperty(propKey$221) && (null != propKey || null != lastProp))
+              switch (propKey$221) {
+                case "type":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  type2 = propKey;
+                  break;
+                case "name":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  name = propKey;
+                  break;
+                case "checked":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  checked = propKey;
+                  break;
+                case "defaultChecked":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  defaultChecked = propKey;
+                  break;
+                case "value":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  value = propKey;
+                  break;
+                case "defaultValue":
+                  propKey !== lastProp && (viewTransitionMutationContext = true);
+                  defaultValue = propKey;
+                  break;
+                case "children":
+                case "dangerouslySetInnerHTML":
+                  if (null != propKey)
+                    throw Error(formatProdErrorMessage(137, tag));
+                  break;
+                default:
+                  propKey !== lastProp && setProp(
+                    domElement,
+                    tag,
+                    propKey$221,
+                    propKey,
+                    nextProps,
+                    lastProp
+                  );
+              }
+          }
+          updateInput(
+            domElement,
+            value,
+            defaultValue,
+            lastDefaultValue,
+            checked,
+            defaultChecked,
+            type2,
+            name
+          );
+          return;
+        case "select":
+          propKey = value = defaultValue = propKey$221 = null;
+          for (type2 in lastProps)
+            if (lastDefaultValue = lastProps[type2], lastProps.hasOwnProperty(type2) && null != lastDefaultValue)
+              switch (type2) {
+                case "value":
+                  break;
+                case "multiple":
+                  propKey = lastDefaultValue;
+                default:
+                  nextProps.hasOwnProperty(type2) || setProp(
+                    domElement,
+                    tag,
+                    type2,
+                    null,
+                    nextProps,
+                    lastDefaultValue
+                  );
+              }
+          for (name in nextProps)
+            if (type2 = nextProps[name], lastDefaultValue = lastProps[name], nextProps.hasOwnProperty(name) && (null != type2 || null != lastDefaultValue))
+              switch (name) {
+                case "value":
+                  type2 !== lastDefaultValue && (viewTransitionMutationContext = true);
+                  propKey$221 = type2;
+                  break;
+                case "defaultValue":
+                  type2 !== lastDefaultValue && (viewTransitionMutationContext = true);
+                  defaultValue = type2;
+                  break;
+                case "multiple":
+                  type2 !== lastDefaultValue && (viewTransitionMutationContext = true), value = type2;
+                default:
+                  type2 !== lastDefaultValue && setProp(
+                    domElement,
+                    tag,
+                    name,
+                    type2,
+                    nextProps,
+                    lastDefaultValue
+                  );
+              }
+          tag = defaultValue;
+          lastProps = value;
+          nextProps = propKey;
+          null != propKey$221 ? updateOptions(domElement, !!lastProps, propKey$221, false) : !!nextProps !== !!lastProps && (null != tag ? updateOptions(domElement, !!lastProps, tag, true) : updateOptions(domElement, !!lastProps, lastProps ? [] : "", false));
+          return;
+        case "textarea":
+          propKey = propKey$221 = null;
+          for (defaultValue in lastProps)
+            if (name = lastProps[defaultValue], lastProps.hasOwnProperty(defaultValue) && null != name && !nextProps.hasOwnProperty(defaultValue))
+              switch (defaultValue) {
+                case "value":
+                  break;
+                case "children":
+                  break;
+                default:
+                  setProp(domElement, tag, defaultValue, null, nextProps, name);
+              }
+          for (value in nextProps)
+            if (name = nextProps[value], type2 = lastProps[value], nextProps.hasOwnProperty(value) && (null != name || null != type2))
+              switch (value) {
+                case "value":
+                  name !== type2 && (viewTransitionMutationContext = true);
+                  propKey$221 = name;
+                  break;
+                case "defaultValue":
+                  name !== type2 && (viewTransitionMutationContext = true);
+                  propKey = name;
+                  break;
+                case "children":
+                  break;
+                case "dangerouslySetInnerHTML":
+                  if (null != name) throw Error(formatProdErrorMessage(91));
+                  break;
+                default:
+                  name !== type2 && setProp(domElement, tag, value, name, nextProps, type2);
+              }
+          updateTextarea(domElement, propKey$221, propKey);
+          return;
+        case "option":
+          for (var propKey$237 in lastProps)
+            if (propKey$221 = lastProps[propKey$237], lastProps.hasOwnProperty(propKey$237) && null != propKey$221 && !nextProps.hasOwnProperty(propKey$237))
+              switch (propKey$237) {
+                case "selected":
+                  domElement.selected = false;
+                  break;
+                default:
+                  setProp(
+                    domElement,
+                    tag,
+                    propKey$237,
+                    null,
+                    nextProps,
+                    propKey$221
+                  );
+              }
+          for (lastDefaultValue in nextProps)
+            if (propKey$221 = nextProps[lastDefaultValue], propKey = lastProps[lastDefaultValue], nextProps.hasOwnProperty(lastDefaultValue) && propKey$221 !== propKey && (null != propKey$221 || null != propKey))
+              switch (lastDefaultValue) {
+                case "selected":
+                  propKey$221 !== propKey && (viewTransitionMutationContext = true);
+                  domElement.selected = propKey$221 && "function" !== typeof propKey$221 && "symbol" !== typeof propKey$221;
+                  break;
+                default:
+                  setProp(
+                    domElement,
+                    tag,
+                    lastDefaultValue,
+                    propKey$221,
+                    nextProps,
+                    propKey
+                  );
+              }
+          return;
+        case "img":
+        case "link":
+        case "area":
+        case "base":
+        case "br":
+        case "col":
+        case "embed":
+        case "hr":
+        case "keygen":
+        case "meta":
+        case "param":
+        case "source":
+        case "track":
+        case "wbr":
+        case "menuitem":
+          for (var propKey$242 in lastProps)
+            propKey$221 = lastProps[propKey$242], lastProps.hasOwnProperty(propKey$242) && null != propKey$221 && !nextProps.hasOwnProperty(propKey$242) && setProp(domElement, tag, propKey$242, null, nextProps, propKey$221);
+          for (checked in nextProps)
+            if (propKey$221 = nextProps[checked], propKey = lastProps[checked], nextProps.hasOwnProperty(checked) && propKey$221 !== propKey && (null != propKey$221 || null != propKey))
+              switch (checked) {
+                case "children":
+                case "dangerouslySetInnerHTML":
+                  if (null != propKey$221)
+                    throw Error(formatProdErrorMessage(137, tag));
+                  break;
+                default:
+                  setProp(
+                    domElement,
+                    tag,
+                    checked,
+                    propKey$221,
+                    nextProps,
+                    propKey
+                  );
+              }
+          return;
+        default:
+          if (isCustomElement(tag)) {
+            for (var propKey$247 in lastProps)
+              propKey$221 = lastProps[propKey$247], lastProps.hasOwnProperty(propKey$247) && void 0 !== propKey$221 && !nextProps.hasOwnProperty(propKey$247) && setPropOnCustomElement(
+                domElement,
+                tag,
+                propKey$247,
+                void 0,
+                nextProps,
+                propKey$221
+              );
+            for (defaultChecked in nextProps)
+              propKey$221 = nextProps[defaultChecked], propKey = lastProps[defaultChecked], !nextProps.hasOwnProperty(defaultChecked) || propKey$221 === propKey || void 0 === propKey$221 && void 0 === propKey || setPropOnCustomElement(
+                domElement,
+                tag,
+                defaultChecked,
+                propKey$221,
+                nextProps,
+                propKey
+              );
+            return;
+          }
+      }
+      for (var propKey$252 in lastProps)
+        propKey$221 = lastProps[propKey$252], lastProps.hasOwnProperty(propKey$252) && null != propKey$221 && !nextProps.hasOwnProperty(propKey$252) && setProp(domElement, tag, propKey$252, null, nextProps, propKey$221);
+      for (lastProp in nextProps)
+        propKey$221 = nextProps[lastProp], propKey = lastProps[lastProp], !nextProps.hasOwnProperty(lastProp) || propKey$221 === propKey || null == propKey$221 && null == propKey || setProp(domElement, tag, lastProp, propKey$221, nextProps, propKey);
+    }
+    function isLikelyStaticResource(initiatorType) {
+      switch (initiatorType) {
+        case "css":
+        case "script":
+        case "font":
+        case "img":
+        case "image":
+        case "input":
+        case "link":
+          return true;
+        default:
+          return false;
+      }
+    }
+    function estimateBandwidth() {
+      if ("function" === typeof performance.getEntriesByType) {
+        for (var count = 0, bits = 0, resourceEntries = performance.getEntriesByType("resource"), i = 0; i < resourceEntries.length; i++) {
+          var entry = resourceEntries[i], transferSize = entry.transferSize, initiatorType = entry.initiatorType, duration = entry.duration;
+          if (transferSize && duration && isLikelyStaticResource(initiatorType)) {
+            initiatorType = 0;
+            duration = entry.responseEnd;
+            for (i += 1; i < resourceEntries.length; i++) {
+              var overlapEntry = resourceEntries[i], overlapStartTime = overlapEntry.startTime;
+              if (overlapStartTime > duration) break;
+              var overlapTransferSize = overlapEntry.transferSize, overlapInitiatorType = overlapEntry.initiatorType;
+              overlapTransferSize && isLikelyStaticResource(overlapInitiatorType) && (overlapEntry = overlapEntry.responseEnd, initiatorType += overlapTransferSize * (overlapEntry < duration ? 1 : (duration - overlapStartTime) / (overlapEntry - overlapStartTime)));
+            }
+            --i;
+            bits += 8 * (transferSize + initiatorType) / (entry.duration / 1e3);
+            count++;
+            if (10 < count) break;
+          }
+        }
+        if (0 < count) return bits / count / 1e6;
+      }
+      return navigator.connection && (count = navigator.connection.downlink, "number" === typeof count) ? count : 5;
+    }
+    var eventsEnabled = null, selectionInformation = null;
+    function getOwnerDocumentFromRootContainer(rootContainerElement) {
+      return 9 === rootContainerElement.nodeType ? rootContainerElement : rootContainerElement.ownerDocument;
+    }
+    function getOwnHostContext(namespaceURI) {
+      switch (namespaceURI) {
+        case "http://www.w3.org/2000/svg":
+          return 1;
+        case "http://www.w3.org/1998/Math/MathML":
+          return 2;
+        default:
+          return 0;
+      }
+    }
+    function getChildHostContextProd(parentNamespace, type2) {
+      if (0 === parentNamespace)
+        switch (type2) {
+          case "svg":
+            return 1;
+          case "math":
+            return 2;
+          default:
+            return 0;
+        }
+      return 1 === parentNamespace && "foreignObject" === type2 ? 0 : parentNamespace;
+    }
+    function createHoistableInstance(type2, props, rootContainerInstance, internalInstanceHandle) {
+      rootContainerInstance = getOwnerDocumentFromRootContainer(
+        rootContainerInstance
+      ).createElement(type2);
+      rootContainerInstance[internalInstanceKey] = internalInstanceHandle;
+      rootContainerInstance[internalPropsKey] = props;
+      setInitialProperties(rootContainerInstance, type2, props);
+      markNodeAsHoistable(rootContainerInstance);
+      return rootContainerInstance;
+    }
+    function shouldSetTextContent(type2, props) {
+      return "textarea" === type2 || "noscript" === type2 || "string" === typeof props.children || "number" === typeof props.children || "bigint" === typeof props.children || "object" === typeof props.dangerouslySetInnerHTML && null !== props.dangerouslySetInnerHTML && null != props.dangerouslySetInnerHTML.__html;
+    }
+    var currentPopstateTransitionEvent = null;
+    function shouldAttemptEagerTransition() {
+      var event = window.event;
+      if (event && "popstate" === event.type) {
+        if (event === currentPopstateTransitionEvent) return false;
+        currentPopstateTransitionEvent = event;
+        return true;
+      }
+      currentPopstateTransitionEvent = null;
+      return false;
+    }
+    var scheduleTimeout = "function" === typeof setTimeout ? setTimeout : void 0, cancelTimeout = "function" === typeof clearTimeout ? clearTimeout : void 0, localPromise = "function" === typeof Promise ? Promise : void 0, localRequestAnimationFrame = "function" === typeof requestAnimationFrame ? requestAnimationFrame : scheduleTimeout, scheduleMicrotask = "function" === typeof queueMicrotask ? queueMicrotask : "undefined" !== typeof localPromise ? function(callback) {
+      return localPromise.resolve(null).then(callback).catch(handleErrorInNextTick);
+    } : scheduleTimeout;
+    function handleErrorInNextTick(error) {
+      setTimeout(function() {
+        throw error;
+      });
+    }
+    function isSingletonScope(type2) {
+      return "head" === type2;
+    }
+    function clearHydrationBoundary(parentInstance, hydrationInstance) {
+      var node = hydrationInstance, depth = 0;
+      do {
+        var nextNode = node.nextSibling;
+        parentInstance.removeChild(node);
+        if (nextNode && 8 === nextNode.nodeType)
+          if (node = nextNode.data, "/$" === node || "/&" === node) {
+            if (0 === depth) {
+              parentInstance.removeChild(nextNode);
+              retryIfBlockedOn(hydrationInstance);
+              return;
+            }
+            depth--;
+          } else if ("$" === node || "$?" === node || "$~" === node || "$!" === node || "&" === node)
+            depth++;
+          else if ("html" === node)
+            clearSingletonPreambleContribution(
+              parentInstance.ownerDocument.documentElement
+            );
+          else if ("head" === node) {
+            node = parentInstance.ownerDocument.head;
+            clearSingletonPreambleContribution(node);
+            for (var node$jscomp$0 = node.firstChild; node$jscomp$0; ) {
+              var nextNode$jscomp$0 = node$jscomp$0.nextSibling, nodeName = node$jscomp$0.nodeName;
+              node$jscomp$0[internalHoistableMarker] || "SCRIPT" === nodeName || "STYLE" === nodeName || "LINK" === nodeName && "stylesheet" === node$jscomp$0.rel.toLowerCase() || node.removeChild(node$jscomp$0);
+              node$jscomp$0 = nextNode$jscomp$0;
+            }
+          } else
+            "body" === node && clearSingletonPreambleContribution(parentInstance.ownerDocument.body);
+        node = nextNode;
+      } while (node);
+      retryIfBlockedOn(hydrationInstance);
+    }
+    function hideOrUnhideDehydratedBoundary(suspenseInstance, isHidden) {
+      var node = suspenseInstance;
+      suspenseInstance = 0;
+      do {
+        var nextNode = node.nextSibling;
+        1 === node.nodeType ? isHidden ? (node._stashedDisplay = node.style.display, node.style.display = "none") : (node.style.display = node._stashedDisplay || "", "" === node.getAttribute("style") && node.removeAttribute("style")) : 3 === node.nodeType && (isHidden ? (node._stashedText = node.nodeValue, node.nodeValue = "") : node.nodeValue = node._stashedText || "");
+        if (nextNode && 8 === nextNode.nodeType)
+          if (node = nextNode.data, "/$" === node)
+            if (0 === suspenseInstance) break;
+            else suspenseInstance--;
+          else
+            "$" !== node && "$?" !== node && "$~" !== node && "$!" !== node || suspenseInstance++;
+        node = nextNode;
+      } while (node);
+    }
+    function applyViewTransitionName(instance, name, className) {
+      name = CSS.escape(name) !== name ? "r-" + btoa(name).replace(/=/g, "") : name;
+      instance.style.viewTransitionName = name;
+      null != className && (instance.style.viewTransitionClass = className);
+      className = getComputedStyle(instance);
+      if ("inline" === className.display) {
+        name = instance.getClientRects();
+        if (1 === name.length) var JSCompiler_inline_result = 1;
+        else
+          for (var i = JSCompiler_inline_result = 0; i < name.length; i++) {
+            var rect = name[i];
+            0 < rect.width && 0 < rect.height && JSCompiler_inline_result++;
+          }
+        1 === JSCompiler_inline_result && (instance = instance.style, instance.display = 1 === name.length ? "inline-block" : "block", instance.marginTop = "-" + className.paddingTop, instance.marginBottom = "-" + className.paddingBottom);
+      }
+    }
+    function restoreViewTransitionName(instance, props) {
+      instance = instance.style;
+      props = props.style;
+      var viewTransitionName = null != props ? props.hasOwnProperty("viewTransitionName") ? props.viewTransitionName : props.hasOwnProperty("view-transition-name") ? props["view-transition-name"] : null : null;
+      instance.viewTransitionName = null == viewTransitionName || "boolean" === typeof viewTransitionName ? "" : ("" + viewTransitionName).trim();
+      viewTransitionName = null != props ? props.hasOwnProperty("viewTransitionClass") ? props.viewTransitionClass : props.hasOwnProperty("view-transition-class") ? props["view-transition-class"] : null : null;
+      instance.viewTransitionClass = null == viewTransitionName || "boolean" === typeof viewTransitionName ? "" : ("" + viewTransitionName).trim();
+      "inline-block" === instance.display && (null == props ? instance.display = instance.margin = "" : (viewTransitionName = props.display, instance.display = null == viewTransitionName || "boolean" === typeof viewTransitionName ? "" : viewTransitionName, viewTransitionName = props.margin, null != viewTransitionName ? instance.margin = viewTransitionName : (viewTransitionName = props.hasOwnProperty("marginTop") ? props.marginTop : props["margin-top"], instance.marginTop = null == viewTransitionName || "boolean" === typeof viewTransitionName ? "" : viewTransitionName, props = props.hasOwnProperty("marginBottom") ? props.marginBottom : props["margin-bottom"], instance.marginBottom = null == props || "boolean" === typeof props ? "" : props)));
+    }
+    function createMeasurement(rect, computedStyle, element) {
+      element = element.ownerDocument.defaultView;
+      return {
+        rect,
+        abs: "absolute" === computedStyle.position || "fixed" === computedStyle.position,
+        clip: "none" !== computedStyle.clipPath || "visible" !== computedStyle.overflow || "none" !== computedStyle.filter || "none" !== computedStyle.mask || "none" !== computedStyle.mask || "0px" !== computedStyle.borderRadius,
+        view: 0 <= rect.bottom && 0 <= rect.right && rect.top <= element.innerHeight && rect.left <= element.innerWidth
+      };
+    }
+    function measureInstance(instance) {
+      var rect = instance.getBoundingClientRect(), computedStyle = getComputedStyle(instance);
+      return createMeasurement(rect, computedStyle, instance);
+    }
+    function forceLayout(ownerDocument) {
+      return ownerDocument.documentElement.clientHeight;
+    }
+    function waitForImageToLoad(resolve) {
+      this.addEventListener("load", resolve);
+      this.addEventListener("error", resolve);
+    }
+    function startViewTransition(suspendedState, rootContainer, transitionTypes, mutationCallback, layoutCallback, afterMutationCallback, spawnedWorkCallback, passiveCallback, errorCallback) {
+      var ownerDocument = 9 === rootContainer.nodeType ? rootContainer : rootContainer.ownerDocument;
+      try {
+        var transition = ownerDocument.startViewTransition({
+          update: function() {
+            var ownerWindow = ownerDocument.defaultView, pendingNavigation = ownerWindow.navigation && ownerWindow.navigation.transition, previousFontLoadingStatus = ownerDocument.fonts.status;
+            mutationCallback();
+            var blockingPromises = [];
+            "loaded" === previousFontLoadingStatus && (forceLayout(ownerDocument), "loading" === ownerDocument.fonts.status && blockingPromises.push(ownerDocument.fonts.ready));
+            previousFontLoadingStatus = blockingPromises.length;
+            if (null !== suspendedState)
+              for (var suspenseyImages = suspendedState.suspenseyImages, imgBytes = 0, i = 0; i < suspenseyImages.length; i++) {
+                var suspenseyImage = suspenseyImages[i];
+                if (!suspenseyImage.complete) {
+                  var rect = suspenseyImage.getBoundingClientRect();
+                  if (0 < rect.bottom && 0 < rect.right && rect.top < ownerWindow.innerHeight && rect.left < ownerWindow.innerWidth) {
+                    imgBytes += estimateImageBytes(suspenseyImage);
+                    if (imgBytes > estimatedBytesWithinLimit) {
+                      blockingPromises.length = previousFontLoadingStatus;
+                      break;
+                    }
+                    suspenseyImage = new Promise(
+                      waitForImageToLoad.bind(suspenseyImage)
+                    );
+                    blockingPromises.push(suspenseyImage);
+                  }
+                }
+              }
+            if (0 < blockingPromises.length)
+              return ownerWindow = Promise.race([
+                Promise.all(blockingPromises),
+                new Promise(function(resolve) {
+                  return setTimeout(resolve, 500);
+                })
+              ]).then(layoutCallback, layoutCallback), (pendingNavigation ? Promise.allSettled([pendingNavigation.finished, ownerWindow]) : ownerWindow).then(afterMutationCallback, afterMutationCallback);
+            layoutCallback();
+            if (pendingNavigation)
+              return pendingNavigation.finished.then(
+                afterMutationCallback,
+                afterMutationCallback
+              );
+            afterMutationCallback();
+          },
+          types: transitionTypes
+        });
+        ownerDocument.__reactViewTransition = transition;
+        var viewTransitionAnimations = [];
+        transition.ready.then(
+          function() {
+            for (var animations = ownerDocument.documentElement.getAnimations({
+              subtree: true
+            }), i = 0; i < animations.length; i++) {
+              var animation = animations[i], effect = animation.effect, pseudoElement = effect.pseudoElement;
+              if (null != pseudoElement && pseudoElement.startsWith("::view-transition")) {
+                viewTransitionAnimations.push(animation);
+                animation = effect.getKeyframes();
+                for (var height = pseudoElement = void 0, unchangedDimensions = true, j = 0; j < animation.length; j++) {
+                  var keyframe = animation[j], w = keyframe.width;
+                  if (void 0 === pseudoElement) pseudoElement = w;
+                  else if (pseudoElement !== w) {
+                    unchangedDimensions = false;
+                    break;
+                  }
+                  w = keyframe.height;
+                  if (void 0 === height) height = w;
+                  else if (height !== w) {
+                    unchangedDimensions = false;
+                    break;
+                  }
+                  delete keyframe.width;
+                  delete keyframe.height;
+                  "none" === keyframe.transform && delete keyframe.transform;
+                }
+                unchangedDimensions && void 0 !== pseudoElement && void 0 !== height && (effect.setKeyframes(animation), unchangedDimensions = getComputedStyle(
+                  effect.target,
+                  effect.pseudoElement
+                ), unchangedDimensions.width !== pseudoElement || unchangedDimensions.height !== height) && (unchangedDimensions = animation[0], unchangedDimensions.width = pseudoElement, unchangedDimensions.height = height, unchangedDimensions = animation[animation.length - 1], unchangedDimensions.width = pseudoElement, unchangedDimensions.height = height, effect.setKeyframes(animation));
+              }
+            }
+            spawnedWorkCallback();
+          },
+          function(error) {
+            ownerDocument.__reactViewTransition === transition && (ownerDocument.__reactViewTransition = null);
+            try {
+              if ("object" === typeof error && null !== error)
+                switch (error.name) {
+                  case "InvalidStateError":
+                    if ("View transition was skipped because document visibility state is hidden." === error.message || "Skipping view transition because document visibility state has become hidden." === error.message || "Skipping view transition because viewport size changed." === error.message || "Transition was aborted because of invalid state" === error.message)
+                      error = null;
+                }
+              null !== error && errorCallback(error);
+            } finally {
+              mutationCallback(), layoutCallback(), spawnedWorkCallback();
+            }
+          }
+        );
+        transition.finished.finally(function() {
+          for (var i = 0; i < viewTransitionAnimations.length; i++)
+            viewTransitionAnimations[i].cancel();
+          ownerDocument.__reactViewTransition === transition && (ownerDocument.__reactViewTransition = null);
+          passiveCallback();
+        });
+        return transition;
+      } catch (x) {
+        return mutationCallback(), layoutCallback(), spawnedWorkCallback(), null;
+      }
+    }
+    function ViewTransitionPseudoElement(pseudo, name) {
+      this._scope = document.documentElement;
+      this._selector = "::view-transition-" + pseudo + "(" + name + ")";
+    }
+    ViewTransitionPseudoElement.prototype.animate = function(keyframes, options2) {
+      options2 = "number" === typeof options2 ? { duration: options2 } : assign({}, options2);
+      options2.pseudoElement = this._selector;
+      return this._scope.animate(keyframes, options2);
+    };
+    ViewTransitionPseudoElement.prototype.getAnimations = function() {
+      for (var scope = this._scope, selector = this._selector, animations = scope.getAnimations({ subtree: true }), result = [], i = 0; i < animations.length; i++) {
+        var effect = animations[i].effect;
+        null !== effect && effect.target === scope && effect.pseudoElement === selector && result.push(animations[i]);
+      }
+      return result;
+    };
+    ViewTransitionPseudoElement.prototype.getComputedStyle = function() {
+      return getComputedStyle(this._scope, this._selector);
+    };
+    function createViewTransitionInstance(name) {
+      return {
+        name,
+        group: new ViewTransitionPseudoElement("group", name),
+        imagePair: new ViewTransitionPseudoElement("image-pair", name),
+        old: new ViewTransitionPseudoElement("old", name),
+        new: new ViewTransitionPseudoElement("new", name)
+      };
+    }
+    function FragmentInstance(fragmentFiber) {
+      this._fragmentFiber = fragmentFiber;
+      this._observers = this._eventListeners = null;
+    }
+    FragmentInstance.prototype.addEventListener = function(type2, listener, optionsOrUseCapture) {
+      var signal = null, cleanup = null;
+      if (null != optionsOrUseCapture && "boolean" !== typeof optionsOrUseCapture && (signal = optionsOrUseCapture.signal || null, null !== signal && signal.aborted))
+        return;
+      null === this._eventListeners && (this._eventListeners = []);
+      var listeners = this._eventListeners;
+      if (-1 === indexOfEventListener(listeners, type2, listener, optionsOrUseCapture)) {
+        var fragmentInstance = this, attachedListener = listener;
+        null != optionsOrUseCapture && "boolean" !== typeof optionsOrUseCapture && true === optionsOrUseCapture.once && (attachedListener = function(event) {
+          fragmentInstance.removeEventListener(
+            type2,
+            listener,
+            optionsOrUseCapture
+          );
+          "function" === typeof listener ? listener.call(this, event) : listener.handleEvent(event);
+        });
+        null !== signal && (cleanup = fragmentInstance.removeEventListener.bind(
+          fragmentInstance,
+          type2,
+          listener,
+          optionsOrUseCapture
+        ), signal.addEventListener("abort", cleanup, { once: true }), cleanup = signal.removeEventListener.bind(signal, "abort", cleanup));
+        signal = getAttachOptions(optionsOrUseCapture);
+        listeners.push({
+          type: type2,
+          listener,
+          optionsOrUseCapture,
+          attachedListener,
+          cleanup
+        });
+        traverseVisibleInstancesAndTextInstances(
+          this._fragmentFiber.child,
+          false,
+          addEventListenerToChild,
+          type2,
+          attachedListener,
+          signal
+        );
+      }
+      this._eventListeners = listeners;
+    };
+    function addEventListenerToChild(child, type2, listener, optionsOrUseCapture) {
+      getInstanceFromHostFiber(child).addEventListener(
+        type2,
+        listener,
+        optionsOrUseCapture
+      );
+      return false;
+    }
+    FragmentInstance.prototype.removeEventListener = function(type2, listener, optionsOrUseCapture) {
+      var listeners = this._eventListeners;
+      if (null !== listeners && (listener = indexOfEventListener(
+        listeners,
+        type2,
+        listener,
+        optionsOrUseCapture
+      ), -1 !== listener)) {
+        var _listeners$index = listeners[listener];
+        optionsOrUseCapture = _listeners$index.attachedListener;
+        var cleanup = _listeners$index.cleanup;
+        _listeners$index = getAttachOptions(_listeners$index.optionsOrUseCapture);
+        traverseVisibleInstancesAndTextInstances(
+          this._fragmentFiber.child,
+          false,
+          removeEventListenerFromChild,
+          type2,
+          optionsOrUseCapture,
+          _listeners$index
+        );
+        listeners.splice(listener, 1);
+        null !== cleanup && cleanup();
+      }
+    };
+    function removeEventListenerFromChild(child, type2, listener, optionsOrUseCapture) {
+      getInstanceFromHostFiber(child).removeEventListener(
+        type2,
+        listener,
+        optionsOrUseCapture
+      );
+      return false;
+    }
+    function getAttachOptions(opts) {
+      return null != opts && "boolean" !== typeof opts && (true === opts.once || opts.signal instanceof AbortSignal) ? { capture: opts.capture, passive: opts.passive } : opts;
+    }
+    function normalizeListenerOptions(opts) {
+      return null == opts ? "c=0" : "boolean" === typeof opts ? "c=" + (opts ? "1" : "0") : "c=" + (opts.capture ? "1" : "0");
+    }
+    function indexOfEventListener(eventListeners, type2, listener, optionsOrUseCapture) {
+      if (0 === eventListeners.length) return -1;
+      optionsOrUseCapture = normalizeListenerOptions(optionsOrUseCapture);
+      for (var i = 0; i < eventListeners.length; i++) {
+        var item = eventListeners[i];
+        if (item.type === type2 && item.listener === listener && normalizeListenerOptions(item.optionsOrUseCapture) === optionsOrUseCapture)
+          return i;
+      }
+      return -1;
+    }
+    FragmentInstance.prototype.dispatchEvent = function(event) {
+      var parentHostFiber = getFragmentParentInstanceOrContainerFiber(
+        this._fragmentFiber
+      );
+      if (null === parentHostFiber) return true;
+      parentHostFiber = getInstanceFromHostFiber(parentHostFiber);
+      var eventListeners = this._eventListeners;
+      if (null !== eventListeners && 0 < eventListeners.length || !event.bubbles) {
+        var temp = 9 === parentHostFiber.nodeType ? parentHostFiber.createComment("") : document.createTextNode("");
+        if (eventListeners)
+          for (var i = 0; i < eventListeners.length; i++) {
+            var _eventListeners$i = eventListeners[i];
+            temp.addEventListener(
+              _eventListeners$i.type,
+              _eventListeners$i.attachedListener,
+              getAttachOptions(_eventListeners$i.optionsOrUseCapture)
+            );
+          }
+        parentHostFiber.appendChild(temp);
+        event = temp.dispatchEvent(event);
+        if (eventListeners)
+          for (i = 0; i < eventListeners.length; i++)
+            _eventListeners$i = eventListeners[i], temp.removeEventListener(
+              _eventListeners$i.type,
+              _eventListeners$i.attachedListener,
+              getAttachOptions(_eventListeners$i.optionsOrUseCapture)
+            );
+        parentHostFiber.removeChild(temp);
+        return event;
+      }
+      return parentHostFiber.dispatchEvent(event);
+    };
+    FragmentInstance.prototype.focus = function(focusOptions) {
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        true,
+        setFocusOnFiberIfFocusable,
+        focusOptions,
+        void 0,
+        void 0
+      );
+    };
+    function setFocusOnFiberIfFocusable(fiber, focusOptions) {
+      if (6 === fiber.tag) return false;
+      fiber = getInstanceFromHostFiber(fiber);
+      return setFocusIfFocusable(fiber, focusOptions);
+    }
+    FragmentInstance.prototype.focusLast = function(focusOptions) {
+      var children = [];
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        true,
+        collectChildren,
+        children,
+        void 0,
+        void 0
+      );
+      for (var i = children.length - 1; 0 <= i && !setFocusOnFiberIfFocusable(children[i], focusOptions); i--) ;
+    };
+    function collectChildren(child, collection) {
+      collection.push(child);
+      return false;
+    }
+    FragmentInstance.prototype.blur = function() {
+      var parentHostFiber = getFragmentParentInstanceOrContainerFiber(
+        this._fragmentFiber
+      );
+      null !== parentHostFiber && (parentHostFiber = getInstanceFromHostFiber(parentHostFiber), parentHostFiber = getOwnerDocumentFromRootContainer(parentHostFiber).activeElement, null !== parentHostFiber && traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        false,
+        blurActiveElementWithinFragment,
+        parentHostFiber,
+        void 0,
+        void 0
+      ));
+    };
+    function blurActiveElementWithinFragment(child, activeElement2) {
+      if (6 === child.tag) return false;
+      child = getInstanceFromHostFiber(child);
+      return child === activeElement2 || child.contains(activeElement2) ? (activeElement2.blur(), true) : false;
+    }
+    FragmentInstance.prototype.observeUsing = function(observer) {
+      null === this._observers && (this._observers = /* @__PURE__ */ new Set());
+      this._observers.add(observer);
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        false,
+        observeChild,
+        observer,
+        void 0,
+        void 0
+      );
+    };
+    function observeChild(child, observer) {
+      if (6 === child.tag) return false;
+      child = getInstanceFromHostFiber(child);
+      observer.observe(child);
+      return false;
+    }
+    FragmentInstance.prototype.unobserveUsing = function(observer) {
+      var observers = this._observers;
+      if (null !== observers && observers.has(observer)) {
+        observers.delete(observer);
+        traverseVisibleInstancesAndTextInstances(
+          this._fragmentFiber.child,
+          false,
+          unobserveChild,
+          observer,
+          void 0,
+          void 0
+        );
+        for (var i = observers = 0; i < pendingIntersectionUnobserves.length; i++) {
+          var pending = pendingIntersectionUnobserves[i];
+          pending.fragmentInstance === this && pending.observer === observer ? observer.unobserve(pending.instance) : pendingIntersectionUnobserves[observers++] = pending;
+        }
+        pendingIntersectionUnobserves.length = observers;
+      }
+    };
+    function unobserveChild(child, observer) {
+      if (6 === child.tag) return false;
+      child = getInstanceFromHostFiber(child);
+      observer.unobserve(child);
+      return false;
+    }
+    var pendingIntersectionUnobserves = [], intersectionUnobserveScheduled = false;
+    function schedulePendingIntersectionUnobserve(fragmentInstance, observer, instance) {
+      pendingIntersectionUnobserves.push({
+        fragmentInstance,
+        observer,
+        instance
+      });
+      intersectionUnobserveScheduled || (intersectionUnobserveScheduled = true, requestPostPaintCallback(function() {
+        intersectionUnobserveScheduled = false;
+        var pending = pendingIntersectionUnobserves;
+        pendingIntersectionUnobserves = [];
+        for (var i = 0; i < pending.length; i++) {
+          var item = pending[i];
+          item.observer.unobserve(item.instance);
+        }
+      }));
+    }
+    FragmentInstance.prototype.getClientRects = function() {
+      var rects = [];
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        false,
+        collectClientRects,
+        rects,
+        void 0,
+        void 0
+      );
+      return rects;
+    };
+    function collectClientRects(child, rects) {
+      if (6 === child.tag) {
+        child = child.stateNode;
+        var range = child.ownerDocument.createRange();
+        range.selectNodeContents(child);
+        rects.push.apply(rects, range.getClientRects());
+      } else
+        child = getInstanceFromHostFiber(child), rects.push.apply(rects, child.getClientRects());
+      return false;
+    }
+    FragmentInstance.prototype.getRootNode = function(getRootNodeOptions) {
+      var parentHostFiber = getFragmentParentInstanceOrContainerFiber(
+        this._fragmentFiber
+      );
+      return null === parentHostFiber ? this : getInstanceFromHostFiber(parentHostFiber).getRootNode(getRootNodeOptions);
+    };
+    FragmentInstance.prototype.compareDocumentPosition = function(otherNode) {
+      var parentHostFiber = getFragmentParentInstanceOrContainerFiber(
+        this._fragmentFiber
+      );
+      if (null === parentHostFiber) return Node.DOCUMENT_POSITION_DISCONNECTED;
+      var children = [];
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        false,
+        collectChildren,
+        children,
+        void 0,
+        void 0
+      );
+      var parentHostInstance = getInstanceFromHostFiber(parentHostFiber);
+      if (0 === children.length) {
+        children = parentHostInstance;
+        if (fiberIsPortaledIntoHost(this._fragmentFiber)) {
+          a: {
+            for (parentHostFiber = this._fragmentFiber.return; null !== parentHostFiber; ) {
+              if (4 === parentHostFiber.tag) {
+                parentHostFiber = parentHostFiber.stateNode.containerInfo;
+                break a;
+              }
+              if (3 === parentHostFiber.tag || 5 === parentHostFiber.tag || 27 === parentHostFiber.tag)
+                break;
+              parentHostFiber = parentHostFiber.return;
+            }
+            parentHostFiber = null;
+          }
+          null != parentHostFiber && (children = parentHostFiber);
+        }
+        parentHostFiber = this._fragmentFiber;
+        var result = parentHostInstance = children.compareDocumentPosition(otherNode);
+        children === otherNode ? result = Node.DOCUMENT_POSITION_CONTAINS : parentHostInstance & Node.DOCUMENT_POSITION_CONTAINED_BY && (children = getFragmentInstanceOrTextInstanceSiblings(parentHostFiber)[1], null === children ? result = Node.DOCUMENT_POSITION_PRECEDING : (otherNode = getInstanceFromHostFiber(children).compareDocumentPosition(
+          otherNode
+        ), result = 0 === otherNode || otherNode & Node.DOCUMENT_POSITION_FOLLOWING ? Node.DOCUMENT_POSITION_FOLLOWING : Node.DOCUMENT_POSITION_PRECEDING));
+        return result |= Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+      }
+      parentHostFiber = getInstanceFromHostFiber(children[0]);
+      result = getInstanceFromHostFiber(children[children.length - 1]);
+      var parentHostInstanceFromDOM = fiberIsPortaledIntoHost(this._fragmentFiber) ? parentHostFiber.parentElement : parentHostInstance;
+      if (null == parentHostInstanceFromDOM)
+        return Node.DOCUMENT_POSITION_DISCONNECTED;
+      parentHostInstance = parentHostInstanceFromDOM.compareDocumentPosition(parentHostFiber) & Node.DOCUMENT_POSITION_CONTAINED_BY;
+      parentHostInstanceFromDOM = parentHostInstanceFromDOM.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_CONTAINED_BY;
+      var firstResult = parentHostFiber.compareDocumentPosition(otherNode), lastResult = result.compareDocumentPosition(otherNode), otherNodeIsWithinFirstOrLastChild = firstResult & Node.DOCUMENT_POSITION_CONTAINED_BY || lastResult & Node.DOCUMENT_POSITION_CONTAINED_BY;
+      lastResult = parentHostInstance && parentHostInstanceFromDOM && firstResult & Node.DOCUMENT_POSITION_FOLLOWING && lastResult & Node.DOCUMENT_POSITION_PRECEDING;
+      parentHostFiber = parentHostInstance && parentHostFiber === otherNode || parentHostInstanceFromDOM && result === otherNode || otherNodeIsWithinFirstOrLastChild || lastResult ? Node.DOCUMENT_POSITION_CONTAINED_BY : !parentHostInstance && parentHostFiber === otherNode || !parentHostInstanceFromDOM && result === otherNode ? Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC : firstResult;
+      return parentHostFiber & Node.DOCUMENT_POSITION_DISCONNECTED || parentHostFiber & Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC || validateDocumentPositionWithFiberTree(
+        parentHostFiber,
+        this._fragmentFiber,
+        children[0],
+        children[children.length - 1],
+        otherNode
+      ) ? parentHostFiber : Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+    };
+    function validateDocumentPositionWithFiberTree(documentPosition, fragmentFiber, precedingBoundaryFiber, followingBoundaryFiber, otherNode) {
+      var otherFiber = getClosestInstanceFromNode(otherNode);
+      if (documentPosition & Node.DOCUMENT_POSITION_CONTAINED_BY) {
+        if (precedingBoundaryFiber = !!otherFiber)
+          a: {
+            for (; null !== otherFiber; ) {
+              if (7 === otherFiber.tag && (otherFiber === fragmentFiber || otherFiber.alternate === fragmentFiber)) {
+                precedingBoundaryFiber = true;
+                break a;
+              }
+              otherFiber = otherFiber.return;
+            }
+            precedingBoundaryFiber = false;
+          }
+        return precedingBoundaryFiber;
+      }
+      if (documentPosition & Node.DOCUMENT_POSITION_CONTAINS) {
+        if (null === otherFiber)
+          return otherFiber = otherNode.ownerDocument, otherNode === otherFiber || otherNode === otherFiber.documentElement || otherNode === otherFiber.body;
+        a: {
+          otherFiber = fragmentFiber;
+          for (fragmentFiber = getFragmentParentInstanceOrContainerFiber(fragmentFiber); null !== otherFiber; ) {
+            if (!(5 !== otherFiber.tag && 3 !== otherFiber.tag && 27 !== otherFiber.tag || otherFiber !== fragmentFiber && otherFiber.alternate !== fragmentFiber)) {
+              otherFiber = true;
+              break a;
+            }
+            otherFiber = otherFiber.return;
+          }
+          otherFiber = false;
+        }
+        return otherFiber;
+      }
+      return documentPosition & Node.DOCUMENT_POSITION_PRECEDING ? ((fragmentFiber = !!otherFiber) && !(fragmentFiber = otherFiber === precedingBoundaryFiber) && (fragmentFiber = getLowestCommonAncestor(
+        precedingBoundaryFiber,
+        otherFiber,
+        getParentForFragmentAncestors
+      ), null === fragmentFiber ? fragmentFiber = false : (traverseVisibleInstancesAndTextInstances(
+        fragmentFiber,
+        true,
+        isFiberPrecedingCheck,
+        otherFiber,
+        precedingBoundaryFiber
+      ), otherFiber = searchTarget, searchTarget = null, fragmentFiber = null !== otherFiber)), fragmentFiber) : documentPosition & Node.DOCUMENT_POSITION_FOLLOWING ? ((fragmentFiber = !!otherFiber) && !(fragmentFiber = otherFiber === followingBoundaryFiber) && (fragmentFiber = getLowestCommonAncestor(
+        followingBoundaryFiber,
+        otherFiber,
+        getParentForFragmentAncestors
+      ), null === fragmentFiber ? fragmentFiber = false : (traverseVisibleInstancesAndTextInstances(
+        fragmentFiber,
+        true,
+        isFiberFollowingCheck,
+        otherFiber,
+        followingBoundaryFiber
+      ), otherFiber = searchTarget, searchBoundary = searchTarget = null, fragmentFiber = null !== otherFiber)), fragmentFiber) : false;
+    }
+    function scrollTextNodeIntoView(textNode, resolvedAlignToTop) {
+      var range = textNode.ownerDocument.createRange();
+      range.selectNodeContents(textNode);
+      textNode = range.getBoundingClientRect();
+      window.scrollTo(
+        window.scrollX + textNode.left,
+        resolvedAlignToTop ? window.scrollY + textNode.top : window.scrollY + textNode.bottom - window.innerHeight
+      );
+    }
+    FragmentInstance.prototype.scrollIntoView = function(alignToTop) {
+      if ("object" === typeof alignToTop) throw Error(formatProdErrorMessage(566));
+      var children = [];
+      traverseVisibleInstancesAndTextInstances(
+        this._fragmentFiber.child,
+        false,
+        collectChildren,
+        children,
+        void 0,
+        void 0
+      );
+      var resolvedAlignToTop = false !== alignToTop;
+      if (0 === children.length) {
+        var hostSiblings = getFragmentInstanceOrTextInstanceSiblings(
+          this._fragmentFiber
+        );
+        hostSiblings = resolvedAlignToTop ? hostSiblings[1] || hostSiblings[0] || getFragmentParentInstanceOrContainerFiber(this._fragmentFiber) : hostSiblings[0] || hostSiblings[1];
+        if (null === hostSiblings) return;
+        if (6 === hostSiblings.tag) {
+          alignToTop = getInstanceFromHostFiber(hostSiblings);
+          scrollTextNodeIntoView(alignToTop, resolvedAlignToTop);
+          return;
+        }
+        hostSiblings = getInstanceFromHostFiber(hostSiblings);
+        if (9 !== hostSiblings.nodeType) {
+          if (11 === hostSiblings.nodeType) {
+            resolvedAlignToTop = "host" in hostSiblings ? hostSiblings.host : null;
+            null !== resolvedAlignToTop && resolvedAlignToTop.scrollIntoView(alignToTop);
+            return;
+          }
+          hostSiblings.scrollIntoView(alignToTop);
+        }
+      }
+      for (hostSiblings = resolvedAlignToTop ? children.length - 1 : 0; hostSiblings !== (resolvedAlignToTop ? -1 : children.length); ) {
+        var child = children[hostSiblings];
+        6 === child.tag ? (child = getInstanceFromHostFiber(child), scrollTextNodeIntoView(child, resolvedAlignToTop)) : getInstanceFromHostFiber(child).scrollIntoView(alignToTop);
+        hostSiblings += resolvedAlignToTop ? -1 : 1;
+      }
+    };
+    function addFragmentHandleToFiber(child, fragmentInstance) {
+      child = getInstanceFromHostFiber(child);
+      addFragmentHandleToInstance(child, fragmentInstance);
+      return false;
+    }
+    function addFragmentHandleToInstance(instance, fragmentInstance) {
+      null == instance.reactFragments && (instance.reactFragments = /* @__PURE__ */ new Set());
+      instance.reactFragments.add(fragmentInstance);
+    }
+    function commitNewChildToFragmentInstance(childInstance, fragmentInstance) {
+      var eventListeners = fragmentInstance._eventListeners;
+      if (null !== eventListeners)
+        for (var i$jscomp$0 = 0; i$jscomp$0 < eventListeners.length; i$jscomp$0++) {
+          var _eventListeners$i3 = eventListeners[i$jscomp$0];
+          childInstance.addEventListener(
+            _eventListeners$i3.type,
+            _eventListeners$i3.attachedListener,
+            getAttachOptions(_eventListeners$i3.optionsOrUseCapture)
+          );
+        }
+      3 !== childInstance.nodeType && (eventListeners = fragmentInstance._observers, null !== eventListeners && eventListeners.forEach(function(observer) {
+        for (var writeIdx = 0, i = 0; i < pendingIntersectionUnobserves.length; i++) {
+          var pending = pendingIntersectionUnobserves[i];
+          if (pending.fragmentInstance !== fragmentInstance || pending.observer !== observer || pending.instance !== childInstance)
+            pendingIntersectionUnobserves[writeIdx++] = pending;
+        }
+        pendingIntersectionUnobserves.length = writeIdx;
+        observer.observe(childInstance);
+      }), addFragmentHandleToInstance(childInstance, fragmentInstance));
+    }
+    function deleteChildFromFragmentInstance(childInstance, fragmentInstance) {
+      var eventListeners = fragmentInstance._eventListeners;
+      if (null !== eventListeners)
+        for (var i = 0; i < eventListeners.length; i++) {
+          var _eventListeners$i4 = eventListeners[i];
+          childInstance.removeEventListener(
+            _eventListeners$i4.type,
+            _eventListeners$i4.attachedListener,
+            getAttachOptions(_eventListeners$i4.optionsOrUseCapture)
+          );
+        }
+      3 !== childInstance.nodeType && (eventListeners = fragmentInstance._observers, null !== eventListeners && eventListeners.forEach(function(observer) {
+        "string" === typeof observer.rootMargin ? schedulePendingIntersectionUnobserve(
+          fragmentInstance,
+          observer,
+          childInstance
+        ) : observer.unobserve(childInstance);
+      }), null != childInstance.reactFragments && childInstance.reactFragments.delete(fragmentInstance));
+    }
+    function clearContainerSparingly(container) {
+      var nextNode = container.firstChild;
+      nextNode && 10 === nextNode.nodeType && (nextNode = nextNode.nextSibling);
+      for (; nextNode; ) {
+        var node = nextNode;
+        nextNode = nextNode.nextSibling;
+        switch (node.nodeName) {
+          case "HTML":
+          case "HEAD":
+          case "BODY":
+            clearContainerSparingly(node);
+            detachDeletedInstance(node);
+            continue;
+          case "SCRIPT":
+          case "STYLE":
+            continue;
+          case "LINK":
+            if ("stylesheet" === node.rel.toLowerCase()) continue;
+        }
+        container.removeChild(node);
+      }
+    }
+    function canHydrateInstance(instance, type2, props, inRootOrSingleton) {
+      for (; 1 === instance.nodeType; ) {
+        var anyProps = props;
+        if (instance.nodeName.toLowerCase() !== type2.toLowerCase()) {
+          if (!inRootOrSingleton && ("INPUT" !== instance.nodeName || "hidden" !== instance.type))
+            break;
+        } else if (!inRootOrSingleton)
+          if ("input" === type2 && "hidden" === instance.type) {
+            var name = null == anyProps.name ? null : "" + anyProps.name;
+            if ("hidden" === anyProps.type && instance.getAttribute("name") === name)
+              return instance;
+          } else return instance;
+        else if (!instance[internalHoistableMarker])
+          switch (type2) {
+            case "meta":
+              if (!instance.hasAttribute("itemprop")) break;
+              return instance;
+            case "link":
+              name = instance.getAttribute("rel");
+              if ("stylesheet" === name && instance.hasAttribute("data-precedence"))
+                break;
+              else if (name !== anyProps.rel || instance.getAttribute("href") !== (null == anyProps.href || "" === anyProps.href ? null : anyProps.href) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin) || instance.getAttribute("title") !== (null == anyProps.title ? null : anyProps.title))
+                break;
+              return instance;
+            case "style":
+              if (instance.hasAttribute("data-precedence")) break;
+              return instance;
+            case "script":
+              name = instance.getAttribute("src");
+              if ((name !== (null == anyProps.src ? null : anyProps.src) || instance.getAttribute("type") !== (null == anyProps.type ? null : anyProps.type) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin)) && name && instance.hasAttribute("async") && !instance.hasAttribute("itemprop"))
+                break;
+              return instance;
+            default:
+              return instance;
+          }
+        instance = getNextHydratable(instance.nextSibling);
+        if (null === instance) break;
+      }
+      return null;
+    }
+    function canHydrateTextInstance(instance, text, inRootOrSingleton) {
+      if ("" === text) return null;
+      for (; 3 !== instance.nodeType; ) {
+        if ((1 !== instance.nodeType || "INPUT" !== instance.nodeName || "hidden" !== instance.type) && !inRootOrSingleton)
+          return null;
+        instance = getNextHydratable(instance.nextSibling);
+        if (null === instance) return null;
+      }
+      return instance;
+    }
+    function canHydrateHydrationBoundary(instance, inRootOrSingleton) {
+      for (; 8 !== instance.nodeType; ) {
+        if ((1 !== instance.nodeType || "INPUT" !== instance.nodeName || "hidden" !== instance.type) && !inRootOrSingleton)
+          return null;
+        instance = getNextHydratable(instance.nextSibling);
+        if (null === instance) return null;
+      }
+      return instance;
+    }
+    function isSuspenseInstancePending(instance) {
+      return "$?" === instance.data || "$~" === instance.data;
+    }
+    function isSuspenseInstanceFallback(instance) {
+      return "$!" === instance.data || "$?" === instance.data && "loading" !== instance.ownerDocument.readyState;
+    }
+    function registerSuspenseInstanceRetry(instance, callback) {
+      var ownerDocument = instance.ownerDocument;
+      if ("$~" === instance.data) instance._reactRetry = callback;
+      else if ("$?" !== instance.data || "loading" !== ownerDocument.readyState)
+        callback();
+      else {
+        var listener = function() {
+          callback();
+          ownerDocument.removeEventListener("DOMContentLoaded", listener);
+        };
+        ownerDocument.addEventListener("DOMContentLoaded", listener);
+        instance._reactRetry = listener;
+      }
+    }
+    function getNextHydratable(node) {
+      for (; null != node; node = node.nextSibling) {
+        var nodeType = node.nodeType;
+        if (1 === nodeType || 3 === nodeType) break;
+        if (8 === nodeType) {
+          nodeType = node.data;
+          if ("$" === nodeType || "$!" === nodeType || "$?" === nodeType || "$~" === nodeType || "&" === nodeType || "F!" === nodeType || "F" === nodeType)
+            break;
+          if ("/$" === nodeType || "/&" === nodeType) return null;
+        }
+      }
+      return node;
+    }
+    var previousHydratableOnEnteringScopedSingleton = null;
+    function getNextHydratableInstanceAfterHydrationBoundary(hydrationInstance) {
+      hydrationInstance = hydrationInstance.nextSibling;
+      for (var depth = 0; hydrationInstance; ) {
+        if (8 === hydrationInstance.nodeType) {
+          var data = hydrationInstance.data;
+          if ("/$" === data || "/&" === data) {
+            if (0 === depth)
+              return getNextHydratable(hydrationInstance.nextSibling);
+            depth--;
+          } else
+            "$" !== data && "$!" !== data && "$?" !== data && "$~" !== data && "&" !== data || depth++;
+        }
+        hydrationInstance = hydrationInstance.nextSibling;
+      }
+      return null;
+    }
+    function getParentHydrationBoundary(targetInstance) {
+      targetInstance = targetInstance.previousSibling;
+      for (var depth = 0; targetInstance; ) {
+        if (8 === targetInstance.nodeType) {
+          var data = targetInstance.data;
+          if ("$" === data || "$!" === data || "$?" === data || "$~" === data || "&" === data) {
+            if (0 === depth) return targetInstance;
+            depth--;
+          } else "/$" !== data && "/&" !== data || depth++;
+        }
+        targetInstance = targetInstance.previousSibling;
+      }
+      return null;
+    }
+    function setFocusIfFocusable(node, focusOptions) {
+      function handleFocus() {
+        didFocus = true;
+      }
+      if (node.ownerDocument.activeElement === node) return true;
+      var didFocus = false;
+      try {
+        node.ownerDocument.addEventListener("focus", handleFocus, true), (node.focus || HTMLElement.prototype.focus).call(node, focusOptions);
+      } finally {
+        node.ownerDocument.removeEventListener("focus", handleFocus, true);
+      }
+      return didFocus;
+    }
+    function requestPostPaintCallback(callback) {
+      localRequestAnimationFrame(function() {
+        localRequestAnimationFrame(function(time) {
+          return callback(time);
+        });
+      });
+    }
+    function resolveSingletonInstance(type2, props, rootContainerInstance) {
+      props = getOwnerDocumentFromRootContainer(rootContainerInstance);
+      switch (type2) {
+        case "html":
+          type2 = props.documentElement;
+          if (!type2) throw Error(formatProdErrorMessage(452));
+          return type2;
+        case "head":
+          type2 = props.head;
+          if (!type2) throw Error(formatProdErrorMessage(453));
+          return type2;
+        case "body":
+          type2 = props.body;
+          if (!type2) throw Error(formatProdErrorMessage(454));
+          return type2;
+        default:
+          throw Error(formatProdErrorMessage(451));
+      }
+    }
+    function releaseSingletonInstance(instance, type2, props) {
+      for (var propKey in props) {
+        var propValue = props[propKey];
+        props.hasOwnProperty(propKey) && null != propValue && setProp(instance, type2, propKey, null, emptyProps, propValue);
+      }
+      null != props.dangerouslySetInnerHTML && (instance.textContent = "");
+      instance.onclick === noop$1 && (instance.onclick = null);
+      detachDeletedInstance(instance);
+    }
+    function clearSingletonPreambleContribution(instance) {
+      for (var attributes = instance.attributes; attributes.length; )
+        instance.removeAttributeNode(attributes[0]);
+      detachDeletedInstance(instance);
+    }
+    var preloadPropsMap = /* @__PURE__ */ new Map(), preconnectsSet = /* @__PURE__ */ new Set();
+    function getHoistableRoot(container) {
+      if ("function" === typeof container.getRootNode) {
+        var rootNode = container.getRootNode();
+        if (9 === rootNode.nodeType || 11 === rootNode.nodeType) return rootNode;
+      }
+      return 9 === container.nodeType ? container : container.ownerDocument;
+    }
+    var previousDispatcher = ReactDOMSharedInternals.d;
+    ReactDOMSharedInternals.d = {
+      f: flushSyncWork,
+      r: requestFormReset,
+      D: prefetchDNS,
+      C: preconnect,
+      L: preload,
+      m: preloadModule,
+      X: preinitScript,
+      S: preinitStyle,
+      M: preinitModuleScript
+    };
+    function flushSyncWork() {
+      var previousWasRendering = previousDispatcher.f(), wasRendering = flushSyncWork$1();
+      return previousWasRendering || wasRendering;
+    }
+    function requestFormReset(form) {
+      var formInst = getInstanceFromNode(form);
+      null !== formInst && 5 === formInst.tag && "form" === formInst.type ? requestFormReset$1(formInst) : previousDispatcher.r(form);
+    }
+    var globalDocument = "undefined" === typeof document ? null : document;
+    function preconnectAs(rel, href, crossOrigin) {
+      var ownerDocument = globalDocument;
+      if (ownerDocument && "string" === typeof href && href) {
+        var limitedEscapedHref = escapeSelectorAttributeValueInsideDoubleQuotes(href);
+        limitedEscapedHref = 'link[rel="' + rel + '"][href="' + limitedEscapedHref + '"]';
+        "string" === typeof crossOrigin && (limitedEscapedHref += '[crossorigin="' + crossOrigin + '"]');
+        preconnectsSet.has(limitedEscapedHref) || (preconnectsSet.add(limitedEscapedHref), rel = { rel, crossOrigin, href }, null === ownerDocument.querySelector(limitedEscapedHref) && (href = ownerDocument.createElement("link"), setInitialProperties(href, "link", rel), markNodeAsHoistable(href), ownerDocument.head.appendChild(href)));
+      }
+    }
+    function prefetchDNS(href) {
+      previousDispatcher.D(href);
+      preconnectAs("dns-prefetch", href, null);
+    }
+    function preconnect(href, crossOrigin) {
+      previousDispatcher.C(href, crossOrigin);
+      preconnectAs("preconnect", href, crossOrigin);
+    }
+    function preload(href, as, options2) {
+      previousDispatcher.L(href, as, options2);
+      var ownerDocument = globalDocument;
+      if (ownerDocument && href && as) {
+        var preloadSelector = 'link[rel="preload"][as="' + escapeSelectorAttributeValueInsideDoubleQuotes(as) + '"]';
+        "image" === as ? options2 && options2.imageSrcSet ? (preloadSelector += '[imagesrcset="' + escapeSelectorAttributeValueInsideDoubleQuotes(
+          options2.imageSrcSet
+        ) + '"]', "string" === typeof options2.imageSizes && (preloadSelector += '[imagesizes="' + escapeSelectorAttributeValueInsideDoubleQuotes(
+          options2.imageSizes
+        ) + '"]')) : preloadSelector += '[href="' + escapeSelectorAttributeValueInsideDoubleQuotes(href) + '"]' : preloadSelector += '[href="' + escapeSelectorAttributeValueInsideDoubleQuotes(href) + '"]';
+        var key = preloadSelector;
+        switch (as) {
+          case "style":
+            key = getStyleKey(href);
+            break;
+          case "script":
+            key = getScriptKey(href);
+        }
+        if (!(preloadPropsMap.has(key) || (href = assign(
+          {
+            rel: "preload",
+            href: "image" === as && options2 && options2.imageSrcSet ? void 0 : href,
+            as
+          },
+          options2
+        ), preloadPropsMap.set(key, href), null !== ownerDocument.querySelector(preloadSelector) || "style" === as && ownerDocument.querySelector(getStylesheetSelectorFromKey(key)) || "script" === as && ownerDocument.querySelector(getScriptSelectorFromKey(key))))) {
+          var instance = ownerDocument.createElement("link");
+          setInitialProperties(instance, "link", href);
+          "style" === as && (instance[internalLoadPendingKey] = true, instance.onload = instance.onerror = function() {
+            clearPendingLoadOnNode(instance);
+          });
+          markNodeAsHoistable(instance);
+          ownerDocument.head.appendChild(instance);
+        }
+      }
+    }
+    function preloadModule(href, options2) {
+      previousDispatcher.m(href, options2);
+      var ownerDocument = globalDocument;
+      if (ownerDocument && href) {
+        var as = options2 && "string" === typeof options2.as ? options2.as : "script", preloadSelector = 'link[rel="modulepreload"][as="' + escapeSelectorAttributeValueInsideDoubleQuotes(as) + '"][href="' + escapeSelectorAttributeValueInsideDoubleQuotes(href) + '"]', key = preloadSelector;
+        switch (as) {
+          case "audioworklet":
+          case "paintworklet":
+          case "serviceworker":
+          case "sharedworker":
+          case "worker":
+          case "script":
+            key = getScriptKey(href);
+        }
+        if (!preloadPropsMap.has(key) && (href = assign({ rel: "modulepreload", href }, options2), preloadPropsMap.set(key, href), null === ownerDocument.querySelector(preloadSelector))) {
+          switch (as) {
+            case "audioworklet":
+            case "paintworklet":
+            case "serviceworker":
+            case "sharedworker":
+            case "worker":
+            case "script":
+              if (ownerDocument.querySelector(getScriptSelectorFromKey(key)))
+                return;
+          }
+          as = ownerDocument.createElement("link");
+          setInitialProperties(as, "link", href);
+          markNodeAsHoistable(as);
+          ownerDocument.head.appendChild(as);
+        }
+      }
+    }
+    function preinitStyle(href, precedence, options2) {
+      previousDispatcher.S(href, precedence, options2);
+      var ownerDocument = globalDocument;
+      if (ownerDocument && href) {
+        var styles = getResourcesFromRoot(ownerDocument).hoistableStyles, key = getStyleKey(href);
+        precedence = precedence || "default";
+        var resource = styles.get(key);
+        if (!resource) {
+          var state = { loading: 0, preload: null };
+          if (resource = ownerDocument.querySelector(
+            getStylesheetSelectorFromKey(key)
+          ))
+            state.loading = 5;
+          else {
+            href = assign(
+              { rel: "stylesheet", href, "data-precedence": precedence },
+              options2
+            );
+            (options2 = preloadPropsMap.get(key)) && adoptPreloadPropsForStylesheet(href, options2);
+            var link = resource = ownerDocument.createElement("link");
+            markNodeAsHoistable(link);
+            setInitialProperties(link, "link", href);
+            link._p = new Promise(function(resolve, reject) {
+              link.onload = resolve;
+              link.onerror = reject;
+            });
+            link.addEventListener("load", function() {
+              state.loading |= 1;
+            });
+            link.addEventListener("error", function() {
+              state.loading |= 2;
+            });
+            state.loading |= 4;
+            insertStylesheet(resource, precedence, ownerDocument);
+          }
+          resource = {
+            type: "stylesheet",
+            instance: resource,
+            count: 1,
+            state
+          };
+          styles.set(key, resource);
+        }
+      }
+    }
+    function preinitScript(src, options2) {
+      previousDispatcher.X(src, options2);
+      var ownerDocument = globalDocument;
+      if (ownerDocument && src) {
+        var scripts = getResourcesFromRoot(ownerDocument).hoistableScripts, key = getScriptKey(src), resource = scripts.get(key);
+        resource || (resource = ownerDocument.querySelector(getScriptSelectorFromKey(key)), resource || (src = assign({ src, async: true }, options2), (options2 = preloadPropsMap.get(key)) && adoptPreloadPropsForScript(src, options2), resource = ownerDocument.createElement("script"), markNodeAsHoistable(resource), setInitialProperties(resource, "link", src), ownerDocument.head.appendChild(resource)), resource = {
+          type: "script",
+          instance: resource,
+          count: 1,
+          state: null
+        }, scripts.set(key, resource));
+      }
+    }
+    function preinitModuleScript(src, options2) {
+      previousDispatcher.M(src, options2);
+      var ownerDocument = globalDocument;
+      if (ownerDocument && src) {
+        var scripts = getResourcesFromRoot(ownerDocument).hoistableScripts, key = getScriptKey(src), resource = scripts.get(key);
+        resource || (resource = ownerDocument.querySelector(getScriptSelectorFromKey(key)), resource || (src = assign({ src, async: true, type: "module" }, options2), (options2 = preloadPropsMap.get(key)) && adoptPreloadPropsForScript(src, options2), resource = ownerDocument.createElement("script"), markNodeAsHoistable(resource), setInitialProperties(resource, "link", src), ownerDocument.head.appendChild(resource)), resource = {
+          type: "script",
+          instance: resource,
+          count: 1,
+          state: null
+        }, scripts.set(key, resource));
+      }
+    }
+    function getResource(type2, currentProps, pendingProps, currentResource) {
+      var JSCompiler_inline_result = (JSCompiler_inline_result = rootInstanceStackCursor.current) ? getHoistableRoot(JSCompiler_inline_result) : null;
+      if (!JSCompiler_inline_result) throw Error(formatProdErrorMessage(446));
+      switch (type2) {
+        case "meta":
+        case "title":
+          return null;
+        case "style":
+          return "string" === typeof pendingProps.precedence && "string" === typeof pendingProps.href ? (pendingProps = getStyleKey(pendingProps.href), currentProps = getResourcesFromRoot(
+            JSCompiler_inline_result
+          ).hoistableStyles, currentResource = currentProps.get(pendingProps), currentResource || (currentResource = {
+            type: "style",
+            instance: null,
+            count: 0,
+            state: null
+          }, currentProps.set(pendingProps, currentResource)), currentResource) : { type: "void", instance: null, count: 0, state: null };
+        case "link":
+          if ("stylesheet" === pendingProps.rel && "string" === typeof pendingProps.href && "string" === typeof pendingProps.precedence) {
+            type2 = getStyleKey(pendingProps.href);
+            var styles$268 = getResourcesFromRoot(
+              JSCompiler_inline_result
+            ).hoistableStyles, resource$269 = styles$268.get(type2);
+            resource$269 || (JSCompiler_inline_result = JSCompiler_inline_result.ownerDocument || JSCompiler_inline_result, resource$269 = {
+              type: "stylesheet",
+              instance: null,
+              count: 0,
+              state: { loading: 0, preload: null }
+            }, styles$268.set(type2, resource$269), (styles$268 = JSCompiler_inline_result.querySelector(
+              getStylesheetSelectorFromKey(type2)
+            )) ? styles$268._p || (resource$269.instance = styles$268, resource$269.state.loading = 5) : (styles$268 = preloadPropsMap.get(type2), styles$268 || (styles$268 = {
+              rel: "preload",
+              as: "style",
+              href: pendingProps.href,
+              crossOrigin: pendingProps.crossOrigin,
+              integrity: pendingProps.integrity,
+              media: pendingProps.media,
+              hrefLang: pendingProps.hrefLang,
+              referrerPolicy: pendingProps.referrerPolicy
+            }, preloadPropsMap.set(type2, styles$268)), preloadStylesheet(
+              JSCompiler_inline_result,
+              type2,
+              styles$268,
+              resource$269.state
+            )));
+            if (currentProps && null === currentResource)
+              throw Error(formatProdErrorMessage(528, ""));
+            return resource$269;
+          }
+          if (currentProps && null !== currentResource)
+            throw Error(formatProdErrorMessage(529, ""));
+          return null;
+        case "script":
+          return currentProps = pendingProps.async, pendingProps = pendingProps.src, "string" === typeof pendingProps && currentProps && "function" !== typeof currentProps && "symbol" !== typeof currentProps ? (pendingProps = getScriptKey(pendingProps), currentProps = getResourcesFromRoot(
+            JSCompiler_inline_result
+          ).hoistableScripts, currentResource = currentProps.get(pendingProps), currentResource || (currentResource = {
+            type: "script",
+            instance: null,
+            count: 0,
+            state: null
+          }, currentProps.set(pendingProps, currentResource)), currentResource) : { type: "void", instance: null, count: 0, state: null };
+        default:
+          throw Error(formatProdErrorMessage(444, type2));
+      }
+    }
+    function getStyleKey(href) {
+      return 'href="' + escapeSelectorAttributeValueInsideDoubleQuotes(href) + '"';
+    }
+    function getStylesheetSelectorFromKey(key) {
+      return 'link[rel="stylesheet"][' + key + "]";
+    }
+    function stylesheetPropsFromRawProps(rawProps) {
+      return assign({}, rawProps, {
+        "data-precedence": rawProps.precedence,
+        precedence: null
+      });
+    }
+    function preloadStylesheet(ownerDocument, key, preloadProps, state) {
+      if (key = ownerDocument.querySelector(
+        'link[rel="preload"][as="style"][' + key + "]"
+      )) {
+        if (true !== key[internalLoadPendingKey]) {
+          state.loading = 1;
+          return;
+        }
+      } else
+        key = ownerDocument.createElement("link"), key[internalLoadPendingKey] = true, key.onload = key.onerror = clearPendingLoadOnNode.bind(null, key), setInitialProperties(key, "link", preloadProps), markNodeAsHoistable(key), ownerDocument.head.appendChild(key);
+      state.preload = key;
+      key.addEventListener("load", function() {
+        return state.loading |= 1;
+      });
+      key.addEventListener("error", function() {
+        return state.loading |= 2;
+      });
+    }
+    function getScriptKey(src) {
+      return '[src="' + escapeSelectorAttributeValueInsideDoubleQuotes(src) + '"]';
+    }
+    function getScriptSelectorFromKey(key) {
+      return "script[async]" + key;
+    }
+    function acquireResource(hoistableRoot, resource, props) {
+      resource.count++;
+      if (null === resource.instance)
+        switch (resource.type) {
+          case "style":
+            var instance = hoistableRoot.querySelector(
+              'style[data-href~="' + escapeSelectorAttributeValueInsideDoubleQuotes(props.href) + '"]'
+            );
+            if (instance)
+              return resource.instance = instance, markNodeAsHoistable(instance), instance;
+            var styleProps = assign({}, props, {
+              "data-href": props.href,
+              "data-precedence": props.precedence,
+              href: null,
+              precedence: null
+            });
+            instance = (hoistableRoot.ownerDocument || hoistableRoot).createElement(
+              "style"
+            );
+            markNodeAsHoistable(instance);
+            setInitialProperties(instance, "style", styleProps);
+            insertStylesheet(instance, props.precedence, hoistableRoot);
+            return resource.instance = instance;
+          case "stylesheet":
+            styleProps = getStyleKey(props.href);
+            var instance$274 = hoistableRoot.querySelector(
+              getStylesheetSelectorFromKey(styleProps)
+            );
+            if (instance$274)
+              return resource.state.loading |= 4, resource.instance = instance$274, markNodeAsHoistable(instance$274), instance$274;
+            instance = stylesheetPropsFromRawProps(props);
+            (styleProps = preloadPropsMap.get(styleProps)) && adoptPreloadPropsForStylesheet(instance, styleProps);
+            instance$274 = (hoistableRoot.ownerDocument || hoistableRoot).createElement("link");
+            markNodeAsHoistable(instance$274);
+            var linkInstance = instance$274;
+            linkInstance._p = new Promise(function(resolve, reject) {
+              linkInstance.onload = resolve;
+              linkInstance.onerror = reject;
+            });
+            setInitialProperties(instance$274, "link", instance);
+            resource.state.loading |= 4;
+            insertStylesheet(instance$274, props.precedence, hoistableRoot);
+            return resource.instance = instance$274;
+          case "script":
+            instance$274 = getScriptKey(props.src);
+            if (styleProps = hoistableRoot.querySelector(
+              getScriptSelectorFromKey(instance$274)
+            ))
+              return resource.instance = styleProps, markNodeAsHoistable(styleProps), styleProps;
+            instance = props;
+            if (styleProps = preloadPropsMap.get(instance$274))
+              instance = assign({}, props), adoptPreloadPropsForScript(instance, styleProps);
+            hoistableRoot = hoistableRoot.ownerDocument || hoistableRoot;
+            styleProps = hoistableRoot.createElement("script");
+            markNodeAsHoistable(styleProps);
+            setInitialProperties(styleProps, "link", instance);
+            hoistableRoot.head.appendChild(styleProps);
+            return resource.instance = styleProps;
+          case "void":
+            return null;
+          default:
+            throw Error(formatProdErrorMessage(443, resource.type));
+        }
+      else
+        "stylesheet" === resource.type && 0 === (resource.state.loading & 4) && (instance = resource.instance, resource.state.loading |= 4, insertStylesheet(instance, props.precedence, hoistableRoot));
+      return resource.instance;
+    }
+    function insertStylesheet(instance, precedence, root3) {
+      for (var nodes = root3.querySelectorAll(
+        'link[rel="stylesheet"][data-precedence],style[data-precedence]'
+      ), last = nodes.length ? nodes[nodes.length - 1] : null, prior = last, i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        if (node.dataset.precedence === precedence) prior = node;
+        else if (prior !== last) break;
+      }
+      prior ? prior.parentNode.insertBefore(instance, prior.nextSibling) : (precedence = 9 === root3.nodeType ? root3.head : root3, precedence.insertBefore(instance, precedence.firstChild));
+    }
+    function adoptPreloadPropsForStylesheet(stylesheetProps, preloadProps) {
+      null == stylesheetProps.crossOrigin && (stylesheetProps.crossOrigin = preloadProps.crossOrigin);
+      null == stylesheetProps.referrerPolicy && (stylesheetProps.referrerPolicy = preloadProps.referrerPolicy);
+      null == stylesheetProps.title && (stylesheetProps.title = preloadProps.title);
+    }
+    function adoptPreloadPropsForScript(scriptProps, preloadProps) {
+      null == scriptProps.crossOrigin && (scriptProps.crossOrigin = preloadProps.crossOrigin);
+      null == scriptProps.referrerPolicy && (scriptProps.referrerPolicy = preloadProps.referrerPolicy);
+      null == scriptProps.integrity && (scriptProps.integrity = preloadProps.integrity);
+    }
+    var tagCaches = null;
+    function getHydratableHoistableCache(type2, keyAttribute, ownerDocument) {
+      if (null === tagCaches) {
+        var cache = /* @__PURE__ */ new Map();
+        var caches = tagCaches = /* @__PURE__ */ new Map();
+        caches.set(ownerDocument, cache);
+      } else
+        caches = tagCaches, cache = caches.get(ownerDocument), cache || (cache = /* @__PURE__ */ new Map(), caches.set(ownerDocument, cache));
+      if (cache.has(type2)) return cache;
+      cache.set(type2, null);
+      ownerDocument = ownerDocument.getElementsByTagName(type2);
+      for (caches = 0; caches < ownerDocument.length; caches++) {
+        var node = ownerDocument[caches];
+        if (!(node[internalHoistableMarker] || node[internalInstanceKey] || "link" === type2 && "stylesheet" === node.getAttribute("rel")) && "http://www.w3.org/2000/svg" !== node.namespaceURI) {
+          var nodeKey = node.getAttribute(keyAttribute) || "";
+          nodeKey = type2 + nodeKey;
+          var existing = cache.get(nodeKey);
+          existing ? existing.push(node) : cache.set(nodeKey, [node]);
+        }
+      }
+      return cache;
+    }
+    function mountHoistable(hoistableRoot, type2, instance) {
+      hoistableRoot = hoistableRoot.ownerDocument || hoistableRoot;
+      hoistableRoot.head.insertBefore(
+        instance,
+        "title" === type2 ? hoistableRoot.querySelector("head > title") : null
+      );
+    }
+    function isHostHoistableType(type2, props, hostContext) {
+      if (1 === hostContext || null != props.itemProp) return false;
+      switch (type2) {
+        case "meta":
+        case "title":
+          return true;
+        case "style":
+          if ("string" !== typeof props.precedence || "string" !== typeof props.href || "" === props.href)
+            break;
+          return true;
+        case "link":
+          if ("string" !== typeof props.rel || "string" !== typeof props.href || "" === props.href || props.onLoad || props.onError)
+            break;
+          switch (props.rel) {
+            case "stylesheet":
+              return type2 = props.disabled, "string" === typeof props.precedence && null == type2;
+            default:
+              return true;
+          }
+        case "script":
+          if (props.async && "function" !== typeof props.async && "symbol" !== typeof props.async && !props.onLoad && !props.onError && props.src && "string" === typeof props.src)
+            return true;
+      }
+      return false;
+    }
+    function maySuspendCommit(type2, props) {
+      return "img" === type2 && null != props.src && "" !== props.src && null == props.onLoad && "lazy" !== props.loading;
+    }
+    function preloadResource(resource) {
+      return "stylesheet" === resource.type && 0 === (resource.state.loading & 3) ? false : true;
+    }
+    function estimateImageBytes(instance) {
+      return (instance.width || 100) * (instance.height || 100) * ("number" === typeof devicePixelRatio ? devicePixelRatio : 1) * 0.25;
+    }
+    function suspendInstance(state, instance) {
+      "function" === typeof instance.decode && (state.imgCount++, instance.complete || (state.imgBytes += estimateImageBytes(instance), state.suspenseyImages.push(instance)), state = onUnsuspendImg.bind(state), instance.decode().then(state, state));
+    }
+    function suspendResource(state, hoistableRoot, resource, props) {
+      if ("stylesheet" === resource.type && ("string" !== typeof props.media || false !== matchMedia(props.media).matches) && 0 === (resource.state.loading & 4)) {
+        if (null === resource.instance) {
+          var key = getStyleKey(props.href), instance = hoistableRoot.querySelector(
+            getStylesheetSelectorFromKey(key)
+          );
+          if (instance) {
+            hoistableRoot = instance._p;
+            null !== hoistableRoot && "object" === typeof hoistableRoot && "function" === typeof hoistableRoot.then && (state.count++, state = onUnsuspend.bind(state), hoistableRoot.then(state, state));
+            resource.state.loading |= 4;
+            resource.instance = instance;
+            markNodeAsHoistable(instance);
+            return;
+          }
+          instance = hoistableRoot.ownerDocument || hoistableRoot;
+          props = stylesheetPropsFromRawProps(props);
+          (key = preloadPropsMap.get(key)) && adoptPreloadPropsForStylesheet(props, key);
+          instance = instance.createElement("link");
+          markNodeAsHoistable(instance);
+          var linkInstance = instance;
+          linkInstance._p = new Promise(function(resolve, reject) {
+            linkInstance.onload = resolve;
+            linkInstance.onerror = reject;
+          });
+          setInitialProperties(instance, "link", props);
+          resource.instance = instance;
+        }
+        null === state.stylesheets && (state.stylesheets = /* @__PURE__ */ new Map());
+        state.stylesheets.set(resource, hoistableRoot);
+        (hoistableRoot = resource.state.preload) && 0 === (resource.state.loading & 3) && (state.count++, resource = onUnsuspend.bind(state), hoistableRoot.addEventListener("load", resource), hoistableRoot.addEventListener("error", resource));
+      }
+    }
+    var estimatedBytesWithinLimit = 0;
+    function waitForCommitToBeReady(state, timeoutOffset) {
+      state.stylesheets && 0 === state.count && insertSuspendedStylesheets(state, state.stylesheets);
+      return 0 < state.count || 0 < state.imgCount ? function(commit) {
+        var stylesheetTimer = setTimeout(function() {
+          state.stylesheets && insertSuspendedStylesheets(state, state.stylesheets);
+          if (state.unsuspend) {
+            var unsuspend = state.unsuspend;
+            state.unsuspend = null;
+            unsuspend();
+          }
+        }, 6e4 + timeoutOffset);
+        0 < state.imgBytes && 0 === estimatedBytesWithinLimit && (estimatedBytesWithinLimit = 62500 * estimateBandwidth());
+        var imgTimer = setTimeout(
+          function() {
+            state.waitingForImages = false;
+            if (0 === state.count && (state.stylesheets && insertSuspendedStylesheets(state, state.stylesheets), state.unsuspend)) {
+              var unsuspend = state.unsuspend;
+              state.unsuspend = null;
+              unsuspend();
+            }
+          },
+          (state.imgBytes > estimatedBytesWithinLimit ? 50 : 800) + timeoutOffset
+        );
+        state.unsuspend = commit;
+        return function() {
+          state.unsuspend = null;
+          clearTimeout(stylesheetTimer);
+          clearTimeout(imgTimer);
+        };
+      } : null;
+    }
+    function checkIfFullyUnsuspended(state) {
+      if (0 === state.count && (0 === state.imgCount || !state.waitingForImages)) {
+        if (state.stylesheets) insertSuspendedStylesheets(state, state.stylesheets);
+        else if (state.unsuspend) {
+          var unsuspend = state.unsuspend;
+          state.unsuspend = null;
+          unsuspend();
+        }
+      }
+    }
+    function onUnsuspend() {
+      this.count--;
+      checkIfFullyUnsuspended(this);
+    }
+    function onUnsuspendImg() {
+      this.imgCount--;
+      checkIfFullyUnsuspended(this);
+    }
+    var precedencesByRoot = null;
+    function insertSuspendedStylesheets(state, resources) {
+      state.stylesheets = null;
+      null !== state.unsuspend && (state.count++, precedencesByRoot = /* @__PURE__ */ new Map(), resources.forEach(insertStylesheetIntoRoot, state), precedencesByRoot = null, onUnsuspend.call(state));
+    }
+    function insertStylesheetIntoRoot(root3, resource) {
+      if (!(resource.state.loading & 4)) {
+        var precedences = precedencesByRoot.get(root3);
+        if (precedences) var last = precedences.get(null);
+        else {
+          precedences = /* @__PURE__ */ new Map();
+          precedencesByRoot.set(root3, precedences);
+          for (var nodes = root3.querySelectorAll(
+            "link[data-precedence],style[data-precedence]"
+          ), i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            if ("LINK" === node.nodeName || "not all" !== node.getAttribute("media"))
+              precedences.set(node.dataset.precedence, node), last = node;
+          }
+          last && precedences.set(null, last);
+        }
+        nodes = resource.instance;
+        node = nodes.getAttribute("data-precedence");
+        i = precedences.get(node) || last;
+        i === last && precedences.set(null, nodes);
+        precedences.set(node, nodes);
+        this.count++;
+        last = onUnsuspend.bind(this);
+        nodes.addEventListener("load", last);
+        nodes.addEventListener("error", last);
+        i ? i.parentNode.insertBefore(nodes, i.nextSibling) : (root3 = 9 === root3.nodeType ? root3.head : root3, root3.insertBefore(nodes, root3.firstChild));
+        resource.state.loading |= 4;
+      }
+    }
+    var HostTransitionContext = {
+      $$typeof: REACT_CONTEXT_TYPE,
+      Provider: null,
+      Consumer: null,
+      _currentValue: sharedNotPendingObject,
+      _currentValue2: sharedNotPendingObject,
+      _threadCount: 0
+    };
+    function FiberRootNode(containerInfo, tag, hydrate, identifierPrefix, onUncaughtError, onCaughtError, onRecoverableError, onDefaultTransitionIndicator, formState) {
+      this.tag = 1;
+      this.containerInfo = containerInfo;
+      this.pingCache = this.current = this.pendingChildren = null;
+      this.timeoutHandle = -1;
+      this.callbackNode = this.next = this.pendingContext = this.context = this.cancelPendingCommit = null;
+      this.callbackPriority = 0;
+      this.expirationTimes = createLaneMap(-1);
+      this.entangledLanes = this.shellSuspendCounter = this.errorRecoveryDisabledLanes = this.expiredLanes = this.warmLanes = this.pingedLanes = this.suspendedLanes = this.pendingLanes = 0;
+      this.entanglements = createLaneMap(0);
+      this.hiddenUpdates = createLaneMap(null);
+      this.identifierPrefix = identifierPrefix;
+      this.onUncaughtError = onUncaughtError;
+      this.onCaughtError = onCaughtError;
+      this.onRecoverableError = onRecoverableError;
+      this.pooledCache = null;
+      this.pooledCacheLanes = 0;
+      this.formState = formState;
+      this.transitionTypes = null;
+      this.incompleteTransitions = /* @__PURE__ */ new Map();
+    }
+    function createFiberRoot(containerInfo, tag, hydrate, initialChildren, hydrationCallbacks, isStrictMode, identifierPrefix, formState, onUncaughtError, onCaughtError, onRecoverableError, onDefaultTransitionIndicator) {
+      containerInfo = new FiberRootNode(
+        containerInfo,
+        tag,
+        hydrate,
+        identifierPrefix,
+        onUncaughtError,
+        onCaughtError,
+        onRecoverableError,
+        onDefaultTransitionIndicator,
+        formState
+      );
+      tag = 1;
+      true === isStrictMode && (tag |= 24);
+      isStrictMode = createFiberImplClass(3, null, null, tag);
+      containerInfo.current = isStrictMode;
+      isStrictMode.stateNode = containerInfo;
+      tag = createCache();
+      tag.refCount++;
+      containerInfo.pooledCache = tag;
+      tag.refCount++;
+      isStrictMode.memoizedState = {
+        element: initialChildren,
+        isDehydrated: hydrate,
+        cache: tag
+      };
+      initializeUpdateQueue(isStrictMode);
+      return containerInfo;
+    }
+    function getContextForSubtree(parentComponent) {
+      if (!parentComponent) return emptyContextObject;
+      parentComponent = emptyContextObject;
+      return parentComponent;
+    }
+    function updateContainerImpl(rootFiber, lane, element, container, parentComponent, callback) {
+      parentComponent = getContextForSubtree(parentComponent);
+      null === container.context ? container.context = parentComponent : container.pendingContext = parentComponent;
+      container = createUpdate(lane);
+      container.payload = { element };
+      callback = void 0 === callback ? null : callback;
+      null !== callback && (container.callback = callback);
+      element = enqueueUpdate(rootFiber, container, lane);
+      null !== element && (scheduleUpdateOnFiber(element, rootFiber, lane), entangleTransitions(element, rootFiber, lane));
+    }
+    function markRetryLaneImpl(fiber, retryLane) {
+      fiber = fiber.memoizedState;
+      if (null !== fiber && null !== fiber.dehydrated) {
+        var a = fiber.retryLane;
+        fiber.retryLane = 0 !== a && a < retryLane ? a : retryLane;
+      }
+    }
+    function markRetryLaneIfNotHydrated(fiber, retryLane) {
+      markRetryLaneImpl(fiber, retryLane);
+      (fiber = fiber.alternate) && markRetryLaneImpl(fiber, retryLane);
+    }
+    function attemptContinuousHydration(fiber) {
+      if (13 === fiber.tag || 31 === fiber.tag) {
+        var root3 = enqueueConcurrentRenderForLane(fiber, 67108864);
+        null !== root3 && scheduleUpdateOnFiber(root3, fiber, 67108864);
+        markRetryLaneIfNotHydrated(fiber, 67108864);
+      }
+    }
+    function attemptHydrationAtCurrentPriority(fiber) {
+      if (13 === fiber.tag || 31 === fiber.tag) {
+        var lane = requestUpdateLane();
+        lane = getBumpedLaneForHydrationByLane(lane);
+        var root3 = enqueueConcurrentRenderForLane(fiber, lane);
+        null !== root3 && scheduleUpdateOnFiber(root3, fiber, lane);
+        markRetryLaneIfNotHydrated(fiber, lane);
+      }
+    }
+    var _enabled = true;
+    function dispatchDiscreteEvent(domEventName, eventSystemFlags, container, nativeEvent) {
+      var prevTransition = ReactSharedInternals.T;
+      ReactSharedInternals.T = null;
+      var previousPriority = ReactDOMSharedInternals.p;
+      try {
+        ReactDOMSharedInternals.p = 2, dispatchEvent(domEventName, eventSystemFlags, container, nativeEvent);
+      } finally {
+        ReactDOMSharedInternals.p = previousPriority, ReactSharedInternals.T = prevTransition;
+      }
+    }
+    function dispatchContinuousEvent(domEventName, eventSystemFlags, container, nativeEvent) {
+      var prevTransition = ReactSharedInternals.T;
+      ReactSharedInternals.T = null;
+      var previousPriority = ReactDOMSharedInternals.p;
+      try {
+        ReactDOMSharedInternals.p = 8, dispatchEvent(domEventName, eventSystemFlags, container, nativeEvent);
+      } finally {
+        ReactDOMSharedInternals.p = previousPriority, ReactSharedInternals.T = prevTransition;
+      }
+    }
+    function dispatchEvent(domEventName, eventSystemFlags, targetContainer, nativeEvent) {
+      if (_enabled) {
+        var blockedOn = findInstanceBlockingEvent(nativeEvent);
+        if (null === blockedOn)
+          dispatchEventForPluginEventSystem(
+            domEventName,
+            eventSystemFlags,
+            nativeEvent,
+            return_targetInst,
+            targetContainer
+          ), clearIfContinuousEvent(domEventName, nativeEvent);
+        else if (queueIfContinuousEvent(
+          blockedOn,
+          domEventName,
+          eventSystemFlags,
+          targetContainer,
+          nativeEvent
+        ))
+          nativeEvent.stopPropagation();
+        else if (clearIfContinuousEvent(domEventName, nativeEvent), eventSystemFlags & 4 && -1 < discreteReplayableEvents.indexOf(domEventName)) {
+          for (; null !== blockedOn; ) {
+            var fiber = getInstanceFromNode(blockedOn);
+            if (null !== fiber)
+              switch (fiber.tag) {
+                case 3:
+                  fiber = fiber.stateNode;
+                  if (fiber.current.memoizedState.isDehydrated) {
+                    var lanes = getHighestPriorityLanes(fiber.pendingLanes);
+                    if (0 !== lanes) {
+                      var root3 = fiber;
+                      root3.pendingLanes |= 2;
+                      for (root3.entangledLanes |= 2; lanes; ) {
+                        var lane = 1 << 31 - clz32(lanes);
+                        root3.entanglements[1] |= lane;
+                        lanes &= ~lane;
+                      }
+                      ensureRootIsScheduled(fiber);
+                      0 === (executionContext & 6) && (workInProgressRootRenderTargetTime = now() + 500, flushSyncWorkAcrossRoots_impl(0));
+                    }
+                  }
+                  break;
+                case 31:
+                case 13:
+                  root3 = enqueueConcurrentRenderForLane(fiber, 2), null !== root3 && scheduleUpdateOnFiber(root3, fiber, 2), flushSyncWork$1(), markRetryLaneIfNotHydrated(fiber, 2);
+              }
+            fiber = findInstanceBlockingEvent(nativeEvent);
+            null === fiber && dispatchEventForPluginEventSystem(
+              domEventName,
+              eventSystemFlags,
+              nativeEvent,
+              return_targetInst,
+              targetContainer
+            );
+            if (fiber === blockedOn) break;
+            blockedOn = fiber;
+          }
+          null !== blockedOn && nativeEvent.stopPropagation();
+        } else
+          dispatchEventForPluginEventSystem(
+            domEventName,
+            eventSystemFlags,
+            nativeEvent,
+            null,
+            targetContainer
+          );
+      }
+    }
+    function findInstanceBlockingEvent(nativeEvent) {
+      nativeEvent = getEventTarget(nativeEvent);
+      return findInstanceBlockingTarget(nativeEvent);
+    }
+    var return_targetInst = null;
+    function findInstanceBlockingTarget(targetNode) {
+      return_targetInst = null;
+      targetNode = getClosestInstanceFromNode(targetNode);
+      if (null !== targetNode) {
+        var nearestMounted = getNearestMountedFiber(targetNode);
+        if (null === nearestMounted) targetNode = null;
+        else {
+          var tag = nearestMounted.tag;
+          if (13 === tag) {
+            targetNode = getSuspenseInstanceFromFiber(nearestMounted);
+            if (null !== targetNode) return targetNode;
+            targetNode = null;
+          } else if (31 === tag) {
+            targetNode = getActivityInstanceFromFiber(nearestMounted);
+            if (null !== targetNode) return targetNode;
+            targetNode = null;
+          } else if (3 === tag) {
+            if (nearestMounted.stateNode.current.memoizedState.isDehydrated)
+              return 3 === nearestMounted.tag ? nearestMounted.stateNode.containerInfo : null;
+            targetNode = null;
+          } else nearestMounted !== targetNode && (targetNode = null);
+        }
+      }
+      return_targetInst = targetNode;
+      return null;
+    }
+    function getEventPriority(domEventName) {
+      switch (domEventName) {
+        case "beforetoggle":
+        case "cancel":
+        case "click":
+        case "close":
+        case "contextmenu":
+        case "copy":
+        case "cut":
+        case "auxclick":
+        case "dblclick":
+        case "dragend":
+        case "dragstart":
+        case "drop":
+        case "focusin":
+        case "focusout":
+        case "input":
+        case "invalid":
+        case "keydown":
+        case "keypress":
+        case "keyup":
+        case "mousedown":
+        case "mouseup":
+        case "paste":
+        case "pause":
+        case "play":
+        case "pointercancel":
+        case "pointerdown":
+        case "pointerup":
+        case "ratechange":
+        case "reset":
+        case "seeked":
+        case "submit":
+        case "toggle":
+        case "touchcancel":
+        case "touchend":
+        case "touchstart":
+        case "volumechange":
+        case "change":
+        case "selectionchange":
+        case "textInput":
+        case "compositionstart":
+        case "compositionend":
+        case "compositionupdate":
+        case "beforeblur":
+        case "afterblur":
+        case "beforeinput":
+        case "blur":
+        case "fullscreenchange":
+        case "fullscreenerror":
+        case "focus":
+        case "hashchange":
+        case "popstate":
+        case "select":
+        case "selectstart":
+          return 2;
+        case "drag":
+        case "dragenter":
+        case "dragexit":
+        case "dragleave":
+        case "dragover":
+        case "mousemove":
+        case "mouseout":
+        case "mouseover":
+        case "pointermove":
+        case "pointerout":
+        case "pointerover":
+        case "resize":
+        case "scroll":
+        case "touchmove":
+        case "wheel":
+        case "mouseenter":
+        case "mouseleave":
+        case "pointerenter":
+        case "pointerleave":
+          return 8;
+        case "message":
+          switch (getCurrentPriorityLevel()) {
+            case ImmediatePriority:
+              return 2;
+            case UserBlockingPriority:
+              return 8;
+            case NormalPriority$1:
+            case LowPriority:
+              return 32;
+            case IdlePriority:
+              return 268435456;
+            default:
+              return 32;
+          }
+        default:
+          return 32;
+      }
+    }
+    var hasScheduledReplayAttempt = false, queuedFocus = null, queuedDrag = null, queuedMouse = null, queuedPointers = /* @__PURE__ */ new Map(), queuedPointerCaptures = /* @__PURE__ */ new Map(), queuedExplicitHydrationTargets = [], discreteReplayableEvents = "mousedown mouseup touchcancel touchend touchstart auxclick dblclick pointercancel pointerdown pointerup dragend dragstart drop compositionend compositionstart keydown keypress keyup input textInput copy cut paste click change contextmenu reset".split(
+      " "
+    );
+    function clearIfContinuousEvent(domEventName, nativeEvent) {
+      switch (domEventName) {
+        case "focusin":
+        case "focusout":
+          queuedFocus = null;
+          break;
+        case "dragenter":
+        case "dragleave":
+          queuedDrag = null;
+          break;
+        case "mouseover":
+        case "mouseout":
+          queuedMouse = null;
+          break;
+        case "pointerover":
+        case "pointerout":
+          queuedPointers.delete(nativeEvent.pointerId);
+          break;
+        case "gotpointercapture":
+        case "lostpointercapture":
+          queuedPointerCaptures.delete(nativeEvent.pointerId);
+      }
+    }
+    function accumulateOrCreateContinuousQueuedReplayableEvent(existingQueuedEvent, blockedOn, domEventName, eventSystemFlags, targetContainer, nativeEvent) {
+      if (null === existingQueuedEvent || existingQueuedEvent.nativeEvent !== nativeEvent)
+        return existingQueuedEvent = {
+          blockedOn,
+          domEventName,
+          eventSystemFlags,
+          nativeEvent,
+          targetContainers: [targetContainer]
+        }, null !== blockedOn && (blockedOn = getInstanceFromNode(blockedOn), null !== blockedOn && attemptContinuousHydration(blockedOn)), existingQueuedEvent;
+      existingQueuedEvent.eventSystemFlags |= eventSystemFlags;
+      blockedOn = existingQueuedEvent.targetContainers;
+      null !== targetContainer && -1 === blockedOn.indexOf(targetContainer) && blockedOn.push(targetContainer);
+      return existingQueuedEvent;
+    }
+    function queueIfContinuousEvent(blockedOn, domEventName, eventSystemFlags, targetContainer, nativeEvent) {
+      switch (domEventName) {
+        case "focusin":
+          return queuedFocus = accumulateOrCreateContinuousQueuedReplayableEvent(
+            queuedFocus,
+            blockedOn,
+            domEventName,
+            eventSystemFlags,
+            targetContainer,
+            nativeEvent
+          ), true;
+        case "dragenter":
+          return queuedDrag = accumulateOrCreateContinuousQueuedReplayableEvent(
+            queuedDrag,
+            blockedOn,
+            domEventName,
+            eventSystemFlags,
+            targetContainer,
+            nativeEvent
+          ), true;
+        case "mouseover":
+          return queuedMouse = accumulateOrCreateContinuousQueuedReplayableEvent(
+            queuedMouse,
+            blockedOn,
+            domEventName,
+            eventSystemFlags,
+            targetContainer,
+            nativeEvent
+          ), true;
+        case "pointerover":
+          var pointerId = nativeEvent.pointerId;
+          queuedPointers.set(
+            pointerId,
+            accumulateOrCreateContinuousQueuedReplayableEvent(
+              queuedPointers.get(pointerId) || null,
+              blockedOn,
+              domEventName,
+              eventSystemFlags,
+              targetContainer,
+              nativeEvent
+            )
+          );
+          return true;
+        case "gotpointercapture":
+          return pointerId = nativeEvent.pointerId, queuedPointerCaptures.set(
+            pointerId,
+            accumulateOrCreateContinuousQueuedReplayableEvent(
+              queuedPointerCaptures.get(pointerId) || null,
+              blockedOn,
+              domEventName,
+              eventSystemFlags,
+              targetContainer,
+              nativeEvent
+            )
+          ), true;
+      }
+      return false;
+    }
+    function attemptExplicitHydrationTarget(queuedTarget) {
+      var targetInst = getClosestInstanceFromNode(queuedTarget.target);
+      if (null !== targetInst) {
+        var nearestMounted = getNearestMountedFiber(targetInst);
+        if (null !== nearestMounted) {
+          if (targetInst = nearestMounted.tag, 13 === targetInst) {
+            if (targetInst = getSuspenseInstanceFromFiber(nearestMounted), null !== targetInst) {
+              queuedTarget.blockedOn = targetInst;
+              runWithPriority(queuedTarget.priority, function() {
+                attemptHydrationAtCurrentPriority(nearestMounted);
+              });
+              return;
+            }
+          } else if (31 === targetInst) {
+            if (targetInst = getActivityInstanceFromFiber(nearestMounted), null !== targetInst) {
+              queuedTarget.blockedOn = targetInst;
+              runWithPriority(queuedTarget.priority, function() {
+                attemptHydrationAtCurrentPriority(nearestMounted);
+              });
+              return;
+            }
+          } else if (3 === targetInst && nearestMounted.stateNode.current.memoizedState.isDehydrated) {
+            queuedTarget.blockedOn = 3 === nearestMounted.tag ? nearestMounted.stateNode.containerInfo : null;
+            return;
+          }
+        }
+      }
+      queuedTarget.blockedOn = null;
+    }
+    function attemptReplayContinuousQueuedEvent(queuedEvent) {
+      if (null !== queuedEvent.blockedOn) return false;
+      for (var targetContainers = queuedEvent.targetContainers; 0 < targetContainers.length; ) {
+        var nextBlockedOn = findInstanceBlockingEvent(queuedEvent.nativeEvent);
+        if (null === nextBlockedOn) {
+          nextBlockedOn = queuedEvent.nativeEvent;
+          var nativeEventClone = new nextBlockedOn.constructor(
+            nextBlockedOn.type,
+            nextBlockedOn
+          );
+          currentReplayingEvent = nativeEventClone;
+          nextBlockedOn.target.dispatchEvent(nativeEventClone);
+          currentReplayingEvent = null;
+        } else
+          return targetContainers = getInstanceFromNode(nextBlockedOn), null !== targetContainers && attemptContinuousHydration(targetContainers), queuedEvent.blockedOn = nextBlockedOn, false;
+        targetContainers.shift();
+      }
+      return true;
+    }
+    function attemptReplayContinuousQueuedEventInMap(queuedEvent, key, map2) {
+      attemptReplayContinuousQueuedEvent(queuedEvent) && map2.delete(key);
+    }
+    function replayUnblockedEvents() {
+      hasScheduledReplayAttempt = false;
+      null !== queuedFocus && attemptReplayContinuousQueuedEvent(queuedFocus) && (queuedFocus = null);
+      null !== queuedDrag && attemptReplayContinuousQueuedEvent(queuedDrag) && (queuedDrag = null);
+      null !== queuedMouse && attemptReplayContinuousQueuedEvent(queuedMouse) && (queuedMouse = null);
+      queuedPointers.forEach(attemptReplayContinuousQueuedEventInMap);
+      queuedPointerCaptures.forEach(attemptReplayContinuousQueuedEventInMap);
+    }
+    function scheduleCallbackIfUnblocked(queuedEvent, unblocked) {
+      queuedEvent.blockedOn === unblocked && (queuedEvent.blockedOn = null, hasScheduledReplayAttempt || (hasScheduledReplayAttempt = true, Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_NormalPriority,
+        replayUnblockedEvents
+      )));
+    }
+    var lastScheduledReplayQueue = null;
+    function scheduleReplayQueueIfNeeded(formReplayingQueue) {
+      lastScheduledReplayQueue !== formReplayingQueue && (lastScheduledReplayQueue = formReplayingQueue, Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_NormalPriority,
+        function() {
+          lastScheduledReplayQueue === formReplayingQueue && (lastScheduledReplayQueue = null);
+          for (var i = 0; i < formReplayingQueue.length; i += 3) {
+            var form = formReplayingQueue[i], submitterOrAction = formReplayingQueue[i + 1], formData = formReplayingQueue[i + 2];
+            if ("function" !== typeof submitterOrAction)
+              if (null === findInstanceBlockingTarget(submitterOrAction || form))
+                continue;
+              else break;
+            var formInst = getInstanceFromNode(form);
+            null !== formInst && (formReplayingQueue.splice(i, 3), i -= 3, startHostTransition(
+              formInst,
+              {
+                pending: true,
+                data: formData,
+                method: form.method,
+                action: submitterOrAction
+              },
+              submitterOrAction,
+              formData
+            ));
+          }
+        }
+      ));
+    }
+    function retryIfBlockedOn(unblocked) {
+      function unblock(queuedEvent) {
+        return scheduleCallbackIfUnblocked(queuedEvent, unblocked);
+      }
+      null !== queuedFocus && scheduleCallbackIfUnblocked(queuedFocus, unblocked);
+      null !== queuedDrag && scheduleCallbackIfUnblocked(queuedDrag, unblocked);
+      null !== queuedMouse && scheduleCallbackIfUnblocked(queuedMouse, unblocked);
+      queuedPointers.forEach(unblock);
+      queuedPointerCaptures.forEach(unblock);
+      for (var i = 0; i < queuedExplicitHydrationTargets.length; i++) {
+        var queuedTarget = queuedExplicitHydrationTargets[i];
+        queuedTarget.blockedOn === unblocked && (queuedTarget.blockedOn = null);
+      }
+      for (; 0 < queuedExplicitHydrationTargets.length && (i = queuedExplicitHydrationTargets[0], null === i.blockedOn); )
+        attemptExplicitHydrationTarget(i), null === i.blockedOn && queuedExplicitHydrationTargets.shift();
+      i = (unblocked.ownerDocument || unblocked).$$reactFormReplay;
+      if (null != i)
+        for (queuedTarget = 0; queuedTarget < i.length; queuedTarget += 3) {
+          var form = i[queuedTarget], submitterOrAction = i[queuedTarget + 1], formProps = form[internalPropsKey] || null;
+          if ("function" === typeof submitterOrAction)
+            formProps || scheduleReplayQueueIfNeeded(i);
+          else if (formProps) {
+            var action = null;
+            if (submitterOrAction && submitterOrAction.hasAttribute("formAction"))
+              if (form = submitterOrAction, formProps = submitterOrAction[internalPropsKey] || null)
+                action = formProps.formAction;
+              else {
+                if (null !== findInstanceBlockingTarget(form)) continue;
+              }
+            else action = formProps.action;
+            "function" === typeof action ? i[queuedTarget + 1] = action : (i.splice(queuedTarget, 3), queuedTarget -= 3);
+            scheduleReplayQueueIfNeeded(i);
+          }
+        }
+    }
+    function defaultOnDefaultTransitionIndicator() {
+      function handleNavigate(event) {
+        event.canIntercept && "react-transition" === event.info && event.intercept({
+          handler: function() {
+            return new Promise(function(resolve) {
+              return pendingResolve = resolve;
+            });
+          },
+          focusReset: "manual",
+          scroll: "manual"
+        });
+      }
+      function handleNavigateComplete() {
+        null !== pendingResolve && (pendingResolve(), pendingResolve = null);
+        isCancelled || setTimeout(startFakeNavigation, 20);
+      }
+      function startFakeNavigation() {
+        if (!isCancelled && !navigation.transition) {
+          var currentEntry = navigation.currentEntry;
+          currentEntry && null != currentEntry.url && navigation.navigate(currentEntry.url, {
+            state: currentEntry.getState(),
+            info: "react-transition",
+            history: "replace"
+          });
+        }
+      }
+      if ("object" === typeof navigation) {
+        var isCancelled = false, pendingResolve = null;
+        navigation.addEventListener("navigate", handleNavigate);
+        navigation.addEventListener("navigatesuccess", handleNavigateComplete);
+        navigation.addEventListener("navigateerror", handleNavigateComplete);
+        setTimeout(startFakeNavigation, 100);
+        return function() {
+          isCancelled = true;
+          navigation.removeEventListener("navigate", handleNavigate);
+          navigation.removeEventListener("navigatesuccess", handleNavigateComplete);
+          navigation.removeEventListener("navigateerror", handleNavigateComplete);
+          null !== pendingResolve && (pendingResolve(), pendingResolve = null);
+        };
+      }
+    }
+    function ReactDOMRoot(internalRoot) {
+      this._internalRoot = internalRoot;
+    }
+    ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render = function(children) {
+      var root3 = this._internalRoot;
+      if (null === root3) throw Error(formatProdErrorMessage(409));
+      var current = root3.current, lane = requestUpdateLane();
+      updateContainerImpl(current, lane, children, root3, null, null);
+    };
+    ReactDOMHydrationRoot.prototype.unmount = ReactDOMRoot.prototype.unmount = function() {
+      var root3 = this._internalRoot;
+      if (null !== root3) {
+        this._internalRoot = null;
+        var container = root3.containerInfo;
+        updateContainerImpl(root3.current, 2, null, root3, null, null);
+        flushSyncWork$1();
+        container[internalContainerInstanceKey] = null;
+      }
+    };
+    function ReactDOMHydrationRoot(internalRoot) {
+      this._internalRoot = internalRoot;
+    }
+    ReactDOMHydrationRoot.prototype.unstable_scheduleHydration = function(target) {
+      if (target) {
+        var updatePriority = resolveUpdatePriority();
+        target = { blockedOn: null, target, priority: updatePriority };
+        for (var i = 0; i < queuedExplicitHydrationTargets.length && 0 !== updatePriority && updatePriority < queuedExplicitHydrationTargets[i].priority; i++) ;
+        queuedExplicitHydrationTargets.splice(i, 0, target);
+        0 === i && attemptExplicitHydrationTarget(target);
+      }
+    };
+    var isomorphicReactPackageVersion$jscomp$inline_2043 = React.version;
+    if ("19.3.0" !== isomorphicReactPackageVersion$jscomp$inline_2043)
+      throw Error(
+        formatProdErrorMessage(
+          527,
+          isomorphicReactPackageVersion$jscomp$inline_2043,
+          "19.3.0"
+        )
+      );
+    ReactDOMSharedInternals.findDOMNode = function(componentOrElement) {
+      var fiber = componentOrElement._reactInternals;
+      if (void 0 === fiber) {
+        if ("function" === typeof componentOrElement.render)
+          throw Error(formatProdErrorMessage(188));
+        componentOrElement = Object.keys(componentOrElement).join(",");
+        throw Error(formatProdErrorMessage(268, componentOrElement));
+      }
+      componentOrElement = findCurrentFiberUsingSlowPath(fiber);
+      componentOrElement = null !== componentOrElement ? findCurrentHostFiberImpl(componentOrElement) : null;
+      componentOrElement = null === componentOrElement ? null : componentOrElement.stateNode;
+      return componentOrElement;
+    };
+    var internals$jscomp$inline_2586 = {
+      bundleType: 0,
+      version: "19.3.0",
+      rendererPackageName: "react-dom",
+      currentDispatcherRef: ReactSharedInternals,
+      reconcilerVersion: "19.3.0"
+    };
+    if ("undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__) {
+      var hook$jscomp$inline_2587 = __REACT_DEVTOOLS_GLOBAL_HOOK__;
+      if (!hook$jscomp$inline_2587.isDisabled && hook$jscomp$inline_2587.supportsFiber)
+        try {
+          rendererID = hook$jscomp$inline_2587.inject(
+            internals$jscomp$inline_2586
+          ), injectedHook = hook$jscomp$inline_2587;
+        } catch (err) {
+        }
+    }
+    reactDomClient_production.createRoot = function(container, options2) {
+      if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+      var isStrictMode = false, identifierPrefix = "", onUncaughtError = defaultOnUncaughtError, onCaughtError = defaultOnCaughtError, onRecoverableError = defaultOnRecoverableError;
+      null !== options2 && void 0 !== options2 && (true === options2.unstable_strictMode && (isStrictMode = true), void 0 !== options2.identifierPrefix && (identifierPrefix = options2.identifierPrefix), void 0 !== options2.onUncaughtError && (onUncaughtError = options2.onUncaughtError), void 0 !== options2.onCaughtError && (onCaughtError = options2.onCaughtError), void 0 !== options2.onRecoverableError && (onRecoverableError = options2.onRecoverableError));
+      options2 = createFiberRoot(
+        container,
+        1,
+        false,
+        null,
+        null,
+        isStrictMode,
+        identifierPrefix,
+        null,
+        onUncaughtError,
+        onCaughtError,
+        onRecoverableError,
+        defaultOnDefaultTransitionIndicator
+      );
+      container[internalContainerInstanceKey] = options2.current;
+      listenToAllSupportedEvents(container);
+      return new ReactDOMRoot(options2);
+    };
+    reactDomClient_production.hydrateRoot = function(container, initialChildren, options2) {
+      if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+      var isStrictMode = false, identifierPrefix = "", onUncaughtError = defaultOnUncaughtError, onCaughtError = defaultOnCaughtError, onRecoverableError = defaultOnRecoverableError, formState = null;
+      null !== options2 && void 0 !== options2 && (true === options2.unstable_strictMode && (isStrictMode = true), void 0 !== options2.identifierPrefix && (identifierPrefix = options2.identifierPrefix), void 0 !== options2.onUncaughtError && (onUncaughtError = options2.onUncaughtError), void 0 !== options2.onCaughtError && (onCaughtError = options2.onCaughtError), void 0 !== options2.onRecoverableError && (onRecoverableError = options2.onRecoverableError), void 0 !== options2.formState && (formState = options2.formState));
+      initialChildren = createFiberRoot(
+        container,
+        1,
+        true,
+        initialChildren,
+        null != options2 ? options2 : null,
+        isStrictMode,
+        identifierPrefix,
+        formState,
+        onUncaughtError,
+        onCaughtError,
+        onRecoverableError,
+        defaultOnDefaultTransitionIndicator
+      );
+      initialChildren.context = getContextForSubtree(null);
+      options2 = initialChildren.current;
+      isStrictMode = requestUpdateLane();
+      isStrictMode = getBumpedLaneForHydrationByLane(isStrictMode);
+      identifierPrefix = createUpdate(isStrictMode);
+      identifierPrefix.callback = null;
+      enqueueUpdate(options2, identifierPrefix, isStrictMode);
+      options2 = isStrictMode;
+      initialChildren.current.lanes = options2;
+      markRootUpdated$1(initialChildren, options2);
+      ensureRootIsScheduled(initialChildren);
+      container[internalContainerInstanceKey] = initialChildren.current;
+      listenToAllSupportedEvents(container);
+      return new ReactDOMHydrationRoot(initialChildren);
+    };
+    reactDomClient_production.version = "19.3.0";
+    return reactDomClient_production;
+  }
+  var hasRequiredClient;
+  function requireClient() {
+    if (hasRequiredClient) return client.exports;
+    hasRequiredClient = 1;
+    function checkDCE() {
+      if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === "undefined" || typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== "function") {
+        return;
+      }
+      try {
+        __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(checkDCE);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    {
+      checkDCE();
+      client.exports = requireReactDomClient_production();
+    }
+    return client.exports;
+  }
+  var clientExports = requireClient();
+  var reactExports = requireReact();
+  const toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  const toCamelCase = (string) => string.replace(
+    /^([A-Z])|[\s-_]+(\w)/g,
+    (match, p1, p2) => p2 ? p2.toUpperCase() : p1.toLowerCase()
+  );
+  const toPascalCase = (string) => {
+    const camelCase = toCamelCase(string);
+    return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
+  };
+  const mergeClasses = (...classes) => classes.filter((className, index, array) => {
+    return Boolean(className) && className.trim() !== "" && array.indexOf(className) === index;
+  }).join(" ").trim();
+  const hasA11yProp = (props) => {
+    for (const prop in props) {
+      if (prop.startsWith("aria-") || prop === "role" || prop === "title") {
+        return true;
+      }
+    }
+  };
+  var defaultAttributes = {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: 24,
+    height: 24,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  const Icon = reactExports.forwardRef(
+    ({
+      color = "currentColor",
+      size = 24,
+      strokeWidth = 2,
+      absoluteStrokeWidth,
+      className = "",
+      children,
+      iconNode,
+      ...rest
+    }, ref) => reactExports.createElement(
+      "svg",
+      {
+        ref,
+        ...defaultAttributes,
+        width: size,
+        height: size,
+        stroke: color,
+        strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
+        className: mergeClasses("lucide", className),
+        ...!children && !hasA11yProp(rest) && { "aria-hidden": "true" },
+        ...rest
+      },
+      [
+        ...iconNode.map(([tag, attrs]) => reactExports.createElement(tag, attrs)),
+        ...Array.isArray(children) ? children : [children]
+      ]
+    )
+  );
+  const createLucideIcon = (iconName, iconNode) => {
+    const Component = reactExports.forwardRef(
+      ({ className, ...props }, ref) => reactExports.createElement(Icon, {
+        ref,
+        iconNode,
+        className: mergeClasses(
+          `lucide-${toKebabCase(toPascalCase(iconName))}`,
+          `lucide-${iconName}`,
+          className
+        ),
+        ...props
+      })
+    );
+    Component.displayName = toPascalCase(iconName);
+    return Component;
+  };
+  const __iconNode$K = [
+    ["path", { d: "M12 8V4H8", key: "hb8ula" }],
+    ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
+    ["path", { d: "M2 14h2", key: "vft8re" }],
+    ["path", { d: "M20 14h2", key: "4cs60a" }],
+    ["path", { d: "M15 13v2", key: "1xurst" }],
+    ["path", { d: "M9 13v2", key: "rq6x2g" }]
+  ];
+  const Bot = createLucideIcon("bot", __iconNode$K);
+  const __iconNode$J = [
+    [
+      "path",
+      { d: "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", key: "ezmyqa" }
+    ],
+    [
+      "path",
+      {
+        d: "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",
+        key: "e1hn23"
+      }
+    ]
+  ];
+  const Braces = createLucideIcon("braces", __iconNode$J);
+  const __iconNode$I = [
+    ["path", { d: "M8 2v4", key: "1cmpym" }],
+    ["path", { d: "M16 2v4", key: "4m81vk" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
+    ["path", { d: "M3 10h18", key: "8toen8" }]
+  ];
+  const Calendar = createLucideIcon("calendar", __iconNode$I);
+  const __iconNode$H = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
+  const ChevronDown = createLucideIcon("chevron-down", __iconNode$H);
+  const __iconNode$G = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
+  const ChevronRight = createLucideIcon("chevron-right", __iconNode$G);
+  const __iconNode$F = [
+    ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
+    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2", key: "4jdomd" }],
+    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v4", key: "3hqy98" }],
+    ["path", { d: "M21 14H11", key: "1bme5i" }],
+    ["path", { d: "m15 10-4 4 4 4", key: "5dvupr" }]
+  ];
+  const ClipboardCopy = createLucideIcon("clipboard-copy", __iconNode$F);
+  const __iconNode$E = [
+    ["path", { d: "M11 14h10", key: "1w8e9d" }],
+    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v1.344", key: "1e62lh" }],
+    ["path", { d: "m17 18 4-4-4-4", key: "z2g111" }],
+    ["path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113", key: "bjbb7m" }],
+    ["rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", key: "ublpy" }]
+  ];
+  const ClipboardPaste = createLucideIcon("clipboard-paste", __iconNode$E);
+  const __iconNode$D = [
+    ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
+    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
+  ];
+  const Clock = createLucideIcon("clock", __iconNode$D);
+  const __iconNode$C = [
+    ["path", { d: "M12 13v8l-4-4", key: "1f5nwf" }],
+    ["path", { d: "m12 21 4-4", key: "1lfcce" }],
+    ["path", { d: "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284", key: "ui1hmy" }]
+  ];
+  const CloudDownload = createLucideIcon("cloud-download", __iconNode$C);
+  const __iconNode$B = [
+    ["path", { d: "m18 16 4-4-4-4", key: "1inbqp" }],
+    ["path", { d: "m6 8-4 4 4 4", key: "15zrgr" }],
+    ["path", { d: "m14.5 4-5 16", key: "e7oirm" }]
+  ];
+  const CodeXml = createLucideIcon("code-xml", __iconNode$B);
+  const __iconNode$A = [
+    ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
+    ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
+  ];
+  const Copy = createLucideIcon("copy", __iconNode$A);
+  const __iconNode$z = [
+    ["ellipse", { cx: "12", cy: "5", rx: "9", ry: "3", key: "msslwz" }],
+    ["path", { d: "M3 5V19A9 3 0 0 0 15 21.84", key: "14ibmq" }],
+    ["path", { d: "M21 5V8", key: "1marbg" }],
+    ["path", { d: "M21 12L18 17H22L19 22", key: "zafso" }],
+    ["path", { d: "M3 12A9 3 0 0 0 14.59 14.87", key: "1y4wr8" }]
+  ];
+  const DatabaseZap = createLucideIcon("database-zap", __iconNode$z);
+  const __iconNode$y = [
+    [
+      "path",
+      {
+        d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
+        key: "1oefj6"
+      }
+    ],
+    ["path", { d: "M14 2v5a1 1 0 0 0 1 1h5", key: "wfsgrz" }],
+    ["path", { d: "M10 9H8", key: "b1mrlr" }],
+    ["path", { d: "M16 13H8", key: "t4e002" }],
+    ["path", { d: "M16 17H8", key: "z1uh3a" }]
+  ];
+  const FileText = createLucideIcon("file-text", __iconNode$y);
+  const __iconNode$x = [
+    [
+      "path",
+      {
+        d: "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2",
+        key: "18mbvz"
+      }
+    ],
+    ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
+    ["path", { d: "M8.5 2h7", key: "csnxdl" }]
+  ];
+  const FlaskConical = createLucideIcon("flask-conical", __iconNode$x);
+  const __iconNode$w = [
+    [
+      "path",
+      {
+        d: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z",
+        key: "1kt360"
+      }
+    ]
+  ];
+  const Folder = createLucideIcon("folder", __iconNode$w);
+  const __iconNode$v = [
+    [
+      "path",
+      {
+        d: "M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z",
+        key: "sc7q7i"
+      }
+    ]
+  ];
+  const Funnel = createLucideIcon("funnel", __iconNode$v);
+  const __iconNode$u = [
+    ["line", { x1: "6", x2: "6", y1: "3", y2: "15", key: "17qcm7" }],
+    ["circle", { cx: "18", cy: "6", r: "3", key: "1h7g24" }],
+    ["circle", { cx: "6", cy: "18", r: "3", key: "fqmcym" }],
+    ["path", { d: "M18 9a9 9 0 0 1-9 9", key: "n2h4wq" }]
+  ];
+  const GitBranch = createLucideIcon("git-branch", __iconNode$u);
+  const __iconNode$t = [
+    ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+    ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
+    ["path", { d: "M2 12h20", key: "9i4pu4" }]
+  ];
+  const Globe = createLucideIcon("globe", __iconNode$t);
+  const __iconNode$s = [
+    ["path", { d: "M10 8h.01", key: "1r9ogq" }],
+    ["path", { d: "M12 12h.01", key: "1mp3jc" }],
+    ["path", { d: "M14 8h.01", key: "1primd" }],
+    ["path", { d: "M16 12h.01", key: "1l6xoz" }],
+    ["path", { d: "M18 8h.01", key: "emo2bl" }],
+    ["path", { d: "M6 8h.01", key: "x9i8wu" }],
+    ["path", { d: "M7 16h10", key: "wp8him" }],
+    ["path", { d: "M8 12h.01", key: "czm47f" }],
+    ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }]
+  ];
+  const Keyboard = createLucideIcon("keyboard", __iconNode$s);
+  const __iconNode$r = [
+    [
+      "path",
+      {
+        d: "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
+        key: "zw3jo"
+      }
+    ],
+    [
+      "path",
+      {
+        d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
+        key: "1wduqc"
+      }
+    ],
+    [
+      "path",
+      {
+        d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
+        key: "kqbvx6"
+      }
+    ]
+  ];
+  const Layers = createLucideIcon("layers", __iconNode$r);
+  const __iconNode$q = [
+    ["path", { d: "M16 5H3", key: "m91uny" }],
+    ["path", { d: "M11 12H3", key: "51ecnj" }],
+    ["path", { d: "M16 19H3", key: "zzsher" }],
+    ["path", { d: "M18 9v6", key: "1twb98" }],
+    ["path", { d: "M21 12h-6", key: "bt1uis" }]
+  ];
+  const ListPlus = createLucideIcon("list-plus", __iconNode$q);
+  const __iconNode$p = [
+    ["path", { d: "M21 5H3", key: "1fi0y6" }],
+    ["path", { d: "M7 12H3", key: "13ou7f" }],
+    ["path", { d: "M7 19H3", key: "wbqt3n" }],
+    [
+      "path",
+      {
+        d: "M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14",
+        key: "qth677"
+      }
+    ],
+    ["path", { d: "M11 10v4h4", key: "172dkj" }]
+  ];
+  const ListRestart = createLucideIcon("list-restart", __iconNode$p);
+  const __iconNode$o = [
+    ["path", { d: "M8 5h13", key: "1pao27" }],
+    ["path", { d: "M13 12h8", key: "h98zly" }],
+    ["path", { d: "M13 19h8", key: "c3s6r1" }],
+    ["path", { d: "M3 10a2 2 0 0 0 2 2h3", key: "1npucw" }],
+    ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3", key: "x1gjn2" }]
+  ];
+  const ListTree = createLucideIcon("list-tree", __iconNode$o);
+  const __iconNode$n = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+  const LoaderCircle = createLucideIcon("loader-circle", __iconNode$n);
+  const __iconNode$m = [
+    ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "132q7q" }],
+    ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "izxlao" }]
+  ];
+  const Mail = createLucideIcon("mail", __iconNode$m);
+  const __iconNode$l = [
+    ["path", { d: "M8 3H5a2 2 0 0 0-2 2v3", key: "1dcmit" }],
+    ["path", { d: "M21 8V5a2 2 0 0 0-2-2h-3", key: "1e4gt3" }],
+    ["path", { d: "M3 16v3a2 2 0 0 0 2 2h3", key: "wsl5sc" }],
+    ["path", { d: "M16 21h3a2 2 0 0 0 2-2v-3", key: "18trek" }]
+  ];
+  const Maximize = createLucideIcon("maximize", __iconNode$l);
+  const __iconNode$k = [
+    ["path", { d: "M4 5h16", key: "1tepv9" }],
+    ["path", { d: "M4 12h16", key: "1lakjw" }],
+    ["path", { d: "M4 19h16", key: "1djgab" }]
+  ];
+  const Menu = createLucideIcon("menu", __iconNode$k);
+  const __iconNode$j = [["path", { d: "M5 12h14", key: "1ays0h" }]];
+  const Minus = createLucideIcon("minus", __iconNode$j);
+  const __iconNode$i = [
+    [
+      "path",
+      {
+        d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
+        key: "10ikf1"
+      }
+    ]
+  ];
+  const Play = createLucideIcon("play", __iconNode$i);
+  const __iconNode$h = [
+    ["path", { d: "M5 12h14", key: "1ays0h" }],
+    ["path", { d: "M12 5v14", key: "s699le" }]
+  ];
+  const Plus = createLucideIcon("plus", __iconNode$h);
+  const __iconNode$g = [
+    ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
+    ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
+    ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
+    ["path", { d: "M8 16H3v5", key: "1cv678" }]
+  ];
+  const RefreshCw = createLucideIcon("refresh-cw", __iconNode$g);
+  const __iconNode$f = [
+    ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
+    ["path", { d: "M3 3v5h5", key: "1xhq8a" }]
+  ];
+  const RotateCcw = createLucideIcon("rotate-ccw", __iconNode$f);
+  const __iconNode$e = [
+    ["path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", key: "1p45f6" }],
+    ["path", { d: "M21 3v5h-5", key: "1q7to0" }]
+  ];
+  const RotateCw = createLucideIcon("rotate-cw", __iconNode$e);
+  const __iconNode$d = [
+    ["path", { d: "M4 11a9 9 0 0 1 9 9", key: "pv89mb" }],
+    ["path", { d: "M4 4a16 16 0 0 1 16 16", key: "k0647b" }],
+    ["circle", { cx: "5", cy: "19", r: "1", key: "bfqh0e" }]
+  ];
+  const Rss = createLucideIcon("rss", __iconNode$d);
+  const __iconNode$c = [
+    ["path", { d: "m21 21-4.34-4.34", key: "14j7rj" }],
+    ["circle", { cx: "11", cy: "11", r: "8", key: "4ej97u" }]
+  ];
+  const Search = createLucideIcon("search", __iconNode$c);
+  const __iconNode$b = [
+    [
+      "path",
+      {
+        d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
+        key: "1ffxy3"
+      }
+    ],
+    ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
+  ];
+  const Send = createLucideIcon("send", __iconNode$b);
+  const __iconNode$a = [
+    [
+      "path",
+      {
+        d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
+        key: "1s2grr"
+      }
+    ],
+    ["path", { d: "M20 2v4", key: "1rf3ol" }],
+    ["path", { d: "M22 4h-4", key: "gwowj6" }],
+    ["circle", { cx: "4", cy: "20", r: "2", key: "6kqj1y" }]
+  ];
+  const Sparkles = createLucideIcon("sparkles", __iconNode$a);
+  const __iconNode$9 = [
+    [
+      "path",
+      {
+        d: "M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z",
+        key: "1dfntj"
+      }
+    ],
+    ["path", { d: "M15 3v5a1 1 0 0 0 1 1h5", key: "6s6qgf" }]
+  ];
+  const StickyNote = createLucideIcon("sticky-note", __iconNode$9);
+  const __iconNode$8 = [
+    ["path", { d: "M12 3v18", key: "108xh3" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", key: "afitv7" }],
+    ["path", { d: "M3 9h18", key: "1pudct" }],
+    ["path", { d: "M3 15h18", key: "5xshup" }]
+  ];
+  const Table = createLucideIcon("table", __iconNode$8);
+  const __iconNode$7 = [
+    ["line", { x1: "10", x2: "14", y1: "2", y2: "2", key: "14vaq8" }],
+    ["line", { x1: "12", x2: "15", y1: "14", y2: "11", key: "17fdiu" }],
+    ["circle", { cx: "12", cy: "14", r: "8", key: "1e1u0o" }]
+  ];
+  const Timer = createLucideIcon("timer", __iconNode$7);
+  const __iconNode$6 = [
+    ["path", { d: "M10 11v6", key: "nco0om" }],
+    ["path", { d: "M14 11v6", key: "outv1u" }],
+    ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
+    ["path", { d: "M3 6h18", key: "d0wm0j" }],
+    ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
+  ];
+  const Trash2 = createLucideIcon("trash-2", __iconNode$6);
+  const __iconNode$5 = [
+    [
+      "path",
+      {
+        d: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+        key: "wmoenq"
+      }
+    ],
+    ["path", { d: "M12 9v4", key: "juzpu7" }],
+    ["path", { d: "M12 17h.01", key: "p32p05" }]
+  ];
+  const TriangleAlert = createLucideIcon("triangle-alert", __iconNode$5);
+  const __iconNode$4 = [
+    [
+      "path",
+      {
+        d: "m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5",
+        key: "ftymec"
+      }
+    ],
+    ["rect", { x: "2", y: "6", width: "14", height: "12", rx: "2", key: "158x01" }]
+  ];
+  const Video = createLucideIcon("video", __iconNode$4);
+  const __iconNode$3 = [
+    [
+      "path",
+      {
+        d: "M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2",
+        key: "q3hayz"
+      }
+    ],
+    ["path", { d: "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", key: "1go1hn" }],
+    ["path", { d: "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8", key: "qlwsc0" }]
+  ];
+  const Webhook = createLucideIcon("webhook", __iconNode$3);
+  const __iconNode$2 = [
+    ["rect", { width: "8", height: "8", x: "3", y: "3", rx: "2", key: "by2w9f" }],
+    ["path", { d: "M7 11v4a2 2 0 0 0 2 2h4", key: "xkn7yn" }],
+    ["rect", { width: "8", height: "8", x: "13", y: "13", rx: "2", key: "1cgmvn" }]
+  ];
+  const Workflow = createLucideIcon("workflow", __iconNode$2);
+  const __iconNode$1 = [
+    ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
+    ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
+  ];
+  const X = createLucideIcon("x", __iconNode$1);
+  const __iconNode = [
+    [
+      "path",
+      {
+        d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
+        key: "1xq2db"
+      }
+    ]
+  ];
+  const Zap = createLucideIcon("zap", __iconNode);
+  function getDefaultExportFromCjs(x) {
+    return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
+  }
+  var jsYaml = {};
+  var loader = {};
+  var common = {};
+  var hasRequiredCommon;
+  function requireCommon() {
+    if (hasRequiredCommon) return common;
+    hasRequiredCommon = 1;
+    function isNothing(subject) {
+      return typeof subject === "undefined" || subject === null;
+    }
+    function isObject(subject) {
+      return typeof subject === "object" && subject !== null;
+    }
+    function toArray(sequence) {
+      if (Array.isArray(sequence)) return sequence;
+      else if (isNothing(sequence)) return [];
+      return [sequence];
+    }
+    function extend(target, source) {
+      if (source) {
+        const sourceKeys = Object.keys(source);
+        for (let index = 0, length = sourceKeys.length; index < length; index += 1) {
+          const key = sourceKeys[index];
+          target[key] = source[key];
+        }
+      }
+      return target;
+    }
+    function repeat(string, count) {
+      let result = "";
+      for (let cycle = 0; cycle < count; cycle += 1) {
+        result += string;
+      }
+      return result;
+    }
+    function isNegativeZero(number) {
+      return number === 0 && Number.NEGATIVE_INFINITY === 1 / number;
+    }
+    common.isNothing = isNothing;
+    common.isObject = isObject;
+    common.toArray = toArray;
+    common.repeat = repeat;
+    common.isNegativeZero = isNegativeZero;
+    common.extend = extend;
+    return common;
+  }
+  var exception;
+  var hasRequiredException;
+  function requireException() {
+    if (hasRequiredException) return exception;
+    hasRequiredException = 1;
+    function formatError(exception2, compact) {
+      let where = "";
+      const message = exception2.reason || "(unknown reason)";
+      if (!exception2.mark) return message;
+      if (exception2.mark.name) {
+        where += 'in "' + exception2.mark.name + '" ';
+      }
+      where += "(" + (exception2.mark.line + 1) + ":" + (exception2.mark.column + 1) + ")";
+      if (!compact && exception2.mark.snippet) {
+        where += "\n\n" + exception2.mark.snippet;
+      }
+      return message + " " + where;
+    }
+    function YAMLException2(reason, mark) {
+      Error.call(this);
+      this.name = "YAMLException";
+      this.reason = reason;
+      this.mark = mark;
+      this.message = formatError(this, false);
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, this.constructor);
+      } else {
+        this.stack = new Error().stack || "";
+      }
+    }
+    YAMLException2.prototype = Object.create(Error.prototype);
+    YAMLException2.prototype.constructor = YAMLException2;
+    YAMLException2.prototype.toString = function toString(compact) {
+      return this.name + ": " + formatError(this, compact);
+    };
+    exception = YAMLException2;
+    return exception;
+  }
+  var snippet;
+  var hasRequiredSnippet;
+  function requireSnippet() {
+    if (hasRequiredSnippet) return snippet;
+    hasRequiredSnippet = 1;
+    const common2 = requireCommon();
+    function getLine(buffer, lineStart, lineEnd, position, maxLineLength) {
+      let head = "";
+      let tail = "";
+      const maxHalfLength = Math.floor(maxLineLength / 2) - 1;
+      if (position - lineStart > maxHalfLength) {
+        head = " ... ";
+        lineStart = position - maxHalfLength + head.length;
+      }
+      if (lineEnd - position > maxHalfLength) {
+        tail = " ...";
+        lineEnd = position + maxHalfLength - tail.length;
+      }
+      return {
+        str: head + buffer.slice(lineStart, lineEnd).replace(/\t/g, "→") + tail,
+        pos: position - lineStart + head.length
+        // relative position
+      };
+    }
+    function padStart(string, max) {
+      return common2.repeat(" ", max - string.length) + string;
+    }
+    function makeSnippet(mark, options) {
+      options = Object.create(options || null);
+      if (!mark.buffer) return null;
+      if (!options.maxLength) options.maxLength = 79;
+      if (typeof options.indent !== "number") options.indent = 1;
+      if (typeof options.linesBefore !== "number") options.linesBefore = 3;
+      if (typeof options.linesAfter !== "number") options.linesAfter = 2;
+      const re = /\r?\n|\r|\0/g;
+      const lineStarts = [0];
+      const lineEnds = [];
+      let match;
+      let foundLineNo = -1;
+      while (match = re.exec(mark.buffer)) {
+        lineEnds.push(match.index);
+        lineStarts.push(match.index + match[0].length);
+        if (mark.position <= match.index && foundLineNo < 0) {
+          foundLineNo = lineStarts.length - 2;
+        }
+      }
+      if (foundLineNo < 0) foundLineNo = lineStarts.length - 1;
+      let result = "";
+      const lineNoLength = Math.min(mark.line + options.linesAfter, lineEnds.length).toString().length;
+      const maxLineLength = options.maxLength - (options.indent + lineNoLength + 3);
+      for (let i = 1; i <= options.linesBefore; i++) {
+        if (foundLineNo - i < 0) break;
+        const line2 = getLine(
+          mark.buffer,
+          lineStarts[foundLineNo - i],
+          lineEnds[foundLineNo - i],
+          mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo - i]),
+          maxLineLength
+        );
+        result = common2.repeat(" ", options.indent) + padStart((mark.line - i + 1).toString(), lineNoLength) + " | " + line2.str + "\n" + result;
+      }
+      const line = getLine(mark.buffer, lineStarts[foundLineNo], lineEnds[foundLineNo], mark.position, maxLineLength);
+      result += common2.repeat(" ", options.indent) + padStart((mark.line + 1).toString(), lineNoLength) + " | " + line.str + "\n";
+      result += common2.repeat("-", options.indent + lineNoLength + 3 + line.pos) + "^\n";
+      for (let i = 1; i <= options.linesAfter; i++) {
+        if (foundLineNo + i >= lineEnds.length) break;
+        const line2 = getLine(
+          mark.buffer,
+          lineStarts[foundLineNo + i],
+          lineEnds[foundLineNo + i],
+          mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo + i]),
+          maxLineLength
+        );
+        result += common2.repeat(" ", options.indent) + padStart((mark.line + i + 1).toString(), lineNoLength) + " | " + line2.str + "\n";
+      }
+      return result.replace(/\n$/, "");
+    }
+    snippet = makeSnippet;
+    return snippet;
+  }
+  var type;
+  var hasRequiredType;
+  function requireType() {
+    if (hasRequiredType) return type;
+    hasRequiredType = 1;
+    const YAMLException2 = requireException();
+    const TYPE_CONSTRUCTOR_OPTIONS = [
+      "kind",
+      "multi",
+      "resolve",
+      "construct",
+      "instanceOf",
+      "predicate",
+      "represent",
+      "representName",
+      "defaultStyle",
+      "styleAliases"
+    ];
+    const YAML_NODE_KINDS = [
+      "scalar",
+      "sequence",
+      "mapping"
+    ];
+    function compileStyleAliases(map2) {
+      const result = {};
+      if (map2 !== null) {
+        Object.keys(map2).forEach(function(style) {
+          map2[style].forEach(function(alias) {
+            result[String(alias)] = style;
+          });
+        });
+      }
+      return result;
+    }
+    function Type2(tag, options) {
+      options = options || {};
+      Object.keys(options).forEach(function(name) {
+        if (TYPE_CONSTRUCTOR_OPTIONS.indexOf(name) === -1) {
+          throw new YAMLException2('Unknown option "' + name + '" is met in definition of "' + tag + '" YAML type.');
+        }
+      });
+      this.options = options;
+      this.tag = tag;
+      this.kind = options["kind"] || null;
+      this.resolve = options["resolve"] || function() {
+        return true;
+      };
+      this.construct = options["construct"] || function(data) {
+        return data;
+      };
+      this.instanceOf = options["instanceOf"] || null;
+      this.predicate = options["predicate"] || null;
+      this.represent = options["represent"] || null;
+      this.representName = options["representName"] || null;
+      this.defaultStyle = options["defaultStyle"] || null;
+      this.multi = options["multi"] || false;
+      this.styleAliases = compileStyleAliases(options["styleAliases"] || null);
+      if (YAML_NODE_KINDS.indexOf(this.kind) === -1) {
+        throw new YAMLException2('Unknown kind "' + this.kind + '" is specified for "' + tag + '" YAML type.');
+      }
+    }
+    type = Type2;
+    return type;
+  }
+  var schema;
+  var hasRequiredSchema;
+  function requireSchema() {
+    if (hasRequiredSchema) return schema;
+    hasRequiredSchema = 1;
+    const YAMLException2 = requireException();
+    const Type2 = requireType();
+    function compileList(schema2, name) {
+      const result = [];
+      schema2[name].forEach(function(currentType) {
+        let newIndex = result.length;
+        result.forEach(function(previousType, previousIndex) {
+          if (previousType.tag === currentType.tag && previousType.kind === currentType.kind && previousType.multi === currentType.multi) {
+            newIndex = previousIndex;
+          }
+        });
+        result[newIndex] = currentType;
+      });
+      return result;
+    }
+    function compileMap() {
+      const result = {
+        scalar: {},
+        sequence: {},
+        mapping: {},
+        fallback: {},
+        multi: {
+          scalar: [],
+          sequence: [],
+          mapping: [],
+          fallback: []
+        }
+      };
+      function collectType(type2) {
+        if (type2.multi) {
+          result.multi[type2.kind].push(type2);
+          result.multi["fallback"].push(type2);
+        } else {
+          result[type2.kind][type2.tag] = result["fallback"][type2.tag] = type2;
+        }
+      }
+      for (let index = 0, length = arguments.length; index < length; index += 1) {
+        arguments[index].forEach(collectType);
+      }
+      return result;
+    }
+    function Schema2(definition) {
+      return this.extend(definition);
+    }
+    Schema2.prototype.extend = function extend(definition) {
+      let implicit = [];
+      let explicit = [];
+      if (definition instanceof Type2) {
+        explicit.push(definition);
+      } else if (Array.isArray(definition)) {
+        explicit = explicit.concat(definition);
+      } else if (definition && (Array.isArray(definition.implicit) || Array.isArray(definition.explicit))) {
+        if (definition.implicit) implicit = implicit.concat(definition.implicit);
+        if (definition.explicit) explicit = explicit.concat(definition.explicit);
+      } else {
+        throw new YAMLException2("Schema.extend argument should be a Type, [ Type ], or a schema definition ({ implicit: [...], explicit: [...] })");
+      }
+      implicit.forEach(function(type2) {
+        if (!(type2 instanceof Type2)) {
+          throw new YAMLException2("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+        }
+        if (type2.loadKind && type2.loadKind !== "scalar") {
+          throw new YAMLException2("There is a non-scalar type in the implicit list of a schema. Implicit resolving of such types is not supported.");
+        }
+        if (type2.multi) {
+          throw new YAMLException2("There is a multi type in the implicit list of a schema. Multi tags can only be listed as explicit.");
+        }
+      });
+      explicit.forEach(function(type2) {
+        if (!(type2 instanceof Type2)) {
+          throw new YAMLException2("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+        }
+      });
+      const result = Object.create(Schema2.prototype);
+      result.implicit = (this.implicit || []).concat(implicit);
+      result.explicit = (this.explicit || []).concat(explicit);
+      result.compiledImplicit = compileList(result, "implicit");
+      result.compiledExplicit = compileList(result, "explicit");
+      result.compiledTypeMap = compileMap(result.compiledImplicit, result.compiledExplicit);
+      return result;
+    };
+    schema = Schema2;
+    return schema;
+  }
+  var str;
+  var hasRequiredStr;
+  function requireStr() {
+    if (hasRequiredStr) return str;
+    hasRequiredStr = 1;
+    const Type2 = requireType();
+    str = new Type2("tag:yaml.org,2002:str", {
+      kind: "scalar",
+      construct: function(data) {
+        return data !== null ? data : "";
+      }
+    });
+    return str;
+  }
+  var seq;
+  var hasRequiredSeq;
+  function requireSeq() {
+    if (hasRequiredSeq) return seq;
+    hasRequiredSeq = 1;
+    const Type2 = requireType();
+    seq = new Type2("tag:yaml.org,2002:seq", {
+      kind: "sequence",
+      construct: function(data) {
+        return data !== null ? data : [];
+      }
+    });
+    return seq;
+  }
+  var map;
+  var hasRequiredMap;
+  function requireMap() {
+    if (hasRequiredMap) return map;
+    hasRequiredMap = 1;
+    const Type2 = requireType();
+    map = new Type2("tag:yaml.org,2002:map", {
+      kind: "mapping",
+      construct: function(data) {
+        return data !== null ? data : {};
+      }
+    });
+    return map;
+  }
+  var failsafe;
+  var hasRequiredFailsafe;
+  function requireFailsafe() {
+    if (hasRequiredFailsafe) return failsafe;
+    hasRequiredFailsafe = 1;
+    const Schema2 = requireSchema();
+    failsafe = new Schema2({
+      explicit: [
+        requireStr(),
+        requireSeq(),
+        requireMap()
+      ]
+    });
+    return failsafe;
+  }
+  var _null;
+  var hasRequired_null;
+  function require_null() {
+    if (hasRequired_null) return _null;
+    hasRequired_null = 1;
+    const Type2 = requireType();
+    function resolveYamlNull(data) {
+      if (data === null) return true;
+      const max = data.length;
+      return max === 1 && data === "~" || max === 4 && (data === "null" || data === "Null" || data === "NULL");
+    }
+    function constructYamlNull() {
+      return null;
+    }
+    function isNull(object) {
+      return object === null;
+    }
+    _null = new Type2("tag:yaml.org,2002:null", {
+      kind: "scalar",
+      resolve: resolveYamlNull,
+      construct: constructYamlNull,
+      predicate: isNull,
+      represent: {
+        canonical: function() {
+          return "~";
+        },
+        lowercase: function() {
+          return "null";
+        },
+        uppercase: function() {
+          return "NULL";
+        },
+        camelcase: function() {
+          return "Null";
+        },
+        empty: function() {
+          return "";
+        }
+      },
+      defaultStyle: "lowercase"
+    });
+    return _null;
+  }
+  var bool;
+  var hasRequiredBool;
+  function requireBool() {
+    if (hasRequiredBool) return bool;
+    hasRequiredBool = 1;
+    const Type2 = requireType();
+    function resolveYamlBoolean(data) {
+      if (data === null) return false;
+      const max = data.length;
+      return max === 4 && (data === "true" || data === "True" || data === "TRUE") || max === 5 && (data === "false" || data === "False" || data === "FALSE");
+    }
+    function constructYamlBoolean(data) {
+      return data === "true" || data === "True" || data === "TRUE";
+    }
+    function isBoolean(object) {
+      return Object.prototype.toString.call(object) === "[object Boolean]";
+    }
+    bool = new Type2("tag:yaml.org,2002:bool", {
+      kind: "scalar",
+      resolve: resolveYamlBoolean,
+      construct: constructYamlBoolean,
+      predicate: isBoolean,
+      represent: {
+        lowercase: function(object) {
+          return object ? "true" : "false";
+        },
+        uppercase: function(object) {
+          return object ? "TRUE" : "FALSE";
+        },
+        camelcase: function(object) {
+          return object ? "True" : "False";
+        }
+      },
+      defaultStyle: "lowercase"
+    });
+    return bool;
+  }
+  var int;
+  var hasRequiredInt;
+  function requireInt() {
+    if (hasRequiredInt) return int;
+    hasRequiredInt = 1;
+    const common2 = requireCommon();
+    const Type2 = requireType();
+    function isHexCode(c) {
+      return c >= 48 && c <= 57 || c >= 65 && c <= 70 || c >= 97 && c <= 102;
+    }
+    function isOctCode(c) {
+      return c >= 48 && c <= 55;
+    }
+    function isDecCode(c) {
+      return c >= 48 && c <= 57;
+    }
+    function resolveYamlInteger(data) {
+      if (data === null) return false;
+      const max = data.length;
+      let index = 0;
+      let hasDigits = false;
+      if (!max) return false;
+      let ch = data[index];
+      if (ch === "-" || ch === "+") {
+        ch = data[++index];
+      }
+      if (ch === "0") {
+        if (index + 1 === max) return true;
+        ch = data[++index];
+        if (ch === "b") {
+          index++;
+          for (; index < max; index++) {
+            ch = data[index];
+            if (ch !== "0" && ch !== "1") return false;
+            hasDigits = true;
+          }
+          return hasDigits && isFinite(parseYamlInteger(data));
+        }
+        if (ch === "x") {
+          index++;
+          for (; index < max; index++) {
+            if (!isHexCode(data.charCodeAt(index))) return false;
+            hasDigits = true;
+          }
+          return hasDigits && isFinite(parseYamlInteger(data));
+        }
+        if (ch === "o") {
+          index++;
+          for (; index < max; index++) {
+            if (!isOctCode(data.charCodeAt(index))) return false;
+            hasDigits = true;
+          }
+          return hasDigits && isFinite(parseYamlInteger(data));
+        }
+      }
+      for (; index < max; index++) {
+        if (!isDecCode(data.charCodeAt(index))) {
+          return false;
+        }
+        hasDigits = true;
+      }
+      if (!hasDigits) return false;
+      return isFinite(parseYamlInteger(data));
+    }
+    function parseYamlInteger(data) {
+      let value = data;
+      let sign = 1;
+      let ch = value[0];
+      if (ch === "-" || ch === "+") {
+        if (ch === "-") sign = -1;
+        value = value.slice(1);
+        ch = value[0];
+      }
+      if (value === "0") return 0;
+      if (ch === "0") {
+        if (value[1] === "b") return sign * parseInt(value.slice(2), 2);
+        if (value[1] === "x") return sign * parseInt(value.slice(2), 16);
+        if (value[1] === "o") return sign * parseInt(value.slice(2), 8);
+      }
+      return sign * parseInt(value, 10);
+    }
+    function constructYamlInteger(data) {
+      return parseYamlInteger(data);
+    }
+    function isInteger(object) {
+      return Object.prototype.toString.call(object) === "[object Number]" && (object % 1 === 0 && !common2.isNegativeZero(object));
+    }
+    int = new Type2("tag:yaml.org,2002:int", {
+      kind: "scalar",
+      resolve: resolveYamlInteger,
+      construct: constructYamlInteger,
+      predicate: isInteger,
+      represent: {
+        binary: function(obj) {
+          return obj >= 0 ? "0b" + obj.toString(2) : "-0b" + obj.toString(2).slice(1);
+        },
+        octal: function(obj) {
+          return obj >= 0 ? "0o" + obj.toString(8) : "-0o" + obj.toString(8).slice(1);
+        },
+        decimal: function(obj) {
+          return obj.toString(10);
+        },
+        hexadecimal: function(obj) {
+          return obj >= 0 ? "0x" + obj.toString(16).toUpperCase() : "-0x" + obj.toString(16).toUpperCase().slice(1);
+        }
+      },
+      defaultStyle: "decimal",
+      styleAliases: {
+        binary: [2, "bin"],
+        octal: [8, "oct"],
+        decimal: [10, "dec"],
+        hexadecimal: [16, "hex"]
+      }
+    });
+    return int;
+  }
+  var float;
+  var hasRequiredFloat;
+  function requireFloat() {
+    if (hasRequiredFloat) return float;
+    hasRequiredFloat = 1;
+    const common2 = requireCommon();
+    const Type2 = requireType();
+    const YAML_FLOAT_PATTERN = new RegExp(
+      // 2.5e4, 2.5 and integers
+      "^(?:[-+]?(?:[0-9]+)(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$"
+    );
+    const YAML_FLOAT_SPECIAL_PATTERN = new RegExp(
+      "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$"
+    );
+    function resolveYamlFloat(data) {
+      if (data === null) return false;
+      if (!YAML_FLOAT_PATTERN.test(data)) {
+        return false;
+      }
+      if (isFinite(parseFloat(data, 10))) {
+        return true;
+      }
+      return YAML_FLOAT_SPECIAL_PATTERN.test(data);
+    }
+    function constructYamlFloat(data) {
+      let value = data.toLowerCase();
+      const sign = value[0] === "-" ? -1 : 1;
+      if ("+-".indexOf(value[0]) >= 0) {
+        value = value.slice(1);
+      }
+      if (value === ".inf") {
+        return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+      } else if (value === ".nan") {
+        return NaN;
+      }
+      return sign * parseFloat(value, 10);
+    }
+    const SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
+    function representYamlFloat(object, style) {
+      if (isNaN(object)) {
+        switch (style) {
+          case "lowercase":
+            return ".nan";
+          case "uppercase":
+            return ".NAN";
+          case "camelcase":
+            return ".NaN";
+        }
+      } else if (Number.POSITIVE_INFINITY === object) {
+        switch (style) {
+          case "lowercase":
+            return ".inf";
+          case "uppercase":
+            return ".INF";
+          case "camelcase":
+            return ".Inf";
+        }
+      } else if (Number.NEGATIVE_INFINITY === object) {
+        switch (style) {
+          case "lowercase":
+            return "-.inf";
+          case "uppercase":
+            return "-.INF";
+          case "camelcase":
+            return "-.Inf";
+        }
+      } else if (common2.isNegativeZero(object)) {
+        return "-0.0";
+      }
+      const res = object.toString(10);
+      return SCIENTIFIC_WITHOUT_DOT.test(res) ? res.replace("e", ".e") : res;
+    }
+    function isFloat(object) {
+      return Object.prototype.toString.call(object) === "[object Number]" && (object % 1 !== 0 || common2.isNegativeZero(object));
+    }
+    float = new Type2("tag:yaml.org,2002:float", {
+      kind: "scalar",
+      resolve: resolveYamlFloat,
+      construct: constructYamlFloat,
+      predicate: isFloat,
+      represent: representYamlFloat,
+      defaultStyle: "lowercase"
+    });
+    return float;
+  }
+  var json;
+  var hasRequiredJson;
+  function requireJson() {
+    if (hasRequiredJson) return json;
+    hasRequiredJson = 1;
+    json = requireFailsafe().extend({
+      implicit: [
+        require_null(),
+        requireBool(),
+        requireInt(),
+        requireFloat()
+      ]
+    });
+    return json;
+  }
+  var core;
+  var hasRequiredCore;
+  function requireCore() {
+    if (hasRequiredCore) return core;
+    hasRequiredCore = 1;
+    core = requireJson();
+    return core;
+  }
+  var timestamp;
+  var hasRequiredTimestamp;
+  function requireTimestamp() {
+    if (hasRequiredTimestamp) return timestamp;
+    hasRequiredTimestamp = 1;
+    const Type2 = requireType();
+    const YAML_DATE_REGEXP = new RegExp(
+      "^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$"
+    );
+    const YAML_TIMESTAMP_REGEXP = new RegExp(
+      "^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$"
+    );
+    function resolveYamlTimestamp(data) {
+      if (data === null) return false;
+      if (YAML_DATE_REGEXP.exec(data) !== null) return true;
+      if (YAML_TIMESTAMP_REGEXP.exec(data) !== null) return true;
+      return false;
+    }
+    function constructYamlTimestamp(data) {
+      let fraction = 0;
+      let delta = null;
+      let match = YAML_DATE_REGEXP.exec(data);
+      if (match === null) match = YAML_TIMESTAMP_REGEXP.exec(data);
+      if (match === null) throw new Error("Date resolve error");
+      const year = +match[1];
+      const month = +match[2] - 1;
+      const day = +match[3];
+      if (!match[4]) {
+        return new Date(Date.UTC(year, month, day));
+      }
+      const hour = +match[4];
+      const minute = +match[5];
+      const second = +match[6];
+      if (match[7]) {
+        fraction = match[7].slice(0, 3);
+        while (fraction.length < 3) {
+          fraction += "0";
+        }
+        fraction = +fraction;
+      }
+      if (match[9]) {
+        const tzHour = +match[10];
+        const tzMinute = +(match[11] || 0);
+        delta = (tzHour * 60 + tzMinute) * 6e4;
+        if (match[9] === "-") delta = -delta;
+      }
+      const date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+      if (delta) date.setTime(date.getTime() - delta);
+      return date;
+    }
+    function representYamlTimestamp(object) {
+      return object.toISOString();
+    }
+    timestamp = new Type2("tag:yaml.org,2002:timestamp", {
+      kind: "scalar",
+      resolve: resolveYamlTimestamp,
+      construct: constructYamlTimestamp,
+      instanceOf: Date,
+      represent: representYamlTimestamp
+    });
+    return timestamp;
+  }
+  var merge;
+  var hasRequiredMerge;
+  function requireMerge() {
+    if (hasRequiredMerge) return merge;
+    hasRequiredMerge = 1;
+    const Type2 = requireType();
+    function resolveYamlMerge(data) {
+      return data === "<<" || data === null;
+    }
+    merge = new Type2("tag:yaml.org,2002:merge", {
+      kind: "scalar",
+      resolve: resolveYamlMerge
+    });
+    return merge;
+  }
+  var binary;
+  var hasRequiredBinary;
+  function requireBinary() {
+    if (hasRequiredBinary) return binary;
+    hasRequiredBinary = 1;
+    const Type2 = requireType();
+    const BASE64_MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r";
+    function resolveYamlBinary(data) {
+      if (data === null) return false;
+      let bitlen = 0;
+      const max = data.length;
+      const map2 = BASE64_MAP;
+      for (let idx = 0; idx < max; idx++) {
+        const code = map2.indexOf(data.charAt(idx));
+        if (code > 64) continue;
+        if (code < 0) return false;
+        bitlen += 6;
+      }
+      return bitlen % 8 === 0;
+    }
+    function constructYamlBinary(data) {
+      const input = data.replace(/[\r\n=]/g, "");
+      const max = input.length;
+      const map2 = BASE64_MAP;
+      let bits = 0;
+      const result = [];
+      for (let idx = 0; idx < max; idx++) {
+        if (idx % 4 === 0 && idx) {
+          result.push(bits >> 16 & 255);
+          result.push(bits >> 8 & 255);
+          result.push(bits & 255);
+        }
+        bits = bits << 6 | map2.indexOf(input.charAt(idx));
+      }
+      const tailbits = max % 4 * 6;
+      if (tailbits === 0) {
+        result.push(bits >> 16 & 255);
+        result.push(bits >> 8 & 255);
+        result.push(bits & 255);
+      } else if (tailbits === 18) {
+        result.push(bits >> 10 & 255);
+        result.push(bits >> 2 & 255);
+      } else if (tailbits === 12) {
+        result.push(bits >> 4 & 255);
+      }
+      return new Uint8Array(result);
+    }
+    function representYamlBinary(object) {
+      let result = "";
+      let bits = 0;
+      const max = object.length;
+      const map2 = BASE64_MAP;
+      for (let idx = 0; idx < max; idx++) {
+        if (idx % 3 === 0 && idx) {
+          result += map2[bits >> 18 & 63];
+          result += map2[bits >> 12 & 63];
+          result += map2[bits >> 6 & 63];
+          result += map2[bits & 63];
+        }
+        bits = (bits << 8) + object[idx];
+      }
+      const tail = max % 3;
+      if (tail === 0) {
+        result += map2[bits >> 18 & 63];
+        result += map2[bits >> 12 & 63];
+        result += map2[bits >> 6 & 63];
+        result += map2[bits & 63];
+      } else if (tail === 2) {
+        result += map2[bits >> 10 & 63];
+        result += map2[bits >> 4 & 63];
+        result += map2[bits << 2 & 63];
+        result += map2[64];
+      } else if (tail === 1) {
+        result += map2[bits >> 2 & 63];
+        result += map2[bits << 4 & 63];
+        result += map2[64];
+        result += map2[64];
+      }
+      return result;
+    }
+    function isBinary(obj) {
+      return Object.prototype.toString.call(obj) === "[object Uint8Array]";
+    }
+    binary = new Type2("tag:yaml.org,2002:binary", {
+      kind: "scalar",
+      resolve: resolveYamlBinary,
+      construct: constructYamlBinary,
+      predicate: isBinary,
+      represent: representYamlBinary
+    });
+    return binary;
+  }
+  var omap;
+  var hasRequiredOmap;
+  function requireOmap() {
+    if (hasRequiredOmap) return omap;
+    hasRequiredOmap = 1;
+    const Type2 = requireType();
+    const _hasOwnProperty = Object.prototype.hasOwnProperty;
+    const _toString = Object.prototype.toString;
+    function resolveYamlOmap(data) {
+      if (data === null) return true;
+      const objectKeys = {};
+      const object = data;
+      for (let index = 0, length = object.length; index < length; index += 1) {
+        const pair = object[index];
+        let pairHasKey = false;
+        if (_toString.call(pair) !== "[object Object]") return false;
+        let pairKey;
+        for (pairKey in pair) {
+          if (_hasOwnProperty.call(pair, pairKey)) {
+            if (!pairHasKey) pairHasKey = true;
+            else return false;
+          }
+        }
+        if (!pairHasKey) return false;
+        if (_hasOwnProperty.call(objectKeys, pairKey)) return false;
+        Object.defineProperty(objectKeys, pairKey, { value: true });
+      }
+      return true;
+    }
+    function constructYamlOmap(data) {
+      return data !== null ? data : [];
+    }
+    omap = new Type2("tag:yaml.org,2002:omap", {
+      kind: "sequence",
+      resolve: resolveYamlOmap,
+      construct: constructYamlOmap
+    });
+    return omap;
+  }
+  var pairs;
+  var hasRequiredPairs;
+  function requirePairs() {
+    if (hasRequiredPairs) return pairs;
+    hasRequiredPairs = 1;
+    const Type2 = requireType();
+    const _toString = Object.prototype.toString;
+    function resolveYamlPairs(data) {
+      if (data === null) return true;
+      const object = data;
+      const result = new Array(object.length);
+      for (let index = 0, length = object.length; index < length; index += 1) {
+        const pair = object[index];
+        if (_toString.call(pair) !== "[object Object]") return false;
+        const keys = Object.keys(pair);
+        if (keys.length !== 1) return false;
+        result[index] = [keys[0], pair[keys[0]]];
+      }
+      return true;
+    }
+    function constructYamlPairs(data) {
+      if (data === null) return [];
+      const object = data;
+      const result = new Array(object.length);
+      for (let index = 0, length = object.length; index < length; index += 1) {
+        const pair = object[index];
+        const keys = Object.keys(pair);
+        result[index] = [keys[0], pair[keys[0]]];
+      }
+      return result;
+    }
+    pairs = new Type2("tag:yaml.org,2002:pairs", {
+      kind: "sequence",
+      resolve: resolveYamlPairs,
+      construct: constructYamlPairs
+    });
+    return pairs;
+  }
+  var set;
+  var hasRequiredSet;
+  function requireSet() {
+    if (hasRequiredSet) return set;
+    hasRequiredSet = 1;
+    const Type2 = requireType();
+    const _hasOwnProperty = Object.prototype.hasOwnProperty;
+    function resolveYamlSet(data) {
+      if (data === null) return true;
+      const object = data;
+      for (const key in object) {
+        if (_hasOwnProperty.call(object, key)) {
+          if (object[key] !== null) return false;
+        }
+      }
+      return true;
+    }
+    function constructYamlSet(data) {
+      return data !== null ? data : {};
+    }
+    set = new Type2("tag:yaml.org,2002:set", {
+      kind: "mapping",
+      resolve: resolveYamlSet,
+      construct: constructYamlSet
+    });
+    return set;
+  }
+  var _default;
+  var hasRequired_default;
+  function require_default() {
+    if (hasRequired_default) return _default;
+    hasRequired_default = 1;
+    _default = requireCore().extend({
+      implicit: [
+        requireTimestamp(),
+        requireMerge()
+      ],
+      explicit: [
+        requireBinary(),
+        requireOmap(),
+        requirePairs(),
+        requireSet()
+      ]
+    });
+    return _default;
+  }
+  var hasRequiredLoader;
+  function requireLoader() {
+    if (hasRequiredLoader) return loader;
+    hasRequiredLoader = 1;
+    const common2 = requireCommon();
+    const YAMLException2 = requireException();
+    const makeSnippet = requireSnippet();
+    const DEFAULT_SCHEMA2 = require_default();
+    const _hasOwnProperty = Object.prototype.hasOwnProperty;
+    const CONTEXT_FLOW_IN = 1;
+    const CONTEXT_FLOW_OUT = 2;
+    const CONTEXT_BLOCK_IN = 3;
+    const CONTEXT_BLOCK_OUT = 4;
+    const CHOMPING_CLIP = 1;
+    const CHOMPING_STRIP = 2;
+    const CHOMPING_KEEP = 3;
+    const PATTERN_NON_PRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/;
+    const PATTERN_NON_ASCII_LINE_BREAKS = /[\x85\u2028\u2029]/;
+    const PATTERN_FLOW_INDICATORS = /[,\[\]{}]/;
+    const PATTERN_TAG_HANDLE = /^(?:!|!!|![0-9A-Za-z-]+!)$/;
+    const PATTERN_TAG_URI = /^(?:!|[^,\[\]{}])(?:%[0-9a-f]{2}|[0-9a-z\-#;/?:@&=+$,_.!~*'()\[\]])*$/i;
+    function _class(obj) {
+      return Object.prototype.toString.call(obj);
+    }
+    function isEol(c) {
+      return c === 10 || c === 13;
+    }
+    function isWhiteSpace(c) {
+      return c === 9 || c === 32;
+    }
+    function isWsOrEol(c) {
+      return c === 9 || c === 32 || c === 10 || c === 13;
+    }
+    function isFlowIndicator(c) {
+      return c === 44 || c === 91 || c === 93 || c === 123 || c === 125;
+    }
+    function fromHexCode(c) {
+      if (c >= 48 && c <= 57) {
+        return c - 48;
+      }
+      const lc = c | 32;
+      if (lc >= 97 && lc <= 102) {
+        return lc - 97 + 10;
+      }
+      return -1;
+    }
+    function escapedHexLen(c) {
+      if (c === 120) {
+        return 2;
+      }
+      if (c === 117) {
+        return 4;
+      }
+      if (c === 85) {
+        return 8;
+      }
+      return 0;
+    }
+    function fromDecimalCode(c) {
+      if (c >= 48 && c <= 57) {
+        return c - 48;
+      }
+      return -1;
+    }
+    function simpleEscapeSequence(c) {
+      switch (c) {
+        case 48:
+          return "\0";
+        case 97:
+          return "\x07";
+        case 98:
+          return "\b";
+        case 116:
+          return "	";
+        case 9:
+          return "	";
+        case 110:
+          return "\n";
+        case 118:
+          return "\v";
+        case 102:
+          return "\f";
+        case 114:
+          return "\r";
+        case 101:
+          return "\x1B";
+        case 32:
+          return " ";
+        case 34:
+          return '"';
+        case 47:
+          return "/";
+        case 92:
+          return "\\";
+        case 78:
+          return "";
+        case 95:
+          return " ";
+        case 76:
+          return "\u2028";
+        case 80:
+          return "\u2029";
+        default:
+          return "";
+      }
+    }
+    function charFromCodepoint(c) {
+      if (c <= 65535) {
+        return String.fromCharCode(c);
+      }
+      return String.fromCharCode(
+        (c - 65536 >> 10) + 55296,
+        (c - 65536 & 1023) + 56320
+      );
+    }
+    function setProperty(object, key, value) {
+      if (key === "__proto__") {
+        Object.defineProperty(object, key, {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value
+        });
+      } else {
+        object[key] = value;
+      }
+    }
+    const simpleEscapeCheck = new Array(256);
+    const simpleEscapeMap = new Array(256);
+    for (let i = 0; i < 256; i++) {
+      simpleEscapeCheck[i] = simpleEscapeSequence(i) ? 1 : 0;
+      simpleEscapeMap[i] = simpleEscapeSequence(i);
+    }
+    function State(input, options) {
+      this.input = input;
+      this.filename = options["filename"] || null;
+      this.schema = options["schema"] || DEFAULT_SCHEMA2;
+      this.onWarning = options["onWarning"] || null;
+      this.legacy = options["legacy"] || false;
+      this.json = options["json"] || false;
+      this.listener = options["listener"] || null;
+      this.maxDepth = typeof options["maxDepth"] === "number" ? options["maxDepth"] : 100;
+      this.maxTotalMergeKeys = typeof options["maxTotalMergeKeys"] === "number" ? options["maxTotalMergeKeys"] : 1e4;
+      this.implicitTypes = this.schema.compiledImplicit;
+      this.typeMap = this.schema.compiledTypeMap;
+      this.length = input.length;
+      this.position = 0;
+      this.line = 0;
+      this.lineStart = 0;
+      this.lineIndent = 0;
+      this.depth = 0;
+      this.totalMergeKeys = 0;
+      this.firstTabInLine = -1;
+      this.documents = [];
+      this.anchorMapTransactions = [];
+    }
+    function generateError(state, message) {
+      const mark = {
+        name: state.filename,
+        buffer: state.input.slice(0, -1),
+        // omit trailing \0
+        position: state.position,
+        line: state.line,
+        column: state.position - state.lineStart
+      };
+      mark.snippet = makeSnippet(mark);
+      return new YAMLException2(message, mark);
+    }
+    function throwError(state, message) {
+      throw generateError(state, message);
+    }
+    function throwWarning(state, message) {
+      if (state.onWarning) {
+        state.onWarning.call(null, generateError(state, message));
+      }
+    }
+    function storeAnchor(state, name, value) {
+      const transactions = state.anchorMapTransactions;
+      if (transactions.length !== 0) {
+        const transaction = transactions[transactions.length - 1];
+        if (!_hasOwnProperty.call(transaction, name)) {
+          transaction[name] = {
+            existed: _hasOwnProperty.call(state.anchorMap, name),
+            value: state.anchorMap[name]
+          };
+        }
+      }
+      state.anchorMap[name] = value;
+    }
+    function beginAnchorTransaction(state) {
+      state.anchorMapTransactions.push(/* @__PURE__ */ Object.create(null));
+    }
+    function commitAnchorTransaction(state) {
+      const transaction = state.anchorMapTransactions.pop();
+      const transactions = state.anchorMapTransactions;
+      if (transactions.length === 0) return;
+      const parent = transactions[transactions.length - 1];
+      const names = Object.keys(transaction);
+      for (let index = 0, length = names.length; index < length; index += 1) {
+        const name = names[index];
+        if (!_hasOwnProperty.call(parent, name)) {
+          parent[name] = transaction[name];
+        }
+      }
+    }
+    function rollbackAnchorTransaction(state) {
+      const transaction = state.anchorMapTransactions.pop();
+      const names = Object.keys(transaction);
+      for (let index = names.length - 1; index >= 0; index -= 1) {
+        const entry = transaction[names[index]];
+        if (entry.existed) {
+          state.anchorMap[names[index]] = entry.value;
+        } else {
+          delete state.anchorMap[names[index]];
+        }
+      }
+    }
+    function snapshotState(state) {
+      return {
+        position: state.position,
+        line: state.line,
+        lineStart: state.lineStart,
+        lineIndent: state.lineIndent,
+        firstTabInLine: state.firstTabInLine,
+        tag: state.tag,
+        anchor: state.anchor,
+        kind: state.kind,
+        result: state.result
+      };
+    }
+    function restoreState(state, snapshot) {
+      state.position = snapshot.position;
+      state.line = snapshot.line;
+      state.lineStart = snapshot.lineStart;
+      state.lineIndent = snapshot.lineIndent;
+      state.firstTabInLine = snapshot.firstTabInLine;
+      state.tag = snapshot.tag;
+      state.anchor = snapshot.anchor;
+      state.kind = snapshot.kind;
+      state.result = snapshot.result;
+    }
+    const directiveHandlers = {
+      YAML: function handleYamlDirective(state, name, args) {
+        if (state.version !== null) {
+          throwError(state, "duplication of %YAML directive");
+        }
+        if (args.length !== 1) {
+          throwError(state, "YAML directive accepts exactly one argument");
+        }
+        const match = /^([0-9]+)\.([0-9]+)$/.exec(args[0]);
+        if (match === null) {
+          throwError(state, "ill-formed argument of the YAML directive");
+        }
+        const major = parseInt(match[1], 10);
+        const minor = parseInt(match[2], 10);
+        if (major !== 1) {
+          throwError(state, "unacceptable YAML version of the document");
+        }
+        state.version = args[0];
+        state.checkLineBreaks = minor < 2;
+        if (minor !== 1 && minor !== 2) {
+          throwWarning(state, "unsupported YAML version of the document");
+        }
+      },
+      TAG: function handleTagDirective(state, name, args) {
+        let prefix;
+        if (args.length !== 2) {
+          throwError(state, "TAG directive accepts exactly two arguments");
+        }
+        const handle = args[0];
+        prefix = args[1];
+        if (!PATTERN_TAG_HANDLE.test(handle)) {
+          throwError(state, "ill-formed tag handle (first argument) of the TAG directive");
+        }
+        if (_hasOwnProperty.call(state.tagMap, handle)) {
+          throwError(state, 'there is a previously declared suffix for "' + handle + '" tag handle');
+        }
+        if (!PATTERN_TAG_URI.test(prefix)) {
+          throwError(state, "ill-formed tag prefix (second argument) of the TAG directive");
+        }
+        try {
+          prefix = decodeURIComponent(prefix);
+        } catch (err) {
+          throwError(state, "tag prefix is malformed: " + prefix);
+        }
+        state.tagMap[handle] = prefix;
+      }
+    };
+    function captureSegment(state, start, end, checkJson) {
+      if (start < end) {
+        const _result = state.input.slice(start, end);
+        if (checkJson) {
+          for (let _position = 0, _length = _result.length; _position < _length; _position += 1) {
+            const _character = _result.charCodeAt(_position);
+            if (!(_character === 9 || _character >= 32 && _character <= 1114111)) {
+              throwError(state, "expected valid JSON character");
+            }
+          }
+        } else if (PATTERN_NON_PRINTABLE.test(_result)) {
+          throwError(state, "the stream contains non-printable characters");
+        }
+        state.result += _result;
+      }
+    }
+    function chargeMergeWork(state) {
+      state.totalMergeKeys++;
+      if (state.maxTotalMergeKeys !== -1 && state.totalMergeKeys > state.maxTotalMergeKeys) {
+        throwError(state, "merge keys exceeded maxTotalMergeKeys (" + state.maxTotalMergeKeys + ")");
+      }
+    }
+    function mergeMappings(state, destination, source, overridableKeys) {
+      if (!common2.isObject(source)) {
+        throwError(state, "cannot merge mappings; the provided source object is unacceptable");
+      }
+      chargeMergeWork(state);
+      const sourceKeys = Object.keys(source);
+      for (let index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
+        const key = sourceKeys[index];
+        chargeMergeWork(state);
+        if (!_hasOwnProperty.call(destination, key)) {
+          setProperty(destination, key, source[key]);
+          overridableKeys[key] = true;
+        }
+      }
+    }
+    function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, startLine, startLineStart, startPos) {
+      if (Array.isArray(keyNode)) {
+        keyNode = Array.prototype.slice.call(keyNode);
+        for (let index = 0, quantity = keyNode.length; index < quantity; index += 1) {
+          if (Array.isArray(keyNode[index])) {
+            throwError(state, "nested arrays are not supported inside keys");
+          }
+          if (typeof keyNode === "object" && _class(keyNode[index]) === "[object Object]") {
+            keyNode[index] = "[object Object]";
+          }
+        }
+      }
+      if (typeof keyNode === "object" && _class(keyNode) === "[object Object]") {
+        keyNode = "[object Object]";
+      }
+      keyNode = String(keyNode);
+      if (_result === null) {
+        _result = {};
+      }
+      if (keyTag === "tag:yaml.org,2002:merge") {
+        if (Array.isArray(valueNode)) {
+          if (valueNode.length > 100) {
+            throwError(state, "abnormal merge sequence size");
+          }
+          for (let index = 0, quantity = valueNode.length; index < quantity; index += 1) {
+            mergeMappings(state, _result, valueNode[index], overridableKeys);
+          }
+        } else {
+          mergeMappings(state, _result, valueNode, overridableKeys);
+        }
+      } else {
+        if (!state.json && !_hasOwnProperty.call(overridableKeys, keyNode) && _hasOwnProperty.call(_result, keyNode)) {
+          state.line = startLine || state.line;
+          state.lineStart = startLineStart || state.lineStart;
+          state.position = startPos || state.position;
+          throwError(state, "duplicated mapping key");
+        }
+        setProperty(_result, keyNode, valueNode);
+        delete overridableKeys[keyNode];
+      }
+      return _result;
+    }
+    function readLineBreak(state) {
+      const ch = state.input.charCodeAt(state.position);
+      if (ch === 10) {
+        state.position++;
+      } else if (ch === 13) {
+        state.position++;
+        if (state.input.charCodeAt(state.position) === 10) {
+          state.position++;
+        }
+      } else {
+        throwError(state, "a line break is expected");
+      }
+      state.line += 1;
+      state.lineStart = state.position;
+      state.firstTabInLine = -1;
+    }
+    function skipSeparationSpace(state, allowComments, checkIndent) {
+      let lineBreaks = 0;
+      let ch = state.input.charCodeAt(state.position);
+      while (ch !== 0) {
+        while (isWhiteSpace(ch)) {
+          if (ch === 9 && state.firstTabInLine === -1) {
+            state.firstTabInLine = state.position;
+          }
+          ch = state.input.charCodeAt(++state.position);
+        }
+        if (allowComments && ch === 35) {
+          do {
+            ch = state.input.charCodeAt(++state.position);
+          } while (ch !== 10 && ch !== 13 && ch !== 0);
+        }
+        if (isEol(ch)) {
+          readLineBreak(state);
+          ch = state.input.charCodeAt(state.position);
+          lineBreaks++;
+          state.lineIndent = 0;
+          while (ch === 32) {
+            state.lineIndent++;
+            ch = state.input.charCodeAt(++state.position);
+          }
+        } else {
+          break;
+        }
+      }
+      if (checkIndent !== -1 && lineBreaks !== 0 && state.lineIndent < checkIndent) {
+        throwWarning(state, "deficient indentation");
+      }
+      return lineBreaks;
+    }
+    function testDocumentSeparator(state) {
+      let _position = state.position;
+      let ch = state.input.charCodeAt(_position);
+      if ((ch === 45 || ch === 46) && ch === state.input.charCodeAt(_position + 1) && ch === state.input.charCodeAt(_position + 2)) {
+        _position += 3;
+        ch = state.input.charCodeAt(_position);
+        if (ch === 0 || isWsOrEol(ch)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function writeFoldedLines(state, count) {
+      if (count === 1) {
+        state.result += " ";
+      } else if (count > 1) {
+        state.result += common2.repeat("\n", count - 1);
+      }
+    }
+    function readPlainScalar(state, nodeIndent, withinFlowCollection) {
+      let captureStart;
+      let captureEnd;
+      let hasPendingContent;
+      let _line;
+      let _lineStart;
+      let _lineIndent;
+      const _kind = state.kind;
+      const _result = state.result;
+      let ch = state.input.charCodeAt(state.position);
+      if (isWsOrEol(ch) || isFlowIndicator(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96) {
+        return false;
+      }
+      if (ch === 63 || ch === 45) {
+        const following = state.input.charCodeAt(state.position + 1);
+        if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following)) {
+          return false;
+        }
+      }
+      state.kind = "scalar";
+      state.result = "";
+      captureStart = captureEnd = state.position;
+      hasPendingContent = false;
+      while (ch !== 0) {
+        if (ch === 58) {
+          const following = state.input.charCodeAt(state.position + 1);
+          if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following)) {
+            break;
+          }
+        } else if (ch === 35) {
+          const preceding = state.input.charCodeAt(state.position - 1);
+          if (isWsOrEol(preceding)) {
+            break;
+          }
+        } else if (state.position === state.lineStart && testDocumentSeparator(state) || withinFlowCollection && isFlowIndicator(ch)) {
+          break;
+        } else if (isEol(ch)) {
+          _line = state.line;
+          _lineStart = state.lineStart;
+          _lineIndent = state.lineIndent;
+          skipSeparationSpace(state, false, -1);
+          if (state.lineIndent >= nodeIndent) {
+            hasPendingContent = true;
+            ch = state.input.charCodeAt(state.position);
+            continue;
+          } else {
+            state.position = captureEnd;
+            state.line = _line;
+            state.lineStart = _lineStart;
+            state.lineIndent = _lineIndent;
+            break;
+          }
+        }
+        if (hasPendingContent) {
+          captureSegment(state, captureStart, captureEnd, false);
+          writeFoldedLines(state, state.line - _line);
+          captureStart = captureEnd = state.position;
+          hasPendingContent = false;
+        }
+        if (!isWhiteSpace(ch)) {
+          captureEnd = state.position + 1;
+        }
+        ch = state.input.charCodeAt(++state.position);
+      }
+      captureSegment(state, captureStart, captureEnd, false);
+      if (state.result) {
+        return true;
+      }
+      state.kind = _kind;
+      state.result = _result;
+      return false;
+    }
+    function readSingleQuotedScalar(state, nodeIndent) {
+      let captureStart;
+      let captureEnd;
+      let ch = state.input.charCodeAt(state.position);
+      if (ch !== 39) {
+        return false;
+      }
+      state.kind = "scalar";
+      state.result = "";
+      state.position++;
+      captureStart = captureEnd = state.position;
+      while ((ch = state.input.charCodeAt(state.position)) !== 0) {
+        if (ch === 39) {
+          captureSegment(state, captureStart, state.position, true);
+          ch = state.input.charCodeAt(++state.position);
+          if (ch === 39) {
+            captureStart = state.position;
+            state.position++;
+            captureEnd = state.position;
+          } else {
+            return true;
+          }
+        } else if (isEol(ch)) {
+          captureSegment(state, captureStart, captureEnd, true);
+          writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+          captureStart = captureEnd = state.position;
+        } else if (state.position === state.lineStart && testDocumentSeparator(state)) {
+          throwError(state, "unexpected end of the document within a single quoted scalar");
+        } else {
+          state.position++;
+          if (!isWhiteSpace(ch)) {
+            captureEnd = state.position;
+          }
+        }
+      }
+      throwError(state, "unexpected end of the stream within a single quoted scalar");
+    }
+    function readDoubleQuotedScalar(state, nodeIndent) {
+      let captureStart;
+      let captureEnd;
+      let tmp;
+      let ch = state.input.charCodeAt(state.position);
+      if (ch !== 34) {
+        return false;
+      }
+      state.kind = "scalar";
+      state.result = "";
+      state.position++;
+      captureStart = captureEnd = state.position;
+      while ((ch = state.input.charCodeAt(state.position)) !== 0) {
+        if (ch === 34) {
+          captureSegment(state, captureStart, state.position, true);
+          state.position++;
+          return true;
+        } else if (ch === 92) {
+          captureSegment(state, captureStart, state.position, true);
+          ch = state.input.charCodeAt(++state.position);
+          if (isEol(ch)) {
+            skipSeparationSpace(state, false, nodeIndent);
+          } else if (ch < 256 && simpleEscapeCheck[ch]) {
+            state.result += simpleEscapeMap[ch];
+            state.position++;
+          } else if ((tmp = escapedHexLen(ch)) > 0) {
+            let hexLength = tmp;
+            let hexResult = 0;
+            for (; hexLength > 0; hexLength--) {
+              ch = state.input.charCodeAt(++state.position);
+              if ((tmp = fromHexCode(ch)) >= 0) {
+                hexResult = (hexResult << 4) + tmp;
+              } else {
+                throwError(state, "expected hexadecimal character");
+              }
+            }
+            state.result += charFromCodepoint(hexResult);
+            state.position++;
+          } else {
+            throwError(state, "unknown escape sequence");
+          }
+          captureStart = captureEnd = state.position;
+        } else if (isEol(ch)) {
+          captureSegment(state, captureStart, captureEnd, true);
+          writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+          captureStart = captureEnd = state.position;
+        } else if (state.position === state.lineStart && testDocumentSeparator(state)) {
+          throwError(state, "unexpected end of the document within a double quoted scalar");
+        } else {
+          state.position++;
+          if (!isWhiteSpace(ch)) {
+            captureEnd = state.position;
+          }
+        }
+      }
+      throwError(state, "unexpected end of the stream within a double quoted scalar");
+    }
+    function readFlowCollection(state, nodeIndent) {
+      let readNext = true;
+      let _line;
+      let _lineStart;
+      let _pos;
+      const _tag = state.tag;
+      let _result;
+      const _anchor = state.anchor;
+      let terminator;
+      let isPair;
+      let isExplicitPair;
+      let isMapping;
+      const overridableKeys = /* @__PURE__ */ Object.create(null);
+      let keyNode;
+      let keyTag;
+      let valueNode;
+      let ch = state.input.charCodeAt(state.position);
+      if (ch === 91) {
+        terminator = 93;
+        isMapping = false;
+        _result = [];
+      } else if (ch === 123) {
+        terminator = 125;
+        isMapping = true;
+        _result = {};
+      } else {
+        return false;
+      }
+      if (state.anchor !== null) {
+        storeAnchor(state, state.anchor, _result);
+      }
+      ch = state.input.charCodeAt(++state.position);
+      while (ch !== 0) {
+        skipSeparationSpace(state, true, nodeIndent);
+        ch = state.input.charCodeAt(state.position);
+        if (ch === terminator) {
+          state.position++;
+          state.tag = _tag;
+          state.anchor = _anchor;
+          state.kind = isMapping ? "mapping" : "sequence";
+          state.result = _result;
+          return true;
+        } else if (!readNext) {
+          throwError(state, "missed comma between flow collection entries");
+        } else if (ch === 44) {
+          throwError(state, "expected the node content, but found ','");
+        }
+        keyTag = keyNode = valueNode = null;
+        isPair = isExplicitPair = false;
+        if (ch === 63) {
+          const following = state.input.charCodeAt(state.position + 1);
+          if (isWsOrEol(following)) {
+            isPair = isExplicitPair = true;
+            state.position++;
+            skipSeparationSpace(state, true, nodeIndent);
+          }
+        }
+        _line = state.line;
+        _lineStart = state.lineStart;
+        _pos = state.position;
+        composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+        keyTag = state.tag;
+        keyNode = state.result;
+        skipSeparationSpace(state, true, nodeIndent);
+        ch = state.input.charCodeAt(state.position);
+        if ((isExplicitPair || state.line === _line) && ch === 58) {
+          isPair = true;
+          ch = state.input.charCodeAt(++state.position);
+          skipSeparationSpace(state, true, nodeIndent);
+          composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+          valueNode = state.result;
+        }
+        if (isMapping) {
+          storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos);
+        } else if (isPair) {
+          _result.push(storeMappingPair(state, null, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos));
+        } else {
+          _result.push(keyNode);
+        }
+        skipSeparationSpace(state, true, nodeIndent);
+        ch = state.input.charCodeAt(state.position);
+        if (ch === 44) {
+          readNext = true;
+          ch = state.input.charCodeAt(++state.position);
+        } else {
+          readNext = false;
+        }
+      }
+      throwError(state, "unexpected end of the stream within a flow collection");
+    }
+    function readBlockScalar(state, nodeIndent) {
+      let folding;
+      let chomping = CHOMPING_CLIP;
+      let didReadContent = false;
+      let detectedIndent = false;
+      let textIndent = nodeIndent;
+      let emptyLines = 0;
+      let atMoreIndented = false;
+      let tmp;
+      let ch = state.input.charCodeAt(state.position);
+      if (ch === 124) {
+        folding = false;
+      } else if (ch === 62) {
+        folding = true;
+      } else {
+        return false;
+      }
+      state.kind = "scalar";
+      state.result = "";
+      while (ch !== 0) {
+        ch = state.input.charCodeAt(++state.position);
+        if (ch === 43 || ch === 45) {
+          if (CHOMPING_CLIP === chomping) {
+            chomping = ch === 43 ? CHOMPING_KEEP : CHOMPING_STRIP;
+          } else {
+            throwError(state, "repeat of a chomping mode identifier");
+          }
+        } else if ((tmp = fromDecimalCode(ch)) >= 0) {
+          if (tmp === 0) {
+            throwError(state, "bad explicit indentation width of a block scalar; it cannot be less than one");
+          } else if (!detectedIndent) {
+            textIndent = nodeIndent + tmp - 1;
+            detectedIndent = true;
+          } else {
+            throwError(state, "repeat of an indentation width identifier");
+          }
+        } else {
+          break;
+        }
+      }
+      if (isWhiteSpace(ch)) {
+        do {
+          ch = state.input.charCodeAt(++state.position);
+        } while (isWhiteSpace(ch));
+        if (ch === 35) {
+          do {
+            ch = state.input.charCodeAt(++state.position);
+          } while (!isEol(ch) && ch !== 0);
+        }
+      }
+      while (ch !== 0) {
+        readLineBreak(state);
+        state.lineIndent = 0;
+        ch = state.input.charCodeAt(state.position);
+        while ((!detectedIndent || state.lineIndent < textIndent) && ch === 32) {
+          state.lineIndent++;
+          ch = state.input.charCodeAt(++state.position);
+        }
+        if (!detectedIndent && state.lineIndent > textIndent) {
+          textIndent = state.lineIndent;
+        }
+        if (isEol(ch)) {
+          emptyLines++;
+          continue;
+        }
+        if (!detectedIndent && textIndent === 0) {
+          throwError(state, "missing indentation for block scalar");
+        }
+        if (state.lineIndent < textIndent) {
+          if (chomping === CHOMPING_KEEP) {
+            state.result += common2.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+          } else if (chomping === CHOMPING_CLIP) {
+            if (didReadContent) {
+              state.result += "\n";
+            }
+          }
+          break;
+        }
+        if (folding) {
+          if (isWhiteSpace(ch)) {
+            atMoreIndented = true;
+            state.result += common2.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+          } else if (atMoreIndented) {
+            atMoreIndented = false;
+            state.result += common2.repeat("\n", emptyLines + 1);
+          } else if (emptyLines === 0) {
+            if (didReadContent) {
+              state.result += " ";
+            }
+          } else {
+            state.result += common2.repeat("\n", emptyLines);
+          }
+        } else {
+          state.result += common2.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+        }
+        didReadContent = true;
+        detectedIndent = true;
+        emptyLines = 0;
+        const captureStart = state.position;
+        while (!isEol(ch) && ch !== 0) {
+          ch = state.input.charCodeAt(++state.position);
+        }
+        captureSegment(state, captureStart, state.position, false);
+      }
+      return true;
+    }
+    function readBlockSequence(state, nodeIndent) {
+      const _tag = state.tag;
+      const _anchor = state.anchor;
+      const _result = [];
+      let detected = false;
+      if (state.firstTabInLine !== -1) return false;
+      if (state.anchor !== null) {
+        storeAnchor(state, state.anchor, _result);
+      }
+      let ch = state.input.charCodeAt(state.position);
+      while (ch !== 0) {
+        if (state.firstTabInLine !== -1) {
+          state.position = state.firstTabInLine;
+          throwError(state, "tab characters must not be used in indentation");
+        }
+        if (ch !== 45) {
+          break;
+        }
+        const following = state.input.charCodeAt(state.position + 1);
+        if (!isWsOrEol(following)) {
+          break;
+        }
+        detected = true;
+        state.position++;
+        if (skipSeparationSpace(state, true, -1)) {
+          if (state.lineIndent <= nodeIndent) {
+            _result.push(null);
+            ch = state.input.charCodeAt(state.position);
+            continue;
+          }
+        }
+        const _line = state.line;
+        composeNode(state, nodeIndent, CONTEXT_BLOCK_IN, false, true);
+        _result.push(state.result);
+        skipSeparationSpace(state, true, -1);
+        ch = state.input.charCodeAt(state.position);
+        if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0) {
+          throwError(state, "bad indentation of a sequence entry");
+        } else if (state.lineIndent < nodeIndent) {
+          break;
+        }
+      }
+      if (detected) {
+        state.tag = _tag;
+        state.anchor = _anchor;
+        state.kind = "sequence";
+        state.result = _result;
+        return true;
+      }
+      return false;
+    }
+    function readBlockMapping(state, nodeIndent, flowIndent) {
+      let allowCompact;
+      let _keyLine;
+      let _keyLineStart;
+      let _keyPos;
+      const _tag = state.tag;
+      const _anchor = state.anchor;
+      const _result = {};
+      const overridableKeys = /* @__PURE__ */ Object.create(null);
+      let keyTag = null;
+      let keyNode = null;
+      let valueNode = null;
+      let atExplicitKey = false;
+      let detected = false;
+      if (state.firstTabInLine !== -1) return false;
+      if (state.anchor !== null) {
+        storeAnchor(state, state.anchor, _result);
+      }
+      let ch = state.input.charCodeAt(state.position);
+      while (ch !== 0) {
+        if (!atExplicitKey && state.firstTabInLine !== -1) {
+          state.position = state.firstTabInLine;
+          throwError(state, "tab characters must not be used in indentation");
+        }
+        const following = state.input.charCodeAt(state.position + 1);
+        const _line = state.line;
+        if ((ch === 63 || ch === 58) && isWsOrEol(following)) {
+          if (ch === 63) {
+            if (atExplicitKey) {
+              storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+              keyTag = keyNode = valueNode = null;
+            }
+            detected = true;
+            atExplicitKey = true;
+            allowCompact = true;
+          } else if (atExplicitKey) {
+            atExplicitKey = false;
+            allowCompact = true;
+          } else {
+            throwError(state, "incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line");
+          }
+          state.position += 1;
+          ch = following;
+        } else {
+          _keyLine = state.line;
+          _keyLineStart = state.lineStart;
+          _keyPos = state.position;
+          if (!composeNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true)) {
+            break;
+          }
+          if (state.line === _line) {
+            ch = state.input.charCodeAt(state.position);
+            while (isWhiteSpace(ch)) {
+              ch = state.input.charCodeAt(++state.position);
+            }
+            if (ch === 58) {
+              ch = state.input.charCodeAt(++state.position);
+              if (!isWsOrEol(ch)) {
+                throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
+              }
+              if (atExplicitKey) {
+                storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+                keyTag = keyNode = valueNode = null;
+              }
+              detected = true;
+              atExplicitKey = false;
+              allowCompact = false;
+              keyTag = state.tag;
+              keyNode = state.result;
+            } else if (detected) {
+              throwError(state, "can not read an implicit mapping pair; a colon is missed");
+            } else {
+              state.tag = _tag;
+              state.anchor = _anchor;
+              return true;
+            }
+          } else if (detected) {
+            throwError(state, "can not read a block mapping entry; a multiline key may not be an implicit key");
+          } else {
+            state.tag = _tag;
+            state.anchor = _anchor;
+            return true;
+          }
+        }
+        if (state.line === _line || state.lineIndent > nodeIndent) {
+          if (atExplicitKey) {
+            _keyLine = state.line;
+            _keyLineStart = state.lineStart;
+            _keyPos = state.position;
+          }
+          if (composeNode(state, nodeIndent, CONTEXT_BLOCK_OUT, true, allowCompact)) {
+            if (atExplicitKey) {
+              keyNode = state.result;
+            } else {
+              valueNode = state.result;
+            }
+          }
+          if (!atExplicitKey) {
+            storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _keyLine, _keyLineStart, _keyPos);
+            keyTag = keyNode = valueNode = null;
+          }
+          skipSeparationSpace(state, true, -1);
+          ch = state.input.charCodeAt(state.position);
+        }
+        if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0) {
+          throwError(state, "bad indentation of a mapping entry");
+        } else if (state.lineIndent < nodeIndent) {
+          break;
+        }
+      }
+      if (atExplicitKey) {
+        storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+      }
+      if (detected) {
+        state.tag = _tag;
+        state.anchor = _anchor;
+        state.kind = "mapping";
+        state.result = _result;
+      }
+      return detected;
+    }
+    function readTagProperty(state) {
+      let isVerbatim = false;
+      let isNamed = false;
+      let tagHandle;
+      let tagName;
+      let ch = state.input.charCodeAt(state.position);
+      if (ch !== 33) return false;
+      if (state.tag !== null) {
+        throwError(state, "duplication of a tag property");
+      }
+      ch = state.input.charCodeAt(++state.position);
+      if (ch === 60) {
+        isVerbatim = true;
+        ch = state.input.charCodeAt(++state.position);
+      } else if (ch === 33) {
+        isNamed = true;
+        tagHandle = "!!";
+        ch = state.input.charCodeAt(++state.position);
+      } else {
+        tagHandle = "!";
+      }
+      let _position = state.position;
+      if (isVerbatim) {
+        do {
+          ch = state.input.charCodeAt(++state.position);
+        } while (ch !== 0 && ch !== 62);
+        if (state.position < state.length) {
+          tagName = state.input.slice(_position, state.position);
+          ch = state.input.charCodeAt(++state.position);
+        } else {
+          throwError(state, "unexpected end of the stream within a verbatim tag");
+        }
+      } else {
+        while (ch !== 0 && !isWsOrEol(ch)) {
+          if (ch === 33) {
+            if (!isNamed) {
+              tagHandle = state.input.slice(_position - 1, state.position + 1);
+              if (!PATTERN_TAG_HANDLE.test(tagHandle)) {
+                throwError(state, "named tag handle cannot contain such characters");
+              }
+              isNamed = true;
+              _position = state.position + 1;
+            } else {
+              throwError(state, "tag suffix cannot contain exclamation marks");
+            }
+          }
+          ch = state.input.charCodeAt(++state.position);
+        }
+        tagName = state.input.slice(_position, state.position);
+        if (PATTERN_FLOW_INDICATORS.test(tagName)) {
+          throwError(state, "tag suffix cannot contain flow indicator characters");
+        }
+      }
+      if (tagName && !PATTERN_TAG_URI.test(tagName)) {
+        throwError(state, "tag name cannot contain such characters: " + tagName);
+      }
+      try {
+        tagName = decodeURIComponent(tagName);
+      } catch (err) {
+        throwError(state, "tag name is malformed: " + tagName);
+      }
+      if (isVerbatim) {
+        state.tag = tagName;
+      } else if (_hasOwnProperty.call(state.tagMap, tagHandle)) {
+        state.tag = state.tagMap[tagHandle] + tagName;
+      } else if (tagHandle === "!") {
+        state.tag = "!" + tagName;
+      } else if (tagHandle === "!!") {
+        state.tag = "tag:yaml.org,2002:" + tagName;
+      } else {
+        throwError(state, 'undeclared tag handle "' + tagHandle + '"');
+      }
+      return true;
+    }
+    function readAnchorProperty(state) {
+      let ch = state.input.charCodeAt(state.position);
+      if (ch !== 38) return false;
+      if (state.anchor !== null) {
+        throwError(state, "duplication of an anchor property");
+      }
+      ch = state.input.charCodeAt(++state.position);
+      const _position = state.position;
+      while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch)) {
+        ch = state.input.charCodeAt(++state.position);
+      }
+      if (state.position === _position) {
+        throwError(state, "name of an anchor node must contain at least one character");
+      }
+      state.anchor = state.input.slice(_position, state.position);
+      return true;
+    }
+    function readAlias(state) {
+      let ch = state.input.charCodeAt(state.position);
+      if (ch !== 42) return false;
+      ch = state.input.charCodeAt(++state.position);
+      const _position = state.position;
+      while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch)) {
+        ch = state.input.charCodeAt(++state.position);
+      }
+      if (state.position === _position) {
+        throwError(state, "name of an alias node must contain at least one character");
+      }
+      const alias = state.input.slice(_position, state.position);
+      if (!_hasOwnProperty.call(state.anchorMap, alias)) {
+        throwError(state, 'unidentified alias "' + alias + '"');
+      }
+      state.result = state.anchorMap[alias];
+      skipSeparationSpace(state, true, -1);
+      return true;
+    }
+    function tryReadBlockMappingFromProperty(state, propertyStart, nodeIndent, flowIndent) {
+      const fallbackState = snapshotState(state);
+      beginAnchorTransaction(state);
+      restoreState(state, propertyStart);
+      state.tag = null;
+      state.anchor = null;
+      state.kind = null;
+      state.result = null;
+      if (readBlockMapping(state, nodeIndent, flowIndent) && state.kind === "mapping") {
+        commitAnchorTransaction(state);
+        return true;
+      }
+      rollbackAnchorTransaction(state);
+      restoreState(state, fallbackState);
+      return false;
+    }
+    function composeNode(state, parentIndent, nodeContext, allowToSeek, allowCompact) {
+      let allowBlockScalars;
+      let allowBlockCollections;
+      let indentStatus = 1;
+      let atNewLine = false;
+      let hasContent = false;
+      let propertyStart = null;
+      let type2;
+      let flowIndent;
+      let blockIndent;
+      if (state.depth >= state.maxDepth) {
+        throwError(state, "nesting exceeded maxDepth (" + state.maxDepth + ")");
+      }
+      state.depth += 1;
+      if (state.listener !== null) {
+        state.listener("open", state);
+      }
+      state.tag = null;
+      state.anchor = null;
+      state.kind = null;
+      state.result = null;
+      const allowBlockStyles = allowBlockScalars = allowBlockCollections = CONTEXT_BLOCK_OUT === nodeContext || CONTEXT_BLOCK_IN === nodeContext;
+      if (allowToSeek) {
+        if (skipSeparationSpace(state, true, -1)) {
+          atNewLine = true;
+          if (state.lineIndent > parentIndent) {
+            indentStatus = 1;
+          } else if (state.lineIndent === parentIndent) {
+            indentStatus = 0;
+          } else if (state.lineIndent < parentIndent) {
+            indentStatus = -1;
+          }
+        }
+      }
+      if (indentStatus === 1) {
+        while (true) {
+          const ch = state.input.charCodeAt(state.position);
+          const propertyState = snapshotState(state);
+          if (atNewLine && (ch === 33 && state.tag !== null || ch === 38 && state.anchor !== null)) {
+            break;
+          }
+          if (!readTagProperty(state) && !readAnchorProperty(state)) {
+            break;
+          }
+          if (propertyStart === null) {
+            propertyStart = propertyState;
+          }
+          if (skipSeparationSpace(state, true, -1)) {
+            atNewLine = true;
+            allowBlockCollections = allowBlockStyles;
+            if (state.lineIndent > parentIndent) {
+              indentStatus = 1;
+            } else if (state.lineIndent === parentIndent) {
+              indentStatus = 0;
+            } else if (state.lineIndent < parentIndent) {
+              indentStatus = -1;
+            }
+          } else {
+            allowBlockCollections = false;
+          }
+        }
+      }
+      if (allowBlockCollections) {
+        allowBlockCollections = atNewLine || allowCompact;
+      }
+      if (indentStatus === 1 || CONTEXT_BLOCK_OUT === nodeContext) {
+        if (CONTEXT_FLOW_IN === nodeContext || CONTEXT_FLOW_OUT === nodeContext) {
+          flowIndent = parentIndent;
+        } else {
+          flowIndent = parentIndent + 1;
+        }
+        blockIndent = state.position - state.lineStart;
+        if (indentStatus === 1) {
+          if (allowBlockCollections && (readBlockSequence(state, blockIndent) || readBlockMapping(state, blockIndent, flowIndent)) || readFlowCollection(state, flowIndent)) {
+            hasContent = true;
+          } else {
+            const ch = state.input.charCodeAt(state.position);
+            if (propertyStart !== null && allowBlockStyles && !allowBlockCollections && ch !== 124 && ch !== 62 && tryReadBlockMappingFromProperty(
+              state,
+              propertyStart,
+              propertyStart.position - propertyStart.lineStart,
+              flowIndent
+            )) {
+              hasContent = true;
+            } else if (allowBlockScalars && readBlockScalar(state, flowIndent) || readSingleQuotedScalar(state, flowIndent) || readDoubleQuotedScalar(state, flowIndent)) {
+              hasContent = true;
+            } else if (readAlias(state)) {
+              hasContent = true;
+              if (state.tag !== null || state.anchor !== null) {
+                throwError(state, "alias node should not have any properties");
+              }
+            } else if (readPlainScalar(state, flowIndent, CONTEXT_FLOW_IN === nodeContext)) {
+              hasContent = true;
+              if (state.tag === null) {
+                state.tag = "?";
+              }
+            }
+            if (state.anchor !== null) {
+              storeAnchor(state, state.anchor, state.result);
+            }
+          }
+        } else if (indentStatus === 0) {
+          hasContent = allowBlockCollections && readBlockSequence(state, blockIndent);
+        }
+      }
+      if (state.tag === null) {
+        if (state.anchor !== null) {
+          storeAnchor(state, state.anchor, state.result);
+        }
+      } else if (state.tag === "?") {
+        if (state.result !== null && state.kind !== "scalar") {
+          throwError(state, 'unacceptable node kind for !<?> tag; it should be "scalar", not "' + state.kind + '"');
+        }
+        for (let typeIndex = 0, typeQuantity = state.implicitTypes.length; typeIndex < typeQuantity; typeIndex += 1) {
+          type2 = state.implicitTypes[typeIndex];
+          if (type2.resolve(state.result)) {
+            state.result = type2.construct(state.result);
+            state.tag = type2.tag;
+            if (state.anchor !== null) {
+              storeAnchor(state, state.anchor, state.result);
+            }
+            break;
+          }
+        }
+      } else if (state.tag !== "!") {
+        if (_hasOwnProperty.call(state.typeMap[state.kind || "fallback"], state.tag)) {
+          type2 = state.typeMap[state.kind || "fallback"][state.tag];
+        } else {
+          type2 = null;
+          const typeList = state.typeMap.multi[state.kind || "fallback"];
+          for (let typeIndex = 0, typeQuantity = typeList.length; typeIndex < typeQuantity; typeIndex += 1) {
+            if (state.tag.slice(0, typeList[typeIndex].tag.length) === typeList[typeIndex].tag) {
+              type2 = typeList[typeIndex];
+              break;
+            }
+          }
+        }
+        if (!type2) {
+          throwError(state, "unknown tag !<" + state.tag + ">");
+        }
+        if (state.result !== null && type2.kind !== state.kind) {
+          throwError(state, "unacceptable node kind for !<" + state.tag + '> tag; it should be "' + type2.kind + '", not "' + state.kind + '"');
+        }
+        if (!type2.resolve(state.result, state.tag)) {
+          throwError(state, "cannot resolve a node with !<" + state.tag + "> explicit tag");
+        } else {
+          state.result = type2.construct(state.result, state.tag);
+          if (state.anchor !== null) {
+            storeAnchor(state, state.anchor, state.result);
+          }
+        }
+      }
+      if (state.listener !== null) {
+        state.listener("close", state);
+      }
+      state.depth -= 1;
+      return state.tag !== null || state.anchor !== null || hasContent;
+    }
+    function readDocument(state) {
+      const documentStart = state.position;
+      let hasDirectives = false;
+      let ch;
+      state.version = null;
+      state.checkLineBreaks = state.legacy;
+      state.tagMap = /* @__PURE__ */ Object.create(null);
+      state.anchorMap = /* @__PURE__ */ Object.create(null);
+      while ((ch = state.input.charCodeAt(state.position)) !== 0) {
+        skipSeparationSpace(state, true, -1);
+        ch = state.input.charCodeAt(state.position);
+        if (state.lineIndent > 0 || ch !== 37) {
+          break;
+        }
+        hasDirectives = true;
+        ch = state.input.charCodeAt(++state.position);
+        let _position = state.position;
+        while (ch !== 0 && !isWsOrEol(ch)) {
+          ch = state.input.charCodeAt(++state.position);
+        }
+        const directiveName = state.input.slice(_position, state.position);
+        const directiveArgs = [];
+        if (directiveName.length < 1) {
+          throwError(state, "directive name must not be less than one character in length");
+        }
+        while (ch !== 0) {
+          while (isWhiteSpace(ch)) {
+            ch = state.input.charCodeAt(++state.position);
+          }
+          if (ch === 35) {
+            do {
+              ch = state.input.charCodeAt(++state.position);
+            } while (ch !== 0 && !isEol(ch));
+            break;
+          }
+          if (isEol(ch)) break;
+          _position = state.position;
+          while (ch !== 0 && !isWsOrEol(ch)) {
+            ch = state.input.charCodeAt(++state.position);
+          }
+          directiveArgs.push(state.input.slice(_position, state.position));
+        }
+        if (ch !== 0) readLineBreak(state);
+        if (_hasOwnProperty.call(directiveHandlers, directiveName)) {
+          directiveHandlers[directiveName](state, directiveName, directiveArgs);
+        } else {
+          throwWarning(state, 'unknown document directive "' + directiveName + '"');
+        }
+      }
+      skipSeparationSpace(state, true, -1);
+      if (state.lineIndent === 0 && state.input.charCodeAt(state.position) === 45 && state.input.charCodeAt(state.position + 1) === 45 && state.input.charCodeAt(state.position + 2) === 45) {
+        state.position += 3;
+        skipSeparationSpace(state, true, -1);
+      } else if (hasDirectives) {
+        throwError(state, "directives end mark is expected");
+      }
+      composeNode(state, state.lineIndent - 1, CONTEXT_BLOCK_OUT, false, true);
+      skipSeparationSpace(state, true, -1);
+      if (state.checkLineBreaks && PATTERN_NON_ASCII_LINE_BREAKS.test(state.input.slice(documentStart, state.position))) {
+        throwWarning(state, "non-ASCII line breaks are interpreted as content");
+      }
+      state.documents.push(state.result);
+      if (state.position === state.lineStart && testDocumentSeparator(state)) {
+        if (state.input.charCodeAt(state.position) === 46) {
+          state.position += 3;
+          skipSeparationSpace(state, true, -1);
+        }
+        return;
+      }
+      if (state.position < state.length - 1) {
+        throwError(state, "end of the stream or a document separator is expected");
+      }
+    }
+    function loadDocuments(input, options) {
+      input = String(input);
+      options = options || {};
+      if (input.length !== 0) {
+        if (input.charCodeAt(input.length - 1) !== 10 && input.charCodeAt(input.length - 1) !== 13) {
+          input += "\n";
+        }
+        if (input.charCodeAt(0) === 65279) {
+          input = input.slice(1);
+        }
+      }
+      const state = new State(input, options);
+      const nullpos = input.indexOf("\0");
+      if (nullpos !== -1) {
+        state.position = nullpos;
+        throwError(state, "null byte is not allowed in input");
+      }
+      state.input += "\0";
+      while (state.input.charCodeAt(state.position) === 32) {
+        state.lineIndent += 1;
+        state.position += 1;
+      }
+      while (state.position < state.length - 1) {
+        readDocument(state);
+      }
+      return state.documents;
+    }
+    function loadAll2(input, iterator, options) {
+      if (iterator !== null && typeof iterator === "object" && typeof options === "undefined") {
+        options = iterator;
+        iterator = null;
+      }
+      const documents = loadDocuments(input, options);
+      if (typeof iterator !== "function") {
+        return documents;
+      }
+      for (let index = 0, length = documents.length; index < length; index += 1) {
+        iterator(documents[index]);
+      }
+    }
+    function load2(input, options) {
+      const documents = loadDocuments(input, options);
+      if (documents.length === 0) {
+        return void 0;
+      } else if (documents.length === 1) {
+        return documents[0];
+      }
+      throw new YAMLException2("expected a single document in the stream, but found more");
+    }
+    loader.loadAll = loadAll2;
+    loader.load = load2;
+    return loader;
+  }
+  var dumper = {};
+  var hasRequiredDumper;
+  function requireDumper() {
+    if (hasRequiredDumper) return dumper;
+    hasRequiredDumper = 1;
+    const common2 = requireCommon();
+    const YAMLException2 = requireException();
+    const DEFAULT_SCHEMA2 = require_default();
+    const _toString = Object.prototype.toString;
+    const _hasOwnProperty = Object.prototype.hasOwnProperty;
+    const CHAR_BOM = 65279;
+    const CHAR_TAB = 9;
+    const CHAR_LINE_FEED = 10;
+    const CHAR_CARRIAGE_RETURN = 13;
+    const CHAR_SPACE = 32;
+    const CHAR_EXCLAMATION = 33;
+    const CHAR_DOUBLE_QUOTE = 34;
+    const CHAR_SHARP = 35;
+    const CHAR_PERCENT = 37;
+    const CHAR_AMPERSAND = 38;
+    const CHAR_SINGLE_QUOTE = 39;
+    const CHAR_ASTERISK = 42;
+    const CHAR_COMMA = 44;
+    const CHAR_MINUS = 45;
+    const CHAR_COLON = 58;
+    const CHAR_EQUALS = 61;
+    const CHAR_GREATER_THAN = 62;
+    const CHAR_QUESTION = 63;
+    const CHAR_COMMERCIAL_AT = 64;
+    const CHAR_LEFT_SQUARE_BRACKET = 91;
+    const CHAR_RIGHT_SQUARE_BRACKET = 93;
+    const CHAR_GRAVE_ACCENT = 96;
+    const CHAR_LEFT_CURLY_BRACKET = 123;
+    const CHAR_VERTICAL_LINE = 124;
+    const CHAR_RIGHT_CURLY_BRACKET = 125;
+    const ESCAPE_SEQUENCES = {};
+    ESCAPE_SEQUENCES[0] = "\\0";
+    ESCAPE_SEQUENCES[7] = "\\a";
+    ESCAPE_SEQUENCES[8] = "\\b";
+    ESCAPE_SEQUENCES[9] = "\\t";
+    ESCAPE_SEQUENCES[10] = "\\n";
+    ESCAPE_SEQUENCES[11] = "\\v";
+    ESCAPE_SEQUENCES[12] = "\\f";
+    ESCAPE_SEQUENCES[13] = "\\r";
+    ESCAPE_SEQUENCES[27] = "\\e";
+    ESCAPE_SEQUENCES[34] = '\\"';
+    ESCAPE_SEQUENCES[92] = "\\\\";
+    ESCAPE_SEQUENCES[133] = "\\N";
+    ESCAPE_SEQUENCES[160] = "\\_";
+    ESCAPE_SEQUENCES[8232] = "\\L";
+    ESCAPE_SEQUENCES[8233] = "\\P";
+    const DEPRECATED_BOOLEANS_SYNTAX = [
+      "y",
+      "Y",
+      "yes",
+      "Yes",
+      "YES",
+      "on",
+      "On",
+      "ON",
+      "n",
+      "N",
+      "no",
+      "No",
+      "NO",
+      "off",
+      "Off",
+      "OFF"
+    ];
+    const DEPRECATED_BASE60_SYNTAX = /^[-+]?[0-9_]+(?::[0-9_]+)+(?:\.[0-9_]*)?$/;
+    function compileStyleMap(schema2, map2) {
+      if (map2 === null) return {};
+      const result = {};
+      const keys = Object.keys(map2);
+      for (let index = 0, length = keys.length; index < length; index += 1) {
+        let tag = keys[index];
+        let style = String(map2[tag]);
+        if (tag.slice(0, 2) === "!!") {
+          tag = "tag:yaml.org,2002:" + tag.slice(2);
+        }
+        const type2 = schema2.compiledTypeMap["fallback"][tag];
+        if (type2 && _hasOwnProperty.call(type2.styleAliases, style)) {
+          style = type2.styleAliases[style];
+        }
+        result[tag] = style;
+      }
+      return result;
+    }
+    function encodeHex(character) {
+      let handle;
+      let length;
+      const string = character.toString(16).toUpperCase();
+      if (character <= 255) {
+        handle = "x";
+        length = 2;
+      } else if (character <= 65535) {
+        handle = "u";
+        length = 4;
+      } else if (character <= 4294967295) {
+        handle = "U";
+        length = 8;
+      } else {
+        throw new YAMLException2("code point within a string may not be greater than 0xFFFFFFFF");
+      }
+      return "\\" + handle + common2.repeat("0", length - string.length) + string;
+    }
+    const QUOTING_TYPE_SINGLE = 1;
+    const QUOTING_TYPE_DOUBLE = 2;
+    function State(options) {
+      this.schema = options["schema"] || DEFAULT_SCHEMA2;
+      this.indent = Math.max(1, options["indent"] || 2);
+      this.noArrayIndent = options["noArrayIndent"] || false;
+      this.skipInvalid = options["skipInvalid"] || false;
+      this.flowLevel = common2.isNothing(options["flowLevel"]) ? -1 : options["flowLevel"];
+      this.styleMap = compileStyleMap(this.schema, options["styles"] || null);
+      this.sortKeys = options["sortKeys"] || false;
+      this.lineWidth = options["lineWidth"] || 80;
+      this.noRefs = options["noRefs"] || false;
+      this.noCompatMode = options["noCompatMode"] || false;
+      this.condenseFlow = options["condenseFlow"] || false;
+      this.quotingType = options["quotingType"] === '"' ? QUOTING_TYPE_DOUBLE : QUOTING_TYPE_SINGLE;
+      this.forceQuotes = options["forceQuotes"] || false;
+      this.replacer = typeof options["replacer"] === "function" ? options["replacer"] : null;
+      this.implicitTypes = this.schema.compiledImplicit;
+      this.explicitTypes = this.schema.compiledExplicit;
+      this.tag = null;
+      this.result = "";
+      this.duplicates = [];
+      this.usedDuplicates = null;
+    }
+    function indentString(string, spaces) {
+      const ind = common2.repeat(" ", spaces);
+      let position = 0;
+      let result = "";
+      const length = string.length;
+      while (position < length) {
+        let line;
+        const next = string.indexOf("\n", position);
+        if (next === -1) {
+          line = string.slice(position);
+          position = length;
+        } else {
+          line = string.slice(position, next + 1);
+          position = next + 1;
+        }
+        if (line.length && line !== "\n") result += ind;
+        result += line;
+      }
+      return result;
+    }
+    function generateNextLine(state, level) {
+      return "\n" + common2.repeat(" ", state.indent * level);
+    }
+    function testImplicitResolving(state, str2) {
+      for (let index = 0, length = state.implicitTypes.length; index < length; index += 1) {
+        const type2 = state.implicitTypes[index];
+        if (type2.resolve(str2)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function isWhitespace(c) {
+      return c === CHAR_SPACE || c === CHAR_TAB;
+    }
+    function isPrintable(c) {
+      return c >= 32 && c <= 126 || c >= 161 && c <= 55295 && c !== 8232 && c !== 8233 || c >= 57344 && c <= 65533 && c !== CHAR_BOM || c >= 65536 && c <= 1114111;
+    }
+    function isNsCharOrWhitespace(c) {
+      return isPrintable(c) && c !== CHAR_BOM && // - b-char
+      c !== CHAR_CARRIAGE_RETURN && c !== CHAR_LINE_FEED;
+    }
+    function isPlainSafe(c, prev, inblock) {
+      const cIsNsCharOrWhitespace = isNsCharOrWhitespace(c);
+      const cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c);
+      return (
+        // ns-plain-safe
+        (inblock ? cIsNsCharOrWhitespace : cIsNsCharOrWhitespace && // - c-flow-indicator
+        c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET) && // ns-plain-char
+        c !== CHAR_SHARP && // false on '#'
+        !(prev === CHAR_COLON && !cIsNsChar) || // false on ': '
+        isNsCharOrWhitespace(prev) && !isWhitespace(prev) && c === CHAR_SHARP || // change to true on '[^ ]#'
+        prev === CHAR_COLON && cIsNsChar
+      );
+    }
+    function isPlainSafeFirst(c) {
+      return isPrintable(c) && c !== CHAR_BOM && !isWhitespace(c) && // - s-white
+      // - (c-indicator ::=
+      // “-” | “?” | “:” | “,” | “[” | “]” | “{” | “}”
+      c !== CHAR_MINUS && c !== CHAR_QUESTION && c !== CHAR_COLON && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET && // | “#” | “&” | “*” | “!” | “|” | “=” | “>” | “'” | “"”
+      c !== CHAR_SHARP && c !== CHAR_AMPERSAND && c !== CHAR_ASTERISK && c !== CHAR_EXCLAMATION && c !== CHAR_VERTICAL_LINE && c !== CHAR_EQUALS && c !== CHAR_GREATER_THAN && c !== CHAR_SINGLE_QUOTE && c !== CHAR_DOUBLE_QUOTE && // | “%” | “@” | “`”)
+      c !== CHAR_PERCENT && c !== CHAR_COMMERCIAL_AT && c !== CHAR_GRAVE_ACCENT;
+    }
+    function isPlainSafeLast(c) {
+      return !isWhitespace(c) && c !== CHAR_COLON;
+    }
+    function codePointAt(string, pos) {
+      const first = string.charCodeAt(pos);
+      let second;
+      if (first >= 55296 && first <= 56319 && pos + 1 < string.length) {
+        second = string.charCodeAt(pos + 1);
+        if (second >= 56320 && second <= 57343) {
+          return (first - 55296) * 1024 + second - 56320 + 65536;
+        }
+      }
+      return first;
+    }
+    function needIndentIndicator(string) {
+      const leadingSpaceRe = /^\n* /;
+      return leadingSpaceRe.test(string);
+    }
+    const STYLE_PLAIN = 1;
+    const STYLE_SINGLE = 2;
+    const STYLE_LITERAL = 3;
+    const STYLE_FOLDED = 4;
+    const STYLE_DOUBLE = 5;
+    function chooseScalarStyle(string, singleLineOnly, indentPerLevel, lineWidth, testAmbiguousType, quotingType, forceQuotes, inblock) {
+      let i;
+      let char = 0;
+      let prevChar = null;
+      let hasLineBreak = false;
+      let hasFoldableLine = false;
+      const shouldTrackWidth = lineWidth !== -1;
+      let previousLineBreak = -1;
+      let plain = isPlainSafeFirst(codePointAt(string, 0)) && isPlainSafeLast(codePointAt(string, string.length - 1));
+      if (singleLineOnly || forceQuotes) {
+        for (i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+          char = codePointAt(string, i);
+          if (!isPrintable(char)) {
+            return STYLE_DOUBLE;
+          }
+          plain = plain && isPlainSafe(char, prevChar, inblock);
+          prevChar = char;
+        }
+      } else {
+        for (i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+          char = codePointAt(string, i);
+          if (char === CHAR_LINE_FEED) {
+            hasLineBreak = true;
+            if (shouldTrackWidth) {
+              hasFoldableLine = hasFoldableLine || // Foldable line = too long, and not more-indented.
+              i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
+              previousLineBreak = i;
+            }
+          } else if (!isPrintable(char)) {
+            return STYLE_DOUBLE;
+          }
+          plain = plain && isPlainSafe(char, prevChar, inblock);
+          prevChar = char;
+        }
+        hasFoldableLine = hasFoldableLine || shouldTrackWidth && (i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ");
+      }
+      if (!hasLineBreak && !hasFoldableLine) {
+        if (plain && !forceQuotes && !testAmbiguousType(string)) {
+          return STYLE_PLAIN;
+        }
+        return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+      }
+      if (indentPerLevel > 9 && needIndentIndicator(string)) {
+        return STYLE_DOUBLE;
+      }
+      if (!forceQuotes) {
+        return hasFoldableLine ? STYLE_FOLDED : STYLE_LITERAL;
+      }
+      return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+    }
+    function writeScalar(state, string, level, iskey, inblock) {
+      state.dump = (function() {
+        if (string.length === 0) {
+          return state.quotingType === QUOTING_TYPE_DOUBLE ? '""' : "''";
+        }
+        if (!state.noCompatMode) {
+          if (DEPRECATED_BOOLEANS_SYNTAX.indexOf(string) !== -1 || DEPRECATED_BASE60_SYNTAX.test(string)) {
+            return state.quotingType === QUOTING_TYPE_DOUBLE ? '"' + string + '"' : "'" + string + "'";
+          }
+        }
+        const indent = state.indent * Math.max(1, level);
+        const lineWidth = state.lineWidth === -1 ? -1 : Math.max(Math.min(state.lineWidth, 40), state.lineWidth - indent);
+        const singleLineOnly = iskey || // No block styles in flow mode.
+        state.flowLevel > -1 && level >= state.flowLevel;
+        function testAmbiguity(string2) {
+          return testImplicitResolving(state, string2);
+        }
+        switch (chooseScalarStyle(
+          string,
+          singleLineOnly,
+          state.indent,
+          lineWidth,
+          testAmbiguity,
+          state.quotingType,
+          state.forceQuotes && !iskey,
+          inblock
+        )) {
+          case STYLE_PLAIN:
+            return string;
+          case STYLE_SINGLE:
+            return "'" + string.replace(/'/g, "''") + "'";
+          case STYLE_LITERAL:
+            return "|" + blockHeader(string, state.indent) + dropEndingNewline(indentString(string, indent));
+          case STYLE_FOLDED:
+            return ">" + blockHeader(string, state.indent) + dropEndingNewline(indentString(foldString(string, lineWidth), indent));
+          case STYLE_DOUBLE:
+            return '"' + escapeString(string) + '"';
+          default:
+            throw new YAMLException2("impossible error: invalid scalar style");
+        }
+      })();
+    }
+    function blockHeader(string, indentPerLevel) {
+      const indentIndicator = needIndentIndicator(string) ? String(indentPerLevel) : "";
+      const clip = string[string.length - 1] === "\n";
+      const keep = clip && (string[string.length - 2] === "\n" || string === "\n");
+      const chomp = keep ? "+" : clip ? "" : "-";
+      return indentIndicator + chomp + "\n";
+    }
+    function dropEndingNewline(string) {
+      return string[string.length - 1] === "\n" ? string.slice(0, -1) : string;
+    }
+    function foldString(string, width) {
+      const lineRe = /(\n+)([^\n]*)/g;
+      let result = (function() {
+        let nextLF = string.indexOf("\n");
+        nextLF = nextLF !== -1 ? nextLF : string.length;
+        lineRe.lastIndex = nextLF;
+        return foldLine(string.slice(0, nextLF), width);
+      })();
+      let prevMoreIndented = string[0] === "\n" || string[0] === " ";
+      let moreIndented;
+      let match;
+      while (match = lineRe.exec(string)) {
+        const prefix = match[1];
+        const line = match[2];
+        moreIndented = line[0] === " ";
+        result += prefix + (!prevMoreIndented && !moreIndented && line !== "" ? "\n" : "") + foldLine(line, width);
+        prevMoreIndented = moreIndented;
+      }
+      return result;
+    }
+    function foldLine(line, width) {
+      if (line === "" || line[0] === " ") return line;
+      const breakRe = / [^ ]/g;
+      let match;
+      let start = 0;
+      let end;
+      let curr = 0;
+      let next = 0;
+      let result = "";
+      while (match = breakRe.exec(line)) {
+        next = match.index;
+        if (next - start > width) {
+          end = curr > start ? curr : next;
+          result += "\n" + line.slice(start, end);
+          start = end + 1;
+        }
+        curr = next;
+      }
+      result += "\n";
+      if (line.length - start > width && curr > start) {
+        result += line.slice(start, curr) + "\n" + line.slice(curr + 1);
+      } else {
+        result += line.slice(start);
+      }
+      return result.slice(1);
+    }
+    function escapeString(string) {
+      let result = "";
+      let char = 0;
+      for (let i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+        char = codePointAt(string, i);
+        const escapeSeq = ESCAPE_SEQUENCES[char];
+        if (!escapeSeq && isPrintable(char)) {
+          result += string[i];
+          if (char >= 65536) result += string[i + 1];
+        } else {
+          result += escapeSeq || encodeHex(char);
+        }
+      }
+      return result;
+    }
+    function writeFlowSequence(state, level, object) {
+      let _result = "";
+      const _tag = state.tag;
+      for (let index = 0, length = object.length; index < length; index += 1) {
+        let value = object[index];
+        if (state.replacer) {
+          value = state.replacer.call(object, String(index), value);
+        }
+        if (writeNode(state, level, value, false, false) || typeof value === "undefined" && writeNode(state, level, null, false, false)) {
+          if (_result !== "") _result += "," + (!state.condenseFlow ? " " : "");
+          _result += state.dump;
+        }
+      }
+      state.tag = _tag;
+      state.dump = "[" + _result + "]";
+    }
+    function writeBlockSequence(state, level, object, compact) {
+      let _result = "";
+      const _tag = state.tag;
+      for (let index = 0, length = object.length; index < length; index += 1) {
+        let value = object[index];
+        if (state.replacer) {
+          value = state.replacer.call(object, String(index), value);
+        }
+        if (writeNode(state, level + 1, value, true, true, false, true) || typeof value === "undefined" && writeNode(state, level + 1, null, true, true, false, true)) {
+          if (!compact || _result !== "") {
+            _result += generateNextLine(state, level);
+          }
+          if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) {
+            _result += "-";
+          } else {
+            _result += "- ";
+          }
+          _result += state.dump;
+        }
+      }
+      state.tag = _tag;
+      state.dump = _result || "[]";
+    }
+    function writeFlowMapping(state, level, object) {
+      let _result = "";
+      const _tag = state.tag;
+      const objectKeyList = Object.keys(object);
+      for (let index = 0, length = objectKeyList.length; index < length; index += 1) {
+        let pairBuffer = "";
+        if (_result !== "") pairBuffer += ", ";
+        if (state.condenseFlow) pairBuffer += '"';
+        const objectKey = objectKeyList[index];
+        let objectValue = object[objectKey];
+        if (state.replacer) {
+          objectValue = state.replacer.call(object, objectKey, objectValue);
+        }
+        if (!writeNode(state, level, objectKey, false, false)) {
+          continue;
+        }
+        if (state.dump.length > 1024) pairBuffer += "? ";
+        pairBuffer += state.dump + (state.condenseFlow ? '"' : "") + ":" + (state.condenseFlow ? "" : " ");
+        if (!writeNode(state, level, objectValue, false, false)) {
+          continue;
+        }
+        pairBuffer += state.dump;
+        _result += pairBuffer;
+      }
+      state.tag = _tag;
+      state.dump = "{" + _result + "}";
+    }
+    function writeBlockMapping(state, level, object, compact) {
+      let _result = "";
+      const _tag = state.tag;
+      const objectKeyList = Object.keys(object);
+      if (state.sortKeys === true) {
+        objectKeyList.sort();
+      } else if (typeof state.sortKeys === "function") {
+        objectKeyList.sort(state.sortKeys);
+      } else if (state.sortKeys) {
+        throw new YAMLException2("sortKeys must be a boolean or a function");
+      }
+      for (let index = 0, length = objectKeyList.length; index < length; index += 1) {
+        let pairBuffer = "";
+        if (!compact || _result !== "") {
+          pairBuffer += generateNextLine(state, level);
+        }
+        const objectKey = objectKeyList[index];
+        let objectValue = object[objectKey];
+        if (state.replacer) {
+          objectValue = state.replacer.call(object, objectKey, objectValue);
+        }
+        if (!writeNode(state, level + 1, objectKey, true, true, true)) {
+          continue;
+        }
+        const explicitPair = state.tag !== null && state.tag !== "?" || state.dump && state.dump.length > 1024;
+        if (explicitPair) {
+          if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) {
+            pairBuffer += "?";
+          } else {
+            pairBuffer += "? ";
+          }
+        }
+        pairBuffer += state.dump;
+        if (explicitPair) {
+          pairBuffer += generateNextLine(state, level);
+        }
+        if (!writeNode(state, level + 1, objectValue, true, explicitPair)) {
+          continue;
+        }
+        if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) {
+          pairBuffer += ":";
+        } else {
+          pairBuffer += ": ";
+        }
+        pairBuffer += state.dump;
+        _result += pairBuffer;
+      }
+      state.tag = _tag;
+      state.dump = _result || "{}";
+    }
+    function detectType(state, object, explicit) {
+      const typeList = explicit ? state.explicitTypes : state.implicitTypes;
+      for (let index = 0, length = typeList.length; index < length; index += 1) {
+        const type2 = typeList[index];
+        if ((type2.instanceOf || type2.predicate) && (!type2.instanceOf || typeof object === "object" && object instanceof type2.instanceOf) && (!type2.predicate || type2.predicate(object))) {
+          if (explicit) {
+            if (type2.multi && type2.representName) {
+              state.tag = type2.representName(object);
+            } else {
+              state.tag = type2.tag;
+            }
+          } else {
+            state.tag = "?";
+          }
+          if (type2.represent) {
+            const style = state.styleMap[type2.tag] || type2.defaultStyle;
+            let _result;
+            if (_toString.call(type2.represent) === "[object Function]") {
+              _result = type2.represent(object, style);
+            } else if (_hasOwnProperty.call(type2.represent, style)) {
+              _result = type2.represent[style](object, style);
+            } else {
+              throw new YAMLException2("!<" + type2.tag + '> tag resolver accepts not "' + style + '" style');
+            }
+            state.dump = _result;
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+    function writeNode(state, level, object, block, compact, iskey, isblockseq) {
+      state.tag = null;
+      state.dump = object;
+      if (!detectType(state, object, false)) {
+        detectType(state, object, true);
+      }
+      const type2 = _toString.call(state.dump);
+      const inblock = block;
+      if (block) {
+        block = state.flowLevel < 0 || state.flowLevel > level;
+      }
+      const objectOrArray = type2 === "[object Object]" || type2 === "[object Array]";
+      let duplicateIndex;
+      let duplicate;
+      if (objectOrArray) {
+        duplicateIndex = state.duplicates.indexOf(object);
+        duplicate = duplicateIndex !== -1;
+      }
+      if (state.tag !== null && state.tag !== "?" || duplicate || state.indent !== 2 && level > 0) {
+        compact = false;
+      }
+      if (duplicate && state.usedDuplicates[duplicateIndex]) {
+        state.dump = "*ref_" + duplicateIndex;
+      } else {
+        if (objectOrArray && duplicate && !state.usedDuplicates[duplicateIndex]) {
+          state.usedDuplicates[duplicateIndex] = true;
+        }
+        if (type2 === "[object Object]") {
+          if (block && Object.keys(state.dump).length !== 0) {
+            writeBlockMapping(state, level, state.dump, compact);
+            if (duplicate) {
+              state.dump = "&ref_" + duplicateIndex + state.dump;
+            }
+          } else {
+            writeFlowMapping(state, level, state.dump);
+            if (duplicate) {
+              state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+            }
+          }
+        } else if (type2 === "[object Array]") {
+          if (block && state.dump.length !== 0) {
+            if (state.noArrayIndent && !isblockseq && level > 0) {
+              writeBlockSequence(state, level - 1, state.dump, compact);
+            } else {
+              writeBlockSequence(state, level, state.dump, compact);
+            }
+            if (duplicate) {
+              state.dump = "&ref_" + duplicateIndex + state.dump;
+            }
+          } else {
+            writeFlowSequence(state, level, state.dump);
+            if (duplicate) {
+              state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+            }
+          }
+        } else if (type2 === "[object String]") {
+          if (state.tag !== "?") {
+            writeScalar(state, state.dump, level, iskey, inblock);
+          }
+        } else if (type2 === "[object Undefined]") {
+          return false;
+        } else {
+          if (state.skipInvalid) return false;
+          throw new YAMLException2("unacceptable kind of an object to dump " + type2);
+        }
+        if (state.tag !== null && state.tag !== "?") {
+          let tagStr = encodeURI(
+            state.tag[0] === "!" ? state.tag.slice(1) : state.tag
+          ).replace(/!/g, "%21");
+          if (state.tag[0] === "!") {
+            tagStr = "!" + tagStr;
+          } else if (tagStr.slice(0, 18) === "tag:yaml.org,2002:") {
+            tagStr = "!!" + tagStr.slice(18);
+          } else {
+            tagStr = "!<" + tagStr + ">";
+          }
+          state.dump = tagStr + " " + state.dump;
+        }
+      }
+      return true;
+    }
+    function getDuplicateReferences(object, state) {
+      const objects = [];
+      const duplicatesIndexes = [];
+      inspectNode(object, objects, duplicatesIndexes);
+      const length = duplicatesIndexes.length;
+      for (let index = 0; index < length; index += 1) {
+        state.duplicates.push(objects[duplicatesIndexes[index]]);
+      }
+      state.usedDuplicates = new Array(length);
+    }
+    function inspectNode(object, objects, duplicatesIndexes) {
+      if (object !== null && typeof object === "object") {
+        const index = objects.indexOf(object);
+        if (index !== -1) {
+          if (duplicatesIndexes.indexOf(index) === -1) {
+            duplicatesIndexes.push(index);
+          }
+        } else {
+          objects.push(object);
+          if (Array.isArray(object)) {
+            for (let i = 0, length = object.length; i < length; i += 1) {
+              inspectNode(object[i], objects, duplicatesIndexes);
+            }
+          } else {
+            const objectKeyList = Object.keys(object);
+            for (let i = 0, length = objectKeyList.length; i < length; i += 1) {
+              inspectNode(object[objectKeyList[i]], objects, duplicatesIndexes);
+            }
+          }
+        }
+      }
+    }
+    function dump2(input, options) {
+      options = options || {};
+      const state = new State(options);
+      if (!state.noRefs) getDuplicateReferences(input, state);
+      let value = input;
+      if (state.replacer) {
+        value = state.replacer.call({ "": value }, "", value);
+      }
+      if (writeNode(state, 0, value, true, true)) return state.dump + "\n";
+      return "";
+    }
+    dumper.dump = dump2;
+    return dumper;
+  }
+  var hasRequiredJsYaml;
+  function requireJsYaml() {
+    if (hasRequiredJsYaml) return jsYaml;
+    hasRequiredJsYaml = 1;
+    const loader2 = requireLoader();
+    const dumper2 = requireDumper();
+    function renamed(from, to) {
+      return function() {
+        throw new Error("Function yaml." + from + " is removed in js-yaml 4. Use yaml." + to + " instead, which is now safe by default.");
+      };
+    }
+    jsYaml.Type = requireType();
+    jsYaml.Schema = requireSchema();
+    jsYaml.FAILSAFE_SCHEMA = requireFailsafe();
+    jsYaml.JSON_SCHEMA = requireJson();
+    jsYaml.CORE_SCHEMA = requireCore();
+    jsYaml.DEFAULT_SCHEMA = require_default();
+    jsYaml.load = loader2.load;
+    jsYaml.loadAll = loader2.loadAll;
+    jsYaml.dump = dumper2.dump;
+    jsYaml.YAMLException = requireException();
+    jsYaml.types = {
+      binary: requireBinary(),
+      float: requireFloat(),
+      map: requireMap(),
+      null: require_null(),
+      pairs: requirePairs(),
+      set: requireSet(),
+      timestamp: requireTimestamp(),
+      bool: requireBool(),
+      int: requireInt(),
+      merge: requireMerge(),
+      omap: requireOmap(),
+      seq: requireSeq(),
+      str: requireStr()
+    };
+    jsYaml.safeLoad = renamed("safeLoad", "load");
+    jsYaml.safeLoadAll = renamed("safeLoadAll", "loadAll");
+    jsYaml.safeDump = renamed("safeDump", "dump");
+    return jsYaml;
+  }
+  var jsYamlExports = requireJsYaml();
+  const yaml = /* @__PURE__ */ getDefaultExportFromCjs(jsYamlExports);
+  const {
+    Type,
+    Schema,
+    FAILSAFE_SCHEMA,
+    JSON_SCHEMA,
+    CORE_SCHEMA,
+    DEFAULT_SCHEMA,
+    load,
+    loadAll,
+    dump,
+    YAMLException,
+    types,
+    safeLoad,
+    safeLoadAll,
+    safeDump
+  } = yaml;
+  const nodeColor = "var(--dk-accent-default)";
+  const triggerColor = "var(--dk-warning-text)";
+  const noteColor = "var(--dk-warning-text)";
+  const handleColor = "var(--dk-accent-default)";
+  const shapeLabelSize = 16;
+  const minZoom = 0.25;
+  const maxZoom = 2;
+  function shapeColor(shape) {
+    if (shape.type === "note") return noteColor;
+    if (shape.data?.nodeKind === "trigger") return triggerColor;
+    return nodeColor;
+  }
+  function centerOf(shape) {
+    return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+  }
+  function shapeContains(shape, point) {
+    return point.x >= shape.x - 10 && point.x <= shape.x + shape.width + 10 && point.y >= shape.y - 10 && point.y <= shape.y + shape.height + 10;
+  }
+  function findNodeAt(shapes, point) {
+    return [...shapes].reverse().find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
+  }
+  function isNodeShape(shape) {
+    return Boolean(shape && shape.type === "node");
+  }
+  function distanceToSegment(point, start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+    const projection = { x: start.x + t * dx, y: start.y + t * dy };
+    return Math.hypot(point.x - projection.x, point.y - projection.y);
+  }
+  function displayLabel(label) {
+    return label.length > 26 ? `${label.slice(0, 23)}...` : label;
+  }
+  function connectionHandles(shape) {
+    return [
+      { id: "top", x: shape.x + shape.width / 2, y: shape.y },
+      { id: "right", x: shape.x + shape.width, y: shape.y + shape.height / 2 },
+      { id: "bottom", x: shape.x + shape.width / 2, y: shape.y + shape.height },
+      { id: "left", x: shape.x, y: shape.y + shape.height / 2 }
+    ];
+  }
+  function nearestConnectionHandle(shape, point) {
+    return connectionHandles(shape).reduce((nearest, handle) => Math.hypot(point.x - handle.x, point.y - handle.y) < Math.hypot(point.x - nearest.x, point.y - nearest.y) ? handle : nearest);
+  }
+  function connectionHandleById(shape, handleId) {
+    return connectionHandles(shape).find((handle) => handle.id === handleId);
+  }
+  function inferConnectionHandles(source, target) {
+    const sourceHandles = connectionHandles(source);
+    const targetHandles = connectionHandles(target);
+    let best = { source: sourceHandles[0], target: targetHandles[0], distance: Number.POSITIVE_INFINITY };
+    for (const sourceHandle of sourceHandles) {
+      for (const targetHandle of targetHandles) {
+        const distance = Math.hypot(sourceHandle.x - targetHandle.x, sourceHandle.y - targetHandle.y);
+        if (distance < best.distance) best = { source: sourceHandle, target: targetHandle, distance };
+      }
+    }
+    return best;
+  }
+  function connectorEndpoints(shape, shapes) {
+    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+    const target = shapes.find((candidate) => candidate.id === shape.targetId);
+    if (source && target) {
+      const inferred = inferConnectionHandles(source, target);
+      const sourceHandle = connectionHandleById(source, shape.sourceHandleId) ?? inferred.source;
+      const targetHandle = connectionHandleById(target, shape.targetHandleId) ?? inferred.target;
+      return { start: sourceHandle, end: targetHandle };
+    }
+    return {
+      start: { x: shape.x, y: shape.y },
+      end: { x: shape.x + shape.width, y: shape.y + shape.height }
+    };
+  }
+  function refreshConnectedArrow(shape, shapes) {
+    if (shape.type !== "arrow") return shape;
+    const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+    const target = shapes.find((candidate) => candidate.id === shape.targetId);
+    if (!source || !target) return shape;
+    const handles = inferConnectionHandles(source, target);
+    return {
+      ...shape,
+      sourceHandleId: handles.source.id,
+      targetHandleId: handles.target.id,
+      x: handles.source.x,
+      y: handles.source.y,
+      width: handles.target.x - handles.source.x,
+      height: handles.target.y - handles.source.y
+    };
+  }
+  function refreshArrowsForMovedShape(shapes, movedShapeId) {
+    return shapes.map((shape) => shape.sourceId === movedShapeId || shape.targetId === movedShapeId ? refreshConnectedArrow(shape, shapes) : shape);
+  }
+  function findConnectorAt(shapes, point) {
+    return [...shapes].reverse().find((shape) => {
+      if (shape.type !== "arrow") return false;
+      const endpoints = connectorEndpoints(shape, shapes);
+      return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
+    });
+  }
+  function brandMark(title, paths) {
+    return function BrandMark({ size = 16, className, x, y }) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "svg",
+        {
+          width: size,
+          height: size,
+          viewBox: "0 0 24 24",
+          role: "img",
+          "aria-label": title,
+          className,
+          x,
+          y,
+          children: paths.map((path) => /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: path.d, fill: path.fill }, path.d))
+        }
+      );
+    };
+  }
+  const SlackLogo = brandMark("Slack", [
+    {
+      // Bottom-left arm
+      d: "M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z",
+      fill: "#E01E5A"
+    },
+    {
+      // Top-left arm
+      d: "M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z",
+      fill: "#36C5F0"
+    },
+    {
+      // Top-right arm
+      d: "M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z",
+      fill: "#2EB67D"
+    },
+    {
+      // Bottom-right arm
+      d: "M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z",
+      fill: "#ECB22E"
+    }
+  ]);
+  const YouTubeLogo = brandMark("YouTube", [
+    {
+      d: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z",
+      fill: "#FF0000"
+    }
+  ]);
+  const DropboxLogo = brandMark("Dropbox", [
+    {
+      d: "M6 1.807 0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z",
+      fill: "#0061FF"
+    }
+  ]);
+  const TelegramLogo = brandMark("Telegram", [
+    {
+      d: "M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z",
+      fill: "#26A5E4"
+    }
+  ]);
+  function SheetsLogo({ size = 16, className, x, y }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        role: "img",
+        "aria-label": "Google Sheets",
+        className,
+        x,
+        y,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M5.4 1.8h8.4l4.8 4.8v13.8a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8V3.6a1.8 1.8 0 0 1 1.8-1.8z",
+              fill: "#0F9D58"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13.8 1.8l4.8 4.8h-4.8z", fill: "#87CEAC" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M7.5 11.25h9v6.6h-9zm1.5 1.5v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2zm-3.6 2.4v1.2h2.4v-1.2zm3.6 0v1.2h2.4v-1.2z",
+              fill: "#fff"
+            }
+          )
+        ]
+      }
+    );
+  }
+  function MailLogo({ size = 16, className, x, y }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        role: "img",
+        "aria-label": "Email",
+        className,
+        x,
+        y,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M3.6 3.9h16.8a2.4 2.4 0 0 1 2.4 2.4v11.4a2.4 2.4 0 0 1-2.4 2.4H3.6a2.4 2.4 0 0 1-2.4-2.4V6.3a2.4 2.4 0 0 1 2.4-2.4z",
+              fill: "#EA4335"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "path",
+            {
+              d: "M2.9 6.4 12 13.3l9.1-6.9",
+              fill: "none",
+              stroke: "#fff",
+              strokeWidth: "1.9",
+              strokeLinecap: "round",
+              strokeLinejoin: "round"
+            }
+          )
+        ]
+      }
+    );
+  }
+  function S3Logo({ size = 16, className, x, y }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        role: "img",
+        "aria-label": "Amazon S3",
+        className,
+        x,
+        y,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "4.6", width: "18", height: "3", rx: "1.5", fill: "#232F3E" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4.6 9.1h14.8l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H7.98a2.1 2.1 0 0 1-2.08-1.8z", fill: "#7AA116" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 9.1h7.4l-1.3 9.9a2.1 2.1 0 0 1-2.08 1.8H12z", fill: "#5a7e10" })
+        ]
+      }
+    );
+  }
+  const logicOperators = [
+    "equals",
+    "not_equals",
+    "in",
+    "prefix",
+    "suffix",
+    "contains",
+    "does_not_contain",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "exists",
+    "empty"
+  ];
+  const actionCatalog = [
+    {
+      type: "agent",
+      label: "Agent",
+      icon: Bot,
+      description: "Queue a prompt for a Dapier worker — a machine running `dapier worker`, listed on the console's Workers tab. The worker runs the prompt as a headless Claude session in its workspace; the step returns as soon as the task is queued. With no worker running, tasks stay queued until one starts. The trigger's stored attachments (an email's files) are staged into the workspace under attachments/ and the run is told where they landed; set Pass trigger attachments to off to skip them.",
+      fields: [
+        { key: "prompt", label: "Prompt", type: "textarea", required: true, placeholder: "{subject}\n\n{text}" },
+        { key: "workspace", label: "Workspace", required: true, placeholder: "/home/alexey/git/dapier" },
+        { key: "engine", label: "Engine", placeholder: "claude" },
+        { key: "tag_prefix", label: "Tag prefix", placeholder: "agent" },
+        { key: "attachments", label: "Pass trigger attachments", type: "select", options: ["default", "off"], default: "default" }
+      ]
+    },
+    {
+      type: "webhook",
+      label: "Webhook",
+      icon: Webhook,
+      description: "POST the event — or a templated JSON payload — to any URL, optionally HMAC-signed with a stored secret. The receiver's response body lands in the step output (parsed JSON, or a text preview) for later steps.",
+      fields: [
+        { key: "url", label: "URL", required: true },
+        { key: "payload", label: "Payload (JSON, templated)", type: "textarea", placeholder: '{"id": "{trigger.id}"}' },
+        { key: "secret_id", label: "Signing secret ID", placeholder: "dapier/webhook" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "http_request",
+      label: "HTTP request",
+      icon: Globe,
+      description: "Call any API: templated URL, headers and body; basic, bearer or API-key auth. Output: {status, body}.",
+      fields: [
+        { key: "url", label: "URL", required: true, placeholder: "https://api.example.com/items/{id}" },
+        { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "PATCH", "DELETE"], default: "GET" },
+        { key: "auth_type", label: "Auth", type: "select", options: ["none", "basic", "bearer", "api_key"], default: "none" },
+        { key: "auth_username", label: "Basic username" },
+        { key: "auth_password", label: "Basic password" },
+        { key: "auth_token", label: "Bearer token", placeholder: "or a connection ID" },
+        { key: "connection_id", label: "Connection ID", placeholder: "bearer token fallback" },
+        { key: "auth_key_name", label: "API key name", placeholder: "x-api-key" },
+        { key: "auth_key_value", label: "API key value" },
+        { key: "auth_key_in", label: "API key in", type: "select", options: ["header", "query"] },
+        { key: "headers", label: "Headers (YAML)", type: "textarea", placeholder: 'accept: application/json\nx-trace: "{trigger.id}"' },
+        { key: "body", label: "Body template", type: "textarea", placeholder: '{"subject": "{subject}"}' },
+        { key: "content_type", label: "Content type", placeholder: "application/json" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "ai_complete",
+      label: "AI: complete",
+      icon: Sparkles,
+      description: "One chat completion against a configured OpenAI-compatible endpoint (LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+      fields: [
+        {
+          key: "prompt",
+          label: "Prompt",
+          type: "textarea",
+          required: true,
+          placeholder: "Summarize this message for the digest:\n{body}"
+        },
+        { key: "system", label: "System message", type: "textarea" },
+        { key: "json_mode", label: "JSON mode", type: "boolean", default: "false" },
+        { key: "temperature", label: "Temperature", type: "number" },
+        { key: "model", label: "Model" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "date_time",
+      label: "Date / time",
+      icon: Clock,
+      description: "Format a timestamp, or current processing time when Timestamp is omitted. Output: {iso, formatted, timezone}.",
+      fields: [
+        { key: "value", label: "Timestamp", placeholder: "{date}", help: "ISO or email Date with offset; omit for current processing time" },
+        { key: "timezone", label: "Timezone", placeholder: "America/Chicago", default: "UTC" },
+        { key: "format", label: "Format", default: "%Y-%m-%d" }
+      ]
+    },
+    {
+      type: "slack",
+      label: "Slack",
+      icon: SlackLogo,
+      description: "Post a templated message to a Slack channel through a stored credential or Slack connection. Output: {ok, channel, ts}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID" },
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        {
+          key: "channel",
+          label: "Channel",
+          placeholder: "#alerts",
+          required: true,
+          discover: { resource: "channels" }
+        },
+        { key: "username", label: "Bot display name", help: "Requires chat:write.customize on modern Slack apps" },
+        { key: "link_names", label: "Link names", type: "boolean" },
+        { key: "reply_broadcast", label: "Broadcast thread reply", type: "boolean" },
+        { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — replies into that thread",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
+        { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
+        { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+        {
+          key: "telegram_format",
+          label: "Telegram formatting",
+          type: "boolean",
+          placeholder: "renders {text} + entities as Slack blocks; long posts split into a thread"
+        },
+        {
+          key: "source_link",
+          label: "Source link template",
+          placeholder: "https://t.me/channel/{message_id}"
+        }
+      ]
+    },
+    {
+      type: "slack_find_user",
+      label: "Slack: find user by email",
+      icon: SlackLogo,
+      description: "Look up one workspace user by email (users.lookupByEmail). Output: {found, user}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", required: true, provider: "slack" },
+        { key: "email", label: "Email", placeholder: "person@example.com", required: true, discover: { resource: "users", value: "{email}" } },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_find",
+      label: "Slack: find user or channel",
+      icon: SlackLogo,
+      description: "Look up one workspace user (by email) or channel (by name). Output: {found, user} or {found, channel}. With Create if missing on, a missed channel is created (created: true).",
+      fields: [
+        { key: "find", label: "Find", type: "select", options: ["user", "channel"], default: "user" },
+        { key: "query", label: "Query", placeholder: "person@example.com or #channel", required: true },
+        {
+          key: "create_if_missing",
+          label: "Create if missing",
+          type: "boolean",
+          default: "false",
+          placeholder: "channels only: create the channel when none matches"
+        },
+        {
+          key: "is_private",
+          label: "Private channel",
+          type: "boolean",
+          default: "false",
+          placeholder: "only used when Create if missing is on"
+        },
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_update_message",
+      label: "Slack: update message",
+      icon: SlackLogo,
+      description: "Edit one already-posted message (chat.update). A slack trigger envelope carries {channel_id} and {ts}. Output: {ok, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "ts",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (updated by the workflow)" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_add_reaction",
+      label: "Slack: add reaction",
+      icon: SlackLogo,
+      description: "React to one message (reactions.add). already_reacted counts as success so a retried run stays green. Output: {ok, reaction, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "timestamp",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "reaction", label: "Reaction", required: true, placeholder: "tada" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_schedule_message",
+      label: "Slack: send scheduled message",
+      icon: SlackLogo,
+      description: "Sends one templated message for later (chat.scheduleMessage). Post at takes an ISO 8601 datetime — a missing offset reads as UTC — or epoch seconds. Output: {ok, channel, scheduled_message_id, ts, post_at}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or #channel", discover: { resource: "channels" } },
+        { key: "text", label: "Text template", type: "textarea", required: true, placeholder: "{title}\n{url}" },
+        { key: "post_at", label: "Post at", required: true, placeholder: "2026-10-02T09:00:00Z" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — schedules the reply into one thread",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
+        { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_add_reminder",
+      label: "Slack: add reminder",
+      icon: SlackLogo,
+      description: "Sets one reminder (reminders.add). Time takes Slack's natural-language times — in 20 minutes, tomorrow 9am — or epoch seconds; empty = Slack's default (20 minutes). Output: {ok, reminder: {id, time, text}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "text", label: "Reminder text", type: "textarea", required: true, placeholder: "Rotate the {customer} API key" },
+        { key: "time", label: "When", placeholder: "in 20 minutes / tomorrow 9am / 1759400000" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_dm",
+      label: "Slack: send direct message",
+      icon: SlackLogo,
+      description: "Open (or reuse) the DM channel with one user and post the templated text into it (conversations.open + chat.postMessage). Chain find user by email to target the person an event names. Output: {ok, user, channel, ts}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{steps.find.output.user.id}", discover: { resource: "users", value: "{id}" } },
+        { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
+        { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
+        { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_create_channel",
+      label: "Slack: create channel",
+      icon: SlackLogo,
+      description: "Create one channel (conversations.create); the name is normalized to what Slack accepts (lowercase, spaces to hyphens, illegal characters dropped). An existing name is an error. Output: {ok, channel: {id, name, is_private}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "name", label: "Channel name", required: true, placeholder: "alerts-{customer}" },
+        { key: "is_private", label: "Private channel", type: "boolean", default: "false" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_set_topic",
+      label: "Slack: set channel topic",
+      icon: SlackLogo,
+      description: "Set one channel's topic (conversations.setTopic). A slack trigger envelope carries {channel_id}. Output: {ok, channel, topic}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        { key: "topic", label: "Topic", type: "textarea", required: true },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_set_purpose",
+      label: "Slack: set channel purpose",
+      icon: SlackLogo,
+      description: "Set one channel's purpose (conversations.setPurpose). A slack trigger envelope carries {channel_id}. Output: {ok, channel, purpose}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        { key: "purpose", label: "Purpose", type: "textarea", required: true },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_invite_to_channel",
+      label: "Slack: invite users to channel",
+      icon: SlackLogo,
+      description: "Invite one or more workspace users into a channel (conversations.invite). Slack's already_in_channel is absorbed as invited: false so a retried run stays green. Output: {invited, channel, users}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or #channel", discover: { resource: "channels" } },
+        {
+          key: "users",
+          label: "Users",
+          required: true,
+          placeholder: "{steps.find.output.user.id} (comma-separated ids)",
+          discover: { resource: "users" }
+        },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_pin_message",
+      label: "Slack: pin message",
+      icon: SlackLogo,
+      description: "Pin one message to its channel (pins.add). A slack trigger envelope carries {channel_id} and {ts}. Output: {pinned, channel, timestamp}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
+        {
+          key: "timestamp",
+          label: "Message ts",
+          required: true,
+          placeholder: "{ts}",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_find_message",
+      label: "Slack: find message",
+      icon: SlackLogo,
+      description: "Search workspace messages (search.messages; the token needs the search:read scope). Output: {found, messages: [{ts, channel_id, channel_name, user, text, permalink}], count} — a miss is not an error.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "query", label: "Query", required: true, placeholder: "deploy postmortem" },
+        { key: "count", label: "Max results", type: "number", placeholder: "20" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "slack_upload_file",
+      label: "Slack: upload file",
+      icon: SlackLogo,
+      description: "Send one file to a channel (files.uploadV2). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content — dropbox/drive read file chain here. Output: {ok, channel, file: {id, name, title, permalink}}.",
+      fields: [
+        { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
+        { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or C01ABC2DEF", discover: { resource: "channels" } },
+        { key: "filename", label: "File name", required: true, placeholder: "report.pdf" },
+        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        { key: "title", label: "Title", placeholder: "shown in Slack (defaults to the file name)" },
+        { key: "initial_comment", label: "Comment", type: "textarea", placeholder: "posted with the file" },
+        {
+          key: "thread_ts",
+          label: "Thread ts",
+          placeholder: "{ts} — replies to that message instead of posting top-level",
+          discover: { resource: "messages", params: { channel: "channel" } }
+        },
+        { key: "content_type", label: "Content type", placeholder: "guessed from the file name" },
+        { key: "credential_id", label: "Credential ID" }
+      ]
+    },
+    {
+      type: "telegram_send",
+      label: "Telegram",
+      icon: Send,
+      description: "Post a message through a Telegram bot connection. The chat defaults to the triggering Telegram message; other triggers name the chat explicitly.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_find_chat",
+      label: "Telegram find chat",
+      icon: Send,
+      description: "Look up one chat's profile (getChat); found is False when the bot cannot see it",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          required: true,
+          placeholder: "@channel or -100…",
+          discover: { resource: "chats" }
+        }
+      ]
+    },
+    {
+      type: "telegram_send_document",
+      label: "Telegram send document",
+      icon: Send,
+      description: "Send a file to a chat (Bot API sendDocument). Media comes from exactly one of source_url or a staged source_s3 {bucket, key} object; the filename defaults to the URL's or key's file name.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.pdf" },
+        { key: "filename", label: "Filename override" },
+        { key: "attachment_selection", label: "Attachment selection", type: "select", options: ["all", "single", "first"], default: "all" },
+        { key: "overwrite", label: "Overwrite existing file", type: "boolean", default: "false" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "true" },
+        { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_send_photo",
+      label: "Telegram send photo",
+      icon: Send,
+      description: "Send a photo to a chat (Bot API sendPhoto). Media comes from exactly one of source_url or a staged source_s3 {bucket, key} object; Bot API photos must be JPEG/PNG/GIF/WEBP under 10 MB.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "source_url", label: "Media URL", placeholder: "https://example.test/report.png" },
+        { key: "filename", label: "Filename override" },
+        { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_send_poll",
+      label: "Telegram send poll",
+      icon: Send,
+      description: "Send a poll to a chat (Bot API sendPoll). Options holds one option per line — 2 to 10 after trimming empty lines; chat_id falls back to the triggering chat like the other sends. Output: {message_id, chat_id, poll: {id, question}}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "question", label: "Question", required: true, placeholder: "Ship on Friday?" },
+        { key: "options", label: "Options", type: "textarea", required: true, placeholder: "Yes\nNo\nNeeds another week" },
+        { key: "anonymous", label: "Anonymous voting", type: "boolean", default: "true" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_edit_message",
+      label: "Telegram edit message",
+      icon: Send,
+      description: "Edit one already-posted message's text (Bot API editMessageText). chat_id falls back to the triggering chat like the other telegram actions; message_id comes from the trigger or an earlier step. Output: {message_id, chat_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "message_id", label: "Message ID", required: true, placeholder: "{message_id}" },
+        { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (edited by the workflow)" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_pin_message",
+      label: "Telegram pin message",
+      icon: Send,
+      description: "Pin one message in a chat (Bot API pinChatMessage). chat_id falls back to the triggering chat; disable_notification pins silently. Output: {pinned, chat_id, message_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "message_id", label: "Message ID", required: true, placeholder: "{message_id}" },
+        { key: "disable_notification", label: "Pin silently", type: "boolean", default: "false" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "telegram_ban_member",
+      label: "Telegram ban member",
+      icon: Send,
+      description: "Ban one member from a chat (Bot API banChatMember). chat_id falls back to the triggering chat; user_id renders from the event. Optional until_date bans until an epoch timestamp (empty means forever). Output: {banned, chat_id, user_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{user_id}" },
+        { key: "until_date", label: "Banned until", placeholder: "1798761600 (epoch seconds; empty = forever)" }
+      ]
+    },
+    {
+      type: "telegram_unban_member",
+      label: "Telegram unban member",
+      icon: Send,
+      description: "Unban one member of a chat (Bot API unbanChatMember). chat_id falls back to the triggering chat; user_id renders from the event. Output: {unbanned, chat_id, user_id}.",
+      fields: [
+        { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+        {
+          key: "chat_id",
+          label: "Chat ID",
+          placeholder: "defaults to the triggering chat",
+          discover: { resource: "chats" }
+        },
+        { key: "user_id", label: "User ID", required: true, placeholder: "{user_id}" }
+      ]
+    },
+    {
+      type: "email_send",
+      label: "Send email",
+      icon: Mail,
+      description: "Send an email through SES. The sender defaults to the workflow's sender; the body is the text body, the HTML body, or both. Any attachment — or a threading header (In-Reply-To / References) — switches the send to raw MIME.",
+      fields: [
+        { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
+        { key: "subject", label: "Subject", placeholder: "{subject}" },
+        { key: "text", label: "Text body", type: "textarea" },
+        { key: "html", label: "HTML body", type: "textarea" },
+        { key: "sender", label: "Sender", placeholder: "defaults to the workflow sender" },
+        { key: "cc", label: "Cc", placeholder: "comma-separated or {templated}" },
+        { key: "bcc", label: "Bcc", placeholder: "comma-separated or {templated}" },
+        { key: "reply_to", label: "Reply-To", placeholder: "replies@example.com" },
+        { key: "in_reply_to", label: "In-Reply-To", placeholder: "{trigger.message_id}" },
+        { key: "references", label: "References", placeholder: "{trigger.message_id} — the thread's chain" },
+        {
+          key: "attachments",
+          label: "Attachments (YAML)",
+          type: "textarea",
+          placeholder: '- filename: report.pdf\n  source_url: "{link}"'
+        }
+      ]
+    },
+    {
+      type: "gmail_send",
+      label: "Gmail: send email",
+      icon: Mail,
+      description: "Send an email from the connection's Gmail mailbox (users.messages.send). Gmail delivers only from the authenticated account, so there is no sender field. The body is the text body, the HTML body, or both.",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google", required: true },
+        { key: "to", label: "To", required: true, placeholder: "you@example.com or {sender}" },
+        { key: "subject", label: "Subject", placeholder: "{subject}" },
+        { key: "text", label: "Text body", type: "textarea" },
+        { key: "html", label: "HTML body", type: "textarea" },
+        { key: "cc", label: "Cc", placeholder: "comma-separated or {templated}" },
+        { key: "bcc", label: "Bcc", placeholder: "comma-separated or {templated}" }
+      ]
+    },
+    {
+      type: "dataops",
+      label: "DataOps intake",
+      icon: DatabaseZap,
+      description: "Push the event into a DataOps intake (url_env or url): attachments and rendered PDFs — or a Dropbox file event's bytes — are staged with sha256 checksums and referenced by s3:// URI.",
+      fields: [
+        { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
+        { key: "url_env", label: "URL env var", placeholder: "DATAOPS_INTAKE_URL" },
+        { key: "url", label: "URL (overrides env)" },
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
+        { key: "path", label: "Dropbox file path", placeholder: "{steps.move.output.item.path}" },
+        { key: "filename", label: "Filename override" },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "dropbox_upload",
+      label: "Dropbox upload",
+      icon: DropboxLogo,
+      description: "Upload the email's stored attachments — or a rendered output file — into a folder in the connection's Dropbox. Output: {uploaded: [paths]}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
+        {
+          key: "folder",
+          label: "Folder",
+          placeholder: "/Invoices",
+          required: true,
+          discover: { resource: "folders", value: "{path}" }
+        },
+        { key: "filename", label: "Filename override" }
+      ]
+    },
+    {
+      type: "dropbox_delete",
+      label: "Dropbox delete",
+      icon: DropboxLogo,
+      description: "Delete one file from the connection's Dropbox, defaulting to the triggering event's path — run it after intake succeeds. Output: {deleted: path}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_find",
+      label: "Dropbox: find file or folder",
+      icon: DropboxLogo,
+      description: "Search the connection's Dropbox for one file or folder by name. Output: {found, item}; folder finds can create the folder when missing.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "query",
+          label: "Name to find",
+          placeholder: "{filename}",
+          required: true,
+          discover: { resource: "search", params: { query: "query" }, value: "{name}" }
+        },
+        { key: "kind", label: "Kind", type: "select", options: ["any", "file", "folder"], default: "any" },
+        {
+          key: "path",
+          label: "Folder to search",
+          placeholder: "defaults to the connection's root",
+          discover: { resource: "folders", value: "{path}" }
+        },
+        { key: "create_if_missing", label: "Create folder if missing", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "dropbox_read_file",
+      label: "Dropbox: read file",
+      icon: DropboxLogo,
+      description: "Download a file from the connection's Dropbox and stage it for later steps. Pair with Amazon S3 (source_s3) to move the bytes into a bucket.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_get_temp_link",
+      label: "Dropbox: get temporary link",
+      icon: DropboxLogo,
+      description: "Mint a direct download link for one file (valid a few hours). Chain it before Amazon S3 and pass {steps.<id>.output.link} as source_url to pull Dropbox bytes into the pipeline.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "path",
+          label: "Path",
+          placeholder: "defaults to the event's file path",
+          discover: { resource: "files", value: "{path}" }
+        }
+      ]
+    },
+    {
+      type: "dropbox_create_folder",
+      label: "Dropbox: create folder",
+      icon: DropboxLogo,
+      description: "Create one folder (files/create_folder_v2). The path is the full destination and renders from the event; an existing folder is an error. Output: {folder, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        { key: "path", label: "Folder path", placeholder: "/Invoices/{month}", required: true }
+      ]
+    },
+    {
+      type: "dropbox_move",
+      label: "Dropbox: move file",
+      icon: DropboxLogo,
+      description: "Move (or rename) one file or folder (files/move_v2) — a move within the same folder under a new name renames. autorename appends a suffix instead of erroring on an existing destination. Output: {moved, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "from_path",
+          label: "From path",
+          required: true,
+          placeholder: "{path} from a dropbox trigger",
+          discover: { resource: "files", value: "{path}" }
+        },
+        { key: "to_path", label: "To path", required: true, placeholder: "/Archive/{filename}" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "dropbox_copy",
+      label: "Dropbox: copy file",
+      icon: DropboxLogo,
+      description: "Copy one file or folder to a new path (files/copy_v2). autorename appends a suffix instead of erroring on an existing destination. Output: {copied, item}.",
+      fields: [
+        { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
+        {
+          key: "from_path",
+          label: "From path",
+          required: true,
+          placeholder: "{path} from a dropbox trigger",
+          discover: { resource: "files", value: "{path}" }
+        },
+        { key: "to_path", label: "To path", required: true, placeholder: "/Archive/{filename}" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "s3_upload",
+      label: "Amazon S3",
+      icon: S3Logo,
+      description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "mailchimp/{name}",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        },
+        {
+          key: "source_url",
+          label: "Source URL",
+          placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media",
+          discover: { resource: "files", from: "source_connection_id", value: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" }
+        },
+        { key: "source_connection_id", label: "Source connection ID", placeholder: "google-drive — authorizes the source URL", provider: "google" },
+        { key: "content_type", label: "Content type", placeholder: "defaults to the trigger's mimeType" },
+        { key: "key_mode", label: "Object key mode", type: "select", options: ["safe", "exact"], default: "safe" },
+        { key: "omit_content_type", label: "Omit Content-Type", type: "boolean", default: "false" },
+        { key: "source_s3", label: "Stored source (bucket/key)", type: "json" }
+      ]
+    },
+    {
+      type: "s3_find",
+      label: "S3: find object",
+      icon: S3Logo,
+      description: "Find the first object matching a name pattern in a bucket (Find Object). A truncated listing rides out in next_token — feed it back on a repeated run to continue.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        { key: "pattern", label: "Name pattern", placeholder: "{name}.pdf", required: true },
+        {
+          key: "prefix",
+          label: "Key prefix",
+          placeholder: "reports/2026/",
+          discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } }
+        },
+        { key: "match", label: "Match", type: "select", options: ["exact", "prefix", "suffix", "contains"], default: "exact" },
+        { key: "next_token", label: "Next token", placeholder: "{previous.next_token} — continues a truncated listing" }
+      ]
+    },
+    {
+      type: "s3_list_objects",
+      label: "S3: list objects",
+      icon: S3Logo,
+      description: "List a bucket's objects under a prefix (ListObjectsV2; List Files). Output: {bucket, prefix, items, count, truncated, next_token} — each item is {key, size, last_modified}; keys arrive alphabetically, capped at Max items (default 20, up to 100). Feed next_token back in to keep walking a truncated listing.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "prefix",
+          label: "Key prefix",
+          placeholder: "reports/2026/",
+          discover: { resource: "objects", params: { bucket: "bucket", prefix: "prefix" } }
+        },
+        {
+          key: "max_items",
+          label: "Max items",
+          type: "number",
+          default: "20",
+          placeholder: "listing bound — capped at 100"
+        },
+        { key: "next_token", label: "Continuation token", placeholder: "{previous.next_token} — walks past the cap" }
+      ]
+    },
+    {
+      type: "s3_read_object",
+      label: "S3: read object",
+      icon: S3Logo,
+      description: "Download one object and stage the bytes for the steps that follow (GetObject). The key defaults to the event's object key. Output: {filename, size, content_type, bucket, key, source_bucket, source_key} — pair with a step whose source_s3 takes templates to move the bytes elsewhere.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "defaults to the event's object key",
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        }
+      ]
+    },
+    {
+      type: "s3_presign_url",
+      label: "S3: presigned URL",
+      icon: S3Logo,
+      description: "Mint a short-lived presigned download URL for one object (presigned GET; one hour by default, up to seven days). Output: {link, bucket, key, expires_in} — feed link into a follow-up step's source_url to hand a private object to another pipeline. Computed, never sent.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "reports/2026/report.pdf",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        },
+        {
+          key: "expires_in",
+          label: "Expires in (s)",
+          type: "number",
+          default: "3600",
+          placeholder: "seconds — one hour by default, capped at 604800 (SigV4's seven days)"
+        }
+      ]
+    },
+    {
+      type: "s3_delete_object",
+      label: "S3: delete object",
+      icon: S3Logo,
+      description: "Delete one object from a bucket (DeleteObject). S3 deletes are idempotent — removing an absent key succeeds. Output: {deleted, bucket, key}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        {
+          key: "bucket",
+          label: "Bucket",
+          placeholder: "datatalks-mailchimp-backup",
+          required: true,
+          discover: { resource: "buckets", account: "aws" }
+        },
+        {
+          key: "key",
+          label: "Object key",
+          placeholder: "tmp/{name}.pdf",
+          required: true,
+          discover: { resource: "objects", params: { bucket: "bucket" } }
+        }
+      ]
+    },
+    {
+      type: "mailchimp_find_member",
+      label: "Mailchimp: find member",
+      icon: MailLogo,
+      description: "Find one audience member by email. Output: {found, member}; a miss is {found: false, member: null} — or, with Create if missing on, the member is created and the output reports created: true.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        },
+        { key: "create_if_missing", label: "Create if missing", type: "boolean", default: "false" },
+        {
+          key: "status",
+          label: "Status if new",
+          type: "select",
+          options: ["subscribed", "pending", "unsubscribed", "cleaned"],
+          default: "subscribed",
+          placeholder: "only used when Create if missing is on"
+        },
+        {
+          key: "merge_fields",
+          label: "Merge fields (JSON)",
+          placeholder: '{"FNAME": "{name}"} — only used when Create if missing is on'
+        }
+      ]
+    },
+    {
+      type: "mailchimp_upsert_member",
+      label: "Mailchimp",
+      icon: MailLogo,
+      description: "Add or update one audience member: Status applies to new members; merge fields are a JSON object.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        },
+        {
+          key: "status",
+          label: "Status if new",
+          type: "select",
+          options: ["subscribed", "pending", "unsubscribed", "cleaned"],
+          default: "subscribed"
+        },
+        { key: "merge_fields", label: "Merge fields (JSON)", placeholder: '{"FNAME": "{name}"}' }
+      ]
+    },
+    {
+      type: "mailchimp_remove_member",
+      label: "Mailchimp: remove member",
+      icon: MailLogo,
+      description: "Permanently remove one audience member by email. A missing email is not an error: the output is {removed: false} — guard with find member when the difference matters.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        }
+      ]
+    },
+    {
+      type: "mailchimp_unsubscribe_member",
+      label: "Mailchimp: unsubscribe member",
+      icon: MailLogo,
+      description: "Unsubscribe one audience member by email — reversible: the member stays on the audience with status unsubscribed, unlike the permanent remove. A missing email is not an error: the output is {unsubscribed: false}.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        }
+      ]
+    },
+    {
+      type: "mailchimp_tag_member",
+      label: "Mailchimp: tag member",
+      icon: MailLogo,
+      description: "Add or remove one tag on an audience member: Add applies the tag, Remove sets it inactive. The member must exist — upsert it first when unsure.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
+        {
+          key: "list_id",
+          label: "Audience",
+          required: true,
+          discover: { resource: "audiences", account: "mailchimp", value: "{id}" }
+        },
+        {
+          key: "email",
+          label: "Email",
+          placeholder: "{sender}",
+          required: true,
+          discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" }
+        },
+        { key: "tag", label: "Tag", placeholder: "digest-readers", required: true },
+        { key: "tag_action", label: "Operation", type: "select", options: ["add", "remove"], default: "add" }
+      ]
+    },
+    {
+      type: "drive_find_file",
+      label: "Drive: find file",
+      icon: FileText,
+      description: "Find the most recently modified Drive file matching a name (Find File)",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "name",
+          label: "File name",
+          placeholder: "report.pdf — substring unless Match is exact",
+          required: true,
+          discover: { resource: "files", value: "{name}" }
+        },
+        {
+          key: "folder",
+          label: "Folder ID",
+          placeholder: "restricts the search to one folder's children",
+          discover: { resource: "folders" }
+        },
+        { key: "match", label: "Match", type: "select", options: ["contains", "exact"], default: "contains" }
+      ]
+    },
+    {
+      type: "drive_read_file",
+      label: "Drive: read file",
+      icon: FileText,
+      description: "Download a Drive file and stage it for later steps (Read File); Google-native docs export first (export_as). Pair with Amazon S3 (source_s3) or Slack's upload file to move the bytes on.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "export_as", label: "Export as", placeholder: "application/pdf — for Google-native files" }
+      ]
+    },
+    {
+      type: "drive_upload_file",
+      label: "Upload file",
+      icon: FileText,
+      description: "Upload one file into the connection's Drive (Upload File). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content. Output: {file_id, name, mime_type, size, webViewLink}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "name", label: "File name", placeholder: "report.pdf", required: true },
+        { key: "source_url", label: "Source URL", placeholder: "https://www.googleapis.com/drive/v3/files/{id}?alt=media" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        {
+          key: "folder_id",
+          label: "Folder ID",
+          placeholder: "uploads into one folder (defaults to the root)",
+          discover: { resource: "folders" }
+        },
+        { key: "content_type", label: "Content type", placeholder: "application/octet-stream" }
+      ]
+    },
+    {
+      type: "drive_copy_file",
+      label: "Drive: copy file",
+      icon: FileText,
+      description: `Copy one Drive file (Drive v3 files.copy); the optional name names the copy, else Drive's "Copy of …". Output: {file_id, name, mime_type, size, webViewLink} — the upload's keys, so the file steps chain.`,
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "name", label: "Copy name", placeholder: `defaults to Drive's "Copy of <original name>"` }
+      ]
+    },
+    {
+      type: "drive_share_file",
+      label: "Drive: share file",
+      icon: FileText,
+      description: "Share one Drive file by creating a permission (Drive v3 permissions.create). Role is reader/commenter/writer; Share with picks user, group, domain, or anyone — a user or group grant needs the grantee's email address. Output: {shared, file_id, permission_id, role, type}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        { key: "role", label: "Role", type: "select", options: ["reader", "commenter", "writer"], default: "reader" },
+        { key: "share_type", label: "Share with", type: "select", options: ["user", "group", "domain", "anyone"], default: "user" },
+        { key: "email_address", label: "Email address", placeholder: "the user or group to grant — required for those share types" }
+      ]
+    },
+    {
+      type: "drive_delete_file",
+      label: "Drive: delete file",
+      icon: FileText,
+      description: "Delete one Drive file (Zapier's Delete File). The default moves the file to the trash (Drive v3 files.update with trashed: true) — recoverable from Drive's trash; Delete permanently calls files.delete instead, which destroys the file outright. Output: {trashed, permanent, file_id, name}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        {
+          key: "permanent",
+          label: "Delete permanently",
+          type: "boolean",
+          default: "false",
+          placeholder: "off: trash (recoverable) — on: files.delete destroys it"
+        }
+      ]
+    },
+    {
+      type: "drive_move_file",
+      label: "Drive: move file",
+      icon: FileText,
+      description: "Move one Drive file between folders (Drive v3 files.update with addParents/removeParents; Zapier's Move File). At least one of Add to folder / Remove from folder is required; adding keeps the file's other parents. Output: {moved: true, file_id, name, parents} — the resulting parents.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "file_id",
+          label: "File ID",
+          required: true,
+          discover: { resource: "files" }
+        },
+        {
+          key: "add_parent",
+          label: "Add to folder",
+          discover: { resource: "folders" }
+        },
+        {
+          key: "remove_parent",
+          label: "Remove from folder",
+          discover: { resource: "folders" }
+        }
+      ]
+    },
+    {
+      type: "drive_create_folder",
+      label: "Drive: create folder",
+      icon: FileText,
+      description: "Create one Drive folder (Drive v3 files.create with the folder mimeType). The optional parent folder places it, else it lands at the Drive root. Output: {folder_id, name, url} — file uploads into it via Upload file's folder_id.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "name", label: "Folder name", placeholder: "Invoices 2026", required: true },
+        {
+          key: "parent_folder_id",
+          label: "Parent folder ID",
+          placeholder: "creates inside one folder (defaults to the Drive root)",
+          discover: { resource: "folders" }
+        }
+      ]
+    },
+    {
+      type: "youtube_find_video",
+      label: "YouTube: find video",
+      icon: YouTubeLogo,
+      description: "Find the top videos for a search query (Find Video)",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "query", label: "Search query", placeholder: "DataTalks kubernetes", required: true }
+      ]
+    },
+    {
+      type: "youtube_find_playlist_items",
+      label: "YouTube: playlist videos",
+      icon: YouTubeLogo,
+      description: "List the videos in a playlist, newest first (Find Playlist Videos). Output: {found, count, videos, video}.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "playlist_id", label: "Playlist ID", discover: { resource: "playlists" } }
+      ]
+    },
+    {
+      type: "youtube_upload_video",
+      label: "Upload video",
+      icon: YouTubeLogo,
+      description: "Upload one video to the connection's YouTube channel (Upload Video). Content comes from exactly one of source_url, a staged source_s3 {bucket, key}, or inline content; bytes stage in memory, so keep sources modest (~100 MB ceiling). Output: {video_id, title, privacy_status, upload_status, url}. Needs the youtube.upload OAuth scope.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "title", label: "Title", placeholder: "Deploying dapier: a walkthrough", required: true },
+        { key: "source_url", label: "Source URL", placeholder: "https://example.test/talk.mp4" },
+        { key: "content", label: "Content", placeholder: "inline text — templated, e.g. {trigger.text}" },
+        { key: "description", label: "Description", placeholder: "shown under the video — templated" },
+        { key: "tags", label: "Tags", placeholder: "comma-separated, e.g. devops, kubernetes" },
+        { key: "category_id", label: "Category ID", placeholder: "YouTube category id, e.g. 22 (People & Blogs)" },
+        { key: "privacy_status", label: "Privacy", type: "select", options: ["public", "unlisted", "private"], default: "unlisted" }
+      ]
+    },
+    {
+      type: "youtube_add_to_playlist",
+      label: "YouTube: add to playlist",
+      icon: YouTubeLogo,
+      description: "Add one video to a playlist the connection can edit (playlistItems.insert; Add Video to Playlist). Output: {playlist_id, video_id, playlist_item_id, title, position}. A video already in the playlist is YouTube's videoAlreadyInPlaylist error, not a silent duplicate.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "playlist_id",
+          label: "Playlist ID",
+          required: true,
+          discover: { resource: "playlists" }
+        },
+        {
+          key: "video_id",
+          label: "Video ID",
+          required: true,
+          placeholder: "{trigger.video_id} from a youtube trigger, or a found video's id",
+          discover: { resource: "videos" }
+        }
+      ]
+    },
+    {
+      type: "youtube_update_video",
+      label: "YouTube: update video",
+      icon: YouTubeLogo,
+      description: "Update one video's title and description (videos.update, part=snippet; Update Video). YouTube replaces the whole snippet on update, so pass category_id when the video's category matters. Output: {updated, video_id, title, description, category_id}.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "video_id",
+          label: "Video ID",
+          required: true,
+          placeholder: "{trigger.video_id} from a youtube trigger",
+          discover: { resource: "videos" }
+        },
+        {
+          key: "title",
+          label: "Title",
+          required: true,
+          placeholder: "the video's new title — YouTube replaces the whole snippet part"
+        },
+        {
+          key: "description",
+          label: "Description",
+          placeholder: "takes templates — left out, YouTube clears it"
+        },
+        {
+          key: "category_id",
+          label: "Category ID",
+          placeholder: "e.g. 22 (People & Blogs) — pass it when the video's category matters, or the update clears it"
+        }
+      ]
+    },
+    {
+      type: "youtube_remove_from_playlist",
+      label: "YouTube: remove from playlist",
+      icon: YouTubeLogo,
+      description: "Remove one item from a playlist the connection can edit (playlistItems.delete; Remove Video from Playlist). An item already gone is {removed: false}, not an error. Output: {removed, playlist_item_id}. Needs the youtube.force-ssl scope.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        {
+          key: "playlist_item_id",
+          label: "Playlist item ID",
+          required: true,
+          placeholder: "{steps.add.output.playlist_item_id} — youtube_add_to_playlist's output, or an item id from a Find Playlist Videos listing"
+        }
+      ]
+    },
+    {
+      type: "youtube_create_playlist",
+      label: "YouTube: create playlist",
+      icon: YouTubeLogo,
+      description: "Create an empty playlist on the connection's channel (playlists.insert, part=snippet,status; Create Playlist). Output: {playlist_id, title, url} — the id chains into Add to Playlist.",
+      fields: [
+        { key: "connection_id", label: "YouTube connection", placeholder: "youtube", required: true, provider: "youtube" },
+        { key: "title", label: "Title", placeholder: "Deploying dapier: full episodes", required: true },
+        { key: "description", label: "Description", placeholder: "shown on the playlist page — templated" },
+        { key: "privacy_status", label: "Privacy", type: "select", options: ["private", "public", "unlisted"], default: "private" }
+      ]
+    },
+    {
+      type: "calendar_create_event",
+      label: "Google Calendar",
+      icon: Calendar,
+      description: "Create an event in a calendar (Create Detailed Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "summary", label: "Title", placeholder: "Interview with {name}", required: true },
+        {
+          key: "start",
+          label: "Starts",
+          placeholder: "2026-10-01T09:00:00 or 2026-10-01",
+          required: true,
+          help: "ISO datetime, or a bare YYYY-MM-DD for an all-day event"
+        },
+        {
+          key: "end",
+          label: "Ends",
+          placeholder: "2026-10-01T10:00:00 or 2026-10-01",
+          required: true,
+          help: "Same shape as Starts — dates with dates, datetimes with datetimes"
+        },
+        {
+          key: "timezone",
+          label: "Time zone",
+          placeholder: "Europe/Berlin",
+          help: "IANA name for the datetimes; omitted means floating time"
+        },
+        { key: "description", label: "Description", type: "textarea", placeholder: "Notes, links, agendas" },
+        { key: "location", label: "Location", placeholder: "Room 4 / https://meet.test/x" },
+        {
+          key: "attendees",
+          label: "Attendees (JSON)",
+          type: "textarea",
+          placeholder: '["a@example.test", "b@example.test"]',
+          help: "JSON array of emails (or {email: …} objects), or a comma-separated list"
+        }
+      ]
+    },
+    {
+      type: "calendar_quick_add",
+      label: "Google Calendar (quick add)",
+      icon: Calendar,
+      description: "Create an event from one line of text (Quick Add Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "text", label: "Event text", placeholder: "Reviewer call tomorrow 10am", required: true }
+      ]
+    },
+    {
+      type: "calendar_find_events",
+      label: "Google Calendar (find event)",
+      icon: Calendar,
+      description: "Find events matching a text query, optionally create the first one when nothing matches (Find or Create Event). Output: {found, created, count, event, events}.",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        {
+          key: "query",
+          label: "Search text",
+          placeholder: "{name}",
+          help: "Free-text match across event fields; empty lists the window"
+        },
+        { key: "time_min", label: "From", placeholder: "2026-09-01T00:00:00Z", help: "Default: yesterday" },
+        { key: "time_max", label: "Until", placeholder: "2026-12-31T23:59:59Z", help: "Default: the end of the next quarter" },
+        {
+          key: "create_if_missing",
+          label: "Create if missing",
+          type: "boolean",
+          default: "false",
+          help: "Post the event from the fields below when nothing matches"
+        },
+        { key: "summary", label: "Create title", placeholder: "Sync with {name}", help: "Only used when Create if missing is on" },
+        { key: "start", label: "Create starts", placeholder: "2026-10-01T09:00:00", help: "Only used when Create if missing is on" },
+        { key: "end", label: "Create ends", placeholder: "2026-10-01T10:00:00", help: "Only used when Create if missing is on" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "description", label: "Create description", type: "textarea" },
+        { key: "location", label: "Create location" },
+        { key: "attendees", label: "Create attendees (JSON)", type: "textarea", placeholder: '["a@example.test"]' }
+      ]
+    },
+    {
+      type: "calendar_update_event",
+      label: "Google Calendar (update event)",
+      icon: Calendar,
+      description: "Patch the provided fields of one event (Update Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        {
+          key: "event_id",
+          label: "Event ID",
+          placeholder: "{steps.find.event.event_id}",
+          required: true,
+          help: "From find's output, the trigger payload's id, or the event's link tail"
+        },
+        { key: "summary", label: "Title" },
+        { key: "start", label: "Starts", placeholder: "2026-10-02T09:00:00" },
+        { key: "end", label: "Ends", placeholder: "2026-10-02T10:00:00" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "description", label: "Description", type: "textarea" },
+        { key: "location", label: "Location" },
+        {
+          key: "attendees",
+          label: "Attendees (JSON)",
+          type: "textarea",
+          help: "Replaces the attendee list; an empty list clears it only when sent as []"
+        }
+      ]
+    },
+    {
+      type: "calendar_delete_event",
+      label: "Google Calendar (delete event)",
+      icon: Calendar,
+      description: "Delete one event from a calendar (Delete Event)",
+      fields: [
+        { key: "connection_id", label: "Connection ID", placeholder: "google-calendar", required: true, provider: "google" },
+        {
+          key: "calendar_id",
+          label: "Calendar ID",
+          placeholder: "primary",
+          required: true,
+          discover: { resource: "calendars" }
+        },
+        { key: "event_id", label: "Event ID", placeholder: "{steps.find.event.event_id}", required: true }
+      ]
+    },
+    {
+      type: "sheets_append_row",
+      label: "Google Sheets",
+      icon: SheetsLogo,
+      description: "Append a row to a worksheet (Create Spreadsheet Row)",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        { key: "sheet_id", label: "Worksheet ID", type: "number", help: "Numeric gid from the sheet URL; overrides Worksheet name" },
+        {
+          key: "sheet_name",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "values",
+          label: "Row values (JSON)",
+          type: "json",
+          required: true,
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "sheets_find_row",
+      label: "Google Sheets (find row)",
+      icon: SheetsLogo,
+      description: "Find a row by a column's value, optionally create it (Find-or-create Spreadsheet Row)",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "sheet_name",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "match_field",
+          label: "Match column (header name)",
+          placeholder: "Task",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "sheet_name" }, value: "{name}" }
+        },
+        { key: "match_value", label: "Match value", placeholder: "{text}", required: true },
+        { key: "create_if_missing", label: "Create the row when missing", type: "boolean", default: "false" },
+        {
+          key: "values",
+          label: "Row values for creation (JSON)",
+          type: "textarea",
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "NEW"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "sheets_lookup_row",
+      label: "Google Sheets (lookup row)",
+      icon: SheetsLogo,
+      description: "Find worksheet rows whose column equals a value (Lookup Spreadsheet Row). Output: {found, row, values, matches}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "column",
+          label: "Column",
+          placeholder: "B or Email",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{name}" }
+        },
+        { key: "value", label: "Value", placeholder: "{text}", required: true },
+        { key: "limit", label: "Max matches", type: "number", default: "1" }
+      ]
+    },
+    {
+      type: "sheets_update_row",
+      label: "Google Sheets (update row)",
+      icon: SheetsLogo,
+      description: "Overwrite one worksheet row starting at column A (Update Spreadsheet Row). Pairs with sheets_lookup_row's row output.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "row",
+          label: "Row number",
+          type: "number",
+          required: true,
+          placeholder: "{steps.lookup.output.row}",
+          discover: { resource: "rows", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{row}" }
+        },
+        {
+          key: "values",
+          label: "Row values (JSON)",
+          type: "textarea",
+          required: true,
+          placeholder: '["{trigger.occurred_at|date_format:%Y-%m-%d}", "{text}", "", "DONE"]'
+        },
+        { key: "value_input_option", label: "Input option", type: "select", options: ["USER_ENTERED", "RAW"], default: "USER_ENTERED" }
+      ]
+    },
+    {
+      type: "sheets_delete_row",
+      label: "Google Sheets (delete row)",
+      icon: SheetsLogo,
+      description: "Delete one worksheet row, shifting the rows under it up (Delete Spreadsheet Row via batchUpdate). Pairs with sheets_lookup_row's row output.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo",
+          required: true,
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "row",
+          label: "Row number",
+          type: "number",
+          required: true,
+          placeholder: "{steps.lookup.output.row}",
+          discover: { resource: "rows", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{row}" }
+        }
+      ]
+    },
+    {
+      type: "sheets_clear_values",
+      label: "Google Sheets (clear values)",
+      icon: SheetsLogo,
+      description: "Clear a worksheet or A1 range (Clear Spreadsheet Values via values:clear) — cell contents go, formatting and the rows themselves stay. Output: {cleared_range, spreadsheet_id}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        { key: "range", label: "Range (A1)", placeholder: "todo!A2:Z100 — a bare range is qualified with the worksheet name" }
+      ]
+    },
+    {
+      type: "sheets_create_spreadsheet",
+      label: "Google Sheets (create spreadsheet)",
+      icon: SheetsLogo,
+      description: "Create an empty spreadsheet (Create Spreadsheet). Output: {spreadsheet_id, url, worksheet}, plus headers_applied when a header row was written — reference {steps.<id>.output.spreadsheet_id} in a follow-up append step.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        { key: "title", label: "Spreadsheet title", placeholder: "Weekly sync {date}", required: true },
+        {
+          key: "headers",
+          label: "Header row (JSON)",
+          type: "textarea",
+          placeholder: '["Date", "Task", "Status"]'
+        }
+      ]
+    },
+    {
+      type: "sheets_add_worksheet",
+      label: "Google Sheets (add worksheet)",
+      icon: SheetsLogo,
+      description: "Add one worksheet to a spreadsheet (Create Worksheet via batchUpdate addSheet). Output: {sheet_id, title, row_count, column_count, spreadsheet_id} — the title chains into the values actions' Worksheet fields. A tab with the same title is Sheets' 400.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        { key: "title", label: "Worksheet title", placeholder: "Archive {date}", required: true },
+        { key: "row_count", label: "Rows", type: "number", default: "1000" },
+        { key: "column_count", label: "Columns", type: "number", default: "26" }
+      ]
+    },
+    {
+      type: "sheets_create_column",
+      label: "Google Sheets (create column)",
+      icon: SheetsLogo,
+      description: "Append one header cell to the worksheet's header row (Create Spreadsheet Column) — the first free column, or the existing one when the name is already there. Output: {spreadsheet_id, worksheet, column, position, cell, created}.",
+      fields: [
+        { key: "connection_id", label: "Google connection", placeholder: "google", required: true, provider: "google" },
+        {
+          key: "spreadsheet_id",
+          label: "Spreadsheet ID",
+          placeholder: "from the sheet URL",
+          required: true,
+          discover: { resource: "spreadsheets" }
+        },
+        {
+          key: "worksheet",
+          label: "Worksheet",
+          placeholder: "todo (default Sheet1)",
+          discover: { resource: "worksheets", params: { spreadsheet_id: "spreadsheet_id" }, value: "{name}" }
+        },
+        {
+          key: "column",
+          label: "Column name (header)",
+          placeholder: "Status",
+          required: true,
+          discover: { resource: "columns", params: { spreadsheet_id: "spreadsheet_id", worksheet: "worksheet" }, value: "{name}" }
+        }
+      ]
+    },
+    {
+      type: "zoom_find_meeting",
+      label: "Zoom find meeting",
+      icon: Video,
+      description: "Find a Zoom meeting by id, or by topic in the scope window (upcoming by default, past with scope: past). With create-if-missing, an upcoming topic miss creates the meeting from the shared create fields (Zapier's Find or Create).",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          discover: { resource: "meetings" }
+        },
+        { key: "topic", label: "Topic", placeholder: "used when no meeting id is given" },
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" },
+        { key: "scope", label: "Scope", type: "select", options: ["upcoming", "past"], default: "upcoming" },
+        { key: "create_if_missing", label: "Create on topic miss", type: "boolean", default: "false" },
+        { key: "start_time", label: "Start time (for create)", placeholder: "{trigger.start} — ISO 8601" },
+        { key: "duration", label: "Duration (min, for create)", type: "number" },
+        { key: "timezone", label: "Timezone (for create)", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda (for create)" },
+        {
+          key: "settings",
+          label: "Settings (JSON, for create)",
+          type: "textarea",
+          placeholder: '{"waiting_room": false}'
+        }
+      ]
+    },
+    {
+      type: "zoom_find_recording",
+      label: "Zoom: find recording",
+      icon: Video,
+      description: "Find Zoom cloud recordings by meeting id or topic, or the most recent (Find Recording). Output: {found, recording, recordings, count}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          discover: { resource: "recordings" }
+        },
+        { key: "topic", label: "Topic", placeholder: "filters the last 30 days when no meeting id is given" },
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" }
+      ]
+    },
+    {
+      type: "zoom_delete_recording",
+      label: "Zoom: delete recording",
+      icon: Video,
+      description: "Delete one meeting's cloud recording (DELETE /meetings/{id}/recordings; Delete Recording). Action picks how: trash (the default) is recoverable from Zoom's trash, permanent destroys the recording and its files. Output: {deleted: true, meeting_id, action}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "recordings" }
+        },
+        { key: "action", label: "Action", type: "select", options: ["trash", "permanent"], default: "trash" }
+      ]
+    },
+    {
+      type: "zoom_create_meeting",
+      label: "Zoom: create meeting",
+      icon: Video,
+      description: "Create a Zoom meeting — scheduled when a start time is given, instant otherwise (Create Meeting). Output: {created, scheduled, meeting: {id, topic, join_url, start_url, passcode, ...}}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "topic", label: "Topic", required: true },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — instant meeting when empty" },
+        { key: "duration", label: "Duration (minutes)", type: "number", default: "60" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"join_before_host": true}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_update_meeting",
+      label: "Zoom: update meeting",
+      icon: Video,
+      description: "Update one Zoom meeting's schedule or metadata — only the fields set are sent, the rest of the meeting stays untouched (PATCH /meetings/{id}). Output: {updated, meeting_id, updated_fields}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "meetings" }
+        },
+        { key: "topic", label: "Topic", placeholder: "the meeting's new title; left out, Zoom keeps the old one" },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — the reschedule field" },
+        { key: "duration", label: "Duration (minutes)", type: "number" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"join_before_host": true}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_add_registrant",
+      label: "Zoom: add registrant",
+      icon: Video,
+      description: "Register one person for a meeting that requires registration and get their personalized join link (POST /meetings/{id}/registrants). Output: {registered, meeting_id, registrant_id, join_url} — join_url is unique per registrant, the thing an invite email templates.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "meetings" }
+        },
+        { key: "email", label: "Email", required: true, placeholder: "{trigger.email}" },
+        { key: "first_name", label: "First name" },
+        { key: "last_name", label: "Last name" }
+      ]
+    },
+    {
+      type: "zoom_list_past_participants",
+      label: "Zoom: list past meeting participants",
+      icon: Video,
+      description: "List who attended one past Zoom meeting (GET /past_meetings/{id}/participants) — name, email and join/leave times per attendee, up to 300 across three pages. Output: {participants, count, meeting_id}; pair with the meeting.ended trigger.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "past_meetings" }
+        }
+      ]
+    },
+    {
+      type: "zoom_delete_meeting",
+      label: "Zoom: delete meeting",
+      icon: Video,
+      description: "Delete one Zoom meeting (DELETE /meetings/{id}). A recurring meeting's whole series goes away unless occurrence_id scopes the delete to one occurrence. Output: {deleted, meeting_id}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "meeting_id",
+          label: "Meeting ID",
+          required: true,
+          discover: { resource: "past_meetings" }
+        },
+        {
+          key: "occurrence_id",
+          label: "Occurrence ID",
+          placeholder: "recurring meetings only: deletes just this occurrence — left out, the whole series is deleted"
+        }
+      ]
+    },
+    {
+      type: "zoom_create_webinar",
+      label: "Zoom: create webinar",
+      icon: Video,
+      description: "Create a Zoom webinar — scheduled when a start time is given, recurring with no fixed time otherwise (Create Webinar). Output: {created, scheduled, webinar: {id, topic, join_url, start_url, passcode, ...}}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "topic", label: "Topic", required: true },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — recurring with no fixed time when empty" },
+        { key: "duration", label: "Duration (minutes)", type: "number", default: "60" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"approval_type": 2}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_update_webinar",
+      label: "Zoom: update webinar",
+      icon: Video,
+      description: "Update one Zoom webinar's schedule or metadata — only the fields set are sent, the rest of the webinar stays untouched (PATCH /webinars/{id}). Output: {updated, webinar_id, updated_fields}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        { key: "topic", label: "Topic", placeholder: "the webinar's new title; left out, Zoom keeps the old one" },
+        { key: "start_time", label: "Start time", placeholder: "2026-10-01T09:00:00Z — the reschedule field" },
+        { key: "duration", label: "Duration (minutes)", type: "number" },
+        { key: "timezone", label: "Time zone", placeholder: "Europe/Berlin" },
+        { key: "agenda", label: "Agenda" },
+        {
+          key: "settings",
+          label: "Settings (JSON)",
+          type: "textarea",
+          placeholder: '{{"approval_type": 2}} — {tokens} expand, literal braces double'
+        }
+      ]
+    },
+    {
+      type: "zoom_find_webinar",
+      label: "Zoom: find webinar",
+      icon: Video,
+      description: "Find a Zoom webinar by id, or by topic in the scope window (upcoming by default, past with scope: past). Output: {found, webinar: {id, topic, start_time, join_url, duration}} — a miss is found: false, not an error.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          discover: { resource: "webinars" }
+        },
+        { key: "topic", label: "Topic", placeholder: "used when no webinar id is given" },
+        { key: "match", label: "Topic match", type: "select", options: ["contains", "exact"], default: "contains" },
+        { key: "scope", label: "Scope", type: "select", options: ["upcoming", "past"], default: "upcoming" }
+      ]
+    },
+    {
+      type: "zoom_add_webinar_registrant",
+      label: "Zoom: add webinar registrant",
+      icon: Video,
+      description: "Register one person for a webinar that requires registration and get their personalized join link (POST /webinars/{id}/registrants). Output: {registered, webinar_id, registrant_id, join_url} — join_url is unique per registrant, the thing an invite email templates.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        { key: "email", label: "Email", required: true, placeholder: "{trigger.email}" },
+        { key: "first_name", label: "First name" },
+        { key: "last_name", label: "Last name" }
+      ]
+    },
+    {
+      type: "zoom_delete_webinar",
+      label: "Zoom: delete webinar",
+      icon: Video,
+      description: "Delete one Zoom webinar (DELETE /webinars/{id}). A recurring webinar's whole series goes away unless occurrence_id scopes the delete to one occurrence. Output: {deleted, webinar_id}.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        },
+        {
+          key: "occurrence_id",
+          label: "Occurrence ID",
+          placeholder: "recurring webinars only: deletes just this occurrence — left out, the whole series is deleted"
+        }
+      ]
+    },
+    {
+      type: "zoom_list_past_webinar_participants",
+      label: "Zoom: list past webinar participants",
+      icon: Video,
+      description: "List who attended one past Zoom webinar (GET /past_webinars/{id}/participants) — name, email and join/leave times per attendee, up to 300 across three pages. Output: {participants, count, webinar_id}; pair with the webinar.ended trigger.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        {
+          key: "webinar_id",
+          label: "Webinar ID",
+          required: true,
+          discover: { resource: "webinars" }
+        }
+      ]
+    },
+    {
+      type: "render_html_to_pdf",
+      label: "Render PDF",
+      icon: FileText,
+      description: "Queue an html-renderer job: the input field's stored email body becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
+      fields: [
+        { key: "input_field", label: "Input field", placeholder: "html" },
+        { key: "output_key", label: "Output key", placeholder: "rendered/{event_id}.pdf" },
+        { key: "output_bucket", label: "Output bucket", discover: { resource: "buckets", account: "aws" } },
+        { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
+        { key: "page_format", label: "PDF page format", group: "pdf", default: "A4" },
+        { key: "print_background", label: "Print background", group: "pdf", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "filter",
+      label: "Filter",
+      icon: Funnel,
+      description: "Stop the chain quietly unless the condition holds",
+      fields: [
+        { key: "field", label: "Field", placeholder: "subject", required: true },
+        { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+        { key: "value", label: "Value", placeholder: "invoice" }
+      ]
+    },
+    {
+      type: "condition",
+      label: "Condition",
+      icon: GitBranch,
+      description: "Run the then steps, or the else steps",
+      fields: [
+        { key: "field", label: "Field", placeholder: "route", required: true },
+        { key: "operator", label: "Operator", type: "select", options: [...logicOperators], default: "equals" },
+        { key: "value", label: "Value" },
+        { key: "then", label: "Then steps (YAML)", type: "yaml", placeholder: '- id: notify\n  type: slack\n  channel: "#alerts"\n  text: "{subject}"' },
+        { key: "else", label: "Else steps (YAML)", type: "yaml" }
+      ]
+    },
+    {
+      type: "paths",
+      label: "Paths",
+      icon: GitBranch,
+      description: "Run the first matching branch's steps, or a default",
+      fields: [
+        {
+          key: "paths",
+          label: "Paths (YAML)",
+          type: "yaml",
+          required: true,
+          placeholder: '- label: invoices\n  when: {subject: {contains: invoice}}\n  actions:\n    - id: notify\n      type: slack\n      channel: "#alerts"\n      text: "{subject}"'
+        },
+        { key: "default", label: "Default steps (YAML)", type: "yaml" }
+      ]
+    },
+    {
+      type: "delay",
+      label: "Delay",
+      icon: Timer,
+      description: "Pause the chain before the next step — over 60s the run suspends and the queue resumes it automatically",
+      fields: [
+        { key: "seconds", label: "Seconds", type: "number", placeholder: "30" },
+        { key: "minutes", label: "Minutes", type: "number" },
+        { key: "hours", label: "Hours", type: "number" },
+        { key: "days", label: "Days", type: "number" },
+        { key: "until", label: "Until (ISO datetime)", placeholder: "2026-10-01T09:00:00Z" }
+      ]
+    },
+    {
+      type: "for_each",
+      label: "For each",
+      icon: ListTree,
+      description: "Run steps once per item of a list (max 100 items)",
+      fields: [
+        { key: "list", label: "List field", placeholder: "attachments", required: true },
+        { key: "item", label: "Item variable", default: "item" },
+        { key: "max_iterations", label: "Max iterations (max 100)", type: "number" },
+        { key: "actions", label: "Steps per item (YAML)", type: "yaml", placeholder: '- id: upload\n  type: dropbox_upload\n  connection_id: dropbox\n  folder: "/Invoices/{item.filename}"' }
+      ]
+    },
+    {
+      type: "digest",
+      label: "Digest",
+      icon: Layers,
+      description: "Accumulate items across runs, then flush them as one batch (a schedule trigger usually fires the flush). Later steps template {digest.items} and {digest.count}.",
+      fields: [
+        { key: "mode", label: "Mode", type: "select", options: ["accumulate", "flush"], default: "accumulate" },
+        { key: "key", label: "Digest key", placeholder: "nightly-invoices", required: true },
+        { key: "item", label: "Item (accumulate)", type: "textarea", placeholder: "{subject}" },
+        { key: "items", label: "Items (accumulate, YAML)", type: "yaml", placeholder: '- "{subject}"\n- "{trigger.occurred_at}"' },
+        { key: "shared", label: "Shared across workflows", type: "boolean", default: "false" }
+      ]
+    },
+    {
+      type: "code",
+      label: "Code (Python)",
+      icon: CodeXml,
+      description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+      fields: [
+        {
+          key: "code",
+          label: "Python source",
+          type: "textarea",
+          required: true,
+          placeholder: '# event data is `input`; last expression is the result\n{"route": input["route"], "score": len(input.get("body", ""))}'
+        },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "js",
+      label: "Code (JavaScript)",
+      icon: Braces,
+      description: "Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`; `return` a value to make it the step result. console.log is captured.",
+      fields: [
+        {
+          key: "code",
+          label: "JavaScript source",
+          type: "textarea",
+          required: true,
+          placeholder: "// event data is `input`; return the result\nreturn {route: input.route, score: (input.items || []).length}"
+        },
+        { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+      ]
+    },
+    {
+      type: "run_workflow",
+      label: "Run workflow",
+      icon: Workflow,
+      description: "Run another published workflow in-process and expose its step outputs to later templating. Nested sub-runs cap at depth 2 (A→B→C runs, A→B→C→D fails); a workflow calling itself is rejected.",
+      fields: [
+        { key: "workflow_id", label: "Workflow ID", placeholder: "invoice-notify", required: true },
+        { key: "payload", label: "Payload (JSON or template)", type: "textarea", placeholder: '{"subject": "{subject}"}' },
+        { key: "output_field", label: "Output field", placeholder: "notify" }
+      ]
+    },
+    {
+      type: "storage_get",
+      label: "Storage: get",
+      icon: DatabaseZap,
+      description: "Read this workflow's persistent key-value state (cross-run memory). A missing key is {found: false}, not an error.",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+      ]
+    },
+    {
+      type: "storage_set",
+      label: "Storage: set",
+      icon: DatabaseZap,
+      description: "Write this workflow's persistent key-value state; templates render against the event and earlier steps. Optional TTL cleans the value up.",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true },
+        { key: "value", label: "Value", type: "textarea", required: true, placeholder: "{steps.lookup.output.row}" },
+        { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+      ]
+    },
+    {
+      type: "storage_delete",
+      label: "Storage: delete",
+      icon: DatabaseZap,
+      description: "Remove one key from this workflow's storage; deleting a missing key is fine ({deleted: false}).",
+      fields: [
+        { key: "key", label: "Key", placeholder: "last-seen-cursor", required: true }
+      ]
+    },
+    {
+      type: "storage_find",
+      label: "Storage: find",
+      icon: DatabaseZap,
+      description: "List this workflow's stored keys under a prefix, ascending (default 20, at most 50) — the search half of Zapier Storage.",
+      fields: [
+        { key: "prefix", label: "Key prefix", placeholder: "seen/", required: true },
+        { key: "limit", label: "Max keys", type: "number" }
+      ]
+    },
+    {
+      type: "digest_add",
+      label: "Digest: add",
+      icon: ListTree,
+      description: "Collect an item into this workflow's digest so a later (e.g. scheduled) run can release the list together — Zapier's Digest. dedupe: true skips a repeat item; holds up to max_items pending (default 500), dropping the oldest beyond that.",
+      fields: [
+        { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+        { key: "item", label: "Item", type: "textarea", placeholder: "{text}" },
+        { key: "dedupe", label: "Skip if already pending", type: "boolean", default: "false" },
+        { key: "max_items", label: "Hold at most (drop oldest beyond)", type: "number" },
+        { key: "ttl_seconds", label: "Expire after (seconds)", type: "number" }
+      ]
+    },
+    {
+      type: "digest_flush",
+      label: "Digest: flush",
+      icon: ListTree,
+      description: "Release this workflow's collected digest items as one list ({items, count, empty}, arrival order) and empty it. Branch on empty with a filter step when a scheduled run may have nothing to release. reset: false peeks without clearing.",
+      fields: [
+        { key: "key", label: "Digest key", placeholder: "todo-items", required: true },
+        { key: "reset", label: "Clear after reading", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "csv_parse",
+      label: "CSV: parse",
+      icon: Table,
+      description: "Parse CSV text into rows for the steps that follow. Content comes from exactly one of content (inline CSV text) or source_s3 {bucket, key} (a staged object — an email attachment, a render output, s3_read_object). Output: {headers, rows, count} — rows are dicts keyed by the header row (header_row on, the default) or plain lists; values stay strings.",
+      fields: [
+        {
+          key: "content",
+          label: "CSV content",
+          type: "textarea",
+          placeholder: "name,amount\n{subject},{amount}"
+        },
+        {
+          key: "source_s3",
+          label: "Staged file (S3)",
+          placeholder: "{bucket: …, key: …}"
+        },
+        { key: "delimiter", label: "Delimiter", placeholder: ", (default)" },
+        { key: "header_row", label: "First row is headers", type: "boolean", default: "true" }
+      ]
+    },
+    {
+      type: "csv_format",
+      label: "CSV: format",
+      icon: Table,
+      description: "Serialize rows into CSV text (save this output with an s3_upload's content, an email body, …). Rows is a template-rendered JSON array of dicts or of arrays; headers sets the column order (default: the first dict row's keys, insertion order). Output: {csv, count}.",
+      fields: [
+        {
+          key: "rows",
+          label: "Rows",
+          type: "textarea",
+          required: true,
+          placeholder: '[{"name": "{subject}", "amount": "{amount}"}]'
+        },
+        {
+          key: "headers",
+          label: "Headers",
+          type: "textarea",
+          placeholder: '["name", "amount"]'
+        },
+        { key: "delimiter", label: "Delimiter", placeholder: ", (default)" }
+      ]
+    }
+  ];
+  const connectorCatalog = [
+    { name: "ai", label: "AI", logo: Sparkles, events: [] },
+    { name: "email", label: "Email", logo: MailLogo, events: ["message.received", "bounce.received", "complaint.received"] },
+    { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
+    { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
+    { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
+    { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received", "channel_post.received", "callback_query.received"] },
+    { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
+    { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
+    { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
+    { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
+    { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
+    { name: "rss", label: "RSS", logo: Rss, events: ["item.new"] },
+    { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
+    { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
+    { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
+    { name: "custom", label: "Custom", logo: Webhook, events: [] }
+  ];
+  const filterOperators = [
+    "equals",
+    "not_equals",
+    "in",
+    "prefix",
+    "suffix",
+    "contains",
+    "does_not_contain",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "exists",
+    "empty"
+  ];
+  const onErrorField = {
+    key: "on_error",
+    label: "On error",
+    type: "select",
+    options: ["halt", "continue", "run"],
+    default: "halt"
+  };
+  const errorActionsField = {
+    key: "error_actions",
+    label: "Error steps (YAML)",
+    type: "yaml",
+    placeholder: '- id: alert\n  type: slack\n  channel: "#alerts"\n  text: "step failed: {steps.upload.error}"'
+  };
+  const onFailField = {
+    key: "on_fail",
+    label: "On fail",
+    type: "select",
+    options: ["continue", "halt"],
+    default: "halt"
+  };
+  const errorHandlingFields = [onErrorField, onFailField, errorActionsField];
+  const stepCategories = {
+    agent: "ai",
+    ai_complete: "ai",
+    filter: "flow",
+    condition: "flow",
+    paths: "flow",
+    delay: "flow",
+    for_each: "flow",
+    digest: "flow",
+    digest_add: "flow",
+    digest_flush: "flow",
+    run_workflow: "flow",
+    code: "data",
+    js: "data",
+    csv_parse: "data",
+    csv_format: "data",
+    storage_get: "data",
+    storage_set: "data",
+    storage_delete: "data",
+    storage_find: "data",
+    http_request: "data",
+    webhook: "data",
+    render_html_to_pdf: "data",
+    dataops: "data"
+  };
+  const appPrefixes = [
+    [/^slack(_|$)/, "slack"],
+    [/^telegram(_|$)/, "telegram"],
+    [/^gmail(_|$)/, "gmail"],
+    [/^email(_|$)/, "email"],
+    [/^dropbox(_|$)/, "dropbox"],
+    [/^s3(_|$)/, "s3"],
+    [/^mailchimp(_|$)/, "mailchimp"],
+    [/^drive(_|$)/, "google-drive"],
+    [/^youtube(_|$)/, "youtube"],
+    [/^calendar(_|$)/, "google-calendar"],
+    [/^sheets(_|$)/, "google-sheets"],
+    [/^zoom(_|$)/, "zoom"]
+  ];
+  function actionConnector(type2) {
+    const hit = appPrefixes.find(([pattern]) => pattern.test(type2));
+    return hit ? connectorCatalog.find((entry) => entry.name === hit[1]) : void 0;
+  }
+  function stepSection(type2) {
+    return stepCategories[type2] ?? (actionConnector(type2) ? "app" : "data");
+  }
+  const verbRanks = [
+    [/^(send|post|create|add|upload|append|invite|share|schedule|quick add)\b/i, 0],
+    [/^(find|list|read|look ?up|get|search|download)\b/i, 1]
+  ];
+  function actionVerbRank(type2) {
+    const entry = actionCatalog.find((candidate) => candidate.type === type2);
+    let verb = entry?.label ?? "";
+    const app = actionConnector(type2)?.label;
+    if (app && verb.toLowerCase().startsWith(app.toLowerCase())) {
+      verb = verb.slice(app.length).replace(/^[\s:()]+/, "").replace(/\)$/, "");
+    }
+    if (!verb.trim()) return 0;
+    const hit = verbRanks.find(([pattern]) => pattern.test(verb));
+    return hit ? hit[1] : 2;
+  }
+  const NODE_WIDTH = 264;
+  const NODE_HEIGHT = 96;
+  const NODE_GAP_Y = 130;
+  const ORIGIN_X = 420;
+  const ORIGIN_Y = 140;
+  function actionMeta(type2) {
+    return actionCatalog.find((entry) => entry.type === type2);
+  }
+  function connectorMeta(name) {
+    return connectorCatalog.find((entry) => entry.name === name);
+  }
+  function connectorLabel(name) {
+    return connectorMeta(name)?.label ?? name;
+  }
+  function defaultFields(type2) {
+    const fields = {};
+    for (const field of actionMeta(type2)?.fields ?? []) {
+      if (field.default !== void 0) fields[field.key] = field.default;
+    }
+    return fields;
+  }
+  function defaultNodeData(kind) {
+    return { nodeKind: "action", actionType: "webhook", fields: defaultFields("webhook") };
+  }
+  function actionNodeTitle(data) {
+    return actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Action";
+  }
+  function actionNodeSubtitle(data) {
+    const fields = data.fields ?? {};
+    const meta = actionMeta(data.actionType ?? "webhook");
+    const first = meta?.fields.find((field) => fields[field.key]);
+    return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
+  }
+  function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+  function orderedWorkflow(workflow) {
+    const source = workflow;
+    const ordered = {};
+    for (const key of WORKFLOW_KEY_ORDER) {
+      if (source[key] !== void 0) ordered[key] = source[key];
+    }
+    for (const [key, value] of Object.entries(source)) {
+      if (!(key in ordered)) ordered[key] = value;
+    }
+    return ordered;
+  }
+  function workflowTriggers(workflow) {
+    if (Array.isArray(workflow.triggers) && workflow.triggers.length) return workflow.triggers;
+    return workflow.trigger ? [workflow.trigger] : [];
+  }
+  function workflowActions(workflow) {
+    if (workflow.flow && isRecord(workflow.flows)) {
+      const bound = workflow.flows[workflow.flow];
+      if (isRecord(bound) && Array.isArray(bound.actions)) return bound.actions;
+    }
+    return Array.isArray(workflow.actions) ? workflow.actions : [];
+  }
+  function fieldTarget(action, field) {
+    if (!field.group) return action;
+    const group = action[field.group];
+    if (isRecord(group)) return group;
+    const created = {};
+    action[field.group] = created;
+    return created;
+  }
+  function orderedActions(shapes, roots) {
+    const outgoing = /* @__PURE__ */ new Map();
+    for (const shape of shapes) {
+      if (shape.type !== "arrow" || !shape.sourceId || !shape.targetId) continue;
+      outgoing.set(shape.sourceId, [...outgoing.get(shape.sourceId) ?? [], shape.targetId]);
+    }
+    const actions = [];
+    const visited = new Set(roots.map((root2) => root2.id));
+    const problems = [];
+    let frontier = roots.flatMap((root2) => (outgoing.get(root2.id) ?? []).filter((id) => !visited.has(id)));
+    while (frontier.length) {
+      const nextFrontier = [];
+      for (const id of frontier) {
+        if (visited.has(id)) {
+          problems.push("The connector graph has a cycle; actions were ordered by traversal.");
+          continue;
+        }
+        visited.add(id);
+        const node = shapes.find((shape) => shape.id === id);
+        if (!node || node.type !== "node") continue;
+        if (node.data?.nodeKind === "trigger") {
+          problems.push("A trigger can only start a workflow; the mid-chain trigger was ignored.");
+          continue;
+        }
+        actions.push(node);
+        nextFrontier.push(...outgoing.get(id) ?? []);
+      }
+      frontier = nextFrontier;
+    }
+    const lost = shapes.filter(
+      (shape) => shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)
+    );
+    for (const shape of lost) {
+      problems.push(`"${shape.label}" is not connected to a trigger and was not saved.`);
+    }
+    return { actions, lost, problems };
+  }
+  function orderedActionNodes(shapes) {
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
+    return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
+  }
+  function filterRulesToYaml(rules, problems) {
+    const filters = {};
+    for (const rule of rules ?? []) {
+      const field = rule.field.trim();
+      if (!field) continue;
+      let value = rule.value;
+      if (rule.operator === "in") {
+        try {
+          value = JSON.parse(rule.value);
+          if (!Array.isArray(value)) throw new Error("not a list");
+        } catch {
+          problems.push(`Filter ${field}: in needs a JSON list, such as ["invoice", "receipts"].`);
+        }
+      } else if (rule.operator === "exists" || rule.operator === "empty") {
+        if (rule.value !== "true" && rule.value !== "false") {
+          problems.push(`Filter ${field}: ${rule.operator} needs true or false.`);
+        }
+        value = rule.value === "true";
+      }
+      filters[field] = { ...filters[field], [rule.operator]: value };
+    }
+    return filters;
+  }
+  function actionToYaml(node, index, problems) {
+    const data = node.data ?? defaultNodeData();
+    const type2 = data.actionType ?? "webhook";
+    const action = {
+      id: (data.fields?.id ?? "").trim() || `action-${index + 1}`,
+      type: type2
+    };
+    const meta = actionMeta(type2);
+    if (!meta) {
+      return { ...action, ...data.raw ?? {} };
+    }
+    const written = {};
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
+      if (field.type === "boolean") {
+        const raw = data.fields?.[field.key];
+        if (raw === void 0) continue;
+        fieldTarget(written, field)[field.key] = raw === "true";
+        continue;
+      }
+      if (field.type === "json") {
+        const text = (data.fields?.[field.key] ?? "").trim();
+        if (text === "") continue;
+        try {
+          const parsed2 = JSON.parse(text);
+          if (!isRecord(parsed2) && !Array.isArray(parsed2)) {
+            problems.push(`"${node.label ?? type2}": ${field.label} must be a JSON object or array.`);
+            continue;
+          }
+          fieldTarget(written, field)[field.key] = parsed2;
+        } catch {
+          problems.push(`"${node.label ?? type2}": ${field.label} is not valid JSON.`);
+        }
+        continue;
+      }
+      if (field.type === "yaml") {
+        const text = (data.fields?.[field.key] ?? "").trim();
+        if (text === "") continue;
+        try {
+          const parsed2 = load(text);
+          if (!Array.isArray(parsed2)) {
+            problems.push(`"${node.label ?? type2}": ${field.label} must be a YAML list of steps.`);
+            continue;
+          }
+          fieldTarget(written, field)[field.key] = parsed2;
+        } catch {
+          problems.push(`"${node.label ?? type2}": ${field.label} is not valid YAML.`);
+        }
+        continue;
+      }
+      const rawValue = data.fields?.[field.key] ?? "";
+      const value = field.key === "prompt" || field.key === "system" ? rawValue : rawValue.trim();
+      if (value.trim() === "") continue;
+      if ((field.key === "on_error" || field.key === "on_fail") && value === "halt") continue;
+      const parsed = field.type === "number" ? Number(value) : value;
+      fieldTarget(written, field)[field.key] = field.type === "number" && Number.isFinite(parsed) ? parsed : value;
+    }
+    const merged = { ...action, ...data.raw ?? {}, ...written };
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
+      if ((field.type === "yaml" || field.type === "json") && !(data.fields?.[field.key] ?? "").trim()) {
+        delete merged[field.key];
+      }
+    }
+    return merged;
+  }
+  function triggerToYaml(data, problems) {
+    return {
+      connector: data.connector ?? "custom",
+      event: data.event?.trim() || "received",
+      filters: filterRulesToYaml(data.filters, problems)
+    };
+  }
+  function workflowFromShapes(shapes, workflowId, enabled, base) {
+    const problems = [];
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
+    if (triggerNodes.length === 0) problems.push("Add a trigger node before saving.");
+    const { actions, lost, problems: chainProblems } = triggerNodes.length ? orderedActions(shapes, triggerNodes) : { actions: [], lost: [], problems: [] };
+    if (triggerNodes.length && actions.length === 0) problems.push("Connect at least one action to the trigger.");
+    const workflow = {
+      ...base,
+      id: workflowId.trim() || "untitled-workflow",
+      enabled
+    };
+    delete workflow.trigger;
+    delete workflow.triggers;
+    if (base?.flow) {
+      const flows = isRecord(base.flows) ? base.flows : {};
+      const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
+      workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map((action, index) => actionToYaml(action, index, problems)) } };
+      workflow.flow = base.flow;
+    } else {
+      workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
+    }
+    if (triggerNodes.length === 1) {
+      workflow.trigger = triggerToYaml(triggerNodes[0].data, problems);
+    } else if (triggerNodes.length > 1) {
+      workflow.triggers = triggerNodes.map((node) => triggerToYaml(node.data, problems));
+    }
+    return { workflow, problems: [...problems, ...chainProblems], lost };
+  }
+  function yamlFiltersToRules(filters) {
+    return Object.entries(filters ?? {}).flatMap(([field, rule]) => {
+      if (!rule || typeof rule !== "object") return [{ field, operator: "equals", value: String(rule ?? "") }];
+      return Object.entries(rule).map(([operator, value]) => ({
+        field,
+        operator: filterOperators.includes(operator) ? operator : "equals",
+        value: Array.isArray(value) ? JSON.stringify(value) : String(value ?? "")
+      }));
+    });
+  }
+  function actionFields(type2, action) {
+    const fields = { id: String(action.id ?? "") };
+    const meta = actionMeta(type2);
+    if (!meta) return fields;
+    for (const field of [...meta.fields, ...errorHandlingFields]) {
+      const holder = field.group ? action[field.group] : action;
+      const value = isRecord(holder) ? holder[field.key] : void 0;
+      if (field.type === "json") {
+        if (value !== void 0) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+        continue;
+      }
+      if (field.type === "yaml") {
+        if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();
+        continue;
+      }
+      if (value !== void 0) fields[field.key] = String(value);
+    }
+    return fields;
+  }
+  function rawAction(action) {
+    return Object.fromEntries(Object.entries(action).filter(([key]) => key !== "id" && key !== "type"));
+  }
+  function rawExtras(action) {
+    const extras = rawAction(action);
+    const meta = actionMeta(String(action.type ?? "webhook"));
+    for (const field of [...meta?.fields ?? [], ...meta ? errorHandlingFields : []]) {
+      if (!field.group) {
+        delete extras[field.key];
+        continue;
+      }
+      const group = extras[field.group];
+      if (isRecord(group)) {
+        const rest = { ...group };
+        delete rest[field.key];
+        if (Object.keys(rest).length) extras[field.group] = rest;
+        else delete extras[field.group];
+      }
+    }
+    return Object.keys(extras).length ? extras : void 0;
+  }
+  function shapesFromWorkflow(workflow) {
+    const shapes = [];
+    const rowY = (index) => ORIGIN_Y + index * (NODE_HEIGHT + NODE_GAP_Y);
+    const triggers = workflowTriggers(workflow);
+    const actions = workflowActions(workflow);
+    const TRIGGER_GAP_X = 72;
+    const rowWidth = triggers.length * NODE_WIDTH + (triggers.length - 1) * TRIGGER_GAP_X;
+    const rowStartX = ORIGIN_X + NODE_WIDTH / 2 - rowWidth / 2;
+    const triggerNodes = triggers.map((spec, index) => {
+      const node = {
+        id: triggers.length === 1 ? "trigger" : `trigger-${index}`,
+        type: "node",
+        x: rowStartX + index * (NODE_WIDTH + TRIGGER_GAP_X),
+        y: rowY(0),
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        label: `${connectorLabel(spec.connector)} · ${spec.event}`,
+        data: {
+          nodeKind: "trigger",
+          connector: connectorCatalog.some((entry) => entry.name === spec.connector) ? spec.connector : "custom",
+          event: spec.event,
+          filters: yamlFiltersToRules(spec.filters)
+        }
+      };
+      shapes.push(node);
+      return node;
+    });
+    let previous = triggerNodes[triggerNodes.length - 1] ?? null;
+    actions.forEach((action, index) => {
+      const type2 = String(action.type ?? "webhook");
+      const extras = rawExtras(action);
+      const node = {
+        id: `action-${index}`,
+        type: "node",
+        x: ORIGIN_X,
+        y: rowY(index + 1),
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        label: actionMeta(type2)?.label ?? String(type2),
+        data: {
+          nodeKind: "action",
+          actionType: type2,
+          fields: actionFields(type2, action),
+          ...extras ? { raw: extras } : {}
+        }
+      };
+      shapes.push(node);
+      for (const source of index === 0 ? triggerNodes : [previous]) {
+        shapes.push({
+          id: `link-${source.id}-${node.id}`,
+          type: "arrow",
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          sourceId: source.id,
+          targetId: node.id,
+          sourceHandleId: "bottom",
+          targetHandleId: "top"
+        });
+      }
+      previous = node;
+    });
+    return shapes;
+  }
+  function summarize(source, workflow) {
+    const primary = workflowTriggers(workflow)[0];
+    return {
+      id: workflow.id,
+      enabled: workflow.enabled !== false,
+      source,
+      connector: primary?.connector ?? "?",
+      event: primary?.event ?? "?",
+      actionCount: workflowActions(workflow).length
+    };
+  }
+  function actionIcon(type2) {
+    return actionMeta(type2)?.icon ?? FileText;
+  }
+  function nodeIcon(data) {
+    if (data?.nodeKind === "trigger") return connectorMeta(data.connector ?? "custom")?.logo ?? Zap;
+    return actionIcon(data?.actionType ?? "webhook");
+  }
+  const triggerPalette = connectorCatalog.map((entry) => ({
+    kind: `trigger:${entry.name}`,
+    label: entry.label,
+    icon: entry.logo
+  }));
+  const actionPalette = actionCatalog.map((entry) => ({
+    kind: entry.type,
+    label: entry.label,
+    icon: entry.icon ?? FileText
+  }));
+  const notePalette = [{ kind: "note", label: "Note", icon: StickyNote }];
+  const allPaletteEntries = [...triggerPalette, ...actionPalette, ...notePalette];
+  function paletteLabel(kind) {
+    return allPaletteEntries.find((entry) => entry.kind === kind)?.label ?? "Node";
+  }
+  function nodeDataForKind(kind) {
+    if (kind === "note") return { nodeKind: "note" };
+    if (kind.startsWith("trigger:")) {
+      const connector = kind.slice("trigger:".length);
+      return {
+        nodeKind: "trigger",
+        connector,
+        event: connectorMeta(connector)?.events[0] ?? "received",
+        filters: []
+      };
+    }
+    return { nodeKind: "action", actionType: kind, fields: defaultFields(kind) };
+  }
+  function nodeTitle(shape) {
+    if (shape.type === "note") return shape.label ?? "Note";
+    if (shape.data?.nodeKind === "trigger") {
+      return `${connectorLabel(shape.data.connector ?? "custom")} · ${shape.data.event}`;
+    }
+    return actionNodeTitle(shape.data ?? {});
+  }
+  function nodeSubtitle(shape) {
+    if (shape.type === "note") return "";
+    if (shape.data?.nodeKind === "trigger") {
+      const rule = (shape.data.filters ?? []).find((entry) => entry.field.trim());
+      return rule ? `${rule.field.trim()} ${rule.operator} ${rule.value}`.trim() : "";
+    }
+    return actionNodeSubtitle(shape.data ?? {});
+  }
+  const RECENTS_KEY = "dapier-designer-recent-steps";
+  const RECENTS_MAX = 5;
+  function loadRecents() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((kind) => typeof kind === "string").slice(0, RECENTS_MAX) : [];
+    } catch {
+      return [];
+    }
+  }
+  function saveRecent(kind) {
+    const next = [kind, ...loadRecents().filter((entry) => entry !== kind)].slice(0, RECENTS_MAX);
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+    } catch {
+    }
+  }
+  const sectionOrder = { Recent: 0, "Flow control": 1, AI: 2, "Developer & data": 3, Triggers: 4 };
+  function sectionRank(name) {
+    return sectionOrder[name] ?? 99;
+  }
+  const sectionNames = {
+    flow: "Flow control",
+    ai: "AI",
+    data: "Developer & data"
+  };
+  function StepPicker({ mode, title, onPick, onClose }) {
+    const [query, setQuery] = reactExports.useState("");
+    const [expanded, setExpanded] = reactExports.useState(/* @__PURE__ */ new Set());
+    const recents = reactExports.useRef(loadRecents());
+    const inputRef = reactExports.useRef(null);
+    reactExports.useEffect(() => {
+      inputRef.current?.focus();
+      const onKey = (event) => {
+        if (event.key === "Escape") onClose();
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    const rows = reactExports.useMemo(() => {
+      if (mode === "trigger") {
+        return triggerPalette.map((entry) => {
+          const connector = connectorCatalog.find((candidate) => `trigger:${candidate.name}` === entry.kind);
+          return {
+            kind: entry.kind,
+            label: entry.label,
+            icon: entry.icon,
+            detail: connector && connector.events.length ? `Fires on: ${connector.events.join(", ")}` : "Custom event payload",
+            section: "Triggers"
+          };
+        });
+      }
+      return actionCatalog.map((entry) => {
+        const connector = actionConnector(entry.type);
+        const section = connector?.label ?? sectionNames[stepSection(entry.type)];
+        return {
+          kind: entry.type,
+          label: entry.label,
+          icon: entry.icon ?? FileText,
+          detail: entry.description ?? "",
+          section
+        };
+      });
+    }, [mode]);
+    const filtered = reactExports.useMemo(() => {
+      const needle = query.trim().toLowerCase();
+      if (!needle) return rows;
+      return rows.filter((row) => row.label.toLowerCase().includes(needle) || String(row.kind).toLowerCase().includes(needle) || row.section.toLowerCase().includes(needle) || row.detail.toLowerCase().includes(needle));
+    }, [query, rows]);
+    const groups = reactExports.useMemo(() => {
+      if (query.trim()) return [];
+      const byName = /* @__PURE__ */ new Map();
+      for (const row of filtered) {
+        const bucket = byName.get(row.section) ?? [];
+        bucket.push(row);
+        byName.set(row.section, bucket);
+      }
+      const recentKinds = new Set(recents.current);
+      const recentRows = rows.filter((row) => recentKinds.has(String(row.kind))).sort((a, b) => recents.current.indexOf(String(a.kind)) - recents.current.indexOf(String(b.kind)));
+      const appGroups = [...byName.entries()].filter(([name]) => sectionOrder[name] === void 0).sort((a, b) => a[0].localeCompare(b[0])).map(([name, groupRows]) => ({ name, rows: groupRows, collapsible: true }));
+      const fixedGroups = [...byName.entries()].filter(([name]) => sectionOrder[name] !== void 0).sort((a, b) => sectionRank(a[0]) - sectionRank(b[0])).map(([name, groupRows]) => ({ name, rows: groupRows, collapsible: false }));
+      const result = [];
+      if (recentRows.length) result.push({ name: "Recent", rows: recentRows, collapsible: false });
+      result.push(...fixedGroups);
+      result.push(...appGroups.map((group) => ({
+        ...group,
+        rows: [...group.rows].sort((a, b) => actionVerbRank(String(a.kind)) - actionVerbRank(String(b.kind)))
+      })));
+      return result;
+    }, [filtered, query, rows]);
+    const firstKind = filtered[0]?.kind;
+    function pick(kind) {
+      if (mode !== "trigger") saveRecent(String(kind));
+      onPick(kind);
+    }
+    function toggle(name) {
+      setExpanded((current) => {
+        const next = new Set(current);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+    }
+    function onListKeyDown(event) {
+      if (event.key === "Enter" && firstKind !== void 0 && event.target === inputRef.current) {
+        event.preventDefault();
+        pick(firstKind);
+      }
+    }
+    const groupIcon = (name) => {
+      const connector = connectorCatalog.find((entry) => entry.label === name);
+      return connector?.logo;
+    };
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "step-picker-overlay", onPointerDown: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        className: "step-picker",
+        role: "dialog",
+        "aria-label": title,
+        onPointerDown: (event) => event.stopPropagation(),
+        onKeyDown: onListKeyDown,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "step-picker-head", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Search, { size: 16, strokeWidth: 2.25 }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                ref: inputRef,
+                value: query,
+                onChange: (event) => setQuery(event.target.value),
+                placeholder: `${title} — search ${mode === "trigger" ? "triggers" : "steps"}`,
+                "aria-label": "Search steps",
+                spellCheck: false
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: onClose, title: "Close", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-picker-body", children: [
+            filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-picker-empty", children: [
+              "Nothing matches “",
+              query.trim(),
+              "”."
+            ] }),
+            groups.map((group) => {
+              const isOpen = !group.collapsible || expanded.has(group.name);
+              const GroupIcon = group.icon ?? groupIcon(group.name);
+              const countNoun = mode === "trigger" ? "trigger" : "step";
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "step-group", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "button",
+                  {
+                    className: group.collapsible ? "step-group-head toggle" : "step-group-head",
+                    onClick: group.collapsible ? () => toggle(group.name) : void 0,
+                    "aria-expanded": group.collapsible ? isOpen : void 0,
+                    type: "button",
+                    children: [
+                      group.collapsible && (isOpen ? /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronDown, { size: 16, strokeWidth: 2.25 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(ChevronRight, { size: 16, strokeWidth: 2.25 })),
+                      GroupIcon && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupIcon, { size: 16, strokeWidth: 2.25 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: group.name }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: group.rows.length === 1 ? `1 ${countNoun}` : `${group.rows.length} ${countNoun}s` })
+                    ]
+                  }
+                ),
+                isOpen && group.rows.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "button",
+                  {
+                    className: "step-row",
+                    onClick: () => pick(row.kind),
+                    type: "button",
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 2.25 }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
+                        row.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.detail })
+                      ] })
+                    ]
+                  },
+                  String(row.kind)
+                ))
+              ] }, group.name);
+            }),
+            query.trim() && filtered.map((row) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "step-row", onClick: () => pick(row.kind), type: "button", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(row.icon, { size: 16, strokeWidth: 2.25 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "step-row-text", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-label", children: row.label }),
+                !row.label.toLowerCase().includes(row.section.toLowerCase()) && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "step-row-detail", children: row.section })
+              ] })
+            ] }, `search-${row.kind}`))
+          ] })
+        ]
+      }
+    ) });
+  }
+  function WorkflowBoard({
+    shapes,
+    setShapes,
+    editShapes,
+    commitDrag,
+    selectedId,
+    setSelectedId,
+    canPasteStep,
+    onDuplicateStep,
+    onCopyStep,
+    onPasteStep,
+    sessionControls
+  }) {
+    const [picker, setPicker] = reactExports.useState(null);
+    const [dragStart, setDragStart] = reactExports.useState(null);
+    const [panStart, setPanStart] = reactExports.useState(null);
+    const [connectorDrag, setConnectorDrag] = reactExports.useState(null);
+    const [reattachDrag, setReattachDrag] = reactExports.useState(null);
+    const [contextMenu, setContextMenu] = reactExports.useState(null);
+    const [editingId, setEditingId] = reactExports.useState(null);
+    const [editingLabel, setEditingLabel] = reactExports.useState("");
+    const [canvasViewBox, setCanvasViewBox] = reactExports.useState({ width: 0, height: 0 });
+    const [zoom, setZoom] = reactExports.useState(1);
+    const [pan, setPan] = reactExports.useState({ x: 0, y: 0 });
+    const svgRef = reactExports.useRef(null);
+    const editorRef = reactExports.useRef(null);
+    const dragSnapshotRef = reactExports.useRef(null);
+    const didDragRef = reactExports.useRef(false);
+    const skipNextEditCommitRef = reactExports.useRef(false);
+    const pointersRef = reactExports.useRef(/* @__PURE__ */ new Map());
+    const pinchRef = reactExports.useRef(null);
+    const didFitRef = reactExports.useRef(false);
+    const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
+    const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
+    const canvasClass = reactExports.useMemo(() => ["drawing-surface", panStart ? "panning" : ""].filter(Boolean).join(" "), [panStart]);
+    const zoomedViewBox = reactExports.useMemo(() => {
+      const width = canvasViewBox.width / zoom;
+      const height = canvasViewBox.height / zoom;
+      return {
+        x: (canvasViewBox.width - width) / 2 + pan.x,
+        y: (canvasViewBox.height - height) / 2 + pan.y,
+        width,
+        height
+      };
+    }, [canvasViewBox, pan, zoom]);
+    function toCanvasPoint(event) {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const point = svg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      const transformed = point.matrixTransform(svg.getScreenCTM()?.inverse());
+      return { x: transformed.x, y: transformed.y };
+    }
+    function toViewportPoint(point) {
+      const svg = svgRef.current;
+      const matrix = svg?.getScreenCTM();
+      if (!svg || !matrix) return null;
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = point.x;
+      svgPoint.y = point.y;
+      const transformed = svgPoint.matrixTransform(matrix);
+      return { x: transformed.x, y: transformed.y };
+    }
+    function toViewportFontSize() {
+      const matrix = svgRef.current?.getScreenCTM();
+      if (!matrix) return shapeLabelSize;
+      return Math.max(11, Math.round(shapeLabelSize * Math.abs(matrix.d) * 10) / 10);
+    }
+    function commitShapes(updater) {
+      editShapes(updater);
+    }
+    function addShape(point, kind, connect) {
+      const id = crypto.randomUUID();
+      if (kind === "note") {
+        const next = {
+          id,
+          type: "note",
+          x: point.x - 110,
+          y: point.y - 44,
+          width: 220,
+          height: 88,
+          label: "Note"
+        };
+        commitShapes((currentShapes) => [...currentShapes, next]);
+      } else {
+        const next = {
+          id,
+          type: "node",
+          x: point.x - NODE_WIDTH / 2,
+          y: point.y - NODE_HEIGHT / 2,
+          width: NODE_WIDTH,
+          height: NODE_HEIGHT,
+          label: paletteLabel(kind),
+          data: nodeDataForKind(kind)
+        };
+        commitShapes((currentShapes) => {
+          if (!connect) return [...currentShapes, next];
+          const source = currentShapes.find((shape) => shape.id === connect.sourceId);
+          if (!isNodeShape(source) || next.data?.nodeKind === "trigger") return [...currentShapes, next];
+          const sourceHandle = connectionHandleById(source, connect.handleId) ?? nearestConnectionHandle(source, point);
+          const targetHandle = nearestConnectionHandle(next, point);
+          const arrow = {
+            id: crypto.randomUUID(),
+            type: "arrow",
+            x: sourceHandle.x,
+            y: sourceHandle.y,
+            width: targetHandle.x - sourceHandle.x,
+            height: targetHandle.y - sourceHandle.y,
+            sourceId: source.id,
+            targetId: next.id,
+            sourceHandleId: sourceHandle.id,
+            targetHandleId: targetHandle.id
+          };
+          return [...currentShapes, next, arrow];
+        });
+      }
+      setSelectedId(id);
+      return id;
+    }
+    function addConnector(sourceId, sourceHandleId, target, targetPoint) {
+      const source = shapes.find((shape) => shape.id === sourceId);
+      if (!isNodeShape(source) || !isNodeShape(target)) return;
+      if (sourceId === target.id || target.data?.nodeKind === "trigger") return;
+      const sourceHandle = connectionHandleById(source, sourceHandleId) ?? nearestConnectionHandle(source, centerOf(target));
+      const targetHandle = nearestConnectionHandle(target, targetPoint);
+      const next = {
+        id: crypto.randomUUID(),
+        type: "arrow",
+        x: sourceHandle.x,
+        y: sourceHandle.y,
+        width: targetHandle.x - sourceHandle.x,
+        height: targetHandle.y - sourceHandle.y,
+        sourceId: source.id,
+        targetId: target.id,
+        sourceHandleId: sourceHandle.id,
+        targetHandleId: targetHandle.id
+      };
+      commitShapes((currentShapes) => [...currentShapes, next]);
+      setSelectedId(next.id);
+      setConnectorDrag(null);
+    }
+    function canvasCenter() {
+      return {
+        x: zoomedViewBox.x + zoomedViewBox.width / 2,
+        y: zoomedViewBox.y + zoomedViewBox.height / 2
+      };
+    }
+    function pickStep(kind) {
+      const request = picker;
+      setPicker(null);
+      if (!request) return;
+      if (request.mode === "change" && request.shapeId) {
+        changeActionType(request.shapeId, kind);
+        return;
+      }
+      let point = request.point;
+      if (!point) {
+        const cascade = shapes.length % 6;
+        point = {
+          x: canvasCenter().x + cascade * 26,
+          y: canvasCenter().y + cascade * 20
+        };
+      }
+      addShape(point, kind, request.connect);
+    }
+    function onPointerDown(event) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointersRef.current.size === 2) {
+        const active = Array.from(pointersRef.current.values());
+        setDragStart(null);
+        setPanStart(null);
+        setConnectorDrag(null);
+        setReattachDrag(null);
+        pinchRef.current = {
+          distance: Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y),
+          zoom
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+      const point = toCanvasPoint(event);
+      const hit = findNodeAt(shapes, point);
+      const connectorHit = hit ? void 0 : findConnectorAt(shapes, point);
+      const draggableHit = hit && hit.type !== "arrow";
+      setSelectedId(hit?.id ?? connectorHit?.id ?? null);
+      setDragStart(draggableHit ? point : null);
+      if (draggableHit) {
+        dragSnapshotRef.current = shapes;
+        didDragRef.current = false;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } else if (!connectorHit) {
+        setPanStart({ clientX: event.clientX, clientY: event.clientY, origin: pan });
+        didDragRef.current = false;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
+    function onPointerMove(event) {
+      if (pointersRef.current.has(event.pointerId)) {
+        pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      const pinch = pinchRef.current;
+      if (pinch && pointersRef.current.size >= 2) {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const active = Array.from(pointersRef.current.values());
+        const distance = Math.hypot(active[0].x - active[1].x, active[0].y - active[1].y);
+        const midX = (active[0].x + active[1].x) / 2;
+        const midY = (active[0].y + active[1].y) / 2;
+        const nextZoom = Math.min(maxZoom, Math.max(minZoom, Math.round(pinch.zoom * distance / pinch.distance * 100) / 100));
+        const worldPerPx = canvasViewBox.width / zoom / rect.width;
+        const midWorldX = canvasViewBox.width / 2 + pan.x + (midX - rect.left - rect.width / 2) * worldPerPx;
+        const midWorldY = canvasViewBox.height / 2 + pan.y + (midY - rect.top - rect.height / 2) * worldPerPx;
+        setZoom(nextZoom);
+        setPan({ x: midWorldX - canvasViewBox.width / 2, y: midWorldY - canvasViewBox.height / 2 });
+        return;
+      }
+      if (panStart) {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const dx2 = (event.clientX - panStart.clientX) * zoomedViewBox.width / rect.width;
+        const dy2 = (event.clientY - panStart.clientY) * zoomedViewBox.height / rect.height;
+        if (dx2 !== 0 || dy2 !== 0) didDragRef.current = true;
+        setPan({ x: panStart.origin.x - dx2, y: panStart.origin.y - dy2 });
+        return;
+      }
+      if (reattachDrag) {
+        setReattachDrag({ ...reattachDrag, current: toCanvasPoint(event) });
+        return;
+      }
+      if (connectorDrag) {
+        setConnectorDrag({ ...connectorDrag, current: toCanvasPoint(event) });
+        return;
+      }
+      if (!selectedId || !dragStart) return;
+      const point = toCanvasPoint(event);
+      const dx = point.x - dragStart.x;
+      const dy = point.y - dragStart.y;
+      if (dx !== 0 || dy !== 0) didDragRef.current = true;
+      setShapes((currentShapes) => {
+        const movedShapes = currentShapes.map((shape) => {
+          if (shape.id !== selectedId) return shape;
+          return { ...shape, x: shape.x + dx, y: shape.y + dy };
+        });
+        return refreshArrowsForMovedShape(movedShapes, selectedId);
+      });
+      setDragStart(point);
+    }
+    function onPointerUp(event) {
+      pointersRef.current.delete(event.pointerId);
+      if (pointersRef.current.size < 2) pinchRef.current = null;
+      if (reattachDrag) {
+        const point = toCanvasPoint(event);
+        const target = findNodeAt(shapes, point);
+        if (isNodeShape(target) && target.data?.nodeKind !== "trigger") {
+          commitShapes((currentShapes) => currentShapes.map((shape) => {
+            if (shape.id !== reattachDrag.arrowId || shape.type !== "arrow") return shape;
+            if (reattachDrag.endpoint === "source" && target.id === shape.targetId) return shape;
+            if (reattachDrag.endpoint === "target" && target.id === shape.sourceId) return shape;
+            const targetHandle = nearestConnectionHandle(target, point);
+            const nextShape = reattachDrag.endpoint === "source" ? { ...shape, sourceId: target.id, sourceHandleId: targetHandle.id } : { ...shape, targetId: target.id, targetHandleId: targetHandle.id };
+            const endpoints = connectorEndpoints(nextShape, currentShapes);
+            return {
+              ...nextShape,
+              x: endpoints.start.x,
+              y: endpoints.start.y,
+              width: endpoints.end.x - endpoints.start.x,
+              height: endpoints.end.y - endpoints.start.y
+            };
+          }));
+        }
+        setReattachDrag(null);
+        return;
+      }
+      if (connectorDrag) {
+        const point = toCanvasPoint(event);
+        const target = findNodeAt(shapes, point);
+        if (isNodeShape(target)) {
+          addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+        } else {
+          setPicker({
+            mode: "action",
+            title: "Add a step",
+            point,
+            connect: { sourceId: connectorDrag.sourceId, handleId: connectorDrag.sourceHandleId }
+          });
+        }
+        setConnectorDrag(null);
+        return;
+      }
+      if (didDragRef.current && dragSnapshotRef.current) {
+        commitDrag(dragSnapshotRef.current);
+      }
+      setPanStart(null);
+      dragSnapshotRef.current = null;
+      didDragRef.current = false;
+      setDragStart(null);
+    }
+    function changeZoom(delta) {
+      setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
+    }
+    function fitToContent() {
+      if (!shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const shape of shapes) {
+        const box = shape.type === "arrow" ? (() => {
+          const endpoints = connectorEndpoints(shape, shapes);
+          return {
+            left: Math.min(endpoints.start.x, endpoints.end.x),
+            right: Math.max(endpoints.start.x, endpoints.end.x),
+            top: Math.min(endpoints.start.y, endpoints.end.y),
+            bottom: Math.max(endpoints.start.y, endpoints.end.y)
+          };
+        })() : {
+          left: Math.min(shape.x, shape.x + shape.width),
+          right: Math.max(shape.x, shape.x + shape.width),
+          top: Math.min(shape.y, shape.y + shape.height),
+          bottom: Math.max(shape.y, shape.y + shape.height)
+        };
+        minX = Math.min(minX, box.left);
+        minY = Math.min(minY, box.top);
+        maxX = Math.max(maxX, box.right);
+        maxY = Math.max(maxY, box.bottom);
+      }
+      const pad = 48;
+      const nextZoom = Math.min(
+        1,
+        Math.max(
+          minZoom,
+          Math.round(Math.min(
+            canvasViewBox.width / (maxX - minX + pad * 2),
+            canvasViewBox.height / (maxY - minY + pad * 2)
+          ) * 100) / 100
+        )
+      );
+      setZoom(nextZoom);
+      setPan({
+        x: minX + (maxX - minX) / 2 - canvasViewBox.width / 2,
+        y: minY + (maxY - minY) / 2 - canvasViewBox.height / 2
+      });
+    }
+    function deleteSelected() {
+      if (!selectedId) return;
+      commitShapes((currentShapes) => currentShapes.filter((shape) => shape.id !== selectedId && shape.sourceId !== selectedId && shape.targetId !== selectedId));
+      setSelectedId(null);
+      setContextMenu(null);
+    }
+    function clearShapes() {
+      if (shapes.length && !window.confirm("Clear the canvas? This removes all nodes and connectors.")) return;
+      commitShapes(() => []);
+      setSelectedId(null);
+      setConnectorDrag(null);
+      setReattachDrag(null);
+      setContextMenu(null);
+    }
+    function openEditor(shape) {
+      setSelectedId(shape.id);
+      setContextMenu(null);
+      skipNextEditCommitRef.current = false;
+      setEditingId(shape.id);
+      setEditingLabel(shape.label ?? "");
+    }
+    function commitEditing() {
+      if (skipNextEditCommitRef.current) {
+        skipNextEditCommitRef.current = false;
+        return;
+      }
+      if (!editingId) return;
+      const nextLabel = editingLabel.trim();
+      commitShapes((currentShapes) => currentShapes.map((shape) => shape.id === editingId ? { ...shape, label: nextLabel || void 0 } : shape));
+      skipNextEditCommitRef.current = true;
+      setEditingId(null);
+      setEditingLabel("");
+    }
+    function cancelEditing() {
+      skipNextEditCommitRef.current = true;
+      setEditingId(null);
+      setEditingLabel("");
+    }
+    function onContextMenu(event) {
+      event.preventDefault();
+      const point = toCanvasPoint(event);
+      const hit = findNodeAt(shapes, point);
+      const connectorHit = hit ? void 0 : findConnectorAt(shapes, point);
+      setSelectedId(hit?.id ?? connectorHit?.id ?? null);
+      setContextMenu({ x: event.clientX, y: event.clientY, point, shapeId: hit?.id ?? connectorHit?.id });
+    }
+    function onCanvasDoubleClick(event) {
+      const point = toCanvasPoint(event);
+      if (findNodeAt(shapes, point) || findConnectorAt(shapes, point)) return;
+      event.preventDefault();
+      setPicker({ mode: "action", title: "Add a step", point });
+    }
+    function startConnectorDrag(event, sourceId, start) {
+      event.stopPropagation();
+      const source = shapes.find((shape) => shape.id === sourceId);
+      if (!isNodeShape(source)) return;
+      setSelectedId(sourceId);
+      setConnectorDrag({ sourceId, sourceHandleId: start.id, start, current: start });
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    function startReattachDrag(event, arrow, endpoint) {
+      event.stopPropagation();
+      const endpoints = connectorEndpoints(arrow, shapes);
+      setSelectedId(arrow.id);
+      setReattachDrag({
+        arrowId: arrow.id,
+        endpoint,
+        fixed: endpoint === "source" ? endpoints.end : endpoints.start,
+        current: endpoint === "source" ? endpoints.start : endpoints.end
+      });
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    function changeActionType(shapeId, actionType) {
+      commitShapes((currentShapes) => currentShapes.map((shape) => {
+        if (shape.id !== shapeId || shape.type !== "node" || shape.data?.nodeKind !== "action") return shape;
+        return {
+          ...shape,
+          label: actionMeta(actionType)?.label ?? actionType,
+          data: { ...defaultNodeData(), actionType, fields: defaultFields(actionType) }
+        };
+      }));
+      setContextMenu(null);
+    }
+    reactExports.useEffect(() => {
+      function onKeyDown(event) {
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+          return;
+        }
+        if (event.key === "Escape") {
+          setContextMenu(null);
+          cancelEditing();
+        }
+      }
+      function onPointerDown2() {
+        setContextMenu(null);
+      }
+      window.addEventListener("keydown", onKeyDown);
+      window.addEventListener("pointerdown", onPointerDown2);
+      return () => {
+        window.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("pointerdown", onPointerDown2);
+      };
+    });
+    reactExports.useEffect(() => {
+      if (!editingId) return;
+      editorRef.current?.focus();
+      editorRef.current?.select();
+    }, [editingId]);
+    reactExports.useEffect(() => {
+      if (contextMenu?.shapeId && !shapes.some((shape) => shape.id === contextMenu.shapeId)) {
+        setContextMenu(null);
+      }
+    });
+    reactExports.useEffect(() => {
+      const currentSvg = svgRef.current;
+      if (!currentSvg) return;
+      const observedSvg = currentSvg;
+      function updateViewBox() {
+        const rect = observedSvg.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const nextViewBox = { width: Math.round(rect.width), height: Math.round(rect.height) };
+        setCanvasViewBox((current) => current.width === nextViewBox.width && current.height === nextViewBox.height ? current : nextViewBox);
+      }
+      updateViewBox();
+      const observer = new ResizeObserver(updateViewBox);
+      observer.observe(observedSvg);
+      window.addEventListener("resize", updateViewBox);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", updateViewBox);
+      };
+    }, []);
+    reactExports.useEffect(() => {
+      if (didFitRef.current || !shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
+      didFitRef.current = true;
+      fitToContent();
+    }, [shapes, canvasViewBox]);
+    const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
+    const editorFontSize = toViewportFontSize();
+    const editorWidth = Math.min(280, Math.max(60, editingLabel.length * editorFontSize * 0.62 + 18));
+    const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "board-panel", "aria-label": "Workflow board", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "board-toolbar", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "palette-actions", "aria-label": "Add nodes", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button",
+              onClick: () => setPicker({ mode: "trigger", title: "When should this run?" }),
+              title: "Add a trigger — when the workflow runs",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Zap, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Trigger" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button accent",
+              onClick: () => setPicker({ mode: "action", title: "Add a step" }),
+              title: "Add a step — flow control, AI, developer tools, or an app",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Step" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              className: "palette-button",
+              onClick: () => addShape(canvasCenter(), "note"),
+              title: "Add a note",
+              type: "button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Note" })
+              ]
+            }
+          )
+        ] }),
+        sessionControls && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "canvas-session-controls", children: sessionControls({ clearCanvas: clearShapes }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-zoom-controls", "aria-label": "Canvas zoom controls", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(-0.1), disabled: zoom <= minZoom, title: "Zoom out", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Minus, { size: 16, strokeWidth: 2.25 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "zoom-button", onClick: () => {
+          setZoom(1);
+          setPan({ x: 0, y: 0 });
+        }, title: "Reset zoom", type: "button", children: [
+          Math.round(zoom * 100),
+          "%"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => changeZoom(0.1), disabled: zoom >= maxZoom, title: "Zoom in", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16, strokeWidth: 2.25 }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: fitToContent, title: "Fit to view", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Maximize, { size: 16, strokeWidth: 2.25 }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "svg",
+        {
+          ref: svgRef,
+          className: canvasClass,
+          viewBox: `${zoomedViewBox.x} ${zoomedViewBox.y} ${zoomedViewBox.width} ${zoomedViewBox.height}`,
+          onPointerDown,
+          onPointerMove,
+          onPointerUp,
+          onPointerCancel: onPointerUp,
+          onDoubleClick: onCanvasDoubleClick,
+          onContextMenu,
+          preserveAspectRatio: "none",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("defs", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("pattern", { id: "grid", width: "28", height: "28", patternUnits: "userSpaceOnUse", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 28 0 L 0 0 0 28", fill: "none", stroke: "var(--dk-border-default)", strokeWidth: "1" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("marker", { id: "connector-preview-arrowhead", markerWidth: "10", markerHeight: "10", refX: "8", refY: "3", orient: "auto", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 0 0 L 8 3 L 0 6 z", fill: nodeColor }) })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: zoomedViewBox.x, y: zoomedViewBox.y, width: zoomedViewBox.width, height: zoomedViewBox.height, fill: "url(#grid)" }),
+            connectorDrag && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "line",
+              {
+                x1: connectorDrag.start.x,
+                y1: connectorDrag.start.y,
+                x2: connectorDrag.current.x,
+                y2: connectorDrag.current.y,
+                stroke: nodeColor,
+                strokeLinecap: "round",
+                strokeWidth: "2",
+                markerEnd: "url(#connector-preview-arrowhead)"
+              }
+            ),
+            reattachDrag && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "line",
+              {
+                x1: reattachDrag.endpoint === "source" ? reattachDrag.current.x : reattachDrag.fixed.x,
+                y1: reattachDrag.endpoint === "source" ? reattachDrag.current.y : reattachDrag.fixed.y,
+                x2: reattachDrag.endpoint === "source" ? reattachDrag.fixed.x : reattachDrag.current.x,
+                y2: reattachDrag.endpoint === "source" ? reattachDrag.fixed.y : reattachDrag.current.y,
+                stroke: nodeColor,
+                strokeLinecap: "round",
+                strokeWidth: "2",
+                markerEnd: "url(#connector-preview-arrowhead)"
+              }
+            ),
+            shapes.map((shape) => {
+              const selected = shape.id === selectedId;
+              const strokeWidth = selected ? "3" : "2";
+              const color = shapeColor(shape);
+              if (shape.type === "node") {
+                const Icon2 = nodeIcon(shape.data);
+                const title = nodeTitle(shape);
+                const subtitle = nodeSubtitle(shape);
+                return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { onDoubleClick: (event) => {
+                  event.stopPropagation();
+                  openEditor(shape);
+                }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "rect",
+                    {
+                      x: shape.x,
+                      y: shape.y,
+                      width: shape.width,
+                      height: shape.height,
+                      rx: "6",
+                      fill: "var(--dk-bg-surface)",
+                      stroke: color,
+                      strokeWidth
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    Icon2,
+                    {
+                      size: 22,
+                      x: shape.x + 21,
+                      y: shape.y + (shape.height - 36) / 2 + 7,
+                      color,
+                      strokeWidth: 1.5
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
+                    displayLabel(title)
+                  ] }),
+                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--dk-text-muted)", fontSize: "12", children: displayLabel(subtitle) })
+                ] }, shape.id);
+              }
+              if (shape.type === "note") {
+                return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { onDoubleClick: (event) => {
+                  event.stopPropagation();
+                  openEditor(shape);
+                }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--dk-warning-bg)", stroke: noteColor, strokeWidth }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--dk-text-primary)", fontSize: shapeLabelSize, fontWeight: "500", children: [
+                    shape.label && /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
+                    shape.label ? displayLabel(shape.label) : ""
+                  ] })
+                ] }, shape.id);
+              }
+              const endpoints = connectorEndpoints(shape, shapes);
+              const midpoint = {
+                x: (endpoints.start.x + endpoints.end.x) / 2,
+                y: (endpoints.start.y + endpoints.end.y) / 2
+              };
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("defs", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("marker", { id: `arrowhead-${shape.id}`, markerWidth: "10", markerHeight: "10", refX: "8", refY: "3", orient: "auto", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M 0 0 L 8 3 L 0 6 z", fill: color }) }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { className: "connector-hitline", x1: endpoints.start.x, y1: endpoints.start.y, x2: endpoints.end.x, y2: endpoints.end.y, stroke: "transparent", strokeWidth: "18" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "line",
+                  {
+                    x1: endpoints.start.x,
+                    y1: endpoints.start.y,
+                    x2: endpoints.end.x,
+                    y2: endpoints.end.y,
+                    stroke: color,
+                    strokeLinecap: "round",
+                    strokeWidth: "2",
+                    markerEnd: `url(#arrowhead-${shape.id})`
+                  }
+                ),
+                selected && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "circle",
+                    {
+                      className: "connection-handle",
+                      cx: endpoints.start.x,
+                      cy: endpoints.start.y,
+                      r: "8",
+                      fill: handleColor,
+                      stroke: "var(--dk-bg-surface)",
+                      strokeWidth: "3",
+                      onPointerDown: (event) => startReattachDrag(event, shape, "source")
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "circle",
+                    {
+                      className: "connection-handle",
+                      cx: endpoints.end.x,
+                      cy: endpoints.end.y,
+                      r: "8",
+                      fill: handleColor,
+                      stroke: "var(--dk-bg-surface)",
+                      strokeWidth: "3",
+                      onPointerDown: (event) => startReattachDrag(event, shape, "target")
+                    }
+                  )
+                ] }),
+                selected && /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: midpoint.x, cy: midpoint.y, r: "3", fill: color })
+              ] }, shape.id);
+            }),
+            isNodeShape(selectedShape) && connectionHandles(selectedShape).map((handle) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "circle",
+              {
+                className: "connection-handle",
+                cx: handle.x,
+                cy: handle.y,
+                r: "8",
+                fill: handleColor,
+                stroke: "var(--dk-bg-surface)",
+                strokeWidth: "3",
+                onPointerDown: (event) => startConnectorDrag(event, selectedShape.id, handle)
+              },
+              `${selectedShape.id}-${handle.id}`
+            ))
+          ]
+        }
+      ),
+      editingShape && editorPosition && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "input",
+        {
+          ref: editorRef,
+          className: "label-editor",
+          value: editingLabel,
+          onChange: (event) => setEditingLabel(event.target.value),
+          onBlur: commitEditing,
+          onKeyDown: (event) => {
+            if (event.key === "Enter") commitEditing();
+            if (event.key === "Escape") cancelEditing();
+          },
+          style: { fontSize: editorFontSize, left: editorPosition.x, top: editorPosition.y, width: editorWidth },
+          "aria-label": "Edit node title"
+        }
+      ),
+      contextMenu && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "canvas-context-menu", style: { left: contextMenu.x, top: contextMenu.y }, onPointerDown: (event) => event.stopPropagation(), children: [
+        !contextMenu.shapeId && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+          setPicker({ mode: "action", title: "Add a step", point: contextMenu.point });
+          setContextMenu(null);
+        }, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ListPlus, { size: 16 }),
+          "Add step…"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+          addShape(contextMenu.point, "note");
+          setContextMenu(null);
+        }, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(StickyNote, { size: 16 }),
+          "Add note"
+        ] }),
+        contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "context-menu-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            setPicker({ mode: "change", title: "Change action type", shapeId: contextMenu.shapeId });
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(ListRestart, { size: 16 }),
+            "Change action type…"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            onDuplicateStep(contextMenu.shapeId);
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16 }),
+            "Duplicate"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+            onCopyStep(contextMenu.shapeId);
+            setContextMenu(null);
+          }, type: "button", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16 }),
+            "Copy step"
+          ] })
+        ] }),
+        canPasteStep && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => {
+          onPasteStep({ x: contextMenu.point.x + 24, y: contextMenu.point.y + 24 });
+          setContextMenu(null);
+        }, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardPaste, { size: 16 }),
+          "Paste step"
+        ] }),
+        contextMenu.shapeId && /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "danger", onClick: deleteSelected, disabled: selectedId !== contextMenu.shapeId, type: "button", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16 }),
+          "Delete"
+        ] })
+      ] }),
+      picker && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        StepPicker,
+        {
+          mode: picker.mode,
+          title: picker.title,
+          onPick: pickStep,
+          onClose: () => setPicker(null)
+        }
+      )
+    ] });
+  }
+  const localConfig = { apiBase: "/api", mode: "local" };
+  const COALESCE_MS = 500;
+  function initHistory() {
+    return { past: [], future: [] };
+  }
+  function pushHistory(state, snapshot, options = {}) {
+    const now = options.now ?? Date.now();
+    const top = state.past[state.past.length - 1];
+    if (options.key && top && top.key === options.key && now - top.at <= COALESCE_MS) {
+      return { past: [...state.past.slice(0, -1), { ...top, at: now }], future: [] };
+    }
+    return {
+      past: [...state.past.slice(-49), { snapshot, at: now, key: options.key }],
+      future: []
+    };
+  }
+  function undoHistory(state, present) {
+    const top = state.past[state.past.length - 1];
+    if (!top) return null;
+    const past = state.past.slice(0, -1);
+    if (past.length) past[past.length - 1] = { ...past[past.length - 1], key: void 0 };
+    return {
+      state: {
+        past,
+        future: [...state.future.slice(-49), { snapshot: present, at: Date.now() }]
+      },
+      snapshot: top.snapshot
+    };
+  }
+  function redoHistory(state, present) {
+    const top = state.future[state.future.length - 1];
+    if (!top) return null;
+    return {
+      state: {
+        past: [...state.past.slice(-49), { snapshot: present, at: Date.now() }],
+        future: state.future.slice(0, -1)
+      },
+      snapshot: top.snapshot
+    };
+  }
+  const EMPTY_SHAPES = [];
+  const noopSetShapes = () => {
+  };
+  const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
+  function readStepClipboard() {
+    try {
+      const text = window.localStorage.getItem(STEP_CLIPBOARD_KEY);
+      if (!text) return null;
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+  function writeStepClipboard(step) {
+    try {
+      window.localStorage.setItem(STEP_CLIPBOARD_KEY, JSON.stringify(step));
+    } catch {
+    }
+  }
+  const MOD_KEY = /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘" : "Ctrl";
+  const SHORTCUTS = [
+    { keys: [`${MOD_KEY} Z`], description: "Undo" },
+    { keys: [`${MOD_KEY} ⇧ Z`, "Ctrl Y"], description: "Redo" },
+    { keys: [`${MOD_KEY} D`], description: "Duplicate the selected step" },
+    { keys: [`${MOD_KEY} C`], description: "Copy the selected step for pasting into any workflow" },
+    { keys: [`${MOD_KEY} V`], description: "Paste a copied step as a new node" },
+    { keys: ["Delete", "Backspace"], description: "Delete the selected shape (undoable)" },
+    { keys: ["?"], description: "Show this cheat sheet" },
+    { keys: ["Esc"], description: "Close menus and dialogs" }
+  ];
+  const CONNECTION_STATUS_LABELS = {
+    connected: "connected",
+    ready: "setup incomplete",
+    expired: "needs reconnection",
+    revoked: "revoked"
+  };
+  function connectionTitle(connection) {
+    if (connection.display_name && connection.display_name !== connection.connection_id) {
+      return connection.display_name;
+    }
+    return connection.account_title || connection.connection_id;
+  }
+  function connectionHint(connection) {
+    const title = connectionTitle(connection);
+    const status = CONNECTION_STATUS_LABELS[connection.status ?? ""] ?? connection.status;
+    return status && status !== "connected" ? `${title} · ${status}` : title;
+  }
+  function TriggerLogo({ connector }) {
+    const Logo = connectorMeta(connector)?.logo;
+    return Logo ? /* @__PURE__ */ jsxRuntimeExports.jsx(Logo, { size: 12 }) : null;
+  }
+  async function api(config, path, init, base = config.apiBase) {
+    const response = await fetch(`${base}${path}`, {
+      headers: init?.body ? { "content-type": "application/json" } : void 0,
+      ...init
+    });
+    if (response.status === 401 && config.onUnauthorized) {
+      config.onUnauthorized();
+      throw new Error("Sign-in required");
+    }
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+    return body;
+  }
+  function workflowYaml(workflow) {
+    return dump(orderedWorkflow(workflow), { lineWidth: 100, noRefs: true }).trimEnd() + "\n";
+  }
+  function PromptField({ field, value, onChange }) {
+    const id = reactExports.useId();
+    const dialog = reactExports.useRef(null);
+    const inline = reactExports.useRef(null);
+    const expanded = reactExports.useRef(null);
+    const [open, setOpen] = reactExports.useState(false);
+    const [draft, setDraft] = reactExports.useState(value);
+    reactExports.useEffect(() => {
+      if (open && dialog.current && !dialog.current.open) {
+        dialog.current.showModal();
+        expanded.current?.focus();
+        expanded.current?.setSelectionRange(inline.current?.selectionStart || 0, inline.current?.selectionEnd || 0);
+      } else if (!open && dialog.current?.open) dialog.current.close();
+    }, [open]);
+    const close = () => setOpen(false);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "prompt-field", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "prompt-field-label", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { htmlFor: id, children: [
+          field.label,
+          field.required ? " *" : ""
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "prompt-expand", onClick: () => {
+          setDraft(value);
+          setOpen(true);
+        }, children: "Expand editor" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "textarea",
+        {
+          id,
+          ref: inline,
+          className: "prompt-inline",
+          rows: 10,
+          value,
+          placeholder: field.placeholder,
+          onChange: (event) => onChange(event.target.value)
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "dialog",
+        {
+          ref: dialog,
+          className: "prompt-editor-dialog",
+          "aria-labelledby": `${id}-title`,
+          "aria-describedby": `${id}-hint`,
+          onCancel: close,
+          onClose: close,
+          onKeyDown: (event) => event.stopPropagation(),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "prompt-editor-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: `${id}-title`, children: [
+                "Edit ",
+                field.label.toLowerCase()
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "dk-button dk-button--secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                id: `${id}-expanded`,
+                ref: expanded,
+                className: "prompt-expanded",
+                value: draft,
+                placeholder: field.placeholder,
+                spellCheck: true,
+                onChange: (event) => setDraft(event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "prompt-editor-actions", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: close, children: "Cancel" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => {
+                onChange(draft);
+                close();
+              }, children: "Apply to step" })
+            ] })
+          ]
+        }
+      )
+    ] });
+  }
+  function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }) {
+    const [discovering, setDiscovering] = reactExports.useState(false);
+    if (field.type === "boolean") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: (value || field.default || "false") === "true",
+            onChange: (event) => onChange(event.target.checked ? "true" : "false")
+          }
+        ),
+        field.label
+      ] });
+    }
+    if (field.type === "select") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("select", { value: value || field.default || "", onChange: (event) => onChange(event.target.value), children: field.options?.map((option) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: option, children: option }, option)) })
+      ] });
+    }
+    if (field.type === "yaml") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "textarea",
+          {
+            className: "raw-yaml",
+            rows: 6,
+            value,
+            placeholder: field.placeholder,
+            onChange: (event) => onChange(event.target.value)
+          }
+        )
+      ] });
+    }
+    if (field.type === "textarea" || field.type === "json") {
+      if (field.key === "prompt" || field.key === "system") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx(PromptField, { field, value, onChange });
+      }
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("textarea", { value, placeholder: field.placeholder, onChange: (event) => onChange(event.target.value) })
+      ] });
+    }
+    if (field.provider && connections) {
+      const matches = connections.filter((connection) => connection.provider === field.provider);
+      const current = matches.find((connection) => connection.connection_id === value);
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+        field.label,
+        field.required ? " *" : "",
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "mono-input",
+            list: `connections-${field.key}`,
+            value,
+            placeholder: matches.length === 1 && !value ? matches[0].connection_id : field.placeholder,
+            onChange: (event) => onChange(event.target.value)
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connection.connection_id, children: connectionHint(connection) }, connection.connection_id)) }),
+        value !== "" && current && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: connectionHint(current) }),
+        value !== "" && !current && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint warn", children: [
+          "Not one of your ",
+          field.provider,
+          " connections — pick one from the list or check the ID."
+        ] })
+      ] });
+    }
+    if (field.discover && config?.mode === "console") {
+      const discover = field.discover;
+      const fromKey = discover.from ?? "connection_id";
+      const account = discover.account ?? (fields?.[fromKey] ?? "").trim();
+      const fromLabel = discover.from ? siblingFields?.find((sibling) => sibling.key === fromKey)?.label.toLowerCase() : void 0;
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+          field.label,
+          field.required ? " *" : "",
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "discover-field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                type: field.type === "number" ? "number" : "text",
+                value,
+                placeholder: field.placeholder,
+                onChange: (event) => onChange(event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button quiet", type: "button", disabled: !account, onClick: () => setDiscovering(true), children: "Browse…" })
+          ] }),
+          !account && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint", children: [
+            "Set ",
+            fromLabel ?? "Connection ID",
+            " first"
+          ] })
+        ] }),
+        account && discovering && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          DiscoveryPicker,
+          {
+            config,
+            discover,
+            accountId: account,
+            fields: fields ?? {},
+            onPick: (picked) => {
+              setDiscovering(false);
+              onChange(picked);
+            },
+            onClose: () => setDiscovering(false)
+          }
+        )
+      ] });
+    }
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+      field.label,
+      field.required ? " *" : "",
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "input",
+        {
+          className: "mono-input",
+          type: field.type === "number" ? "number" : "text",
+          step: field.type === "number" ? "any" : void 0,
+          value,
+          placeholder: field.placeholder,
+          onChange: (event) => onChange(event.target.value)
+        }
+      )
+    ] });
+  }
+  function resourceSingular(resource) {
+    return resource.replace(/_/g, " ").replace(/s$/, "");
+  }
+  function article(word) {
+    return /^[aeiou]/i.test(word) ? "an" : "a";
+  }
+  function applyTemplate(template, item) {
+    return template.replace(/\{(\w+)\}/g, (_, key) => String(item[key] ?? ""));
+  }
+  function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose }) {
+    const [items, setItems] = reactExports.useState(null);
+    const [error, setError] = reactExports.useState("");
+    const [query, setQuery] = reactExports.useState("");
+    const adminBase = config.apiBase.replace(/\/designer$/, "");
+    const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
+    const url = reactExports.useMemo(() => {
+      const params = new URLSearchParams();
+      for (const [param, key] of Object.entries(discover.params ?? {})) {
+        const val = (fields[key] ?? "").trim();
+        if (val) params.set(param, val);
+      }
+      const qs = params.toString();
+      return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
+    }, [accountPath, discover.resource, discover.params, fields]);
+    reactExports.useEffect(() => {
+      let cancelled = false;
+      setItems(null);
+      setError("");
+      api(config, url, void 0, adminBase).then((data) => {
+        if (!cancelled) setItems(data.items ?? []);
+      }).catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [config, url, adminBase]);
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    const needle = query.trim().toLowerCase();
+    const matches = (items ?? []).filter((item) => !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
+    const resource = discover.resource.replace(/_/g, " ");
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "picker-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: "picker-title", children: [
+            "Pick ",
+            article(resourceSingular(discover.resource)),
+            " ",
+            resourceSingular(discover.resource)
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              value: query,
+              placeholder: `Filter ${resource}…`,
+              "aria-label": `Filter ${resource}`,
+              autoFocus: true,
+              onChange: (event) => setQuery(event.target.value)
+            }
+          ),
+          error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
+          !error && items === null && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Loading…" }),
+          items !== null && matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
+            "No ",
+            resource,
+            " found"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: matches.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              type: "button",
+              className: "picker-item",
+              onClick: () => onPick(applyTemplate(discover.value ?? "{id}", item)),
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: item.name }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: item.id })
+              ]
+            },
+            item.id
+          )) })
+        ]
+      }
+    ) });
+  }
+  function RawJsonInput({ value, draft, onChange, onInvalidChange }) {
+    const [text, setText] = reactExports.useState(() => draft ?? JSON.stringify(value, null, 2));
+    const [invalid, setInvalid] = reactExports.useState(draft !== void 0);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "textarea",
+        {
+          className: "raw-json",
+          value: text,
+          rows: 8,
+          onChange: (event) => {
+            setText(event.target.value);
+            try {
+              const parsed = JSON.parse(event.target.value);
+              if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                setInvalid(false);
+                onInvalidChange(null);
+                onChange(parsed);
+                return;
+              }
+            } catch {
+            }
+            setInvalid(true);
+            onInvalidChange(event.target.value);
+          }
+        }
+      ),
+      invalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Invalid JSON — fixes apply once it parses." })
+    ] });
+  }
+  function outputPaths(output, depth = 0, prefix = "") {
+    const paths = [];
+    for (const [key, value] of Object.entries(output)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      paths.push(path);
+      if (depth < 1 && value && typeof value === "object" && !Array.isArray(value)) {
+        paths.push(...outputPaths(value, depth + 1, path));
+      }
+    }
+    return paths;
+  }
+  function StepsTemplatePicker({ steps, onPick, onClose }) {
+    reactExports.useEffect(() => {
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "section",
+      {
+        className: "picker-panel",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "steps-templates-title",
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "steps-templates-title", children: "Insert from previous steps" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Outputs from earlier steps’ test runs — click one to copy its template, then paste it into any action field." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: steps.map((step) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: step.id }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: step.label })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "template-chips", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  title: `Copy {steps.${step.id}.output}`,
+                  onClick: () => onPick(`{steps.${step.id}.output}`),
+                  children: `{steps.${step.id}.output}`
+                }
+              ),
+              outputPaths(step.output ?? {}).map((path) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  title: `Copy {steps.${step.id}.output.${path}}`,
+                  onClick: () => onPick(`{steps.${step.id}.output.${path}}`),
+                  children: `{steps.${step.id}.output.${path}}`
+                },
+                path
+              ))
+            ] })
+          ] }, step.id)) })
+        ]
+      }
+    ) });
+  }
+  function App({ config = localConfig }) {
+    const [summaries, setSummaries] = reactExports.useState([]);
+    const [sourceName, setSourceName] = reactExports.useState(null);
+    const [workflowId, setWorkflowId] = reactExports.useState("new-workflow");
+    const [hookBacked, setHookBacked] = reactExports.useState(false);
+    const [initialWorkflowLoaded, setInitialWorkflowLoaded] = reactExports.useState(false);
+    const [enabled, setEnabled] = reactExports.useState(true);
+    const [shapes, setShapes] = reactExports.useState(EMPTY_SHAPES);
+    const [selectedId, setSelectedId] = reactExports.useState(null);
+    const [savedSnapshot, setSavedSnapshot] = reactExports.useState("[]");
+    const [savedId, setSavedId] = reactExports.useState("new-workflow");
+    const [savedEnabled, setSavedEnabled] = reactExports.useState(true);
+    const [canvasExtraDirty, setCanvasExtraDirty] = reactExports.useState(false);
+    const [invalidRawDrafts, setInvalidRawDrafts] = reactExports.useState({});
+    const [leaveOpen, setLeaveOpen] = reactExports.useState(false);
+    const leaveResolver = reactExports.useRef(null);
+    const allowUnload = reactExports.useRef(false);
+    const [status, setStatus] = reactExports.useState({ kind: "idle", message: "" });
+    const [git, setGit] = reactExports.useState(null);
+    const [connections, setConnections] = reactExports.useState(null);
+    const [view, setView] = reactExports.useState("canvas");
+    const [yamlText, setYamlText] = reactExports.useState("");
+    const [savedYaml, setSavedYaml] = reactExports.useState("");
+    const [base, setBase] = reactExports.useState(null);
+    const [draftInfo, setDraftInfo] = reactExports.useState(null);
+    const [testOpen, setTestOpen] = reactExports.useState(false);
+    const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
+    const [testBusy, setTestBusy] = reactExports.useState(false);
+    const [testStrict, setTestStrict] = reactExports.useState(false);
+    const [sampleBusy, setSampleBusy] = reactExports.useState(false);
+    const [testResult, setTestResult] = reactExports.useState(null);
+    const [stepTest, setStepTest] = reactExports.useState({
+      nodeId: null,
+      busy: false,
+      result: null
+    });
+    const [stepOutputs, setStepOutputs] = reactExports.useState({});
+    const [triggerSample, setTriggerSample] = reactExports.useState(null);
+    const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
+    const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
+    const [navOpen, setNavOpen] = reactExports.useState(false);
+    const navSidebarRef = reactExports.useRef(null);
+    const navToggleRef = reactExports.useRef(null);
+    const [clipboardHasStep, setClipboardHasStep] = reactExports.useState(() => readStepClipboard() !== null);
+    const dirty = reactExports.useMemo(
+      () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
+      [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
+    );
+    const [editHistory, setEditHistory] = reactExports.useState(initHistory);
+    const canUndo = editHistory.past.length > 0;
+    const canRedo = editHistory.future.length > 0;
+    const draftRef = reactExports.useRef({ shapes: EMPTY_SHAPES, workflowId: "new-workflow", enabled: true });
+    draftRef.current = { shapes, workflowId, enabled };
+    function commitEdit(previous, coalesceKey) {
+      setEditHistory((current) => pushHistory(current, previous, coalesceKey ? { key: coalesceKey } : {}));
+    }
+    function editShapes(updater, coalesceKey) {
+      if (hookBacked) return;
+      const current = draftRef.current;
+      const nextShapes = updater(current.shapes);
+      if (nextShapes === current.shapes) return;
+      commitEdit(current, coalesceKey);
+      setShapes(nextShapes);
+    }
+    function commitDrag(preDragShapes) {
+      if (preDragShapes === draftRef.current.shapes) return;
+      commitEdit({ ...draftRef.current, shapes: preDragShapes });
+    }
+    function applySnapshot(snapshot) {
+      setShapes(snapshot.shapes);
+      setWorkflowId(snapshot.workflowId);
+      setEnabled(snapshot.enabled);
+      setSelectedId((current) => snapshot.shapes.some((shape) => shape.id === current) ? current : null);
+    }
+    function undo() {
+      if (hookBacked) return;
+      const step = undoHistory(editHistory, draftRef.current);
+      if (!step) return;
+      applySnapshot(step.snapshot);
+      setEditHistory(step.state);
+    }
+    function redo() {
+      if (hookBacked) return;
+      const step = redoHistory(editHistory, draftRef.current);
+      if (!step) return;
+      applySnapshot(step.snapshot);
+      setEditHistory(step.state);
+    }
+    function resetHistory() {
+      setEditHistory(initHistory());
+    }
+    function renameWorkflow(id) {
+      if (hookBacked) return;
+      commitEdit(draftRef.current, "workflow-id");
+      setWorkflowId(id);
+    }
+    function toggleEnabled(next) {
+      if (hookBacked) return;
+      commitEdit(draftRef.current);
+      setEnabled(next);
+    }
+    function deleteSelectedShape() {
+      if (hookBacked) return;
+      const id = selectedId;
+      if (!id) return;
+      commitEdit(draftRef.current);
+      setShapes((current) => current.filter((shape) => shape.id !== id && shape.sourceId !== id && shape.targetId !== id));
+      setSelectedId(null);
+    }
+    function duplicateStep(id) {
+      if (hookBacked) return;
+      const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+      if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+      const data = shape.data;
+      const label = `${shape.label ?? actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Step"} (copy)`;
+      const copy = {
+        ...shape,
+        id: crypto.randomUUID(),
+        x: shape.x + 36,
+        y: shape.y + 36,
+        label,
+        data: {
+          ...data,
+          fields: { ...data.fields, id: data.fields?.id ? `${data.fields.id.trim()}-copy` : "" },
+          ...data.filters ? { filters: data.filters.map((rule) => ({ ...rule })) } : {},
+          ...data.raw ? { raw: { ...data.raw } } : {}
+        }
+      };
+      commitEdit(draftRef.current);
+      setShapes((current) => {
+        const at = current.findIndex((entry) => entry.id === id);
+        if (at < 0) return [...current, copy];
+        const next = [...current];
+        next.splice(at + 1, 0, copy);
+        return next;
+      });
+      setSelectedId(copy.id);
+      setStatus({ kind: "ok", message: `Step duplicated as "${label}".` });
+    }
+    function copyStep(id) {
+      const shape = draftRef.current.shapes.find((entry) => entry.id === id);
+      if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
+      const data = shape.data;
+      writeStepClipboard({
+        actionType: data.actionType,
+        fields: { ...data.fields ?? {} },
+        ...data.raw ? { raw: { ...data.raw } } : {},
+        label: shape.label
+      });
+      setClipboardHasStep(true);
+      setStatus({ kind: "ok", message: "Step copied — open another workflow and press Ctrl/Cmd+V or right-click → Paste step." });
+    }
+    function pasteStep(at) {
+      const step = readStepClipboard();
+      if (!step || view !== "canvas" || hookBacked) return;
+      const anchor = at ?? (selected ? { x: selected.x + 36, y: selected.y + 36 } : { x: 420, y: 260 });
+      const type2 = step.actionType ?? "webhook";
+      const label = step.label ?? actionMeta(type2)?.label ?? type2;
+      const next = {
+        id: crypto.randomUUID(),
+        type: "node",
+        x: anchor.x,
+        y: anchor.y,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        label,
+        data: {
+          nodeKind: "action",
+          actionType: type2,
+          fields: { ...step.fields ?? {} },
+          ...step.raw ? { raw: step.raw } : {}
+        }
+      };
+      commitEdit(draftRef.current);
+      setShapes((current) => [...current, next]);
+      setSelectedId(next.id);
+      setStatus({ kind: "ok", message: `Step pasted as "${label}" — connect it, review its settings, then save.` });
+    }
+    reactExports.useEffect(() => {
+      function onKeyDown(event) {
+        if (event.key === "Escape") {
+          if (shortcutsOpen) {
+            event.preventDefault();
+            setShortcutsOpen(false);
+          }
+          if (navOpen) {
+            event.preventDefault();
+            setNavOpen(false);
+          }
+          return;
+        }
+        if (leaveOpen || stepsPickerOpen || shortcutsOpen) return;
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+        if (target instanceof HTMLElement && target.isContentEditable) return;
+        if (event.metaKey || event.ctrlKey) {
+          if (view !== "canvas") return;
+          const key = event.key.toLowerCase();
+          if (key === "z") {
+            event.preventDefault();
+            if (event.shiftKey) redo();
+            else undo();
+          } else if (key === "y") {
+            event.preventDefault();
+            redo();
+          } else if (key === "v" && readStepClipboard()) {
+            event.preventDefault();
+            pasteStep();
+          } else if (key === "d") {
+            event.preventDefault();
+            if (selectedId) duplicateStep(selectedId);
+          } else if (key === "c" && selectedId) {
+            event.preventDefault();
+            copyStep(selectedId);
+          }
+          return;
+        }
+        if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
+          if (view !== "canvas") return;
+          event.preventDefault();
+          deleteSelectedShape();
+          return;
+        }
+        if (event.key === "?") {
+          event.preventDefault();
+          setShortcutsOpen(true);
+        }
+      }
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    });
+    reactExports.useEffect(() => {
+      setInvalidRawDrafts((current) => {
+        const retained = Object.fromEntries(Object.entries(current).filter(([id]) => shapes.some((shape) => shape.id === id && shape.type === "node" && shape.data?.nodeKind === "action" && !actionCatalog.some((action) => action.type === shape.data?.actionType))));
+        return Object.keys(retained).length === Object.keys(current).length ? current : retained;
+      });
+    }, [shapes]);
+    function askToLeave() {
+      if (!dirty) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        if (leaveResolver.current) return resolve(false);
+        leaveResolver.current = resolve;
+        setLeaveOpen(true);
+      });
+    }
+    function resolveLeave(allowed) {
+      allowUnload.current = allowed;
+      setLeaveOpen(false);
+      leaveResolver.current?.(allowed);
+      leaveResolver.current = null;
+    }
+    reactExports.useEffect(() => {
+      if (!dirty) return;
+      const warn = (event) => {
+        if (allowUnload.current) return;
+        event.preventDefault();
+        event.returnValue = "";
+      };
+      window.addEventListener("beforeunload", warn);
+      return () => window.removeEventListener("beforeunload", warn);
+    }, [dirty]);
+    reactExports.useEffect(() => {
+      if (!navOpen) return;
+      const aside = navSidebarRef.current;
+      if (!aside) return;
+      const initial = aside.querySelector(".workflow-item") ?? aside.querySelector(".sidebar-action");
+      initial?.focus();
+      const onKey = (event) => {
+        if (event.key !== "Tab") return;
+        const items = [...aside.querySelectorAll("a[href], button:not(:disabled)")].filter((item) => !item.hidden && getComputedStyle(item).display !== "none");
+        if (!items.length) return;
+        const firstItem = items[0];
+        const lastItem = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === firstItem) {
+          event.preventDefault();
+          lastItem.focus();
+        } else if (!event.shiftKey && document.activeElement === lastItem) {
+          event.preventDefault();
+          firstItem.focus();
+        }
+      };
+      aside.addEventListener("keydown", onKey);
+      return () => {
+        aside.removeEventListener("keydown", onKey);
+        navToggleRef.current?.focus();
+      };
+    }, [navOpen]);
+    reactExports.useEffect(() => {
+      const desktop = window.matchMedia("(min-width: 721px)");
+      const onChange = (event) => {
+        if (event.matches) setNavOpen(false);
+      };
+      desktop.addEventListener("change", onChange);
+      return () => desktop.removeEventListener("change", onChange);
+    }, []);
+    reactExports.useEffect(() => {
+      if (!leaveOpen) return;
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          resolveLeave(false);
+        }
+        if (event.key !== "Tab") return;
+        const buttons = [...document.querySelectorAll(".leave-prompt button:not(:disabled)")];
+        if (!buttons.length) return;
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [leaveOpen]);
+    reactExports.useEffect(() => {
+      if (!initialWorkflowLoaded || !config.embedded || window.parent === window) return;
+      window.parent.postMessage(
+        {
+          type: "designer:meta",
+          id: workflowId,
+          enabled,
+          source: sourceName,
+          editable: view === "canvas" && !hookBacked,
+          dirty
+        },
+        window.location.origin
+      );
+    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty, hookBacked]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onLeaveRequest = async (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        const data = event.data;
+        if (data?.type !== "designer:request-leave" || typeof data.requestId !== "string") return;
+        const allowed = await askToLeave();
+        window.parent.postMessage({ type: "designer:leave-result", requestId: data.requestId, allowed }, window.location.origin);
+      };
+      window.addEventListener("message", onLeaveRequest);
+      return () => window.removeEventListener("message", onLeaveRequest);
+    });
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data;
+        if (data?.type !== "designer:set-id" || typeof data.id !== "string") return;
+        const id = data.id.trim();
+        if (!id) return;
+        if (view !== "canvas") {
+          setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit id: in the YAML." });
+          return;
+        }
+        renameWorkflow(id);
+      };
+      window.addEventListener("message", onMessage);
+      return () => window.removeEventListener("message", onMessage);
+    }, [config.embedded, view]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data;
+        if (data?.type !== "designer:set-connections" || !Array.isArray(data.connections)) return;
+        const options = data.connections.filter((entry) => {
+          if (!entry || typeof entry !== "object") return false;
+          const record = entry;
+          return typeof record.connection_id === "string" && typeof record.provider === "string";
+        });
+        setConnections(options);
+      };
+      window.addEventListener("message", onMessage);
+      return () => window.removeEventListener("message", onMessage);
+    }, [config.embedded]);
+    reactExports.useEffect(() => {
+      if (config.mode !== "console" || !workflowId || workflowId === "new-workflow") {
+        setTriggerSample(null);
+        return;
+      }
+      let cancelled = false;
+      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      api(
+        config,
+        `/triggers/sample?workflow=${encodeURIComponent(workflowId)}`,
+        void 0,
+        adminBase
+      ).then((payload) => {
+        if (cancelled) return;
+        const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+        setTriggerSample({ source: payload.source, fields: Object.keys(data) });
+      }).catch(() => {
+        if (!cancelled) setTriggerSample(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [config, workflowId]);
+    const refreshGit = reactExports.useCallback(() => {
+      if (config.mode !== "local") return;
+      api(config, "/git/status").then(setGit).catch(() => setGit(null));
+    }, [config]);
+    const refreshList = reactExports.useCallback(async () => {
+      const data = await api(config, "/workflows");
+      setSummaries(data.workflows);
+      return data.workflows;
+    }, [config]);
+    reactExports.useEffect(() => {
+      refreshList().then((workflows) => {
+        const requested = new URLSearchParams(window.location.search).get("workflow");
+        const match = requested ? workflows.find((summary) => summary.source === requested || summary.id === requested) : null;
+        if (match) return openWorkflow(match);
+        if (config.mode === "console") newWorkflow();
+      }).catch((error) => setStatus({ kind: "error", message: String(error) })).finally(() => setInitialWorkflowLoaded(true));
+      refreshGit();
+    }, [refreshGit, refreshList]);
+    async function openWorkflow(summary) {
+      try {
+        const draftOnly = summary.published === false;
+        const ref = summary.source || summary.id;
+        const data = await api(
+          config,
+          `/workflows/${encodeURIComponent(ref)}${draftOnly ? "/draft" : ""}`
+        );
+        const workflow = data.workflow;
+        let draft = data.draft ?? null;
+        if (!draftOnly && summary.has_draft && !draft) {
+          draft = await api(config, `/workflows/${summary.source}/draft`).then((payload) => payload.draft).catch(() => null);
+        }
+        allowUnload.current = false;
+        const shapes2 = shapesFromWorkflow(workflow);
+        const yaml2 = workflowYaml(workflow);
+        setSourceName(summary.source);
+        setHookBacked(data.hook_backed === true);
+        setWorkflowId(workflow.id);
+        setEnabled(workflow.enabled !== false);
+        setShapes(shapes2);
+        setSavedSnapshot(JSON.stringify(shapes2));
+        setSavedId(workflow.id);
+        setSavedEnabled(workflow.enabled !== false);
+        setCanvasExtraDirty(false);
+        setInvalidRawDrafts({});
+        setBase(workflow);
+        setYamlText(yaml2);
+        setSavedYaml(yaml2);
+        setDraftInfo(draft);
+        setSelectedId(null);
+        setStepTest({ nodeId: null, busy: false, result: null });
+        setStepOutputs({});
+        resetHistory();
+        setStatus({ kind: "idle", message: "" });
+        if (config.mode === "console" && !config.embedded) {
+          history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(ref)}`);
+        }
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    function newWorkflow() {
+      allowUnload.current = false;
+      const trigger = {
+        id: "trigger",
+        type: "node",
+        x: 420,
+        y: 140,
+        width: 232,
+        height: 96,
+        label: "email · message.received",
+        data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
+      };
+      setSourceName(null);
+      setHookBacked(false);
+      setInvalidRawDrafts({});
+      setWorkflowId("new-workflow");
+      setEnabled(true);
+      setShapes([trigger]);
+      setSavedSnapshot("[]");
+      setSavedId("new-workflow");
+      setSavedEnabled(true);
+      setCanvasExtraDirty(false);
+      setBase(null);
+      setYamlText("");
+      setSavedYaml("");
+      setDraftInfo(null);
+      setSelectedId("trigger");
+      setStepTest({ nodeId: null, busy: false, result: null });
+      setStepOutputs({});
+      resetHistory();
+      setStatus({ kind: "idle", message: "" });
+    }
+    function parseYamlText(text) {
+      try {
+        const parsed = load(text);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          setStatus({ kind: "error", message: "The YAML must be one object mapping." });
+          return null;
+        }
+        return parsed;
+      } catch (error) {
+        const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+        setStatus({ kind: "error", message: `Invalid YAML: ${message}` });
+        return null;
+      }
+    }
+    function switchView(next) {
+      if (next === view) return;
+      if (next === "yaml") {
+        if (Object.keys(invalidRawDrafts).length) {
+          setStatus({ kind: "error", message: "Fix the invalid action JSON before switching to YAML." });
+          return;
+        }
+        const built = workflowFromShapes(shapes, workflowId, enabled, base);
+        if (built.lost.length) {
+          const noun = built.lost.length === 1 ? "node is" : "nodes are";
+          setStatus({
+            kind: "error",
+            message: `${built.lost.length} ${noun} not connected to a trigger and would be lost in YAML — connect or delete them first.`
+          });
+          return;
+        }
+        setYamlText(workflowYaml(built.workflow));
+      } else {
+        const parsed = parseYamlText(yamlText);
+        if (!parsed) return;
+        const nextShapes = shapesFromWorkflow(parsed);
+        const nextId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : workflowId;
+        const nextEnabled = parsed.enabled !== false;
+        commitEdit({ shapes, workflowId, enabled });
+        setShapes(nextShapes);
+        setCanvasExtraDirty(yamlText !== savedYaml);
+        setBase(parsed);
+        setWorkflowId(nextId);
+        setEnabled(nextEnabled);
+        setSelectedId(null);
+      }
+      setTestOpen(false);
+      setStepTest({ nodeId: null, busy: false, result: null });
+      setView(next);
+    }
+    async function save() {
+      if (hookBacked) {
+        setStatus({ kind: "error", message: "This workflow runs from its trigger and is read-only here — duplicate it to edit a copy." });
+        return false;
+      }
+      if (Object.keys(invalidRawDrafts).length) {
+        setStatus({ kind: "error", message: "Fix the invalid action JSON before saving." });
+        return false;
+      }
+      let yamlOut;
+      let workflow;
+      let nextShapes;
+      if (view === "yaml") {
+        const parsed = parseYamlText(yamlText);
+        if (!parsed) return false;
+        workflow = parsed;
+        yamlOut = yamlText;
+        nextShapes = shapesFromWorkflow(parsed);
+      } else {
+        const built = workflowFromShapes(shapes, workflowId, enabled, base);
+        if (built.problems.length) {
+          setStatus({ kind: "error", message: built.problems.join(" ") });
+          return false;
+        }
+        workflow = built.workflow;
+        yamlOut = workflowYaml(workflow);
+        nextShapes = shapes;
+      }
+      setStatus({ kind: "busy", message: "Saving…" });
+      try {
+        const result = await api(config, "/workflows", {
+          method: "PUT",
+          body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
+        });
+        setBase(workflow);
+        setSavedYaml(yamlOut);
+        setSavedId(workflow.id);
+        setSavedEnabled(workflow.enabled !== false);
+        setCanvasExtraDirty(false);
+        setDraftInfo(result.published === false ? result.draft ?? { base_revision: 0, stale: false } : null);
+        if (view === "yaml") {
+          setShapes(nextShapes);
+          setSavedSnapshot(JSON.stringify(nextShapes));
+          setWorkflowId(workflow.id);
+          setEnabled(workflow.enabled !== false);
+        } else {
+          setSavedSnapshot(JSON.stringify(shapes));
+        }
+        setSourceName(`${workflow.id}.yaml`);
+        if (config.mode === "console" && !config.embedded) {
+          history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(`${workflow.id}.yaml`)}`);
+        }
+        setSummaries((current) => {
+          const others = current.filter((entry2) => entry2.source !== sourceName && entry2.source !== `${workflow.id}.yaml`);
+          const entry = summarize(`${workflow.id}.yaml`, workflow);
+          const previous = current.find((existing) => existing.source === `${workflow.id}.yaml`);
+          const published = result.published !== false ? true : previous?.published === true;
+          return [...others, {
+            ...entry,
+            published,
+            has_draft: result.published === false || previous?.has_draft === true || void 0
+          }].sort((a, b) => a.source.localeCompare(b.source));
+        });
+        refreshGit();
+        resetHistory();
+        setStatus({
+          kind: "ok",
+          message: result.published === false ? "Draft saved — nothing is live yet. Publish when it is ready." : `Saved live. Workflow is ${workflow.enabled === false ? "Off" : "On"}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+        });
+        return true;
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+        return false;
+      }
+    }
+    async function publishDraft() {
+      if (!sourceName || !draftInfo) return;
+      if (dirty) {
+        setStatus({ kind: "error", message: "Save the draft before publishing it." });
+        return;
+      }
+      setStatus({ kind: "busy", message: "Publishing…" });
+      try {
+        const result = await api(
+          config,
+          `/workflows/${encodeURIComponent(sourceName)}/publish`,
+          { method: "POST", body: "{}" }
+        );
+        setDraftInfo(null);
+        await refreshList();
+        refreshGit();
+        setStatus({
+          kind: "ok",
+          message: `Published live${result.revision ? ` as v${result.revision}` : ""}.` + (result.git_sync_error ? ` Git sync failed: ${result.git_sync_error}` : "")
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function discardDraft() {
+      if (!sourceName || !draftInfo) return;
+      if (!window.confirm("Discard the saved draft? The drafted edits are lost; the live workflow is untouched.")) return;
+      setStatus({ kind: "busy", message: "Discarding…" });
+      try {
+        await api(config, `/workflows/${encodeURIComponent(sourceName)}/draft`, { method: "DELETE" });
+        setDraftInfo(null);
+        await refreshList();
+        setStatus({ kind: "ok", message: "Draft discarded — live is untouched." });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function revertChanges() {
+      if (!dirty || status.kind === "busy") return;
+      if (!sourceName) {
+        newWorkflow();
+        return;
+      }
+      if (!window.confirm("Revert unsaved changes? The canvas goes back to the last saved state.")) return;
+      const summary = summaries.find((item) => item.source === sourceName) ?? {
+        id: workflowId,
+        enabled: true,
+        source: sourceName,
+        connector: "",
+        event: "",
+        actionCount: 0,
+        published: !draftInfo,
+        has_draft: !!draftInfo
+      };
+      await openWorkflow(summary);
+    }
+    async function leaveAfterSave() {
+      if (await save()) resolveLeave(true);
+    }
+    async function openWorkflowSafely(summary) {
+      const same = summary.source ? summary.source === sourceName : !summary.source && summary.id === workflowId;
+      if (same || !await askToLeave()) return;
+      await openWorkflow(summary);
+    }
+    async function newWorkflowSafely() {
+      if (!await askToLeave()) return;
+      newWorkflow();
+    }
+    async function duplicateWorkflow() {
+      const ref = sourceName || (hookBacked ? workflowId : null);
+      if (!ref) return;
+      const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
+      if (name === null) return;
+      const trimmed = name.trim();
+      setStatus({ kind: "busy", message: "Duplicating…" });
+      try {
+        const result = await api(
+          config,
+          `/workflows/${encodeURIComponent(ref)}/duplicate`,
+          {
+            method: "POST",
+            body: JSON.stringify(trimmed ? { name: trimmed } : {})
+          }
+        );
+        await refreshList();
+        refreshGit();
+        setStatus({
+          kind: "ok",
+          message: result.published === false ? `Duplicated as ${result.file}; goes live after deployment.` : `Duplicated as ${result.file}.`
+        });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function push() {
+      setStatus({ kind: "busy", message: "Pushing…" });
+      try {
+        const result = await api(config, "/git/push", { method: "POST" });
+        refreshGit();
+        setStatus({ kind: "ok", message: result.output.trim() || "Pushed" });
+      } catch (error) {
+        setStatus({ kind: "error", message: String(error) });
+      }
+    }
+    async function runTest(execute, strict) {
+      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+      if (problems.length) {
+        setStatus({ kind: "error", message: problems.join(" ") });
+        return;
+      }
+      let sample;
+      const mode = execute ? "execute" : "dry-run";
+      try {
+        sample = JSON.parse(testEvent);
+      } catch {
+        setTestResult({ mode, matched: false, steps: [], error: "The sample event is not valid JSON." });
+        return;
+      }
+      if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+        setTestResult({ mode, matched: false, steps: [], error: "The sample event must be a JSON object." });
+        return;
+      }
+      if (execute && !window.confirm("Run the actions for real? Live messages will be sent.")) return;
+      setTestBusy(true);
+      setTestResult(null);
+      try {
+        setTestResult(await api(config, "/workflows/test", {
+          method: "POST",
+          body: JSON.stringify({ event: sample, workflow, execute, ...strict ? { strict: true } : {} })
+        }));
+      } catch (error) {
+        setTestResult({ mode, matched: false, steps: [], error: String(error) });
+      } finally {
+        setTestBusy(false);
+      }
+    }
+    async function pullSample() {
+      const trigger = shapes.find((shape) => shape.data?.nodeKind === "trigger")?.data;
+      if (!trigger?.connector) {
+        setStatus({ kind: "error", message: "Add a trigger node first — the sample is pulled for its connector." });
+        return;
+      }
+      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      setSampleBusy(true);
+      try {
+        const pulled = await api(
+          config,
+          "/discover",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              connector: trigger.connector,
+              event: trigger.event || void 0,
+              connection_id: trigger.fields?.connection_id || void 0
+            })
+          },
+          adminBase
+        );
+        const sample = pulled.sample ?? {};
+        const data = sample.data;
+        setTestEvent(JSON.stringify(
+          data && typeof data === "object" && Object.keys(data).length > 0 ? data : sample,
+          null,
+          2
+        ));
+        setStatus({ kind: "ok", message: `Sample pulled for ${trigger.connector} (${pulled.source ?? "discovered"}).` });
+      } catch (error) {
+        setStatus({ kind: "error", message: `Sample pull failed: ${String(error)}` });
+      } finally {
+        setSampleBusy(false);
+      }
+    }
+    async function testSelectedStep(execute) {
+      if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
+      const nodeId = selected.id;
+      const actionId = (selected.data.fields?.id ?? "").trim();
+      if (!actionId) {
+        setStatus({ kind: "error", message: "Give this action an Action ID first — the step test targets it." });
+        return;
+      }
+      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+      if (problems.length) {
+        setStatus({ kind: "error", message: problems.join(" ") });
+        return;
+      }
+      let sample;
+      try {
+        sample = JSON.parse(testEvent);
+      } catch {
+        setTestOpen(true);
+        setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event is not valid JSON — fix it in the Test run panel." } });
+        return;
+      }
+      if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+        setTestOpen(true);
+        setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event must be a JSON object — fix it in the Test run panel." } });
+        return;
+      }
+      if (execute && !window.confirm(`Run the ${selected.data.actionType} step for real? It acts with live side effects.`)) return;
+      const steps = { ...stepOutputs };
+      for (const step of testResult?.steps ?? []) {
+        if (step.action_id && (step.output || step.error)) {
+          steps[step.action_id] = {
+            status: step.ok ? "completed" : "failed",
+            ...step.output ? { output: step.output } : {},
+            ...step.error ? { error: step.error } : {}
+          };
+        }
+      }
+      setStepTest({ nodeId, busy: true, result: null });
+      try {
+        const result = await api(config, "/workflows/test-step", {
+          method: "POST",
+          body: JSON.stringify({
+            action_id: actionId,
+            event: sample,
+            workflow,
+            execute,
+            ...Object.keys(steps).length ? { steps } : {}
+          })
+        });
+        setStepTest({ nodeId, busy: false, result });
+        if (execute && result.ok && !result.error) {
+          const output = result.steps[0]?.output;
+          setStepOutputs((current) => ({
+            ...current,
+            [actionId]: { status: "completed", ...output ? { output } : {} }
+          }));
+        }
+      } catch (error) {
+        setStepTest({ nodeId, busy: false, result: { mode: execute ? "execute-step" : "test-step", matched: false, steps: [], error: String(error) } });
+      }
+    }
+    async function copyTemplate(template) {
+      try {
+        await navigator.clipboard.writeText(template);
+        setStatus({ kind: "ok", message: `Copied ${template} — paste it into any action template.` });
+      } catch {
+        setStatus({ kind: "ok", message: template });
+      }
+    }
+    function updateSelected(mutate) {
+      if (!selectedId) return;
+      editShapes((current) => current.map((shape) => {
+        if (shape.id !== selectedId || !shape.data) return shape;
+        const data = mutate(shape.data);
+        const label = data.nodeKind === "trigger" ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}` : shape.label;
+        return { ...shape, data, label };
+      }), `node:${selectedId}`);
+    }
+    const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
+    const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
+    const priorSteps = (() => {
+      const chain = orderedActionNodes(shapes);
+      const at = chain.findIndex((node) => node.id === selectedId);
+      if (at <= 0) return [];
+      return chain.map((node, index) => {
+        const id = (node.data?.fields?.id ?? "").trim() || `action-${index + 1}`;
+        const output = stepOutputs[id]?.output;
+        return {
+          id,
+          label: node.label || node.data?.actionType || id,
+          ...output ? { output } : {}
+        };
+      }).slice(0, at);
+    })();
+    const selectedInspector = () => {
+      if (!selected || selected.type !== "node" || !selected.data) {
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-empty", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Select a node on the canvas to edit its properties." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Drag from a node's handle to connect it; double-click a node to rename it." })
+        ] });
+      }
+      const data = selected.data;
+      if (data.nodeKind === "trigger") {
+        const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom")) ?? { events: [] };
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Source" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Connector",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "select",
+                {
+                  value: data.connector ?? "custom",
+                  onChange: (event) => updateSelected((current) => ({ ...current, connector: event.target.value })),
+                  children: connectorCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.name, children: entry.label }, entry.name))
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Event",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "mono-input",
+                  value: data.event ?? "",
+                  list: "trigger-events",
+                  onChange: (event) => updateSelected((current) => ({ ...current, event: event.target.value }))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: "trigger-events", children: connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: event }, event)) })
+            ] })
+          ] }),
+          triggerSample && triggerSample.fields.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Sample fields" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+              "From this workflow's last trigger",
+              triggerSample.source ? ` (${triggerSample.source})` : "",
+              " — click to copy a field, paste it into any action template."
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "template-chips", children: triggerSample.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "template-chip",
+                title: `Copy {trigger.${field}}`,
+                onClick: () => copyTemplate(`{trigger.${field}}`),
+                children: `{trigger.${field}}`
+              },
+              field
+            )) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Filters" }),
+            data.connector === "email" && data.event === "message.received" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Use route equals with the address name, such as invoice, or route in with a JSON list of names. Actions belong to this workflow. To deliberately share addresses with another workflow, set allow_email_overlap: true in YAML." }),
+            (data.filters ?? []).map((rule, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "filter-row", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "mono-input",
+                  placeholder: "field",
+                  value: rule.field,
+                  onChange: (event) => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).map((entry, i) => i === index ? { ...entry, field: event.target.value } : entry)
+                  }))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "select",
+                {
+                  value: rule.operator,
+                  onChange: (event) => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).map((entry, i) => i === index ? { ...entry, operator: event.target.value } : entry)
+                  })),
+                  children: filterOperators.map((op) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: op, children: op }, op))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "icon-button",
+                  title: "Remove filter",
+                  type: "button",
+                  onClick: () => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).filter((_, i) => i !== index)
+                  })),
+                  children: "×"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "mono-input filter-value",
+                  placeholder: rule.operator === "in" ? '["invoice", "receipts"]' : "value",
+                  value: rule.value,
+                  onChange: (event) => updateSelected((current) => ({
+                    ...current,
+                    filters: (current.filters ?? []).map((entry, i) => i === index ? { ...entry, value: event.target.value } : entry)
+                  }))
+                }
+              )
+            ] }, index)),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "add-row",
+                type: "button",
+                onClick: () => updateSelected((current) => ({
+                  ...current,
+                  filters: [...current.filters ?? [], { field: "", operator: "equals", value: "" }]
+                })),
+                children: "Add filter"
+              }
+            )
+          ] })
+        ] });
+      }
+      const type2 = data.actionType ?? "webhook";
+      const meta = actionMeta(type2);
+      const setField = (key, value) => updateSelected((current) => ({
+        ...current,
+        fields: { ...current.fields, [key]: value }
+      }));
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Identity" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Action type",
+            meta ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "select",
+              {
+                value: data.actionType,
+                onChange: (event) => updateSelected((current) => ({
+                  ...current,
+                  actionType: event.target.value,
+                  fields: defaultFields(event.target.value),
+                  raw: void 0
+                })),
+                children: actionCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.type, children: entry.label }, entry.type))
+              }
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                value: data.actionType ?? "",
+                onChange: (event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Action ID",
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                value: data.fields?.id ?? "",
+                placeholder: "action-1",
+                onChange: (event) => setField("id", event.target.value)
+              }
+            )
+          ] })
+        ] }),
+        meta ? /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
+          meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field,
+              value: data.fields?.[field.key] ?? "",
+              connections,
+              fields: data.fields,
+              siblingFields: meta.fields,
+              config,
+              onChange: (value) => setField(field.key, value)
+            },
+            field.key
+          ))
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Unknown action" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Not in the catalog — the YAML is kept as-is on save. Edit it as JSON:" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RawJsonInput,
+            {
+              value: data.raw ?? {},
+              draft: invalidRawDrafts[selected.id],
+              onInvalidChange: (text) => setInvalidRawDrafts((current) => {
+                const next = { ...current };
+                if (text === null) delete next[selected.id];
+                else next[selected.id] = text;
+                return next;
+              }),
+              onChange: (raw) => updateSelected((current) => ({ ...current, raw }))
+            },
+            selected.id
+          )
+        ] }),
+        config.mode === "console" && priorSteps.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Insert from previous steps" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+            "Earlier steps’ outputs as ",
+            "{steps.*}",
+            " templates — click one, paste it into any template field."
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => setStepsPickerOpen(true), children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Browse step outputs…" }) })
+        ] }),
+        meta && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Error handling" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: onErrorField,
+              value: data.fields?.on_error ?? "",
+              onChange: (value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_error: value, ...value && value !== "halt" ? { on_fail: "" } : {} }
+              }))
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: onFailField,
+              value: data.fields?.on_fail ?? "",
+              onChange: (value) => updateSelected((current) => ({
+                ...current,
+                fields: { ...current.fields, on_fail: value, ...value === "continue" ? { on_error: "" } : {} }
+              }))
+            }
+          ),
+          ((data.fields?.on_error ?? "") === "run" || (data.fields?.error_actions ?? "").trim() !== "") && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: errorActionsField,
+              value: data.fields?.error_actions ?? "",
+              onChange: (value) => setField("error_actions", value)
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+            "What a failed step does. On error: halt (the default) fails the run, continue records the failure and moves on, run also executes the error steps. On fail: continue absorbs one failure — the step reads skipped in run history. A handled failure is visible to later steps as ",
+            "{steps.<id>.error}",
+            "."
+          ] })
+        ] }),
+        config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Test step" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Runs just this step against the Test run panel’s sample event. “Run step” executes it for real — side effects limited to this step — and its output feeds the next step’s test." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                disabled: stepTest.busy,
+                onClick: () => testSelectedStep(false),
+                children: [
+                  stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 2.25 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: "dk-button dk-button--danger",
+                type: "button",
+                disabled: stepTest.busy,
+                onClick: () => testSelectedStep(true),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 2.25 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run step" })
+                ]
+              }
+            )
+          ] }),
+          stepTest.nodeId === selected.id && stepTest.result && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${stepTest.result.error && stepTest.result.steps.length === 0 ? "failed" : stepTest.result.ok ? "passed" : ""}`, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: stepTest.result.error && stepTest.result.steps.length === 0 ? stepTest.result.error : /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { children: [
+              stepTest.result.ok ? "Step ok" : "Step failed",
+              stepTest.result.mode === "test-step" ? " (dry)" : ""
+            ] }) }),
+            stepTest.result.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: step.ok ? "test-step ok" : "test-step failed", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-title", children: [
+                step.action_id,
+                " ",
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("em", { children: [
+                  "(",
+                  step.action_type || "?",
+                  ")"
+                ] }),
+                !step.ok && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                  " — ",
+                  step.error
+                ] })
+              ] }),
+              (step.warnings ?? []).map((warning) => /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                "warning: ",
+                warning
+              ] }, warning)),
+              step.rendered_input != null && /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "test-io", children: JSON.stringify(step.rendered_input, null, 2) }),
+              step.output != null && /* @__PURE__ */ jsxRuntimeExports.jsxs("pre", { className: "test-io", children: [
+                "output: ",
+                JSON.stringify(step.output, null, 2)
+              ] })
+            ] }, `${step.action_id}-${index}`))
+          ] })
+        ] })
+      ] });
+    };
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: config.embedded ? "designer-shell embedded" : "designer-shell", children: [
+      navOpen && !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "sidebar-scrim", role: "presentation", onClick: () => setNavOpen(false) }),
+      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "aside",
+        {
+          id: "workflow-sidebar",
+          ref: navSidebarRef,
+          className: navOpen ? "designer-sidebar open" : "designer-sidebar",
+          role: navOpen ? "dialog" : void 0,
+          "aria-modal": navOpen || void 0,
+          "aria-label": navOpen ? "Workflows" : void 0,
+          children: [
+            config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
+              summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  className: summary.source === sourceName ? "workflow-item active" : "workflow-item",
+                  "aria-current": summary.source === sourceName ? "page" : void 0,
+                  onClick: () => {
+                    setNavOpen(false);
+                    openWorkflowSafely(summary);
+                  },
+                  type: "button",
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 16, strokeWidth: 2.25 }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-text", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
+                        summary.connector === "?" ? "No trigger yet" : `${connectorLabel(summary.connector)}/${summary.event}`,
+                        " · ",
+                        summary.actionCount,
+                        " action",
+                        summary.actionCount === 1 ? "" : "s"
+                      ] })
+                    ] }),
+                    !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-off", children: "Off" }),
+                    summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Draft" }),
+                    summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Edited" })
+                  ]
+                },
+                summary.source
+              )),
+              summaries.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "No workflows found." })
+            ] }),
+            config.mode === "local" && git && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "git-foot", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 16, strokeWidth: 2.25 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: git.branch }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: git.dirty ? "git-dirty" : "git-clean", children: git.dirty ? "unsaved changes" : "clean" }),
+              (git.ahead > 0 || git.behind > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                git.ahead,
+                "↑ ",
+                git.behind,
+                "↓"
+              ] })
+            ] })
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", inert: navOpen || void 0, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
+          !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "icon-button nav-toggle",
+              type: "button",
+              ref: navToggleRef,
+              "aria-label": "Toggle workflow list",
+              "aria-expanded": navOpen,
+              "aria-controls": "workflow-sidebar",
+              onClick: () => setNavOpen((open) => !open),
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx(Menu, { size: 16, strokeWidth: 2.25 })
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "view-switch", role: "group", "aria-label": "Editor view", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: view === "canvas" ? "view-option active" : "view-option",
+                  "aria-pressed": view === "canvas",
+                  onClick: () => switchView("canvas"),
+                  children: "Canvas"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: view === "yaml" ? "view-option active" : "view-option",
+                  "aria-pressed": view === "yaml",
+                  onClick: () => switchView("yaml"),
+                  children: "YAML"
+                }
+              )
+            ] }),
+            !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "id-input",
+                value: workflowId,
+                "aria-label": "Workflow ID",
+                placeholder: "workflow-id",
+                disabled: view === "yaml" || hookBacked,
+                title: hookBacked ? "Runs from its trigger — read-only" : view === "yaml" ? "Edit the id in the YAML view" : void 0,
+                onChange: (event) => renameWorkflow(event.target.value)
+              }
+            ),
+            view === "canvas" && triggerNodes.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-problems", children: "Add a trigger node to save." })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "label",
+              {
+                className: "check-label enabled-toggle",
+                title: view === "yaml" ? "Edit the on/off state in YAML" : "Applies when you save",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "checkbox",
+                      checked: enabled,
+                      disabled: view === "yaml" || hookBacked,
+                      title: hookBacked ? "Runs from its trigger — the on/off switch lives in Triggers" : void 0,
+                      onChange: (event) => toggleEnabled(event.target.checked),
+                      "aria-label": "Workflow state after saving"
+                    }
+                  ),
+                  enabled ? "On" : "Off"
+                ]
+              }
+            ),
+            enabled !== savedEnabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "state-save-hint", children: "Save to apply" }),
+            status.message && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `status-message ${status.kind}`, children: [
+              status.kind === "busy" && /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }),
+              status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 16, strokeWidth: 2.25 }),
+              status.message
+            ] }),
+            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+              "Push ",
+              git && git.ahead > 0 ? `(${git.ahead})` : ""
+            ] }) }),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                onClick: duplicateWorkflow,
+                disabled: status.kind === "busy" || !sourceName && !hookBacked,
+                title: hookBacked ? "Copy this trigger-run workflow under a new id — the copy is an ordinary editable workflow" : !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: testOpen ? "button secondary active" : "dk-button dk-button--secondary",
+                type: "button",
+                onClick: () => setTestOpen(!testOpen),
+                disabled: status.kind === "busy" || view === "yaml",
+                title: view === "yaml" ? "Switch to Canvas to test this workflow" : void 0,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                onClick: publishDraft,
+                disabled: status.kind === "busy" || !sourceName || !draftInfo || dirty,
+                title: !draftInfo ? "Save the workflow first — a save writes a draft" : dirty ? "Save the draft before publishing it" : draftInfo.stale ? `The live workflow moved past this draft (based on v${draftInfo.base_revision}) — publishing will refuse it until you save again` : `Publish the draft live (based on v${draftInfo.base_revision})`,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Publish draft" })
+              }
+            ),
+            config.mode === "console" && draftInfo && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                onClick: discardDraft,
+                disabled: status.kind === "busy",
+                title: "Throw the saved draft away — the live workflow is untouched",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                onClick: revertChanges,
+                disabled: hookBacked || status.kind === "busy" || !dirty,
+                title: hookBacked ? "Runs from its trigger — read-only" : "Throw unsaved changes away — back to the last saved state",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Revert" })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary",
+                type: "button",
+                onClick: save,
+                disabled: hookBacked || status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,
+                title: hookBacked ? "Runs from its trigger — read-only" : void 0,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: hookBacked ? "Read-only" : Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" })
+              }
+            )
+          ] })
+        ] }),
+        hookBacked && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "read-only-note", role: "note", children: "This workflow runs from its trigger (webhook/telegram/…) — the designer shows it read-only. Edit the trigger in Triggers, or Duplicate it to edit an editable copy." }),
+        view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor-bar", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mono-file", children: hookBacked ? workflowId : `workflows/${sourceName ?? `${workflowId}.yaml`}` }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "yaml-hint", children: "comments are not preserved on save" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "textarea",
+            {
+              className: "yaml-text",
+              value: yamlText,
+              spellCheck: false,
+              "aria-label": "Workflow YAML",
+              readOnly: hookBacked,
+              onChange: (event) => setYamlText(event.target.value)
+            }
+          )
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            WorkflowBoard,
+            {
+              shapes,
+              setShapes: hookBacked ? noopSetShapes : setShapes,
+              editShapes,
+              commitDrag,
+              selectedId,
+              setSelectedId,
+              canPasteStep: clipboardHasStep,
+              onDuplicateStep: duplicateStep,
+              onCopyStep: copyStep,
+              onPasteStep: pasteStep,
+              sessionControls: (actions) => /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCw, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setShortcutsOpen(true), title: "Keyboard shortcuts (?)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Keyboard, { size: 16, strokeWidth: 2.25 }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: actions.clearCanvas, title: "Clear canvas", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
+              ] })
+            }
+          ),
+          testOpen && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "test-panel", "aria-label": "Test run", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "test-panel-head", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Test run" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16, strokeWidth: 2.25 }) })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run for real” executes the actions with live side effects." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Sample event (JSON)",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "textarea",
+                {
+                  className: "test-event",
+                  rows: 6,
+                  spellCheck: false,
+                  value: testEvent,
+                  onChange: (event) => setTestEvent(event.target.value)
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--primary", type: "button", disabled: testBusy, onClick: () => runTest(false, testStrict), children: [
+                testBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  className: "dk-button dk-button--secondary",
+                  type: "button",
+                  disabled: sampleBusy || testBusy,
+                  onClick: pullSample,
+                  title: "Pull a real sample event for this workflow's trigger connector",
+                  children: [
+                    sampleBusy ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 16, strokeWidth: 2.25, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CloudDownload, { size: 16, strokeWidth: 2.25 }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Pull sample" })
+                  ]
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "label",
+                {
+                  className: "check-label",
+                  title: "Dry run only: rendered-input warnings (an empty required field, a value implausible for its type) fail their step instead of riding along",
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        type: "checkbox",
+                        checked: testStrict,
+                        onChange: (event) => setTestStrict(event.target.checked),
+                        "aria-label": "Strict test run"
+                      }
+                    ),
+                    "Strict"
+                  ]
+                }
+              )
+            ] }),
+            testResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${testResult.error && testResult.steps.length === 0 ? "failed" : testResult.ok ? "passed" : ""}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: testResult.error && testResult.steps.length === 0 ? testResult.error : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: testResult.mode === "execute" ? "Executed" : "Dry run" }),
+                " — ",
+                testResult.matched ? "a trigger matches the sample event." : "NO trigger matches the sample event.",
+                testResult.enabled === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: " This workflow is Off." }),
+                testResult.error && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                  " Run stopped: ",
+                  testResult.error
+                ] })
+              ] }) }),
+              testResult.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: step.ok ? "test-step ok" : "test-step failed", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-title", children: [
+                  index + 1,
+                  ". ",
+                  step.action_id,
+                  " ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("em", { children: [
+                    "(",
+                    step.action_type || "?",
+                    ")"
+                  ] }),
+                  !step.ok && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                    " — ",
+                    step.error
+                  ] })
+                ] }),
+                (step.rendered_input ?? step.output) !== void 0 && (step.rendered_input ?? step.output) !== null && /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "test-io", children: JSON.stringify(step.rendered_input ?? step.output, null, 2) })
+              ] }, `${step.action_id}-${index}`))
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: selected?.type === "node" ? "inspector" : "inspector empty", children: [
+            selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ") })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
+            shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Nodes" }),
+              shapes.filter((shape) => shape.type === "node").map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: shape.id === selectedId ? "node-jump-item selected" : "node-jump-item",
+                  "aria-current": shape.id === selectedId ? "true" : void 0,
+                  onClick: () => setSelectedId(shape.id),
+                  children: shape.label || shape.data?.actionType || shape.id
+                },
+                shape.id
+              ))
+            ] }),
+            selected?.type === "node" && selected.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => copyStep(selected.id), title: "Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ClipboardCopy, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Copy step" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", onClick: deleteSelectedShape, title: "Delete this step (Delete)", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 16, strokeWidth: 2.25 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Delete" })
+              ] })
+            ] }),
+            selectedInspector(),
+            selected?.type === "arrow" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Connector. Drag an endpoint handle to reattach it; Delete removes it." })
+          ] })
+        ] })
+      ] }),
+      leaveOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "leave-backdrop", role: "presentation", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "leave-prompt", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "leave-title", "aria-describedby": "leave-description", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "leave-title", children: "Unsaved workflow changes" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
+        status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: status.message }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
+        ] })
+      ] }) }),
+      stepsPickerOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        StepsTemplatePicker,
+        {
+          steps: priorSteps,
+          onPick: (template) => {
+            setStepsPickerOpen(false);
+            void copyTemplate(template);
+          },
+          onClose: () => setStepsPickerOpen(false)
+        }
+      ),
+      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: () => setShortcutsOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "section",
+        {
+          className: "picker-panel shortcuts-panel",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": "shortcuts-title",
+          onClick: (event) => event.stopPropagation(),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "shortcuts-title", children: "Keyboard shortcuts" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shortcut-list", children: SHORTCUTS.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "shortcut-row", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-keys", children: shortcut.keys.map((key) => /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: key }, key)) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-desc", children: shortcut.description })
+            ] }, shortcut.description)) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Double-click a node to rename it; drag from a handle to connect steps." })
+          ]
+        }
+      ) })
+    ] });
+  }
+  const THEME_KEY = "dakit-theme";
+  const LEGACY_THEME_KEY = "dapier-theme";
+  function storedTheme() {
+    try {
+      const theme = localStorage.getItem(THEME_KEY);
+      if (theme === "dark" || theme === "light") return theme;
+      const legacy = localStorage.getItem(LEGACY_THEME_KEY);
+      return legacy === "dark" || legacy === "light" ? legacy : null;
+    } catch {
+      return null;
+    }
+  }
+  function applyStoredTheme() {
+    let theme = storedTheme();
+    if (theme === null) {
+      const applied = document.documentElement.dataset.theme;
+      theme = applied === "dark" || applied === "light" ? applied : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.dataset.theme = theme;
+  }
+  applyStoredTheme();
+  window.addEventListener("storage", (event) => {
+    if (event.key === THEME_KEY || event.key === LEGACY_THEME_KEY || event.key === null) applyStoredTheme();
+  });
+  const root = document.getElementById("designer-root");
+  if (root) {
+    const embedded = new URLSearchParams(window.location.search).get("embed") === "1";
+    clientExports.createRoot(root).render(
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        App,
+        {
+          config: {
+            apiBase: "/api/admin/designer",
+            mode: "console",
+            embedded,
+            onUnauthorized: () => {
+              (embedded && window.top ? window.top : window).location.assign("/auth/login");
+            }
+          }
+        }
+      )
+    );
+  }
+})();
