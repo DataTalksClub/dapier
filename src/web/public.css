@@ -19,6 +19,17 @@
   color-scheme: dark;
 }
 
+/* Marketing display sizes, named because family.md's type scale stops at
+   --dk-text-page (32px) and these are the two blessed public-page
+   exceptions above it (docs/family-review.md, criterion 4). No app
+   surface may use them. Named in dakit's --dk- convention; they live here
+   rather than vendor/dakit.css because sync-dakit restores that file from
+   upstream dakit verbatim. */
+:root {
+  --dk-text-display: clamp(40px, 7vw, 68px);
+  --dk-text-display-legal: clamp(36px, 6vw, 52px);
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -73,7 +84,7 @@ a:hover { color: var(--dk-accent-hover); }
 }
 
 h1, h2, h3 { line-height: 1.2; }
-h1 { max-width: 760px; margin: 0; font-size: clamp(40px, 7vw, 68px); font-weight: 500; letter-spacing: -.045em; }
+h1 { max-width: 760px; margin: 0; font-size: var(--dk-text-display); font-weight: 500; letter-spacing: -.045em; }
 h2 { margin: 42px 0 12px; font-size: var(--dk-text-xl); font-weight: var(--dk-weight-semibold); letter-spacing: -.02em; }
 h3 { margin: 0 0 8px; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 p { margin: 0 0 16px; }
@@ -90,7 +101,7 @@ p { margin: 0 0 16px; }
 .callout p:last-child { margin-bottom: 0; }
 
 .legal-page { max-width: 760px; }
-.legal-page h1 { font-size: clamp(36px, 6vw, 52px); }
+.legal-page h1 { font-size: var(--dk-text-display-legal); }
 .legal-page h2 { margin-top: 34px; font-size: var(--dk-text-xl); }
 .legal-page ul { padding-left: 22px; }
 .legal-page li { margin: 7px 0; }
