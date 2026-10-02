@@ -591,7 +591,7 @@ $('#edit-connection-test').addEventListener('click', async (event) => {
   try {
     const verdict = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/test`, { method: 'POST' });
     const identity = verdict.identity?.name ? ` — ${verdict.identity.name}` : '';
-    result.textContent = `${verdict.ok ? '✓' : '✗'} ${verdict.detail || 'no health check for this provider'}${identity}`;
+    result.textContent = `${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || 'no health check for this provider'}${identity}`;
     result.hidden = false;
     result.classList.toggle('form-error', !verdict.ok);
   } catch (error) {

@@ -40,7 +40,7 @@ async function testCredential(button) {
   button.disabled = true;
   try {
     const verdict = await api(`/api/admin/connections/${provider}/test`, { method: 'POST', body: '{}' });
-    notice(`${verdict.ok ? '✓' : '✗'} ${verdict.detail || (verdict.ok ? 'connection OK' : 'check failed')}`);
+    notice(`${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || (verdict.ok ? 'connection OK' : 'check failed')}`, !verdict.ok);
   } catch (error) { notice(`Test failed: ${error.message}`); }
   finally { button.disabled = false; }
 }

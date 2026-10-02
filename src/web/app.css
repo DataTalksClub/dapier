@@ -533,7 +533,10 @@ tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 2px solid v
 dialog {
   width: min(520px, calc(100vw - 32px));
   border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
+  /* Overlays are the family's one rounded-plus-shadowed surface
+     (family.md): radius-lg + the overlay shadow; static containers and
+     controls stay at radius-md with no shadow. */
+  border-radius: var(--dk-radius-lg);
   padding: 0;
   background: var(--dk-bg-surface);
   color: var(--dk-text-primary);
@@ -555,6 +558,7 @@ dialog form { display: contents; }
   padding: var(--dk-space-4) var(--dk-space-5);
   background: var(--dk-bg-muted);
   border-bottom: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-lg) var(--dk-radius-lg) 0 0;
 }
 .dialog-head h2 { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 #run-title, #workflow-title { font-family: var(--dk-font-mono); font-size: var(--dk-text-lg); font-weight: var(--dk-weight-medium); }
@@ -580,6 +584,7 @@ dialog form { display: contents; }
   padding: var(--dk-space-3) var(--dk-space-5);
   border-top: 1px solid var(--dk-border-default);
   background: var(--dk-bg-muted);
+  border-radius: 0 0 var(--dk-radius-lg) var(--dk-radius-lg);
 }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -1023,7 +1028,7 @@ body[data-view="workflows"] .workflow-page-actions .dk-button { height: var(--dk
 .workflow-switch:hover .workflow-switch-track { outline: 2px solid var(--dk-accent-border); outline-offset: 2px; }
 .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
 .workflow-list-row .workflow-actions .workflow-more:hover { border-color: var(--dk-border-default); }
-.workflow-menu { position: fixed; inset: auto; margin: 0; width: 180px; padding: 6px; border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); overflow-y: auto; }
+.workflow-menu { position: fixed; inset: auto; margin: 0; width: 180px; padding: 6px; border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); overflow-y: auto; }
 .workflow-menu:popover-open { display: grid; gap: 2px; }
 .workflow-menu .dk-button { justify-content: flex-start; width: 100%; height: var(--dk-size-control-sm); min-width: 0; margin: 0 !important; padding: 0 10px; border-color: transparent; background: transparent; text-align: left; }
 .workflow-menu .dk-button:hover { background: var(--dk-bg-hover); }
