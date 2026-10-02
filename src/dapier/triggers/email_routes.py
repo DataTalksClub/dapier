@@ -87,8 +87,14 @@ def inventory():
                     continue
                 row = addresses.setdefault(name, {"name": name,
                     "address": email_triggers.address_for(name), "handlers": []})
-                if handler not in row["handlers"]:
-                    row["handlers"].append(handler)
+                existing = next((h for h in row["handlers"] if h["workflow"] == handler["workflow"]), None)
+                if existing:
+                    if handler["filters"] not in existing["matching_filters"]:
+                        existing["matching_filters"].append(copy.deepcopy(handler["filters"]))
+                else:
+                    entry = copy.deepcopy(handler)
+                    entry["matching_filters"] = [copy.deepcopy(handler["filters"])]
+                    row["handlers"].append(entry)
     return {"domain": email_triggers.trigger_domain(),
             "addresses": [addresses[k] for k in sorted(addresses)],
             "subscriptions": subscriptions, "watchers": watchers}

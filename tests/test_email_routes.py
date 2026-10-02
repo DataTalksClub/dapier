@@ -200,3 +200,16 @@ def test_duplicate_requires_explicit_email_fanout(stores):
     status, result = designer_store.api_duplicate("first.yaml", {})
     assert status == 409 and "allow_email_overlap" in result["error"]
     assert published_workflows.get_item("first-copy") is None
+
+
+def test_two_matching_triggers_in_one_workflow_show_one_address_owner(stores):
+    first = workflow("first", {"in": ["invoice", "receipts"]})
+    first["triggers"] = [first.pop("trigger"), {
+        "connector": "email", "event": "message.received",
+        "filters": {"route": {"equals": "invoice"}, "subject": {"contains": "bill"}}}]
+    published_workflows.publish(first)
+    rows = {row["name"]: row for row in email_routes.inventory()["addresses"]}
+    assert len(rows["invoice"]["handlers"]) == 1
+    assert len(rows["invoice"]["handlers"][0]["matching_filters"]) == 2
+    assert len(rows["receipts"]["handlers"][0]["matching_filters"]) == 1
+    assert matching.matches(first, {"connector": "email", "event": "message.received", "data": {"route": "invoice"}})
