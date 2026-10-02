@@ -15,7 +15,7 @@ def credentials_set(api_url, provider, path, debug=False):
     """Store a provider credential; the value travels only in the request body.
 
     Single-field providers take the raw value; multi-field providers (aws)
-    take a JSON object with exactly their fields.
+    take a JSON object with their fields or an IAM role_arn.
     """
     fields = CREDENTIAL_FIELDS.get(provider)
     if not fields:
@@ -40,9 +40,13 @@ def credentials_set(api_url, provider, path, debug=False):
             print(f"The {provider} credential must be a JSON object with keys: "
                   f"{', '.join(fields)}.")
             return 2
-        if not isinstance(parsed, dict) or sorted(parsed) != sorted(fields) or not all(
+        role_config = (
+            provider == "aws" and isinstance(parsed, dict)
+            and isinstance(parsed.get("role_arn"), str) and parsed["role_arn"].strip()
+        )
+        if not role_config and (not isinstance(parsed, dict) or sorted(parsed) != sorted(fields) or not all(
                 isinstance(parsed.get(field), str) and parsed.get(field).strip()
-                for field in fields):
+                for field in fields)):
             print(f"The {provider} credential must be a JSON object with keys: "
                   f"{', '.join(fields)}.")
             return 2
@@ -52,5 +56,4 @@ def credentials_set(api_url, provider, path, debug=False):
     print(f"Stored the {data.get('provider', provider)} credential. "
           "It is live immediately; the value is never shown again.")
     return 0
-
 

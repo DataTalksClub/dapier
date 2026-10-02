@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["emails_from_add", "emails_from_list", "emails_from_remove", "emails_migrate"]
+__all__ = ["emails_from_add", "emails_from_list", "emails_from_remove"]
 
 
 def emails_from_list(api_url, debug=False):
@@ -30,13 +30,4 @@ def emails_from_remove(api_url, address, debug=False):
                     f"/api/agent/email-from?address={quote(address, safe='')}",
                     debug=debug)
     print(f"Removed {address}." if data.get("removed") else f"{address} was not on the list.")
-    return 0
-
-
-
-
-def emails_migrate(api_url, name, debug=False):
-    data = api.call(api_url, "POST", "/api/agent/email-triggers/migrate",
-                    {"name": name}, debug=debug)
-    print(f"Converted {name} to workflow {data['workflow']}. Its existing configuration remains live.")
     return 0

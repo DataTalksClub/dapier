@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useId, type Dispatch, type SetStateAction } from "react";
 import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "lucide-react";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
@@ -10,6 +10,10 @@ import type { ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, 
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
+
+/** Read-only canvas: the board's drag path writes through this instead of
+    setShapes when the open workflow runs from its trigger. */
+const noopSetShapes: Dispatch<SetStateAction<DiagramShape[]>> = () => {};
 
 /** localStorage key copying a step across workflows: Copy step writes it,
     Paste step (any workflow's editor) reads it. */
@@ -543,6 +547,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [summaries, setSummaries] = useState<WorkflowSummary[]>([]);
   const [sourceName, setSourceName] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState("new-workflow");
+  /** The open workflow runs from its trigger (webhook/telegram/...): the API
+      serves it by id, there is no file to save to, and saves refuse the id —
+      everything below keys off this to keep the canvas read-only. */
+  const [hookBacked, setHookBacked] = useState(false);
   const [initialWorkflowLoaded, setInitialWorkflowLoaded] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [shapes, setShapes] = useState<DiagramShape[]>(EMPTY_SHAPES);
@@ -624,6 +632,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   /** History-tracked shape edit — the board's discrete ops and the inspector. */
   function editShapes(updater: (current: DiagramShape[]) => DiagramShape[], coalesceKey?: string) {
+    if (hookBacked) return;
     const current = draftRef.current;
     const nextShapes = updater(current.shapes);
     if (nextShapes === current.shapes) return;
@@ -647,6 +656,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   }
 
   function undo() {
+    if (hookBacked) return;
     const step = undoHistory(editHistory, draftRef.current);
     if (!step) return;
     applySnapshot(step.snapshot);
@@ -654,6 +664,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   }
 
   function redo() {
+    if (hookBacked) return;
     const step = redoHistory(editHistory, draftRef.current);
     if (!step) return;
     applySnapshot(step.snapshot);
@@ -667,11 +678,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   /** Rename from the standalone input or the console's set-id message. */
   function renameWorkflow(id: string) {
+    if (hookBacked) return;
     commitEdit(draftRef.current, "workflow-id");
     setWorkflowId(id);
   }
 
   function toggleEnabled(next: boolean) {
+    if (hookBacked) return;
     commitEdit(draftRef.current);
     setEnabled(next);
   }
@@ -679,6 +692,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   /** Deletes the selected shape (node — with its arrows — note, or connector).
       One undo entry, so no confirm dialog. */
   function deleteSelectedShape() {
+    if (hookBacked) return;
     const id = selectedId;
     if (!id) return;
     commitEdit(draftRef.current);
@@ -692,6 +706,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       fresh node id, its Action ID suffixed "-copy", and its field values,
       filters and raw extras carried over. */
   function duplicateStep(id: string) {
+    if (hookBacked) return;
     const shape = draftRef.current.shapes.find((entry) => entry.id === id);
     if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
     const data = shape.data;
@@ -742,7 +757,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       through save validation). Unconnected, like a manually-added step. */
   function pasteStep(at?: Point) {
     const step = readStepClipboard();
-    if (!step || view !== "canvas") return;
+    if (!step || view !== "canvas" || hookBacked) return;
     const anchor = at ?? (selected
       ? { x: selected.x + 36, y: selected.y + 36 }
       : { x: 420, y: 260 });
@@ -906,12 +921,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         id: workflowId,
         enabled,
         source: sourceName,
-        editable: view === "canvas",
+        editable: view === "canvas" && !hookBacked,
         dirty
       },
       window.location.origin
     );
-  }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
+  }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty, hookBacked]);
 
   useEffect(() => {
     if (!config.embedded) return;
@@ -1017,9 +1032,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       // A draft-only workflow (published: false) has no live item to GET —
       // the draft read serves it. A live workflow with a draft also pulls the
       // draft block so the Publish/Discard buttons know what they act on.
+      // Hook-backed workflows (summary.source null) have no file at all —
+      // the API resolves their id; the response's hook_backed flag turns
+      // the canvas read-only.
       const draftOnly = summary.published === false;
-      const data = await api<{ workflow: Workflow; draft?: DraftInfo }>(
-        config, `/workflows/${summary.source}${draftOnly ? "/draft" : ""}`);
+      const ref = summary.source || summary.id;
+      const data = await api<{ workflow: Workflow; draft?: DraftInfo; hook_backed?: boolean }>(
+        config, `/workflows/${encodeURIComponent(ref)}${draftOnly ? "/draft" : ""}`);
       const workflow = data.workflow;
       let draft = data.draft ?? null;
       if (!draftOnly && summary.has_draft && !draft) {
@@ -1031,6 +1050,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       const shapes = shapesFromWorkflow(workflow);
       const yaml = workflowYaml(workflow);
       setSourceName(summary.source);
+      setHookBacked(data.hook_backed === true);
       setWorkflowId(workflow.id);
       setEnabled(workflow.enabled !== false);
       setShapes(shapes);
@@ -1049,7 +1069,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       resetHistory();
       setStatus({ kind: "idle", message: "" });
       if (config.mode === "console" && !config.embedded) {
-        history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(summary.source)}`);
+        history.replaceState(null, "", `${window.location.pathname}?workflow=${encodeURIComponent(ref)}`);
       }
     } catch (error) {
       setStatus({ kind: "error", message: String(error) });
@@ -1069,6 +1089,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
     };
     setSourceName(null);
+    setHookBacked(false);
     setInvalidRawDrafts({});
     setWorkflowId("new-workflow");
     setEnabled(true);
@@ -1142,6 +1163,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   }
 
   async function save(): Promise<boolean> {
+    if (hookBacked) {
+      setStatus({ kind: "error", message: "This workflow runs from its trigger and is read-only here — duplicate it to edit a copy." });
+      return false;
+    }
     if (Object.keys(invalidRawDrafts).length) {
       setStatus({ kind: "error", message: "Fix the invalid action JSON before saving." });
       return false;
@@ -1268,7 +1293,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   }
 
   async function openWorkflowSafely(summary: WorkflowSummary) {
-    if (summary.source === sourceName || !(await askToLeave())) return;
+    // Same-workflow check: saved flows match on file, hook-backed ones on id
+    // (they have no source file).
+    const same = summary.source
+      ? summary.source === sourceName
+      : !summary.source && summary.id === workflowId;
+    if (same || !(await askToLeave())) return;
     await openWorkflow(summary);
   }
 
@@ -1279,16 +1309,19 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
   /** Copies the saved workflow under a new id (server slugifies the name,
      default `<id>-copy`) without touching this draft; the list then shows
-     both. The console's duplicate route commits and publishes like a save. */
+     both. The console's duplicate route commits and publishes like a save.
+     A hook-backed workflow duplicates by id — the copy is an ordinary
+     managed workflow the trigger does not own. */
   async function duplicateWorkflow() {
-    if (!sourceName) return;
+    const ref = sourceName || (hookBacked ? workflowId : null);
+    if (!ref) return;
     const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
     if (name === null) return;
     const trimmed = name.trim();
     setStatus({ kind: "busy", message: "Duplicating…" });
     try {
       const result = await api<{ file: string; published?: boolean; commit?: string | null }>(
-        config, `/workflows/${encodeURIComponent(sourceName)}/duplicate`, {
+        config, `/workflows/${encodeURIComponent(ref)}/duplicate`, {
           method: "POST",
           body: JSON.stringify(trimmed ? { name: trimmed } : {})
         });
@@ -1902,8 +1935,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 value={workflowId}
                 aria-label="Workflow ID"
                 placeholder="workflow-id"
-                disabled={view === "yaml"}
-                title={view === "yaml" ? "Edit the id in the YAML view" : undefined}
+                disabled={view === "yaml" || hookBacked}
+                title={hookBacked ? "Runs from its trigger — read-only" : view === "yaml" ? "Edit the id in the YAML view" : undefined}
                 onChange={(event) => renameWorkflow(event.target.value)}
               />
             )}
@@ -1919,7 +1952,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <input
                 type="checkbox"
                 checked={enabled}
-                disabled={view === "yaml"}
+                disabled={view === "yaml" || hookBacked}
+                title={hookBacked ? "Runs from its trigger — the on/off switch lives in Triggers" : undefined}
                 onChange={(event) => toggleEnabled(event.target.checked)}
                 aria-label="Workflow state after saving"
               />
@@ -1943,8 +1977,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 className="dk-button dk-button--secondary"
                 type="button"
                 onClick={duplicateWorkflow}
-                disabled={status.kind === "busy" || !sourceName}
-                title={!sourceName ? "Save the workflow first — duplicates copy the saved file" : undefined}
+                disabled={status.kind === "busy" || (!sourceName && !hookBacked)}
+                title={hookBacked
+                  ? "Copy this trigger-run workflow under a new id — the copy is an ordinary editable workflow"
+                  : !sourceName ? "Save the workflow first — duplicates copy the saved file" : undefined}
               >
                 <span>Duplicate</span>
               </button>
@@ -1988,16 +2024,29 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <span>Discard draft</span>
               </button>
             )}
-            <button className="dk-button dk-button--primary" type="button" onClick={save} disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}>
-              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? (draftInfo ? "Save draft" : "Save changes") : "Saved"}</span>
+            <button
+              className="dk-button dk-button--primary"
+              type="button"
+              onClick={save}
+              disabled={hookBacked || status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}
+              title={hookBacked ? "Runs from its trigger — read-only" : undefined}
+            >
+              <span>{hookBacked ? "Read-only" : Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? (draftInfo ? "Save draft" : "Save changes") : "Saved"}</span>
             </button>
           </div>
         </header>
 
+        {hookBacked && (
+          <div className="read-only-note" role="note">
+            This workflow runs from its trigger (webhook/telegram/…) — the designer shows it read-only.
+            Edit the trigger in Triggers, or Duplicate it to edit an editable copy.
+          </div>
+        )}
+
         {view === "yaml" ? (
           <div className="yaml-editor">
             <div className="yaml-editor-bar">
-              <span className="mono-file">workflows/{sourceName ?? `${workflowId}.yaml`}</span>
+              <span className="mono-file">{hookBacked ? workflowId : `workflows/${sourceName ?? `${workflowId}.yaml`}`}</span>
               <span className="yaml-hint">comments are not preserved on save</span>
             </div>
             <textarea
@@ -2005,6 +2054,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               value={yamlText}
               spellCheck={false}
               aria-label="Workflow YAML"
+              readOnly={hookBacked}
               onChange={(event) => setYamlText(event.target.value)}
             />
           </div>
@@ -2012,7 +2062,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         <div className="designer-body">
           <WorkflowBoard
             shapes={shapes}
-            setShapes={setShapes}
+            setShapes={hookBacked ? noopSetShapes : setShapes}
             editShapes={editShapes}
             commitDrag={commitDrag}
             selectedId={selectedId}

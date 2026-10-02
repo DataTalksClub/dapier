@@ -299,19 +299,12 @@ dapier emails from add alexey@datatalks.club
 
 In the console, **New email** opens the workflow designer with an email trigger
 and an address filter. **Edit workflow** opens the same editor used by Workflows.
-There is no separate email action editor. The old `emails save|delete` commands
-(and their `triggers` aliases) explain the replacement commands; the old PUT and
-DELETE `/api/{admin,agent}/email-triggers` endpoints return 410 without writing.
+There is no separate email action editor and no separate email-trigger store:
+`dapier emails list|show` reads the same inventory the console does, and every
+edit goes through the ordinary workflow draft and publish lifecycle.
 
-Existing legacy records remain readable and executable during conversion:
-`dapier emails migrate <name>` (or **Convert to workflow** in Emails) explicitly
-publishes their unchanged configuration as a workflow, retaining the workflow
-and step identities, filters, enabled state, and actions. Published definitions
-take precedence during an interrupted conversion; retry completes cleanup.
-All later edits use the ordinary workflow draft and publish lifecycle.
-
-Publishing checks route ownership across workflows and any remaining legacy
-records, including disabled workflows. Overlap returns 409 and leaves the draft
+Publishing checks route ownership across the published workflows, including
+disabled ones. Overlap returns 409 and leaves the draft
 available to edit. Deliberate fan-out requires `allow_email_overlap: true` on the
 workflow being published; set it in the designer's YAML view or workflow YAML.
 The Emails list then shows all handlers for the address. Broad subscriptions
@@ -455,7 +448,7 @@ dapier connections revoke youtube-personal   # revoke stored tokens
 dapier connections create youtube-team --provider youtube --scopes https://www.googleapis.com/auth/youtube.readonly
 dapier connections connect youtube-team --agent my-agent   # open consent in Chrome
 dapier connections edit dropbox --root-path /incoming
-dapier connections scopes dropbox --scopes account_info.read files.metadata.read files.content.read files.content.write
+dapier connections edit dropbox --scopes account_info.read files.metadata.read files.content.read files.content.write
 dapier oauth-clients list                    # shared OAuth clients (dropbox/google/zoom; youtube shares google)
 dapier oauth-clients set google --client-id my-id --client-secret-file -   # or a file path
 dapier oauth-clients set zoom --client-id my-id --client-secret-file -

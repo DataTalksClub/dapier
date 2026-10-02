@@ -10,6 +10,12 @@ import re
 from urllib.parse import unquote
 
 from . import access, common, connections, designer, device, ops, triggers
+
+# A workflow ref: the managed file name, or a bare id — hook-backed
+# workflows (webhook/telegram/... triggers) have no file and are addressed
+# by id on the read/duplicate/test routes. The store gates every verb, so
+# the id form still refuses writes with its own error.
+_WORKFLOW_REF = r"([a-z0-9][a-z0-9._-]*\.yaml|[a-z0-9][a-z0-9_-]{0,62})"
 from .common import (  # noqa: F401 - the facade tests patch through
     authenticate, require_operator, reset_rate_limits,
     _is_operator, _json_response)
@@ -72,9 +78,6 @@ def route(event, method, path):
         return delete_connection(event, match.group(1))
     if match and method == "PUT":
         return update_connection_metadata(event, match.group(1))
-    scopes_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/scopes", path)
-    if scopes_match and method == "PUT":
-        return update_connection_scopes(event, scopes_match.group(1))
     connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
     if connect_match and method == "POST":
         return start_connect(event, connect_match.group(1))
@@ -91,9 +94,7 @@ def route(event, method, path):
         return connections_test_api(event, test_connection_match.group(1))
     if method == "POST" and path == "/api/agent/connections/import":
         return import_connection(event)
-    if path == "/api/agent/email-triggers/migrate" and method == "POST":
-        return email_triggers_api(event, method)
-    if path == "/api/agent/email-triggers" and method in ("GET", "PUT", "DELETE"):
+    if path == "/api/agent/email-triggers" and method == "GET":
         return email_triggers_api(event, method)
     if path == "/api/agent/email-from" and method in ("GET", "POST", "DELETE"):
         return email_from_api(event, method)
@@ -180,7 +181,7 @@ def route(event, method, path):
         return designer_export_api(event)
     if path == "/api/agent/discover" and method == "POST":
         return discover_samples_api(event)
-    designer_match = re.fullmatch(r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)", path)
+    designer_match = re.fullmatch(r"/api/agent/designer/workflows/" + _WORKFLOW_REF, path)
     if designer_match and method == "GET":
         return designer_api(event, method, source=designer_match.group(1))
     if designer_match and method == "PUT":
@@ -196,15 +197,15 @@ def route(event, method, path):
     if designer_folder_match and method == "PUT":
         return designer_folder_api(event, designer_folder_match.group(1))
     designer_test_match = re.fullmatch(
-        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test", path)
+        r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/test", path)
     if designer_test_match and method == "POST":
         return designer_test_api(event, designer_test_match.group(1))
     designer_test_step_match = re.fullmatch(
-        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/test-step", path)
+        r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/test-step", path)
     if designer_test_step_match and method == "POST":
         return designer_test_step_api(event, designer_test_step_match.group(1))
     designer_duplicate_match = re.fullmatch(
-        r"/api/agent/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/duplicate", path)
+        r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/duplicate", path)
     if designer_duplicate_match and method == "POST":
         return designer_duplicate_api(event, designer_duplicate_match.group(1))
     designer_versions_match = re.fullmatch(

@@ -118,13 +118,12 @@ def test_admin_schedule_create_toggle_delete(monkeypatch):
     assert body["rule"] == "dapier-schedule-morning-digest"
     assert events.rules["dapier-schedule-morning-digest"]["State"] == "ENABLED"
 
-    # List: the view's table rows — public_view fields plus the flow catalog.
+    # List: the view's table rows.
     listed = admin.route(
         admin_request("GET", "/api/admin/schedule-triggers", cookies=cookies),
         "GET", "/api/admin/schedule-triggers")
     assert listed["statusCode"] == 200
     payload = json.loads(listed["body"])
-    assert isinstance(payload["flows"], list)
     assert [item["schedule_id"] for item in payload["schedules"]] == ["morning-digest"]
     row = payload["schedules"][0]
     assert row["expression"] == "cron(0 8 * * ? *)"

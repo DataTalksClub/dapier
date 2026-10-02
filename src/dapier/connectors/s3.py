@@ -1,6 +1,6 @@
 """Amazon S3 connector: upload files to and find objects in a bucket with
-stored AWS keys, plus bucket/object discovery, the stored-keys health
-check, the new/updated/deleted-file poll sources, and the trigger chip's
+an assumed IAM role or legacy AWS keys, plus bucket/object discovery, the
+identity health check, the new/updated/deleted-file poll sources, and the trigger chip's
 sample pull."""
 import json
 
@@ -181,36 +181,29 @@ register(Action(
 ))
 
 
-def _stored_keys(connection):
-    """The (access_key_id, secret_access_key) pair behind the connection.
-
-    Prefers the connection's own credential record and falls back to the
-    shared ``aws`` credential, mirroring the s3_upload resolution.
-    """
-    from ..connections import credentials
+def _stored_config(connection):
+    from ..connections import aws
 
     for credential_id in (connection.get("credential_id"), DEFAULT_CREDENTIAL_ID):
         if not credential_id:
             continue
         try:
-            secret = credentials.get_credential(credential_id)
-        except KeyError:
-            continue
-        if secret.get("access_key_id") and secret.get("secret_access_key"):
-            return secret["access_key_id"], secret["secret_access_key"]
-    raise RuntimeError("no stored AWS keys for this connection")
+            return aws.stored_config(credential_id)
+        except ValueError as exc:
+            if "is not configured" not in str(exc):
+                raise
+    raise RuntimeError("no stored AWS keys or role for this connection")
 
 
 def _run_buckets(connection, params, *, transport=None):
-    import boto3
+    from ..connections import aws
 
-    access_key, secret_key = _stored_keys(connection)
-    client = boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
-    )
+    config = _stored_config(connection)
+    if config.get("buckets") is not None:
+        return [{"id": name, "name": name} for name in config["buckets"]]
     return [
         {"id": bucket["Name"], "name": bucket["Name"]}
-        for bucket in client.list_buckets().get("Buckets", [])
+        for bucket in aws.client("s3", config).list_buckets().get("Buckets", [])
         if bucket.get("Name")
     ]
 
@@ -219,7 +212,7 @@ register_discovery(Discovery(
     name="buckets",
     connector="s3",
     label="Buckets",
-    description="S3 buckets reachable with the stored AWS keys",
+    description="Configured S3 buckets, or buckets listed by the AWS identity",
     run=_run_buckets,
 ))
 
@@ -232,12 +225,9 @@ def _iso(value):
 def _run_objects(connection, params, *, transport=None):
     """The keys in one bucket (under ``prefix`` when given), basenames as
     display names."""
-    import boto3
+    from ..connections import aws
 
-    access_key, secret_key = _stored_keys(connection)
-    client = boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
-    )
+    client = aws.client("s3", _stored_config(connection))
     request = {"Bucket": params["bucket"], "MaxKeys": 100}
     prefix = str(params.get("prefix") or "").strip()
     if prefix:
@@ -265,26 +255,17 @@ register_discovery(Discovery(
 
 
 def _run_test(connection):
-    """STS get-caller-identity against the stored AWS key pair."""
-    import boto3
+    """Verify the effective assumed role or legacy AWS identity."""
+    from ..connections import aws
 
     try:
-        access_key, secret_key = _stored_keys(connection)
-        identity = boto3.client(
-            "sts", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
-        ).get_caller_identity()
+        identity = aws.client("sts", _stored_config(connection)).get_caller_identity()
     except Exception as exc:
-        return {"ok": False, "detail": f"AWS key check failed: {exc}"}
+        return {"ok": False, "detail": f"AWS identity check failed: {exc}"}
     arn = identity.get("Arn") or ""
-    return {
-        "ok": True,
-        "detail": f"AWS keys verified ({arn})",
-        "identity": {
-            "account": identity.get("Account"),
-            "arn": arn,
-            "user_id": identity.get("UserId"),
-        },
-    }
+    return {"ok": True, "detail": f"AWS identity verified ({arn})",
+            "identity": {"account": identity.get("Account"), "arn": arn,
+                         "user_id": identity.get("UserId")}}
 
 
 register_connection_test(ConnectionTest(connector="aws", run=_run_test))
@@ -394,21 +375,14 @@ def _s3_poll_validate(body):
 
 
 def _s3_poll_client(item):
-    """The boto3 client on the stored credential's key pair."""
-    import boto3
-
-    from ..connections import credentials
+    from ..connections import aws
 
     credential_id = str(item.get("credential_id") or DEFAULT_CREDENTIAL_ID).strip()
     try:
-        secret = credentials.get_credential(credential_id)
-    except KeyError:
-        raise RuntimeError(f"credential '{credential_id}' is not configured") from None
-    access_key = secret.get("access_key_id")
-    secret_key = secret.get("secret_access_key")
-    if not access_key or not secret_key:
-        raise RuntimeError(f"credential '{credential_id}' does not contain AWS keys")
-    return boto3.client("s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        config = aws.stored_config(credential_id)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from None
+    return aws.client("s3", config)
 
 
 def _s3_poll_objects(client, bucket, prefix):

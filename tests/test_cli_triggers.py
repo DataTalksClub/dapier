@@ -100,15 +100,12 @@ def test_save_puts_each_kind_route(monkeypatch, tmp_path, capsys):
         path = tmp_path / f"{kind}.json"
         path.write_text(json.dumps(payload))
         savers = {
-            "email": commands.triggers_save,
             "hook": commands.hooks_save,
             "schedule": commands.schedules_save,
             "poll": commands.polls_save,
         }
         return savers[kind]("https://api.example.test", str(path))
 
-    assert save("email", {"name": "consulting", "actions": TRIGGER["actions"]}) == 2
-    assert seen == {}
     assert save("hook", {"kind": "webhook", "name": "orders", "actions": HOOK["actions"]}) == 0
     assert (seen["method"], seen["path"]) == ("PUT", "/api/agent/hook-triggers")
     assert save("schedule", {"name": "morning-digest", "expression": SCHEDULE["expression"]}) == 0
@@ -133,8 +130,6 @@ def test_delete_calls_each_kind_route(monkeypatch, capsys):
 
     def fake_call(api_url, method, path, body=None, **kwargs):
         seen.update(method=method, path=path)
-        if path.startswith("/api/agent/email-triggers"):
-            return {"ok": True, "address": TRIGGER["address"]}
         if path.startswith("/api/agent/hook-triggers"):
             return {"ok": True, "hook_id": "orders", "kind": "telegram"}
         if path.startswith("/api/agent/schedule-triggers"):
@@ -142,8 +137,6 @@ def test_delete_calls_each_kind_route(monkeypatch, capsys):
         return {"ok": True, "poll_id": "inbox-watch"}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    assert commands.triggers_delete("https://api.example.test", "consulting") == 2
-    assert seen == {}
     assert commands.hooks_delete("https://api.example.test", "orders", kind="telegram") == 0
     assert (seen["method"], seen["path"]) == ("DELETE", "/api/agent/hook-triggers?name=orders&kind=telegram")
     assert commands.schedules_delete("https://api.example.test", "morning-digest") == 0
@@ -151,7 +144,6 @@ def test_delete_calls_each_kind_route(monkeypatch, capsys):
     assert commands.polls_delete("https://api.example.test", "inbox-watch") == 0
     assert (seen["method"], seen["path"]) == ("DELETE", "/api/agent/poll-triggers?name=inbox-watch")
     out, _ = capsys.readouterr()
-    assert "owning workflow" in out
     assert "Deleted telegram trigger 'orders'" in out
     assert "Deleted schedule trigger 'morning-digest'" in out
     assert "Deleted poll trigger 'inbox-watch'" in out

@@ -183,15 +183,9 @@ def _route_grants_tokens(event, method, path, operator_payload, operator_subject
 
 
 def _route_ops_email(event, method, path, operator_payload, operator_subject):
-    """Email triggers, the sender allowlist, host tasks, workers."""
-    if method == "POST" and path == "/api/admin/email-triggers/migrate":
-        return routes.migrate_email_trigger(event, operator_subject)
+    """The email inventory, the sender allowlist, host tasks, workers."""
     if method == "GET" and path == "/api/admin/email-triggers":
         return routes.list_email_triggers(event)
-    if method == "PUT" and path == "/api/admin/email-triggers":
-        return routes.save_email_trigger(event, operator_subject)
-    if method == "DELETE" and path == "/api/admin/email-triggers":
-        return routes.delete_email_trigger(event, operator_subject)
     if method == "GET" and path == "/api/admin/email-from":
         return routes.email_from_list(event)
     if method == "POST" and path == "/api/admin/email-from":

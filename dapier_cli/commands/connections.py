@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_scopes", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "token_exec", "token_write"]
+__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "token_exec", "token_write"]
 
 
 # Documented child-process variables. The provider-specific alias exists so
@@ -186,13 +186,6 @@ def connections_edit(api_url, connection_id, *, display_name=None, scopes=None,
     print(f"Updated {connection_id}.")
     if "scopes" in body:
         print("Reconnect it to grant the updated scopes.")
-    return 0
-
-
-def connections_scopes(api_url, connection_id, scopes, debug=False):
-    api.call(api_url, "PUT", f"/api/agent/connections/{connection_id}/scopes",
-             {"scopes": list(scopes)}, debug=debug)
-    print(f"Updated requested scopes for {connection_id}. Reconnect it to grant the new scopes.")
     return 0
 
 

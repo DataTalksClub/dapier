@@ -4,28 +4,12 @@ import json
 from dapier_cli import commands, main
 
 
-def test_emails_save_and_triggers_save_are_both_retired(monkeypatch, tmp_path):
-    seen = []
-
-    def fake_call(api_url, method, path, body=None, **kwargs):
-        seen.append((method, path, body))
-        return {"created": True, "address": "agent@dtcdev.click", "name": "agent"}
-
-    monkeypatch.setattr(commands.api, "call", fake_call)
-    path = tmp_path / "email.json"
-    body = {"name": "agent", "actions": [{"type": "agent", "prompt": "{subject}", "workspace": "/work"}]}
-    path.write_text(json.dumps(body))
-    assert main.main(["emails", "save", str(path)]) == 2
-    assert main.main(["triggers", "save", str(path)]) == 2
-    assert seen == []
-
-
 def test_webhooks_list_and_hooks_list_call_the_hook_route(monkeypatch):
     seen = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
         seen.append((method, path))
-        return {"hooks": [], "base_url": "https://dapier.example.test", "flows": []}
+        return {"hooks": [], "base_url": "https://dapier.example.test", }
 
     monkeypatch.setattr(commands.api, "call", fake_call)
     assert main.main(["webhooks", "list"]) == 0
@@ -76,7 +60,7 @@ def test_help_moves_triggers_and_hooks_and_drops_agent_mail():
     worker_help = choices["worker"].format_help()
     assert "API" not in worker_help
     emails_help = choices["emails"].format_help()
-    for name in ("list", "show", "save", "delete", "from"):
+    for name in ("list", "show", "from"):
         assert name in emails_help
     for name in ("list", "show", "save", "delete"):
         assert name in webhooks_help

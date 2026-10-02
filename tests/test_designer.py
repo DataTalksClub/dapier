@@ -125,20 +125,15 @@ def test_parse_workflow_accepts_triggers_list_with_inline_actions():
 
 @pytest.mark.parametrize("yaml_text,fragment", [
     ("id: x\ntrigger: {connector: email, event: e}\nflow: shared\nactions: [{type: webhook, url: 'https://x'}]\n",
-     "not both"),
+     "shared flows are retired"),
+    ("id: x\ntrigger: {connector: email, event: e}\nflow: nope\n",
+     "shared flows are retired"),
     ("id: x\ntriggers: [{connector: email}]\nactions: [{type: webhook, url: 'https://x'}]\n",
      "connector and an event"),
 ])
 def test_parse_workflow_rejects_bad_multi_trigger_and_flow_shapes(yaml_text, fragment):
     with pytest.raises(designer_store.WorkflowError, match=fragment):
         designer_store.parse_workflow(yaml_text)
-
-
-def test_parse_workflow_rejects_unknown_flow_reference(tmp_path, monkeypatch):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-    with pytest.raises(designer_store.WorkflowError, match="no shared flow"):
-        designer_store.parse_workflow(
-            "id: x\ntrigger: {connector: email, event: e}\nflow: nope\n")
 
 
 LOGIC_YAML = """\

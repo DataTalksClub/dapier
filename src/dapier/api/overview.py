@@ -34,32 +34,32 @@ def _workflows(visible=None, owners=None):
                 workflow, item.get("file"), published=True,
                 failures=counts.get(str(workflow["id"]), 0))
     for workflow, _owner in hook_triggers.listed_workflows(visible):
-        result.setdefault(str(workflow["id"]), _workflow_view(
+        result.setdefault(str(workflow["id"]), {**_workflow_view(
             workflow, None, published=True,
-            failures=counts.get(str(workflow["id"]), 0)))
+            failures=counts.get(str(workflow["id"]), 0)),
+            # Run by its trigger (hooks), no source file: the console opens
+            # these in the designer read-only (the API serves them by id).
+            "hook_backed": True})
     return sorted(result.values(), key=lambda workflow: str(workflow["id"]))
 
 
 def _workflow_view(workflow, source, *, published, failures=0):
     """One overview row; the primary trigger stays in ``trigger`` for the
-    console, with ``triggerCount`` covering multi-trigger workflows and
-    ``actions`` showing the resolved chain of a flow-bound workflow. The
+    console, with ``triggerCount`` covering multi-trigger workflows. The
     auto-pause fields are engine-stamped runtime state (designer_store.
     api_auto_pause sets them; re-enabling clears them) and ``failures`` is
     the live consecutive-failure count behind them."""
     from ..engine import matching
 
     triggers = matching.workflow_triggers(workflow)
-    resolved = matching.resolve_workflow(workflow) or {}
     view = {
         "id": workflow["id"],
         "enabled": workflow.get("enabled", True),
         "description": str(workflow.get("description") or ""),
         "trigger": triggers[0] if triggers else {},
         "triggerCount": len(triggers),
-        "flow": workflow.get("flow"),
         "source": source,
-        "actions": _action_views(resolved.get("actions")),
+        "actions": _action_views(workflow.get("actions")),
         "published": published,
         # Zapier-style labels (designer_store._tags_of semantics): [] for
         # hand-written YAML that carries something else under ``tags``.

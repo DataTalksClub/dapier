@@ -11,8 +11,6 @@ from conftest import stubbed_action
 from src.dapier.engine import (
     all_workflows,
     execute,
-    flow_actions,
-    flow_catalog,
     matches,
     run_dataops,
     run_dropbox_delete,
@@ -685,18 +683,10 @@ class SharedFlowTests(unittest.TestCase):
                          "url": "https://example.test/intake"}],
         }
 
-    def test_flow_catalog_and_actions(self):
-        self.assertEqual(flow_catalog(), [])
-        self.assertIsNone(flow_actions("invoice-dataops"))
-        self.assertIsNone(flow_actions("no-such-flow"))
-
-    def test_all_workflows_resolves_the_flow_reference(self):
+    def test_all_workflows_serves_every_trigger(self):
         workflow = self.workflow
         self.assertEqual([action["type"] for action in workflow["actions"]], ["webhook"])
         self.assertEqual(len(workflow_triggers(workflow)), 2)
-
-    def test_undefined_flow_fails_closed(self):
-        self.assertIsNone(matching.resolve_workflow({"id": "broken", "flow": "missing"}))
 
     def test_common_actions_run_for_every_trigger(self):
         run_webhook = MagicMock(return_value={"status": 200})

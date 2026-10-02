@@ -36,9 +36,6 @@ def register(sub):
     root_group = edit_p.add_mutually_exclusive_group()
     root_group.add_argument("--root-path", default=None, help="Dropbox only: listing root")
     root_group.add_argument("--clear-root-path", action="store_true", help="Dropbox only: list from the Dropbox root")
-    scopes_p = conn_sub.add_parser("scopes", help="Replace a connection's requested OAuth scopes")
-    scopes_p.add_argument("connection_id")
-    scopes_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
     import_p = conn_sub.add_parser("import", help="One-time operator import of an existing credential")
     import_p.add_argument("connection_id")
     import_p.add_argument("--provider", required=True)
@@ -114,8 +111,6 @@ def run(args, api_url, debug, child=None):
             api_url, args.connection_id, display_name=args.display_name,
             scopes=args.scopes, root_path=root_path, debug=debug,
         )
-    if args.command == "scopes":
-        return commands.connections_scopes(api_url, args.connection_id, args.scopes, debug)
     if args.command == "import":
         return commands.connections_import(
             api_url, args.connection_id, args.provider, args.client_id,

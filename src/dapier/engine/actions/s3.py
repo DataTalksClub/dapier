@@ -5,11 +5,10 @@ read, delete, or mint download links for single objects.
 (optionally authorized by a connection's bearer token) or ``source_s3`` (a
 staged ``{bucket, key}`` object, like an email attachment, a render output,
 or an earlier dropbox_read_file's output — bucket/key take templates). The
-target bucket is written with a credential's access key pair —
-the key/secret approach, not the stack's own identity — so backups can land
-in any bucket.
+target bucket is written with the configured assumed role or legacy access
+key pair. Internal staging uses the stack's execution identity.
 
-``s3_find`` lists the bucket with the same stored keys and returns the
+``s3_find`` lists the bucket with the same AWS configuration and returns the
 objects whose key (or basename) match a pattern — the first match keeps the
 single-object output, the full list (capped at 25) rides in ``matches`` with
 ``next_token`` chaining a truncated listing; a miss is a ``found: False``
@@ -23,6 +22,7 @@ import mimetypes
 import os
 
 from ...connections import credentials, tokens
+from ...connections import aws as aws_credentials
 from . import base
 from .templating import render
 
@@ -42,20 +42,11 @@ PRESIGN_DEFAULT_EXPIRY = 3600
 PRESIGN_MAX_EXPIRY = 7 * 24 * 60 * 60
 
 
-def _aws_keys(action):
-    """The (access_key_id, secret_access_key) pair for the target bucket."""
+def _aws_config(action):
     credential_id = str(action.get("credential_id") or DEFAULT_CREDENTIAL_ID).strip()
     if action.get("connection_id"):
         credential_id = base._connected_connection(action["connection_id"])["credential_id"]
-    try:
-        secret = credentials.get_credential(credential_id)
-    except KeyError:
-        raise ValueError(f"credential {credential_id} is not configured") from None
-    access_key = secret.get("access_key_id")
-    secret_key = secret.get("secret_access_key")
-    if not access_key or not secret_key:
-        raise ValueError(f"credential {credential_id} does not contain AWS keys")
-    return access_key, secret_key
+    return aws_credentials.stored_config(credential_id)
 
 
 def _source_token(connection_id, *, transport=None):
@@ -139,15 +130,11 @@ def run_s3_upload(action, event, *, transport=None, steps=None, s3_client=None):
         raise ValueError("s3_upload requires a bucket")
     key = _object_key(action, event, steps)
     content_type = _content_type(action, event, steps)
-    access_key, secret_key = _aws_keys(action)
+    config = _aws_config(action)
     body = _source_body(action, event, steps, transport=transport)
     client = s3_client
     if client is None:
-        import boto3
-
-        client = boto3.client(
-            "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
-        )
+        client = aws_credentials.client("s3", config)
     kwargs = {"Bucket": bucket, "Key": key, "Body": body}
     omit = action.get("omit_content_type", False)
     if isinstance(omit, str):
@@ -180,15 +167,9 @@ def _find_hit(mode, pattern, key):
 
 
 def _client(action, s3_client):
-    """The injected test client, or a real one on the credential's key pair."""
     if s3_client is not None:
         return s3_client
-    access_key, secret_key = _aws_keys(action)
-    import boto3
-
-    return boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key,
-    )
+    return aws_credentials.client("s3", _aws_config(action))
 
 
 def _find_client(action, s3_client):

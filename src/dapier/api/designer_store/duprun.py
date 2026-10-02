@@ -6,9 +6,9 @@ import yaml
 
 from ...triggers import published_workflows
 from .github import SyncConfigError, SyncError, TOKEN_SECRET_ENV
-from .validation import (AUTO_PAUSE_KEYS, FILE_PATTERN, WorkflowError,
-                         _LateBinding, filename_for, parse_workflow,
-                         slugify_id)
+from .validation import (AUTO_PAUSE_KEYS, FILE_PATTERN, ID_PATTERN,
+                         WorkflowError, _LateBinding, filename_for,
+                         parse_workflow, slugify_id)
 from .drafts import api_save
 from .history import RUN_STATE_KEYS
 from .listing import api_get, workflow_yaml_text
@@ -38,13 +38,16 @@ def api_duplicate(source, body=None, operator=None):
     file slug), strip run-state bookkeeping, and save through the same
     commit-and-publish path api_save uses — so publishing and the git commit
     behave identically. The original file, id, and published item are left
-    untouched.
+    untouched. The source resolves by file name or bare id — a hook-backed
+    workflow has no file, so duplicating one (into an editable managed copy)
+    addresses it by id.
 
     ``body`` optionally carries ``{"name": "..."}``; without it the copy is
     named ``<id>-copy`` (the workflow's id is its name). Returns api_save's
     response shape plus ``duplicated_from``.
     """
-    if not FILE_PATTERN.fullmatch(source or ""):
+    workflow_id = str(source or "").removesuffix(".yaml")
+    if not (FILE_PATTERN.fullmatch(source or "") or ID_PATTERN.fullmatch(workflow_id)):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
     if body is None:
         body = {}

@@ -289,7 +289,7 @@ def test_shared_drive_request_includes_drive_scope_and_pagination():
 def test_backup_preserves_title_bytes_and_explicit_mimetype(monkeypatch):
     event = fixture("drive")
     action = workflow("mailing-list-backup")["actions"][1]
-    monkeypatch.setattr(s3, "_aws_keys", lambda _action: ("key", "secret"))
+    monkeypatch.setattr(s3, "_aws_config", lambda _action: {"access_key_id": "key", "secret_access_key": "secret"})
     monkeypatch.setattr(s3.base, "_s3_body", lambda ref: b"backup bytes")
     client = type(
         "FakeS3", (), {"put_object": lambda self, **kw: setattr(self, "request", kw)}

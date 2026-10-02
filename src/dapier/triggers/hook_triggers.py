@@ -64,10 +64,7 @@ from ..connections.providers import telegram_api
 from .intake.mailchimp_webhooks import EVENT_TYPES as MAILCHIMP_EVENT_TYPES
 
 logger = logging.getLogger(__name__)
-from .email_triggers import (
-    ACTION_SPECS, NAME_PATTERN, TriggerError, flow_catalog,
-    resolve_actions_flow, validate_actions,
-)
+from .email_triggers import NAME_PATTERN, TriggerError, resolve_actions
 
 TABLE_ENV = "HOOK_TRIGGERS_TABLE"
 BASE_URL_ENV = "HOOKS_BASE_URL"
@@ -410,7 +407,7 @@ def build_item(body, operator, kind, previous=None):
     if previous and previous.get("kind") != kind:
         raise TriggerError(
             f"the name '{name}' is already used by a {previous.get('kind')} trigger")
-    actions, flow = resolve_actions_flow(body)
+    actions = resolve_actions(body)
     previous = previous or {}
     created = not previous
     token = new_token() if (created or body.get("rotate_token")) else previous.get("token")
@@ -428,7 +425,6 @@ def build_item(body, operator, kind, previous=None):
             else previous.get("signature_header"), kind),
         "response": validate_response(body.get("response"), kind),
         "actions": actions or [],
-        "flow": flow,
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -750,7 +746,7 @@ def _register_youtube(item, *, transport=None):
 
 
 def workflow_for(item):
-    """The engine workflow for a stored hook, or None when its flow is gone.
+    """The engine workflow for a stored hook.
 
     A mailchimp trigger fans out into one trigger spec per subscribed event
     type — the intake publishes ``event`` named by the delivery's ``type``
@@ -765,15 +761,6 @@ def workflow_for(item):
     """
     kind = item.get("kind")
     actions = item.get("actions") or []
-    flow = str(item.get("flow") or "").strip()
-    if flow:
-        from ..engine import matching
-
-        actions = matching.flow_actions(flow)
-        if actions is None:
-            logger.warning("hook trigger '%s' binds undefined flow '%s'; skipped",
-                           item.get("hook_id"), flow)
-            return None
     filters = {"hook": {"equals": item["hook_id"]}}
     if kind == "mailchimp":
         triggers = [
@@ -819,6 +806,49 @@ def load_workflows(table_ref=None):
     ]
 
 
+def _item_for_workflow_id(workflow_id, table_ref=None):
+    """The stored hook projecting ``workflow_id`` (``<kind>-trigger-<hook>``), or None."""
+    if not os.environ.get(TABLE_ENV):
+        return None
+    items = load_items() if table_ref is None else load_items(table_ref=table_ref)
+    for item in items:
+        if workflow_id_for(item) == workflow_id:
+            return item
+    return None
+
+
+def workflow_by_id(workflow_id, visible=None, table_ref=None):
+    """One hook-backed engine workflow by its workflow id, or None.
+
+    The single-workflow mirror of listed_workflows: the designer and CLI
+    read a trigger-run workflow through it, projected exactly as the list
+    projects it (enabled state included, tokens never). ``visible`` (an
+    auth.visibility.Visibility, None = unrestricted) scopes the read by the
+    trigger's creator — a workflow the caller may not see answers None,
+    like the list hiding the row.
+    """
+    item = _item_for_workflow_id(str(workflow_id or ""), table_ref)
+    if item is None:
+        return None
+    if visible is not None and not visible.owner_visible(str(item.get("created_by") or "")):
+        return None
+    workflow = workflow_for(item)
+    if workflow is None:
+        return None
+    return {**workflow, "enabled": item.get("enabled", True)}
+
+
+def owns_workflow_id(workflow_id, table_ref=None):
+    """The kind of the hook trigger projecting ``workflow_id``, or None.
+
+    The engine prefers managed workflows — a published definition under a
+    trigger's id silently takes over its routing (matching.all_workflows
+    drops the hook duplicate). Saves refuse such an id so a designer save
+    cannot rewire a live trigger by accident."""
+    item = _item_for_workflow_id(workflow_id, table_ref)
+    return str(item.get("kind") or "hook") if item else None
+
+
 def listed_workflows(visible=None):
     """Hook-backed workflows for Console and CLI, including disabled hooks.
 
@@ -844,7 +874,7 @@ def public_view(item):
     hook configurable (rotate it to invalidate)."""
     view = {key: item.get(key) for key in (
         "hook_id", "kind", "url", "token", "description", "dedupe_path",
-        "response", "actions", "flow", "enabled", "created_by", "created_at", "updated_at",
+        "response", "actions", "enabled", "created_by", "created_at", "updated_at",
     )}
     if item.get("kind") == "telegram":
         view["connection_id"] = item.get("connection_id")
@@ -882,7 +912,6 @@ def api_list(table_ref=None, kind=None):
     return 200, {
         "base_url": base_url(),
         "hooks": [public_view(item) for item in items],
-        "flows": flow_catalog(),
     }
 
 

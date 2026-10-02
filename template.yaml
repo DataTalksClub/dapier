@@ -3,6 +3,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: Code-configured serverless automation runner
 
 Parameters:
+  AwsAssumableRoleArns:
+    Type: CommaDelimitedList
+    Default: arn:aws:iam::387546586013:role/dapier-mailchimp-backup
+    AllowedPattern: 'arn:aws(-us-gov|-cn)?:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+'
+    Description: IAM roles operators may configure for provider access
+
   DomainName:
     Type: String
     Default: dapier.dtcdev.click
@@ -151,6 +157,7 @@ Globals:
     Tracing: Active
     Environment:
       Variables:
+        AWS_ASSUMABLE_ROLE_ARNS: !Join [",", !Ref AwsAssumableRoleArns]
         EVENT_QUEUE_URL: !Ref EventQueue
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         CREDENTIALS_TABLE: !Ref CredentialsTable
@@ -179,7 +186,6 @@ Globals:
         OPERATOR_EMAILS: !Ref OperatorEmails
         OPERATOR_SUBJECTS: !Ref OperatorSubjects
         TRIGGER_EMAIL_DOMAIN: !Ref TriggerEmailDomain
-        EMAIL_TRIGGERS_TABLE: !Ref EmailTriggersTable
         EMAIL_FROM_TABLE: !Ref EmailFromTable
         HOST_TASKS_TABLE: !Ref HostTasksTable
         HOST_QUEUE_URL: !Ref HostQueue
@@ -237,6 +243,10 @@ Resources:
       Layers:
         - Ref: JsRuntimeLayer
       Policies:
+        - Statement:
+            Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !Ref AwsAssumableRoleArns
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
         - SQSSendMessagePolicy:
@@ -267,8 +277,6 @@ Resources:
             TableName: !Ref GrantsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AuditTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EmailTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EmailFromTable
         - DynamoDBCrudPolicy:
@@ -317,6 +325,12 @@ Resources:
         # the inbound mail bucket.
         - S3ReadPolicy:
             BucketName: !Ref DatamailerInboundBucketName
+        # Designer/CLI execution tests run file-read steps in the API process.
+        # Stage and read their bytes just as the worker does.
+        - Statement:
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject]
+            Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -601,6 +615,10 @@ Resources:
           LLM_API_KEY: !Ref LlmApiKey
           LLM_MODEL: !Ref LlmModel
       Policies:
+        - Statement:
+            Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !Ref AwsAssumableRoleArns
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
             Effect: Allow
@@ -624,8 +642,6 @@ Resources:
             Resource: !GetAtt DigestsTable.Arn
         - DynamoDBReadPolicy:
             TableName: !Ref ConnectionsTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref EmailTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref HookTriggersTable
         - DynamoDBCrudPolicy:
@@ -1045,16 +1061,6 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
-      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
-
-  EmailTriggersTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - {AttributeName: name, AttributeType: S}
-      KeySchema:
-        - {AttributeName: name, KeyType: HASH}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   EmailFromTable:

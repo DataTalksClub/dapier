@@ -99,7 +99,6 @@ class WebhookSaveTests(unittest.TestCase):
             actions = [{"type": "webhook", "url": "https://intake.test/x"}]
             _status, payload = hook_triggers.api_save(
                 {"name": "orders", "actions": actions}, "op", table_ref=stub)
-            self.assertEqual(payload["flow"], "")
             self.assertEqual(hook_triggers.load_workflows(table_ref=stub)[0]["actions"], actions)
             with self.assertRaises(hook_triggers.TriggerError):
                 hook_triggers.api_save(

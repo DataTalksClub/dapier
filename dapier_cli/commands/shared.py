@@ -4,16 +4,8 @@ import json
 import sys
 
 
-def print_flows(flows):
-    if flows:
-        print("Shared flows (bind with \"flow\": \"<name>\"): "
-              + ", ".join(f"{flow['name']} ({flow.get('actions', 0)} action(s))" for flow in flows))
-
-
 def entry_label(item):
-    """What a trigger runs: its flow binding or its inline action types."""
-    if item.get("flow"):
-        return f"flow={item['flow']}"
+    """What a trigger runs: its inline action types."""
     return ",".join(action.get("type", "?") for action in item.get("actions") or []) or "-"
 
 

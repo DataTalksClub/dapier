@@ -154,7 +154,7 @@ First change the app's **Permissions** and click **Submit**. Then replace the
 connection's full scope list and reconnect it:
 
 ```powershell
-uv run dapier connections scopes dropbox --scopes account_info.read `
+uv run dapier connections edit dropbox --scopes account_info.read `
   files.metadata.read files.content.read files.content.write
 uv run dapier connections connect dropbox --agent <agent-name>
 ```
