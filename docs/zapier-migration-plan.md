@@ -247,8 +247,9 @@ sent a default/literal before activation, and use `omit_content_type` if needed.
 Google-native Drive documents use the existing download adapter's export behavior,
 which also needs comparison if that folder contains native documents.
 
-The Telegram bridge's HTTP method, capitalization and content type need checking
-against its sender. Its hook has no text/date dedupe: repeated tasks remain
+The original Telegram bridge sender is unknown; native Telegram is the supported
+primary path. Isolated tests verified POST JSON and URL-encoded form parsing,
+case-sensitive Date/Text and bearer authentication, without identifying that sender. Its hook has no text/date dedupe: repeated tasks remain
 separate events. Agree on a sender-supplied request ID, then configure
 `dedupe_path: request_id` to distinguish intentional repeats from retries.
 This contract is separate from the existing native Telegram bot's update-ID
@@ -284,3 +285,36 @@ Before cutover:
 5. With separate cutover authorization, publish the reviewed workflows, enable
    their polls/hook and verify new events. Existing Zapier senders and Zaps
    are not changed by saving these drafts.
+
+
+### Production Dropbox landing cutover plan
+
+Automatic polling was verified with an isolated, exact-filename synthetic
+workflow. Production `invoice-landing` polling remains disabled. The current
+live `dropbox_on_upload` consumer monitors `/_dtc_paperwork/income-invoices/`
+and performs intake/delete; the landing-folder migration draft is not live.
+Do not enable a second business consumer over the same files.
+
+For a separately authorized production cutover:
+
+1. Save the current published workflow and poll configuration for rollback,
+   inventory landing-file metadata, and confirm which service uploads files.
+2. Pause uploads for the cursor-seeding window. Disable the old consumer, then
+   replace the same workflow ID with the reviewed four-step landing draft
+   (UTC date, rename, move, DataOps intake), initially disabled. Do not retain
+   its old delete action or create another overlapping workflow.
+3. Keep the production poll pointed at `/_dtc_paperwork/invoices-landing` with
+   `rate(2 minutes)`. Seed its cursor while uploads remain paused; historical
+   files need an explicitly reviewed backlog plan rather than automatic replay.
+4. Enable the corrected workflow after seeding, then resume uploads to the
+   landing folder. Verify a fresh unique synthetic file produces one run,
+   matching archived bytes, absent landing paths and one DataOps receipt.
+5. For rollback, disable the poll and replacement workflow before restoring
+   the saved consumer/configuration. Do not replay events or delete archives
+   automatically.
+
+This plan has not been executed; existing production consumers remain unchanged.
+Native Telegram is the supported primary TODO path. The original catch-hook
+sender is unknown, so the existing hook remains unchanged for compatibility.
+Stable request IDs are required before enabling retry deduplication for that
+sender; this limitation does not block native Telegram's update-ID path.

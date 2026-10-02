@@ -121,7 +121,7 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 - [x] Send an actual synthetic invoice email; verify receipt, UTC date conversion, exact filename, matching bytes and DataOps intake.
 - [x] Verify the clearly labelled synthetic CLI fallback: exact archive bytes and accepted DataOps receipt, without claiming email delivery.
 - [ ] Verify required bookkeeping output in DataOps (legacy sheet references are in the migration plan).
-- [ ] Agree on cutover and verify one new invoice completes without duplicate archival/intake.
+- [x] Verify one actual Gmail invoice completes without duplicate archival/intake; one matching run and provider receipt were observed.
 
 Invoice preparation (2026-10-02): Dropbox account verification passed for Alexey Grigorev. Provider metadata confirmed `/_dtc_paperwork/invoices` exists with `read_only: false` and `no_access: false`. Published invoice v5 On: UTC email date, exactly one attachment, overwrite/autorename disabled, then DataOps. Actual invoice email remains unsent; the CLI fallback archive and receipt evidence are recorded below. Chrome draft subject is `Dapier synthetic invoice Chrome 2026-10-02 01`; synthetic PDF is 1,855 bytes, SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`. Browser attachment upload is pending.
 
@@ -137,11 +137,12 @@ Source: Zap `153485577`; draft: `telegram-todo`.
 
 - [x] Configure hook `telegram-todo` and the same TODO workbook/worksheet ID `0`.
 - [x] Map sender `Date` and `Text`, Notes blank, Status `NEW`.
-- [ ] Confirm the actual sender's HTTP method, content type, field capitalization and authentication.
-- [ ] Agree on request-ID handling for retries versus intentional repeated tasks.
+- [ ] Identify the original sender contract if that compatibility integration is used; sender unknown, native Telegram is primary.
+- [ ] Configure a stable request ID in the original sender if it is recovered; existing compatibility configuration remains unchanged.
 - [x] Verify workbook access and columns/order through a direct Sheets read.
 - [x] Send one authenticated synthetic request; verify exactly one row and unchanged sender Date/Text.
-- [ ] Agree on sender cutover, enable the hook/workflow and verify one request creates one row.
+- [x] Verify isolated JSON/form authentication, stable-ID retry suppression, distinct-ID repeats and missing-ID behavior without external writes.
+- [ ] Perform original sender cutover only if needed; the existing enabled compatibility hook is retained unchanged.
 
 Catch-hook test (2026-10-02): published `telegram-todo` v1 On and enabled its existing bearer-authenticated hook. POST JSON returned HTTP 202 accepted. Run `telegram-todo:b7f95eb2-2ec7-4d68-97b0-f4163cd11943` completed at 19:45:44 UTC. A direct Sheets API read found exactly one matching row, `todo!A106:D106`: `2026-10-02T19:50:00Z`, `SYNTHETIC TEST Dapier Telegram catch hook 2026-10-02 01`, blank Notes, `NEW`. Date is supplied test data, not processing time. Actual upstream sender contract, retry deduplication and sender cutover remain pending.
 
@@ -185,7 +186,61 @@ Cleanup: the isolated `invoice-receipt-integration-test` hook and the two manage
 
 Integration fix deployment: [CI/deploy run 37057902392](https://github.com/DataTalksClub/dapier/actions/runs/37057902392), commit `5218b08`, passed tests, designer checks and deployed before the successful intake-only verifications above. Domain bookkeeping/review remains in DataOps.
 
-Next user actions: authorize/configure the real Dropbox landing cutover and verify a fresh file through its two-minute poll; reinstall the Slack app with `chat:write.customize` and renew its token without further public test posts. Original Zapier timezone semantics and actual catch-hook sender/retry contract remain separate checks.
+Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery and custom Slack-name rendering await a safe future event. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Original Zapier timezone, attachment/collision and MIME semantics remain separate comparisons.
 
 For implementation details and unresolved source semantics, see
 [the migration plan](zapier-migration-plan.md#adjustments-and-remaining-source-provider-checks).
+
+
+Final cleanup permission verification: deployment
+[37062138765](https://github.com/DataTalksClub/dapier/actions/runs/37062138765)
+(commit `5974a08`) succeeded. CLI deletion of the owned disabled
+`invoice-landing-test-20261002` then succeeded, including its EventBridge rule
+and cursor/retry state. The production `invoice-landing` poll remains disabled.
+Permissions allow writes only to poll and hook retry-state key prefixes, and a
+failed poll cleanup retains its configuration for retry. No real invoice was
+moved or deleted during cleanup; synthetic archives are retained as evidence.
+
+
+Isolated catch-hook retest after deployment
+[37063196165](https://github.com/DataTalksClub/dapier/actions/runs/37063196165)
+(commit `8936c18`, 3,761 tests and 42 subtests passed):
+
+- Unauthenticated POST returned 401; no workflow was admitted.
+- JSON request `synthetic-form-fixed-01` completed one echo-only run,
+  `webhook-trigger-catch-retry-test-20261002:catch-retry-test-20261002-dd2d867fc1f01859`,
+  at 20:57:30 UTC. JSON and URL-encoded form retries both returned HTTP 202
+  with `duplicate: true` and the same event ID; no extra run was created.
+- A form request with new ID `synthetic-form-fixed-02` completed separately,
+  run suffix `catch-retry-test-20261002-0928afbed8987df2`, at 20:57:31 UTC.
+  Both valid runs preserved `Date: 2026-10-02T20:40:00Z` and
+  `Text: SYNTHETIC TEST Dapier form-fixed retry 2026-10-02` exactly.
+- Lowercase `date`/`text` was acknowledged but intentionally failed the
+  case-sensitive contract check. HTTP 202 means accepted intake, not business
+  completion. These negative test events had no external-write actions.
+- Two identical requests without `request_id` completed two separate runs,
+  suffixes `02d365b6-a2e0-47e9-9f3a-2f938e18d18b` and
+  `cc4836a3-200f-4ba5-8bf7-98f00263a610`. Missing IDs do not deduplicate.
+
+The first live form test exposed raw-body fallback instead of parsed fields;
+that failure was fixed in shared webhook intake without changing JSON behavior.
+Tests cover cross-encoding identity, case, blank fields, encoded characters and
+repeated keys. All tests used an isolated echo-only hook, not the production
+TODO workbook. The original sender is unknown: native Telegram remains primary,
+and the existing `telegram-todo` compatibility hook/configuration is unchanged.
+
+The isolated `catch-retry-test-20261002` hook was then deleted successfully,
+including its retry state; the owner-only local bearer file was removed.
+Final inventory contains only existing `automator-telegram`, `telegram-todo`
+and `todo` hooks; polls are the disabled production `invoice-landing` and enabled
+`mailchimp-drive-backup`. Only the pre-existing Dropbox grant for
+`dataops-invoice-publication` remains. Test archives and run evidence are retained.
+No public Slack post or additional invoice archive/move was performed.
+
+Current outcome: mailing backup, email TODO, native Telegram text/empty-text
+handling, actual Gmail invoice ingress and isolated automatic Dropbox polling
+have provider evidence. Catch-hook compatibility and retry mechanics were
+verified synthetically. Slack custom-name permission is present; future rendered
+name and actual new-video trigger remain pending. Production Dropbox migration
+and source-semantic comparisons remain unchecked above. DataOps accepted the
+invoice receipts as `needs-review`; bookkeeping completion is not claimed.
