@@ -160,6 +160,7 @@ Globals:
         TASK_USAGE_TABLE: !Ref TaskUsageTable
         STORAGE_TABLE: !Ref StorageTable
         DIGESTS_TABLE: !Ref DigestsTable
+        BOOKKEEPING_TABLE: !Ref BookkeepingEntriesTable
         AUDIT_TABLE: !Ref AuditTable
         RENDER_QUEUE_URL: !Ref RenderQueue
         RENDER_ARTIFACTS_BUCKET: !Ref RenderArtifactsBucket
@@ -305,6 +306,9 @@ Resources:
         # ... and its digest steps.
         - DynamoDBCrudPolicy:
             TableName: !Ref DigestsTable
+        # The bookkeeping review endpoints read and confirm/reject entries.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BookkeepingEntriesTable
         - Statement:
             Effect: Allow
             Action: [events:PutRule, events:PutTargets, events:DeleteRule,
@@ -595,6 +599,7 @@ Resources:
           TASK_USAGE_TABLE: !Ref TaskUsageTable
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable
+          BOOKKEEPING_TABLE: !Ref BookkeepingEntriesTable
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         - Statement:
@@ -648,6 +653,9 @@ Resources:
             TableName: !Ref EmailFromTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ExecutionsTable
+        # The bookkeeping_stage action writes pending entries.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BookkeepingEntriesTable
         - S3CrudPolicy:
             BucketName: !Ref RenderArtifactsBucket
         - S3CrudPolicy:
@@ -1171,6 +1179,23 @@ Resources:
       KeySchema:
         - {AttributeName: scope, KeyType: HASH}
         - {AttributeName: key, KeyType: RANGE}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  # Parsed invoices awaiting human confirmation (src/dapier/
+  # bookkeeping_store.py). Two item kinds: the entry (partition `entry`,
+  # sort entry_id) and one dedup marker per provider+invoice number
+  # (partition `dedup`), claimed with a conditional put so a redelivered
+  # email stages one entry, not two.
+  BookkeepingEntriesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+        - {AttributeName: sk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+        - {AttributeName: sk, KeyType: RANGE}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   # Pending CLI device pairings and issued CLI device sessions

@@ -9,5 +9,6 @@ needs. ``None`` means no known template matched — the caller (the
 """
 
 from .parsers import parse_invoice, parse_pdf
+from .text import pdf_text
 
-__all__ = ["parse_invoice", "parse_pdf"]
+__all__ = ["parse_invoice", "parse_pdf", "pdf_text"]
