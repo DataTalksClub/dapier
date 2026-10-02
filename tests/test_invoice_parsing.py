@@ -118,3 +118,17 @@ def test_hetzner_is_not_claimed():
 
 def test_plain_text_is_not_claimed():
     assert parse_invoice("hello world, nothing here") is None
+
+
+def test_nul_separator_in_stripe_ids_is_normalized():
+    # pypdf renders the non-breaking space in Stripe invoice ids as NUL;
+    # the parser normalizes it so the id reads like the PDF shows it.
+    assert parse_invoice("Invoice number 113F2C7E\x000019\n$23.80 USD due August 11, 2024\nOpenAI, LLC")[
+        "invoice_number"] == "113F2C7E 0019"
+
+
+def test_nul_separator_in_stripe_ids_is_normalized():
+    # pypdf renders the non-breaking space in Stripe invoice ids as NUL;
+    # the parser normalizes it so the id reads like the PDF shows it.
+    assert parse_invoice("Invoice number 113F2C7E\x000019\n$23.80 USD due August 11, 2024\nOpenAI, LLC")[
+        "invoice_number"] == "113F2C7E 0019"
