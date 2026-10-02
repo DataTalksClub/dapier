@@ -109,12 +109,14 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 
 - [x] Configure archive `/_dtc_paperwork/invoices/<UTC email date>-<Subject>.pdf`, unchanged attachment bytes, overwrite disabled.
 - [x] Forward archived invoice intake to DataOps.
-- [ ] Verify Dropbox archive access and DataOps intake availability.
-- [ ] Confirm email route and accepted senders.
+- [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
+- [x] Confirm invoice route `invoice@dtcdev.click`; actual sender acceptance remains pending the email test.
 - [ ] Confirm single/multiple/inline attachment selection and filename conflict behavior.
 - [ ] With authorization, send one test invoice; verify date conversion, exact filename, matching bytes and DataOps receipt.
 - [ ] Verify required bookkeeping output in DataOps (legacy sheet references are in the migration plan).
 - [ ] Agree on cutover and verify one new invoice completes without duplicate archival/intake.
+
+Invoice preparation (2026-10-02): Dropbox account verification passed for Alexey Grigorev. Provider metadata confirmed `/_dtc_paperwork/invoices` exists with `read_only: false` and `no_access: false`. Published invoice v5 On: UTC email date, exactly one attachment, overwrite/autorename disabled, then DataOps. No invoice email has been sent and no archive file has been created by this test. Chrome draft subject is `Dapier synthetic invoice Chrome 2026-10-02 01`; synthetic PDF is 1,855 bytes, SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`. Browser attachment upload is pending.
 
 ## 4. Telegram TODO catch hook
 
@@ -124,9 +126,11 @@ Source: Zap `153485577`; draft: `telegram-todo`.
 - [x] Map sender `Date` and `Text`, Notes blank, Status `NEW`.
 - [ ] Confirm the actual sender's HTTP method, content type, field capitalization and authentication.
 - [ ] Agree on request-ID handling for retries versus intentional repeated tasks.
-- [ ] Verify workbook access and columns/order.
-- [ ] With authorization, send one request; verify the exact row and unchanged sender Date/Text.
+- [x] Verify workbook access and columns/order through a direct Sheets read.
+- [x] Send one authenticated synthetic request; verify exactly one row and unchanged sender Date/Text.
 - [ ] Agree on sender cutover, enable the hook/workflow and verify one request creates one row.
+
+Catch-hook test (2026-10-02): published `telegram-todo` v1 On and enabled its existing bearer-authenticated hook. POST JSON returned HTTP 202 accepted. Run `telegram-todo:b7f95eb2-2ec7-4d68-97b0-f4163cd11943` completed at 19:45:44 UTC. A direct Sheets API read found exactly one matching row, `todo!A106:D106`: `2026-10-02T19:50:00Z`, `SYNTHETIC TEST Dapier Telegram catch hook 2026-10-02 01`, blank Notes, `NEW`. Date is supplied test data, not processing time. Actual upstream sender contract, retry deduplication and sender cutover remain pending.
 
 ## 5. YouTube to Slack
 
@@ -138,6 +142,8 @@ Source: Zap `110871466`; draft: `youtube-slack`.
 - [ ] Confirm exact message spacing and approve WebSub delivery as the adjustment from polling.
 - [ ] With authorization, post one test message; verify channel, name, title, URL and previews.
 - [ ] Agree on cutover and verify a new video notification once.
+
+Provider checks (2026-10-02): Slack token verification passed for DataTalks.Club (`T01ATQK62F8`); real message/channel/custom-name checks are pending the Chrome action test. YouTube live identity verification passed for DataTalksClub (`UCDvErgK0j5ur3aLgn6U-LqQ`) using the stored readonly connection. Chrome renewal outcome is unconfirmed: the UI still requests reconnection and no recent callback audit record was returned. No account binding was changed.
 
 ## 6. Dropbox invoice landing
 
