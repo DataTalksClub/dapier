@@ -72,9 +72,6 @@ def route(event, method, path):
         return delete_connection(event, match.group(1))
     if match and method == "PUT":
         return update_connection_metadata(event, match.group(1))
-    scopes_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/scopes", path)
-    if scopes_match and method == "PUT":
-        return update_connection_scopes(event, scopes_match.group(1))
     connect_match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)/connect", path)
     if connect_match and method == "POST":
         return start_connect(event, connect_match.group(1))
