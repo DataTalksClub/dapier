@@ -1,7 +1,7 @@
 # Migration draft; save through dapier workflows save. No cutover is authorized.
 id: telegram-todo
 enabled: false
-description: 'Zapier 153485577: Original Date/Text catch-hook contract to the TODO
+description: 'Original Date/Text catch-hook contract to the TODO
   worksheet.'
 actions:
 - id: append-row

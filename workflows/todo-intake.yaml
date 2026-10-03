@@ -1,7 +1,7 @@
 # Migration draft; save through dapier workflows save.
 id: todo-intake
 enabled: false
-description: 'Zapier 153709869: Email tasks use processing time; retain native Telegram
+description: 'Email tasks use processing time; retain native Telegram
   tasks and confirmations.'
 actions:
 - id: native-text

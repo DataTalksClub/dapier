@@ -7,7 +7,7 @@
 # `dapier hooks save` — because Telegram delivery is registered per stored
 # hook, so the YAML bundle carries only the flow and the email entry point.
 #
-# Both paths reproduce the retired Zapier zaps (Telegram /todo hook and
+# Both paths reproduce the retired automations (Telegram /todo hook and
 # "Add emails to TODO list" inbound email -> Google Sheets "Create
 # Spreadsheet Row"): rows land in the TODO list sheet (Date/Task/Status,
 # Status=NEW) with a trigger-shaped Task, the DataOps intake push is kept,
@@ -22,7 +22,7 @@ flows:
         auth_secret_id: dapier/dataops
 
   todo-sheet:
-    description: TODO list sheet row (the old Zapier zap), then the DataOps intake
+    description: TODO list sheet row, then the DataOps intake
     actions:
       - id: append-row
         type: sheets_append_row
