@@ -1,8 +1,27 @@
 """Shared test fixtures/helpers."""
 from contextlib import contextmanager
 from dataclasses import replace
+from unittest.mock import MagicMock, patch
 
 from src.dapier.connectors import registry as connector_registry
+
+
+@contextmanager
+def fake_logic_time(clock=None):
+    """One fake clock across the three logic_pkg modules that read it.
+
+    The engine's clock reads moved with the logic split — ``core._elapsed``,
+    ``controls``' delay sleeps, ``execution``'s step timing — so tests fake
+    all three with the same mock and the ``monotonic`` call order matches
+    the pre-split single-module seam. Pass ``clock`` to stand in a
+    module-like clock object (e.g. test_logic's ``_Clock``); the default is
+    a plain MagicMock.
+    """
+    fake = clock if clock is not None else MagicMock()
+    with patch("src.dapier.engine.logic_pkg.controls.time", new=fake):
+        with patch("src.dapier.engine.logic_pkg.core.time", new=fake):
+            with patch("src.dapier.engine.logic_pkg.execution.time", new=fake):
+                yield fake
 
 
 @contextmanager

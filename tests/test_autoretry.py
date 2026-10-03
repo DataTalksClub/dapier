@@ -80,7 +80,7 @@ class AutoretryTests(unittest.TestCase):
         runner, calls = flaky_runner(fail_times=1)
         steps = [{"id": "post", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 2}}]
-        with patch("src.dapier.engine.logic.time.sleep") as fake_sleep:
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep") as fake_sleep:
             stop, hooks, outputs = run_chain(steps, run_action=runner)
 
         assert stop is None
@@ -92,7 +92,7 @@ class AutoretryTests(unittest.TestCase):
         runner, calls = flaky_runner(fail_times=2)
         steps = [{"id": "post", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 2}}]
-        with patch("src.dapier.engine.logic.time.sleep") as fake_sleep:
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep") as fake_sleep:
             _stop, hooks, outputs = run_chain(steps, run_action=runner)
 
         assert len(calls) == 3  # total tries = attempts + 1
@@ -101,8 +101,8 @@ class AutoretryTests(unittest.TestCase):
 
     def test_backoff_doubles_and_caps_with_jitter(self):
         plan = {"attempts": 3, "initial_seconds": 2, "max_seconds": 5}
-        with patch("src.dapier.engine.logic.random.uniform", return_value=0.0) as jitter, \
-                patch("src.dapier.engine.logic.time.sleep") as fake_sleep:
+        with patch("src.dapier.engine.logic_pkg.execution.random.uniform", return_value=0.0) as jitter, \
+                patch("src.dapier.engine.logic_pkg.execution.time.sleep") as fake_sleep:
             runner, _calls = flaky_runner(fail_times=3)
             run_chain([{"id": "post", "type": "webhook", "url": "https://example.test",
                         "autoretry": plan}], run_action=runner)
@@ -139,7 +139,7 @@ class ExhaustedTests(unittest.TestCase):
         runner, calls = flaky_runner(fail_times=99, step_id="post")
         steps = [{"id": "post", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 2}}]
-        with patch("src.dapier.engine.logic.time.sleep"):
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             with pytest.raises(RuntimeError, match="provider 429"):
                 run_chain(steps, run_action=runner, hooks=hooks)
 
@@ -154,7 +154,7 @@ class ExhaustedTests(unittest.TestCase):
         steps = [{"id": "boom", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 1}, "on_fail": "continue"},
                  {"id": "post", "type": "webhook", "url": "https://example.test"}]
-        with patch("src.dapier.engine.logic.time.sleep"):
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             stop, hooks, outputs = run_chain(steps, run_action=runner)
 
         assert stop is None
@@ -168,7 +168,7 @@ class ExhaustedTests(unittest.TestCase):
         steps = [{"id": "boom", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 1}, "on_error": "continue"},
                  {"id": "post", "type": "webhook", "url": "https://example.test"}]
-        with patch("src.dapier.engine.logic.time.sleep"):
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             stop, hooks, outputs = run_chain(steps, run_action=runner)
 
         assert stop is None
@@ -182,7 +182,7 @@ class ExhaustedTests(unittest.TestCase):
                   "autoretry": {"attempts": 1}, "on_error": "run",
                   "error_actions": [{"id": "alert", "type": "webhook",
                                      "url": "https://example.test/alert"}]}]
-        with patch("src.dapier.engine.logic.time.sleep"):
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             _stop, hooks, outputs = run_chain(steps, run_action=runner)
 
         assert ("before", "boom.error.alert", "webhook") in hooks.calls
@@ -194,7 +194,7 @@ class ExhaustedTests(unittest.TestCase):
         runner, _calls = flaky_runner(fail_times=99, step_id="boom")
         steps = [{"id": "boom", "type": "webhook", "url": "https://example.test",
                   "autoretry": {"attempts": 1}, "on_error": "continue"}]
-        with patch("src.dapier.engine.logic.time.sleep"):
+        with patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             _stop, _hooks, outputs = run_chain(steps, run_action=runner)
         assert outputs["boom"]["output"] == {}
 
@@ -265,7 +265,7 @@ class FullEngineTests(unittest.TestCase):
         hooks = Hooks()
         with patch("src.dapier.engine.all_workflows", return_value=[workflow]), \
                 patch("src.dapier.connectors.registry.run_action", side_effect=flaky), \
-                patch("src.dapier.engine.logic.time.sleep"):
+                patch("src.dapier.engine.logic_pkg.execution.time.sleep"):
             matched = execute({**EVENT}, before_action=hooks.before,
                               after_action=hooks.after, on_action_error=hooks.error)
 

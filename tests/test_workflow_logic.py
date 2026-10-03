@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from src.dapier.engine import execute, logic
+from conftest import fake_logic_time
 from src.dapier.engine.logic import parse_moment
 
 
@@ -189,7 +190,7 @@ class ConditionTests(unittest.TestCase):
 
 class DelayTests(unittest.TestCase):
     def test_sleeps_and_reports(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.monotonic.side_effect = [0.0, 0.05]
             fake_time.sleep.return_value = None
             stop, hooks = run_chain([{"id": "pause", "type": "delay", "seconds": 30}])
@@ -200,7 +201,7 @@ class DelayTests(unittest.TestCase):
                 {"delay_seconds": 30, "slept_seconds": 30}) in hooks.calls
 
     def test_long_delay_suspends_the_run(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.time.return_value = 1000.0
             with pytest.raises(logic.RunSuspended) as suspended:
                 run_chain([{"id": "pause", "type": "delay", "seconds": 3600}])
@@ -217,7 +218,7 @@ class DelayTests(unittest.TestCase):
                 run_chain([{"id": "pause", "type": "delay", "seconds": seconds}])
 
     def test_numeric_string_seconds_is_rendered(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.time.return_value = 0.0
             stop, hooks = run_chain([{"id": "pause", "type": "delay", "seconds": "30"}])
 
@@ -232,7 +233,7 @@ class DelayTests(unittest.TestCase):
         for step, total in ({"minutes": 5}, 300), \
                 ({"hours": 1, "minutes": 1}, 3660), ({"days": 2}, 2 * 86400):
             with self.subTest(step=step), \
-                    patch("src.dapier.engine.logic.time") as fake_time:
+                    fake_logic_time() as fake_time:
                 fake_time.time.return_value = 0.0
                 with pytest.raises(logic.RunSuspended) as suspended:
                     run_chain([{"id": "pause", "type": "delay", **step}])
@@ -241,7 +242,7 @@ class DelayTests(unittest.TestCase):
             assert suspended.value.output["delay_seconds"] == total
 
     def test_until_parses_to_the_wake_up_moment(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.time.return_value = parse_moment("2026-09-28T00:00:00+00:00")
             with pytest.raises(logic.RunSuspended) as suspended:
                 run_chain([{"id": "pause", "type": "delay",
@@ -250,7 +251,7 @@ class DelayTests(unittest.TestCase):
         assert suspended.value.resume_at == parse_moment("2026-10-01T09:00:00Z")
 
     def test_until_in_the_past_resumes_immediately(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.time.return_value = parse_moment("2026-10-01T09:00:00+00:00")
             stop, hooks = run_chain([{"id": "pause", "type": "delay",
                                       "until": "2026-10-01T09:00:00Z"}])
@@ -463,7 +464,7 @@ class ExecuteIntegrationTests(unittest.TestCase):
                                   "actions": workflow_actions}]), \
              patch("src.dapier.connectors.registry.run_action",
                    lambda action, event, workflow_id=None, steps=None: {"status": 200}), \
-             patch("src.dapier.engine.logic.time") as fake_time:
+             fake_logic_time() as fake_time:
             fake_time.monotonic.side_effect = [0.0, 0.01, 0.02, 0.03]
             execute({**EVENT}, before_action=hooks.before, after_action=hooks.after,
                     on_action_error=hooks.error)
@@ -482,7 +483,7 @@ class ExecuteIntegrationTests(unittest.TestCase):
                                   "actions": [{"id": "gate", "type": "filter",
                                                "field": "route", "operator": "equals",
                                                "value": "invoice"}]}]), \
-             patch("src.dapier.engine.logic.time") as fake_time:
+             fake_logic_time() as fake_time:
             execute({**EVENT}, before_action=hooks.before, after_action=hooks.after,
                     on_action_error=hooks.error)
 

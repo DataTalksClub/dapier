@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import fake_logic_time
 from src.dapier.engine import logic, worker
 from botocore.exceptions import ClientError
 
@@ -123,7 +124,7 @@ class SuspendTests(unittest.TestCase):
     """The engine side: short delays sleep, long ones suspend the chain."""
 
     def test_short_delay_sleeps_inline(self):
-        with patch("src.dapier.engine.logic.time") as fake_time:
+        with fake_logic_time() as fake_time:
             fake_time.monotonic.side_effect = [0.0, 0.05]
             fake_time.time.return_value = 1000.0
             stop, hooks = run_chain([{"id": "pause", "type": "delay", "seconds": 30}])

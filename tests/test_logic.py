@@ -17,6 +17,7 @@ from unittest import mock
 
 import pytest
 
+from conftest import fake_logic_time
 from src.dapier.engine import logic
 from src.dapier.engine.actions import templating
 
@@ -325,7 +326,7 @@ def run_delay(steps, data=None, run_action=None):
     hooks = Hooks()
     outputs = {}
     event = {**EVENT, "data": EVENT["data"] if data is None else data}
-    with mock.patch.object(logic, "time", clock):
+    with fake_logic_time(clock):
         try:
             logic.run_chain(
                 "wf-1", steps, event,
@@ -446,7 +447,7 @@ class DelaySuspendTests(unittest.TestCase):
         assert loop["from"] == 1
 
         resumed = Hooks()
-        with mock.patch.object(logic, "time", _Clock()):
+        with fake_logic_time(_Clock()):
             stop = logic.resume_chain(
                 "wf-1", susp.segments, {**EVENT, "data": {"items": items}},
                 runner, before_action=resumed.before, after_action=resumed.after,

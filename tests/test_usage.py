@@ -297,9 +297,10 @@ def test_resume_path_gates_through_the_same_hook(usage_table, monkeypatch):
 
 def _run_gate_chain(monkeypatch, step, before_action):
     from src.dapier.engine import logic
+    from src.dapier.engine.logic_pkg import execution
 
     ran, seen = [], {"after": [], "error": []}
-    monkeypatch.setattr(logic, "_execute_step",
+    monkeypatch.setattr(execution, "_execute_step",
                         lambda *args, **kwargs: pytest.fail("must not run"))
     outcome = {}
     try:

@@ -52,8 +52,8 @@ def sequence_runner(errors):
 def stepped_sleep():
     """Patch jitter to zero and record every backoff sleep."""
     sleeps = []
-    uniform = patch("src.dapier.engine.logic.random.uniform", return_value=0.0)
-    sleeper = patch("src.dapier.engine.logic.time.sleep",
+    uniform = patch("src.dapier.engine.logic_pkg.execution.random.uniform", return_value=0.0)
+    sleeper = patch("src.dapier.engine.logic_pkg.execution.time.sleep",
                     side_effect=lambda seconds: sleeps.append(seconds))
     return sleeps, uniform, sleeper
 
