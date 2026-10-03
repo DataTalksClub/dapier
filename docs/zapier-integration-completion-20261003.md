@@ -1,12 +1,11 @@
 # Integration completion — 2026-10-03
 
-Completed integration checks within the authorized synthetic-only scope passed.
-Final handoff is held while Chrome investigates whether isolated, inactive
-Zapier copies can safely test the remaining hidden adapter behaviors.
+All executable integration checks within the authorized synthetic-only scope passed,
+including isolated tests of the original Zapier adapters.
 Required invoice/Dropbox publication passed through the actual DataOps worker
 with isolated live providers and local ledger state. Production ledger
 publication, genuine YouTube publisher delivery, production Dropbox cutover
-and unknown source equivalence remain unverified. Acceptance criteria have not
+and future upstream exporter behavior remain unverified. Acceptance criteria have not
 been narrowed.
 Historical failures are retained; fixes and retests below supersede them.
 
@@ -16,7 +15,7 @@ Historical failures are retained; fixes and retests below supersede them.
 | --- | --- | --- |
 | Mailing-list backup | Original ZIP and fresh PDF delivery previously passed. New isolated Drive file A backed up once; replacement B retained the same ID and did not back up; new ID with the same name replaced the exact S3 key with C. Idle polling produced no extra runs. Content-Type is literal `none`. Folders are now excluded. | Future upstream exporter naming/replacement is not established. Legacy January 2025 S3 metadata confirms literal `none` MIME parity. |
 | Email TODO | Existing actual Gmail retest produced exactly one correctly mapped row and DataOps receipt. Published fixed-CST source now matches live v8. Six fixed-offset midnight/DST cases and actual Gmail row110/one DataOps receipt passed. | Earlier America/Chicago DST interpretation was a parity bug, now corrected to fixed UTC−06:00. |
-| Invoice attachment email | Actual Gmail ingress/archive/DataOps receipt previously passed. Multiple PDFs and inline-PNG-plus-PDF fail closed before archive/intake. Same-byte and changed-byte collisions return HTTP 409, without overwrite or autorename. | Published source confirms singular Attachment and Overwrite No; hidden MIME selection and conflict/autorename behavior remain unproved. Selected behavior is explicit single selection and strict conflicts. |
+| Invoice attachment email | Actual Gmail ingress/archive/DataOps receipt previously passed. Multiple PDFs and inline-PNG-plus-PDF fail closed before archive/intake. Same-byte and changed-byte collisions return HTTP 409, without overwrite or autorename. | Original adapter: single PDF unchanged; multiple/inline ZIP bundling; same-byte no-op and changed-byte autorename. Dapier single selection and strict conflicts are explicit adjustments. |
 | Telegram TODO | Existing actual native text/confirmation, empty-text guard, isolated JSON/form authentication and stable-ID retry tests passed. Mapping unchanged; private audio was never opened or replayed. | Native Telegram is primary. Unknown original catch-hook sender is compatibility-only; sender discovery/cutover is conditional, outside acceptance. |
 | YouTube → Slack | Real HTTP callback challenge/signature/XML/identity validation passed. Signed synthetic Atom initial delivery and retry produced exactly one completed action and one provider message, username YouTube, in #integration_test. | Synthetic callback is not a genuine upload or publisher-to-hub delivery. Future genuine-event dependency below. |
 | Dropbox landing → archive | Prior automatic isolated polling passed. Normal, already-prefixed and multi-extension names preserve all bytes and extensions. Rename and archive collisions return 409, retain source files, and preserve destination revisions. UTC processing-date behavior passed. | Production landing poll remains disabled; existing legacy consumer remains unchanged. |
@@ -192,10 +191,11 @@ intake, authentication, validation, routing, action and retry behavior only.
 - **Production Dropbox cutover: unchecked.** Concrete rollback and cursor tests
   passed, but user/deployment governance must authorize and perform the planned
   non-overlap transition; legacy consumer unchanged and landing poll disabled.
-- **Source equivalence: unknown.** Hidden attachment selection/conflict and Dropbox collision wire behavior,
-  plus future upstream export behavior remain unresolved after source UI review. Fixed CST, UTC prefix, Slack spacing/options and renderer
-  steps are now confirmed. The chosen
-  intended behavior is tested; unestablished source behavior is not marked proved. Legacy S3 MIME parity is now independently confirmed.
+- **Future exporter behavior: unknown.** Owned-repo read-only searches found
+  imports/tests/docs and the assumed-role policy, not the upstream exporter.
+  Future create/replace/naming requires owner evidence. Source CST, UTC dates
+  and prefix, Slack options, renderer steps, legacy MIME and original adapter
+  hydration/collisions are resolved; stricter Dapier behavior is explicit.
 
 ### Isolated actual-worker live-provider publication
 
@@ -299,15 +299,13 @@ production Dropbox consumer or production Slack destination was replaced.
 Source UI review resolved CST, UTC invoice dates, UTC Dropbox processing time,
 unconditional prefix/extension handling, Slack spacing/options and body-PDF
 steps. Legacy S3 metadata independently resolved MIME wire parity. Only these
-five checklist items remain unchecked. Feasibility of further original-adapter
-tests through isolated inactive Zapier copies is under investigation.
+three checklist items remain unchecked. Original adapter isolation is complete;
+no remaining executable synthetic check is omitted.
 
 | Unchecked criterion | Concrete boundary / dependency |
 | --- | --- |
 | Future exporter creates/replaces/repeats names | Requires upstream exporter definition or future owner export evidence; historical matching metadata does not prove future behavior. Isolated create, replace and repeated-name polling passed. |
-| Hidden original email attachment/conflict behavior | Source singular Attachment and Overwrite No are confirmed. Hidden MIME selection and same-byte conflict/autorename semantics require authoritative adapter documentation or historical receipts. Intended ambiguity and same/changed-byte strict 409 behavior passed. |
 | Genuine YouTube upload delivery | Requires the next legitimate owner upload; authenticated synthetic callback/retry passed without public upload. |
-| Hidden original Dropbox collision behavior | Unconditional prefix, extension and UTC processing clock are resolved. Collision/autorename wire semantics require original provider receipts or authoritative adapter documentation; selected strict behavior passed. |
 | Production Dropbox cutover | Prepared non-overlap/rollback plan requires an authorized production migration window; existing consumer unchanged, new production poll disabled. |
 
 Production financial ledger publication was not performed. Required integration
@@ -333,7 +331,7 @@ receipt `email-afded997578052334528c1a4f444d63c` was accepted once.
 Dropbox v1 formats Python processing time as YYYY-MM-DD, then unconditionally
 prefixes Date-File Name, retains the extension and moves Path Display to the
 invoice archive. [Zapier documents UTC for Python Code actions](https://help.zapier.com/hc/en-us/articles/8496326417549-Use-Python-code-in-Zap-workflows),
-confirming UTC source parity. Hidden collision behavior remains unproved.
+confirming UTC source parity. Isolated original Rename/Move tests also resolve collision autorename; Dapier strict rejection is an adjustment.
 
 Slack v1 matches the live template exactly: two newlines around Title,
 `Link: ` followed by Play Url, YouTube bot name, no automation link, expanded
@@ -364,5 +362,97 @@ zero current-run temporary workflows, polls, tokens or grants. Production
 `C01BQC114P2`. Owned Drive folder and publication spreadsheet are recoverably
 trashed; owned Dropbox test roots and local DynamoDB were removed. Existing
 grants remain; synthetic S3 evidence and audit receipts are intentionally
-retained without deletion IAM expansion. No further Dapier email/Slack actions are queued. Separate read-only/isolated
-Zapier-copy feasibility work is pending; final completeness is not yet claimed.
+retained without deletion IAM expansion. No further browser test actions are queued. Original-adapter isolation completed
+below; its owned provider resources and temporary URL files are removed.
+
+## Isolated original-adapter evidence — completed
+
+An inactive copy of invoice Zap `382288655` retains the original Dropbox
+Upload action and `Overwrite: No`; its Sheets step was removed and the target
+is only `/dapier-integration-tests/zapier-adapter-20261003`. Chrome tested the
+Dropbox step only; neither whole-Zap execution nor activation occurred.
+
+Baseline A uploaded exactly 1,855 synthetic bytes, SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`,
+file ID `id:nn8KyArhBWgAAAAAAACGRw`, revision `65ce9651c138202505a9a`.
+One confirmed same-byte retest reported “A File was sent” and retained that
+ID/revision, size, modified time and hash; provider inventory contains exactly
+one destination file. Original same-byte success/no-op behavior is therefore
+resolved. An earlier preview guard prevented a click and is explicitly not
+counted as a test.
+
+Dapier's strict 409 is retained as an intentional migration adjustment: a new
+email colliding with an existing archive filename fails before a further intake.
+Stable-ID delivery retries are handled separately by event/intake dedupe.
+Changed-byte conflict and singular Attachment hydration were subsequently
+verified below; opaque trigger output alone was not used to infer first-file
+selection. Adapter input resources and URL files have been removed.
+
+Changed-byte B succeeded in the original copied adapter and created
+`synthetic-zapier-collision-20261003 (1).pdf`, 1,497 bytes, SHA256
+`36dd080af300b32df9fc0ac95069713bdfeb37ba0474ae5ff042dd71a7fccac5`,
+ID `id:nn8KyArhBWgAAAAAAACGSA`, revision `65ce9789d175802505a9a`.
+Independent byte readback confirms both files and the unchanged baseline.
+Original invoice conflicts are therefore resolved: same-byte success/no-op,
+changed-byte autorename. Dapier deliberately uses strict 409 for both new-ingress
+conflict cases; it does not claim parity for this behavior. MIME hydration results are verified below.
+
+Original singular `Attachment` hydration of the actual synthetic two-PDF email
+succeeded as a ZIP, rather than selecting the first PDF. Dropbox output adds
+`.zip` to the configured `.pdf` name: `synthetic-zapier-multiple-hydration-20261003.pdf.zip`,
+ID `id:nn8KyArhBWgAAAAAAACGSQ`, revision `65ce98ba715fe02505a9a`, 4,012 bytes,
+SHA256 `f532b6f10c57a01d153beddf3ba609a8e0b0e7272118babe6f599246bb847ee0`.
+ZIP magic and independent entry inspection confirm exactly
+`dapier-attachment-A-20261003.pdf` and `dapier-attachment-B-20261003.pdf`,
+each 1,855 bytes with original fixture SHA256 `a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`.
+No customer attachment was inspected. Dapier's multiple-attachment ambiguity
+rejection is an explicit adjustment to keep archive/intake document selection
+unambiguous, not source parity. Single/inline controls passed as recorded below.
+
+Single control independently verifies an unchanged PDF: 1,855 bytes, original
+fixture SHA256, ID `id:nn8KyArhBWgAAAAAAACGSg`, revision
+`65ce9b4ed809002505a9a`; exactly one single-control output exists.
+
+Actual forwarded inline control hydrates as
+`synthetic-zapier-inline-hydration-20261003.pdf.zip`, 2,213 bytes,
+ID `id:nn8KyArhBWgAAAAAAACGSw`, revision `65ce9bf125a2f02505a9a`, ZIP SHA256
+`fcaf39705cc7ab6791c93ccacae893060620fb4eb6b6f95b12324f442c24eeb9`.
+Exactly two entries match local synthetic fixtures: PNG
+`dapier-inline-20261003.png`, 68 bytes, SHA256
+`bf0bf9ded3de6859d23a91140e903b41e0dcac7507e3fef04d2d7c60fa0707eb`;
+PDF `dapier-attachment-A-20261003.pdf`, 1,855 bytes, original fixture hash.
+Original email selection/collision source comparisons are resolved. Dapier
+intentionally rejects multiple/inline ambiguity instead of bundling ZIPs and
+rejects collisions instead of no-op/autorename. Original Dropbox rename/move collision isolation also completed below.
+
+Inactive copy `382289809` of the original Dropbox flow tested only Rename
+against the dedicated collision pair. Original Rename autorenamed source A to
+`rename/synthetic-rename-target-20261003 (1).pdf`, retaining its ID
+`id:nn8KyArhBWgAAAAAAACGUA` and exact 1,855-byte fixture/hash; new revision
+`65ce9d70d6f6e02505a9a`. Original target B remains 1,497 bytes with unchanged
+ID/revision/hash. Exactly two files remain; the old source path is absent as
+expected for rename. Dapier's conflict rejection is intentionally stricter.
+The separate prepared Move source/destination were untouched by Rename and
+tested independently below. No full Zap or original code ran.
+
+Original Move succeeded with autorename to
+`move/destination/synthetic-move-collision-20261003 (1).pdf`, 1,855 bytes,
+original A SHA256 and ID `id:nn8KyArhBWgAAAAAAACGUg`, new revision
+`65ce9e2bd04ae02505a9a`. Source path is absent; existing target B retains
+1,497 bytes, ID/revision/hash; exactly two destination files. Chrome and
+independent provider readback agree. Original Rename/Move collision semantics
+are fully resolved for the tested changed-byte conflict. Strict Dapier rejection
+is an intentional adjustment that avoids silently autorenaming invoice paths.
+
+Final adapter cleanup paginated all 17 entries (11 synthetic files), removed
+only `/dapier-integration-tests/zapier-adapter-20261003`, and verified absence
+through the parent provider listing. Temporary A/B URL files were removed.
+Proof: `.tmp/zapier-adapter-cleanup-proof.json`. Inactive copied Zaps
+`382288655` and `382289809` are owned cleanup items; original Zaps were never
+edited, activated or run. Copy deletion confirmation is recorded in handoff.
+
+Upstream exporter search across owned repositories found only audience-export
+imports/tests/docs and folder references in Dapier triggers/tests. The
+aws-infra Mailchimp template is an assumed-role policy, not an exporter. Future
+upstream naming/create/replace remains dependent on owner evidence; local
+polling semantics are tested. No public YouTube upload, production Dropbox
+cutover or real financial publication was performed.

@@ -2,11 +2,11 @@
 
 Tick a box only after recording provider or execution evidence. Current acceptance
 results are in [the October 3 completion report](zapier-integration-completion-20261003.md).
-Completed checks within the synthetic-only scope passed, including the selected
+All executable checks within the authorized synthetic-only scope passed, including the selected
 seventh body-to-PDF path and required invoice/Dropbox publication through the
 actual DataOps worker with isolated live providers and local ledger state.
 Production ledger publication was not performed. Genuine YouTube delivery,
-production cutover and the specific unknown source behaviors remain unchecked
+production cutover and future upstream exporter behavior remain unchecked
 below; their acceptance criteria have not been narrowed. Earlier dated evidence below is retained as history.
 
 ## 1. Mailing-list backup — current flow
@@ -122,7 +122,7 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 - [x] Forward archived invoice intake to DataOps.
 - [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
 - [x] Verify `alexey@datatalks.club` sender acceptance through actual Gmail delivery to `invoice@dtcdev.click`.
-- [ ] Confirm hidden original adapter behavior for single/multiple/inline MIME selection and filename conflicts. Published source confirms singular `Attachment` and `Overwrite: No`; these visible fields do not establish ambiguity, same-byte conflict or autorename wire behavior.
+- [x] Confirm original single/multiple/inline Attachment hydration and filename-conflict behavior through inactive copied adapter steps: single PDF unchanged; multiple PDFs and inline PNG+PDF bundled into ZIP with appended `.zip`; same-byte no-op; changed-byte autorename. Dapier single selection/strict 409 are explicit adjustments.
 - [x] Separately verify intended single selection and strict same-byte/changed-byte collision behavior.
 - [x] Send an actual synthetic invoice email; verify receipt, UTC date conversion, exact filename, matching bytes and DataOps intake.
 - [x] Verify the clearly labelled synthetic CLI fallback: exact archive bytes and accepted DataOps receipt, without claiming email delivery.
@@ -181,7 +181,7 @@ Source: Zap `155120966`; draft: `dropbox_on_upload`.
 - [x] Confirm original Dropbox processing-date timezone: published Python `datetime.now()` plus Zapier documentation establishes UTC; tested migration matches.
 - [x] Separately verify intended UTC processing date and midnight conversion.
 - [x] Confirm original unconditional date prefix and extension mapping: Date + hyphen + base File Name, rename output retains extension, then Path Display moves to archive. Already-prefixed and multi-extension tests match this intent.
-- [ ] Confirm original Dropbox collision/autorename adapter defaults beyond visible configuration; wire behavior remains unproved.
+- [x] Confirm original Dropbox Rename/Move collision behavior through inactive copied adapter steps: both autorename source to `(1).pdf`, preserve source bytes/ID, and preserve existing target. Dapier strict collision rejection is an intentional adjustment.
 - [x] Separately verify intended rename/move conflicts and already-prefixed/multi-extension byte/name preservation.
 - [x] Upload one test-only file; verify exact destination name, matching bytes, removal from landing and DataOps receipt using the isolated worker/CLI fallback.
 - [x] Verify required final bookkeeping publication/output for Dropbox intake through the actual DataOps worker/provider factory: canonical Gmail/Dropbox source dedupe, isolated live Sheet/Dropbox readbacks and retries, local ledger only. Production ledger publication was not performed.
@@ -200,7 +200,7 @@ Cleanup: the isolated `invoice-receipt-integration-test` hook and the two manage
 
 Integration fix deployment: [CI/deploy run 37057902392](https://github.com/DataTalksClub/dapier/actions/runs/37057902392), commit `5218b08`, passed tests, designer checks and deployed before the successful intake-only verifications above. Domain bookkeeping/review remains in DataOps.
 
-Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery awaits a future event; the authorized isolated custom-name smoke passed. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Source CST/UTC timezones and legacy MIME are resolved; hidden attachment/collision wire behavior remains unproved.
+Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery awaits a future event; the authorized isolated custom-name smoke passed. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Source CST/UTC timezones and legacy MIME are resolved; original attachment and collision behavior is resolved through isolated adapter tests, with stricter Dapier behavior explicitly documented.
 
 For implementation details and unresolved source semantics, see
 [the migration plan](zapier-migration-plan.md#adjustments-and-remaining-source-provider-checks).
@@ -355,7 +355,7 @@ accepted receipt `email-afded997578052334528c1a4f444d63c`.
 Invoice Zap153562936 v1 (2025-08-11): Formatter1.0.7 Raw Date input,
 YYYY-MM-DD, from/to UTC; Dropbox folder `/_dtc_paperwork/invoices`, singular
 Attachment input, overwrite No, filename Output-Subject.pdf. Mapping/date
-settings match; multiple/inline selection and collision wire remain unproved.
+settings match. Isolated original-adapter tests below resolve single/multiple/inline hydration and collisions, including the explicit Dapier adjustments.
 
 Dropbox Zap155120966 v1 (2025-08-27): Python processing clock formats
 YYYY-MM-DD, unconditional Date-File Name rename and Path Display move to
@@ -374,4 +374,29 @@ No source Zap was edited, run, published or enabled.
 
 Legacy object `2025-01-02-audience_export_d5c87e5d20.zip` has S3 Content-Type `none`, size 7,374,681 bytes and LastModified `2025-01-02T16:49:29+00:00`. Matching Drive file `17CkStUYbrzDVKSRxIrPWYn_i3olN2V1O` has the same filename/size and January 2025 creation metadata. This resolves MIME parity for the original archive without content download or writes.
 
-Final paginated read audit found no current-run temporary workflows, polls, grants or tokens. The production `invoice-landing` poll remains disabled. Owned test Drive folder and spreadsheet are recoverably trashed; owned Dropbox roots and local DynamoDB were removed. Existing grants remain. Synthetic S3 objects and audit evidence are retained; no deletion IAM was added. No Dapier email/Slack actions remain queued. Final handoff is held pending Chrome investigation of safe isolated original-adapter test feasibility.
+Final paginated read audit found no current-run temporary workflows, polls, grants or tokens. The production `invoice-landing` poll remains disabled. Owned test Drive folder and spreadsheet are recoverably trashed; owned Dropbox roots and local DynamoDB were removed. Existing grants remain. Synthetic S3 objects and audit evidence are retained; no deletion IAM was added. No Dapier email/Slack actions remain queued. Original-adapter isolation is complete; its owned Dropbox root and temporary URL files are also removed, with paginated inventory and provider absence verified.
+
+## Original adapter isolation — completed
+
+- [x] Resolve original invoice same-byte collision: inactive copied Zap's original Dropbox step with Overwrite No succeeds without changing ID/revision/hash; exactly one destination file. Dapier strict 409 is an explicit fail-closed adjustment, retained before downstream intake.
+- Source collision and hydration checks completed below. No copied Zap was activated or run as a whole.
+
+- [x] Resolve original invoice changed-byte collision: Overwrite No creates `(1).pdf`, exact 1,497-byte changed fixture/hash, while preserving the original 1,855-byte file/revision/hash. Dapier strict 409 intentionally prevents autorenamed archive/intake on filename conflicts.
+
+- [x] Resolve original multiple-PDF singular Attachment hydration: bundles both synthetic PDFs in ZIP and appends `.zip` to the requested `.pdf` name. Dapier ambiguity rejection is an explicit adjustment. Single/inline controls also passed below.
+
+- [x] Original single control: one unchanged 1,855-byte PDF, exact source hash, one unique output.
+- [x] Original inline control: `.pdf.zip`, 2,213 bytes, exactly the synthetic PNG (68 bytes) and PDF (1,855 bytes), both fixture hashes verified. No inline exclusion occurred. Dapier fails closed on this ambiguity instead of creating a ZIP archive.
+
+- [x] Resolve original Rename collision: copied original step autorenames source to `(1).pdf`, preserving bytes/ID and existing target; Dapier strict conflict is an intentional adjustment. Original Move collision also passed.
+
+- [x] Resolve original Move collision: source A moves to destination `(1).pdf`, exact hash/ID preserved; old source path absent, existing B revision/hash unchanged, two destination files. Dapier strict rejection is an intentional adjustment.
+- [x] Remove owned adapter root after paginated inventory of 17 entries / 11 synthetic files; provider parent listing verifies absence. Remove temporary link files.
+
+Only three acceptance boxes remain unchecked: future upstream exporter behavior,
+genuine YouTube publisher delivery and production Dropbox cutover. Read-only
+owned-repo search found imports/tests/docs and an assumed-role template, not an
+exporter definition. Actual production ledger publication was not performed;
+required publication integration passed against isolated live providers/local
+ledger. Automatic renewal's direct rule/target/log reads remain access-limited,
+separate from the verified active authenticated hub lease and repaired stack.
