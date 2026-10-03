@@ -21,6 +21,7 @@ actions:
   filename: '{steps.email-date.output.formatted}-{subject}.pdf'
   overwrite: false
   autorename: false
+  strict_conflict: true
 - id: file-to-dataops
   type: dataops
   auth_secret_id: dapier/dataops

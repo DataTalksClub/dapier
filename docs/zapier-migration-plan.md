@@ -318,3 +318,9 @@ Native Telegram is the supported primary TODO path. The original catch-hook
 sender is unknown, so the existing hook remains unchanged for compatibility.
 Stable request IDs are required before enabling retry deduplication for that
 sender; this limitation does not block native Telegram's update-ID path.
+
+Invoice archives use `overwrite: false`, `autorename: false`, and
+`strict_conflict: true`. Dropbox otherwise accepts an identical-byte upload as
+a successful no-op; strict conflict rejects that case as well as changed bytes.
+This is the selected migration behavior; the original Zapier duplicate default
+is unavailable. See [Dropbox's upload specification](https://github.com/dropbox/dropbox-api-spec/blob/main/files.stone).

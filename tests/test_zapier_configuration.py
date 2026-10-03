@@ -556,3 +556,16 @@ def test_native_todo_without_task_text_neither_appends_nor_confirms(payload):
 
     logic.run_chain("todo-intake", workflow("todo-intake")["actions"], event, runner)
     assert calls == []
+
+
+def test_strict_upload_conflict_is_forwarded_and_fails_without_overwrite():
+    seen = {}
+    def conflict(method, url, *, headers, body, timeout):
+        seen.update(json.loads(headers["dropbox-api-arg"]))
+        return 409, b'{"error":{".tag":"path","path":{".tag":"conflict"}}}'
+    with pytest.raises(RuntimeError, match="HTTP 409.*path/conflict"):
+        dropbox._dropbox_upload("token", "/synthetic.pdf", b"same bytes",
+                                autorename=False, strict_conflict=True, transport=conflict)
+    assert seen["strict_conflict"] is True
+    assert seen["mode"] == "add"
+    assert seen["autorename"] is False

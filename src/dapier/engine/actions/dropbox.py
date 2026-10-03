@@ -41,13 +41,14 @@ def _upload_files(action, data):
     return files
 
 def _dropbox_upload(access_token, path, payload, *, transport=None,
-                    overwrite=False, autorename=True):
+                    overwrite=False, autorename=True, strict_conflict=False):
     transport = transport or base._default_transport
     headers = {
         "authorization": f"Bearer {access_token}",
         "dropbox-api-arg": json.dumps(
             {"path": path, "mode": "overwrite" if overwrite else "add",
-             "autorename": autorename, "mute": False},
+             "autorename": autorename, "mute": False,
+             **({"strict_conflict": True} if strict_conflict else {})},
             separators=(",", ":"),
         ),
         "content-type": "application/octet-stream",
@@ -108,7 +109,8 @@ def run_dropbox_upload(action, event, transport=None, steps=None):
         path = f"{folder}/{base._safe_filename(override or file['filename'])}"
         metadata = _dropbox_upload(access_token, path, base._s3_body(file["s3"]), transport=transport,
                                    overwrite=_boolean(action, "overwrite"),
-                                   autorename=_boolean(action, "autorename", True))
+                                   autorename=_boolean(action, "autorename", True),
+                                   strict_conflict=_boolean(action, "strict_conflict"))
         uploaded.append(metadata.get("path_display") or metadata.get("path_lower") or path)
     return {"uploaded": uploaded}
 

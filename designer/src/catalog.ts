@@ -453,6 +453,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "filename", label: "Filename override" },
       { key: "attachment_selection", label: "Attachment selection", type: "select", options: ["all", "single", "first"], default: "all" },
       { key: "overwrite", label: "Overwrite existing file", type: "boolean", default: "false" },
+      { key: "strict_conflict", label: "Reject identical file conflicts", type: "boolean", default: "false" },
       { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "true" },
       { key: "caption", label: "Caption", type: "textarea", placeholder: "New mail: {subject}" },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
