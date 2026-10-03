@@ -1,13 +1,17 @@
-# Paired with invoice-body-render; disable broad legacy completion before cutover.
+# Paired with invoice-body-render and invoice-intake's body branch: the
+# renderer reports job.completed with the source event's route, so both the
+# invoice and invoice-pdf addresses complete through this flow.
 id: invoice-body-completion
-enabled: false
+enabled: true
 description: Archive the completed email PDF and forward its exact bytes to DataOps.
 trigger:
   connector: renderer
   event: job.completed
   filters:
     route:
-      equals: invoice-pdf
+      in:
+      - invoice
+      - invoice-pdf
 actions:
 - id: email-date
   type: date_time

@@ -1,46 +1,195 @@
-# Migration draft; save through dapier workflows save. No cutover is authorized.
 id: invoice-intake
-enabled: false
-description: 'Zapier 153562936: Archive the single email attachment with the UTC email
-  date, then forward to DataOps.'
-actions:
-- id: email-date
-  type: date_time
-  value: '{date}'
-  timezone: UTC
-  format: '%Y-%m-%d'
-- id: clean-subject
-  type: code
-  code: |
-    import re
-    subject = str(input.get("subject") or "").strip()
-    subject = re.sub(r"^(?:(?:fwd?|re)\s*:\s*)+", "", subject, flags=re.I).strip()
-    subject = re.sub(r"\s*\[(?:account|invoice\s*id)\s*:[^\]]*\]", "", subject, flags=re.I).strip()
-    subject = re.sub(r"\s+Invoice\s+Available\b.*$", "", subject, flags=re.I).strip()
-    if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
-        subject = "Amazon Web Services"
-    attachment = (input.get("attachments") or [{}])[0]
-    checksum = re.sub(r"^sha256:", "", str(attachment.get("checksum") or ""), flags=re.I)
-    if not re.fullmatch(r"[a-f0-9]{64}", checksum, flags=re.I):
-        raise ValueError("Attachment checksum is required for archive naming")
-    output = {"subject": subject or "Invoice", "document_key": checksum.lower()[:12]}
-- id: archive-attachment
-  type: dropbox_upload
-  connection_id: dropbox
-  folder: /_dtc_paperwork/invoices
-  source: attachment
-  attachment_selection: single
-  filename: '{steps.email-date.output.formatted}-{steps.clean-subject.output.result.subject}-{steps.clean-subject.output.result.document_key}.pdf'
-  overwrite: false
-  autorename: false
-  strict_conflict: true
-- id: file-to-dataops
-  type: dataops
-  auth_secret_id: dapier/dataops
-  url_env: DATAOPS_INTAKE_URL
+enabled: true
+description: 'Invoice emails: triage on arrival. A single attachment is archived
+  to Dropbox and forwarded to DataOps; a body-only email has its forwarded
+  header stripped and renders to PDF (the completion flow archives and
+  forwards it); two or more attachments fail the run.'
 trigger:
   connector: email
   event: message.received
   filters:
     route:
       equals: invoice
+actions:
+- id: triage
+  type: code
+  code: |
+    attachments = input.get("attachments") or []
+    count = len(attachments)
+    if count > 1:
+        raise ValueError(f"expected at most one attachment, got {count} attachments")
+    output = {"has_attachment": count == 1, "attachment_count": count}
+  tests:
+  - name: body-only email renders to PDF
+    input:
+      attachments: []
+    expected:
+      has_attachment: false
+      attachment_count: 0
+  - name: single attachment follows the archive path
+    input:
+      attachments:
+      - filename: invoice.pdf
+    expected:
+      has_attachment: true
+      attachment_count: 1
+  - name: two attachments fail
+    input:
+      attachments:
+      - {}
+      - {}
+    expected_error: got 2 attachments
+- id: route
+  type: condition
+  when:
+    steps.triage.output.result.has_attachment:
+      equals: true
+  then:
+  - id: email-date
+    type: date_time
+    value: '{date}'
+    timezone: UTC
+    format: '%Y-%m-%d'
+  - id: clean-subject
+    type: code
+    code: |
+      import re
+      subject = str(input.get("subject") or "").strip()
+      subject = re.sub(r"^(?:(?:fwd?|re)\s*:\s*)+", "", subject, flags=re.I).strip()
+      subject = re.sub(r"\s*\[(?:account|invoice\s*id)\s*:[^\]]*\]", "", subject, flags=re.I).strip()
+      subject = re.sub(r"\s+Invoice\s+Available\b.*$", "", subject, flags=re.I).strip()
+      if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
+          subject = "Amazon Web Services"
+      attachment = (input.get("attachments") or [{}])[0]
+      checksum = re.sub(r"^sha256:", "", str(attachment.get("checksum") or ""), flags=re.I)
+      if not re.fullmatch(r"[a-f0-9]{64}", checksum, flags=re.I):
+          raise ValueError("Attachment checksum is required for archive naming")
+      output = {"subject": subject or "Invoice", "document_key": checksum.lower()[:12]}
+    tests:
+    - name: forward prefix and receipt suffix come off
+      input:
+        subject: 'Fwd: Your Google Play Order Receipt from Oct 2, 2026'
+        attachments:
+        - checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      expected:
+        subject: Your Google Play Order Receipt from Oct 2, 2026
+        document_key: aaaaaaaaaaaa
+    - name: AWS subjects normalize
+      input:
+        subject: 'Fwd: Amazon Web Services Invoice Available [Account: 1234]'
+        attachments:
+        - checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      expected:
+        subject: Amazon Web Services
+        document_key: bbbbbbbbbbbb
+    - name: a missing checksum fails
+      input:
+        subject: Invoice
+        attachments:
+        - filename: invoice.pdf
+      expected_error: checksum is required
+  - id: archive-attachment
+    type: dropbox_upload
+    connection_id: dropbox
+    folder: /_dtc_paperwork/invoices
+    source: attachment
+    attachment_selection: single
+    filename: '{steps.email-date.output.formatted}-{steps.clean-subject.output.result.subject}-{steps.clean-subject.output.result.document_key}.pdf'
+    overwrite: false
+    autorename: false
+    strict_conflict: true
+  - id: file-to-dataops
+    type: dataops
+    auth_secret_id: dapier/dataops
+    url_env: DATAOPS_INTAKE_URL
+  else:
+  - id: strip-forwarded
+    type: code
+    code: |
+      import re
+
+      body = input.get("body") if isinstance(input.get("body"), dict) else {}
+      piece = body.get("html")
+      if not isinstance(piece, dict):
+          piece = {"value": input.get("html") if isinstance(input.get("html"), str) else ""}
+      html = str(piece.get("value") or "")
+      if not html:
+          part = body.get("text") if isinstance(body.get("text"), dict) else {}
+          text = str(part.get("value") or "")
+          for old, new in (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;")):
+              text = text.replace(old, new)
+          html = f"<pre>{text}</pre>"
+      marker = re.search(r"-{2,}\s*Forwarded message\s*-{2,}", html, flags=re.I)
+      stripped = html
+      if marker:
+          # Walk the header lines that follow the marker (From/Date/Subject/
+          # To/..., through tags and whitespace), then cut marker plus
+          # headers in one go. Anchored matches keep this linear.
+          separator = r"(?:\s|<[^>]*>)*"
+          # A header line runs to the end of the line or the next block tag,
+          # whichever comes first — addresses like <a@b.c> ride along (they
+          # only look like tags).
+          line_body = r"(?:[^\n<]|<(?!/?(?:div|p|br)\b)[^>]*>)*"
+          header_line = re.compile(
+              separator + r"(?:from|date|subject|to|cc|bcc|reply-to)\s*:" + line_body,
+              flags=re.I,
+          )
+          position = marker.end()
+          matched = header_line.match(html, position)
+          while matched:
+              position = matched.end()
+              matched = header_line.match(html, position)
+          # Drop the marker's own now-empty wrapper tags: bare closing tags
+          # ahead of the cut, then the header block's closers behind it.
+          prefix = re.sub(r"(?:<[^>]*>|\s)*$", "", html[:marker.start()])
+          boundary = re.match(r"(?:</(?:div|p)>|\s)*", html[position:])
+          stripped = prefix + html[position + boundary.end():]
+      output = {"html": stripped.strip(), "forwarded_header_removed": marker is not None}
+    tests:
+    - name: the forwarded header block goes, the receipt stays
+      input:
+        body:
+          html:
+            value: "<div>---------- Forwarded message ----------</div><div>From: Google
+              Play <googleplay-noreply@google.com></div><div>Date: Fri, Oct 2, 2026,
+              08:56</div><div>Subject: Your Google Play Order Receipt from Oct 2,
+              2026</div><div>To: <alexey.s.grigoriev@gmail.com></div><div><table><tr><td>Order
+              total: 0.99 EUR</td></tr></table></div>"
+      expected:
+        html: "<div><table><tr><td>Order total: 0.99 EUR</td></tr></table></div>"
+        forwarded_header_removed: true
+    - name: a plaintext forward keeps only the body
+      input:
+        body:
+          html:
+            value: "---------- Forwarded message ----------\nFrom: a@b.c\nDate:
+              today\nSubject: Receipt\nTo: d@e.f\n\nOrder total: 42 EUR\n"
+      expected:
+        html: "Order total: 42 EUR"
+        forwarded_header_removed: true
+    - name: no marker leaves the body alone
+      input:
+        body:
+          html:
+            value: <p>Receipt</p>
+      expected:
+        html: <p>Receipt</p>
+        forwarded_header_removed: false
+    - name: a text-only email renders from a pre block
+      input:
+        body:
+          text:
+            value: "Total: 1.00 EUR\n"
+          html: null
+      expected:
+        html: "<pre>Total: 1.00 EUR\n</pre>"
+        forwarded_header_removed: false
+  - id: render-pdf
+    type: render_html_to_pdf
+    input_field: html
+    input_value: '{steps.strip-forwarded.output.result.html}'
+    output_key: invoice-body/{event_id}.pdf
+    output_bucket_env: RENDER_ARTIFACTS_BUCKET
+    pdf:
+      page_format: A4
+      print_background: true
