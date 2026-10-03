@@ -11,8 +11,8 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.connectors import drive as drive_connector  # noqa: F401 (registers)
-from src.dapier.engine.actions.drive import run_drive_read_file
+from plugins.google.connector import drive as drive_connector
+from plugins.google.runners.drive import run_drive_read_file
 
 FILES_URL = "https://www.googleapis.com/drive/v3/files"
 

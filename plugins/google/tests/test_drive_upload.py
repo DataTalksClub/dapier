@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.drive import run_drive_upload_file
+from plugins.google.runners.drive import run_drive_upload_file
 
 UPLOAD_URL_PREFIX = ("https://www.googleapis.com/upload/drive/v3/files"
                      "?uploadType=multipart&supportsAllDrives=true")

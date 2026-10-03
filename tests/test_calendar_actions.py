@@ -15,7 +15,8 @@ import pytest
 
 from src.dapier.connections.providers import oauth_providers
 from src.dapier.engine.actions import base
-from src.dapier.connectors import calendar, registry  # noqa: F401  (calendar: registration)
+from src.dapier.connectors import registry  # noqa: F401  (import = registration)
+from plugins.google.connector import calendar
 from src.dapier.connections import discovery as provider
 from src.dapier.connections import tokens
 

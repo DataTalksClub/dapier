@@ -9,8 +9,8 @@ and the live listings can never drift apart.
 import hashlib
 import json
 
-from ..connections import discovery as provider
-from ..engine.actions.sheets import (
+from src.dapier.connections import discovery as provider
+from plugins.google.runners.sheets import (
     run_sheets_add_worksheet,
     run_sheets_append_row,
     run_sheets_clear_values,
@@ -21,8 +21,8 @@ from ..engine.actions.sheets import (
     run_sheets_lookup_row,
     run_sheets_update_row,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors.registry import (
     Action,
     ConnectionTest,
     Discovery,
@@ -349,8 +349,8 @@ register_connection_test(ConnectionTest(connector="google", run=_tested))
 
 # --- trigger discovery: spreadsheet options for the sheets actions' id field ----
 
-from . import trigger_discovery  # noqa: E402
-from .trigger_discovery import (  # noqa: E402
+from src.dapier.connectors import trigger_discovery  # noqa: E402
+from src.dapier.connectors.trigger_discovery import (  # noqa: E402
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     TriggerDiscovery,
@@ -475,7 +475,7 @@ def _sheets_poll_validate(body):
     ``worksheet`` (default Sheet1), the ``connection_id`` of the Google
     connection to poll as (required — the fetch refreshes its OAuth token),
     plus the fetch defaults every stored sheets poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     spreadsheet_id = str(body.get("spreadsheet_id") or "").strip()
@@ -506,7 +506,7 @@ def _sheets_poll_rows(item, *, name, transport=None):
     are skipped). Raises ``RuntimeError`` on a failed fetch, like every
     poll source.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError(f"poll source '{name}' needs connection_id: "
@@ -697,7 +697,7 @@ def _stored_sheets_poll(name):
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
     raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -747,7 +747,7 @@ def _fetch_sheets_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     example); a bare chip ask without a poll stays on the classic new-row
     sample.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_sheets_poll(name)

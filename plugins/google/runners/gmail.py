@@ -13,10 +13,10 @@ must include ``gmail.send``; a read-only token fails with the API's 403.
 import base64
 import json
 
-from ...connections import tokens
-from . import base
-from .email import _addresses, _raw_message
-from .templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.email import _addresses, _raw_message
+from src.dapier.engine.actions.templating import render
 
 GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1"
 PROFILE_URL = GMAIL_API_URL + "/users/me/profile"

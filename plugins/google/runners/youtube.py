@@ -9,9 +9,9 @@ a video's snippet metadata (videos.update)."""
 import json
 import urllib.parse
 
-from ...connections import tokens
-from . import base
-from .templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 PLAYLIST_ITEMS_URL = "https://www.googleapis.com/youtube/v3/playlistItems"
@@ -552,13 +552,13 @@ def run_youtube_update_video(action, event, *, transport=None, steps=None):
 
 
 def run_youtube_subscription_status(action, event, *, steps=None):
-    from ...triggers.intake.youtube_subscriptions import subscription_status
+    from src.dapier.triggers.intake.youtube_subscriptions import subscription_status
 
     channel_id = render(str(action.get("channel_id") or ""), event, steps).strip()
     return subscription_status(channel_id)
 
 
 def run_youtube_subscription_renew(action, event, *, steps=None):
-    from ...triggers.intake.youtube_subscriptions import renew_subscription
+    from src.dapier.triggers.intake.youtube_subscriptions import renew_subscription
     channel_id = render(str(action.get("channel_id") or ""), event, steps).strip()
     return renew_subscription(channel_id)

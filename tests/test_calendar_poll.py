@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import calendar
+from plugins.google.connector import calendar
 from src.dapier.connections import discovery as provider
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError

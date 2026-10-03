@@ -13,10 +13,11 @@ import pytest
 import yaml
 
 from src.dapier.connectors import registry
-from src.dapier.connectors import drive
+from plugins.google.connector import drive
 from src.dapier.api.designer_store import parse_workflow
 from src.dapier.engine import logic
-from src.dapier.engine.actions import date_time, sheets, dataops
+from src.dapier.engine.actions import date_time, dataops
+from plugins.google.runners import sheets
 import plugins.aws.runners.s3 as s3
 import plugins.dropbox.runners.dropbox as dropbox
 from src.dapier.connections.providers import dropbox_api

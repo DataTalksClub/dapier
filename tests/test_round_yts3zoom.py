@@ -20,7 +20,7 @@ from plugins.aws.runners.s3 import (
     run_s3_presign_url,
     run_s3_read_object,
 )
-from src.dapier.engine.actions.youtube import (
+from plugins.google.runners.youtube import (
     run_youtube_add_to_playlist,
     run_youtube_update_video,
 )
@@ -89,7 +89,7 @@ def google_response(snippet):
 
 def run_playlist_add(transport, action, event=None, steps=None):
     action = {"type": "youtube_add_to_playlist", "connection_id": "google", **action}
-    with patch("src.dapier.engine.actions.youtube._youtube_connection",
+    with patch("plugins.google.runners.youtube._youtube_connection",
                return_value=dict(YOUTUBE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -168,7 +168,7 @@ class YoutubeAddToPlaylistTests(unittest.TestCase):
 
 def run_video_update(transport, action, event=None, steps=None):
     action = {"type": "youtube_update_video", "connection_id": "google", **action}
-    with patch("src.dapier.engine.actions.youtube._youtube_connection",
+    with patch("plugins.google.runners.youtube._youtube_connection",
                return_value=dict(YOUTUBE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

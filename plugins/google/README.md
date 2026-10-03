@@ -6,7 +6,7 @@ scopes, and token. The Google Cloud project configuration allows the client to
 request scopes; it does not grant them to an account until that account
 completes consent.
 
-See the [shared connector procedures](README.md) for OAuth credential
+See the [shared connector procedures](../../docs/connectors/README.md) for OAuth credential
 rotation, CLI operations, and the general process for changing scopes.
 
 ## Current configuration
@@ -53,7 +53,7 @@ callback. Get new direction before adding different accounts or OAuth scopes.
 
    This callback is fixed by the stack's `OAUTH_CALLBACK_URL` and is used by
    both the console and CLI. Copy the client ID and secret, then store them
-   immediately with the [credential rotation procedure](README.md#updating-or-rotating-an-oauth-client-id-and-secret).
+   immediately with the [credential rotation procedure](../../docs/connectors/README.md#updating-or-rotating-an-oauth-client-id-and-secret).
    Google does not show an existing client secret again.
 
 The project's current Dapier scopes are:
@@ -435,4 +435,226 @@ and [restricted-scope verification requirements](https://developers.google.com/i
   so their refresh tokens are issued under the production status.
 
 For where to change default scopes in code and the common CLI workflow, use the
-[shared connector guide](README.md#where-scope-behavior-lives-in-the-repository).
+[shared connector guide](../../docs/connectors/README.md#where-scope-behavior-lives-in-the-repository).
+
+---
+
+## Google Calendar connector
+
+The Google Calendar connector covers Zapier's Calendar staples: create an
+event (detailed or quick-add), find events (with a find-or-create option),
+update one, delete one, and a "New Event" poll trigger. Everything runs
+through a Google OAuth connection — the same connection type Drive and
+Sheets use — talking to the Calendar API v3.
+
+The connector is registered as `google-calendar` (palette chip, discovery
+sources, poll source). Connection ids are separate from the connector name:
+the docs' scheduling account is connected as `google-calendar` (see
+[the Google guide](#the-two-workspace-account-connections)).
+
+### Connect it
+
+The Google connector uses the shared Google OAuth client
+([google.md) documents the client setup). Create or update the
+connection with the CLI:
+
+```sh
+uv run dapier connections create google-calendar --provider google --scopes \
+  https://www.googleapis.com/auth/calendar.freebusy \
+  https://www.googleapis.com/auth/calendar.events.owned \
+  https://www.googleapis.com/auth/calendar.readonly \
+  https://www.googleapis.com/auth/userinfo.email
+uv run dapier connections connect google-calendar --agent <agent-name>
+```
+
+The console's Google connection card requests exactly these scopes.
+
+| Scope | Purpose | Google classification |
+|-------|---------|-----------------------|
+| `https://www.googleapis.com/auth/calendar.events.owned` | Create, update, and delete events on calendars the user owns | Sensitive |
+| `https://www.googleapis.com/auth/calendar.readonly` | The calendars/events listings and the New Event poll | Sensitive |
+| `https://www.googleapis.com/auth/calendar.freebusy` | Free/busy lookups for the scheduling flows | Sensitive |
+| `https://www.googleapis.com/auth/userinfo.email` | Verify the consenting account at connect time | Basic identity |
+
+#### Consent-time scope step (ops)
+
+The live Google OAuth client must request the calendar scopes at consent
+time. Add each scope from the table above to the Google Auth Platform
+project's **Data Access** scope list (the procedure and the project's
+current scope table are in [google.md)), keep the Dapier
+connection's scope list in sync, then reconnect the account — changing a
+scope list never updates an already issued refresh token. Dapier itself adds
+no code-level gate on top: a Google connection verifies through the
+`userinfo.email` identity check, so a connection granted the calendar scopes
+verifies and serves the connector as-is.
+
+### Actions
+
+| Action | Zapier counterpart | Notes |
+|--------|--------------------|-------|
+| `calendar_create_event` | Create Detailed Event | Full event: title, start/end, timezone, description, location, attendees. |
+| `calendar_quick_add` | Quick Add Event | One line of text ("Reviewer call tomorrow 10am"), Calendar parses it. |
+| `calendar_find_events` | Find or Create Event | Text `q` over a time window (defaults: yesterday through the next quarter); with **Create if missing** a miss posts the event instead of returning `found: false`. |
+| `calendar_update_event` | Update Event | Patches only the fields that are set; attendees replaces the whole list. |
+| `calendar_delete_event` | Delete Event | Removes one event; pair with a find step when the event may already be gone. |
+
+Times are ISO: a bare `YYYY-MM-DD` is an all-day event (Google's `date`
+field), anything else a `dateTime` with the optional IANA `timezone` pinned
+on. Start and end must agree on the style — Google rejects mixed event
+times. Find outputs chain into update/delete through
+`{steps.<id>.output.event.event_id}`.
+
+### Trigger: New Event (poll)
+
+`event.new` is a poll, not a webhook: Calendar has no event-creation push,
+so a stored poll trigger lists the calendar on the poll schedule
+(`google-calendar.events` source, `rate(5 minutes)` is a good cadence) and
+fires one event per **newly created** event.
+
+The cursor is the event's `created` timestamp, seeded on the first fire so
+enabling a trigger does not fire the calendar's whole history; an edit to an
+old event never poses as a new event. A recurring series' occurrences carry
+the series' creation time, so a new week of a weekly series does not fire
+one event per occurrence.
+
+Save a poll trigger from a JSON file:
+
+```sh
+uv run dapier triggers polls save calendar-news.json
+```
+
+```json
+{
+  "name": "calendar-news",
+  "expression": "rate(5 minutes)",
+  "source": "google-calendar.events",
+  "calendar_id": "ops@example.test",
+  "connection_id": "google-calendar",
+  "actions": [{"type": "email_send", "to": "ops@example.test"}]
+}
+```
+
+`connection_id` is required (the poll refreshes the connection's OAuth
+token); `calendar_id` takes any id from the calendars listing, `primary`
+included.
+
+### Discovery
+
+The connection's listings feed the field pickers (console and CLI):
+
+| Resource | Lists |
+|----------|-------|
+| `google-calendar.calendars` | Calendars the connection can see, with timezones — the actions' Calendar ID field browses it. |
+| `google-calendar.events` | Upcoming events in one calendar (`calendar_id` required, optional text `query`). |
+
+```sh
+uv run dapier connections discover google-calendar calendars
+uv run dapier connections discover google-calendar events --param calendar_id=ops@example.test
+```
+
+The trigger config offers the same listings as options (a calendar picker,
+and per-calendar event options).
+
+---
+
+## YouTube connector
+
+YouTube is a Google OAuth connection (provider `youtube`) on the shared
+Google client. The [Google guide) is the source of truth for:
+
+- creating and connecting the channel — OAuth consent with
+  `youtube.readonly`, channel verification, and the Brand Account fallback
+  when no channel is found ([Google setup](#google-cloud-scope-configuration)
+  and [account connections](#calendar-youtube-and-other-accounts));
+- the `video.published` push trigger — YouTube's PubSubHubbub feed on the
+  shared `/hooks/youtube` callback, the hub secret, and the five-day
+  renewal schedule ([YouTube video push](#youtube-video-push-websub));
+- the **Upload video** action and its scope caveat: uploading needs
+  `https://www.googleapis.com/auth/youtube.upload`, and Dapier connections
+  request only `youtube.readonly` today — a read-only token fails the
+  upload with HTTP 403 ([YouTube upload video](#youtube-upload-video)).
+
+This page is the YouTube-specific rest: triggers without webhooks, the
+action catalog, and discovery.
+
+### Triggers
+
+| Trigger | Kind | Notes |
+| --- | --- | --- |
+| `youtube` / `video.published` | hook (push) | fires from the PubSubHubbub notification; setup lives in the [Google guide](#youtube-video-push-websub). The trigger stores a `channel_id` filter; disabling or deleting never unsubscribes — the shared callback means other watchers keep the subscription, and the renewal schedule releases released channels by lapsing. |
+| `youtube.videos` poll | poll (no webhook) | the no-push path: a stored poll trigger lists the watched channel's uploads playlist on the schedule and publishes the same `youtube` / `video.published` event, so workflows match the same chip either way |
+
+The poll trigger (`dapier polls save`) needs the `connection_id` of the
+YouTube connection to poll as (its OAuth token is refreshed like the
+actions' calls); an empty `channel_id` resolves to the connection's own
+channel at fetch time:
+
+```json
+{
+  "name": "channel-uploads",
+  "source": "youtube.videos",
+  "expression": "rate(1 hour)",
+  "connection_id": "youtube",
+  "flow": "channel-uploads"
+}
+```
+
+Each fire lists recent uploads (the channel id with `UC` swapped for `UU`
+— the uploads playlist) and publishes videos published strictly after the
+stored watermark, in the notification's data shape: `{id, video_id,
+channel_id, title, url, published}`. `published` rides along only from the
+poll — the webhook notification itself carries no publish time. The first
+fire seeds the watermark without emitting.
+
+### Actions
+
+All actions take `connection_id`.
+
+| action | YouTube Data API | notes |
+| --- | --- | --- |
+| `youtube_find_video` | `search.list` | top videos for a search query |
+| `youtube_find_playlist_items` | `playlistItems.list` | one playlist's videos, newest first; `playlist_id` from the playlists discovery |
+| `youtube_upload_video` | `videos.insert` (multipart) | needs the `youtube.upload` scope ([caveat](#youtube-upload-video)); bytes from exactly one of `source_url`, staged `source_s3 {bucket, key}`, or inline `content`; `privacy_status` defaults to unlisted; ~100 MB ceiling |
+| `youtube_add_to_playlist` | `playlistItems.insert` | adds one video to an editable playlist; an already-present video surfaces YouTube's `videoAlreadyInPlaylist` error rather than duplicating silently |
+| `youtube_update_video` | `videos.update` (snippet) | title required — YouTube replaces the whole snippet, so pass `category_id` (and the description, which an omitted value clears) when they matter |
+
+### Discovery
+
+YouTube connections list live resources over
+`dapier connections discover <connection> [resource]` and the console/CLI
+pickers: `channel` (the connected channel), `playlists`, `playlist_items`
+(one playlist's videos, needs `playlist_id`), and `videos` (the channel's
+recent uploads, newest first).
+
+### Gotchas
+
+- Connection setup, scopes, and the WebSub subscription lifecycle are
+  [Google-guide) territory — this page deliberately does not
+  repeat them.
+- The push and poll paths publish the same event name; a workflow filter on
+  `channel_id` works for both, but only the poll envelope carries
+  `published`.
+- A youtube poll without a stored `channel_id` resolves the connection's
+  own channel through `channels().mine` at fetch time — point it at a
+  different channel explicitly when the connection can see more than one.
+
+### Read-only WebSub lease diagnostic
+
+The `youtube_subscription_status` action takes `channel_id` and reads the
+[hub's subscriber diagnostic](https://pubsubhubbub.appspot.com/subscribe) using
+the deployed callback and existing server-held WebSub secret. It returns only
+`active`, `state`, `expires_at`, `topic`, and `callback`; it never returns the
+secret-bearing diagnostic URL or raw response. It neither renews nor changes
+subscriptions. The action is available in the console designer and through
+`dapier workflows test --execute`/the shared workflow-test API. A diagnostic
+failure or unrecognized lease fields cannot be reported as an active lease.
+
+`youtube_subscription_renew` accepts `channel_id` only for a channel watched by
+an enabled workflow. It renews using the same callback, topic and server-held
+secret as the scheduled renewal. This action is available through the shared
+designer API, Console action catalog and CLI workflow test path. It sends no
+video or Slack notification.
+
+Renewal runs every four days, leaving one day of margin against the observed
+five-day hub lease. The renewal Lambda reads the four live workflow/trigger
+tables with scoped read-only permissions.

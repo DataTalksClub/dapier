@@ -12,7 +12,7 @@ from src.dapier.triggers import poll_sources, poll_triggers
 @pytest.fixture
 def fake_source(monkeypatch):
     """A registered throwaway source; builtin modules stay unloaded."""
-    monkeypatch.setattr(poll_sources, "_loaded", True)
+    monkeypatch.setattr(poll_sources, "_load_builtins", lambda: None)
 
     def validate(body):
         bucket = str(body.get("bucket") or "").strip()

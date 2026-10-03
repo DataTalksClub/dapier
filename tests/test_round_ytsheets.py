@@ -14,8 +14,8 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.sheets import run_sheets_create_column
-from src.dapier.engine.actions.youtube import (
+from plugins.google.runners.sheets import run_sheets_create_column
+from plugins.google.runners.youtube import (
     run_youtube_create_playlist,
     run_youtube_remove_from_playlist,
 )
@@ -59,7 +59,7 @@ def json_body(payload):
 def run_playlist_remove(transport, action, event=None, steps=None):
     action = {"type": "youtube_remove_from_playlist",
               "connection_id": "youtube", **action}
-    with patch("src.dapier.engine.actions.youtube._youtube_connection",
+    with patch("plugins.google.runners.youtube._youtube_connection",
                return_value=dict(YOUTUBE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -130,7 +130,7 @@ class YoutubeRemoveFromPlaylistTests(unittest.TestCase):
 def run_playlist_create(transport, action, event=None, steps=None):
     action = {"type": "youtube_create_playlist",
               "connection_id": "youtube", **action}
-    with patch("src.dapier.engine.actions.youtube._youtube_connection",
+    with patch("plugins.google.runners.youtube._youtube_connection",
                return_value=dict(YOUTUBE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -214,7 +214,7 @@ class YoutubeCreatePlaylistTests(unittest.TestCase):
 def run_column_create(transport, action, event=None, steps=None):
     action = {"type": "sheets_create_column", "connection_id": "google",
               **action}
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value=dict(GOOGLE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

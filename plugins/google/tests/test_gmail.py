@@ -24,11 +24,12 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import gmail, registry  # noqa: F401  (import = registration)
+from src.dapier.connectors import registry  # noqa: F401  (import = registration)
+from plugins.google.connector import gmail
 from src.dapier.connectors import trigger_discovery
 from src.dapier.connections import discovery as provider
 from src.dapier.connections import tokens
-from src.dapier.engine.actions.gmail import run_gmail_send
+from plugins.google.runners.gmail import run_gmail_send
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError
 
@@ -202,7 +203,7 @@ def no_history(monkeypatch):
 # --- registration -----------------------------------------------------------------
 
 
-def test_the_source_resolves_through_the_builtin_module_seam():
+def test_the_source_resolves():
     spec = poll_sources.resolve("gmail.messages")
     assert (spec.connector, spec.event) == ("gmail", "message.received")
     with pytest.raises(ValueError, match="must be one of"):
@@ -442,7 +443,7 @@ def test_the_budget_parks_no_cursor_and_the_seen_set_dedupes_the_refetch():
 
 
 def send_connection(monkeypatch):
-    monkeypatch.setattr("src.dapier.engine.actions.gmail._gmail_connection",
+    monkeypatch.setattr("plugins.google.runners.gmail._gmail_connection",
                         lambda connection_id: {
                             "connection_id": connection_id, "provider": "google",
                             "status": "connected", "credential_id": "oauth#google"})

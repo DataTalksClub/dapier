@@ -32,10 +32,10 @@ import base64
 import urllib.parse
 from datetime import datetime, timezone
 
-from ..connections import discovery as provider
-from ..engine.actions.gmail import run_gmail_send
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.connections import discovery as provider
+from plugins.google.runners.gmail import run_gmail_send
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors.registry import (
     Action,
     Connector,
     Discovery,
@@ -43,8 +43,8 @@ from .registry import (
     register,
     register_discovery,
 )
-from . import trigger_discovery
-from .trigger_discovery import (
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
     options_from_registry,
@@ -152,7 +152,7 @@ def _gmail_poll_validate(body):
     optional Gmail ``query`` (a ``label:`` term from the labels listing, or
     any search expression — a whole-mailbox watch stays the default), plus
     the fetch defaults every stored gmail poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     if not str(body.get("connection_id") or "").strip():
@@ -265,7 +265,7 @@ def _gmail_poll_fetch(item, cursor=None, *, transport=None):
     source carries. Raises ``RuntimeError`` on a failed fetch, like every
     poll source.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError("poll source 'gmail.messages' needs connection_id: "
@@ -343,7 +343,7 @@ def _stored_gmail_poll(name):
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
     raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -370,7 +370,7 @@ def _fetch_gmail_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     to the recorded/documented sample instead of failing: a sample pull
     shows the payload shape, it never raises.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_gmail_poll(name)

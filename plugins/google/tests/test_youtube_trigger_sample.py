@@ -1,7 +1,7 @@
 """The YouTube trigger sample's live fetch and its fallbacks.
 
 The chip's sample prefers live data — the connected channel's newest upload
-via the playlist_items listing (connectors.youtube._live_upload) — and falls
+via the playlist_items listing (plugins.google.connector.youtube._live_upload) — and falls
 back to recorded history, then a documented PubSubHubbub notification, so a
 sample pull always answers with something an author can build on. The
 playlists options listing powers the find-playlist-items action's playlist
@@ -13,7 +13,7 @@ import pytest
 
 from src.dapier.connectors import trigger_discovery
 import src.dapier.connectors  # noqa: F401  (import = registration)
-from src.dapier.connectors import youtube
+from plugins.google.connector import youtube
 
 
 @pytest.fixture(autouse=True)

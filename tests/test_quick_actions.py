@@ -21,13 +21,13 @@ import pytest
 
 from src.dapier.connectors import registry
 from src.dapier.connections import tokens
-from src.dapier.engine.actions.drive import (
+from plugins.google.runners.drive import (
     run_drive_delete_file,
     run_drive_move_file,
 )
 from src.dapier.engine.actions.email import run_email_send
 from plugins.aws.runners.s3 import run_s3_list_objects
-from src.dapier.engine.actions.sheets import run_sheets_add_worksheet
+from plugins.google.runners.sheets import run_sheets_add_worksheet
 from plugins.zoom.runners import run_zoom_delete_recording
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
@@ -205,7 +205,7 @@ def test_drive_delete_file_permanent_error_raises():
 
 
 def run_sheets_add(action, transport):
-    with mock.patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with mock.patch("plugins.google.runners.sheets._sheets_connection",
                     return_value=GOOGLE_CONNECTION):
         return run_sheets_add_worksheet(
             {"type": "sheets_add_worksheet", "connection_id": "google",

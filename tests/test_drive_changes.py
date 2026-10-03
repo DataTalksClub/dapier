@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import drive, trigger_discovery  # noqa: F401  (drive: registration)
+from src.dapier.connectors import trigger_discovery
+from plugins.google.connector import drive
 from src.dapier.connections import discovery as provider
 from src.dapier.engine.actions import base
 from src.dapier.connections import tokens

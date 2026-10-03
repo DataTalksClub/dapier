@@ -6,9 +6,9 @@ lives in ``connectors.ingress``.
 
 The connectors without a module of their own (renderer, custom) register
 their trigger sample discoveries here, next to the chip that offers them;
-connectors with a module sample in their own module — zoom one documented
-payload per declared event, slack and youtube a live fetch with the
-history/synthetic fallback, mailchimp one payload per Mailchimp webhook
+provider connectors sample in their own plugin modules — zoom one
+documented payload per declared event, slack and youtube a live fetch with
+the history/synthetic fallback, mailchimp one payload per Mailchimp webhook
 type — and schedule and poll in connectors.schedule / connectors.poll — a
 schedule fire is synthesized and a poll fire has a live fetch path, so
 each owns its sample.
@@ -17,18 +17,7 @@ from .registry import Connector, connector
 
 connector(Connector(name="email", label="Email",
                     events=("message.received", "bounce.received", "complaint.received"), icon="mail"))
-connector(Connector(name="youtube", label="YouTube", events=("video.published",), icon="youtube"))
-# Provider chips whose fires come from poll sources (triggers/poll_sources):
-# a stored poll trigger with a non-http source publishes these connectors'
-# events, scoped per trigger through the poll-name filter.
-connector(Connector(name="google-sheets", label="Google Sheets", events=("row.new", "row.updated"), icon="table"))
-connector(Connector(name="google-drive", label="Google Drive",
-                    events=("file.created", "file.updated", "file.deleted"),
-                    icon="folder"))
-connector(Connector(name="google-calendar", label="Google Calendar",
-                    events=("event.new",),
-                    icon="calendar"))
-connector(Connector(name="renderer", label="Renderer", events=("job.completed",), icon="file-text"))
+connector(Connector(name="renderer" , label="Renderer", events=("job.completed",), icon="file-text"))
 connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))
 connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw"))
 connector(Connector(name="custom", label="Custom", events=(), icon="webhook"))

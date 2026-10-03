@@ -4,14 +4,13 @@ Provider-specific setup and verified account details live in separate guides:
 
 | Provider | Guide | Connection examples | Authentication |
 |----------|-------|---------------------|----------------|
-| Google | [Google Calendar, YouTube, Drive, Docs, Sheets, and Gmail](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
-| YouTube | [YouTube](youtube.md) (setup in the Google guide) | `youtube` | OAuth on the shared Google client |
-| Dropbox | [Dropbox](dropbox.md) | `dropbox` | OAuth |
+| Google | [Google Calendar, YouTube, Drive, Docs, Sheets, and Gmail](../../plugins/google/README.md) (plugin) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
+| Dropbox | [Dropbox](../../plugins/dropbox/README.md) (plugin) | `dropbox` | OAuth |
 | Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` | Pasted bot or user token |
-| Zoom | [Zoom](zoom.md) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
-| Telegram | [Telegram](telegram.md) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
-| Mailchimp | [Mailchimp](mailchimp.md) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
-| Amazon S3 | [AWS / S3](aws.md) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
+| Zoom | [Zoom](../../plugins/zoom/README.md) (plugin) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
+| Telegram | [Telegram](../../plugins/telegram/README.md) (plugin) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
+| Mailchimp | [Mailchimp](../../plugins/mailchimp/README.md) (plugin) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
+| Amazon S3 | [AWS / S3](../../plugins/aws/README.md) (plugin) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
 | AI (LLM) | [AI](ai.md) | — (no connection; the env is the config) | `LLM_API_KEY` (+ optional `LLM_BASE_URL`/`LLM_MODEL`) |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle
@@ -36,8 +35,8 @@ https://dapier.dtcdev.click/oauth/callback
 ```
 
 For client creation, scope requirements, and the verified state of each
-provider app, see the [Google](google.md), [Dropbox](dropbox.md), and
-[Zoom](zoom.md) guides. YouTube uses the shared Google client. Slack uses a
+provider app, see the [Google](../../plugins/google/README.md), [Dropbox](../../plugins/dropbox/README.md), and
+[Zoom](../../plugins/zoom/README.md) guides. YouTube uses the shared Google client. Slack uses a
 pasted token. Zoom's recording webhook uses a separate signing token in
 addition to its OAuth client for Zoom API access. Telegram also uses a
 pasted token, while Mailchimp and Amazon S3 use stored provider
@@ -147,9 +146,9 @@ To add or change a scope:
    **Google Auth Platform → Data access** scope table. Dropbox uses the app's
    **Permissions** tab; click **Submit** after changing it. Zoom uses the
    OAuth app's **Scopes** page. See the
-   [Google scope instructions](google.md#google-cloud-scope-configuration) or
-   [Dropbox permissions instructions](dropbox.md#app-configuration) or
-   [Zoom OAuth instructions](zoom.md#zoom-oauth-for-api-access).
+   [Google scope instructions](../../plugins/google/README.md#google-cloud-scope-configuration) or
+   [Dropbox permissions instructions](../../plugins/dropbox/README.md#app-configuration) or
+   [Zoom OAuth instructions](../../plugins/zoom/README.md#zoom-oauth-for-api-access).
 2. Replace the connection's scope list in **Connectors → Edit**, or run:
 
    ```sh
@@ -206,7 +205,7 @@ revoke and reconnect as above. Dropbox's [get current account endpoint](https://
 requires `account_info.read` for identity verification. Adding an app
 permission does not change tokens already issued. Google's production apps
 may need review for sensitive or restricted scopes; see the
-[Google guide](google.md#google-oauth-publishing-status).
+[Google guide](../../plugins/google/README.md#google-oauth-publishing-status).
 
 ## Expected-account binding (optional)
 

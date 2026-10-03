@@ -13,26 +13,21 @@ from . import registry, trigger_discovery  # noqa: F401
 from . import (  # noqa: F401  (import = registration)
     agent,
     ai,
-    calendar,
     code,
     csv,
     dataops,
     date_time,
     digest,
-    drive,
     email,
-    gmail,
     ingress,
     logic,
     poll,
     render,
     schedule,
-    sheets,
     storage,
     subworkflow,
     triggers,
     webhook,
-    youtube,
 )
 from .ingress import normalize_event  # noqa: F401
 from .registry import (  # noqa: F401

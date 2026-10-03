@@ -19,7 +19,7 @@ connection.
 import urllib.parse
 from datetime import datetime, timezone
 
-from ..engine.actions.drive import (
+from plugins.google.runners.drive import (
     run_drive_copy_file,
     run_drive_create_folder,
     run_drive_delete_file,
@@ -29,9 +29,9 @@ from ..engine.actions.drive import (
     run_drive_share_file,
     run_drive_upload_file,
 )
-from ..connections import discovery as provider
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import Action, Discovery, register, register_discovery
+from src.dapier.connections import discovery as provider
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors.registry import Action, Discovery, register, register_discovery
 
 
 def _run_files(connection, params, *, transport=None):
@@ -273,8 +273,8 @@ register(Action(
 
 # --- trigger discovery: file options for the find action's name field ----------
 
-from . import trigger_discovery  # noqa: E402
-from .trigger_discovery import (  # noqa: E402
+from src.dapier.connectors import trigger_discovery  # noqa: E402
+from src.dapier.connectors.trigger_discovery import (  # noqa: E402
     DEFAULT_LIMIT,
     TriggerDiscovery,
     register_trigger_discovery,
@@ -342,7 +342,7 @@ def _drive_poll_validate(body):
     folder-scoped), the ``connection_id`` of the Google connection to poll
     as (required — the fetch refreshes its OAuth token), plus the fetch
     defaults every stored drive poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     folder_id = str(body.get("folder_id") or "").strip()
@@ -409,7 +409,7 @@ def _drive_poll_fetch(item, cursor=None, *, transport=None):
     fires a bogus "file.created"; the seen store then dedupes the re-listed
     id. Raises ``RuntimeError`` on a failed fetch, like every poll source.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError("poll source 'google-drive.files' needs connection_id: "
@@ -475,7 +475,7 @@ def _drive_changes_validate(body):
     (required — the fetch refreshes its OAuth token) and the optional
     ``folder_id`` the updates source filters on, plus the fetch defaults
     every stored drive poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     if not str(body.get("connection_id") or "").strip():
@@ -519,7 +519,7 @@ def _drive_changes_fetch(item, cursor, *, removed, name, transport=None):
     (a file edited twice on one page fires once). Raises ``RuntimeError``
     on a failed fetch, like every poll source.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError(f"poll source '{name}' needs connection_id: "
@@ -594,7 +594,7 @@ def _stored_drive_poll(name):
     distinguishes live-vs-fallback, so any storage hiccup folds too —
     sampling never raises for want of infrastructure (see
     docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -664,7 +664,7 @@ def _fetch_drive_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     answered with a ``file.created`` run or example); a bare chip ask
     without a poll stays on the classic new-file sample.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_drive_poll(name)

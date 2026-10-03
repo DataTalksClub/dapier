@@ -18,19 +18,20 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import calendar, registry, trigger_discovery  # noqa: F401
+from src.dapier.connectors import registry, trigger_discovery  # noqa: F401
+from plugins.google.connector import calendar
 from src.dapier.connections import discovery as provider
 from src.dapier.connections import tokens
 from src.dapier.engine.actions import base
-from src.dapier.engine.actions.calendar import run_calendar_create_event
-from src.dapier.engine.actions.calendar import run_calendar_delete_event
-from src.dapier.engine.actions.calendar import run_calendar_find_events
-from src.dapier.engine.actions.calendar import run_calendar_quick_add
-from src.dapier.engine.actions.calendar import run_calendar_update_event
+from plugins.google.runners.calendar import run_calendar_create_event
+from plugins.google.runners.calendar import run_calendar_delete_event
+from plugins.google.runners.calendar import run_calendar_find_events
+from plugins.google.runners.calendar import run_calendar_quick_add
+from plugins.google.runners.calendar import run_calendar_update_event
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError
 
-WEB = Path(__file__).resolve().parents[1] / "src" / "web"
+WEB = Path(__file__).resolve().parents[3] / "src" / "web"
 CAL_ID = "ops@example.test"
 CAL_Q = urllib.parse.quote(CAL_ID, safe="")
 EVENT_ID = "1a2B3c4D5e6F7g8H9i0J_k4n9vqe7c9k"

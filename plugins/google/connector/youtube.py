@@ -7,8 +7,8 @@ discovery and health-check runners delegate to the shared provider layer
 (``connections.discovery``), which hits the YouTube Data API with the
 connection's own token.
 """
-from ..connections import discovery as provider
-from ..engine.actions.youtube import (
+from src.dapier.connections import discovery as provider
+from plugins.google.runners.youtube import (
     run_youtube_add_to_playlist,
     run_youtube_create_playlist,
     run_youtube_find_playlist_items,
@@ -19,8 +19,8 @@ from ..engine.actions.youtube import (
     run_youtube_subscription_status,
     run_youtube_subscription_renew,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors.registry import (
     Action,
     ConnectionTest,
     Discovery,
@@ -317,7 +317,7 @@ def _youtube_poll_validate(body):
     optional ``channel_id`` (empty stores "the connection's own channel",
     resolved through channels.mine at fetch time), plus the fetch defaults
     every stored youtube poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     if not str(body.get("connection_id") or "").strip():
@@ -379,7 +379,7 @@ def _youtube_poll_fetch(item, cursor=None, *, transport=None):
     parks it only once the page drains). Raises ``RuntimeError`` on a failed
     fetch, like every poll source.
     """
-    from ..engine.actions import base
+    from src.dapier.engine.actions import base
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError("poll source 'youtube.videos' needs connection_id: "
@@ -431,7 +431,7 @@ def _stored_youtube_poll(name):
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
     raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()
     if not name or "." in name:
@@ -460,8 +460,8 @@ _YOUTUBE_EPOCH_CURSOR = "0000-01-01T00:00:00Z"
 # falls back to recorded history, then a documented notification, so the
 # designer preview always renders (the slack connector's fetch chain).
 
-from . import trigger_discovery  # noqa: E402
-from .trigger_discovery import (  # noqa: E402
+from src.dapier.connectors import trigger_discovery  # noqa: E402
+from src.dapier.connectors.trigger_discovery import (  # noqa: E402
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     TriggerDiscovery,
@@ -572,7 +572,7 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport
     account, or a failed listing, falls through — the sample pull must
     answer with something a workflow author can build on.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     item = _stored_youtube_poll(event)
     if item is not None:

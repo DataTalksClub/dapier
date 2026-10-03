@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src.dapier.engine.actions.sheets import run_sheets_find_row
+from plugins.google.runners.sheets import run_sheets_find_row
 
 
 class FakeTransport:
@@ -39,7 +39,7 @@ def run_find(transport, action, event=None):
         "occurred_at": "2026-09-26T21:50:31+00:00",
         "data": {"text": "/todo call the dentist", "chat_id": 123},
     }
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value={"connection_id": "google", "provider": "google",
                              "status": "connected"}), \
          patch("src.dapier.connections.tokens.get_access_token",

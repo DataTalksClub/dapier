@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from src.dapier.connectors.registry import DISCOVERIES, action_specs, run_action
-from src.dapier.engine.actions.drive import run_drive_find_file
+from plugins.google.runners.drive import run_drive_find_file
 from plugins.aws.runners.s3 import run_s3_find
 
 

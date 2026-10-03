@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors.registry import run_action
-from src.dapier.engine.actions.sheets import run_sheets_append_row, run_sheets_find_row
+from plugins.google.runners.sheets import run_sheets_append_row, run_sheets_find_row
 
 
 class FakeTransport:
@@ -31,7 +31,7 @@ def run(transport, action, event=None):
         "occurred_at": "2026-09-26T21:50:31+00:00",
         "data": {"text": "/todo call the dentist", "chat_id": 123},
     }
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value={"connection_id": "google", "provider": "google",
                              "status": "connected"}), \
          patch("src.dapier.connections.tokens.get_access_token",
@@ -121,7 +121,7 @@ class RegistryDispatchTests(unittest.TestCase):
 
     def test_run_action_dispatches_sheets_append_row(self):
         transport = FakeTransport()
-        with patch("src.dapier.engine.actions.sheets._sheets_connection",
+        with patch("plugins.google.runners.sheets._sheets_connection",
                    return_value={"connection_id": "google", "provider": "google",
                                  "status": "connected"}), \
              patch("src.dapier.connections.tokens.get_access_token",
@@ -175,7 +175,7 @@ def run_find(transport, action, event=None):
         "occurred_at": "2026-09-26T21:50:31+00:00",
         "data": {"text": "/todo call the dentist", "chat_id": 123},
     }
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value={"connection_id": "google", "provider": "google",
                              "status": "connected"}), \
          patch("src.dapier.connections.tokens.get_access_token",
@@ -263,7 +263,7 @@ class FindRowTests(unittest.TestCase):
 class FindRowRegistryTests(unittest.TestCase):
     def test_run_action_dispatches_sheets_find_row(self):
         transport = FindTransport(rows=SHEET)
-        with patch("src.dapier.engine.actions.sheets._sheets_connection",
+        with patch("plugins.google.runners.sheets._sheets_connection",
                    return_value={"connection_id": "google", "provider": "google",
                                  "status": "connected"}), \
              patch("src.dapier.connections.tokens.get_access_token",

@@ -10,7 +10,7 @@ from src.dapier.connectors.registry import (
     run_action,
     validate_action_chain,
 )
-from src.dapier.engine.actions.sheets import (
+from plugins.google.runners.sheets import (
     run_sheets_lookup_row,
     run_sheets_update_row,
 )
@@ -41,7 +41,7 @@ def _sheet_body(*rows):
 
 
 def _connected():
-    return (patch("src.dapier.engine.actions.sheets._sheets_connection",
+    return (patch("plugins.google.runners.sheets._sheets_connection",
                   return_value={"connection_id": "google", "provider": "google",
                                 "status": "connected"}),
             patch("src.dapier.connections.tokens.get_access_token",

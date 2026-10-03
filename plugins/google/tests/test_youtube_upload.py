@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.youtube import run_youtube_upload_video
+from plugins.google.runners.youtube import run_youtube_upload_video
 
 UPLOAD_URL_PREFIX = ("https://www.googleapis.com/upload/youtube/v3/videos"
                      "?uploadType=multipart&part=snippet%2Cstatus")
@@ -246,7 +246,7 @@ class YoutubeUploadTests(unittest.TestCase):
     def test_oversized_video_fails_the_in_memory_guard(self):
         transport = FakeTransport()
 
-        with patch("src.dapier.engine.actions.youtube.MAX_VIDEO_BYTES", 16):
+        with patch("plugins.google.runners.youtube.MAX_VIDEO_BYTES", 16):
             for action in (
                 {"content": "0123456789abcdefghij"},
                 {"source_s3": {"bucket": "b", "key": "k"}},

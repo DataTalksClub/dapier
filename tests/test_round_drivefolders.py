@@ -16,12 +16,12 @@ from unittest.mock import patch
 
 from src.dapier.connectors import registry
 from src.dapier.connectors import trigger_discovery
-from src.dapier.engine.actions.drive import (
+from plugins.google.runners.drive import (
     run_drive_create_folder,
     run_drive_delete_file,
     run_drive_find_file,
 )
-from src.dapier.engine.actions.sheets import run_sheets_clear_values
+from plugins.google.runners.sheets import run_sheets_clear_values
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 
@@ -277,7 +277,7 @@ class DriveCreateFolderTests(unittest.TestCase):
 
 def run_clear(transport, action, event=None, steps=None):
     action = {"type": "sheets_clear_values", "connection_id": "google", **action}
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value=dict(GOOGLE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

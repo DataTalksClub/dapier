@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.sheets import (
+from plugins.google.runners.sheets import (
     run_sheets_create_spreadsheet,
     run_sheets_delete_row,
 )
@@ -86,7 +86,7 @@ def multipart_parts(call):
 
 def run_delete(transport, action, event=None, steps=None):
     action = {"type": "sheets_delete_row", "connection_id": "google", **action}
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value=dict(GOOGLE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -177,7 +177,7 @@ class SheetsDeleteRowTests(unittest.TestCase):
 def run_create(transport, action, event=None, steps=None):
     action = {"type": "sheets_create_spreadsheet", "connection_id": "google",
               **action}
-    with patch("src.dapier.engine.actions.sheets._sheets_connection",
+    with patch("plugins.google.runners.sheets._sheets_connection",
                return_value=dict(GOOGLE_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -540,7 +540,7 @@ class RegistryTests(unittest.TestCase):
             ("example.test/pic", 200, b"bytes"))
         with patch("src.dapier.engine.actions.base._connected_connection",
                    return_value=dict(TELEGRAM_CONNECTION)), \
-             patch("src.dapier.engine.actions.sheets._sheets_connection",
+             patch("plugins.google.runners.sheets._sheets_connection",
                    return_value=dict(GOOGLE_CONNECTION)), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})), \

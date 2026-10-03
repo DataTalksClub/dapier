@@ -606,7 +606,7 @@ telemetry and depth cap.
    (reuse `values.get` + `transport`), register in `connectors/sheets.py` with
    fields (`spreadsheet_id`, `sheet_name`, `match_field`, `match_value`,
    `create_if_missing`); document the `{steps.find.output.*}` pattern in
-   `docs/connectors/google.md`; verify through `wf test` and a live workflow
+   `plugins/google/README.md`; verify through `wf test` and a live workflow
    rather than new endpoints (parity holds: console designer, CLI `wf test`,
    and runs views all reach it through the same API). Tests:
    `tests/test_sheets_actions.py` found/not-found/create-if-missing.
@@ -664,7 +664,7 @@ Trigger connectors (palette chips + sample pull):
 | connector | events | sample pull | trigger options | action pickers | conn test | find actions |
 |---|---|---|---|---|---|---|
 | email | message.received | ✓ | — | — | — (no connection record) | — (send only) |
-| youtube | video.published | ✓ | — (push, no trigger fields) | playlists | youtube | find video, find playlist videos, upload video (needs `youtube.upload` scope — see docs/connectors/google.md) |
+| youtube | video.published | ✓ | — (push, no trigger fields) | playlists | youtube | find video, find playlist videos, upload video (needs `youtube.upload` scope — see plugins/google/README.md) |
 | dropbox | file.created/updated/deleted | ✓ per event | folders | files, folders, search | dropbox | find file or folder |
 | zoom | recording.completed, recording.transcript_completed, meeting.started, meeting.ended, meeting.registration_created, webinar.started, webinar.ended, webinar.registration_created | ✓ per event | meetings, past_meetings, recordings, webinars | meetings, past_meetings, recordings, webinars | zoom | find meeting, find recording, find webinar, create meeting + webinar, update meeting + webinar, delete meeting/recording/webinar, add registrant (meeting + webinar), list past participants (meeting + webinar) |
 | slack | message.received, app.mention, reaction.added, member.joined | ✓ per event | channels | channels, users, messages | slack | find user or channel (create-if-missing on channels), find user by email, find message, update message, add reaction, pin, invite users, DM, create channel, set topic/purpose, upload file, schedule, add reminder |

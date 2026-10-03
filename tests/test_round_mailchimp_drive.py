@@ -25,7 +25,7 @@ import pytest
 from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import discovery, tokens
 from src.dapier.engine.actions import base
-from src.dapier.engine.actions.drive import run_drive_copy_file, run_drive_share_file
+from plugins.google.runners.drive import run_drive_copy_file, run_drive_share_file
 from plugins.mailchimp.runners.mailchimp import (
     run_mailchimp_remove_member,
     run_mailchimp_tag_member,

@@ -9,7 +9,8 @@ import pytest
 
 from src.dapier.connections import discovery
 from src.dapier.connections import tokens
-from src.dapier.connectors import registry, youtube  # noqa: F401  (registration)
+from src.dapier.connectors import registry  # noqa: F401  (registration)
+from plugins.google.connector import youtube
 
 
 class FakeTransport:

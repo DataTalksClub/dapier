@@ -15,18 +15,18 @@ history and a later edit never poses as a new event.
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 
-from ..connections import discovery as provider
-from ..engine.actions.calendar import (
+from src.dapier.connections import discovery as provider
+from plugins.google.runners.calendar import (
     run_calendar_create_event,
     run_calendar_delete_event,
     run_calendar_find_events,
     run_calendar_quick_add,
     run_calendar_update_event,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import Action, Discovery, register, register_discovery
-from . import trigger_discovery
-from .trigger_discovery import (
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors.registry import Action, Discovery, register, register_discovery
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
     options_from_registry,
@@ -273,7 +273,7 @@ def _events_poll_validate(body):
     calendar-scoped), the ``connection_id`` of the Google connection to
     poll as (required — the fetch refreshes its OAuth token), plus the
     fetch defaults every stored calendar poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     calendar_id = str(body.get("calendar_id") or "").strip()
@@ -340,7 +340,7 @@ def _events_poll_fetch(item, cursor=None, *, transport=None):
     later occurrences don't fire one by one. Raises ``RuntimeError`` on a
     failed fetch, like every poll source.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not str(item.get("connection_id") or "").strip():
         raise RuntimeError("poll source 'google-calendar.events' needs connection_id: "
@@ -405,7 +405,7 @@ def _stored_calendar_poll(name):
     distinguishes live-vs-fallback, so any storage hiccup folds too —
     sampling never raises for want of infrastructure (see
     docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -432,7 +432,7 @@ def _fetch_calendar_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     through to the recorded/documented sample instead of failing: a sample
     pull shows the payload shape, it never raises.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_calendar_poll(name)

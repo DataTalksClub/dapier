@@ -39,7 +39,7 @@ below is verified live, not copied.
   mailchimp find member + upsert member; create actions: mailchimp upsert
   member, zoom create meeting (scheduled or instant), youtube upload video
   (the last write-action gap; needs the `youtube.upload` OAuth scope — see
-  docs/connectors/google.md), drive upload file.
+  plugins/google/README.md), drive upload file.
 - **Replay + test are platform-level**, so they cover every connector by
   construction: full replay, replay-from-step, inbox replay, per-step
   "Test step", trigger-sample autofill, connection test.

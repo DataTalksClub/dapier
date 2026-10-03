@@ -19,9 +19,9 @@ import mimetypes
 import os
 import urllib.parse
 
-from ...connections import tokens
-from . import base
-from .templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files"
 DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"

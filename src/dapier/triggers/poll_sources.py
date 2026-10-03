@@ -13,24 +13,15 @@ source's events carry the source's own connector and event names
 (``s3``/``file.created``), so workflows pick the matching palette chip while
 the trigger still scopes runs through its ``poll`` filter.
 
-A source registers itself with :func:`register_source` from its connector
-module (connectors/s3.py, connectors/sheets.py, connectors/drive.py,
-connectors/zoom.py, connectors/dropbox.py, connectors/youtube.py);
-:func:`resolve`/:func:`stored_source` import the
-built-in provider modules on first use so a scheduled fire never depends on
-the engine having loaded the connectors package first. Provider modules
-import their triggers siblings lazily, so the import stays cycle-free.
+A source registers itself with :func:`register_source` from its plugin's
+import — the loader imports every plugin, and :func:`resolve`/
+:func:`stored_source` run it on first use so a scheduled fire never depends
+on the engine having loaded the connectors package first.
 """
 
 DEFAULT_SOURCE = "http"
 
 SOURCES: dict = {}
-
-_BUILTIN_MODULES = ("..connectors.sheets", "..connectors.drive",
-                    "..connectors.youtube",
-                    "..connectors.calendar", "..connectors.gmail")
-_loaded = False
-
 
 class PollSource:
     """One named fetch source behind a poll trigger's ``source`` key.
@@ -62,20 +53,12 @@ def register_source(source):
 
 
 def _load_builtins():
-    global _loaded
-    if _loaded:
-        return
     # Plugin poll sources register at their plugin's import; a scheduled
     # fire can reach resolve() without the connectors package ever having
     # been imported, so the loader runs here too (idempotent).
     from ..plugins import load_all
 
     load_all()
-    import importlib
-
-    for module in _BUILTIN_MODULES:
-        importlib.import_module(module, __package__)
-    _loaded = True
 
 
 def source_names():

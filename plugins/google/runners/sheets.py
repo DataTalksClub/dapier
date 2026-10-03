@@ -4,9 +4,9 @@ the header-column writer)."""
 import json
 import urllib.parse
 
-from ...connections import tokens
-from . import base
-from .templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 VALUE_INPUT_OPTIONS = ("USER_ENTERED", "RAW")
 

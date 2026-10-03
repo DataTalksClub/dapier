@@ -145,13 +145,17 @@ def test_real_tree_loads_every_plugin():
     import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
 
     manifests = plugins.load_all()
-    expected = {"slack", "rss", "mailchimp", "telegram", "dropbox", "aws", "zoom"}
+    expected = {"slack", "rss", "mailchimp", "telegram", "dropbox", "aws", "zoom",
+                "google"}
     assert expected <= set(manifests), set(manifests)
     for name in expected:
         assert plugins.core_compat_ok(manifests[name]), name
 
-    # chips: every migrated connector is in the trigger catalog
-    for chip in expected - {"aws"} | {"s3"}:  # aws's chip is named s3
+    # chips: every migrated connector is in the trigger catalog (aws's chip
+    # is named s3; the google plugin serves five chips off one connection)
+    for chip in (expected - {"aws", "google"} | {"s3"}
+                 | {"google-sheets", "google-drive", "google-calendar", "gmail",
+                    "youtube"}):
         assert chip in registry.CONNECTORS, chip
 
     # provider mappings fed from the manifests
@@ -162,24 +166,32 @@ def test_real_tree_loads_every_plugin():
     assert registry.PROVIDER_DISCOVERY_SOURCES["s3"] == ("s3",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["aws"] == ("s3",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["zoom"] == ("zoom",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["google"] == (
+        "google-sheets", "google-drive", "google-calendar", "gmail")
+    assert registry.PROVIDER_DISCOVERY_SOURCES["youtube"] == ("youtube",)
     assert registry.CONNECTION_TEST_ALIASES["s3"] == "aws"
 
     # actions: at least one per action-carrying plugin
     for action in ("slack", "mailchimp_find_member", "telegram_send",
-                   "dropbox_upload", "s3_upload", "zoom_create_meeting"):
+                   "dropbox_upload", "s3_upload", "zoom_create_meeting",
+                   "sheets_append_row", "gmail_send", "youtube_upload_video"):
         assert action in registry.ACTIONS, action
 
     # poll sources
     for source in ("slack.messages", "rss", "mailchimp.members",
-                   "dropbox.files", "s3", "zoom.recordings"):
+                   "dropbox.files", "s3", "zoom.recordings",
+                   "google-sheets.rows", "google-drive.files",
+                   "google-calendar.events", "gmail.messages", "youtube.videos"):
         assert source in poll_sources.SOURCES, source
 
     # connection tests and discoveries carry the connectors they did before
     # (aws registers its health check under the aws connector but its
     # bucket/object discoveries under s3, as before the move)
-    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "aws", "zoom"):
+    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "aws",
+                           "zoom", "google", "youtube"):
         assert any(test.connector == connector_name for test in
                    registry.connection_tests().values()), connector_name
-    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "s3", "zoom"):
+    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "s3",
+                           "zoom", "google-sheets", "youtube"):
         assert any(entry.connector == connector_name for entry in
                    registry.discoveries()), connector_name

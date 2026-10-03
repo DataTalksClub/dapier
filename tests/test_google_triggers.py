@@ -17,7 +17,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import drive, sheets  # noqa: F401  (import = registration)
+from plugins.google.connector import drive
+from plugins.google.connector import sheets
 from src.dapier.connectors import trigger_discovery
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError

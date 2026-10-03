@@ -1,0 +1,10 @@
+name: google
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [google, youtube]
+  discovery_sources:
+    google: [google-sheets, google-drive, google-calendar, gmail]
+    youtube: [youtube]
+  trigger_chips: [youtube, google-sheets, google-drive, google-calendar, gmail]
+  poll_sources: [google-sheets.rows, google-sheets.updates, google-drive.files, google-drive.updates, google-drive.deletions, google-calendar.events, gmail.messages, youtube.videos]
