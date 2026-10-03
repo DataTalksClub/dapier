@@ -147,7 +147,8 @@ sent to production.
 Read-only YouTube refresh verifies channel UCDvErgK0j5ur3aLgn6U-LqQ. Its latest
 upload is `aSI_dxt8KhY`, published 2026-09-30T04:44:20Z; no genuine ingress was
 recorded in the test window. Live workflow names that channel, no YouTube poll
-is configured, and deployed infrastructure renews WebSub every five days.
+is configured. The old renewal interval was five days; the repair uses four
+days to leave margin against the observed five-day lease.
 The authenticated read-only lease diagnostic uses the existing server-held
 secret and returns only state/expiry/topic/callback. Its final provider result
 is recorded in the completion handoff; the earlier unauthenticated 400 is not
@@ -157,13 +158,14 @@ The authenticated diagnostic initially returned `expired`. An idempotent renewal
 of the existing watched channel used the exact deployed callback/topic/current
 secret and was accepted with HTTP 202; hub state became `verified`. The hub's
 human-formatted expiry required RFC 2822 parsing; regression tests preserve
-`active: null` when expiry is unknown. Final active/future-expiry provider
-readback is in the sanitized handoff proof.
+`active: null` when expiry is unknown. Authenticated provider readback confirmed `active: true`, state `verified`,
+expiry `2026-10-08T05:01:07+00:00`, with the existing topic and callback.
+The sanitized handoff proof records this readback.
 
 The renewal Lambda had only Secrets Manager access even though `all_workflows()`
 reads four DynamoDB tables. This confirmed stack configuration defect is repaired
 with read-only access to those exact existing workflow/trigger tables and an
-explicitly enabled five-day schedule. It is a plausible expiry cause; historical
+explicitly enabled four-day schedule. It is a plausible expiry cause; historical
 scheduled failures are not claimed without log evidence. Local AWS inspection
 was blocked with `AWS Gate is closed or denied: HTTP 403`. Post-deploy CI uses
 existing authority to inspect physical rule/target and bounded recent failure

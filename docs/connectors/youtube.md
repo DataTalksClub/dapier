@@ -95,3 +95,7 @@ an enabled workflow. It renews using the same callback, topic and server-held
 secret as the scheduled renewal. This action is available through the shared
 designer API, Console action catalog and CLI workflow test path. It sends no
 video or Slack notification.
+
+Renewal runs every four days, leaving one day of margin against the observed
+five-day hub lease. The renewal Lambda reads the four live workflow/trigger
+tables with scoped read-only permissions.

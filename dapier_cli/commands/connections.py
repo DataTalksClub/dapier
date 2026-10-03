@@ -142,7 +142,7 @@ def print_hook_setup(provider, api_url):
               f"({YOUTUBE_HUB_URL}) with callback {base}/hooks/youtube and topic "
               f"https://www.youtube.com/xml/feeds/videos.xml?channel_id=<CHANNEL_ID>; "
               f"the renewal schedule also re-subscribes every channel a youtube "
-              f"workflow item filters on every five days.")
+              f"workflow item filters on every four days.")
     elif provider == "dropbox":
         print(f"To receive file events, set the Dropbox app's Webhook URI to "
               f"{base}/hooks/dropbox in the App Console; deliveries are signed "

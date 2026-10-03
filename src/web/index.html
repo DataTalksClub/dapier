@@ -694,7 +694,7 @@
           <code id="edit-youtube-url" class="break-all"></code>
           <p>Subscribe the channel on the hub — pass the callback above, the topic <code>https://www.youtube.com/xml/feeds/videos.xml?channel_id=<em>CHANNEL_ID</em></code>, and <code>hub.secret</code> set to the configured webhook secret:</p>
           <pre id="edit-youtube-curl" class="sample-json mono"></pre>
-          <p class="field-hint">The renewal schedule re-subscribes every channel a <code>youtube / video.published</code> workflow item filters on every five days, so subscriptions stay live; the manual subscribe above starts watching immediately. With a webhook secret configured, unsigned deliveries are rejected.</p>
+          <p class="field-hint">The renewal schedule re-subscribes every channel a <code>youtube / video.published</code> workflow item filters on every four days, so subscriptions stay live; the manual subscribe above starts watching immediately. With a webhook secret configured, unsigned deliveries are rejected.</p>
         </section>
         <section id="edit-dropbox-setup" class="detail-block" hidden>
           <h3>Dropbox webhook</h3>

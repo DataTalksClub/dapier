@@ -263,7 +263,7 @@ workflow item names it.
 1. Connect the channel (OAuth, `youtube.readonly`) as described above.
 2. Create a workflow item with `connector: youtube`,
    `event: video.published`, and a `channel_id` filter (for example
-   `channel_id: {equals: UC…}`). A renewal schedule runs every five days and
+   `channel_id: {equals: UC…}`). A renewal schedule runs every four days and
    re-subscribes every channel named this way, passing the stored hub secret so
    deliveries arrive signed (`X-Hub-Signature: sha1=…`) and Dapier verifies
    them.

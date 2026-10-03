@@ -586,7 +586,7 @@ Resources:
         Renewal:
           Type: Schedule
           Properties:
-            Schedule: rate(5 days)
+            Schedule: rate(4 days)
             Enabled: true
 
   YouTubeWebhookSecret:

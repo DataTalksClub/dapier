@@ -90,4 +90,4 @@ def test_youtube_renewal_can_read_every_live_workflow_source():
         resource=yaml.load(fh, Loader=yaml.SafeLoader)["Resources"]["YouTubeSubscriptionFunction"]["Properties"]
     tables={policy["DynamoDBReadPolicy"]["TableName"]["Ref"] for policy in resource["Policies"] if "DynamoDBReadPolicy" in policy}
     assert tables == {"PublishedWorkflowsTable", "HookTriggersTable", "ScheduleTriggersTable", "PollTriggersTable"}
-    assert resource["Events"]["Renewal"]["Properties"] == {"Schedule":"rate(5 days)","Enabled":True}
+    assert resource["Events"]["Renewal"]["Properties"] == {"Schedule":"rate(4 days)","Enabled":True}
