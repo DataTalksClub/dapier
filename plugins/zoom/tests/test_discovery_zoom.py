@@ -15,7 +15,7 @@ from src.dapier.api import discovery as api_discovery
 from src.dapier.api import runs
 from src.dapier.connectors import registry
 from src.dapier.connectors import trigger_discovery
-from src.dapier.connectors import zoom as zoom_connector  # noqa: F401 (registers)
+import plugins.zoom.connector as zoom_connector  # noqa: F401 (registers)
 from src.dapier.connections import discovery as provider
 from src.dapier.connections import tokens
 from src.dapier.connections.providers import oauth_providers

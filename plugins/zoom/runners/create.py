@@ -1,6 +1,6 @@
 """zoom_create_meeting / zoom_create_webinar: the create runners and the
 payload builders zoom_find_meeting's create-if-missing branch shares."""
-from ....connections import tokens
+from src.dapier.connections import tokens
 from .core import (_apply_duration, _apply_settings, _created_view,
                    _created_webinar_view, _parse_start_time, _pkg,
                    _raise_zoom_error, _rendered, _request_json)

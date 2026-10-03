@@ -18,18 +18,9 @@ from .registry import Connector, connector
 connector(Connector(name="email", label="Email",
                     events=("message.received", "bounce.received", "complaint.received"), icon="mail"))
 connector(Connector(name="youtube", label="YouTube", events=("video.published",), icon="youtube"))
-connector(Connector(name="zoom", label="Zoom",
-                    events=("recording.completed", "recording.transcript_completed",
-                            "meeting.started", "meeting.ended",
-                            "meeting.registration_created",
-                            "webinar.started", "webinar.ended",
-                            "webinar.registration_created"),
-                    icon="video"))
 # Provider chips whose fires come from poll sources (triggers/poll_sources):
 # a stored poll trigger with a non-http source publishes these connectors'
-# events, scoped per trigger through the poll-name filter. The zoom chip
-# above joins them on recording.completed: the zoom.recordings poll source
-# (connectors/zoom.py) publishes it on a schedule, no Zoom app required.
+# events, scoped per trigger through the poll-name filter.
 connector(Connector(name="google-sheets", label="Google Sheets", events=("row.new", "row.updated"), icon="table"))
 connector(Connector(name="google-drive", label="Google Drive",
                     events=("file.created", "file.updated", "file.deleted"),

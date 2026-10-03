@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 from src.dapier.connectors import registry
 from plugins.aws.runners.s3 import run_s3_find
-from src.dapier.engine.actions.zoom import run_zoom_list_past_participants
+from plugins.zoom.runners import run_zoom_list_past_participants
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 
@@ -185,7 +185,7 @@ class S3FindListingTests(unittest.TestCase):
 def run_participants(transport, action, event=None, steps=None):
     action = {"type": "zoom_list_past_participants",
               "connection_id": "zoom-main", **action}
-    with patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with patch("plugins.zoom.runners._zoom_connection",
                return_value=dict(ZOOM_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

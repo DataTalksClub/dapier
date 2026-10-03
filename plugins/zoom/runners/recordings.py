@@ -3,8 +3,8 @@ account's cloud recordings."""
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 
-from ....connections import tokens
-from ..templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions.templating import render
 from .core import (DELETE_RECORDING_ACTIONS, MATCH_MODES, _get_json, _pkg,
                    _raise_zoom_error, _recording_view, _rendered,
                    _request_json, _topic_matches)

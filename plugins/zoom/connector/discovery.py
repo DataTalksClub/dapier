@@ -1,12 +1,12 @@
 """Zoom discovery: connection-scoped listings, health check, trigger options."""
-from ...connections import discovery as provider
-from ..registry import (
+from src.dapier.connections import discovery as provider
+from src.dapier.connectors.registry import (
     ConnectionTest,
     Discovery,
     register_connection_test,
     register_discovery,
 )
-from ..trigger_discovery import (
+from src.dapier.connectors.trigger_discovery import (
     TriggerDiscovery,
     id_name_options,
     register_trigger_discovery,

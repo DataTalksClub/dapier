@@ -3,7 +3,7 @@
 Three events on the way to "every connector fires Zapier-style events", each
 covered on both of its surfaces: the intake that publishes the event
 (api.router._telegram_hook, triggers.intake.zoom_webhooks) and the sample
-pull that documents it (connectors.telegram, connectors.zoom), so a filter
+pull that documents it (plugins.telegram, plugins.zoom), so a filter
 or template copied from a pulled sample matches a real delivery. Channel
 announcements are their own telegram event (channel_post.received) with the
 same hook/filter matching as message.received, and inline-keyboard button

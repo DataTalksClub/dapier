@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.zoom import run_zoom_delete_meeting
+from plugins.zoom.runners import run_zoom_delete_meeting
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 
@@ -49,7 +49,7 @@ def json_body(payload):
 
 def run_delete(transport, action, event=None, steps=None):
     action = {"type": "zoom_delete_meeting", "connection_id": "zoom-main", **action}
-    with patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with patch("plugins.zoom.runners._zoom_connection",
                return_value=dict(ZOOM_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -118,7 +118,7 @@ class ZoomDeleteMeetingTests(unittest.TestCase):
         transport = FakeTransport(("/meetings/9100", 204, b""))
         with patch("src.dapier.engine.actions.base._default_transport",
                    transport), \
-             patch("src.dapier.engine.actions.zoom._zoom_connection",
+             patch("plugins.zoom.runners._zoom_connection",
                    return_value=dict(ZOOM_CONNECTION)), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})):

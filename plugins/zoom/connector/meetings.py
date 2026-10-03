@@ -4,7 +4,7 @@ The runners live in :mod:`src.dapier.engine.actions.zoom`; this module only
 declares the catalog entries (labels, fields, discovery wiring) the console
 and the engine read.
 """
-from ...engine.actions.zoom import (
+from plugins.zoom.runners import (
     run_zoom_add_registrant,
     run_zoom_create_meeting,
     run_zoom_delete_meeting,
@@ -14,7 +14,7 @@ from ...engine.actions.zoom import (
     run_zoom_list_past_participants,
     run_zoom_update_meeting,
 )
-from ..registry import Action, register
+from src.dapier.connectors.registry import Action, register
 
 register(Action(
     type="zoom_find_meeting",

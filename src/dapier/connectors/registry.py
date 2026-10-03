@@ -137,7 +137,6 @@ CONNECTION_TESTS: dict = {}
 PROVIDER_DISCOVERY_SOURCES = {
     "google": ("google-sheets", "google-drive", "google-calendar", "gmail"),
     "youtube": ("youtube",),
-    "zoom": ("zoom",),
 }
 
 # Providers whose health check is registered under another key. Now empty:

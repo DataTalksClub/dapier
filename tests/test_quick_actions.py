@@ -28,7 +28,7 @@ from src.dapier.engine.actions.drive import (
 from src.dapier.engine.actions.email import run_email_send
 from plugins.aws.runners.s3 import run_s3_list_objects
 from src.dapier.engine.actions.sheets import run_sheets_add_worksheet
-from src.dapier.engine.actions.zoom import run_zoom_delete_recording
+from plugins.zoom.runners import run_zoom_delete_recording
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 
@@ -278,7 +278,7 @@ def test_sheets_add_worksheet_duplicate_title_is_a_runtime_error():
 
 
 def run_zoom_delete_recording_with(action, transport):
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=ZOOM_CONNECTION):
         return run_zoom_delete_recording(
             {"type": "zoom_delete_recording", "connection_id": "zoom-main",
@@ -618,7 +618,7 @@ def test_registry_dispatches_drive_move_and_zoom_delete():
             {"type": "drive_move_file", "connection_id": "google",
              "file_id": "1a2B3c", "remove_parent": "folder-a",
              "add_parent": "folder-b"}, EVENT, "wf-1")
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=ZOOM_CONNECTION), \
          mock.patch("src.dapier.engine.actions.base._default_transport",
                     transport):

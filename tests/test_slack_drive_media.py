@@ -24,7 +24,7 @@ from src.dapier.connections import tokens
 from src.dapier.engine.actions import base
 from src.dapier.engine.actions.drive import run_drive_read_file
 from plugins.slack.runners.slack import run_slack_upload_file
-from src.dapier.engine.actions.zoom import run_zoom_find_meeting
+from plugins.zoom.runners import run_zoom_find_meeting
 
 SLACK_TOKEN = {"token": "xoxb-test"}
 GOOGLE_CONNECTION = {"connection_id": "gdrive", "provider": "google",
@@ -320,7 +320,7 @@ def test_the_media_chain_validates_against_the_registry():
 
 
 def run_zoom(action, transport):
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=dict(ZOOM_CONNECTION)), \
          mock.patch.object(tokens, "get_access_token",
                            return_value=("tok", {})):
@@ -424,7 +424,7 @@ def test_find_or_create_dispatches_and_validates_through_the_registry():
         (200, {"meetings": []}),
         (201, {"id": 9102, "topic": "Standup"}))
 
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=dict(ZOOM_CONNECTION)), \
          mock.patch.object(tokens, "get_access_token",
                            return_value=("tok", {})), \

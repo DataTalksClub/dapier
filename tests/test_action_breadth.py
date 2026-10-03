@@ -17,7 +17,7 @@ import pytest
 from src.dapier.connectors import registry
 from src.dapier.connections import tokens
 from plugins.dropbox.runners.dropbox import run_dropbox_get_temp_link
-from src.dapier.engine.actions.zoom import run_zoom_create_meeting
+from plugins.zoom.runners import run_zoom_create_meeting
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 
@@ -61,7 +61,7 @@ def token_seam(monkeypatch):
 
 
 def run_zoom_create(action, transport):
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=ZOOM_CONNECTION):
         return run_zoom_create_meeting(
             {"type": "zoom_create_meeting", "connection_id": "zoom-main", **action},
@@ -125,7 +125,7 @@ def test_zoom_create_meeting_dispatches_through_the_registry():
     transport = FakeTransport(
         ("users/me/meetings", 201,
          {"id": 9110, "topic": "Live lecture", "join_url": "https://zoom.us/j/9110"}))
-    with mock.patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with mock.patch("plugins.zoom.runners._zoom_connection",
                     return_value=ZOOM_CONNECTION), \
          mock.patch("src.dapier.engine.actions.base._default_transport", transport):
         output = registry.ACTIONS["zoom_create_meeting"].run(

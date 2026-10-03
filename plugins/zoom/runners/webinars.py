@@ -4,8 +4,8 @@ shapes one level up on Zoom's REST API (webinar ids are NOT meeting ids:
 a registrant added to the wrong kind of id is Zoom's 4xx)."""
 import urllib.parse
 
-from ....connections import tokens
-from ..templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions.templating import render
 from .core import (_collect_participants, _get_json, _pkg,
                    _raise_zoom_error, _rendered, _request_json,
                    _topic_matches, _topic_query, _update_fields,

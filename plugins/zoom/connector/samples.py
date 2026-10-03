@@ -1,5 +1,5 @@
 """Zoom's documented per-event webhook samples behind the sample pull."""
-from ..trigger_discovery import per_event_sample_fetch
+from src.dapier.connectors.trigger_discovery import per_event_sample_fetch
 
 # --- trigger samples: one documented payload per declared event -----------------
 #

@@ -2,8 +2,8 @@
 zoom_list_past_participants: the meeting lifecycle runners."""
 import urllib.parse
 
-from ....connections import tokens
-from ..templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions.templating import render
 from .core import (_collect_participants, _created_view, _flag, _get_json,
                    _meeting_view, _pkg, _raise_zoom_error, _rendered,
                    _request_json, _topic_matches, _topic_query,

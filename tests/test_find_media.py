@@ -21,7 +21,7 @@ from src.dapier.engine.actions.youtube import (
     run_youtube_find_playlist_items,
     run_youtube_find_video,
 )
-from src.dapier.engine.actions.zoom import (
+from plugins.zoom.runners import (
     run_zoom_create_meeting,
     run_zoom_find_meeting,
     run_zoom_find_recording,
@@ -68,7 +68,10 @@ def connections(monkeypatch):
 
 def with_connection(module_name, connection):
     """Patch the connection seam the way the engine action module resolves it."""
-    helper = {"youtube": "_youtube_connection", "zoom": "_zoom_connection"}.get(
+    if module_name == "zoom":  # a plugin: the seam lives on the runners package
+        return mock.patch("plugins.zoom.runners._zoom_connection",
+                          return_value=dict(connection))
+    helper = {"youtube": "_youtube_connection"}.get(
         module_name, "_connected_connection")
     module = "base" if module_name == "telegram" else module_name
     return mock.patch(f"src.dapier.engine.actions.{module}.{helper}",

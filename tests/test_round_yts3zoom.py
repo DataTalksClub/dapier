@@ -24,7 +24,7 @@ from src.dapier.engine.actions.youtube import (
     run_youtube_add_to_playlist,
     run_youtube_update_video,
 )
-from src.dapier.engine.actions.zoom import (
+from plugins.zoom.runners import (
     run_zoom_add_registrant,
     run_zoom_update_meeting,
 )
@@ -461,7 +461,7 @@ class S3DeleteObjectTests(unittest.TestCase):
 
 def run_meeting_update(transport, action, event=None, steps=None):
     action = {"type": "zoom_update_meeting", "connection_id": "zoom-main", **action}
-    with patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with patch("plugins.zoom.runners._zoom_connection",
                return_value=dict(ZOOM_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -537,7 +537,7 @@ class ZoomUpdateMeetingTests(unittest.TestCase):
 
 def run_registrant_add(transport, action, event=None, steps=None):
     action = {"type": "zoom_add_registrant", "connection_id": "zoom-main", **action}
-    with patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with patch("plugins.zoom.runners._zoom_connection",
                return_value=dict(ZOOM_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

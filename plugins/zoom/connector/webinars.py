@@ -1,5 +1,5 @@
 """Zoom action registrations: webinars and their registrants."""
-from ...engine.actions.zoom import (
+from plugins.zoom.runners import (
     run_zoom_add_webinar_registrant,
     run_zoom_create_webinar,
     run_zoom_delete_webinar,
@@ -7,7 +7,7 @@ from ...engine.actions.zoom import (
     run_zoom_list_past_webinar_participants,
     run_zoom_update_webinar,
 )
-from ..registry import Action, register
+from src.dapier.connectors.registry import Action, register
 
 register(Action(
     type="zoom_create_webinar",

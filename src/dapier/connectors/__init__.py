@@ -33,7 +33,6 @@ from . import (  # noqa: F401  (import = registration)
     triggers,
     webhook,
     youtube,
-    zoom,
 )
 from .ingress import normalize_event  # noqa: F401
 from .registry import (  # noqa: F401

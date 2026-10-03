@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.zoom import (
+from plugins.zoom.runners import (
     run_zoom_delete_webinar,
     run_zoom_list_past_webinar_participants,
 )
@@ -53,7 +53,7 @@ def fake_transport(routes):
 def run_zoom_action(runner, action, event=None, transport=None):
     action = {"type": runner.__name__.replace("run_", "", 1),
               "connection_id": "zoom-main", **action}
-    with patch("src.dapier.engine.actions.zoom._zoom_connection",
+    with patch("plugins.zoom.runners._zoom_connection",
                return_value=dict(ZOOM_CONNECTION)), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

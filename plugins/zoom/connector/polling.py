@@ -11,10 +11,10 @@ same chip either way.
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 
-from ...connections import discovery as provider
-from ...triggers.poll_sources import PollSource, register_source
-from .. import trigger_discovery  # noqa: F401  (as_sample in _fetch_zoom_sample)
-from ..trigger_discovery import (
+from src.dapier.connections import discovery as provider
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors import trigger_discovery  # noqa: F401  (as_sample in _fetch_zoom_sample)
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
     register_trigger_discovery,
@@ -45,7 +45,7 @@ def _zoom_poll_validate(body):
     poll as (required — the fetch refreshes its OAuth token), the optional
     ``for_email`` mailbox (default ``me`` — the connection's own user),
     plus the fetch defaults every stored zoom poll carries."""
-    from ...triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     if not str(body.get("connection_id") or "").strip():
@@ -141,7 +141,7 @@ def _list_recordings(item, *, transport=None):
     token is refreshed exactly like the classic fetch. Raises
     ``RuntimeError`` on a failed fetch, like every poll source.
     """
-    from ...triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     for_email = str(item.get("for_email") or "").strip() or "me"
     token = poll_triggers._bearer_token(item["connection_id"])
@@ -202,7 +202,7 @@ def _stored_zoom_poll(name):
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
     raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
-    from ...triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()
     if not name or "." in name:
@@ -232,7 +232,7 @@ def _fetch_zoom_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     per-event chain: the newest recorded zoom run carrying the asked event,
     else the documented webhook example. A sample pull shows the payload
     shape, it never raises."""
-    from ...triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     item = _stored_zoom_poll(event)
     if item is not None:

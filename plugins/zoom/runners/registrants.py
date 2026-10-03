@@ -2,7 +2,7 @@
 on a meeting or webinar that requires registration."""
 import urllib.parse
 
-from ....connections import tokens
+from src.dapier.connections import tokens
 from .core import _pkg, _raise_zoom_error, _rendered, _request_json
 
 

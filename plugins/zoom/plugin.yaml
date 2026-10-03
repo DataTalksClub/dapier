@@ -1,0 +1,9 @@
+name: zoom
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [zoom]
+  discovery_sources:
+    zoom: [zoom]
+  trigger_chips: [zoom]
+  poll_sources: [zoom.recordings]
