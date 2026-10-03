@@ -1,7 +1,6 @@
 # Paired with invoice-body-render; disable broad legacy completion before cutover.
 id: invoice-body-completion
 enabled: false
-tags: [zapier-migration, zapier-153699998]
 description: Archive the completed email PDF and forward its exact bytes to DataOps.
 trigger:
   connector: renderer

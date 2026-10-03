@@ -3,9 +3,6 @@ id: todo-intake
 enabled: false
 description: 'Zapier 153709869: Email tasks use processing time; retain native Telegram
   tasks and confirmations.'
-tags:
-- zapier-migration
-- zapier-153709869
 actions:
 - id: native-text
   type: code

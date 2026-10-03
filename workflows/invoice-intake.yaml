@@ -3,9 +3,6 @@ id: invoice-intake
 enabled: false
 description: 'Zapier 153562936: Archive the single email attachment with the UTC email
   date, then forward to DataOps.'
-tags:
-- zapier-migration
-- zapier-153562936
 actions:
 - id: email-date
   type: date_time

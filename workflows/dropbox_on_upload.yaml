@@ -3,9 +3,6 @@ id: dropbox_on_upload
 enabled: false
 description: 'Zapier 155120966: Date-prefix files in invoices-landing, move to invoices,
   then forward the archived file to DataOps.'
-tags:
-- zapier-migration
-- zapier-155120966
 actions:
 - id: processing-date
   type: date_time

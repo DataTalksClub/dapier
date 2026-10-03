@@ -2,7 +2,6 @@
 # Migration draft only; enable with its completion consumer during cutover.
 id: invoice-body-render
 enabled: false
-tags: [zapier-migration, zapier-153699998]
 description: Render invoice-pdf email HTML, then route the completed artifact to the owning service.
 trigger:
   connector: email

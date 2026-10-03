@@ -3,9 +3,6 @@ id: telegram-todo
 enabled: false
 description: 'Zapier 153485577: Original Date/Text catch-hook contract to the TODO
   worksheet.'
-tags:
-- zapier-migration
-- zapier-153485577
 actions:
 - id: append-row
   type: sheets_append_row

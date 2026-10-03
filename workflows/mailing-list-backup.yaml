@@ -3,9 +3,6 @@ id: mailing-list-backup
 enabled: false
 description: 'Zapier 157386985: Shared Drive mailchimp folder to S3 with the original
   title as key and unchanged bytes.'
-tags:
-- zapier-migration
-- zapier-157386985
 actions:
 - id: download-file
   type: drive_read_file

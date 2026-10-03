@@ -3,9 +3,6 @@ id: youtube-slack
 enabled: false
 description: 'Zapier 110871466: YouTube WebSub announcements; preserve channel, display
   name, message order and unfurling.'
-tags:
-- zapier-migration
-- zapier-110871466
 actions:
 - id: notify-slack
   type: slack
