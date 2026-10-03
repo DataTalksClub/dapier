@@ -1,6 +1,8 @@
 # Integration completion — 2026-10-03
 
-Executable integration checks within the authorized synthetic-only scope passed.
+Completed integration checks within the authorized synthetic-only scope passed.
+Final handoff is held while Chrome investigates whether isolated, inactive
+Zapier copies can safely test the remaining hidden adapter behaviors.
 Required invoice/Dropbox publication passed through the actual DataOps worker
 with isolated live providers and local ledger state. Production ledger
 publication, genuine YouTube publisher delivery, production Dropbox cutover
@@ -12,13 +14,13 @@ Historical failures are retained; fixes and retests below supersede them.
 
 | Flow | Completed verification | Boundary |
 | --- | --- | --- |
-| Mailing-list backup | Original ZIP and fresh PDF delivery previously passed. New isolated Drive file A backed up once; replacement B retained the same ID and did not back up; new ID with the same name replaced the exact S3 key with C. Idle polling produced no extra runs. Content-Type is literal `none`. Folders are now excluded. | Future exporter naming/replacement behavior and Zapier's original MIME adapter semantics are unavailable. |
-| Email TODO | Existing actual Gmail retest produced exactly one correctly mapped row and DataOps receipt. Processing-clock/row/intake tests previously passed. Published source now confirms fixed CST; migration correction and retest are in progress. | Earlier America/Chicago DST interpretation was a parity bug; source CST is fixed UTC−06:00. |
-| Invoice attachment email | Actual Gmail ingress/archive/DataOps receipt previously passed. Multiple PDFs and inline-PNG-plus-PDF fail closed before archive/intake. Same-byte and changed-byte collisions return HTTP 409, without overwrite or autorename. | Original Zapier selection and duplicate defaults are unavailable. Selected behavior is explicit single selection and strict conflicts. |
+| Mailing-list backup | Original ZIP and fresh PDF delivery previously passed. New isolated Drive file A backed up once; replacement B retained the same ID and did not back up; new ID with the same name replaced the exact S3 key with C. Idle polling produced no extra runs. Content-Type is literal `none`. Folders are now excluded. | Future upstream exporter naming/replacement is not established. Legacy January 2025 S3 metadata confirms literal `none` MIME parity. |
+| Email TODO | Existing actual Gmail retest produced exactly one correctly mapped row and DataOps receipt. Published fixed-CST source now matches live v8. Six fixed-offset midnight/DST cases and actual Gmail row110/one DataOps receipt passed. | Earlier America/Chicago DST interpretation was a parity bug, now corrected to fixed UTC−06:00. |
+| Invoice attachment email | Actual Gmail ingress/archive/DataOps receipt previously passed. Multiple PDFs and inline-PNG-plus-PDF fail closed before archive/intake. Same-byte and changed-byte collisions return HTTP 409, without overwrite or autorename. | Published source confirms singular Attachment and Overwrite No; hidden MIME selection and conflict/autorename behavior remain unproved. Selected behavior is explicit single selection and strict conflicts. |
 | Telegram TODO | Existing actual native text/confirmation, empty-text guard, isolated JSON/form authentication and stable-ID retry tests passed. Mapping unchanged; private audio was never opened or replayed. | Native Telegram is primary. Unknown original catch-hook sender is compatibility-only; sender discovery/cutover is conditional, outside acceptance. |
 | YouTube → Slack | Real HTTP callback challenge/signature/XML/identity validation passed. Signed synthetic Atom initial delivery and retry produced exactly one completed action and one provider message, username YouTube, in #integration_test. | Synthetic callback is not a genuine upload or publisher-to-hub delivery. Future genuine-event dependency below. |
 | Dropbox landing → archive | Prior automatic isolated polling passed. Normal, already-prefixed and multi-extension names preserve all bytes and extensions. Rename and archive collisions return 409, retain source files, and preserve destination revisions. UTC processing-date behavior passed. | Production landing poll remains disabled; existing legacy consumer remains unchanged. |
-| Selected invoice body → PDF | Actual no-attachment HTML Gmail email completed rendering; archived PDF contains the heading/marker and matches completion checksum. Intake-only forwarding of that actual artifact returned accepted/needs-review. Disabled paired migration definitions validate. | DataOps forwarding was an explicit CLI action using the invoice-pdf contract, after isolated archive verification; it was not an automatic production completion consumer. Original inactive Zap 153699998 has no exported steps. |
+| Selected invoice body → PDF | Actual no-attachment HTML Gmail email completed rendering; archived PDF contains the heading/marker and matches completion checksum. Intake-only forwarding of that actual artifact returned accepted/needs-review. Disabled paired migration definitions validate. | DataOps forwarding was an explicit CLI action using the invoice-pdf contract, after isolated archive verification; it was not an automatic production completion consumer. Original disabled Zap153699998 source UI now confirms Body Html→ConvertAPI PDF→UTC Dropbox archive→Sheets. Native rendering and DataOps ownership are documented adjustments. |
 
 ## Provider evidence
 
@@ -190,10 +192,10 @@ intake, authentication, validation, routing, action and retry behavior only.
 - **Production Dropbox cutover: unchecked.** Concrete rollback and cursor tests
   passed, but user/deployment governance must authorize and perform the planned
   non-overlap transition; legacy consumer unchanged and landing poll disabled.
-- **Source equivalence: unknown.** Original attachment/duplicate defaults,
-  timezone metadata, MIME adapter behavior, exact message spacing, future
-  export behavior and inactive renderer steps remain unavailable. The chosen
-  intended behavior is tested; unavailable source facts are not marked proved.
+- **Source equivalence: unknown.** Hidden attachment selection/conflict and Dropbox collision wire behavior,
+  plus future upstream export behavior remain unresolved after source UI review. Fixed CST, UTC prefix, Slack spacing/options and renderer
+  steps are now confirmed. The chosen
+  intended behavior is tested; unestablished source behavior is not marked proved. Legacy S3 MIME parity is now independently confirmed.
 
 ### Isolated actual-worker live-provider publication
 
@@ -294,21 +296,73 @@ production Dropbox consumer or production Slack destination was replaced.
 
 ## Audit of remaining unchecked boxes
 
-The original unchecked criteria retain their scope; source UI review is
-resolving facts that were absent from the export.
+Source UI review resolved CST, UTC invoice dates, UTC Dropbox processing time,
+unconditional prefix/extension handling, Slack spacing/options and body-PDF
+steps. Legacy S3 metadata independently resolved MIME wire parity. Only these
+five checklist items remain unchecked. Feasibility of further original-adapter
+tests through isolated inactive Zapier copies is under investigation.
 
 | Unchecked criterion | Concrete boundary / dependency |
 | --- | --- |
-| Future exporter creates/replaces/repeats names | Exporter definition or owner-generated export is unavailable; isolated create, replace and repeated-name polling passed. |
-| Original Zapier MIME `none` adapter semantics | Original provider HTTP evidence unavailable; selected literal S3 Content-Type `none` verified. |
-| Original TODO processing timezone | Resolved by published v1 source UI and official Zapier variable documentation: fixed CST UTC−06:00. Earlier Chicago interpretation was a parity bug; correction/retest tracked in checklist. |
-| Original email attachment/conflict defaults | Original adapter steps/defaults unavailable; intended multiple/inline ambiguity and same/changed-byte strict 409 behavior passed. |
-| Original Slack message spacing | Exact original literal unavailable; current message/action/custom username verified by provider and Chrome. |
+| Future exporter creates/replaces/repeats names | Requires upstream exporter definition or future owner export evidence; historical matching metadata does not prove future behavior. Isolated create, replace and repeated-name polling passed. |
+| Hidden original email attachment/conflict behavior | Source singular Attachment and Overwrite No are confirmed. Hidden MIME selection and same-byte conflict/autorename semantics require authoritative adapter documentation or historical receipts. Intended ambiguity and same/changed-byte strict 409 behavior passed. |
 | Genuine YouTube upload delivery | Requires the next legitimate owner upload; authenticated synthetic callback/retry passed without public upload. |
-| Original Dropbox processing timezone | Original metadata unavailable; intended UTC processing-date behavior passed. |
-| Original Dropbox collision/prefix defaults | Original adapter defaults unavailable; intended strict collisions, prefixed names and extensions tested. |
+| Hidden original Dropbox collision behavior | Unconditional prefix, extension and UTC processing clock are resolved. Collision/autorename wire semantics require original provider receipts or authoritative adapter documentation; selected strict behavior passed. |
 | Production Dropbox cutover | Prepared non-overlap/rollback plan requires an authorized production migration window; existing consumer unchanged, new production poll disabled. |
 
 Production financial ledger publication was not performed. Required integration
 publication checks were completed in the explicitly authorized isolated live
 provider/local-ledger setup; no real payment attestation is implied.
+
+## Published-source UI reconciliation
+
+Chrome inspected original published/disabled definitions read-only; source Zaps
+were never edited, run or activated. Mailing v1 confirms two-minute legacy
+Drive polling and exact title/file/S3 settings, including literal MIME `none`;
+metadata-only HEAD of the matching January 2025 archive independently confirms literal `none` wire Content-Type. Invoice v1
+confirms UTC Raw Date formatting, archive path, singular Attachment input,
+overwrite No and Output-Subject.pdf naming.
+
+TODO v1 uses a fixed-CST system variable. [Zapier documents CST and CDT as
+separate fixed offsets](https://help.zapier.com/hc/en-us/articles/35720226565773-Create-reusable-variables-to-use-in-Zap-workflows).
+The migration's Chicago/DST interpretation was corrected; live v8 preserves
+processing time/ISO and changes only email timezone. Exactly one actual Gmail
+row110 contains `2026-10-02T23:36:39-06:00`, correct sender/task, blank Notes/NEW;
+receipt `email-afded997578052334528c1a4f444d63c` was accepted once.
+
+Dropbox v1 formats Python processing time as YYYY-MM-DD, then unconditionally
+prefixes Date-File Name, retains the extension and moves Path Display to the
+invoice archive. [Zapier documents UTC for Python Code actions](https://help.zapier.com/hc/en-us/articles/8496326417549-Use-Python-code-in-Zap-workflows),
+confirming UTC source parity. Hidden collision behavior remains unproved.
+
+Slack v1 matches the live template exactly: two newlines around Title,
+`Link: ` followed by Play Url, YouTube bot name, no automation link, expanded
+links/name linking and no broadcast. Existing provider output matches with
+Slack's native angle-bracket URL markup; no new test post was sent.
+
+The original disabled body-PDF source now confirms Raw Date→UTC YYYY-MM-DD,
+Body Html→ConvertAPI PDF (`test.html` input), File URL→Dropbox archive with
+Output-Raw Subject.pdf and overwrite No, followed by Sheets. The native
+renderer/disabled completion definitions preserve that intent; DataOps review
+and publication replace the domain-specific Sheets step. This resolves the
+previous export-only gap without claiming identical PDF-engine output.
+
+## Final legacy MIME and cleanup proof
+
+The existing deployed `s3_head_object` action read metadata only for
+`datatalks-mailchimp-backup/2025-01-02-audience_export_d5c87e5d20.zip`:
+Content-Type `none`, size 7,374,681, LastModified
+`2025-01-02T16:49:29+00:00`. Matching Drive metadata for file
+`17CkStUYbrzDVKSRxIrPWYn_i3olN2V1O` establishes the same name/size and
+January 2025 creation. This confirms original archive MIME parity without
+downloading customer content or writing any object. Proof files:
+`.tmp/root-legacy-s3-head-proof.json` and `.tmp/legacy-s3-drive-lineage-proof.json`.
+
+Final paginated cleanup audit (`.tmp/root-cleanup-inventory-proof.json`) found
+zero current-run temporary workflows, polls, tokens or grants. Production
+`invoice-landing` remains disabled; production YouTube destination remains
+`C01BQC114P2`. Owned Drive folder and publication spreadsheet are recoverably
+trashed; owned Dropbox test roots and local DynamoDB were removed. Existing
+grants remain; synthetic S3 evidence and audit receipts are intentionally
+retained without deletion IAM expansion. No further Dapier email/Slack actions are queued. Separate read-only/isolated
+Zapier-copy feasibility work is pending; final completeness is not yet claimed.

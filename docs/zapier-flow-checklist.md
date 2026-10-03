@@ -2,10 +2,12 @@
 
 Tick a box only after recording provider or execution evidence. Current acceptance
 results are in [the October 3 completion report](zapier-integration-completion-20261003.md).
-Executable checks within the synthetic-only scope passed, including the selected
-seventh body-to-PDF path. Required final DataOps publication, genuine YouTube
-delivery, production cutover and source-equivalence checks remain explicitly
-unverified below; their acceptance criteria have not been narrowed. Earlier dated evidence below is retained as history.
+Completed checks within the synthetic-only scope passed, including the selected
+seventh body-to-PDF path and required invoice/Dropbox publication through the
+actual DataOps worker with isolated live providers and local ledger state.
+Production ledger publication was not performed. Genuine YouTube delivery,
+production cutover and the specific unknown source behaviors remain unchecked
+below; their acceptance criteria have not been narrowed. Earlier dated evidence below is retained as history.
 
 ## 1. Mailing-list backup — current flow
 
@@ -16,10 +18,10 @@ Source: Zap `157386985`; draft: `mailing-list-backup`.
 - [x] User uploaded test file named `2026-10-02-audience_export_3fc301b1e9` (2026-10-02).
 - [x] Confirm upload is in [the watched folder](https://drive.google.com/drive/folders/1-MAoAuQbny7FK9UQuk8800zT8M8TOQ59). Full name: `2026-10-02-audience_export_3fc301b1e9.zip`; Drive ID: `1huEwoRwTG3ojH8_737qpZYLSCy2zIui7`.
 - [x] Verify Dapier's Google connection can see the file (Drive metadata GET returned the exact file, parent and size: 7,664,202 bytes).
-- [ ] Confirm whether future exports create new files or replace existing ones, and whether names repeat; original exporter behavior unavailable.
+- [ ] Confirm whether future exports create new files or replace existing ones, and whether names repeat; future upstream exporter behavior is not established by the inspected Zap or historical file metadata.
 - [x] Separately test intended Drive create/replacement/repeated-name/idle-poll semantics against providers.
 - [x] Configure role `arn:aws:iam::387546586013:role/dapier-mailchimp-backup`; verify assumed-role identity and destination bucket access.
-- [ ] Resolve original Zapier `mimetype=none` adapter behavior; original HTTP evidence unavailable.
+- [x] Resolve original Zapier `mimetype=none` wire behavior for the identified legacy archive: metadata-only S3 HEAD confirms literal `none`, matching the source field and current flow; matching Drive filename/size and January 2025 dates establish pre-migration lineage.
 - [x] Separately verify selected literal `none` Content-Type through S3 provider GET.
 - [x] Copy the uploaded ZIP to `s3://datatalks-mailchimp-backup/2026-10-02-audience_export_3fc301b1e9.zip`; verify 7,664,202 bytes and MD5 `d0f8c566634fc7faa32e602ab30b31c3`, matching Drive.
 - [x] With user authorization, publish/enable `mailing-list-backup` and enable `mailchimp-drive-backup` every 2 minutes.
@@ -38,7 +40,7 @@ connection test reported the expected assumed role, and the ZIP was downloaded
 and uploaded through the workflow's two actual provider steps. An independent
 S3 lookup found the exact object, and a signed GET downloaded its bytes for the
 checksum comparison. The observed S3 Content-Type is the configured literal
-`none`; original Zapier MIME semantics still need comparison.
+`none`; the January 2025 legacy-object HEAD now independently confirms matching wire behavior without downloading customer content.
 
 The workflow and poll are now enabled. The deployment adding role support and
 API file staging passed, as did 3,798 tests. The default role/session
@@ -51,7 +53,7 @@ and matching bytes. The original ZIP was processed manually because the poll
 seeds existing files without replay.
 
 **Next flow:** email TODO. Remaining source-parity questions above concern
-future export naming and Zapier's MIME behavior, not the verified delivery.
+future upstream export naming/replacement, not the verified delivery or now-confirmed legacy MIME value.
 
 ## 2. Email TODO
 
@@ -61,7 +63,7 @@ Source: Zap `153709869`; workflow: `todo-intake` (v5 published and enabled after
 - [x] Configure Task `Process email "<Subject>" from <From>`, Notes blank, Status `NEW`.
 - [x] Verify workbook access and columns `Date`, `Task`, `Notes`, `Status`.
 - [x] Confirm source processing-time timezone: published Zap153709869 v1 uses `Current time: CST (ISO)`; Zapier documents fixed UTC−06:00.
-- [ ] Verify fixed UTC−06:00 processing-clock parity across midnight and both DST boundaries, then an actual Gmail retest after live publication. The earlier Chicago/DST interpretation was incorrect.
+- [x] Verify fixed UTC−06:00 processing-clock parity across midnight and both DST boundaries; actual Gmail after live v8 produced exactly one row110 with `2026-10-02T23:36:39-06:00`, blank Notes/NEW and accepted DataOps receipt. Earlier Chicago/DST interpretation was incorrect.
 - [x] Verify route `todo@dtcdev.click` accepts `alexey@datatalks.club` (live receipt). Other sender policies remain outside this test.
 - [x] Retest verified one correctly populated row and DataOps receipt; initial failed test and successful v5 evidence are recorded below.
 - [x] Verify existing native Telegram task creation and confirmation through the real private bot.
@@ -104,8 +106,7 @@ a direct Sheets API read:
 Run `todo-intake:1774d0306c420e34c55a0f9adcea64b643c47e838542fb3b6b614546925b520d`
 completed all 7 steps at 19:35:59 UTC. The DataOps API returned
 `status: accepted`, item `email-d0de9a5657f075cfb7cb697f8010f8cd`.
-Email mapping and intake receipt pass; native Telegram and original Zapier CST
-semantics remain separate checks.
+Email mapping and intake receipt passed at this stage. Native Telegram and fixed-CST source parity subsequently passed as recorded below.
 
 Native Telegram evidence (2026-10-02): Alexey sent `/todo SYNTHETIC TEST Dapier Chrome native Telegram 2026-10-02 01` privately to `@dtc_todo_bot`. Run `todo-intake:todo-446915fcc743d237` completed at 19:57:38 UTC. Direct Sheets read found exactly one row, `todo!A107:D107`: `2026-10-02`, command-stripped task text, blank Notes, `NEW`. Telegram returned confirmation message ID `7212`; the browser tester confirmed receipt. This is real Telegram delivery, separate from the catch-hook test.
 
@@ -121,7 +122,7 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 - [x] Forward archived invoice intake to DataOps.
 - [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
 - [x] Verify `alexey@datatalks.club` sender acceptance through actual Gmail delivery to `invoice@dtcdev.click`.
-- [ ] Confirm original source single/multiple/inline selection and filename-conflict defaults; not exported.
+- [ ] Confirm hidden original adapter behavior for single/multiple/inline MIME selection and filename conflicts. Published source confirms singular `Attachment` and `Overwrite: No`; these visible fields do not establish ambiguity, same-byte conflict or autorename wire behavior.
 - [x] Separately verify intended single selection and strict same-byte/changed-byte collision behavior.
 - [x] Send an actual synthetic invoice email; verify receipt, UTC date conversion, exact filename, matching bytes and DataOps intake.
 - [x] Verify the clearly labelled synthetic CLI fallback: exact archive bytes and accepted DataOps receipt, without claiming email delivery.
@@ -159,7 +160,7 @@ Source: Zap `110871466`; draft: `youtube-slack`.
 - [x] Configure YouTube channel `UCDvErgK0j5ur3aLgn6U-LqQ` and Slack channel `C01BQC114P2`.
 - [x] Configure display name `YouTube`, unfurling/name linking enabled, reply broadcast disabled.
 - [x] Verify Slack channel access and `chat:write.customize` permission through read-only provider requests.
-- [ ] Confirm original exact message spacing; exported literal spacing unavailable.
+- [x] Confirm original exact Slack spacing/options from published v1 source UI: two newlines before/after Title, trailing space after `Link:`, YouTube bot, no automation link, expand links/link names on, broadcast off. Live template and existing synthetic provider message match (Slack wraps the URL in native angle markup).
 - [x] Verify selected spacing/username through signed real-callback ingress and provider receipt; WebSub is the documented adjustment.
 - [x] Post exactly one synthetic message; verify channel, title, URL and link preview against Slack history.
 - [x] Verify a synthetic message displays `YouTube` in the explicitly authorized `#integration_test` channel; production destination unchanged.
@@ -177,9 +178,10 @@ Source: Zap `155120966`; draft: `dropbox_on_upload`.
 - [x] Configure `/_dtc_paperwork/invoices-landing`, every 2 minutes, all file types.
 - [x] Configure processing-date prefix, original extension once, move to `/_dtc_paperwork/invoices`, then DataOps intake.
 - [x] Verify Dropbox access to both folders and accepted DataOps intake via the isolated test.
-- [ ] Confirm original processing-date timezone; source metadata unavailable.
+- [x] Confirm original Dropbox processing-date timezone: published Python `datetime.now()` plus Zapier documentation establishes UTC; tested migration matches.
 - [x] Separately verify intended UTC processing date and midnight conversion.
-- [ ] Confirm original adapter collision/already-prefixed defaults where not exported.
+- [x] Confirm original unconditional date prefix and extension mapping: Date + hyphen + base File Name, rename output retains extension, then Path Display moves to archive. Already-prefixed and multi-extension tests match this intent.
+- [ ] Confirm original Dropbox collision/autorename adapter defaults beyond visible configuration; wire behavior remains unproved.
 - [x] Separately verify intended rename/move conflicts and already-prefixed/multi-extension byte/name preservation.
 - [x] Upload one test-only file; verify exact destination name, matching bytes, removal from landing and DataOps receipt using the isolated worker/CLI fallback.
 - [x] Verify required final bookkeeping publication/output for Dropbox intake through the actual DataOps worker/provider factory: canonical Gmail/Dropbox source dedupe, isolated live Sheet/Dropbox readbacks and retries, local ledger only. Production ledger publication was not performed.
@@ -198,7 +200,7 @@ Cleanup: the isolated `invoice-receipt-integration-test` hook and the two manage
 
 Integration fix deployment: [CI/deploy run 37057902392](https://github.com/DataTalksClub/dapier/actions/runs/37057902392), commit `5218b08`, passed tests, designer checks and deployed before the successful intake-only verifications above. Domain bookkeeping/review remains in DataOps.
 
-Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery awaits a future event; the authorized isolated custom-name smoke passed. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Original Zapier timezone, attachment/collision and MIME semantics remain separate comparisons.
+Remaining checks: production Dropbox cutover follows the migration plan and has not been activated; actual new-video delivery awaits a future event; the authorized isolated custom-name smoke passed. Slack permission readiness is verified. Native Telegram is the supported primary path; the unknown original catch-hook sender remains a compatibility limitation. Source CST/UTC timezones and legacy MIME are resolved; hidden attachment/collision wire behavior remains unproved.
 
 For implementation details and unresolved source semantics, see
 [the migration plan](zapier-migration-plan.md#adjustments-and-remaining-source-provider-checks).
@@ -287,7 +289,7 @@ Actual new-video-trigger verification remains pending.
 
 ## 7. Selected invoice email body → PDF
 
-Original inactive source: Zap `153699998`; selected disabled migration definitions
+Original disabled source: Zap `153699998`, now inspected read-only; selected disabled migration definitions
 `invoice-body-render` and `invoice-body-completion`. No exported source steps
 exist for this inactive Zap, so this verifies documented intended behavior.
 
@@ -335,5 +337,41 @@ for source equivalence by the fixed-CST correction/retest.
 Published mailing Zap157386985 v1 (`dtc-shared-drive`, 2024-09-05) confirms
 Drive1.22.0 New File in Folder Legacy, two-minute polling, S3 bucket
 `datatalks-mailchimp-backup`, key `1.Title`, file `1.File`, leading slash false
-and literal MIME field `none`. Adapter wire semantics and future upstream
-export naming/replacement are separate unresolved facts.
+and literal MIME field `none`. Metadata-only HEAD of the matching January 2025 archive confirms literal `none` on the wire. Future upstream export naming/replacement remains unproved.
+
+## Fixed-CST actual Gmail receipt — 2026-10-03
+
+Live TODO v8 changes only the email timezone to `Etc/GMT+6`; native Telegram
+text guards/mapping remain unchanged. Chrome sent the unique subject
+`Dapier TODO fixed CST source parity 2026-10-03 01` exactly once.
+Run `todo-intake:968682bcc10c0867e1948c6631f3eed7a789ea3ea928198b6996f26cd12a4f13`
+completed from 05:36:38 UTC. Direct provider read found exactly one matching
+row, `todo!A110:D110`, processing ISO `2026-10-02T23:36:39-06:00`, correct
+Alexey sender/subject, blank Notes and NEW. The single DataOps step returned
+accepted receipt `email-afded997578052334528c1a4f444d63c`.
+
+## Additional published-source settings confirmed read-only
+
+Invoice Zap153562936 v1 (2025-08-11): Formatter1.0.7 Raw Date input,
+YYYY-MM-DD, from/to UTC; Dropbox folder `/_dtc_paperwork/invoices`, singular
+Attachment input, overwrite No, filename Output-Subject.pdf. Mapping/date
+settings match; multiple/inline selection and collision wire remain unproved.
+
+Dropbox Zap155120966 v1 (2025-08-27): Python processing clock formats
+YYYY-MM-DD, unconditional Date-File Name rename and Path Display move to
+`/_dtc_paperwork/invoices`. [Zapier's Python runtime documentation](https://help.zapier.com/hc/en-us/articles/8496326417549-Use-Python-code-in-Zap-workflows)
+establishes UTC irrespective of account/Zap timezone.
+
+Disabled body-PDF Zap153699998: inbound Email by Zapier; Raw Date formatter
+from/to UTC, YYYY-MM-DD; ConvertAPI PDF Tools2.3.3 converts Body Html via
+`test.html` to PDF; Dropbox receives File URL, overwrite No, filename
+Output-Raw Subject.pdf in the same invoice archive, followed by Sheets.
+The tested native renderer and disabled completion pair preserve HTML/PDF
+and UTC archive intent; DataOps owns the review/publication replacement.
+No source Zap was edited, run, published or enabled.
+
+## Final source and cleanup audit
+
+Legacy object `2025-01-02-audience_export_d5c87e5d20.zip` has S3 Content-Type `none`, size 7,374,681 bytes and LastModified `2025-01-02T16:49:29+00:00`. Matching Drive file `17CkStUYbrzDVKSRxIrPWYn_i3olN2V1O` has the same filename/size and January 2025 creation metadata. This resolves MIME parity for the original archive without content download or writes.
+
+Final paginated read audit found no current-run temporary workflows, polls, grants or tokens. The production `invoice-landing` poll remains disabled. Owned test Drive folder and spreadsheet are recoverably trashed; owned Dropbox roots and local DynamoDB were removed. Existing grants remain. Synthetic S3 objects and audit evidence are retained; no deletion IAM was added. No Dapier email/Slack actions remain queued. Final handoff is held pending Chrome investigation of safe isolated original-adapter test feasibility.
