@@ -164,9 +164,16 @@ def _publish(connector, event_type, data, source=None, event_id=None):
 
 
 def _youtube(body):
-    root = ET.fromstring(body)
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError:
+        raise ValueError("invalid Atom XML") from None
     ns = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
-    for entry in root.findall("atom:entry", ns):
+    entries = root.findall("atom:entry", ns)
+    for entry in entries:
+        if not entry.findtext("yt:videoId", namespaces=ns) or not entry.findtext("yt:channelId", namespaces=ns):
+            raise ValueError("Atom video entry requires video and channel IDs")
+    for entry in entries:
         video_id = entry.findtext("yt:videoId", namespaces=ns)
         channel_id = entry.findtext("yt:channelId", namespaces=ns)
         _publish("youtube", "video.published", {
@@ -604,7 +611,10 @@ def handler(event, _context):
     elif path == "/hooks/youtube":
         if not _verify_youtube(event, body):
             return _response(401, {"error": "invalid signature"})
-        _youtube(body)
+        try:
+            _youtube(body)
+        except ValueError as exc:
+            return _response(400, {"error": str(exc)})
     elif path == "/hooks/ses-notifications":
         from ..triggers.intake import ses_notifications
 

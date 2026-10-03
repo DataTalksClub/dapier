@@ -17717,6 +17717,11 @@
         { key: "url", label: "URL", required: true },
         { key: "payload", label: "Payload (JSON, templated)", type: "textarea", placeholder: '{"id": "{trigger.id}"}' },
         { key: "secret_id", label: "Signing secret ID", placeholder: "dapier/webhook" },
+        { "key": "payload_format", "label": "Payload format", "type": "select", "options": ["json", "text"], "default": "json" },
+        { "key": "content_type", "label": "Content type" },
+        { "key": "secret_id_env", "label": "Signing secret ID env var" },
+        { "key": "signature_algorithm", "label": "Signature algorithm", "type": "select", "options": ["sha256", "sha1"], "default": "sha256" },
+        { "key": "signature_header", "label": "Signature header" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
     },

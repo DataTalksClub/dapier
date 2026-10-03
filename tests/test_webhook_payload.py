@@ -121,3 +121,29 @@ class RegistryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_raw_atom_websub_signature_uses_exact_bytes_and_server_secret(monkeypatch):
+    monkeypatch.setenv("TEST_SIGNING_SECRET_ID", "stored-websub-secret")
+    body = '<feed>\n <title>Synthetic {title}</title>\n</feed>\n'
+    transport = recording_transport()
+    with patch.object(webhook_action.base, "_signing_secret", return_value="server-secret") as secret:
+        run({"url": "https://example.test/hook", "payload": body, "payload_format": "text",
+             "content_type": "application/atom+xml", "secret_id_env": "TEST_SIGNING_SECRET_ID",
+             "signature_algorithm": "sha1", "signature_header": "x-hub-signature"},
+            {"data": {"title": "marker"}}, transport=transport)
+    expected = body.replace("{title}", "marker").encode()
+    call = transport.calls[0]
+    assert call["body"] == expected
+    assert call["headers"]["content-type"] == "application/atom+xml"
+    assert call["headers"]["x-hub-signature"] == "sha1=" + hmac.new(b"server-secret", expected, hashlib.sha1).hexdigest()
+    secret.assert_called_once_with("stored-websub-secret")
+
+
+def test_missing_signing_secret_env_fails_before_http(monkeypatch):
+    import pytest
+    monkeypatch.delenv("MISSING_SECRET_ID", raising=False)
+    transport = recording_transport()
+    with pytest.raises(ValueError, match="not configured"):
+        run({"url": "https://example.test", "secret_id_env": "MISSING_SECRET_ID"}, transport=transport)
+    assert not transport.calls

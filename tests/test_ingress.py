@@ -497,3 +497,26 @@ def test_telegram_media_captions_hoist_caption_entities(monkeypatch):
     data = json.loads(sent[0]["MessageBody"])["data"]
     assert data["text"] == "photo caption"
     assert data["entities"] == entities
+
+
+def test_youtube_atom_validates_whole_feed_before_publishing(monkeypatch):
+    import pytest
+    sent = []
+    monkeypatch.setattr(ingress, "_publish", lambda *args, **kwargs: sent.append((args, kwargs)))
+    body = b'<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015"><entry><yt:videoId>synthetic</yt:videoId><yt:channelId>channel</yt:channelId></entry><entry><yt:videoId>missing-channel</yt:videoId></entry></feed>'
+    with pytest.raises(ValueError, match="requires video and channel"):
+        ingress._youtube(body)
+    assert not sent
+    with pytest.raises(ValueError, match="invalid Atom XML"):
+        ingress._youtube(b'<feed>')
+    assert not sent
+
+
+def test_youtube_atom_retry_has_same_stable_event_id(monkeypatch):
+    sent = []
+    monkeypatch.setattr(ingress, "_publish", lambda *args, **kwargs: sent.append((args, kwargs)))
+    body = b'<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015"><entry><yt:videoId>synthetic</yt:videoId><yt:channelId>channel</yt:channelId><title>Marker</title></entry></feed>'
+    ingress._youtube(body)
+    ingress._youtube(body)
+    assert len(sent) == 2
+    assert all(call[1]["event_id"] == "youtube:synthetic" for call in sent)

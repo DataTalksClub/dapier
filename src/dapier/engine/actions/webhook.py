@@ -12,6 +12,7 @@ that hides them keeps the old two-key output.
 import hashlib
 import hmac
 import json
+import os
 import urllib.error
 import urllib.request
 
@@ -93,10 +94,18 @@ def request_output(status, raw, headers=None):
 
 def run_webhook(action, event, *, steps=None, transport=None):
     body = _request_body(action, event, steps)
-    headers = {"content-type": "application/json", "user-agent": "dapier/0.1"}
-    if action.get("secret_id"):
-        digest = hmac.new(base._signing_secret(action["secret_id"]).encode(), body, hashlib.sha256).hexdigest()
-        headers["x-dapier-signature"] = f"sha256={digest}"
+    headers = {"content-type": action.get("content_type") or "application/json", "user-agent": "dapier/0.1"}
+    secret_id = action.get("secret_id")
+    if action.get("secret_id_env"):
+        secret_id = os.environ.get(action["secret_id_env"])
+        if not secret_id:
+            raise ValueError("webhook signing secret environment variable is not configured")
+    algorithm = action.get("signature_algorithm", "sha256")
+    if algorithm not in ("sha256", "sha1"):
+        raise ValueError("webhook signature_algorithm must be sha256 or sha1")
+    if secret_id:
+        digest = hmac.new(base._signing_secret(secret_id).encode(), body, getattr(hashlib, algorithm)).hexdigest()
+        headers[action.get("signature_header") or "x-dapier-signature"] = f"{algorithm}={digest}"
     timeout = action.get("timeout_seconds", 10)
     if transport is not None:
         status, raw, response_headers = transport_response(
@@ -129,6 +138,11 @@ def _request_body(action, event, steps):
     A payload that does not render to JSON is a clear step failure, in the
     same dialect as the auth errors — never a silently mangled body.
     """
+    payload_format = action.get("payload_format", "json")
+    if payload_format not in ("json", "text"):
+        raise ValueError("webhook payload_format must be json or text")
+    if payload_format == "text":
+        return render(str(action.get("payload") or ""), event, steps).encode()
     payload = str(action.get("payload") or "").strip()
     if not payload:
         return json.dumps(event, separators=(",", ":"), sort_keys=True).encode()

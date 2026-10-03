@@ -24,12 +24,17 @@ register(Action(
     icon="webhook",
     run=lambda action, event, workflow_id, steps=None: run_webhook(action, event, steps=steps),
     required=frozenset({"url"}),
-    optional=frozenset({"payload", "secret_id", "timeout_seconds"}),
+    optional=frozenset({"payload", "secret_id", "timeout_seconds", "payload_format", "content_type", "secret_id_env", "signature_algorithm", "signature_header"}),
     fields=(
         {"key": "url", "label": "URL", "type": "url", "required": True},
         {"key": "payload", "label": "Payload (JSON, templated)", "type": "textarea",
          "placeholder": '{"id": "{trigger.id}"}'},
         {"key": "secret_id", "label": "Signing secret ID", "placeholder": "dapier/webhook"},
+        {"key": "payload_format", "label": "Payload format", "type": "select", "options": ["json", "text"], "default": "json"},
+        {"key": "content_type", "label": "Content type"},
+        {"key": "secret_id_env", "label": "Signing secret ID env var"},
+        {"key": "signature_algorithm", "label": "Signature algorithm", "type": "select", "options": ["sha256", "sha1"], "default": "sha256"},
+        {"key": "signature_header", "label": "Signature header"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
 ))

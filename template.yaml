@@ -617,6 +617,7 @@ Resources:
           GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
           DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
           DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
+          YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           # Configuration set attached to every workflow send

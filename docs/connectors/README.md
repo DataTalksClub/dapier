@@ -288,3 +288,11 @@ fields, preserving field case and blank values. Repeated form keys become
 arrays. A scalar `request_id` configured as `dedupe_path` identifies the same
 retry across JSON and form encoding; without that field, deliveries remain
 separate. HTTP 202 acknowledges intake, not downstream workflow completion.
+
+Signed outbound webhooks support `payload_format: text` for exact templated XML
+or text bytes, `content_type`, `signature_algorithm: sha1|sha256`, and
+`signature_header`. Defaults preserve JSON and X-Dapier-Signature SHA256.
+`secret_id_env` resolves a Secrets Manager ID on the server; neither the signing
+secret nor the signature is returned to the operator. YouTube WebSub callback
+validation rejects malformed XML or incomplete video identities before queuing
+any entries. Empty feeds retain their no-op behavior.
