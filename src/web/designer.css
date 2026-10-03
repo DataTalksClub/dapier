@@ -253,7 +253,7 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
 
 ::selection { background: var(--dk-selection); }
 
-:focus-visible { outline: 2px solid var(--dk-focus-ring); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
 
 [hidden] { display: none !important; }
 
@@ -330,7 +330,8 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
 .dk-select { padding-right: calc(2 * var(--dk-space-3) + 10px); }
 .dk-input::placeholder, .dk-textarea::placeholder { color: var(--dk-text-faint); }
 .dk-input:hover, .dk-select:hover, .dk-textarea:hover { border-color: var(--dk-border-strong); }
-.dk-input:focus-visible, .dk-select:focus-visible, .dk-textarea:focus-visible { outline: 2px solid var(--dk-focus-ring); outline-offset: 0; border-color: var(--dk-accent-default); }
+.dk-input:focus-visible, .dk-select:focus-visible, .dk-textarea:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; border-color: var(--dk-accent-default); }
+.dk-input:focus, .dk-select:focus, .dk-textarea:focus { outline: none; border-color: var(--dk-accent-default); box-shadow: 0 0 0 3px var(--dk-focus-ring); }
 
 /* --- cards & surfaces ------------------------------------------------------- */
 
@@ -920,12 +921,22 @@ select { cursor: pointer; }
 select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
 select:disabled { opacity: .5; cursor: default; }
 
+/* The family focus recipe (vendor/dakit.css base + components): a 3px ring
+   at 2px offset on :focus-visible; text controls swap to the accent border
+   with a 3px halo on :focus. Mirrors the vendored bundle — update together. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   border-color: var(--dk-accent-default);
-  outline: 2px solid var(--dk-focus-ring);
-  outline-offset: 0;
+  outline: 3px solid var(--dk-focus-ring);
+  outline-offset: 2px;
+}
+input:focus:not([type="checkbox"]),
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--dk-accent-default);
+  box-shadow: 0 0 0 3px var(--dk-focus-ring);
 }
 input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 
@@ -1877,7 +1888,7 @@ input[type="checkbox"], input[type="radio"] {
   text-align: left;
 }
 .node-jump-item:hover, .node-jump-item.selected { background: var(--dk-accent-soft); border-color: var(--dk-accent-default); color: var(--dk-accent-default); }
-.node-jump-item:focus-visible { outline: 2px solid var(--dk-accent-default); outline-offset: 1px; }
+.node-jump-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -2px; }
 
 /* {trigger.*} sample chips in the trigger inspector: click copies the
    template for pasting into an action field. */
