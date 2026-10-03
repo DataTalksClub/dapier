@@ -1106,6 +1106,14 @@ def _operator(monkeypatch):
 
 def test_errors_summary_groups_failed_runs_by_workflow(monkeypatch):
     _operator(monkeypatch)
+    from src.dapier.api import errors
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 30, 12, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(errors, "datetime", FixedDatetime)
     from src.dapier.api import runs as runs_api
 
     failed = [
