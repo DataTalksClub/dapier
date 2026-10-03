@@ -228,7 +228,7 @@ class TestDriveFetch:
 
         assert len(calls) == 1
         query = urllib.parse.parse_qs(urllib.parse.urlparse(calls[0]["url"]).query)
-        assert query["q"] == ["'FLD-9' in parents and trashed=false"]
+        assert query["q"] == ["'FLD-9' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'"]
         assert query["orderBy"] == ["createdTime desc"]
         assert "createdTime" in query["fields"][0]
         # Items are the API's own file objects, JSON-safe as returned.

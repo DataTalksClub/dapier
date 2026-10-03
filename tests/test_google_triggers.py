@@ -797,3 +797,13 @@ def test_both_chips_are_in_the_sample_catalog():
 
     assert "google-sheets" in catalog["sample"]
     assert "google-drive" in catalog["sample"]
+
+
+def test_drive_file_poll_ignores_folders_even_when_provider_returns_them(google_transport):
+    page = drive_page("2026-09-28T10:00:00.000Z")
+    folder = dict(page["files"][0], id="folder", mimeType="application/vnd.google-apps.folder")
+    page["files"].append(folder)
+    google_transport(Transport(page))
+    files, cursor = drive._drive_poll_fetch(stored(drive_body()), "2026-09-26T00:00:00.000Z")
+    assert [file["id"] for file in files] == ["file-0"]
+    assert cursor == "2026-09-28T10:00:00.000Z"

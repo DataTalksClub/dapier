@@ -324,3 +324,9 @@ Invoice archives use `overwrite: false`, `autorename: false`, and
 a successful no-op; strict conflict rejects that case as well as changed bytes.
 This is the selected migration behavior; the original Zapier duplicate default
 is unavailable. See [Dropbox's upload specification](https://github.com/dropbox/dropbox-api-spec/blob/main/files.stone).
+
+Drive file polling excludes folders at the provider query and response boundary.
+A new subfolder is not a downloadable backup file; native document files remain
+eligible. Creation polling uses file identity and creation time, so replacing
+contents preserves the original event, while a distinct file with the same name
+produces a new event and replaces the configured exact S3 key.

@@ -364,7 +364,7 @@ def _list_folder_files(token, folder_id, *, drive_id=None, transport=None):
     """The folder's files (up to ~300: three pages of 100), newest created
     first, with the fields the events and pickers share."""
     page_params = {
-        "q": f"'{folder_id}' in parents and trashed=false",
+        "q": f"'{folder_id}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'",
         "orderBy": "createdTime desc",
         "pageSize": DRIVE_POLL_PAGE_SIZE,
         "fields": "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,webViewLink)",
@@ -379,7 +379,8 @@ def _list_folder_files(token, folder_id, *, drive_id=None, transport=None):
                + urllib.parse.urlencode(page_params))
         data = provider._request("GET", url, token, None, transport=transport)
         page = [entry for entry in data.get("files") or []
-                if isinstance(entry, dict) and entry.get("id")]
+                if isinstance(entry, dict) and entry.get("id")
+                and entry.get("mimeType") != "application/vnd.google-apps.folder"]
         files.extend(page)
         if not page or len(files) >= DRIVE_POLL_PAGE_SIZE * DRIVE_POLL_PAGES \
                 or not data.get("nextPageToken"):
