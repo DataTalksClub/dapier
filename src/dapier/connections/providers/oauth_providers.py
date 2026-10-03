@@ -10,6 +10,7 @@ stays unit-testable without HTTP mocks:
 
 import base64
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -107,6 +108,68 @@ def normalize_scopes(provider_name, scopes):
     if provider_name in ("youtube", "google") and not cleaned:
         raise ProviderError("Google connections require at least one scope")
     return cleaned
+
+
+# The scopes a Gmail connection's calls answer to. This is flow-owned glue,
+# not plugin code: the OAuth flow and the agent API's connect start call
+# :func:`connection_grant_scopes`, and core must not import plugin code (the
+# Gmail chip itself lives in plugins/google).
+GMAIL_SCOPES = (
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+)
+
+# The Google scope URL a bare GMAIL_SCOPES environment entry expands to:
+# "gmail.modify" -> "https://www.googleapis.com/auth/gmail.modify".
+_GOOGLE_SCOPE_URL_PREFIX = "https://www.googleapis.com/auth/"
+
+# What marks a connection's requested scope as a Gmail one (the shared
+# "google" provider also carries Sheets, Drive and Calendar connections
+# that must not inherit Gmail scopes).
+_GMAIL_SCOPE_MARKER = "/auth/gmail."
+
+
+def effective_gmail_scopes():
+    """The declared Gmail scopes plus any ``GMAIL_SCOPES`` environment extras.
+
+    The environment variable lists live-use extras beyond the declaration
+    (gmail.modify, gmail.settings, gmail.labels) — comma- or
+    whitespace-separated, each entry a full scope URL or a short name that
+    expands to the Google auth URL above. It is read at call time, so a
+    deployment extends its Gmail grants without a code change and tests set
+    the variable per test. Entries already in the declaration and
+    duplicates collapse; with the variable unset this is exactly
+    GMAIL_SCOPES.
+    """
+    raw = os.environ.get("GMAIL_SCOPES") or ""
+    extras = []
+    for entry in raw.replace(",", " ").split():
+        scope = entry if "://" in entry else _GOOGLE_SCOPE_URL_PREFIX + entry
+        if scope not in GMAIL_SCOPES and scope not in extras:
+            extras.append(scope)
+    return GMAIL_SCOPES + tuple(extras)
+
+
+def connection_grant_scopes(provider_name, scopes):
+    """The scope set a connection's OAuth grant requests and is verified
+    against — the flow's single answer to "what may this connection ask
+    for" (``oauth_flow.oauth_start``/``oauth_callback`` and the agent API's
+    connect start all go through here).
+
+    The connection's own requested scopes, normalized like every grant; a
+    Google connection that touches Gmail (any ``gmail.`` scope) also
+    carries the effective Gmail scope set above, so the consent screen
+    requests the declaration plus any ``GMAIL_SCOPES`` environment extras
+    and the callback's missing-scope check holds the grant to them. Other
+    providers and Google connections that never touch Gmail come back
+    unchanged. Raises ``ProviderError`` like ``normalize_scopes`` (a
+    Google connection needs at least one scope).
+    """
+    cleaned = normalize_scopes(provider_name, scopes)
+    if provider_name != "google" or not any(
+            _GMAIL_SCOPE_MARKER in scope for scope in cleaned):
+        return cleaned
+    return sorted(set(cleaned) | set(effective_gmail_scopes()))
 
 
 def authorization_url(provider_name, *, client_id, redirect_uri, scopes, state, code_challenge=None):

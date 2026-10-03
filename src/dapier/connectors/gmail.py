@@ -15,11 +15,12 @@ reconnecting):
     https://www.googleapis.com/auth/gmail.readonly   (messages, labels)
     https://www.googleapis.com/auth/gmail.send       (the send action)
 
-Those two lines are GMAIL_SCOPES below — the single declaration the OAuth
-flow derives a Gmail connection's grant from. The ``GMAIL_SCOPES``
-environment variable extends it with live-use extras (gmail.modify,
-gmail.settings, gmail.labels) at consent and verification time; see
-:func:`effective_gmail_scopes`.
+Those two lines are ``GMAIL_SCOPES`` in
+``connections.providers.oauth_providers`` — the single declaration the
+OAuth flow derives a Gmail connection's grant from (flow-owned glue, so it
+lives in core). The ``GMAIL_SCOPES`` environment variable extends it with
+live-use extras (gmail.modify, gmail.settings, gmail.labels) at consent
+and verification time; see ``effective_gmail_scopes`` there.
 
 The poll source keys on each message's ``internalDate`` — the drive files
 source's watermark applied to mail: the first fire seeds the watermark at
@@ -28,12 +29,10 @@ messages delivered strictly after it, oldest first, and the seen store
 dedupes the re-listed ids.
 """
 import base64
-import os
 import urllib.parse
 from datetime import datetime, timezone
 
 from ..connections import discovery as provider
-from ..connections.providers import oauth_providers
 from ..engine.actions.gmail import run_gmail_send
 from ..triggers.poll_sources import PollSource, register_source
 from .registry import (
@@ -51,66 +50,6 @@ from .trigger_discovery import (
     options_from_registry,
     register_trigger_discovery,
 )
-
-# The scopes the chip's calls answer to, declared next to the code that
-# needs them (see the module docstring for how a connection is granted them).
-GMAIL_SCOPES = (
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-)
-
-# The Google scope URL a bare GMAIL_SCOPES environment entry expands to:
-# "gmail.modify" -> "https://www.googleapis.com/auth/gmail.modify".
-_GOOGLE_SCOPE_URL_PREFIX = "https://www.googleapis.com/auth/"
-
-# What marks a connection's requested scope as a Gmail one (the shared
-# "google" provider also carries Sheets, Drive and Calendar connections
-# that must not inherit Gmail scopes).
-_GMAIL_SCOPE_MARKER = "/auth/gmail."
-
-
-def effective_gmail_scopes():
-    """The declared Gmail scopes plus any ``GMAIL_SCOPES`` environment extras.
-
-    The environment variable lists live-use extras beyond the declaration
-    (gmail.modify, gmail.settings, gmail.labels) — comma- or
-    whitespace-separated, each entry a full scope URL or a short name that
-    expands to the Google auth URL above. It is read at call time, so a
-    deployment extends its Gmail grants without a code change and tests set
-    the variable per test. Entries already in the declaration and
-    duplicates collapse; with the variable unset this is exactly
-    GMAIL_SCOPES.
-    """
-    raw = os.environ.get("GMAIL_SCOPES") or ""
-    extras = []
-    for entry in raw.replace(",", " ").split():
-        scope = entry if "://" in entry else _GOOGLE_SCOPE_URL_PREFIX + entry
-        if scope not in GMAIL_SCOPES and scope not in extras:
-            extras.append(scope)
-    return GMAIL_SCOPES + tuple(extras)
-
-
-def connection_grant_scopes(provider_name, scopes):
-    """The scope set a connection's OAuth grant requests and is verified
-    against — the flow's single answer to "what may this connection ask
-    for" (``oauth_flow.oauth_start``/``oauth_callback`` and the agent API's
-    connect start all go through here).
-
-    The connection's own requested scopes, normalized like every grant; a
-    Google connection that touches Gmail (any ``gmail.`` scope) also
-    carries the effective Gmail scope set above, so the consent screen
-    requests the declaration plus any ``GMAIL_SCOPES`` environment extras
-    and the callback's missing-scope check holds the grant to them. Other
-    providers and Google connections that never touch Gmail come back
-    unchanged. Raises ``ProviderError`` like ``normalize_scopes`` (a
-    Google connection needs at least one scope).
-    """
-    cleaned = oauth_providers.normalize_scopes(provider_name, scopes)
-    if provider_name != "google" or not any(
-            _GMAIL_SCOPE_MARKER in scope for scope in cleaned):
-        return cleaned
-    return sorted(set(cleaned) | set(effective_gmail_scopes()))
-
 
 GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1"
 GMAIL_MESSAGES_URL = GMAIL_API_URL + "/users/me/messages"

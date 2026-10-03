@@ -14,6 +14,7 @@ from ..auth.session import OAUTH_COOKIE
 from . import records as connection_model
 from . import credentials
 from .providers import oauth_clients, oauth_providers
+from .providers.oauth_providers import connection_grant_scopes
 
 
 def _connection(connection_id):
@@ -74,8 +75,6 @@ def oauth_start(event, connection_id):
         return http._json_response(503, {"error": "OAuth callback URL is not configured"})
     provider_name = connection["provider"]
     try:
-        from ..connectors.gmail import connection_grant_scopes
-
         scopes = connection_grant_scopes(provider_name, connection.get("scopes"))
     except oauth_providers.ProviderError as exc:
         return http._json_response(400, {"error": str(exc)})
@@ -160,8 +159,6 @@ def oauth_callback(event):
                      outcome="error", error=str(exc))
         return _callback_result("exchange_failed", connection_id)
     try:
-        from ..connectors.gmail import connection_grant_scopes
-
         requested = set(connection_grant_scopes(
             connection["provider"], connection.get("scopes")))
     except (oauth_providers.ProviderError, oauth_providers.UnknownProviderError):

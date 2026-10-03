@@ -13,6 +13,7 @@ from ...connections import importing
 from ...connections import records as connections
 from ...connections import tokens
 from ...connections.providers import oauth_clients, oauth_providers
+from ...connections.providers.oauth_providers import connection_grant_scopes
 from ...connections.records import BindingError
 from ...connections.tokens import TokenError
 from ...connections import oauth_flow
@@ -434,8 +435,6 @@ def start_connect(event, connection_id):
     if not redirect_uri:
         return _json_response(503, {"error": "OAuth callback URL is not configured"})
     try:
-        from ...connectors.gmail import connection_grant_scopes
-
         scopes = connection_grant_scopes(connection["provider"], connection.get("scopes"))
     except oauth_providers.ProviderError as exc:
         return _json_response(400, {"error": str(exc)})
