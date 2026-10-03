@@ -549,3 +549,10 @@ def run_youtube_update_video(action, event, *, transport=None, steps=None):
         "description": updated_snippet.get("description"),
         "category_id": updated_snippet.get("categoryId") or category_id or None,
     }
+
+
+def run_youtube_subscription_status(action, event, *, steps=None):
+    from ...triggers.intake.youtube_subscriptions import subscription_status
+
+    channel_id = render(str(action.get("channel_id") or ""), event, steps).strip()
+    return subscription_status(channel_id)

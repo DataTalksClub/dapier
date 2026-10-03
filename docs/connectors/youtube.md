@@ -78,3 +78,14 @@ recent uploads, newest first).
 - A youtube poll without a stored `channel_id` resolves the connection's
   own channel through `channels().mine` at fetch time — point it at a
   different channel explicitly when the connection can see more than one.
+
+## Read-only WebSub lease diagnostic
+
+The `youtube_subscription_status` action takes `channel_id` and reads the
+[hub's subscriber diagnostic](https://pubsubhubbub.appspot.com/subscribe) using
+the deployed callback and existing server-held WebSub secret. It returns only
+`active`, `state`, `expires_at`, `topic`, and `callback`; it never returns the
+secret-bearing diagnostic URL or raw response. It neither renews nor changes
+subscriptions. The action is available in the console designer and through
+`dapier workflows test --execute`/the shared workflow-test API. A diagnostic
+failure or unrecognized lease fields cannot be reported as an active lease.

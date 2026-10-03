@@ -16,6 +16,7 @@ from ..engine.actions.youtube import (
     run_youtube_remove_from_playlist,
     run_youtube_update_video,
     run_youtube_upload_video,
+    run_youtube_subscription_status,
 )
 from ..triggers.poll_sources import PollSource, register_source
 from .registry import (
@@ -26,6 +27,17 @@ from .registry import (
     register_connection_test,
     register_discovery,
 )
+
+register(Action(
+    type="youtube_subscription_status",
+    label="YouTube: subscription status",
+    description="Read authenticated WebSub lease state using the existing server-held secret; returns only state, expiry, topic and callback.",
+    icon="youtube",
+    run=lambda action, event, workflow_id, steps=None: run_youtube_subscription_status(action, event, steps=steps),
+    required=frozenset({"channel_id"}),
+    optional=frozenset(),
+    fields=({"key": "channel_id", "label": "Channel ID", "required": True},),
+))
 
 register(Action(
     type="youtube_find_video",

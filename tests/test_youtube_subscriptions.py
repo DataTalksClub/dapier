@@ -119,3 +119,30 @@ def test_handler_reads_secret_id_from_environment(monkeypatch):
     youtube_subscriptions.handler({}, None)
 
     assert seen["secret_id"] == "the-secret-id"
+
+
+def test_subscription_diagnostic_keeps_secret_server_side(monkeypatch):
+    import urllib.parse
+    from src.dapier.triggers.intake import youtube_subscriptions as subscriptions
+    monkeypatch.setattr(subscriptions, "_settings", lambda: ("https://example.test/hooks/youtube", "server-only-secret"))
+    seen = {}
+    def transport(method, url, **kwargs):
+        seen.update(method=method, params=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query))
+        return 200, b'<table><tr><th>State</th><td>verified</td></tr><tr><th>Expiration</th><td>2099-01-01 00:00:00 UTC</td></tr><tr><th>Secret</th><td>server-only-secret</td></tr></table>'
+    result = subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ", transport=transport)
+    assert seen["method"] == "GET"
+    assert seen["params"]["hub.secret"] == ["server-only-secret"]
+    assert result == {"active": True, "state": "verified", "expires_at": "2099-01-01T00:00:00+00:00", "topic": "https://www.youtube.com/feeds/videos.xml?channel_id=UCDvErgK0j5ur3aLgn6U-LqQ", "callback": "https://example.test/hooks/youtube"}
+    assert "secret" not in json.dumps(result)
+
+
+def test_subscription_diagnostic_never_exposes_http_error_url(monkeypatch):
+    import io
+    import pytest
+    from urllib.error import HTTPError
+    from src.dapier.triggers.intake import youtube_subscriptions as subscriptions
+    monkeypatch.setattr(subscriptions, "_settings", lambda: ("https://example.test/callback", "server-only-secret"))
+    def transport(method, url, **kwargs):
+        raise HTTPError(url, 400, "secret-value", {}, io.BytesIO(b"secret-value"))
+    with pytest.raises(RuntimeError, match="^YouTube hub diagnostic returned HTTP 400$"):
+        subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ", transport=transport)

@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import urllib.parse
+import urllib.error
 import urllib.request
 
 import boto3
@@ -195,3 +196,70 @@ def reconcile(previous_workflow, workflow):
         except Exception as exc:
             warnings.append(f"YouTube unsubscribe for channel {channel_id} failed: {exc}")
     return warnings
+
+
+def subscription_status(channel_id, *, transport=None):
+    """Read the hub's authenticated diagnostic without exposing its secret URL."""
+    import re
+    from datetime import datetime, timezone
+    from html.parser import HTMLParser
+
+    if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
+        raise ValueError("a valid YouTube channel ID is required")
+    callback, secret = _settings()
+    topic = topic_url(channel_id)
+    url = "https://pubsubhubbub.appspot.com/subscription-details?" + urllib.parse.urlencode({
+        "hub.callback": callback, "hub.topic": topic, "hub.secret": secret,
+    })
+    try:
+        if transport:
+            status, raw = transport("GET", url, headers={}, body=None, timeout=TIMEOUT)
+        else:
+            with urllib.request.urlopen(url, timeout=TIMEOUT) as response:
+                status, raw = response.status, response.read()
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"YouTube hub diagnostic returned HTTP {exc.code}") from None
+    except Exception:
+        raise RuntimeError("YouTube hub diagnostic unreachable") from None
+    if status >= 300:
+        raise RuntimeError(f"YouTube hub diagnostic returned HTTP {status}")
+
+    class VisibleText(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.tokens = []
+            self.hidden = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style"):
+                self.hidden += 1
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style"):
+                self.hidden = max(0, self.hidden - 1)
+
+        def handle_data(self, data):
+            if not self.hidden and data.strip():
+                self.tokens.append(data.strip())
+
+    parser = VisibleText()
+    parser.feed(raw.decode("utf-8", errors="replace"))
+    state, expiry = "unknown", None
+    for index, token in enumerate(parser.tokens[:-1]):
+        label = token.lower().strip(" :")
+        value = " ".join(parser.tokens[index + 1:index + 4])
+        if label in ("state", "subscription state", "subscription status"):
+            match = re.match(r"(verified|unverified|active|expired|pending|deleted)\b", value, re.I)
+            if match:
+                state = match[1].lower()
+        if "expir" in label and len(label) < 60:
+            match = re.search(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?", value)
+            if match:
+                stamp = datetime.fromisoformat(match[0].replace("Z", "+00:00"))
+                if stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=timezone.utc)
+                expiry = stamp.astimezone(timezone.utc).isoformat()
+    active = None if state == "unknown" or expiry is None else (
+        state in ("verified", "active") and datetime.fromisoformat(expiry) > datetime.now(timezone.utc))
+    return {"active": active, "state": state, "expires_at": expiry,
+            "topic": topic, "callback": callback}

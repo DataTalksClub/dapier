@@ -972,6 +972,13 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "youtube_subscription_status",
+    label: "YouTube: subscription status",
+    icon: YouTubeLogo,
+    description: "Read authenticated WebSub lease state; signing credentials stay on the server.",
+    fields: [{ key: "channel_id", label: "Channel ID", required: true }]
+  },
+  {
     type: "youtube_find_video",
     label: "YouTube: find video",
     icon: YouTubeLogo,
