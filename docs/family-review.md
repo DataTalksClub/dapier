@@ -114,3 +114,85 @@ and the zoom icon-buttons needed explicit 44px rules.
   the dedicated strip felt like chrome for its own sake.
 - The public marketing callout keeps its accent left edge on the
   single-purpose public pages (no operator shell there).
+
+## Round 9 — drift audit at the plugin-era main tip (2026-10-03)
+
+Fresh adversarial pass at main `5e7f063` (after the plugin program landed on
+top of the family work). Method: the live `src/web` served through the
+stubbed-API rig (`.tmp/family-r9/`, fixtures corrected to the real listing
+shapes), 41 captures — every console register, the designer, public home and
+terms, device-free mobile set at 390×844, mobile drawers, the connections
+manage dialog, keyboard focus states, a live theme round-trip — plus
+computed-style probes (`.tmp/family-r9/shots/probes.json`) and a vendored
+bundle diff against `dakit/dist`.
+
+Generic-tell sweep: clean. No gradients, no pastel pills (dot+word only), no
+eyebrow micro-labels above content, no icons in labelled buttons, no
+dark-sidebar/light-canvas split (nav shares the page plane), no uniform
+metric-card rows, real type tension (32px/700 h1 over 11–12px mono metadata),
+tokens byte-equal to the dapier remap in both themes.
+
+What the audit did find — all family **drift** that accumulated while the
+spec moved on dakit side (`71a39d3` icon geometry, `dea377c` focus recipe):
+
+1. **Focus recipe stale** (probe: 2px outline everywhere; `box-shadow: none`
+   on a focused input): app-local mirrors in `app.css` (3 rules) and
+   `designer.css` (3 rules) still teach the old base recipe; the vendored
+   bundle predates dakit `dea377c` (3px ring, 2px offset, input halo).
+2. **Icons off-geometry** (probe: 16px svgs, stroke-width 1.5px): console
+   `icons.js` and designer `icons.tsx` still draw the retired 16×16 grid;
+   family.md now mandates the 24-grid at 20px/stroke 1.8.
+3. **Off-family brand identity**: `favicon.svg` and the public pages' brand
+   tile are the pre-family green rounded-`d` (raw hex); the app shell's mark
+   is the accent square with the bold "D".
+4. **Public pages ignore the theme** (`public.css` pins light; the dark-mode
+   capture renders white).
+5. **Designer mobile drawer** opens with a scrim but no `role="dialog"` /
+   `aria-modal` (the console drawer has both).
+6. **Null-trigger crash** (functional, surfaced by the no-trigger fixture
+   row): `format.js` `triggerLabel()` dereferences `workflow.trigger.connector`
+   unguarded, so a workflow without a resolvable trigger breaks the Home and
+   Workflows renders with "Could not load workflows/activity" banners.
+
+Fixes for 1–6 land in this round; verdict below after the independent judge.
+
+## Round 9 — drift audit at the plugin-era main tip (2026-10-03)
+
+Fresh adversarial pass at main `5e7f063` (after the plugin program landed on
+top of the family work). Method: the live `src/web` served through the
+stubbed-API rig (`.tmp/family-r9/`, fixtures corrected to the real listing
+shapes), 41 captures — every console register, the designer, public home and
+terms, device-free mobile set at 390×844, mobile drawers, the connections
+manage dialog, keyboard focus states, a live theme round-trip — plus
+computed-style probes (`.tmp/family-r9/shots/probes.json`) and a vendored
+bundle diff against `dakit/dist`.
+
+Generic-tell sweep: clean. No gradients, no pastel pills (dot+word only), no
+eyebrow micro-labels above content, no icons in labelled buttons, no
+dark-sidebar/light-canvas split (nav shares the page plane), no uniform
+metric-card rows, real type tension (32px/700 h1 over 11–12px mono metadata),
+tokens byte-equal to the dapier remap in both themes.
+
+What the audit did find — all family **drift** that accumulated while the
+spec moved on dakit side (`71a39d3` icon geometry, `dea377c` focus recipe):
+
+1. **Focus recipe stale** (probe: 2px outline everywhere; `box-shadow: none`
+   on a focused input): app-local mirrors in `app.css` (3 rules) and
+   `designer.css` (3 rules) still teach the old base recipe; the vendored
+   bundle predates dakit `dea377c` (3px ring, 2px offset, input halo).
+2. **Icons off-geometry** (probe: 16px svgs, stroke-width 1.5px): console
+   `icons.js` and designer `icons.tsx` still draw the retired 16×16 grid;
+   family.md now mandates the 24-grid at 20px/stroke 1.8.
+3. **Off-family brand identity**: `favicon.svg` and the public pages' brand
+   tile are the pre-family green rounded-`d` (raw hex); the app shell's mark
+   is the accent square with the bold "D".
+4. **Public pages ignore the theme** (`public.css` pins light; the dark-mode
+   capture renders white).
+5. **Designer mobile drawer** opens with a scrim but no `role="dialog"` /
+   `aria-modal` (the console drawer has both).
+6. **Null-trigger crash** (functional, surfaced by the no-trigger fixture
+   row): `format.js` `triggerLabel()` dereferences `workflow.trigger.connector`
+   unguarded, so a workflow without a resolvable trigger breaks the Home and
+   Workflows renders with "Could not load workflows/activity" banners.
+
+Fixes for 1–6 land in this round; verdict below after the independent judge.

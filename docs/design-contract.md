@@ -1,67 +1,85 @@
 # Dapier console — design contract
 
-## Attack: what the current console gets wrong
+Dapier renders the shared DataTalksClub family design. The source of truth is
+the **dakit** design system (`../dakit`): `docs/family.md` there is the rubric,
+and dataops' rendered UI is the canonical reference. When this document and
+dakit disagree, dakit wins and this file gets updated. (The pre-family
+"operations register" contract this file once carried is retired; it described
+a direction dapier deliberately left on 2026-10-02 when it joined the family.)
 
-1. The dark sidebar beside a pale content field makes the shell resemble a stock admin template. The rail is louder than the operator's work.
-2. Four metrics march across Overview at equal weight, even though connected accounts and recent runs answer different questions. The values lack a clear time or scope cue.
-3. The Connections page repeats the page title, then explains the section before showing any account. Five equally sized provider cards once pushed the actual accounts below the fold.
-4. Generic rounded controls make actions with different consequences look alike. In the connection dialog, save, grant management, reconnect, and revoke compete in one button band.
-5. The table spends a full column repeating provider names while the account identity—the information that distinguishes two Google Calendars—has been absent.
-6. Helper prose appears under most headings. It can bury the status and next action an operator came to see.
-7. The modal has the same soft card treatment as every other app surface. Long forms and access grants need the clarity of a working sheet, not a decorative card.
+## How the family is consumed
 
-These are claims about the UI in this repository. They are the checklist for screenshot review.
+- The console serves a **vendored copy** of the built bundle:
+  `src/web/vendor/dakit.css` + `src/web/vendor/dakit-tokens.css` (+ fonts).
+  Never link `../dakit` from the app. After changing dakit, run
+  `make sync-dakit` and commit the refreshed vendor files; the copies must
+  stay byte-identical to `dakit/dist`.
+- All app CSS (`src/web/app.css`, `designer.css`, `public.css`, `device.css`)
+  is written against `--dk-*` tokens only. No app-local hex values, radii, or
+  shadows. The sanctioned exceptions are provider brand marks
+  (Google/Slack/Zoom logos, full color) and the dapier remap of the token
+  values in `designer.css`/`app.css`, which must match dakit's own light/dark
+  values exactly.
+- The designer is the family's sanctioned dense toolshell: same shell anatomy
+  and tokens; the canvas may drop below the console rhythm (13.5px, the one
+  density exception family.md grants dapier).
 
-## Direction: the operations register
+## Pinned recipes (verify against dakit/docs/family.md)
 
-Dapier is a control plane. It should look like a working register: quiet paper, sharp rules, strong type, and one green action signal. Navigation belongs on the same plane as the work, separated by a vertical rule. Account identity and state outrank decorative provider branding. The interface is deliberately dense where people compare records and spacious where they make a decision.
+- **Shell**: 268px sidebar (`--dk-size-sidebar`) on `--dk-bg-muted` with a
+  right hairline; uppercase muted group labels; icon+text nav rows; the
+  selected page is the filled `--dk-accent-soft` row only — no rail, no
+  stripe. Mobile ≤860px: one top bar + modal drawer (scrim, Escape, focus
+  trap, restoration).
+- **Page anatomy**: one 32px `h1` + one-line muted description; primary
+  actions in the header band; content in one bordered container with muted
+  header bands and hairline-divided rows; Home is the strip-and-panels
+  anatomy, not a dashboard grid.
+- **Controls**: `--dk-size-control-*` heights (34px desktop, 44px touch);
+  `--dk-radius-md` (6px) static, `--dk-radius-lg` (10px) + overlay shadow for
+  modal/popover surfaces; one CMP-blue primary per view; destructive actions
+  quiet and separated; labels above inputs with the `.dk-form-actions` footer.
+- **Focus**: the family recipe, never an app-local variant —
+  `outline: 3px solid var(--dk-focus-ring)` at 2px offset on `:focus-visible`
+  (full-bleed rows inset it), and text controls that swap to the accent border
+  with a `0 0 0 3px` halo on `:focus`. App CSS that mirrors the base layer
+  must track `dakit/css/base.css` byte-for-byte in spirit: when the vendored
+  bundle updates the recipe, the mirrors update in the same commit.
+- **Icons**: one language — inline SVG, 24×24 viewBox paths rendered at 20px,
+  `stroke="currentColor"`, stroke-width 1.8, round caps/joins, no fills.
+  The shared shapes copy dakit's canonical set (`showcase.html`); per-app
+  shapes stay on the same grid. No icon fonts, no emoji, no 16-grid strokes.
+- **Status**: dot+word pairs in token colors; triplet badges only where status
+  changes a decision; machine values (ids, timestamps) in IBM Plex Mono.
 
-### Type
+## Deliberate departures (recorded, not drift)
 
-- IBM Plex Sans (self-hosted) for prose, controls, and the single large page title.
-- IBM Plex Mono (self-hosted) for IDs, timestamps, technical values, small structural labels, and metric numbers.
-- Scale: 11px structural labels; 12px metadata; 13px table/control text; 15px section headings; 18px dialog titles; 32px page title; 38px principal metric. Weight 500/600 provides hierarchy; no all-caps micro-labels above every heading.
+- Machine values (workflow ids, timestamps, "Updated") stay mono — dapier's
+  identifier texture; dataops uses sans for the same slots.
+- The workflows list expresses On/Off with a switch (it is the toggle, not a
+  status readout); run status comes from the dot+word "Latest run" read.
+- Connections rows may carry two actions (Get token + Manage): token
+  retrieval is a distinct operator task. Candidate for a follow-up menu.
+- The standalone designer's footer shows the working-copy git state
+  (branch + clean/dirty). It is local tool chrome for the operator who
+  commits workflows, not a family-shell element.
 
-### Color
+## Banned tells
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| Paper | `#eeede6` | `#101611` | page and navigation plane |
-| Surface | `#faf9f4` | `#182019` | forms and dialogs |
-| Ink | `#202820` | `#edf2e9` | primary text |
-| Secondary ink | `#485348` | `#bac8b8` | table prose |
-| Muted ink | `#667166` | `#91a090` | metadata |
-| Rule | `#c4cabf` | `#344235` | rows and controls |
-| Strong rule | `#879688` | `#627563` | shell and section boundaries |
-| Signal green | `#0b6745` | `#49b981` | primary action and active navigation |
-| Signal dark | `#074e33` | `#70d59e` | hover/focus |
-| Alert | `#9c4b20` | `#e6a36f` | errors and incomplete setup |
-
-No gradients. No colored status chips. A dot and a word carry state; a rule or solid fill marks the chosen action. Feedback may use a faint paper tint but routine content does not.
-
-### Geometry and spacing
-
-- Navigation width: 204px desktop; drawer on narrow screens. Navigation and content share the paper color; a 1px strong rule separates them.
-- Content gutters: 40px desktop, 24px tablet, 18px mobile. The top bar is one band: 8px of vertical padding around the 32px title, with that page's filters and primary action in the middle and refresh on the right. Content starts within 12px of the band. Later sections: 20px. Table rows: at least 52px.
-- Controls are square (`0px` radius), 38px tall. Dialogs also have square corners. The only circles are status dots and the environment indicator.
-- One-pixel rules provide structure. No drop shadows on cards, buttons, or tables. A dialog uses a single hard `4px 4px 0` offset shadow.
-- Provider choices are ruled rows, not equal-height cards. The connection table is the first content block.
-- Mobile tables become stacked records with the account identity first. Actions wrap below metadata; no horizontal overflow for common operations.
-
-### Components
-
-- Page title: one 32px title in the top bar. That bar also holds the page's filters and primary action. Sections get a distinct heading only when they introduce a new task; no duplicate page title, and no second refresh for the same data. Helper copy is one line in the bar, or omitted when it only restates the page.
-- Primary button: solid signal green. Secondary: transparent with a strong rule. Destructive actions are text/rule and visually separated from routine save.
-- Status: 7px dot plus plain text. “Setup incomplete” and “Needs reconnection” use alert ink; connected uses signal green.
-- Table: one hairline per record, no zebra tint. Name and verified account identity share the first cell; internal ID lives in Manage.
-- Form: labels above inputs, square borders, generous grouping rules. Grants are working rows with permission and expiry metadata.
-- Dialog: flat surface, strong top and bottom rules, hard offset shadow. It must remain usable without visual dependence on the backdrop.
-- Icons: navigation and unlabelled controls only. Never inside a labelled action button.
-
-### Banned tells
-
-Dark sidebar against a light page; equal metric cards; uniform rounded rectangles; pastel status pills; eyebrow text above every heading; decorative icons in labelled buttons; generic explainer copy; gradients; glass effects; repeated shadows; equal-size provider cards above account data.
+Any app-local focus width/halo; icons off the 24-grid geometry; raw hex
+outside the token remap and provider marks; gradients; pastel status pills;
+eyebrow micro-labels above content headings; icons inside labelled buttons;
+dark sidebar against a light canvas; dashboard card grids; off-family brand
+marks (the app identity is the accent rounded square with the bold "D" —
+the favicon and public pages carry the same tile).
 
 ## Verification
 
-Render the real HTML, CSS, and JS at desktop and mobile widths. Capture login/forbidden, Overview, Connections (including add picker and pending/connected states), a management dialog, the grants dialog, and a mobile table. Check the attack list against the images, then smoke-check navigation, picker, dialogs, grant save/revoke, token revoke, and browser console errors. The designer iframe keeps its full-height canvas behavior and gets a navigation smoke check; its own editor visual system is outside this console reskin.
+Render the real HTML/CSS/JS through the stubbed-API static server and
+capture every console page plus the designer at 1440×900 and 390×844, light
+and dark, with dataops' home as the side-by-side reference; include the
+mobile drawers, a management dialog, and keyboard focus states. An
+independent judge compares against `../dakit/docs/family.md`; rounds and
+verdicts are recorded in `docs/family-review.md`. Functional smoke:
+navigation, picker, dialogs, grant save/revoke, token revoke, browser
+console errors.
