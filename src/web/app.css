@@ -843,6 +843,9 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     align-items: center;
     row-gap: 0;
     width: 100%;
+    /* the base 8px block padding would push the 64px row down and sag the
+       bar buttons below the optical center of dataops' 64px bar */
+    padding: 0;
   }
   .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-pad)); right: calc(-1 * var(--page-pad)); border-bottom: 1px solid var(--dk-border-default); }
   .topbar-title { display: contents; }
@@ -984,6 +987,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .table-wrap td.workflow-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 10px; }
   .table-wrap td.workflow-actions::before { display: none; }
   .table-wrap td.workflow-actions .dk-button { width: auto; }
+  /* Status suffixes (failed step, delayed-until) keep the status read's wide
+     column — auto-placement would drop them into the 92px label column and
+     wrap mono tokens mid-word. */
+  .table-wrap td[data-label="Status"] > .mono { grid-column: 2; }
 
   .form-grid { grid-template-columns: 1fr; }
   dialog { width: calc(100vw - 24px); }
