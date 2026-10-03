@@ -656,6 +656,16 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem]
             Resource: !GetAtt CredentialsTable.Arn
+        # Provider tokens expire during unattended runs. The worker persists
+        # version-conditional refreshes, but cannot edit operator credentials.
+        - Statement:
+            Sid: WorkerOAuthCredentialRefresh
+            Effect: Allow
+            Action: [dynamodb:PutItem]
+            Resource: !GetAtt CredentialsTable.Arn
+            Condition:
+              ForAllValues:StringLike:
+                dynamodb:LeadingKeys: ["oauth#*"]
         - DynamoDBCrudPolicy:
             TableName: !Ref TaskUsageTable
         - Statement:

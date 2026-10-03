@@ -219,3 +219,13 @@ as called for in [#1680](https://github.com/AI-Shipping-Labs/website/issues/1680
 3. Add the DTC-authenticated CLI and token delivery contract.
 4. Enroll the two YouTube connections, verify end-to-end access, then migrate
    individual consumers deliberately.
+
+### Workflow worker refresh permissions
+
+The workflow worker reads provider credentials and saves refreshed OAuth token
+records using version-conditional writes. Its `dynamodb:PutItem` permission is
+scoped to the credentials table and `oauth#*` partition keys; it cannot write
+operator credentials or delete credentials. This permits unattended workflows
+(such as Dropbox attachment uploads) to continue after access tokens expire.
+The template regression test protects this permission separately from token
+lifecycle tests, which do not enforce deployed IAM policies.
