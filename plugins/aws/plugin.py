@@ -4,7 +4,7 @@ identity health check, the new/updated/deleted-file poll sources, and the trigge
 sample pull."""
 import json
 
-from ..engine.actions.s3 import (
+from plugins.aws.runners.s3 import (
     DEFAULT_CREDENTIAL_ID,
     run_s3_delete_object,
     run_s3_find,
@@ -14,15 +14,21 @@ from ..engine.actions.s3 import (
     run_s3_read_object,
     run_s3_upload,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.connectors.registry import (
     Action,
+    Connector,
     ConnectionTest,
     Discovery,
+    connector,
     register,
     register_connection_test,
     register_discovery,
 )
+from src.dapier.triggers.poll_sources import PollSource, register_source
+
+connector(Connector(name="s3", label="S3",
+                    events=("file.created", "file.updated", "file.deleted"),
+                    icon="database"))
 
 register(Action(
     type="s3_upload",
@@ -183,7 +189,7 @@ register(Action(
 
 
 def _stored_config(connection):
-    from ..connections import aws
+    from src.dapier.connections import aws
 
     for credential_id in (connection.get("credential_id"), DEFAULT_CREDENTIAL_ID):
         if not credential_id:
@@ -197,7 +203,7 @@ def _stored_config(connection):
 
 
 def _run_buckets(connection, params, *, transport=None):
-    from ..connections import aws
+    from src.dapier.connections import aws
 
     config = _stored_config(connection)
     if config.get("buckets") is not None:
@@ -226,7 +232,7 @@ def _iso(value):
 def _run_objects(connection, params, *, transport=None):
     """The keys in one bucket (under ``prefix`` when given), basenames as
     display names."""
-    from ..connections import aws
+    from src.dapier.connections import aws
 
     client = aws.client("s3", _stored_config(connection))
     request = {"Bucket": params["bucket"], "MaxKeys": 100}
@@ -257,7 +263,7 @@ register_discovery(Discovery(
 
 def _run_test(connection):
     """Verify the effective assumed role or legacy AWS identity."""
-    from ..connections import aws
+    from src.dapier.connections import aws
 
     try:
         identity = aws.client("sts", _stored_config(connection)).get_caller_identity()
@@ -274,8 +280,8 @@ register_connection_test(ConnectionTest(connector="aws", run=_run_test))
 
 # --- trigger discovery: bucket options for the upload action's bucket field ----
 
-from . import trigger_discovery
-from .trigger_discovery import (
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     TriggerDiscovery,
@@ -358,7 +364,7 @@ def _s3_poll_validate(body):
     """Save-time fetch spec: ``bucket`` (required), optional ``prefix`` and
     ``credential_id`` (the shared ``aws`` keys by default), with the fetch
     defaults a stored s3 poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     bucket = str(body.get("bucket") or "").strip()
@@ -376,7 +382,7 @@ def _s3_poll_validate(body):
 
 
 def _s3_poll_client(item):
-    from ..connections import aws
+    from src.dapier.connections import aws
 
     credential_id = str(item.get("credential_id") or DEFAULT_CREDENTIAL_ID).strip()
     try:
@@ -575,7 +581,7 @@ def _stored_s3_poll(name):
     unconfigured poll triggers, an unknown name and a non-s3 source (the
     generic poll connector owns those) all fold together: the caller only
     distinguishes live-vs-fallback."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -654,7 +660,7 @@ def _fetch_s3_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     ``file.created`` run or example, and an unknown event lands on the
     classic new-file sample.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_s3_poll(name)

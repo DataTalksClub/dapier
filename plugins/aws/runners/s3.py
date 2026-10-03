@@ -21,10 +21,10 @@ success, not an error.
 import mimetypes
 import os
 
-from ...connections import credentials, tokens
-from ...connections import aws as aws_credentials
-from . import base
-from .templating import render
+from src.dapier.connections import aws as aws_credentials
+from src.dapier.connections import credentials, tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 DEFAULT_CREDENTIAL_ID = "aws"
 DOWNLOAD_TIMEOUT = 30

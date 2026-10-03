@@ -26,7 +26,7 @@ from src.dapier.engine.actions.drive import (
     run_drive_move_file,
 )
 from src.dapier.engine.actions.email import run_email_send
-from src.dapier.engine.actions.s3 import run_s3_list_objects
+from plugins.aws.runners.s3 import run_s3_list_objects
 from src.dapier.engine.actions.sheets import run_sheets_add_worksheet
 from src.dapier.engine.actions.zoom import run_zoom_delete_recording
 

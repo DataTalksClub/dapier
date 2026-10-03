@@ -138,12 +138,12 @@ PROVIDER_DISCOVERY_SOURCES = {
     "google": ("google-sheets", "google-drive", "google-calendar", "gmail"),
     "youtube": ("youtube",),
     "zoom": ("zoom",),
-    "s3": ("s3",),
-    "aws": ("s3",),
 }
 
-# Providers whose health check is registered under another key.
-CONNECTION_TEST_ALIASES = {"s3": "aws"}
+# Providers whose health check is registered under another key. Now empty:
+# the s3→aws alias moved into the aws plugin's manifest, and plugins feed
+# this map through the loader.
+CONNECTION_TEST_ALIASES = {}
 
 
 def register(action):

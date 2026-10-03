@@ -20,7 +20,7 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from src.dapier.connectors import s3 as s3_connector
+import plugins.aws.plugin as s3_connector
 from src.dapier.connectors import trigger_discovery
 from src.dapier.connectors.registry import CONNECTORS
 from src.dapier.triggers import poll_sources, poll_triggers

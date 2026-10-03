@@ -1,0 +1,12 @@
+name: aws
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [aws, s3]
+  discovery_sources:
+    s3: [s3]
+    aws: [s3]
+  test_aliases:
+    s3: aws
+  trigger_chips: [s3]
+  poll_sources: [s3, s3.updates, s3.deletions]

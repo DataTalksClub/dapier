@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.s3 import run_s3_find
+from plugins.aws.runners.s3 import run_s3_find
 from src.dapier.engine.actions.zoom import run_zoom_list_past_participants
 
 import src.dapier.connectors  # noqa: F401  (import = registration)

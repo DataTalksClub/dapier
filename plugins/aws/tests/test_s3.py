@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors.registry import action_specs, run_action
-from src.dapier.engine.actions.s3 import run_s3_upload
+from plugins.aws.runners.s3 import run_s3_upload
 
 
 class FakeTransport:
@@ -219,7 +219,7 @@ if __name__ == "__main__":
 
 def test_object_metadata_uses_head_without_content_download_or_custom_metadata():
     from datetime import datetime, timezone
-    from src.dapier.engine.actions.s3 import run_s3_head_object
+    from plugins.aws.runners.s3 import run_s3_head_object
     class HeadersOnly:
         def head_object(self, **kwargs):
             assert kwargs == {"Bucket":"test-bucket", "Key":"legacy.zip"}

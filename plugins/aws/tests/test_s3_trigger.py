@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import boto3
 import pytest
 
-from src.dapier.connectors import s3 as s3_connector
+import plugins.aws.plugin as s3_connector
 from src.dapier.connectors import trigger_discovery
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError

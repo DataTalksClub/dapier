@@ -37,9 +37,6 @@ connector(Connector(name="google-drive", label="Google Drive",
 connector(Connector(name="google-calendar", label="Google Calendar",
                     events=("event.new",),
                     icon="calendar"))
-connector(Connector(name="s3", label="S3",
-                    events=("file.created", "file.updated", "file.deleted"),
-                    icon="database"))
 connector(Connector(name="renderer", label="Renderer", events=("job.completed",), icon="file-text"))
 connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))
 connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw"))

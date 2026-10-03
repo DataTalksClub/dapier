@@ -26,7 +26,6 @@ from . import (  # noqa: F401  (import = registration)
     logic,
     poll,
     render,
-    s3,
     schedule,
     sheets,
     storage,

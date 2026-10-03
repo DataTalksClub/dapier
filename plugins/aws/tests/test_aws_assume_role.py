@@ -8,8 +8,8 @@ import yaml
 from dapier_cli import commands
 from src.dapier.api import admin
 from src.dapier.connections import aws, credentials
-from src.dapier.connectors import s3
-from src.dapier.engine.actions import s3 as actions
+import plugins.aws.plugin as s3
+from plugins.aws.runners import s3 as actions
 
 ROLE = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
 CONFIG = {
@@ -20,7 +20,7 @@ CONFIG = {
 
 
 def test_api_can_stage_file_bytes_and_assume_only_configured_roles():
-    source = Path(__file__).resolve().parents[1] / "template.yaml"
+    source = Path(__file__).resolve().parents[3] / "template.yaml"
     document = yaml.load(source.read_text(), Loader=yaml.BaseLoader)
     resources = document["Resources"]
     api_policies = resources["IngressFunction"]["Properties"]["Policies"]

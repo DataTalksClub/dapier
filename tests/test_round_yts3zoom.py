@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.s3 import (
+from plugins.aws.runners.s3 import (
     run_s3_delete_object,
     run_s3_presign_url,
     run_s3_read_object,
