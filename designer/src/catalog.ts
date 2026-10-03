@@ -1529,9 +1529,10 @@ export const actionCatalog: ActionEntry[] = [
     type: "render_html_to_pdf",
     label: "Render PDF",
     icon: FileText,
-    description: "Queue an html-renderer job: the input field's stored email body becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
+    description: "Queue an html-renderer job: the input field's stored email body — or input_value, a template (e.g. a code step's transformed body) that wins when set — becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
     fields: [
       { key: "input_field", label: "Input field", placeholder: "html" },
+      { key: "input_value", label: "Input value (template)", placeholder: "{steps.clean.output.result.html}" },
       { key: "output_key", label: "Output key", placeholder: "rendered/{event_id}.pdf" },
       { key: "output_bucket", label: "Output bucket", discover: { resource: "buckets", account: "aws" } },
       { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
