@@ -188,7 +188,7 @@ Source: Zap `155120966`; draft: `dropbox_on_upload`.
 - [x] Verify Dropbox/Gmail canonical draft dedupe and safe review/reject publication gate separately; no ledger publication.
 - [x] Verify a fresh synthetic file through an isolated automatic two-minute poll and one complete run.
 - [x] Verify isolated pause/resume cursor retention and exact workflow rollback; concrete non-overlap cutover/rollback plan prepared.
-- [ ] Agree on production cutover and replace the legacy live consumer before enabling the production landing poll. Governance remains unperformed: landing poll disabled and legacy consumer unchanged.
+- [ ] Complete general production replacement wiring after the verified original-folder Explorer test: reviewed four-step `dropbox_on_upload` plus seeded/enabled `invoice-landing`. User confirmed the original folder and original Zap is OFF; broad live replacement remains unperformed, poll disabled and old income-invoices definition unchanged.
 
 Dropbox landing fallback (2026-10-02): uploaded only `dapier-synthetic-invoice-landing-20261002-01.pdf` using the same 1,855-byte fixture. An isolated worker workflow restricted to that exact test path performed both moves, ending at `/_dtc_paperwork/invoices/2026-10-02-dapier-synthetic-invoice-landing-20261002-01.pdf`. Provider metadata confirmed both original and intermediate landing paths absent; a direct archived download matched the original SHA256 above. DataOps initially returned HTTP 400 because Dapier used unsupported route `dropbox-upload` and document kind `dropbox-file`. The adapter fix uses a configurable `recipient_route` (default `invoice`) and supported kind `attachment`. After deployment, an intake-only API/CLI execution against the already archived path returned `accepted`, item `email-12d01cd72b823cd547ceaf5bc4de4e05`, artifact `email-document-303c85e3150060b66c543afe1eb0f191`, status `needs-review`. No rename/move was replayed. The actual production landing workflow and disabled poll were retained; automatic two-minute polling is not claimed as tested.
 
@@ -402,3 +402,16 @@ ledger. Automatic renewal's direct rule/target/log reads remain access-limited,
 separate from the verified active authenticated hub lease and repaired stack.
 
 - [x] Chrome deleted only inactive copied Zaps `382288655` and `382289809` to recoverable Trash; neither was published/activated, originals untouched. Sanitized proof: `.tmp/zapier-copy-cleanup-proof.json`.
+
+## Windows Explorer sync through original folder — 2026-10-03
+
+- [x] Original Zap155120966 OFF confirmed read-only; original source `/_dtc_paperwork/invoices-landing` empty on provider and Explorer. User confirmed this desired source; no producer-folder transition is needed.
+- [x] Zero matching source/archive files, inbox events and owned test runs before upload; exact-file workflow and owned two-minute poll seeded without replay.
+- [x] User pasted `dapier-explorer-dropbox-20261003-01.pdf` exactly once via Windows Explorer; actual sync triggered one automatic four-step run, no manual workflow execution.
+- [x] Archive `/_dtc_paperwork/invoices/2026-10-03-dapier-explorer-dropbox-20261003-01.pdf` has 1,855 exact fixture bytes/hash; original/intermediate landing paths absent. DataOps accepted `email-d206d0271da667bca9f1be3162217af1`, needs-review. No financial publication.
+- [x] After another two-minute schedule interval, one run/archive/intake action remained, archive revision unchanged. API does not expose a separate receipt for an empty poll invocation.
+- [x] Owned workflow/poll removed and API absence verified; original production definition unchanged, archived synthetic evidence retained.
+
+Run: `integration-explorer-dropbox-20261003:explorer-dropbox-20261003-a3fad02c9ed9ca46`.
+Proofs: `.tmp/explorer-dropbox-final-proof.json`,
+`.tmp/explorer-dropbox-inbox-proof.json`, `.tmp/explorer-dropbox-cleanup-proof.json`.

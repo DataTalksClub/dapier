@@ -303,7 +303,7 @@ Completed access/contract checks and remaining production cutover gates:
    Use strict dry-runs and per-step tests with synthetic prior outputs for
    dependencies. Dry-runs cannot verify provider defaults or permissions.
 5. Existing enabled migrations have completed their live tests. The remaining
-   production Dropbox cutover needs the separate authorization/producer transition
+   production Dropbox cutover needs the concrete replacement/poll wiring
    below; do not enable another overlapping consumer to close a test checkbox.
    Existing Zapier senders and originals were never changed by draft/test work.
 
@@ -316,10 +316,11 @@ live `dropbox_on_upload` consumer monitors `/_dtc_paperwork/income-invoices/`
 and performs intake/delete; the landing-folder migration draft is not live.
 Do not enable a second business consumer over the same files.
 
-For a separately authorized production cutover:
+For general production replacement (distinct from the verified exact-file test):
 
 1. Save the current published workflow and poll configuration for rollback,
-   inventory landing-file metadata, and confirm which service uploads files.
+   inventory landing-file metadata. The user confirmed manual Dropbox desktop
+   sync into the original landing folder; no producer-folder transition is needed.
 2. Pause uploads for the cursor-seeding window. Disable the old consumer, then
    replace the same workflow ID with the reviewed four-step landing draft
    (UTC date, rename, move, DataOps intake), initially disabled. Do not retain
@@ -376,9 +377,13 @@ Current API inventory confirms `mailchimp-drive-backup` enabled at two minutes,
 targets `/_dtc_paperwork/invoices-landing`; a production workflow named
 `invoice-landing` is not published. That poll ID must not be mistaken for an
 already deployed replacement workflow. Safe rollback/cursor tests passed in
-isolation. Remaining cutover work requires identifying the file producer and
-folder transition, choosing historical-backlog handling and approving a window
-to pause uploads, disable/drain the old consumer, seed and enable one replacement.
+isolation and on the actual original folder through Windows Explorer. Original
+Zap155120966 is OFF; user confirmed desktop sync uses invoices-landing. No
+producer/folder transition remains. The general configuration change is to
+replace the old definition with the reviewed four-step landing workflow, seed
+and enable the landing poll while uploads are paused, and retain the saved
+rollback definition. Real historical files, if present at activation, must not
+be replayed automatically. The exact-file test did not perform this replacement.
 There is no additional fixture test that can substitute for those decisions.
 
 The other remaining acceptance inputs are owner evidence for future upstream
@@ -386,3 +391,5 @@ export behavior and a genuine future YouTube upload. No public upload or
 production cutover was performed to force acceptance. Direct scheduler
 rule/target/log diagnostics remain access-limited; authenticated hub lease state
 and expiry are verified separately, not a false pass of automatic invocation logs.
+
+The actual Explorer test delivered exactly one archive and accepted DataOps intake, with exact fixture bytes and absent landing paths. Its owned poll/workflow were removed; the archive remains evidence. See the completion report for run identity and the additional-interval duplicate check.

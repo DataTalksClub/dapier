@@ -189,8 +189,10 @@ intake, authentication, validation, routing, action and retry behavior only.
 - **Genuine YouTube upload: unchecked.** Requires the next legitimate owner
   upload; synthetic callback delivery does not satisfy publisher-to-hub proof.
 - **Production Dropbox cutover: unchecked.** Concrete rollback and cursor tests
-  passed, but user/deployment governance must authorize and perform the planned
-  non-overlap transition; legacy consumer unchanged and landing poll disabled.
+  passed, including the actual original-folder Explorer upload. The general
+  replacement/poll switch was not performed by that exact-file test; legacy
+  consumer remains unchanged and landing poll disabled. Producer folder is
+  confirmed and needs no transition.
 - **Future exporter behavior: unknown.** Owned-repo read-only searches found
   imports/tests/docs and the assumed-role policy, not the upstream exporter.
   Future create/replace/naming requires owner evidence. Source CST, UTC dates
@@ -306,7 +308,7 @@ no remaining executable synthetic check is omitted.
 | --- | --- |
 | Future exporter creates/replaces/repeats names | Requires upstream exporter definition or future owner export evidence; historical matching metadata does not prove future behavior. Isolated create, replace and repeated-name polling passed. |
 | Genuine YouTube upload delivery | Requires the next legitimate owner upload; authenticated synthetic callback/retry passed without public upload. |
-| Production Dropbox cutover | Prepared non-overlap/rollback plan requires an authorized production migration window; existing consumer unchanged, new production poll disabled. |
+| Production Dropbox cutover | Prepared non-overlap/rollback plan remains a concrete general wiring change: reviewed four-step replacement plus seeded/enabled landing poll. User confirmed original folder, original Zap OFF and actual Explorer test passed; old consumer/new production poll unchanged by the isolated test. |
 
 Production financial ledger publication was not performed. Required integration
 publication checks were completed in the explicitly authorized isolated live
@@ -457,3 +459,35 @@ aws-infra Mailchimp template is an assumed-role policy, not an exporter. Future
 upstream naming/create/replace remains dependent on owner evidence; local
 polling semantics are tested. No public YouTube upload, production Dropbox
 cutover or real financial publication was performed.
+
+## Actual Explorer upload on original Zapier source
+
+The user confirmed Dropbox desktop upload uses the original
+`/_dtc_paperwork/invoices-landing` folder; no producer-folder transition is needed.
+Chrome read-only original Zap155120966 showed OFF. Provider and Explorer folder
+baselines were empty, with zero matching event/run/archive. An owned exact-path
+workflow/poll was seeded without replay, then the user pasted one unique PDF
+via Windows File Explorer. No API upload or manual workflow execution occurred.
+
+One automatic run `integration-explorer-dropbox-20261003:explorer-dropbox-20261003-a3fad02c9ed9ca46`
+started at `2026-10-03T07:49:59.006853+00:00`; all four UTC-prefix, rename, move
+and intake steps completed. Archive
+`/_dtc_paperwork/invoices/2026-10-03-dapier-explorer-dropbox-20261003-01.pdf`
+is 1,855 bytes with SHA256
+`a81cc4eced5b087376cd1ccc8da187b55bc72cf063bf84471d9be647769e7388`,
+ID `id:nn8KyArhBWgAAAAAAACGVA`, revision `65ceae586e49fe58652f1`.
+Original and intermediate landing paths are absent. DataOps accepted
+`email-d206d0271da667bca9f1be3162217af1`, artifact
+`email-document-fa0bfc47663ac7cd4acb7e37a69049a6`, needs-review.
+One inbox event matched the exact-file workflow and ingress-only poll handler;
+only the former performed the four integration steps.
+
+After the additional two-minute schedule interval, run/archive/intake-action
+counts remained one, with unchanged archive revision/hash. The API exposes no
+separate invocation receipt for a subsequent empty poll; no such receipt is
+claimed. Owned workflow/poll deletion and original production-definition
+preservation are independently verified; the synthetic archive/audit is retained.
+General live migration wiring is still unperformed: publish the reviewed
+four-step definition under `dropbox_on_upload` instead of income-invoices
+intake/delete, seed and enable `invoice-landing`, keep original Zap OFF. This
+is distinct from the now-proven producer folder and actual Explorer ingestion.
