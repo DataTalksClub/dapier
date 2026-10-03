@@ -569,3 +569,16 @@ def test_strict_upload_conflict_is_forwarded_and_fails_without_overwrite():
     assert seen["strict_conflict"] is True
     assert seen["mode"] == "add"
     assert seen["autorename"] is False
+
+
+def test_dropbox_real_http_conflict_keeps_provider_status_and_tag():
+    import io
+    from urllib.error import HTTPError
+    def conflict(*args, **kwargs):
+        raise HTTPError("https://example.test/upload", 409, "Conflict", {},
+                        io.BytesIO(b'{"error":{".tag":"path","path":{".tag":"conflict"}}}'))
+    with pytest.raises(RuntimeError, match="HTTP 409.*path/conflict"):
+        dropbox._dropbox_upload("token", "/synthetic.pdf", b"same",
+                                strict_conflict=True, transport=conflict)
+    with pytest.raises(RuntimeError, match="HTTP 409.*path/conflict"):
+        dropbox._dropbox_rpc("https://example.test/move", "token", {}, transport=conflict)

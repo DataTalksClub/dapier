@@ -165,3 +165,7 @@ Removing access requires updating the list, revoking the existing token, and
 reconnecting. Review the workflow before removing write access: it deletes
 processed files. The [shared scope guide](README.md#changing-requested-scopes)
 explains the source files that define defaults and validation.
+
+Upload and move/copy errors preserve Dropbox's HTTP status and conflict tag.
+An HTTP 409 conflict is reported as a provider rejection rather than an
+unreachable endpoint, including when the default urllib transport raises it.

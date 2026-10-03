@@ -5,6 +5,7 @@ import json
 import mimetypes
 import os
 import urllib.request
+import urllib.error
 
 from ...connections import tokens
 from . import base
@@ -57,6 +58,8 @@ def _dropbox_upload(access_token, path, payload, *, transport=None,
         status, raw = transport(
             "POST", DROPBOX_UPLOAD_URL, headers=headers, body=payload, timeout=15,
         )
+    except urllib.error.HTTPError as exc:
+        status, raw = exc.code, exc.read()
     except Exception as exc:
         raise RuntimeError(f"dropbox upload unreachable: {type(exc).__name__}")
     if status >= 300:
@@ -124,6 +127,8 @@ def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dro
         status, raw = transport(
             "POST", url, headers=headers, body=json.dumps(payload).encode(), timeout=15,
         )
+    except urllib.error.HTTPError as exc:
+        status, raw = exc.code, exc.read()
     except Exception as exc:
         raise RuntimeError(f"{unreachable}: {type(exc).__name__}")
     if status >= 300:
