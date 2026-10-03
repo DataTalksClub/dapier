@@ -556,3 +556,9 @@ def run_youtube_subscription_status(action, event, *, steps=None):
 
     channel_id = render(str(action.get("channel_id") or ""), event, steps).strip()
     return subscription_status(channel_id)
+
+
+def run_youtube_subscription_renew(action, event, *, steps=None):
+    from ...triggers.intake.youtube_subscriptions import renew_subscription
+    channel_id = render(str(action.get("channel_id") or ""), event, steps).strip()
+    return renew_subscription(channel_id)

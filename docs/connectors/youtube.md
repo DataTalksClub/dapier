@@ -89,3 +89,9 @@ secret-bearing diagnostic URL or raw response. It neither renews nor changes
 subscriptions. The action is available in the console designer and through
 `dapier workflows test --execute`/the shared workflow-test API. A diagnostic
 failure or unrecognized lease fields cannot be reported as an active lease.
+
+`youtube_subscription_renew` accepts `channel_id` only for a channel watched by
+an enabled workflow. It renews using the same callback, topic and server-held
+secret as the scheduled renewal. This action is available through the shared
+designer API, Console action catalog and CLI workflow test path. It sends no
+video or Slack notification.

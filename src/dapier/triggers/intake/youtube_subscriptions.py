@@ -259,7 +259,15 @@ def subscription_status(channel_id, *, transport=None):
                 if stamp.tzinfo is None:
                     stamp = stamp.replace(tzinfo=timezone.utc)
                 expiry = stamp.astimezone(timezone.utc).isoformat()
-    active = None if state == "unknown" or expiry is None else (
+    active = False if state in ("expired", "deleted", "unverified") else None if state == "unknown" or expiry is None else (
         state in ("verified", "active") and datetime.fromisoformat(expiry) > datetime.now(timezone.utc))
     return {"active": active, "state": state, "expires_at": expiry,
             "topic": topic, "callback": callback}
+
+
+def renew_subscription(channel_id):
+    """Renew only a channel already watched by an enabled workflow."""
+    if channel_id not in channels_from_workflows(engine.all_workflows()):
+        raise ValueError("channel is not watched by an enabled YouTube workflow")
+    status = subscribe_channel(channel_id)
+    return {"accepted": status == 202, "status": status, "topic": topic_url(channel_id)}

@@ -18860,6 +18860,13 @@
       fields: [{ key: "channel_id", label: "Channel ID", required: true }]
     },
     {
+      type: "youtube_subscription_renew",
+      label: "YouTube: renew subscription",
+      icon: YouTubeLogo,
+      description: "Renew an already watched channel with the deployed callback and secret.",
+      fields: [{ key: "channel_id", label: "Channel ID", required: true }]
+    },
+    {
       type: "youtube_find_video",
       label: "YouTube: find video",
       icon: YouTubeLogo,

@@ -146,3 +146,19 @@ def test_subscription_diagnostic_never_exposes_http_error_url(monkeypatch):
         raise HTTPError(url, 400, "secret-value", {}, io.BytesIO(b"secret-value"))
     with pytest.raises(RuntimeError, match="^YouTube hub diagnostic returned HTTP 400$"):
         subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ", transport=transport)
+
+
+def test_renew_only_watched_channel_with_existing_settings(monkeypatch):
+    monkeypatch.setattr(youtube_subscriptions.engine, "all_workflows", lambda: [workflow({"equals": "UCexisting"})])
+    seen=[]
+    monkeypatch.setattr(youtube_subscriptions, "subscribe_channel", lambda channel: seen.append(channel) or 202)
+    assert youtube_subscriptions.renew_subscription("UCexisting")["accepted"] is True
+    with pytest.raises(ValueError, match="not watched"):
+        youtube_subscriptions.renew_subscription("UCother")
+    assert seen == ["UCexisting"]
+
+
+def test_expired_diagnostic_is_inactive_even_without_expiry(monkeypatch):
+    monkeypatch.setattr(youtube_subscriptions, "_settings", lambda: ("https://example.test/callback", "server-only"))
+    result=youtube_subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ",transport=lambda *a,**k: (200,b"<b>State</b><span>expired</span>"))
+    assert result["state"] == "expired" and result["active"] is False
