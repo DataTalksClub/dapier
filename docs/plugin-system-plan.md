@@ -1,9 +1,11 @@
 # Plugin system for connections, triggers, and actions — migration plan
 
-Status: in progress — Phases 0–2 landed 2026-10-03: the loader, the slack
-pilot, and all six small plugins (rss, mailchimp, telegram, dropbox, aws,
-zoom). Remaining: Phase 3 (the google family) and Phase 4 (cleanup +
-parity audit). Written 2026-10-03.
+Status: complete — all four phases landed 2026-10-03. Every provider
+integration (slack, rss, mailchimp, telegram, dropbox, aws, zoom, google)
+lives in `plugins/<name>/` with its own manifest, README/CHANGELOG, test
+lane, and CI lane; the last hand-maintained lists (`_BUILTIN_MODULES`,
+hard-coded `PROVIDER_DISCOVERY_SOURCES` entries) are gone and the provider
+mappings are loader-fed from the manifests. Written 2026-10-03.
 
 Provider glue that core calls stayed in core (`connections/providers/`:
 slack_tokens, telegram_api, mailchimp_api, dropbox_api, aws, zoom) —

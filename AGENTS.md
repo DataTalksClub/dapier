@@ -20,6 +20,20 @@ Implement the integration with the owning service instead. The bookkeeping
 code that used to live here has been deleted; do not resurrect it from
 history.
 
+## Integrations live in plugins/ (structure)
+
+Each provider integration (slack, rss, mailchimp, telegram, dropbox, aws,
+zoom, google) lives in `plugins/<name>/` — its connector registrations,
+runners, manifest (`plugin.yaml`), README/CHANGELOG, and its own tests in
+`plugins/<name>/tests/` with a CI lane per plugin. The loader
+(`src/dapier/plugins/__init__.py`) imports every `plugins/*/plugin.py` at
+startup; import == registration into the connector registry, and the
+manifest feeds the provider→discovery mappings. Core (`src/dapier`) never
+imports plugin code: glue that core itself calls (OAuth provider adapters,
+flow-owned scope policy, webhook/resolve intake Lambdas under
+`triggers/intake/`) stays in core. A new integration is a new plugin
+folder, not an entry in a core hand-list — there are no hand-lists left.
+
 ## UI/CLI parity (required)
 
 Dapier has three surfaces, and every state-changing action must be reachable
