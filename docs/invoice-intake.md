@@ -2,7 +2,7 @@
 
 Vendor invoice emails forwarded to `invoice@dtcdev.click` are
 filed straight into the DataOps document intake. Dapier is only the
-pipe — one trigger, one action; extraction and human confirmation live
+pipe — transport, subject formatting and attachment archiving; extraction and field verification live
 in DataOps (`POST /api/v1/intake/email-documents`, contract
 `2026-07-01`). The canonical definition is
 `workflows/invoice-intake.yaml`.
@@ -11,7 +11,13 @@ in DataOps (`POST /api/v1/intake/email-documents`, contract
 
 ```
 SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
-  1. file-to-dataops — stage the PDF into the DataOps documents bucket
+  1. email-date — format the email date in UTC
+  2. clean-subject — a Python code step removes forwarding/reply prefixes,
+     "Invoice Available" and account/invoice brackets; AWS subjects become
+     "Amazon Web Services". It returns a stable attachment checksum suffix.
+  3. archive-attachment — archive the original PDF using date, clean subject
+     and checksum suffix, so different invoices on the same day do not collide.
+  4. file-to-dataops — stage the PDF into the DataOps documents bucket
      (transfer/ prefix, sha256 in object metadata), then post the intake
      envelope to DATAOPS_INTAKE_URL with x-dataops-intake-secret
 ```
@@ -24,7 +30,10 @@ immutable-message conflict checks.
 The intake is idempotent per (recipientRoute, messageId), checksum- and
 size-verifies every staged object, and files each attachment as a
 DataOps artifact — review and bookkeeping happen in the DataOps console
-from there. Nothing in dapier keeps invoice state.
+from there. The code step does not change the original email subject sent to
+DataOps or parse invoice contents. DataOps handles extraction, verification and
+spreadsheet publication, and uses its own stable document ID for archive names.
+Nothing in Dapier keeps invoice state.
 
 ## Live setup (one-time)
 

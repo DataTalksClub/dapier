@@ -98,9 +98,11 @@ def test_email_invoice_upload_keeps_bytes_and_utc_date_filename(monkeypatch):
         return 200, b"{}"
 
     output = dropbox.run_dropbox_upload(
-        actions[1], event, steps={"email-date": {"output": date}}, transport=transport
+        next(a for a in actions if a["id"] == "archive-attachment"), event,
+        steps={"email-date": {"output": date},
+               "clean-subject": {"output": run_code(actions[1], event)}}, transport=transport
     )
-    assert output["uploaded"] == ["/_dtc_paperwork/invoices/2026-09-30-Example.pdf"]
+    assert output["uploaded"] == ["/_dtc_paperwork/invoices/2026-09-30-Example-000000000000.pdf"]
     assert calls[0]["body"] == b"unchanged PNG bytes"  # suffix is not a conversion
     arg = json.loads(calls[0]["headers"]["dropbox-api-arg"])
     assert arg["mode"] == "add" and arg["autorename"] is False
@@ -114,7 +116,7 @@ def test_ambiguous_email_attachments_fail_before_upload(monkeypatch):
         dropbox.tokens, "get_access_token", lambda *a, **kw: ("token", {})
     )
     with pytest.raises(ValueError, match="exactly one"):
-        dropbox.run_dropbox_upload(workflow("invoice-intake")["actions"][1], event)
+        dropbox.run_dropbox_upload(next(a for a in workflow("invoice-intake")["actions"] if a["id"] == "archive-attachment"), event)
 
 
 def test_upload_filename_override_cannot_collapse_multiple_files(monkeypatch):
@@ -421,7 +423,13 @@ def test_full_preview_formats_email_date_and_preserves_code_source():
 
     report = dryrun.test_run(workflow("invoice-intake"), fixture("email"), strict=True)
     assert all(step["ok"] for step in report["steps"])
-    assert report["steps"][1]["rendered_input"]["filename"] == "2026-09-30-Example.pdf"
+    assert report["steps"][1]["rendered_input"]["code"] == workflow("invoice-intake")["actions"][1]["code"]
+    event = fixture("email")
+    actions = workflow("invoice-intake")["actions"]
+    preview = dryrun.test_step(workflow("invoice-intake"), "archive-attachment", event,
+                              step_outputs={"email-date": {"output": date_time.run_date_time(actions[0], event)},
+                                            "clean-subject": {"output": run_code(actions[1], event)}})
+    assert preview["steps"][0]["rendered_input"]["filename"] == "2026-09-30-Example-000000000000.pdf"
     code = {"id": "example", "type": "code", "code": "output = {'date': input['date']}"}
     assert (
         dryrun.test_run(
