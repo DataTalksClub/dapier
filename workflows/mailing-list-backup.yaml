@@ -25,5 +25,8 @@ trigger:
   connector: google-drive
   event: file.created
   filters:
+    mimeType:
+      not_equals: application/vnd.google-apps.folder
     poll:
       equals: mailchimp-drive-backup
+
