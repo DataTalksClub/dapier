@@ -189,11 +189,15 @@ def test_offset_dates_convert_to_utc(source, expected):
 @pytest.mark.parametrize(
     "instant,expected",
     [
-        ("2026-09-30T04:30:00+00:00", "2026-09-29T23:30:00-05:00"),
+        ("2026-09-30T04:30:00+00:00", "2026-09-29T22:30:00-06:00"),
         ("2026-12-01T05:30:00+00:00", "2026-11-30T23:30:00-06:00"),
+        ("2026-03-08T07:59:59+00:00", "2026-03-08T01:59:59-06:00"),
+        ("2026-03-08T08:00:00+00:00", "2026-03-08T02:00:00-06:00"),
+        ("2026-11-01T06:59:59+00:00", "2026-11-01T00:59:59-06:00"),
+        ("2026-11-01T07:00:00+00:00", "2026-11-01T01:00:00-06:00"),
     ],
 )
-def test_email_todo_uses_processing_clock_and_configurable_dst(instant, expected):
+def test_email_todo_uses_processing_clock_and_fixed_cst_without_dst(instant, expected):
     event = fixture("email")
     event["data"]["route"] = "todo"
     clock = workflow("todo-intake")["actions"][1]["else"][0]

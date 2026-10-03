@@ -60,8 +60,8 @@ Source: Zap `153709869`; workflow: `todo-intake` (v5 published and enabled after
 - [x] Configure workbook `1xdeCQOLRS4vodv3GjaXNaC6t63-qdqL3X98KqJFs0dw`, worksheet ID `0`.
 - [x] Configure Task `Process email "<Subject>" from <From>`, Notes blank, Status `NEW`.
 - [x] Verify workbook access and columns `Date`, `Task`, `Notes`, `Status`.
-- [ ] Confirm source processing-time timezone; original Zapier CST metadata unavailable.
-- [x] Separately verify intended Chicago timezone across midnight and DST boundaries.
+- [x] Confirm source processing-time timezone: published Zap153709869 v1 uses `Current time: CST (ISO)`; Zapier documents fixed UTC−06:00.
+- [ ] Verify fixed UTC−06:00 processing-clock parity across midnight and both DST boundaries, then an actual Gmail retest after live publication. The earlier Chicago/DST interpretation was incorrect.
 - [x] Verify route `todo@dtcdev.click` accepts `alexey@datatalks.club` (live receipt). Other sender policies remain outside this test.
 - [x] Retest verified one correctly populated row and DataOps receipt; initial failed test and successful v5 evidence are recorded below.
 - [x] Verify existing native Telegram task creation and confirmation through the real private bot.
@@ -320,3 +320,20 @@ and Dropbox root descendants, and disabled redirects. Two forbidden-resource
 requests were rejected locally. Temporary grants/token and DynamoDB container
 were removed after readbacks; the publication Dropbox root was removed.
 Spreadsheet recoverable-trash provider confirmation is recorded in the report.
+
+## Source UI review correction — fixed CST
+
+Read-only published Zap153709869 v1 maps the TODO Date field to
+`Current time: CST (ISO)`. [Zapier's system-variable documentation](https://help.zapier.com/hc/en-us/articles/35720226565773-Create-reusable-variables-to-use-in-Zap-workflows)
+defines CST as fixed UTC−06:00 and CDT separately as UTC−05:00.
+`America/Chicago` was a migration parity bug during summer. The email
+processing clock now uses `Etc/GMT+6` (IANA's reversed-sign name for UTC−06:00),
+retaining ISO output and leaving native Telegram mapping/text guards unchanged.
+Earlier Chicago test results are historical behavior evidence, superseded
+for source equivalence by the fixed-CST correction/retest.
+
+Published mailing Zap157386985 v1 (`dtc-shared-drive`, 2024-09-05) confirms
+Drive1.22.0 New File in Folder Legacy, two-minute polling, S3 bucket
+`datatalks-mailchimp-backup`, key `1.Title`, file `1.File`, leading slash false
+and literal MIME field `none`. Adapter wire semantics and future upstream
+export naming/replacement are separate unresolved facts.

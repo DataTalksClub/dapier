@@ -13,7 +13,7 @@ Historical failures are retained; fixes and retests below supersede them.
 | Flow | Completed verification | Boundary |
 | --- | --- | --- |
 | Mailing-list backup | Original ZIP and fresh PDF delivery previously passed. New isolated Drive file A backed up once; replacement B retained the same ID and did not back up; new ID with the same name replaced the exact S3 key with C. Idle polling produced no extra runs. Content-Type is literal `none`. Folders are now excluded. | Future exporter naming/replacement behavior and Zapier's original MIME adapter semantics are unavailable. |
-| Email TODO | Existing actual Gmail retest produced exactly one correctly mapped row and DataOps receipt. Processing-clock behavior and Chicago midnight/DST boundaries passed. | Chicago is the documented intended CST/DST behavior; original Zapier timezone metadata is unavailable. |
+| Email TODO | Existing actual Gmail retest produced exactly one correctly mapped row and DataOps receipt. Processing-clock/row/intake tests previously passed. Published source now confirms fixed CST; migration correction and retest are in progress. | Earlier America/Chicago DST interpretation was a parity bug; source CST is fixed UTC−06:00. |
 | Invoice attachment email | Actual Gmail ingress/archive/DataOps receipt previously passed. Multiple PDFs and inline-PNG-plus-PDF fail closed before archive/intake. Same-byte and changed-byte collisions return HTTP 409, without overwrite or autorename. | Original Zapier selection and duplicate defaults are unavailable. Selected behavior is explicit single selection and strict conflicts. |
 | Telegram TODO | Existing actual native text/confirmation, empty-text guard, isolated JSON/form authentication and stable-ID retry tests passed. Mapping unchanged; private audio was never opened or replayed. | Native Telegram is primary. Unknown original catch-hook sender is compatibility-only; sender discovery/cutover is conditional, outside acceptance. |
 | YouTube → Slack | Real HTTP callback challenge/signature/XML/identity validation passed. Signed synthetic Atom initial delivery and retry produced exactly one completed action and one provider message, username YouTube, in #integration_test. | Synthetic callback is not a genuine upload or publisher-to-hub delivery. Future genuine-event dependency below. |
@@ -81,8 +81,9 @@ was included in these edge-case tests.
 Executed date-time cases covered UTC email date crossing midnight, Chicago
 summer/winter midnight, March 8 spring-forward and November 1 fall-back on
 both sides of the transition, plus current UTC processing date. Intended
-choices remain UTC for invoice dates/prefixes and America/Chicago for TODO
-processing timestamps; exported source timezone metadata is unavailable.
+choices remain UTC for invoice dates/prefixes. Original TODO source UI now
+confirms fixed CST (UTC−06:00); the earlier Chicago tests are superseded by
+the fixed-offset correction and retest, not evidence of source parity.
 
 Chrome Finance evidence for canonical draft
 `c4cfb2964c1e15da72f5c7005633043e46976e8a2c479bf86725aae124fdb264`:
@@ -293,13 +294,14 @@ production Dropbox consumer or production Slack destination was replaced.
 
 ## Audit of remaining unchecked boxes
 
-All nine remaining boxes retain their original scope.
+The original unchecked criteria retain their scope; source UI review is
+resolving facts that were absent from the export.
 
 | Unchecked criterion | Concrete boundary / dependency |
 | --- | --- |
 | Future exporter creates/replaces/repeats names | Exporter definition or owner-generated export is unavailable; isolated create, replace and repeated-name polling passed. |
 | Original Zapier MIME `none` adapter semantics | Original provider HTTP evidence unavailable; selected literal S3 Content-Type `none` verified. |
-| Original TODO processing timezone | Source timezone metadata unavailable; intended Chicago midnight and both DST transitions passed. |
+| Original TODO processing timezone | Resolved by published v1 source UI and official Zapier variable documentation: fixed CST UTC−06:00. Earlier Chicago interpretation was a parity bug; correction/retest tracked in checklist. |
 | Original email attachment/conflict defaults | Original adapter steps/defaults unavailable; intended multiple/inline ambiguity and same/changed-byte strict 409 behavior passed. |
 | Original Slack message spacing | Exact original literal unavailable; current message/action/custom username verified by provider and Chrome. |
 | Genuine YouTube upload delivery | Requires the next legitimate owner upload; authenticated synthetic callback/retry passed without public upload. |

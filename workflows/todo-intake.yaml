@@ -41,7 +41,7 @@ actions:
   else:
   - id: processing-time
     type: date_time
-    timezone: America/Chicago
+    timezone: Etc/GMT+6
   - id: email-fields
     type: code
     code: 'sender = input.get(''sender'') or {}
