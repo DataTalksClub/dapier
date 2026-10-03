@@ -77,7 +77,7 @@ Short-lived access tokens are renewed as needed; they do not need separate
 durable backups. DynamoDB does not contain bearer credentials. Preserve a valid
 refresh token when a refresh response omits `refresh_token`. Make connection
 edits and token refreshes safe under concurrent use: do not overwrite a newer
-secret with stale state, and do not lose a rotated refresh token. Redact
+secret with stale state, and do not lose a rotated refresh token. If refresh omits `scope`, preserve the previously granted scope; an explicit scope response, including a narrower or empty value, remains authoritative. Legacy missing scope metadata is repaired through a verified refresh using recorded consent as the fallback. Generic HTTP actions use this same refresh and identity-check path for OAuth connections. Redact
 provider error bodies before logging or returning them.
 
 Provider adapters define authorization URL, token URL, extra consent fields,

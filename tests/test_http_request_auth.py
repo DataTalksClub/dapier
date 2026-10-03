@@ -157,3 +157,12 @@ class AuthTypeValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_http_oauth_connection_uses_refresh_broker(monkeypatch):
+    from src.dapier.connections import tokens
+    monkeypatch.setattr(webhook_connector.base, "_connected_connection", lambda _: {"connection_id": "dropbox", "provider": "dropbox"})
+    calls = []
+    monkeypatch.setattr(tokens, "get_access_token", lambda c: (calls.append(c) or "refreshed", {}))
+    assert webhook_connector._connection_token("dropbox") == "refreshed"
+    assert len(calls) == 1

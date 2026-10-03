@@ -284,3 +284,30 @@ def test_revoke_direct_token_connection_clears_local_secret(monkeypatch):
 
     assert updated["status"] == "revoked"
     assert writes == [{}]
+
+
+def test_refresh_preserves_scope_when_provider_omits_it(monkeypatch):
+    configure_client(monkeypatch)
+    writes = []
+    configure_store(monkeypatch, stored_token(expires_at=1, scope="files.content.read files.content.write"), writes)
+    transport_for(monkeypatch, token_response={"access_token": "new-access", "expires_in": 3600}, verify_payload={"items": [{"id": "UC1", "snippet": {}}]})
+    _, info = get_access_token(connection())
+    assert info["scope"] == "files.content.read files.content.write"
+    assert writes[0]["scope"] == info["scope"]
+
+
+def test_refresh_respects_explicit_narrower_scope(monkeypatch):
+    configure_client(monkeypatch)
+    configure_store(monkeypatch, stored_token(expires_at=1, scope="scope-a scope-b"))
+    transport_for(monkeypatch, token_response={"access_token": "new-access", "expires_in": 3600, "scope": "scope-a"}, verify_payload={"items": [{"id": "UC1", "snippet": {}}]})
+    _, info = get_access_token(connection())
+    assert info["scope"] == "scope-a"
+
+
+def test_refresh_repairs_missing_scope_from_recorded_consent(monkeypatch):
+    configure_client(monkeypatch)
+    configure_store(monkeypatch, stored_token(scope=""))
+    transport_for(monkeypatch, token_response={"access_token": "new-access", "expires_in": 3600}, verify_payload={"items": [{"id": "UC1", "snippet": {}}]})
+    _, info = get_access_token(connection(granted_scopes=["scope-a", "scope-b"]))
+    assert info["refreshed"] is True
+    assert info["scope"] == "scope-a scope-b"

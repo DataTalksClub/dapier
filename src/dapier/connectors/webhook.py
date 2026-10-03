@@ -38,8 +38,12 @@ register(Action(
 def _connection_token(connection_id):
     """The bearer token behind a connected connection, for request auth."""
     connection = base._connected_connection(connection_id)
-    from ..connections import credentials
+    from ..connections import credentials, tokens
+    from ..connections.records import TOKEN_PROVIDERS
 
+    if connection.get("provider") and connection["provider"] not in TOKEN_PROVIDERS:
+        token, _info = tokens.get_access_token(connection)
+        return token
     secret = credentials.get_credential(connection["credential_id"])
     token = secret.get("token") or secret.get("access_token")
     if not token:

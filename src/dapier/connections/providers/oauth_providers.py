@@ -238,7 +238,7 @@ def refresh_access_token(provider_name, *, refresh_token, client_id, client_secr
     return data
 
 
-def normalize_token_data(data, *, previous_refresh_token=None, now=None):
+def normalize_token_data(data, *, previous_refresh_token=None, previous_scope="", now=None):
     """Normalize a token response into Dapier's stored token shape.
 
     Preserves a valid refresh token when the provider omits ``refresh_token``
@@ -259,7 +259,7 @@ def normalize_token_data(data, *, previous_refresh_token=None, now=None):
         "refresh_token": refresh_token,
         "expires_at": now + max(lifetime - 60, 0),
         "token_type": data.get("token_type", "Bearer"),
-        "scope": data.get("scope", ""),
+        "scope": data["scope"] if "scope" in data else previous_scope,
         "obtained_at": now,
     }
 

@@ -89,6 +89,7 @@ def refresh_and_store(connection, record, *, transport=None):
         raise TokenError(str(exc))
     normalized = oauth_providers.normalize_token_data(
         response, previous_refresh_token=refresh_token,
+        previous_scope=stored.get("scope") or " ".join(connection.get("granted_scopes") or []),
     )
     try:
         account_id, account_title = oauth_providers.verify_account(
@@ -120,7 +121,9 @@ def get_access_token(connection, *, transport=None, _retry=True):
     record = _record(connection["connection_id"])
     stored = _stored_tokens(record)
     access_token = stored.get("access_token")
-    if access_token and not oauth_providers.is_expired(stored):
+    missing_scope_metadata = (not stored.get("scope") and stored.get("refresh_token")
+                              and connection.get("granted_scopes"))
+    if access_token and not oauth_providers.is_expired(stored) and not missing_scope_metadata:
         try:
             account_id, account_title = oauth_providers.verify_account(
                 connection["provider"], access_token, transport=transport,
