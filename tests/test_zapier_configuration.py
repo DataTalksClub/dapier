@@ -16,7 +16,8 @@ from src.dapier.connectors import registry
 from src.dapier.connectors import drive
 from src.dapier.api.designer_store import parse_workflow
 from src.dapier.engine import logic
-from src.dapier.engine.actions import date_time, s3, sheets, dataops
+from src.dapier.engine.actions import date_time, sheets, dataops
+import plugins.aws.runners.s3 as s3
 import plugins.dropbox.runners.dropbox as dropbox
 from src.dapier.connections.providers import dropbox_api
 from plugins.slack.runners import slack

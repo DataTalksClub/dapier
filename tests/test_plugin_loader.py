@@ -9,7 +9,6 @@ import pytest
 from src.dapier import plugins
 from src.dapier.connectors import registry
 from src.dapier.triggers import poll_sources
-from src.dapier.triggers import poll_sources
 
 MANIFEST = """\
 name: {name}
@@ -138,37 +137,49 @@ def test_core_compat_mismatch_warns_but_loads(plugin_root):
         f"{plugins.CORE_VERSION}"]
 
 
-def test_real_tree_loads_the_slack_plugin():
+def test_real_tree_loads_every_plugin():
     """The deployment smoke: the repo's plugins/ imports cleanly through the
-    loader and slack's surface is registered exactly as before the move."""
+    loader and each plugin's surface is registered exactly as before the
+    move — actions or poll sources, the chip, the provider mappings, and
+    (where the plugin has one) its connection test and discoveries."""
     import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
 
     manifests = plugins.load_all()
-    assert "slack" in manifests
-    assert plugins.core_compat_ok(manifests["slack"])
+    expected = {"slack", "rss", "mailchimp", "telegram", "dropbox", "aws", "zoom"}
+    assert expected <= set(manifests), set(manifests)
+    for name in expected:
+        assert plugins.core_compat_ok(manifests[name]), name
 
-    assert "slack" in registry.ACTIONS
-    assert "slack" in registry.CONNECTORS
+    # chips: every migrated connector is in the trigger catalog
+    for chip in expected - {"aws"} | {"s3"}:  # aws's chip is named s3
+        assert chip in registry.CONNECTORS, chip
+
+    # provider mappings fed from the manifests
     assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
-    assert "slack.messages" in poll_sources.SOURCES
-    assert any(test.connector == "slack" for test in
-               registry.connection_tests().values())
-    assert any(entry.connector == "slack" for entry in registry.discoveries())
+    assert registry.PROVIDER_DISCOVERY_SOURCES["mailchimp"] == ("mailchimp",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["telegram"] == ("telegram",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["dropbox"] == ("dropbox",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["s3"] == ("s3",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["aws"] == ("s3",)
+    assert registry.PROVIDER_DISCOVERY_SOURCES["zoom"] == ("zoom",)
+    assert registry.CONNECTION_TEST_ALIASES["s3"] == "aws"
 
+    # actions: at least one per action-carrying plugin
+    for action in ("slack", "mailchimp_find_member", "telegram_send",
+                   "dropbox_upload", "s3_upload", "zoom_create_meeting"):
+        assert action in registry.ACTIONS, action
 
-def test_real_tree_loads_the_slack_plugin():
-    """The deployment smoke: the repo's plugins/ imports cleanly through the
-    loader and slack's surface is registered exactly as before the move."""
-    import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
+    # poll sources
+    for source in ("slack.messages", "rss", "mailchimp.members",
+                   "dropbox.files", "s3", "zoom.recordings"):
+        assert source in poll_sources.SOURCES, source
 
-    manifests = plugins.load_all()
-    assert "slack" in manifests
-    assert plugins.core_compat_ok(manifests["slack"])
-
-    assert "slack" in registry.ACTIONS
-    assert "slack" in registry.CONNECTORS
-    assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
-    assert "slack.messages" in poll_sources.SOURCES
-    assert any(test.connector == "slack" for test in
-               registry.connection_tests().values())
-    assert any(entry.connector == "slack" for entry in registry.discoveries())
+    # connection tests and discoveries carry the connectors they did before
+    # (aws registers its health check under the aws connector but its
+    # bucket/object discoveries under s3, as before the move)
+    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "aws", "zoom"):
+        assert any(test.connector == connector_name for test in
+                   registry.connection_tests().values()), connector_name
+    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "s3", "zoom"):
+        assert any(entry.connector == connector_name for entry in
+                   registry.discoveries()), connector_name

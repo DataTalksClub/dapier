@@ -202,7 +202,15 @@ def _import_plugin(base, name):
     plugin_py = base / name / "plugin.py"
     if not plugin_py.is_file():
         raise PluginError(f"plugin {name!r}: missing plugin.py")
-    module_name = f"dapier_plugin_{name}"
+    # Load under the module name tests and runners import —
+    # ``plugins.<name>.plugin`` — so there is exactly one module object per
+    # plugin: whichever side imports first wins sys.modules, and the
+    # registry's registered closures and a test's patch targets always
+    # belong to the same module. spec_from_file_location bypasses sys.path,
+    # so a loader-test plugin root without a plugins/ package on it works.
+    module_name = f"plugins.{name}.plugin"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, plugin_py)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module

@@ -1,6 +1,15 @@
 # Plugin system for connections, triggers, and actions — migration plan
 
-Status: in progress — Phase 0 (loader) and Phase 1 (slack pilot) landed 2026-10-03. Written 2026-10-03.
+Status: in progress — Phases 0–2 landed 2026-10-03: the loader, the slack
+pilot, and all six small plugins (rss, mailchimp, telegram, dropbox, aws,
+zoom). Remaining: Phase 3 (the google family) and Phase 4 (cleanup +
+parity audit). Written 2026-10-03.
+
+Provider glue that core calls stayed in core (`connections/providers/`:
+slack_tokens, telegram_api, mailchimp_api, dropbox_api, aws, zoom) —
+core must not import plugin code. The same rule kept the webhook/resolve
+intake Lambdas (`mailchimp_webhooks`, `dropbox_resolver`, `zoom_webhooks`,
+`slack_events`) in `triggers/intake/` with their API-router wiring.
 
 ## Goal
 
