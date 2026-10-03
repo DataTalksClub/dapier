@@ -330,3 +330,13 @@ A new subfolder is not a downloadable backup file; native document files remain
 eligible. Creation polling uses file identity and creation time, so replacing
 contents preserves the original event, while a distinct file with the same name
 produces a new event and replaces the configured exact S3 key.
+
+The selected body-to-PDF path is also included: disabled drafts
+`invoice-body-render` and `invoice-body-completion` route `invoice-pdf` through
+the existing renderer, archive the completed PDF with UTC date/subject, and
+forward it to DataOps. Source Zap 153699998 was inactive and its steps were not
+exported; this is tested intended behavior, not verified original equivalence.
+Before enabling the pair, disable the broad `rendered-invoice-dataops` consumer
+and drain its runs. Confirm no second consumer watches the selected archive
+folder. Restore the old completion definition if rolling back, after pausing
+the new incoming and completion pair; never overlap the consumers.

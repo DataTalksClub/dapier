@@ -37,6 +37,8 @@ def fixture(name):
     "name",
     [
         "invoice-intake",
+        "invoice-body-render",
+        "invoice-body-completion",
         "todo-intake",
         "telegram-todo",
         "youtube-slack",

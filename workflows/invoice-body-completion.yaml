@@ -1,0 +1,29 @@
+# Paired with invoice-body-render; disable broad legacy completion before cutover.
+id: invoice-body-completion
+enabled: false
+tags: [zapier-migration, zapier-153699998]
+description: Archive the completed email PDF and forward its exact bytes to DataOps.
+trigger:
+  connector: renderer
+  event: job.completed
+  filters:
+    route:
+      equals: invoice-pdf
+actions:
+- id: email-date
+  type: date_time
+  value: '{source_event.data.date}'
+  timezone: UTC
+  format: '%Y-%m-%d'
+- id: archive-rendered
+  type: dropbox_upload
+  connection_id: dropbox
+  source: output
+  folder: /_dtc_paperwork/invoices
+  filename: '{steps.email-date.output.formatted}-{source_event.data.subject}.pdf'
+  overwrite: false
+  autorename: false
+  strict_conflict: true
+- id: intake-rendered
+  type: dataops
+  auth_secret_id: dapier/dataops
