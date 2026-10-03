@@ -601,6 +601,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** Mobile: the workflow sidebar opens as a modal drawer (scrim, one pane). */
   const [navOpen, setNavOpen] = useState(false);
+  const navDrawerRef = useRef<HTMLElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
+  const navWasOpen = useRef(false);
   /** A step sits on the cross-workflow clipboard, so Paste step can appear. */
   const [clipboardHasStep, setClipboardHasStep] = useState(() => readStepClipboard() !== null);
 
@@ -908,6 +911,51 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [leaveOpen]);
+
+  /** The mobile drawer is a modal dialog, like the console's: while it is
+      open the main pane goes inert, focus starts inside, Tab cycles inside,
+      and closing restores focus to the toggle. */
+  useEffect(() => {
+    const drawer = navDrawerRef.current;
+    if (!drawer) return;
+    if (navOpen) {
+      navWasOpen.current = true;
+      const main = document.querySelector<HTMLElement>(".designer-main");
+      if (main) main.inert = true;
+      const first = drawer.querySelector<HTMLElement>("a[href], button:not([disabled])");
+      first?.focus();
+      return () => {
+        if (main) main.inert = false;
+      };
+    }
+    if (navWasOpen.current) {
+      navWasOpen.current = false;
+      navToggleRef.current?.focus();
+    }
+  }, [navOpen]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const drawer = navDrawerRef.current;
+      if (!drawer) return;
+      const items = [...drawer.querySelectorAll<HTMLElement>("a[href], button:not([disabled])")]
+        .filter((el) => el.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   /** Tells the framing console what the title bar should show and edit.
      The console owns the h1 rename affordance; it answers with set-id. */
@@ -1875,7 +1923,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         <div className="sidebar-scrim" role="presentation" onClick={() => setNavOpen(false)} />
       )}
       {!config.embedded && (
-        <aside className={navOpen ? "designer-sidebar open" : "designer-sidebar"}>
+        <aside
+          ref={navDrawerRef}
+          className={navOpen ? "designer-sidebar open" : "designer-sidebar"}
+          role={navOpen ? "dialog" : undefined}
+          aria-modal={navOpen || undefined}
+          aria-label="Workflows"
+        >
         {config.mode === "console" ? (
           <a className="brand brand-link" href="/"><span className="workspace-mark" aria-hidden="true">D</span><span>← Console · Designer</span></a>
         ) : (
@@ -1923,6 +1977,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         <header className="designer-topbar">
           {!config.embedded && (
             <button
+              ref={navToggleRef}
               className="icon-button nav-toggle"
               type="button"
               aria-label="Toggle workflow list"

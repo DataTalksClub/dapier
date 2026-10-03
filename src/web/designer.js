@@ -21988,6 +21988,9 @@
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
     const [shortcutsOpen, setShortcutsOpen] = reactExports.useState(false);
     const [navOpen, setNavOpen] = reactExports.useState(false);
+    const navDrawerRef = reactExports.useRef(null);
+    const navToggleRef = reactExports.useRef(null);
+    const navWasOpen = reactExports.useRef(false);
     const [clipboardHasStep, setClipboardHasStep] = reactExports.useState(() => readStepClipboard() !== null);
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
@@ -22229,6 +22232,45 @@
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [leaveOpen]);
+    reactExports.useEffect(() => {
+      const drawer = navDrawerRef.current;
+      if (!drawer) return;
+      if (navOpen) {
+        navWasOpen.current = true;
+        const main = document.querySelector(".designer-main");
+        if (main) main.inert = true;
+        const first = drawer.querySelector("a[href], button:not([disabled])");
+        first?.focus();
+        return () => {
+          if (main) main.inert = false;
+        };
+      }
+      if (navWasOpen.current) {
+        navWasOpen.current = false;
+        navToggleRef.current?.focus();
+      }
+    }, [navOpen]);
+    reactExports.useEffect(() => {
+      if (!navOpen) return;
+      const onKey = (event) => {
+        if (event.key !== "Tab") return;
+        const drawer = navDrawerRef.current;
+        if (!drawer) return;
+        const items = [...drawer.querySelectorAll("a[href], button:not([disabled])")].filter((el) => el.offsetParent !== null);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [navOpen]);
     reactExports.useEffect(() => {
       if (!initialWorkflowLoaded || !config.embedded || window.parent === window) return;
       window.parent.postMessage(
@@ -23110,67 +23152,78 @@
     };
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: config.embedded ? "designer-shell embedded" : "designer-shell", children: [
       navOpen && !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "sidebar-scrim", role: "presentation", onClick: () => setNavOpen(false) }),
-      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: navOpen ? "designer-sidebar open" : "designer-sidebar", children: [
-        config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
-          summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              className: summary.source === sourceName ? "workflow-item active" : "workflow-item",
-              "aria-current": summary.source === sourceName ? "page" : void 0,
-              onClick: () => {
-                setNavOpen(false);
-                openWorkflowSafely(summary);
-              },
-              type: "button",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 20, strokeWidth: 1.8 }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-text", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
-                    connectorLabel(summary.connector),
-                    "/",
-                    summary.event,
-                    " · ",
-                    summary.actionCount,
-                    " action",
-                    summary.actionCount === 1 ? "" : "s"
-                  ] })
-                ] }),
-                !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-off", children: "Off" }),
-                summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Draft" }),
-                summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Edited" })
-              ]
-            },
-            summary.source
-          )),
-          summaries.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "No workflows found." })
-        ] }),
-        config.mode === "local" && git && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "git-foot", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 20, strokeWidth: 1.8 }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: git.branch }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: git.dirty ? "git-dirty" : "git-clean", children: git.dirty ? "unsaved changes" : "clean" }),
-          (git.ahead > 0 || git.behind > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
-            git.ahead,
-            "↑ ",
-            git.behind,
-            "↓"
-          ] })
-        ] })
-      ] }),
+      !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "aside",
+        {
+          ref: navDrawerRef,
+          className: navOpen ? "designer-sidebar open" : "designer-sidebar",
+          role: navOpen ? "dialog" : void 0,
+          "aria-modal": navOpen || void 0,
+          "aria-label": "Workflows",
+          children: [
+            config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary sidebar-action", type: "button", onClick: newWorkflowSafely, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "New workflow" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "workflow-nav", "aria-label": "Workflows", children: [
+              summaries.map((summary) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  className: summary.source === sourceName ? "workflow-item active" : "workflow-item",
+                  "aria-current": summary.source === sourceName ? "page" : void 0,
+                  onClick: () => {
+                    setNavOpen(false);
+                    openWorkflowSafely(summary);
+                  },
+                  type: "button",
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(Workflow, { size: 20, strokeWidth: 1.8 }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-text", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-name", children: summary.id }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "workflow-meta", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(TriggerLogo, { connector: summary.connector }),
+                        connectorLabel(summary.connector),
+                        "/",
+                        summary.event,
+                        " · ",
+                        summary.actionCount,
+                        " action",
+                        summary.actionCount === 1 ? "" : "s"
+                      ] })
+                    ] }),
+                    !summary.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-off", children: "Off" }),
+                    summary.published === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Draft" }),
+                    summary.published !== false && summary.has_draft && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workflow-disabled state-draft", children: "Edited" })
+                  ]
+                },
+                summary.source
+              )),
+              summaries.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "No workflows found." })
+            ] }),
+            config.mode === "local" && git && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "git-foot", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(GitBranch, { size: 20, strokeWidth: 1.8 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: git.branch }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: git.dirty ? "git-dirty" : "git-clean", children: git.dirty ? "unsaved changes" : "clean" }),
+              (git.ahead > 0 || git.behind > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                git.ahead,
+                "↑ ",
+                git.behind,
+                "↓"
+              ] })
+            ] })
+          ]
+        }
+      ),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
           !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
+              ref: navToggleRef,
               className: "icon-button nav-toggle",
               type: "button",
               "aria-label": "Toggle workflow list",
