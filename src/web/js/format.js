@@ -25,6 +25,7 @@ export function wrapTokens(value) {
 
 export function triggerLabel(workflow) {
   const trigger = workflow.trigger;
+  if (!trigger || !trigger.connector) return 'No trigger yet';
   const base = `${trigger.connector} · ${trigger.event}`;
   const extra = (workflow.triggerCount || 1) - 1;
   return extra > 0 ? `${base} +${extra}` : base;

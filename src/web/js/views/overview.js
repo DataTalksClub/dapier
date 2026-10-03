@@ -37,7 +37,8 @@ const ACTION_TEXT = {
 };
 
 function workflowTriggerText(workflow) {
-  const trigger = workflow.trigger || {};
+  if (!workflow.trigger || !workflow.trigger.connector) return 'No trigger yet';
+  const trigger = workflow.trigger;
   const key = `${trigger.connector}.${trigger.event}`;
   const text = TRIGGER_TEXT[key] || `${trigger.connector || 'Unknown'}: ${String(trigger.event || 'event').replace(/[._]/g, ' ')}`;
   const extra = (workflow.triggerCount || 1) - 1;
