@@ -486,7 +486,7 @@ a.brand:hover span:last-child {
   padding: 0;
   width: var(--dk-size-control-md);
 }
-.icon-button svg { width: 16px; height: 16px; flex: none; }
+.icon-button svg { width: 20px; height: 20px; flex: none; }
 
 .icon-button.active,
 .icon-button:hover:not(:disabled) {
@@ -963,7 +963,7 @@ input[type="checkbox"], input[type="radio"] {
 
 @media (max-width: 720px) {
   .nav-toggle { display: inline-flex; }
-  .nav-toggle svg { width: 16px; height: 16px; }
+  .nav-toggle svg { width: 20px; height: 20px; }
   .designer-shell { grid-template-columns: minmax(0, 1fr); }
   /* The family's mobile anatomy: a 64px app bar — menu + workflow name —
      with the view switch and actions in a toolbar row below the hairline. */

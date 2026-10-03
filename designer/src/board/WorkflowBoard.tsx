@@ -617,7 +617,7 @@ export function WorkflowBoard({
             title="Add a trigger — when the workflow runs"
             type="button"
           >
-            <Zap size={16} strokeWidth={1.5} />
+            <Zap size={20} strokeWidth={1.8} />
             <span>Trigger</span>
           </button>
           <button
@@ -626,7 +626,7 @@ export function WorkflowBoard({
             title="Add a step — flow control, AI, developer tools, or an app"
             type="button"
           >
-            <Plus size={16} strokeWidth={1.5} />
+            <Plus size={20} strokeWidth={1.8} />
             <span>Step</span>
           </button>
           <button
@@ -635,7 +635,7 @@ export function WorkflowBoard({
             title="Add a note"
             type="button"
           >
-            <StickyNote size={16} strokeWidth={1.5} />
+            <StickyNote size={20} strokeWidth={1.8} />
             <span>Note</span>
           </button>
         </div>
@@ -648,16 +648,16 @@ export function WorkflowBoard({
 
       <div className="canvas-zoom-controls" aria-label="Canvas zoom controls">
         <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
-          <Minus size={16} strokeWidth={1.5} />
+          <Minus size={20} strokeWidth={1.8} />
         </button>
         <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
           {Math.round(zoom * 100)}%
         </button>
         <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
-          <Plus size={16} strokeWidth={1.5} />
+          <Plus size={20} strokeWidth={1.8} />
         </button>
         <button className="icon-button" onClick={fitToContent} title="Fit to view" type="button">
-          <Maximize size={16} strokeWidth={1.5} />
+          <Maximize size={20} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -733,7 +733,7 @@ export function WorkflowBoard({
                   x={shape.x + 21}
                   y={shape.y + (shape.height - 36) / 2 + 7}
                   color={color}
-                  strokeWidth={1.5}
+                  strokeWidth={1.8}
                 />
                 <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill="var(--dk-text-primary)" fontSize={subtitle ? 15 : 13} fontWeight="500">
                   <title>{shape.label}</title>
@@ -830,39 +830,39 @@ export function WorkflowBoard({
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
           {!contextMenu.shapeId && (
             <button onClick={() => { setPicker({ mode: "action", title: "Add a step", point: contextMenu.point }); setContextMenu(null); }} type="button">
-              <ListPlus size={16} />
+              <ListPlus size={20} />
               Add step…
             </button>
           )}
           <button onClick={() => { addShape(contextMenu.point, "note"); setContextMenu(null); }} type="button">
-            <StickyNote size={16} />
+            <StickyNote size={20} />
             Add note
           </button>
           {contextShape && contextShape.type === "node" && contextShape.data?.nodeKind === "action" && (
             <div className="context-menu-group">
               <button onClick={() => { setPicker({ mode: "change", title: "Change action type", shapeId: contextMenu.shapeId }); setContextMenu(null); }} type="button">
-                <ListRestart size={16} />
+                <ListRestart size={20} />
                 Change action type…
               </button>
               <button onClick={() => { onDuplicateStep(contextMenu.shapeId!); setContextMenu(null); }} type="button">
-                <Copy size={16} />
+                <Copy size={20} />
                 Duplicate
               </button>
               <button onClick={() => { onCopyStep(contextMenu.shapeId!); setContextMenu(null); }} type="button">
-                <ClipboardCopy size={16} />
+                <ClipboardCopy size={20} />
                 Copy step
               </button>
             </div>
           )}
           {canPasteStep && (
             <button onClick={() => { onPasteStep({ x: contextMenu.point.x + 24, y: contextMenu.point.y + 24 }); setContextMenu(null); }} type="button">
-              <ClipboardPaste size={16} />
+              <ClipboardPaste size={20} />
               Paste step
             </button>
           )}
           {contextMenu.shapeId && (
             <button className="danger" onClick={deleteSelected} disabled={selectedId !== contextMenu.shapeId} type="button">
-              <Trash2 size={16} />
+              <Trash2 size={20} />
               Delete
             </button>
           )}

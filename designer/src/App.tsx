@@ -142,7 +142,7 @@ function PromptField({ field, value, onChange }: {
         onKeyDown={event => event.stopPropagation()}>
         <header className="prompt-editor-head">
           <h2 id={`${id}-title`}>Edit {field.label.toLowerCase()}</h2>
-          <button type="button" className="dk-button dk-button--secondary" aria-label="Close prompt editor" onClick={close}><X size={16} strokeWidth={1.5} /></button>
+          <button type="button" className="dk-button dk-button--secondary" aria-label="Close prompt editor" onClick={close}><X size={20} strokeWidth={1.8} /></button>
         </header>
         <p id={`${id}-hint`} className="prompt-editor-hint">Changes apply to this step. Save the workflow when you’re ready.</p>
         <label className="prompt-editor-label" htmlFor={`${id}-expanded`}>{field.label}</label>
@@ -1828,12 +1828,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <div className="test-actions">
               <button className="dk-button dk-button--secondary" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(false)}>
-                {stepTest.busy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <FlaskConical size={16} strokeWidth={1.5} />}
+                {stepTest.busy ? <Loader2 size={20} strokeWidth={1.8} className="spin" /> : <FlaskConical size={20} strokeWidth={1.8} />}
                 <span>Dry</span>
               </button>
               <button className="dk-button dk-button--danger" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(true)}>
-                <Play size={16} strokeWidth={1.5} /><span>Run step</span>
+                <Play size={20} strokeWidth={1.8} /><span>Run step</span>
               </button>
             </div>
             {stepTest.nodeId === selected.id && stepTest.result && (
@@ -1893,7 +1893,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               onClick={() => { setNavOpen(false); openWorkflowSafely(summary); }}
               type="button"
             >
-              <WorkflowIcon size={16} strokeWidth={1.5} />
+              <WorkflowIcon size={20} strokeWidth={1.8} />
               <span className="workflow-text">
                 <span className="workflow-name">{summary.id}</span>
                 <span className="workflow-meta">
@@ -1910,7 +1910,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         </nav>
         {config.mode === "local" && git && (
           <div className="git-foot">
-            <GitBranch size={16} strokeWidth={1.5} />
+            <GitBranch size={20} strokeWidth={1.8} />
             <span>{git.branch}</span>
             <span className={git.dirty ? "git-dirty" : "git-clean"}>{git.dirty ? "unsaved changes" : "clean"}</span>
             {(git.ahead > 0 || git.behind > 0) && <span>{git.ahead}↑ {git.behind}↓</span>}
@@ -1929,7 +1929,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               aria-expanded={navOpen}
               onClick={() => setNavOpen((open) => !open)}
             >
-              <Menu size={16} strokeWidth={1.5} />
+              <Menu size={20} strokeWidth={1.8} />
             </button>
           )}
           <div className="topbar-title">
@@ -1986,8 +1986,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             {enabled !== savedEnabled && <span className="state-save-hint">Save to apply</span>}
             {status.message && (
               <span className={`status-message ${status.kind}`}>
-                {status.kind === "busy" && <Loader2 size={16} strokeWidth={1.5} className="spin" />}
-                {status.kind === "error" && <TriangleAlert size={16} strokeWidth={1.5} />}
+                {status.kind === "busy" && <Loader2 size={20} strokeWidth={1.8} className="spin" />}
+                {status.kind === "error" && <TriangleAlert size={20} strokeWidth={1.8} />}
                 {status.message}
               </span>
             )}
@@ -2106,12 +2106,12 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             onPasteStep={pasteStep}
             sessionControls={(actions) => (
               <>
-                <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button"><RotateCcw size={16} strokeWidth={1.5} /></button>
-                <button className="icon-button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)" type="button"><RotateCw size={16} strokeWidth={1.5} /></button>
+                <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button"><RotateCcw size={20} strokeWidth={1.8} /></button>
+                <button className="icon-button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)" type="button"><RotateCw size={20} strokeWidth={1.8} /></button>
                 <button className="icon-button" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" type="button">
-                  <Keyboard size={16} strokeWidth={1.5} />
+                  <Keyboard size={20} strokeWidth={1.8} />
                 </button>
-                <button className="icon-button" onClick={actions.clearCanvas} title="Clear canvas" type="button"><X size={16} strokeWidth={1.5} /></button>
+                <button className="icon-button" onClick={actions.clearCanvas} title="Clear canvas" type="button"><X size={20} strokeWidth={1.8} /></button>
               </>
             )}
           />
@@ -2120,7 +2120,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <header className="test-panel-head">
                 <h2>Test run</h2>
                 <button className="icon-button" type="button" title="Close" onClick={() => setTestOpen(false)}>
-                  <X size={16} strokeWidth={1.5} />
+                  <X size={20} strokeWidth={1.8} />
                 </button>
               </header>
               <p className="test-hint">
@@ -2138,11 +2138,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               </label>
               <div className="test-actions">
                 <button className="dk-button dk-button--primary" type="button" disabled={testBusy} onClick={() => runTest(false, testStrict)}>
-                  {testBusy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <FlaskConical size={16} strokeWidth={1.5} />}
+                  {testBusy ? <Loader2 size={20} strokeWidth={1.8} className="spin" /> : <FlaskConical size={20} strokeWidth={1.8} />}
                   <span>Dry run</span>
                 </button>
                 <button className="dk-button dk-button--danger" type="button" disabled={testBusy} onClick={() => runTest(true, testStrict)}>
-                  <Play size={16} strokeWidth={1.5} /><span>Run for real</span>
+                  <Play size={20} strokeWidth={1.8} /><span>Run for real</span>
                 </button>
                 <button
                   className="dk-button dk-button--secondary"
@@ -2151,7 +2151,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                   onClick={pullSample}
                   title="Pull a real sample event for this workflow's trigger connector"
                 >
-                  {sampleBusy ? <Loader2 size={16} strokeWidth={1.5} className="spin" /> : <CloudDownload size={16} strokeWidth={1.5} />}
+                  {sampleBusy ? <Loader2 size={20} strokeWidth={1.8} className="spin" /> : <CloudDownload size={20} strokeWidth={1.8} />}
                   <span>Pull sample</span>
                 </button>
                 <label
@@ -2202,7 +2202,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           <aside className={selected?.type === "node" ? "inspector" : "inspector empty"}>
             {selected?.type === "node" && (
               <button className="icon-button inspector-close" type="button" aria-label="Close panel" onClick={() => setSelectedId(null)}>
-                <X size={16} strokeWidth={1.5} />
+                <X size={20} strokeWidth={1.8} />
               </button>
             )}
             {selected?.type === "node" && selected.data ? (
@@ -2236,13 +2236,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             {selected?.type === "node" && selected.data?.nodeKind === "action" && (
               <div className="inspector-toolbar">
                 <button className="dk-button dk-button--secondary" type="button" onClick={() => duplicateStep(selected.id)} title="Duplicate this step (Ctrl/Cmd+D)">
-                  <Copy size={16} strokeWidth={1.5} /><span>Duplicate</span>
+                  <Copy size={20} strokeWidth={1.8} /><span>Duplicate</span>
                 </button>
                 <button className="dk-button dk-button--secondary" type="button" onClick={() => copyStep(selected.id)} title="Copy for pasting into any workflow (Ctrl/Cmd+C, then Ctrl/Cmd+V)">
-                  <ClipboardCopy size={16} strokeWidth={1.5} /><span>Copy step</span>
+                  <ClipboardCopy size={20} strokeWidth={1.8} /><span>Copy step</span>
                 </button>
                 <button className="dk-button dk-button--danger" type="button" onClick={deleteSelectedShape} title="Delete this step (Delete)">
-                  <Trash2 size={16} strokeWidth={1.5} /><span>Delete</span>
+                  <Trash2 size={20} strokeWidth={1.8} /><span>Delete</span>
                 </button>
               </div>
             )}
