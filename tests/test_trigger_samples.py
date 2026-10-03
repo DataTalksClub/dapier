@@ -474,13 +474,13 @@ def test_s3_object_options_pass_the_bucket_through(monkeypatch):
 def test_mailchimp_audience_options_fall_back_to_the_shared_credential(monkeypatch):
     """mailchimp is a key credential with often no connection record: the
     pseudo-account fallback still lists audiences from the stored key."""
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    import plugins.mailchimp.plugin as mailchimp_plugin
 
     monkeypatch.setattr(
         "src.dapier.connections.credentials.get_credential",
         lambda credential_id: {"apiKey": "key-us21", "server": "us21"})
     monkeypatch.setattr(
-        mailchimp_actions, "mailchimp_request",
+        mailchimp_plugin, "mailchimp_request",
         lambda method, url, api_key, transport=None: (
             200, {"lists": [{"id": "abc123", "name": "Digest",
                              "stats": {"member_count": 42}}]}))

@@ -157,7 +157,7 @@ def test_missing_credential_reports_a_failed_check(monkeypatch):
 
 
 def test_find_member_found(monkeypatch, mailchimp_cred):
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    from plugins.mailchimp.runners import mailchimp as mailchimp_actions
 
     fake = fake_transport(monkeypatch, FakeMailchimp())
     output = mailchimp_actions.run_mailchimp_find_member(
@@ -168,7 +168,7 @@ def test_find_member_found(monkeypatch, mailchimp_cred):
 
 
 def test_find_member_miss_is_not_an_error(monkeypatch, mailchimp_cred):
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    from plugins.mailchimp.runners import mailchimp as mailchimp_actions
 
     fake_transport(monkeypatch, FakeMailchimp(member_exists=False))
     output = mailchimp_actions.run_mailchimp_find_member(
@@ -177,7 +177,7 @@ def test_find_member_miss_is_not_an_error(monkeypatch, mailchimp_cred):
 
 
 def test_upsert_puts_the_md5_member_path(monkeypatch, mailchimp_cred):
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    from plugins.mailchimp.runners import mailchimp as mailchimp_actions
 
     fake = fake_transport(monkeypatch, FakeMailchimp())
     output = mailchimp_actions.run_mailchimp_upsert_member(
@@ -192,7 +192,7 @@ def test_upsert_puts_the_md5_member_path(monkeypatch, mailchimp_cred):
 
 
 def test_upsert_rejects_bad_merge_fields(monkeypatch, mailchimp_cred):
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    from plugins.mailchimp.runners import mailchimp as mailchimp_actions
 
     with pytest.raises(ValueError):
         mailchimp_actions.run_mailchimp_upsert_member(
@@ -201,7 +201,7 @@ def test_upsert_rejects_bad_merge_fields(monkeypatch, mailchimp_cred):
 
 
 def test_upsert_rejects_an_unknown_status(monkeypatch, mailchimp_cred):
-    from src.dapier.engine.actions import mailchimp as mailchimp_actions
+    from plugins.mailchimp.runners import mailchimp as mailchimp_actions
 
     with pytest.raises(ValueError):
         mailchimp_actions.run_mailchimp_upsert_member(

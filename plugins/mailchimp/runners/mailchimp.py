@@ -6,13 +6,13 @@ suffix rides in the key, and the API root is derived from it. Every request
 is basic auth with an arbitrary username and the API key as the password.
 """
 
-import base64
 import hashlib
 import json
 
-from ...connections import credentials
-from . import base
-from .templating import render
+from src.dapier.connections import credentials
+from src.dapier.connections.providers.mailchimp_api import mailchimp_request
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 DEFAULT_CREDENTIAL_ID = "mailchimp"
 STATUSES = ("subscribed", "pending", "unsubscribed", "cleaned")
@@ -39,32 +39,6 @@ def _api_settings(action):
     if not server:
         raise ValueError("the Mailchimp API key needs its datacenter suffix (e.g. abc123-us12)")
     return api_key, server
-
-
-def mailchimp_request(method, url, api_key, *, payload=None, transport=None):
-    """One Marketing API call: ``(status, parsed body)``, never raising on
-    HTTP errors — callers turn status codes into outputs (404 = not found)."""
-    transport = transport or base._default_transport
-    headers = {
-        "authorization": "Basic " + base64.b64encode(f"anystring:{api_key}".encode()).decode(),
-        "accept": "application/json",
-    }
-    body = None
-    if payload is not None:
-        headers["content-type"] = "application/json"
-        body = json.dumps(payload, separators=(",", ":")).encode()
-    try:
-        status, raw = transport(method, url, headers=headers, body=body, timeout=15)
-    except Exception as exc:
-        raise RuntimeError(f"Mailchimp unreachable: {type(exc).__name__}") from None
-    if isinstance(raw, dict):
-        data = raw
-    else:
-        try:
-            data = json.loads(raw) if raw else {}
-        except (ValueError, TypeError):
-            data = {}
-    return status, data if isinstance(data, dict) else {}
 
 
 def _call(method, path, action, *, payload=None, transport=None):

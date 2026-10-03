@@ -30,10 +30,6 @@ connector(Connector(name="telegram", label="Telegram",
                     events=("message.received", "channel_post.received",
                             "callback_query.received"),
                     icon="send"))
-connector(Connector(name="mailchimp", label="Mailchimp",
-                    events=("subscribe", "unsubscribe", "profile", "upemail",
-                            "cleaned", "campaign", "member.new"),
-                    icon="mail"))
 # Provider chips whose fires come from poll sources (triggers/poll_sources):
 # a stored poll trigger with a non-http source publishes these connectors'
 # events, scoped per trigger through the poll-name filter. The zoom chip

@@ -16,7 +16,7 @@ import pytest
 from src.dapier.connectors import registry
 from src.dapier.connections import credentials
 from src.dapier.engine.actions import base
-from src.dapier.engine.actions.mailchimp import (
+from plugins.mailchimp.runners.mailchimp import (
     run_mailchimp_find_member,
     run_mailchimp_remove_member,
     run_mailchimp_tag_member,

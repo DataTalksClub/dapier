@@ -4,8 +4,8 @@ member" poll source — all behind the stored Mailchimp credential (Marketing
 API v3, basic auth with the key)."""
 import urllib.parse
 
-from ..engine.actions import mailchimp
-from ..engine.actions.mailchimp import (
+from plugins.mailchimp.runners import mailchimp
+from plugins.mailchimp.runners.mailchimp import (
     DEFAULT_CREDENTIAL_ID,
     run_mailchimp_find_member,
     run_mailchimp_remove_member,
@@ -13,15 +13,34 @@ from ..engine.actions.mailchimp import (
     run_mailchimp_unsubscribe_member,
     run_mailchimp_upsert_member,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.registry import (
     Action,
+    Connector,
     ConnectionTest,
     Discovery,
+    connector,
     register,
     register_connection_test,
     register_discovery,
 )
+from src.dapier.connectors.trigger_discovery import (
+    DEFAULT_LIMIT,
+    TriggerDiscovery,
+    options_from_registry,
+    per_event_sample_fetch,
+    register_trigger_discovery,
+)
+from src.dapier.connections.providers.mailchimp_api import (
+    mailchimp_request,
+    stored_settings,
+)
+from src.dapier.triggers.poll_sources import PollSource, register_source
+
+connector(Connector(name="mailchimp", label="Mailchimp",
+                    events=("subscribe", "unsubscribe", "profile", "upemail",
+                            "cleaned", "campaign", "member.new"),
+                    icon="mail"))
 
 register(Action(
     type="mailchimp_find_member",
@@ -154,30 +173,9 @@ register(Action(
 ))
 
 
-def _stored_settings(connection):
-    """The (api_key, server) pair behind the connection, falling back to the
-    shared ``mailchimp`` credential — mirroring the s3 key resolution."""
-    from ..connections import credentials
-
-    for credential_id in (connection.get("credential_id"), DEFAULT_CREDENTIAL_ID):
-        if not credential_id:
-            continue
-        try:
-            secret = credentials.get_credential(credential_id)
-        except KeyError:
-            continue
-        api_key = str(secret.get("apiKey") or secret.get("api_key") or "").strip()
-        server = str(secret.get("server") or "").strip()
-        if api_key and not server and "-" in api_key:
-            server = api_key.rsplit("-", 1)[-1]
-        if api_key and server:
-            return api_key, server
-    raise RuntimeError("no stored Mailchimp API key for this connection")
-
-
 def _run_audiences(connection, params, *, transport=None):
-    api_key, server = _stored_settings(connection)
-    status, data = mailchimp.mailchimp_request(
+    api_key, server = stored_settings(connection)
+    status, data = mailchimp_request(
         "GET", f"https://{server}.api.mailchimp.com/3.0/lists?count=100",
         api_key, transport=transport)
     if status >= 300:
@@ -200,9 +198,9 @@ register_discovery(Discovery(
 
 
 def _run_members(connection, params, *, transport=None):
-    api_key, server = _stored_settings(connection)
+    api_key, server = stored_settings(connection)
     list_id = str(params.get("list_id") or "").strip()
-    status, data = mailchimp.mailchimp_request(
+    status, data = mailchimp_request(
         "GET",
         f"https://{server}.api.mailchimp.com/3.0/lists/{list_id}/members?count=100",
         api_key, transport=transport)
@@ -234,8 +232,8 @@ register_discovery(Discovery(
 def _run_test(connection):
     """Ping the Marketing API with the stored key (never raises)."""
     try:
-        api_key, server = _stored_settings(connection)
-        status, data = mailchimp.mailchimp_request(
+        api_key, server = stored_settings(connection)
+        status, data = mailchimp_request(
             "GET", f"https://{server}.api.mailchimp.com/3.0/ping", api_key)
     except Exception as exc:
         return {"ok": False, "detail": f"Mailchimp key check failed: {exc}"}
@@ -255,57 +253,18 @@ def _run_test(connection):
 register_connection_test(ConnectionTest(connector="mailchimp", run=_run_test))
 
 
-# --- stored-hook webhook lifecycle (triggers.hook_triggers) --------------------
-#
-# The raw Marketing API calls behind a mailchimp hook trigger's registration:
-# Mailchimp webhooks are configured per audience, so standing a trigger up
-# means POSTing the callback URL to ``/lists/{list_id}/webhooks`` with the
-# subscribed types, and tearing it down means listing the audience's webhooks
-# (there is no delete-by-URL), finding ours by URL, and deleting it by id.
-# Every call is the same basic-auth request the ping test and the audience
-# fetchers use, with an injectable transport for tests.
-
-
-def register_webhook(list_id, url, events, api_key, server, *, transport=None):
-    """Subscribe one webhook on an audience; returns the created id.
-
-    ``events`` maps each intake type (subscribe, unsubscribe, ...) to whether
-    it is subscribed; every source is subscribed (user, admin, api) so
-    changes made through the Marketing API itself — like the upsert action —
-    fire too. A rejection raises RuntimeError with Mailchimp's detail.
-    """
-    status, data = mailchimp.mailchimp_request(
-        "POST", f"https://{server}.api.mailchimp.com/3.0/lists/{list_id}/webhooks",
-        api_key, payload={"url": url, "events": dict(events),
-                          "sources": {"user": True, "admin": True, "api": True}},
-        transport=transport)
-    if status >= 300:
-        detail = str(data.get("detail") or data.get("title") or "") if isinstance(data, dict) else ""
-        raise RuntimeError(f"Mailchimp rejected the webhook registration: {detail or f'HTTP {status}'}")
-    return str(data.get("id") or "")
-
-
-def list_webhooks(list_id, api_key, server, *, transport=None):
-    """The audience's registered webhooks (``{id, url, ...}`` dicts)."""
-    status, data = mailchimp.mailchimp_request(
-        "GET", f"https://{server}.api.mailchimp.com/3.0/lists/{list_id}/webhooks",
-        api_key, transport=transport)
-    if status >= 300:
-        raise RuntimeError(f"Mailchimp webhook listing returned HTTP {status}")
-    return [entry for entry in data.get("webhooks") or [] if isinstance(entry, dict)]
-
-
-def delete_webhook(list_id, webhook_id, api_key, server, *, transport=None):
-    """Remove one webhook by id; a rejection raises RuntimeError."""
-    status, data = mailchimp.mailchimp_request(
-        "DELETE", f"https://{server}.api.mailchimp.com/3.0/lists/{list_id}/webhooks/{webhook_id}",
-        api_key, transport=transport)
-    if status >= 300:
-        detail = str(data.get("detail") or data.get("title") or "") if isinstance(data, dict) else ""
-        raise RuntimeError(f"Mailchimp webhook removal failed: {detail or f'HTTP {status}'}")
-
-
 # --- poll source: "New Member" on the poll-trigger schedule --------------------
+#
+# The webhook types above are push — Mailchimp POSTs them (the raw webhook
+# registration calls live in core connections.providers.mailchimp_api, where
+# triggers.hook_triggers reaches them without importing plugin code) — but
+# Zapier's other audience staple, "New Subscriber", has no webhook: it is a
+# poll against the members listing. The ``mailchimp.members`` source lists
+# the audience through the Marketing API on the poll schedule with the
+# stored key (the named ``connection_id`` when the poll carries one, else
+# the shared ``mailchimp`` credential) and publishes ``mailchimp``/
+# ``member.new`` events so workflows match the chip while staying scoped
+# through the poll-name filter.
 #
 # The webhook types above are push — Mailchimp POSTs them — but Zapier's
 # other audience staple, "New Subscriber", has no webhook: it is a poll
@@ -327,7 +286,7 @@ MAILCHIMP_EPOCH_CURSOR = "0000-01-01T00:00:00+00:00"
 def _mailchimp_poll_validate(body):
     """Save-time fetch spec: ``list_id`` (required — the audience to watch)
     plus the fetch defaults every stored mailchimp poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     list_id = str(body.get("list_id") or "").strip()
@@ -344,13 +303,13 @@ def _mailchimp_poll_validate(body):
 def _poll_api_key(item):
     """The (api_key, server) pair behind a stored poll: the named mailchimp
     connection when one is stored, else the shared ``mailchimp`` credential."""
-    from ..engine.actions import base
+    from src.dapier.engine.actions import base
 
     connection = {}
     connection_id = str(item.get("connection_id") or "").strip()
     if connection_id:
         connection = base._connected_connection(connection_id)
-    return _stored_settings(connection)
+    return stored_settings(connection)
 
 
 def _mailchimp_member_out(entry):
@@ -434,7 +393,7 @@ def _stored_mailchimp_poll(name):
     event names do, so a per-event ask never matches a poll; every storage
     hiccup folds into the same None — sampling never raises for want of
     infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()
     if not name or "." in name:
@@ -459,15 +418,6 @@ def _stored_mailchimp_poll(name):
 # chip does not declare it. The event field of a discovery request picks the
 # payload; history answers only when its replayed envelope carries the asked
 # type — see per_event_sample_fetch.
-
-from . import trigger_discovery  # noqa: E402
-from .trigger_discovery import (  # noqa: E402
-    DEFAULT_LIMIT,
-    TriggerDiscovery,
-    options_from_registry,
-    per_event_sample_fetch,
-    register_trigger_discovery,
-)
 
 _MERGES = {
     "EMAIL": "reader@example.test",
@@ -567,7 +517,7 @@ def _fetch_mailchimp_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT)
     """
     item = _stored_mailchimp_poll(event)
     if item is not None:
-        from ..triggers import poll_triggers
+        from src.dapier.triggers import poll_triggers
 
         try:
             members, _next_cursor = _mailchimp_poll_fetch(item, MAILCHIMP_EPOCH_CURSOR)

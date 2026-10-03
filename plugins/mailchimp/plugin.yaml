@@ -1,0 +1,9 @@
+name: mailchimp
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [mailchimp]
+  discovery_sources:
+    mailchimp: [mailchimp]
+  trigger_chips: [mailchimp]
+  poll_sources: [mailchimp.members]

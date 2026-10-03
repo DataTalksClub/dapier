@@ -25,7 +25,6 @@ from . import (  # noqa: F401  (import = registration)
     gmail,
     ingress,
     logic,
-    mailchimp,
     poll,
     render,
     s3,

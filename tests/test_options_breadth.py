@@ -115,7 +115,7 @@ def test_missing_required_param_is_a_404_not_a_listing(monkeypatch):
 def test_member_options_delegate_like_the_audience_options(monkeypatch):
     """mailchimp imports its delegation by name; the pseudo-account fallback
     (``connection_id: "mailchimp"``) resolves through it the same way."""
-    from src.dapier.connectors import mailchimp
+    import plugins.mailchimp.plugin as mailchimp
 
     seen = []
     monkeypatch.setattr(mailchimp, "options_from_registry", _delegate_fake(seen))

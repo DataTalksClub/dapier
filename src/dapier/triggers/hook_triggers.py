@@ -659,13 +659,13 @@ def _mailchimp_api_settings(item, connections_table):
     """The (api_key, server) pair behind a mailchimp trigger: the bound
     connection's stored credential, else the shared ``mailchimp`` credential
     (the same resolution the connector's audience fetchers use)."""
-    from ..connectors.mailchimp import _stored_settings
+    from ..connections.providers.mailchimp_api import stored_settings
 
     connection = {}
     if item.get("connection_id"):
         connection = _mailchimp_connection(item["connection_id"], connections_table)
     try:
-        return _stored_settings(connection)
+        return stored_settings(connection)
     except RuntimeError as exc:
         raise TriggerError(str(exc)) from None
 
@@ -679,7 +679,7 @@ def _register_mailchimp(item, *, connections_table=None, transport=None):
     registration first removes any webhook already registered under this
     trigger's URL (it may carry stale subscribed types), then posts the
     current one."""
-    from ..connectors import mailchimp as mailchimp_connector
+    from ..connections.providers import mailchimp_api as mailchimp_connector
 
     try:
         api_key, server = _mailchimp_api_settings(item, connections_table)
@@ -703,7 +703,7 @@ def _unregister_mailchimp(item, *, connections_table=None, transport=None):
     URL, and deleted by id. Returns a warning for the response, or None when
     the registration is gone — every failure logs and continues, since the
     trigger is gone either way and Mailchimp must never block its deletion."""
-    from ..connectors import mailchimp as mailchimp_connector
+    from ..connections.providers import mailchimp_api as mailchimp_connector
 
     try:
         api_key, server = _mailchimp_api_settings(item, connections_table)
