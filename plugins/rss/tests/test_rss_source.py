@@ -12,7 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import registry, rss as rss_connector
+import plugins.rss.plugin as rss_connector  # noqa: F401 (registers)
+from src.dapier.connectors import registry
 from src.dapier.connectors import trigger_discovery
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError

@@ -1,0 +1,7 @@
+name: rss
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  {}
+  # No connection provider: any RSS 2.0 / Atom feed works without a
+  # credential. The rss poll source and trigger chip register from plugin.py.

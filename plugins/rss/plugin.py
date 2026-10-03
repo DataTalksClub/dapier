@@ -17,13 +17,16 @@ import re
 import urllib.request
 import xml.etree.ElementTree as ET
 
-from ..triggers.poll_sources import PollSource, register_source
-from . import trigger_discovery
-from .trigger_discovery import (
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.registry import Connector, connector
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
     register_trigger_discovery,
 )
+from src.dapier.triggers.poll_sources import PollSource, register_source
+
+connector(Connector(name="rss", label="RSS", events=("item.new",), icon="rss"))
 
 RSS_TIMEOUT = 10
 RSS_SUMMARY_CHARS = 500
@@ -33,7 +36,7 @@ RSS_USER_AGENT = "dapier-poll-rss/1.0"
 def _rss_poll_validate(body):
     """Save-time fetch spec: ``url`` (the feed), with the fetch defaults a
     stored rss poll carries (next_cursor mode; items identify at ``id``)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     body = body if isinstance(body, dict) else {}
     url = str(body.get("url") or "").strip()
@@ -173,7 +176,7 @@ def _stored_rss_poll(name):
     together: the caller only distinguishes live-vs-fallback, so any
     storage hiccup folds too — sampling never raises for want of
     infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     if not name:
         return None
@@ -211,7 +214,7 @@ def _fetch_rss_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     through to the recorded/documented sample instead of failing: a sample
     pull shows the payload shape, it never raises.
     """
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(event or "").strip().lower()
     item = _stored_rss_poll(name)

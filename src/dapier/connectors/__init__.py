@@ -28,7 +28,6 @@ from . import (  # noqa: F401  (import = registration)
     mailchimp,
     poll,
     render,
-    rss,
     s3,
     schedule,
     sheets,
