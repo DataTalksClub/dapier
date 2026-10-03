@@ -6,7 +6,6 @@ from .matching import (  # noqa: F401
     workflows,
 )
 from .actions.webhook import run_webhook  # noqa: F401
-from .actions.slack import run_slack  # noqa: F401
 from .actions.telegram import run_telegram_send  # noqa: F401
 from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401

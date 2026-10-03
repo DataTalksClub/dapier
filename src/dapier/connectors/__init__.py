@@ -32,7 +32,6 @@ from . import (  # noqa: F401  (import = registration)
     s3,
     schedule,
     sheets,
-    slack,
     storage,
     subworkflow,
     telegram,
@@ -63,3 +62,8 @@ from .registry import (  # noqa: F401
     run_action,
     validate_action_chain,
 )
+
+from ..plugins import load_all  # noqa: E402  (after every core import:
+    # plugins may import any core module, so they load once core is whole)
+
+load_all()

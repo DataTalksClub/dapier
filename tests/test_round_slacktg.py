@@ -15,7 +15,7 @@ import json
 import pytest
 
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.slack import (
+from plugins.slack.runners.slack import (
     run_slack_find_message,
     run_slack_invite_to_channel,
     run_slack_pin_message,

@@ -16,7 +16,8 @@ from src.dapier.connectors import registry
 from src.dapier.connectors import drive
 from src.dapier.api.designer_store import parse_workflow
 from src.dapier.engine import logic
-from src.dapier.engine.actions import date_time, dropbox, s3, sheets, slack, dataops
+from src.dapier.engine.actions import date_time, dropbox, s3, sheets, dataops
+from plugins.slack.runners import slack
 from src.dapier.engine.actions.code import run_code
 from src.dapier.engine.actions.templating import render
 from src.dapier.triggers import poll_triggers

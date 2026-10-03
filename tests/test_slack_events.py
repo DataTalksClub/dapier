@@ -304,7 +304,7 @@ def test_slack_trigger_sample_is_delivery_shaped(monkeypatch):
     connection = {"connection_id": "slack-conn", "provider": "slack",
                   "status": connections.STATUS_CONNECTED, "credential_id": "oauth#slack-conn"}
     monkeypatch.setattr(trigger_discovery, "connected_connection", lambda *a, **k: connection)
-    from src.dapier.connectors import slack as slack_connector
+    import plugins.slack.plugin as slack_connector
 
     def fake_discover(_connection, resource, params, *, transport=None):
         if resource == "channels":

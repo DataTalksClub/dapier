@@ -12,7 +12,7 @@ from src.dapier.connections import discovery as connections_discovery
 from src.dapier.connections.providers import telegram_api
 from src.dapier.connectors import registry
 from src.dapier.engine import execute, run_telegram_send
-from src.dapier.engine.actions import slack as slack_action
+from plugins.slack.runners import slack as slack_action
 
 
 def stub_transport(result, status=200, *, capture=None):

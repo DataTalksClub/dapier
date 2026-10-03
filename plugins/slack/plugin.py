@@ -3,7 +3,7 @@ connection (send — top-level or threaded, scheduled, DM, update, react,
 create-channel, topic, purpose, file upload), plus channel/user discovery,
 the auth.test health check, the Events-API trigger samples (one per declared
 event — message.received, app.mention, reaction.added, member.joined —
-delivered by triggers.intake.slack_events), the find actions, and the
+delivered by src.dapier.triggers.intake.slack_events), the find actions, and the
 ``slack.messages`` poll source (channel history feeding message.received on
 a schedule, no Slack app required).
 
@@ -12,8 +12,8 @@ The discovery and health-check runners delegate to the shared provider layer
 """
 import json
 
-from ..connections import discovery as provider
-from ..engine.actions.slack import (
+from src.dapier.connections import discovery as provider
+from plugins.slack.runners.slack import (
     run_slack,
     run_slack_add_reaction,
     run_slack_add_reminder,
@@ -30,23 +30,31 @@ from ..engine.actions.slack import (
     run_slack_update_message,
     run_slack_upload_file,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from . import trigger_discovery
-from .registry import (
+from src.dapier.triggers.poll_sources import PollSource, register_source
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.registry import (
     Action,
     ConnectionTest,
+    Connector,
     Discovery,
+    connector,
     register,
     register_connection_test,
     register_discovery,
 )
-from .trigger_discovery import (
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     DiscoveryUpstream,
     TriggerDiscovery,
     register_trigger_discovery,
 )
+
+connector(Connector(
+    name="slack", label="Slack",
+    events=("message.received", "app.mention",
+            "reaction.added", "member.joined"),
+    icon="slack"))
 
 register(Action(
     type="slack",
@@ -580,7 +588,7 @@ _SYNTHETIC_DELIVERY = _SYNTHETIC_DELIVERIES["message.received"]
 
 def _envelope(connection_id, payload, event=None):
     """A sample envelope with the exact data shape a real delivery publishes."""
-    from ..triggers.intake import slack_events
+    from src.dapier.triggers.intake import slack_events
 
     return {
         "connector": "slack",
@@ -730,7 +738,7 @@ def _slack_poll_validate(body):
     read as (required — the fetch resolves its stored bot token) and the
     ``channel_id`` of the channel to watch (required), plus the fetch
     defaults every stored slack poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     if not str(body.get("connection_id") or "").strip():
@@ -749,8 +757,8 @@ def _slack_poll_validate(body):
 
 def _slack_poll_token(item):
     """The connection's stored bot token, resolved like the actions'."""
-    from ..connections import credentials
-    from ..engine.actions import base
+    from src.dapier.connections import credentials
+    from src.dapier.engine.actions import base
 
     connection = base._connected_connection(item["connection_id"])
     secret = credentials.get_credential(connection.get("credential_id"))

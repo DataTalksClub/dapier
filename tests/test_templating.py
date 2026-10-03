@@ -7,7 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from conftest import stubbed_action
-from src.dapier.engine import execute, run_email_send, run_slack
+from src.dapier.engine import execute, run_email_send
+from plugins.slack.runners.slack import run_slack
 from src.dapier.engine.actions.templating import (
     TemplateError,
     build_context,

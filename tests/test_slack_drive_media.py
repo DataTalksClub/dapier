@@ -23,7 +23,7 @@ from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import tokens
 from src.dapier.engine.actions import base
 from src.dapier.engine.actions.drive import run_drive_read_file
-from src.dapier.engine.actions.slack import run_slack_upload_file
+from plugins.slack.runners.slack import run_slack_upload_file
 from src.dapier.engine.actions.zoom import run_zoom_find_meeting
 
 SLACK_TOKEN = {"token": "xoxb-test"}

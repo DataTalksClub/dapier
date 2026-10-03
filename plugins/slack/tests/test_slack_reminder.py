@@ -8,9 +8,9 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src.dapier.connectors import slack as slack_connector  # noqa: F401 (registers)
+import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.slack import run_slack_add_reminder
+from plugins.slack.runners.slack import run_slack_add_reminder
 
 
 class FakeTransport:

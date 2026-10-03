@@ -11,8 +11,8 @@ import unittest
 from unittest.mock import patch
 
 from src.dapier.connectors import registry
-from src.dapier.connectors import slack as slack_connector  # noqa: F401 (registers)
-from src.dapier.engine.actions.slack import run_slack_upload_file
+import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
+from plugins.slack.runners.slack import run_slack_upload_file
 
 GET_URL_URL = "https://slack.com/api/files.getUploadURLExternal"
 COMPLETE_URL = "https://slack.com/api/files.completeUploadExternal"

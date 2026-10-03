@@ -138,7 +138,6 @@ PROVIDER_DISCOVERY_SOURCES = {
     "google": ("google-sheets", "google-drive", "google-calendar", "gmail"),
     "youtube": ("youtube",),
     "zoom": ("zoom",),
-    "slack": ("slack",),
     "telegram": ("telegram",),
     "dropbox": ("dropbox",),
     "s3": ("s3",),
@@ -512,11 +511,15 @@ LOGIC_OPERATORS = FILTER_OPERATORS
 def catalog():
     """The JSON-safe catalog behind ``GET /api/catalog``."""
     return {
-        "actions": [_entry_json(entry) for entry in ACTIONS.values()]
-        + [_entry_json(entry) for entry in LOGIC.values()],
+        # Sorted: plugin modules load in their own order, so registration
+        # order is no longer a stable surface.
+        "actions": [_entry_json(entry)
+                    for entry in sorted(ACTIONS.values(), key=lambda e: e.type)]
+        + [_entry_json(entry)
+           for entry in sorted(LOGIC.values(), key=lambda e: e.type)],
         "connectors": [
             {"name": entry.name, "label": entry.label, "events": list(entry.events), "icon": entry.icon}
-            for entry in CONNECTORS.values()
+            for entry in sorted(CONNECTORS.values(), key=lambda e: e.name)
         ],
         # Discovery manifests: which provider listings exist and the query
         # params each one needs (the same field-dict schema as action fields).

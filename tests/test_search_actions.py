@@ -14,7 +14,7 @@ from src.dapier.engine.actions.sheets import (
     run_sheets_lookup_row,
     run_sheets_update_row,
 )
-from src.dapier.engine.actions.slack import run_slack_find_user
+from plugins.slack.runners.slack import run_slack_find_user
 
 
 class FakeTransport:
@@ -180,7 +180,7 @@ class SheetsUpdateRowTests(unittest.TestCase):
 class SlackFindUserTests(unittest.TestCase):
     def find(self, transport, action, event=None):
         action = {"type": "slack_find_user", "connection_id": "slack", **action}
-        with patch("src.dapier.engine.actions.slack._token_for",
+        with patch("plugins.slack.runners.slack._token_for",
                    return_value="xoxb-token"):
             return run_slack_find_user(action, event or EVENT, transport=transport)
 
@@ -235,7 +235,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_run_action_dispatches_slack_find_user(self):
         transport = FakeTransport(b'{"ok": false, "error": "users_not_found"}')
-        with patch("src.dapier.engine.actions.slack._token_for",
+        with patch("plugins.slack.runners.slack._token_for",
                    return_value="xoxb-token"), \
              patch("src.dapier.engine.actions.base._default_transport", transport):
             output = run_action(

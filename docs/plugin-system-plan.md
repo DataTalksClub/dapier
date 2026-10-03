@@ -1,6 +1,6 @@
 # Plugin system for connections, triggers, and actions — migration plan
 
-Status: plan only (no code changes yet). Written 2026-10-03.
+Status: in progress — Phase 0 (loader) and Phase 1 (slack pilot) landed 2026-10-03. Written 2026-10-03.
 
 ## Goal
 

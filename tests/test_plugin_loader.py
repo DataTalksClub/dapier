@@ -8,6 +8,8 @@ import pytest
 
 from src.dapier import plugins
 from src.dapier.connectors import registry
+from src.dapier.triggers import poll_sources
+from src.dapier.triggers import poll_sources
 
 MANIFEST = """\
 name: {name}
@@ -134,3 +136,39 @@ def test_core_compat_mismatch_warns_but_loads(plugin_root):
     assert plugins.compat_warnings() == [
         "plugin probe 0.1.0 declares core_compat >=99.0 but core is "
         f"{plugins.CORE_VERSION}"]
+
+
+def test_real_tree_loads_the_slack_plugin():
+    """The deployment smoke: the repo's plugins/ imports cleanly through the
+    loader and slack's surface is registered exactly as before the move."""
+    import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
+
+    manifests = plugins.load_all()
+    assert "slack" in manifests
+    assert plugins.core_compat_ok(manifests["slack"])
+
+    assert "slack" in registry.ACTIONS
+    assert "slack" in registry.CONNECTORS
+    assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
+    assert "slack.messages" in poll_sources.SOURCES
+    assert any(test.connector == "slack" for test in
+               registry.connection_tests().values())
+    assert any(entry.connector == "slack" for entry in registry.discoveries())
+
+
+def test_real_tree_loads_the_slack_plugin():
+    """The deployment smoke: the repo's plugins/ imports cleanly through the
+    loader and slack's surface is registered exactly as before the move."""
+    import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
+
+    manifests = plugins.load_all()
+    assert "slack" in manifests
+    assert plugins.core_compat_ok(manifests["slack"])
+
+    assert "slack" in registry.ACTIONS
+    assert "slack" in registry.CONNECTORS
+    assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
+    assert "slack.messages" in poll_sources.SOURCES
+    assert any(test.connector == "slack" for test in
+               registry.connection_tests().values())
+    assert any(entry.connector == "slack" for entry in registry.discoveries())

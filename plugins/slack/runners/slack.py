@@ -10,11 +10,11 @@ import mimetypes
 import os
 import re
 
-from ...connections import credentials
-from .. import logic
-from . import base
-from . import telegram_format
-from .templating import render
+from src.dapier.connections import credentials
+from src.dapier.engine import logic
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions import telegram_format
+from src.dapier.engine.actions.templating import render
 
 SLACK_LOOKUP_BY_EMAIL_URL = "https://slack.com/api/users.lookupByEmail"
 SLACK_CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list"

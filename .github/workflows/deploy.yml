@@ -38,6 +38,18 @@ jobs:
       - run: sam validate --lint
       - run: sam build --config-env sandbox
 
+  # Per-plugin lanes: fast feedback on a plugin's own tests. The deploy
+  # gate stays the full `make test` above, which includes every lane.
+  plugin-lanes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        plugin: [slack]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: make plugin-test PLUGIN=${{ matrix.plugin }}
+
   deploy:
     if: github.event_name != 'pull_request'
     needs: test

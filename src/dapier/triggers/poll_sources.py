@@ -29,7 +29,7 @@ SOURCES: dict = {}
 _BUILTIN_MODULES = ("..connectors.s3", "..connectors.sheets", "..connectors.drive",
                     "..connectors.zoom", "..connectors.dropbox", "..connectors.youtube",
                     "..connectors.rss",
-                    "..connectors.mailchimp", "..connectors.slack",
+                    "..connectors.mailchimp",
                     "..connectors.calendar", "..connectors.gmail")
 _loaded = False
 
@@ -67,6 +67,12 @@ def _load_builtins():
     global _loaded
     if _loaded:
         return
+    # Plugin poll sources register at their plugin's import; a scheduled
+    # fire can reach resolve() without the connectors package ever having
+    # been imported, so the loader runs here too (idempotent).
+    from ..plugins import load_all
+
+    load_all()
     import importlib
 
     for module in _BUILTIN_MODULES:

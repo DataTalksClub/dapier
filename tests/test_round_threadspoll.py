@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 from src.dapier.connectors import registry
 from src.dapier.connections.providers import telegram_api
-from src.dapier.engine.actions.slack import (
+from plugins.slack.runners.slack import (
     run_slack,
     run_slack_schedule_message,
 )

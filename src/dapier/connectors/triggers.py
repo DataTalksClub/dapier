@@ -26,10 +26,6 @@ connector(Connector(name="zoom", label="Zoom",
                             "webinar.started", "webinar.ended",
                             "webinar.registration_created"),
                     icon="video"))
-connector(Connector(name="slack", label="Slack",
-                    events=("message.received", "app.mention",
-                            "reaction.added", "member.joined"),
-                    icon="slack"))
 connector(Connector(name="telegram", label="Telegram",
                     events=("message.received", "channel_post.received",
                             "callback_query.received"),

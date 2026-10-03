@@ -7,7 +7,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Google | [Google Calendar, YouTube, Drive, Docs, Sheets, and Gmail](google.md) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
 | YouTube | [YouTube](youtube.md) (setup in the Google guide) | `youtube` | OAuth on the shared Google client |
 | Dropbox | [Dropbox](dropbox.md) | `dropbox` | OAuth |
-| Slack | [Slack](slack.md) | `slack` | Pasted bot or user token |
+| Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` | Pasted bot or user token |
 | Zoom | [Zoom](zoom.md) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
 | Telegram | [Telegram](telegram.md) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
 | Mailchimp | [Mailchimp](mailchimp.md) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |

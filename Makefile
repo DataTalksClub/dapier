@@ -1,4 +1,4 @@
-.PHONY: build deploy test validate layer sync-dakit designer-install designer designer-build designer-console
+.PHONY: build deploy test plugin-test validate layer sync-dakit designer-install designer designer-build designer-console
 
 build: layer
 	scripts/build-sam.sh
@@ -27,6 +27,13 @@ test:
 	uv run --with boto3 --with pytest --with pyyaml --with "pyjwt[crypto]" --with mini-racer --with moto --with pypdf env \
 		PYTHONPATH=. AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
 		AWS_DEFAULT_REGION=eu-west-1 DAPIER_SKIP_CONFIG_DB=1 pytest -q
+
+# One plugin's test lane: `make plugin-test PLUGIN=slack`. Same environment
+# as `make test`; CI runs these per plugin for fast feedback on plugin PRs.
+plugin-test:
+	uv run --with boto3 --with pytest --with pyyaml --with "pyjwt[crypto]" --with mini-racer --with moto --with pypdf env \
+		PYTHONPATH=. AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
+		AWS_DEFAULT_REGION=eu-west-1 DAPIER_SKIP_CONFIG_DB=1 pytest -q plugins/$(PLUGIN)/tests
 
 designer-install:
 	cd designer && npm install

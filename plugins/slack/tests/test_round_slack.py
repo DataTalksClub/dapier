@@ -17,7 +17,7 @@ from src.dapier.connectors import trigger_discovery
 from src.dapier.connectors.registry import CONNECTORS
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.intake import slack_events
-from src.dapier.engine.actions.slack import (
+from plugins.slack.runners.slack import (
     run_slack_add_reaction,
     run_slack_update_message,
 )

@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from conftest import stubbed_action
+from plugins.slack.runners.slack import run_slack
 from src.dapier.engine import (
     all_workflows,
     execute,
@@ -16,7 +17,6 @@ from src.dapier.engine import (
     run_dropbox_delete,
     run_dropbox_upload,
     run_email_send,
-    run_slack,
     workflow_triggers,
 )
 from src.dapier.engine.actions.dataops import _email_intake_body
