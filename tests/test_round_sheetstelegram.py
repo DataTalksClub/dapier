@@ -17,7 +17,7 @@ from src.dapier.engine.actions.sheets import (
     run_sheets_create_spreadsheet,
     run_sheets_delete_row,
 )
-from src.dapier.engine.actions.telegram import (
+from plugins.telegram.runners.telegram import (
     run_telegram_send_document,
     run_telegram_send_photo,
 )

@@ -16,7 +16,7 @@ from src.dapier.connectors import registry
 from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import tokens
 from src.dapier.connections.providers import telegram_api
-from src.dapier.engine.actions.telegram import run_telegram_find_chat
+from plugins.telegram.runners.telegram import run_telegram_find_chat
 from src.dapier.engine.actions.youtube import (
     run_youtube_find_playlist_items,
     run_youtube_find_video,

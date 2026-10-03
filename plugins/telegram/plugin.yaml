@@ -1,0 +1,8 @@
+name: telegram
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [telegram]
+  discovery_sources:
+    telegram: [telegram]
+  trigger_chips: [telegram]

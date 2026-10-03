@@ -26,10 +26,6 @@ connector(Connector(name="zoom", label="Zoom",
                             "webinar.started", "webinar.ended",
                             "webinar.registration_created"),
                     icon="video"))
-connector(Connector(name="telegram", label="Telegram",
-                    events=("message.received", "channel_post.received",
-                            "callback_query.received"),
-                    icon="send"))
 # Provider chips whose fires come from poll sources (triggers/poll_sources):
 # a stored poll trigger with a non-http source publishes these connectors'
 # events, scoped per trigger through the poll-name filter. The zoom chip

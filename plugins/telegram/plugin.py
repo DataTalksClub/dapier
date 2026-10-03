@@ -7,8 +7,7 @@ The ``chats`` listing reads the bot's pending updates, which Telegram only
 serves while no webhook is set — the same webhook Dapier's triggers use —
 so live bots surface Telegram's own conflict message instead of a listing.
 """
-from ..connections import discovery as provider
-from ..engine.actions.telegram import (
+from plugins.telegram.runners.telegram import (
     run_telegram_ban_member,
     run_telegram_edit_message,
     run_telegram_find_chat,
@@ -19,16 +18,19 @@ from ..engine.actions.telegram import (
     run_telegram_send_poll,
     run_telegram_unban_member,
 )
-from . import trigger_discovery
-from .registry import (
+from src.dapier.connections import discovery as provider
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.registry import (
     Action,
+    Connector,
     ConnectionTest,
     Discovery,
+    connector,
     register,
     register_connection_test,
     register_discovery,
 )
-from .trigger_discovery import (
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     DiscoveryNotFound,
     DiscoveryUpstream,
@@ -36,6 +38,11 @@ from .trigger_discovery import (
     per_event_sample_fetch,
     register_trigger_discovery,
 )
+
+connector(Connector(name="telegram", label="Telegram",
+                    events=("message.received", "channel_post.received",
+                            "callback_query.received"),
+                    icon="send"))
 
 register(Action(
     type="telegram_send",
@@ -353,7 +360,7 @@ def _live_hook_id():
     The sample's ``hook`` field matches what a real delivery would carry, so
     templates referencing ``{hook}`` preview truthfully.
     """
-    from ..triggers import hook_triggers
+    from src.dapier.triggers import hook_triggers
 
     try:
         items = hook_triggers.load_items()
@@ -380,8 +387,8 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport
     something a workflow author can build on. Only a connection the operator
     named explicitly that is not connected still surfaces as a 502.
     """
-    from ..connections.providers import telegram_api
-    from ..triggers import hook_triggers
+    from src.dapier.connections.providers import telegram_api
+    from src.dapier.triggers import hook_triggers
 
     try:
         connection = trigger_discovery.connected_connection("telegram", connection_id)

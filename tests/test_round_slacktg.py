@@ -20,7 +20,7 @@ from plugins.slack.runners.slack import (
     run_slack_invite_to_channel,
     run_slack_pin_message,
 )
-from src.dapier.engine.actions.telegram import (
+from plugins.telegram.runners.telegram import (
     run_telegram_ban_member,
     run_telegram_edit_message,
     run_telegram_pin_message,

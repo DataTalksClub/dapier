@@ -22,7 +22,7 @@ from plugins.slack.runners.slack import (
     run_slack,
     run_slack_schedule_message,
 )
-from src.dapier.engine.actions.telegram import run_telegram_send_poll
+from plugins.telegram.runners.telegram import run_telegram_send_poll
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
 

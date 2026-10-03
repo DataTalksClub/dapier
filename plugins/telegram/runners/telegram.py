@@ -5,10 +5,10 @@ import json
 import mimetypes
 import urllib.parse
 
-from ...connections import credentials
-from ...connections.providers import telegram_api
-from . import base
-from .templating import render
+from src.dapier.connections import credentials
+from src.dapier.connections.providers import telegram_api
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 MEDIA_DOWNLOAD_TIMEOUT = 30
 MEDIA_UPLOAD_TIMEOUT = 30

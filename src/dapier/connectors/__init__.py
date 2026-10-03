@@ -32,7 +32,6 @@ from . import (  # noqa: F401  (import = registration)
     sheets,
     storage,
     subworkflow,
-    telegram,
     triggers,
     webhook,
     youtube,

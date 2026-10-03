@@ -11,7 +11,8 @@ from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import discovery as connections_discovery
 from src.dapier.connections.providers import telegram_api
 from src.dapier.connectors import registry
-from src.dapier.engine import execute, run_telegram_send
+from src.dapier.engine import execute
+from plugins.telegram.runners.telegram import run_telegram_send
 from plugins.slack.runners import slack as slack_action
 
 
@@ -245,7 +246,7 @@ class SlackTelegramFormatTests(unittest.TestCase):
 class TelegramToSlackFlowTests(unittest.TestCase):
     """The migrated Telegram action chain runs from a managed hook."""
 
-    actions = yaml.safe_load((Path(__file__).resolve().parents[1] /
+    actions = yaml.safe_load((Path(__file__).resolve().parents[3] /
                               "migrations/legacy-workflows/telegram-slack.yaml").read_text())[
         "flows"]["telegram-to-slack"]["actions"]
 
@@ -309,7 +310,7 @@ class ChatsDiscoveryTests(unittest.TestCase):
                   "status": "connected", "credential_id": "bot#tg"}
 
     def chats_entry(self):
-        import src.dapier.connectors.telegram  # noqa: F401  (import = registration)
+        import plugins.telegram.plugin  # noqa: F401  (import = registration)
 
         entry = next((d for d in registry.discoveries_for_provider("telegram")
                       if f"{d.connector}.{d.name}" == "telegram.chats"), None)
