@@ -18489,6 +18489,17 @@
       ]
     },
     {
+      type: "s3_head_object",
+      label: "S3: object metadata",
+      icon: S3Logo,
+      description: "Read Content-Type, size, modification time and ETag with HEAD; does not download object content.",
+      fields: [
+        { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
+        { key: "bucket", label: "Bucket", required: true, discover: { resource: "buckets", account: "aws" } },
+        { key: "key", label: "Object key", required: true, discover: { resource: "objects", params: { bucket: "bucket" } } }
+      ]
+    },
+    {
       type: "s3_read_object",
       label: "S3: read object",
       icon: S3Logo,

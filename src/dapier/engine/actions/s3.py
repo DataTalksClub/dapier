@@ -427,3 +427,15 @@ def run_s3_list_objects(action, event, *, transport=None, steps=None, s3_client=
         "truncated": truncated,
         "next_token": token or "",
     }
+
+
+def run_s3_head_object(action, event, *, transport=None, steps=None, s3_client=None):
+    """Read object headers only; never download or stage its content."""
+    bucket = _required(action, "bucket", event, steps, "s3_head_object")
+    key = _required(action, "key", event, steps, "s3_head_object")
+    response = _client(action, s3_client).head_object(Bucket=bucket, Key=key)
+    modified = response.get("LastModified")
+    return {"bucket": bucket, "key": key, "size": response.get("ContentLength"),
+            "content_type": response.get("ContentType"),
+            "last_modified": modified.isoformat() if hasattr(modified, "isoformat") else modified,
+            "etag": response.get("ETag")}

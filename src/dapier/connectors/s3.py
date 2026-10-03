@@ -8,6 +8,7 @@ from ..engine.actions.s3 import (
     DEFAULT_CREDENTIAL_ID,
     run_s3_delete_object,
     run_s3_find,
+    run_s3_head_object,
     run_s3_list_objects,
     run_s3_presign_url,
     run_s3_read_object,
@@ -694,3 +695,17 @@ def _fetch_s3_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
 register_trigger_discovery(TriggerDiscovery(
     connector="s3", label="S3", kind="sample", resource="",
     fetch=_fetch_s3_sample))
+
+
+register(Action(
+    type="s3_head_object", label="S3: object metadata", icon="s3",
+    description="Read Content-Type, size, modification time and ETag using HEAD only; object content and custom metadata are not downloaded.",
+    run=lambda action, event, workflow_id, steps=None: run_s3_head_object(action, event, steps=steps),
+    required=frozenset({"bucket", "key"}),
+    optional=frozenset({"credential_id", "connection_id"}),
+    fields=(
+        {"key":"credential_id", "label":"Credential ID", "placeholder":"aws (default)"},
+        {"key":"bucket", "label":"Bucket", "required":True, "discover":{"resource":"s3.buckets"}},
+        {"key":"key", "label":"Object key", "required":True, "discover":{"resource":"s3.objects","params":{"bucket":"bucket"}}},
+    ),
+))

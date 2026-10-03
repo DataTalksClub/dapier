@@ -215,3 +215,16 @@ class RegistryDispatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_object_metadata_uses_head_without_content_download_or_custom_metadata():
+    from datetime import datetime, timezone
+    from src.dapier.engine.actions.s3 import run_s3_head_object
+    class HeadersOnly:
+        def head_object(self, **kwargs):
+            assert kwargs == {"Bucket":"test-bucket", "Key":"legacy.zip"}
+            return {"ContentLength":100, "ContentType":"application/zip", "LastModified":datetime(2024,1,1,tzinfo=timezone.utc), "ETag":'"etag"', "Metadata":{"private":"not-returned"}}
+        def get_object(self, **kwargs):
+            raise AssertionError("metadata inspection must not download content")
+    result=run_s3_head_object({"bucket":"test-bucket", "key":"legacy.zip"},{},s3_client=HeadersOnly())
+    assert result == {"bucket":"test-bucket", "key":"legacy.zip", "size":100, "content_type":"application/zip", "last_modified":"2024-01-01T00:00:00+00:00", "etag":'"etag"'}

@@ -155,3 +155,12 @@ disk), so keep sources modest.
   values on the same poll-trigger machinery; a bucket watch needs
   `source: "s3"` (new), `"s3.updates"` (changed) or `"s3.deletions"`
   (removed), not a `url`.
+
+### Object metadata without downloading content
+
+`s3_head_object` requires `bucket` and `key`, with optional `credential_id` or
+`connection_id`. It uses the existing assumed role/credential and S3 HEAD only,
+returning Content-Type, size, last-modified and ETag. It does not retrieve
+content or custom metadata. The Console catalog, shared API and CLI workflow
+test path expose the same action; no new IAM permission is needed beyond
+existing object-read access.
