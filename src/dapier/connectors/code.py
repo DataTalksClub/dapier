@@ -10,7 +10,7 @@ register(Action(
                  "the last expression (or an `output` variable) becomes the step result."),
     run=lambda action, event, workflow_id, steps=None: run_code(action, event),
     required=frozenset({"code"}),
-    optional=frozenset({"timeout_seconds"}),
+    optional=frozenset({"timeout_seconds", "tests"}),
     fields=(
         {"key": "code", "label": "Python source", "type": "textarea", "required": True,
          "placeholder": '# event data is `input`; last expression is the result\n{"route": input["route"], "score": len(input.get("body", ""))}'},
@@ -26,7 +26,7 @@ register(Action(
                  "`return` a value to make it the step result. console.log is captured."),
     run=lambda action, event, workflow_id, steps=None: run_js(action, event),
     required=frozenset({"code"}),
-    optional=frozenset({"timeout_seconds"}),
+    optional=frozenset({"timeout_seconds", "tests"}),
     fields=(
         {"key": "code", "label": "JavaScript source", "type": "textarea", "required": True,
          "placeholder": '// event data is `input`; return the result\nreturn {route: input.route, score: (input.items || []).length}'},

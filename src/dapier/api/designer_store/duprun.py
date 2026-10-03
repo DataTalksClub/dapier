@@ -196,6 +196,47 @@ def api_test_step(source, body, operator=None):
     return 200, report
 
 
+def api_test_code(source, body, operator=None):
+    """Run one code/js action's ``tests`` cases (Zapier-style code-block
+    tests). Pure: the snippet runs against each case's ``input`` with no
+    connections touched and nothing recorded — the dry-run contract at
+    snippet granularity.
+
+    Same workflow resolution as api_test_run; the body names the step with
+    ``action_id``. The action must carry a ``tests`` list (validated at
+    save time), and the cases run through the real ``run_code``/``run_js``
+    runners, so sandbox, timeout and error shaping match a live run.
+    """
+    del operator  # recorded by the calling route; the run itself is read-only
+    if not isinstance(body, dict):
+        return 400, {"error": "request body must be an object"}
+    action_id = body.get("action_id")
+    if not isinstance(action_id, str) or not action_id.strip():
+        return 400, {"error": 'body must include "action_id": the code step to test'}
+    status, payload = _workflow_under_test(source, body)
+    if status != 200:
+        return status, payload
+
+    from ...engine import code_tests, dryrun
+
+    step = dryrun.find_step(payload["workflow"], action_id)
+    if step is None:
+        return 400, {"error": f"no step named {action_id}"}
+    if step.get("type") not in ("code", "js"):
+        return 400, {"error": f"step {action_id} is a {step.get('type')!r} action; "
+                              "code tests run on code/js steps only"}
+    if step.get("tests") is None:
+        return 400, {"error": f"step {action_id} has no tests; add a tests list to the "
+                              "action (name, input, expected/expected_error)"}
+    try:
+        report = code_tests.run_code_tests(step)
+    except code_tests.CodeTestsError as exc:
+        return 400, {"error": str(exc)}
+    report["file"] = payload["label"]
+    report["action_id"] = action_id
+    return 200, report
+
+
 # Top-level key order for workflow YAML the server writes; the designer
 # client emits the same order. Stored dicts keep whatever order they were
 # parsed in — this only applies at dump time.

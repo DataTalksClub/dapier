@@ -43,6 +43,8 @@ bulk, and export."""
         return routes.test_designer_workflow(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/test-step":
         return routes.test_designer_step(event, operator_subject)
+    if method == "POST" and path == "/api/admin/designer/workflows/test-code":
+        return routes.test_designer_code(event, operator_subject)
     if method == "POST" and path == "/api/admin/designer/workflows/bulk":
         return routes.bulk_designer_workflow(event, operator_subject,
                                              visible=_read_scope(operator_payload))
@@ -92,6 +94,11 @@ def _route_designer_versions(event, method, path, operator_payload, operator_sub
         r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/test-step", path)
     if method == "POST" and designer_test_step_match:
         return routes.test_designer_step(event, operator_subject, designer_test_step_match.group(1),
+                                         visible=_read_scope(operator_payload))
+    designer_test_code_match = re.fullmatch(
+        r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/test-code", path)
+    if method == "POST" and designer_test_code_match:
+        return routes.test_designer_code(event, operator_subject, designer_test_code_match.group(1),
                                          visible=_read_scope(operator_payload))
     designer_duplicate_match = re.fullmatch(
         r"/api/admin/designer/workflows/" + _WORKFLOW_REF + r"/duplicate", path)

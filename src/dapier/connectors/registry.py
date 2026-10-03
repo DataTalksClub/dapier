@@ -471,6 +471,18 @@ def validate_action_chain(actions):
         validate_error_keys(action, str(action_type))
         validate_on_fail_key(action, str(action_type))
         validate_autoretry_key(action, str(action_type))
+        if action.get("tests") is not None:
+            # Code-block tests (engine.code_tests): the key itself is only
+            # legal where the registry allows it (code/js optional sets —
+            # anything else already failed the unknown-key check above);
+            # the case list is shape-checked here so a bad case fails the
+            # save with the same message the run would raise.
+            from ..engine.code_tests import CodeTestsError, validate_code_tests
+
+            try:
+                validate_code_tests(action)
+            except CodeTestsError as exc:
+                raise ActionError(f"{action_type}: {exc}") from exc
         if action.get("error_actions"):
             validate_action_chain(action["error_actions"])
         _validate_field_types(action, entry)

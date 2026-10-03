@@ -79,6 +79,11 @@ def register(sub):
     wf_test_step_p.add_argument("--execute", action="store_true",
                                 help="Actually run this one step (real side effects); default "
                                      "renders and evaluates only")
+    wf_test_code_p = wf_sub.add_parser("test-code",
+                                       help="Run a code step's tests (the action's tests list)")
+    wf_test_code_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
+    wf_test_code_p.add_argument("--action", required=True,
+                                help="The code step's action id (e.g. triage)")
     wf_versions_p = wf_sub.add_parser("versions",
                                       help="List a workflow's published versions (newest first)")
     wf_versions_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
@@ -214,4 +219,6 @@ def run(args, api_url, debug, child=None):
         return commands.workflows_test_step(api_url, args.file, args.action, args.event,
                                             steps_spec=args.steps, execute=args.execute,
                                             debug=debug)
+    if args.command == "test-code":
+        return commands.workflows_test_code(api_url, args.file, args.action, debug=debug)
     return 2

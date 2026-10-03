@@ -1,4 +1,7 @@
 """js action: sandboxed JavaScript transforms, executed by embedded V8."""
+import os
+import subprocess
+import sys
 import unittest
 
 from src.dapier.engine.actions.code import run_js
@@ -53,9 +56,29 @@ class JsCodeStepTests(unittest.TestCase):
         self.assertIn("code step failed", message)
 
     def test_timeout_fails_the_step(self):
-        with self.assertRaises(RuntimeError) as ctx:
-            run("while (true) {}", timeout_seconds=0.5)
-        self.assertIn("timed out after 0.5s", str(ctx.exception))
+        # In a subprocess: the timed-out V8 isolate keeps spinning (a daemon
+        # thread is abandoned, not killed), and a live spinner in this
+        # process flakes every later snippet under load.
+        code = (
+            "import os\n"
+            "from src.dapier.engine.actions.code import run_js\n"
+            "try:\n"
+            "    run_js({'type': 'js', 'code': 'while (true) {}',"
+            " 'timeout_seconds': 0.5}, {'data': {}})\n"
+            "except RuntimeError as exc:\n"
+            "    assert 'timed out after 0.5s' in str(exc), exc\n"
+            "else:\n"
+            "    raise AssertionError('the runaway snippet did not time out')\n"
+            # os._exit skips interpreter finalization: finalizing the stuck
+            # isolate deadlocks in py_mini_racer's __del__ (the daemon thread
+            # is abandoned spinning, never killed).
+            "os._exit(0)\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH": "."}, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_no_host_apis_reach_the_snippet(self):
         output = run("return [typeof fetch, typeof require, typeof process]")
@@ -78,7 +101,7 @@ class JsCatalogAndValidationTests(unittest.TestCase):
 
         entry = registry.ACTIONS["js"]
         self.assertEqual(entry.required, frozenset({"code"}))
-        self.assertEqual(entry.optional, frozenset({"timeout_seconds"}))
+        self.assertEqual(entry.optional, frozenset({"timeout_seconds", "tests"}))
 
     def test_catalog_lists_the_js_step(self):
         from src.dapier.connectors import catalog

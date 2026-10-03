@@ -173,6 +173,10 @@ def route(event, method, path):
         return designer_test_api(event, None)
     if path == "/api/agent/designer/workflows/test-step" and method == "POST":
         return designer_test_step_api(event, None)
+    if path == "/api/agent/designer/workflows/test-code" and method == "POST":
+        return designer_test_code_api(event, None)
+    if path == "/api/agent/designer/workflows/test-code" and method == "POST":
+        return designer_test_code_api(event, None)
     if path == "/api/agent/designer/workflows/bulk" and method == "POST":
         return designer_bulk_api(event)
     if path == "/api/agent/designer/workflows/export-all" and method == "GET":
@@ -204,6 +208,14 @@ def route(event, method, path):
         r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/test-step", path)
     if designer_test_step_match and method == "POST":
         return designer_test_step_api(event, designer_test_step_match.group(1))
+    designer_test_code_match = re.fullmatch(
+        r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/test-code", path)
+    if designer_test_code_match and method == "POST":
+        return designer_test_code_api(event, designer_test_code_match.group(1))
+    designer_test_code_match = re.fullmatch(
+        r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/test-code", path)
+    if designer_test_code_match and method == "POST":
+        return designer_test_code_api(event, designer_test_code_match.group(1))
     designer_duplicate_match = re.fullmatch(
         r"/api/agent/designer/workflows/" + _WORKFLOW_REF + r"/duplicate", path)
     if designer_duplicate_match and method == "POST":

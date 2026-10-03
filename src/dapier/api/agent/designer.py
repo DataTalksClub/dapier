@@ -20,7 +20,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_all_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
+__all__ = ["designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_all_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_code_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
 
 
 
@@ -259,6 +259,31 @@ def designer_rollback_api(event, source):
     except (ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(str(payload.get("file", source or "unknown")), "workflow.rollback", subject,
+               outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return _json_response(status, payload)
+
+
+def designer_test_code_api(event, source):
+    """Operator-only code-block tests: run one code/js action's ``tests``
+    cases against their own inputs. Pure — no connections, nothing
+    recorded — under the same workflow.test grant as the dry-run, since it
+    is the same capability at snippet granularity."""
+    subject, error = require_operator(event, "workflow.test")
+    if error:
+        return error
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(event, subject,
+                               str(source).removesuffix(".yaml"), "workflow.test")
+        if denied:
+            return denied
+    try:
+        body = json.loads(event.get("body") or "{}")
+        status, payload = designer_store.api_test_code(source, body, operator=subject)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    audit.emit(str(payload.get("file", source or "unknown")), "workflow.test-code", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return _json_response(status, payload)
 

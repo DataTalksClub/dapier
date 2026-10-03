@@ -146,3 +146,47 @@ export interface TestRunResult {
   steps: TestStepResult[];
   error?: string;
 }
+
+/** One code-block test case: the case ran through the real code runner. */
+export interface CodeTestCaseResult {
+  name: string;
+  ok: boolean;
+  expected?: unknown;
+  actual?: unknown;
+  error?: string;
+  stdout?: string;
+}
+
+/** Payload of POST /designer/workflows/test-code (one code/js action's
+    tests list, run against each case's own input). */
+export interface CodeTestReport {
+  file?: string;
+  action_id?: string;
+  total: number;
+  passed: number;
+  failed: number;
+  cases: CodeTestCaseResult[];
+  error?: string;
+}
+
+/** One code-block test case: the case ran through the real code runner. */
+export interface CodeTestCaseResult {
+  name: string;
+  ok: boolean;
+  expected?: unknown;
+  actual?: unknown;
+  error?: string;
+  stdout?: string;
+}
+
+/** Payload of POST /designer/workflows/test-code (one code/js action's
+    tests list, run against each case's own input). */
+export interface CodeTestReport {
+  file?: string;
+  action_id?: string;
+  total: number;
+  passed: number;
+  failed: number;
+  cases: CodeTestCaseResult[];
+  error?: string;
+}

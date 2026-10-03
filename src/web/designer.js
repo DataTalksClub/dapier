@@ -19684,9 +19684,10 @@
       type: "render_html_to_pdf",
       label: "Render PDF",
       icon: FileText,
-      description: "Queue an html-renderer job: the input field's stored email body becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
+      description: "Queue an html-renderer job: the input field's stored email body — or input_value, a template (e.g. a code step's transformed body) that wins when set — becomes a PDF at output_key in output_bucket (env fallback RENDER_ARTIFACTS_BUCKET). Output: {job_id, output}.",
       fields: [
         { key: "input_field", label: "Input field", placeholder: "html" },
+        { key: "input_value", label: "Input value (template)", placeholder: "{steps.clean.output.result.html}" },
         { key: "output_key", label: "Output key", placeholder: "rendered/{event_id}.pdf" },
         { key: "output_bucket", label: "Output bucket", discover: { resource: "buckets", account: "aws" } },
         { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" },
@@ -21983,6 +21984,12 @@
       busy: false,
       result: null
     });
+    const [codeTest, setCodeTest] = reactExports.useState({
+      nodeId: null,
+      busy: false,
+      result: null
+    });
+    const [testsDrafts, setTestsDrafts] = reactExports.useState({});
     const [stepOutputs, setStepOutputs] = reactExports.useState({});
     const [triggerSample, setTriggerSample] = reactExports.useState(null);
     const [stepsPickerOpen, setStepsPickerOpen] = reactExports.useState(false);
@@ -22802,6 +22809,58 @@
         setStepTest({ nodeId, busy: false, result: { mode: execute ? "execute-step" : "test-step", matched: false, steps: [], error: String(error) } });
       }
     }
+    function setTestsText(nodeId, text) {
+      let parsed;
+      try {
+        parsed = load(text);
+      } catch {
+        setTestsDrafts((current) => ({ ...current, [nodeId]: text }));
+        return;
+      }
+      setTestsDrafts((current) => {
+        if (!(nodeId in current)) return current;
+        const next = { ...current };
+        delete next[nodeId];
+        return next;
+      });
+      if (parsed === null || parsed === void 0) {
+        updateSelected((current) => {
+          const raw = { ...current.raw ?? {} };
+          delete raw.tests;
+          return { ...current, raw };
+        });
+        return;
+      }
+      if (!Array.isArray(parsed)) {
+        setTestsDrafts((current) => ({ ...current, [nodeId]: text }));
+        return;
+      }
+      updateSelected((current) => ({ ...current, raw: { ...current.raw ?? {}, tests: parsed } }));
+    }
+    async function runCodeTests() {
+      if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
+      const nodeId = selected.id;
+      const actionId = (selected.data.fields?.id ?? "").trim();
+      if (!actionId) {
+        setStatus({ kind: "error", message: "Give this action an Action ID first — its tests target it." });
+        return;
+      }
+      const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+      if (problems.length) {
+        setStatus({ kind: "error", message: problems.join(" ") });
+        return;
+      }
+      setCodeTest({ nodeId, busy: true, result: null });
+      try {
+        const result = await api(config, "/workflows/test-code", {
+          method: "POST",
+          body: JSON.stringify({ action_id: actionId, workflow })
+        });
+        setCodeTest({ nodeId, busy: false, result });
+      } catch (error) {
+        setCodeTest({ nodeId, busy: false, result: { total: 0, passed: 0, failed: 0, cases: [], error: String(error) } });
+      }
+    }
     async function copyTemplate(template) {
       try {
         await navigator.clipboard.writeText(template);
@@ -23005,21 +23064,91 @@
             )
           ] })
         ] }),
-        meta ? /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
-          meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-            FieldInput,
-            {
-              field,
-              value: data.fields?.[field.key] ?? "",
-              connections,
-              fields: data.fields,
-              siblingFields: meta.fields,
-              config,
-              onChange: (value) => setField(field.key, value)
-            },
-            field.key
-          ))
+        meta ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
+            meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              FieldInput,
+              {
+                field,
+                value: data.fields?.[field.key] ?? "",
+                connections,
+                fields: data.fields,
+                siblingFields: meta.fields,
+                config,
+                onChange: (value) => setField(field.key, value)
+              },
+              field.key
+            ))
+          ] }),
+          (data.actionType === "code" || data.actionType === "js") && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Code tests" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+              "Cases riding on this step as its ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "tests" }),
+              " list (YAML). Each runs the snippet against its own ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "input" }),
+              ":",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "expected" }),
+              " asserts the result deep-equal,",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "expected_error" }),
+              " asserts a failing run, neither only asserts it runs. Pure — no connections, nothing recorded."
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                "aria-label": "Code tests (YAML)",
+                className: "tests-editor",
+                rows: 9,
+                spellCheck: false,
+                value: testsDrafts[selected.id] ?? dump(data.raw?.tests ?? []),
+                placeholder: "- name: no attachments\n  input:\n    attachments: []\n  expected:\n    has_attachment: false",
+                onChange: (event) => setTestsText(selected.id, event.target.value)
+              }
+            ),
+            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "test-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                className: "dk-button dk-button--secondary",
+                type: "button",
+                disabled: codeTest.busy,
+                onClick: runCodeTests,
+                children: [
+                  codeTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 20, strokeWidth: 1.8, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 20, strokeWidth: 1.8 }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run tests" })
+                ]
+              }
+            ) }),
+            codeTest.nodeId === selected.id && codeTest.result && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `test-result ${codeTest.result.error && codeTest.result.cases.length === 0 ? "failed" : codeTest.result.failed === 0 && codeTest.result.total > 0 ? "passed" : "failed"}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-summary", children: codeTest.result.error && codeTest.result.cases.length === 0 ? codeTest.result.error : /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { children: [
+                codeTest.result.passed,
+                "/",
+                codeTest.result.total,
+                " passed",
+                codeTest.result.failed ? ` — ${codeTest.result.failed} FAILED` : ""
+              ] }) }),
+              codeTest.result.cases.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: item.ok ? "test-step ok" : "test-step failed", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-title", children: [
+                  item.name,
+                  !item.ok && item.error && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "test-step-error", children: [
+                    " — ",
+                    item.error
+                  ] })
+                ] }),
+                !item.ok && item.error && item.stdout && /* @__PURE__ */ jsxRuntimeExports.jsxs("pre", { className: "test-io", children: [
+                  "stdout: ",
+                  item.stdout
+                ] }),
+                !item.ok && (item.expected !== void 0 || item.actual !== void 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs("pre", { className: "test-io", children: [
+                  "expected: ",
+                  JSON.stringify(item.expected),
+                  "\n",
+                  "actual:   ",
+                  JSON.stringify(item.actual)
+                ] })
+              ] }, item.name))
+            ] })
+          ] })
         ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Unknown action" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Not in the catalog — the YAML is kept as-is on save. Edit it as JSON:" }),

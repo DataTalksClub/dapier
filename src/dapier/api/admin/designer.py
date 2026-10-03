@@ -171,6 +171,30 @@ def test_designer_step(event, operator, source=None, visible=None):
     return http._json_response(status, payload)
 
 
+def test_designer_code(event, operator, source=None, visible=None):
+    """Console mirror of the code-block tests (same domain module as the CLI).
+
+    Run one code/js action's ``tests`` cases against their own inputs —
+    pure, no connections, nothing recorded. The workflow comes inline (the
+    designer's unsaved draft) or from a saved file."""
+    if source:
+        # Keyed by a saved workflow: the write gate applies. An inline
+        # workflow (the designer's unsaved draft) is nobody's stored row.
+        denied = _write_denied(visible, str(source).removesuffix(".yaml"),
+                               "workflow.test", operator)
+        if denied:
+            return denied
+    try:
+        body = http._request_json(event)
+        status, payload = designer_store.api_test_code(source, body, operator=operator)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    session._audit_event(str(payload.get("file", source or "unknown")), "workflow.test-code",
+                 operator,
+                 outcome="ok" if status == 200 else "error", error=payload.get("error"))
+    return http._json_response(status, payload)
+
+
 def versions_designer_workflow(source, visible=None):
     """Console mirror of the CLI versions list: one workflow's history."""
     status, payload = designer_store.api_versions(source, visible=visible)

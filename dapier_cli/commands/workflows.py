@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_step", "workflows_versions"]
+__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_code", "workflows_test_step", "workflows_versions"]
 
 
 def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
@@ -556,6 +556,39 @@ def workflows_test_step(api_url, path, action_id, event_spec, steps_spec=None,
     if data.get("error"):
         print(f"Run error: {data['error']}")
     return 0 if data.get("ok") else 1
+
+
+def workflows_test_code(api_url, path, action_id, debug=False):
+    """Run one code/js action's tests, via the agent API.
+
+    The cases ride in the workflow YAML (the action's ``tests`` list); the
+    API runs each against its own input through the real sandbox and
+    reports pass/fail per case. Exits 0 when every case passed, 1 when any
+    failed, 2 on input errors.
+    """
+    yaml_text, error = _read_workflow_yaml(path)
+    if error:
+        print(error)
+        return 2
+    body = {"yaml": yaml_text, "action_id": action_id}
+    data = api.call(api_url, "POST", "/api/agent/designer/workflows/test-code",
+                    body, debug=debug)
+    label = data.get("file") or path
+    total, passed = data.get("total", 0), data.get("passed", 0)
+    failed = data.get("failed", total - passed)
+    print(f"Tested {action_id} of {label} — {passed}/{total} passed"
+          + (f", {failed} FAILED" if failed else ""))
+    for case in data.get("cases") or []:
+        mark = "pass" if case.get("ok") else "FAIL"
+        print(f"  {mark}  {case.get('name')}")
+        if case.get("ok"):
+            continue
+        if case.get("error"):
+            print(f"      {case['error']}")
+        if case.get("expected") is not None or case.get("actual") is not None:
+            print(f"      expected: {json.dumps(case.get('expected'), sort_keys=True)}")
+            print(f"      actual:   {json.dumps(case.get('actual'), sort_keys=True)}")
+    return 0 if failed == 0 and total > 0 else 1
 
 
 

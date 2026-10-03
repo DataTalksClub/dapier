@@ -6,7 +6,7 @@ import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, on
 import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
-import type { ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
@@ -588,6 +588,15 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [stepTest, setStepTest] = useState<{ nodeId: string | null; busy: boolean; result: TestRunResult | null }>({
     nodeId: null, busy: false, result: null
   });
+  /** Code-block tests (the code/js step's tests list): the cases run
+     through the real runner against each case's own input. Keyed by node
+     id like the step test. */
+  const [codeTest, setCodeTest] = useState<{ nodeId: string | null; busy: boolean; result: CodeTestReport | null }>({
+    nodeId: null, busy: false, result: null
+  });
+  /** Work-in-progress tests YAML, only while the text does not parse — the
+     textarea would otherwise snap back to the last valid list mid-keystroke. */
+  const [testsDrafts, setTestsDrafts] = useState<Record<string, string>>({});
   /** Outputs of the steps already tested for real this session, shaped like
      run history: testing step 2 sees step 1's output, like Zapier's editor. */
   const [stepOutputs, setStepOutputs] = useState<Record<string, { status: string; output?: Record<string, unknown>; error?: string }>>({});
@@ -1559,6 +1568,68 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     }
   }
 
+  /** Edit the selected code/js step's tests list (its `raw.tests`) through a
+     YAML textarea. Text that parses updates the step at once (an empty one
+     clears it); mid-edit garbage parks in the draft so the textarea does
+     not snap back to the last valid list. */
+  function setTestsText(nodeId: string, text: string) {
+    let parsed: unknown;
+    try {
+      parsed = load(text);
+    } catch {
+      setTestsDrafts((current) => ({ ...current, [nodeId]: text }));
+      return;
+    }
+    setTestsDrafts((current) => {
+      if (!(nodeId in current)) return current;
+      const next = { ...current };
+      delete next[nodeId];
+      return next;
+    });
+    if (parsed === null || parsed === undefined) {
+      updateSelected((current) => {
+        const raw = { ...(current.raw ?? {}) };
+        delete raw.tests;
+        return { ...current, raw };
+      });
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      setTestsDrafts((current) => ({ ...current, [nodeId]: text }));
+      return;
+    }
+    updateSelected((current) => ({ ...current, raw: { ...(current.raw ?? {}), tests: parsed } }));
+  }
+
+  /** Run the selected code/js step's tests (Zapier-style code-block tests):
+     each case runs the snippet against its own input through the real
+     runner — pure, no connections. The current draft goes inline, like the
+     step test. */
+  async function runCodeTests() {
+    if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
+    const nodeId = selected.id;
+    const actionId = (selected.data.fields?.id ?? "").trim();
+    if (!actionId) {
+      setStatus({ kind: "error", message: "Give this action an Action ID first — its tests target it." });
+      return;
+    }
+    const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
+    if (problems.length) {
+      setStatus({ kind: "error", message: problems.join(" ") });
+      return;
+    }
+    setCodeTest({ nodeId, busy: true, result: null });
+    try {
+      const result = await api<CodeTestReport>(config, "/workflows/test-code", {
+        method: "POST",
+        body: JSON.stringify({ action_id: actionId, workflow })
+      });
+      setCodeTest({ nodeId, busy: false, result });
+    } catch (error) {
+      setCodeTest({ nodeId, busy: false, result: { total: 0, passed: 0, failed: 0, cases: [], error: String(error) } });
+    }
+  }
+
   /** Click-to-insert a {trigger.field} chip: copies the template so it can
      be pasted into any action field; without clipboard access the template
      itself lands in the status line, still readable and copyable. */
@@ -1773,6 +1844,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           </label>
         </section>
         {meta ? (
+          <>
           <section className="inspector-group">
             <h3>Settings</h3>
             {meta.fields.map((field) => (
@@ -1788,6 +1860,63 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               />
             ))}
           </section>
+          {(data.actionType === "code" || data.actionType === "js") && (
+            <section className="inspector-group">
+              <h3>Code tests</h3>
+              <p className="inspector-hint">
+                Cases riding on this step as its <code>tests</code> list (YAML).
+                Each runs the snippet against its own <code>input</code>:
+                <code>expected</code> asserts the result deep-equal,
+                <code>expected_error</code> asserts a failing run, neither only
+                asserts it runs. Pure — no connections, nothing recorded.
+              </p>
+              <textarea
+                aria-label="Code tests (YAML)"
+                className="tests-editor"
+                rows={9}
+                spellCheck={false}
+                value={testsDrafts[selected.id] ?? dump(data.raw?.tests ?? [])}
+                placeholder={"- name: no attachments\n  input:\n    attachments: []\n  expected:\n    has_attachment: false"}
+                onChange={(event) => setTestsText(selected.id, event.target.value)}
+              />
+              {config.mode === "console" && (
+                <div className="test-actions">
+                  <button className="dk-button dk-button--secondary" type="button"
+                          disabled={codeTest.busy} onClick={runCodeTests}>
+                    {codeTest.busy
+                      ? <Loader2 size={20} strokeWidth={1.8} className="spin" />
+                      : <FlaskConical size={20} strokeWidth={1.8} />}
+                    <span>Run tests</span>
+                  </button>
+                </div>
+              )}
+              {codeTest.nodeId === selected.id && codeTest.result && (
+                <div className={`test-result ${codeTest.result.error && codeTest.result.cases.length === 0 ? "failed" : codeTest.result.failed === 0 && codeTest.result.total > 0 ? "passed" : "failed"}`}>
+                  <p className="test-summary">
+                    {codeTest.result.error && codeTest.result.cases.length === 0
+                      ? codeTest.result.error
+                      : <strong>{codeTest.result.passed}/{codeTest.result.total} passed
+                          {codeTest.result.failed ? ` — ${codeTest.result.failed} FAILED` : ""}</strong>}
+                  </p>
+                  {codeTest.result.cases.map((item) => (
+                    <div key={item.name} className={item.ok ? "test-step ok" : "test-step failed"}>
+                      <span className="test-step-title">
+                        {item.name}
+                        {!item.ok && item.error && <span className="test-step-error"> — {item.error}</span>}
+                      </span>
+                      {!item.ok && item.error && item.stdout && (
+                        <pre className="test-io">stdout: {item.stdout}</pre>
+                      )}
+                      {!item.ok && (item.expected !== undefined || item.actual !== undefined) && (
+                        <pre className="test-io">expected: {JSON.stringify(item.expected)}{"\n"}actual:   {JSON.stringify(item.actual)}</pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+          </>
         ) : (
           <section className="inspector-group">
             <h3>Unknown action</h3>
