@@ -229,37 +229,55 @@ were workbook `1jIBou5XvBY3uy7dsxDUVM4yiPZAgXUN5AZJN3bDJgHU`, worksheet ID
 Those values are reference requirements for DataOps if the legacy sheet remains
 part of its output; this change does not claim that output is configured there.
 
-Email TODO drafts explicitly use `America/Chicago`, consistent with the observed
-summer offset of -05:00. That is a configurable candidate, not verified Zapier
-CST semantics. Landing-folder drafts explicitly use UTC; the original sandbox
-zone is unknown. Confirm both before activation. Tests cover midnight offsets
-and seasonal DST changes.
+Email TODO uses fixed CST, UTC−06:00, through `Etc/GMT+6`. Published Zap153709869
+uses `Current time: CST (ISO)`; Zapier documents CST and CDT as separate fixed
+offsets. The earlier `America/Chicago` candidate was incorrect and is superseded.
+Six midnight/DST boundary cases and actual Gmail row110/accepted DataOps receipt
+passed after live v8. Landing-folder processing dates use UTC, matching original
+Python `datetime.now()` and Zapier's documented UTC Code-action runtime; the
+unconditional date prefix and extension handling also match the source.
 
-Invoice uploads require one stored attachment. Multiple/inline-attachment
-selection needs source-provider evidence before choosing `first` or another
-contract. Conflict autorename is disabled in the invoice draft, so an existing
-filename fails rather than silently overwriting it; Zapier's exact duplicate-name
-behavior is still unverified.
+Original singular Attachment hydration is now provider-verified through an
+inactive isolated copy: one PDF remains a PDF; multiple PDFs and inline PNG plus
+PDF bundle into ZIPs and append `.zip` to the requested `.pdf` name. Original
+Overwrite No succeeds as a same-byte no-op and autorenames changed-byte uploads.
+Original Dropbox Rename and Move also autorename on changed-byte collisions,
+retaining source bytes/ID and preserving the existing target. Dapier intentionally
+requires exactly one stored attachment and rejects filename conflicts with strict
+409 before further intake. These fail-closed rules are explicit migration
+adjustments, not identical Zapier adapter behavior.
 
-The backup draft preserves `content_type: none` as a literal, matching the
-visible configuration. Verify whether Zapier actually omitted Content-Type or
-sent a default/literal before activation, and use `omit_content_type` if needed.
-Google-native Drive documents use the existing download adapter's export behavior,
-which also needs comparison if that folder contains native documents.
+The backup preserves literal `content_type: none`. Metadata-only HEAD of the
+pre-migration January 2025 archive, matched to original Drive filename/size and
+creation metadata, confirms actual Content-Type `none`; no customer content was
+downloaded. This resolves the original MIME wire comparison. A fully paginated
+metadata-only read of the current watched folder found 82 files (52
+`application/x-zip-compressed`, 30 `application/zip`), no Google-native documents
+and no folders. Google-native export format remains a conditional future-input
+limitation if such files are later introduced, not an unresolved comparison for
+the current ZIP inputs. Future exporter create/replace/repeated-name behavior
+still requires owner evidence: owned-repo searches found imports/tests/docs and
+an assumed-role policy, not the producer definition.
 
-The original Telegram bridge sender is unknown; native Telegram is the supported
-primary path. Isolated tests verified POST JSON and URL-encoded form parsing,
-case-sensitive Date/Text and bearer authentication, without identifying that sender. Its hook has no text/date dedupe: repeated tasks remain
-separate events. Agree on a sender-supplied request ID, then configure
-`dedupe_path: request_id` to distinguish intentional repeats from retries.
-This contract is separate from the existing native Telegram bot's update-ID
-identity.
+The original Telegram bridge sender is unknown; native Telegram remains the
+supported primary path. Isolated JSON/form authentication, parsing and stable-ID
+retry tests passed. Existing catch-hook compatibility is retained unchanged;
+text/date alone must not deduplicate intentional repeats. Actual legacy-sender
+retry/cutover is conditional on a known sender-supplied request-ID contract and
+does not block native Telegram's update-ID identity.
 
-Slack blank-line spacing is retained from the current Dapier flow because the
-source inspection did not establish exact line breaks. YouTube WebSub remains
-the intentional replacement for 2-minute polling. Dapier's default pause after
-five consecutive failures is its own policy; it is not presented as Zapier's
-undisclosed error-ratio threshold.
+Published source Slack formatting is confirmed: two newlines around Title,
+`Link: ` plus Play Url, YouTube bot name, no automation link, expanded links,
+name linking and no broadcast. Migrated configuration and retained synthetic
+provider output match. YouTube WebSub intentionally replaces two-minute polling;
+authenticated synthetic HTTP ingress/signature/retry tests delivered exactly once
+in the isolated test channel. Genuine publisher-to-hub delivery still requires a
+legitimate future owner upload. Dapier's pause after five consecutive failures
+remains its own policy, not Zapier's undisclosed error-ratio threshold.
+
+See [the completion report](zapier-integration-completion-20261003.md) for provider
+proofs, isolated actual-worker/live-provider DataOps publication, documented
+adjustments and cleanup. Production financial ledger publication was not performed.
 
 ### Validation and activation checklist
 
@@ -269,7 +287,7 @@ worksheet rename handling, CLI/API draft saving and failure recovery after file
 moves. Successful file steps stay deduplicated after their leases expire,
 and retries restore saved outputs for downstream path templates.
 
-Before cutover:
+Completed access/contract checks and remaining production cutover gates:
 
 1. Verify access to the exact shared Drive folder and TODO workbook. The current
    Google connection identifies `alexey@datatalks.club`; the source used
@@ -277,14 +295,17 @@ Before cutover:
    define the destination, but access must be checked.
 2. Connect Dropbox and Slack, grant the display-name scope, and configure the
    target S3 credential through the Console or CLI. Verify DataOps intake.
-3. Resolve the timezone, attachment, collision, MIME and Telegram contracts
-   above; verify downstream bookkeeping behavior separately in DataOps.
+3. Timezone, attachment, collision and MIME source checks are resolved above.
+   Native Telegram is primary. Required DataOps publication integration passed
+   against isolated live providers/local ledger; no production ledger publication
+   or real payment attestation is claimed.
 4. Inspect each draft against live with `dapier workflows draft-diff <id>`.
    Use strict dry-runs and per-step tests with synthetic prior outputs for
    dependencies. Dry-runs cannot verify provider defaults or permissions.
-5. With separate cutover authorization, publish the reviewed workflows, enable
-   their polls/hook and verify new events. Existing Zapier senders and Zaps
-   are not changed by saving these drafts.
+5. Existing enabled migrations have completed their live tests. The remaining
+   production Dropbox cutover needs the separate authorization/producer transition
+   below; do not enable another overlapping consumer to close a test checkbox.
+   Existing Zapier senders and originals were never changed by draft/test work.
 
 
 ### Production Dropbox landing cutover plan
@@ -322,8 +343,10 @@ sender; this limitation does not block native Telegram's update-ID path.
 Invoice archives use `overwrite: false`, `autorename: false`, and
 `strict_conflict: true`. Dropbox otherwise accepts an identical-byte upload as
 a successful no-op; strict conflict rejects that case as well as changed bytes.
-This is the selected migration behavior; the original Zapier duplicate default
-is unavailable. See [Dropbox's upload specification](https://github.com/dropbox/dropbox-api-spec/blob/main/files.stone).
+This is an intentional migration adjustment: original copied-adapter tests
+verified same-byte successful no-op and changed-byte upload autorename, plus
+Rename/Move autorename. Strict rejection preserves existing destinations and
+prevents silently creating alternate invoice archive paths. See [Dropbox's upload specification](https://github.com/dropbox/dropbox-api-spec/blob/main/files.stone).
 
 Drive file polling excludes folders at the provider query and response boundary.
 A new subfolder is not a downloadable backup file; native document files remain
@@ -334,9 +357,32 @@ produces a new event and replaces the configured exact S3 key.
 The selected body-to-PDF path is also included: disabled drafts
 `invoice-body-render` and `invoice-body-completion` route `invoice-pdf` through
 the existing renderer, archive the completed PDF with UTC date/subject, and
-forward it to DataOps. Source Zap 153699998 was inactive and its steps were not
-exported; this is tested intended behavior, not verified original equivalence.
+forward it to DataOps. Read-only source inspection of inactive Zap153699998 confirms Raw Date→UTC
+YYYY-MM-DD, Body Html→ConvertAPI PDF (`test.html` input), File URL→Dropbox with
+Output-Raw Subject.pdf and Overwrite No, then Sheets. Actual no-attachment HTML
+email/native renderer artifact and archive/intake were verified. Native rendering
+and DataOps ownership are explicit adjustments; PDF-engine byte identity is not
+claimed. Both migration definitions remain disabled.
 Before enabling the pair, disable the broad `rendered-invoice-dataops` consumer
 and drain its runs. Confirm no second consumer watches the selected archive
 folder. Restore the old completion definition if rolling back, after pausing
 the new incoming and completion pair; never overlap the consumers.
+
+### Remaining owner decisions and current inventory
+
+Current API inventory confirms `mailchimp-drive-backup` enabled at two minutes,
+`invoice-landing` disabled at two minutes, and `dropbox_on_upload` enabled on
+`/_dtc_paperwork/income-invoices/` with intake/delete. The reviewed landing draft
+targets `/_dtc_paperwork/invoices-landing`; a production workflow named
+`invoice-landing` is not published. That poll ID must not be mistaken for an
+already deployed replacement workflow. Safe rollback/cursor tests passed in
+isolation. Remaining cutover work requires identifying the file producer and
+folder transition, choosing historical-backlog handling and approving a window
+to pause uploads, disable/drain the old consumer, seed and enable one replacement.
+There is no additional fixture test that can substitute for those decisions.
+
+The other remaining acceptance inputs are owner evidence for future upstream
+export behavior and a genuine future YouTube upload. No public upload or
+production cutover was performed to force acceptance. Direct scheduler
+rule/target/log diagnostics remain access-limited; authenticated hub lease state
+and expiry are verified separately, not a false pass of automatic invocation logs.
