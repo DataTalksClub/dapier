@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 from ...connections import tokens
-from . import base, dropbox
+from ...connections.providers import dropbox_api
+from . import base
 from .templating import render
 
 
@@ -94,9 +95,9 @@ def _dropbox_intake_body(action, event, *, steps=None):
         raise ValueError("dropbox intake requires a file path")
     filename = base._safe_filename(path.split("/")[-1])
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    connection = dropbox._dropbox_connection(action["connection_id"])
+    connection = dropbox_api.dropbox_connection(action["connection_id"])
     access_token, _info = tokens.get_access_token(connection)
-    body = dropbox._dropbox_download(access_token, path)
+    body = dropbox_api.dropbox_download(access_token, path)
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
     key = f"dropbox/{str(event['id']).replace('/', '_')}/{filename}"
     storage_uri = _stage_document(key, body, content_type, checksum)

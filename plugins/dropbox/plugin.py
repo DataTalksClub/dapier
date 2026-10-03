@@ -3,9 +3,7 @@ connection, plus folder/file discovery, the account health check, and the
 "new file in folder" poll source behind the trigger chip's sample pull."""
 import json
 
-from ..connections import discovery as provider
-from ..connections import tokens
-from ..engine.actions.dropbox import (
+from plugins.dropbox.runners.dropbox import (
     _dropbox_rpc,
     run_dropbox_copy,
     run_dropbox_create_folder,
@@ -16,15 +14,23 @@ from ..engine.actions.dropbox import (
     run_dropbox_read_file,
     run_dropbox_upload,
 )
-from ..triggers.poll_sources import PollSource, register_source
-from .registry import (
+from src.dapier.connections import discovery as provider
+from src.dapier.connections import tokens
+from src.dapier.connectors.registry import (
     Action,
+    Connector,
     ConnectionTest,
     Discovery,
+    connector,
     register,
     register_connection_test,
     register_discovery,
 )
+from src.dapier.triggers.poll_sources import PollSource, register_source
+
+connector(Connector(name="dropbox", label="Dropbox",
+                    events=("file.created", "file.updated", "file.deleted"),
+                    icon="dropbox"))
 
 DROPBOX_LIST_FOLDER_URL = "https://api.dropboxapi.com/2/files/list_folder"
 DROPBOX_LIST_CONTINUE_URL = "https://api.dropboxapi.com/2/files/list_folder/continue"
@@ -334,7 +340,7 @@ def _dropbox_poll_validate(body):
     path the actions and folder pickers speak), the ``connection_id`` of the
     Dropbox connection to poll as (required — the fetch refreshes its OAuth
     token), plus the fetch defaults every stored dropbox poll carries."""
-    from ..triggers.email_triggers import TriggerError
+    from src.dapier.triggers.email_triggers import TriggerError
 
     body = body if isinstance(body, dict) else {}
     path = str(body.get("path") or "").strip()
@@ -355,7 +361,7 @@ def _dropbox_poll_files(item, *, transport=None):
     """The folder's file entries through the module's own listing, on the
     stored connection's (refreshed) OAuth token — the exact call the folder
     pickers serve, so the poll sees what the operator browsed."""
-    from ..engine.actions import base
+    from src.dapier.engine.actions import base
 
     connection = base._connected_connection(item["connection_id"])
     return _run_entries(connection, {"path": str(item.get("path") or "").strip()},
@@ -423,7 +429,7 @@ def _stored_dropbox_poll(name):
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
     raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()
     if not name or "." in name:
@@ -446,8 +452,8 @@ _DROPBOX_EPOCH_CURSOR = "0000-01-01T00:00:00Z"
 # --- trigger discovery: a per-event file sample — recorded history when its
 # envelope carries the asked event, else a realistic example
 
-from . import trigger_discovery
-from .trigger_discovery import (
+from src.dapier.connectors import trigger_discovery
+from src.dapier.connectors.trigger_discovery import (
     DEFAULT_LIMIT,
     TriggerDiscovery,
     options_from_registry,
@@ -504,7 +510,7 @@ def _fetch_dropbox_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     per-event chain: the newest recorded dropbox run carrying the asked
     event, else the documented webhook example. A sample pull shows the
     payload shape, it never raises."""
-    from ..triggers import poll_triggers
+    from src.dapier.triggers import poll_triggers
 
     item = _stored_dropbox_poll(event)
     if item is not None:

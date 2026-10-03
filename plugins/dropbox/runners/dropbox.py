@@ -7,21 +7,24 @@ import os
 import urllib.request
 import urllib.error
 
-from ...connections import tokens
-from . import base
-from .templating import render
+from src.dapier.connections import tokens
+from src.dapier.engine.actions import base
+from src.dapier.engine.actions.templating import render
 
 DROPBOX_UPLOAD_URL = "https://content.dropboxapi.com/2/files/upload"
-DROPBOX_DOWNLOAD_URL = "https://content.dropboxapi.com/2/files/download"
 DROPBOX_DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 DROPBOX_SEARCH_URL = "https://api.dropboxapi.com/2/files/search"
 DROPBOX_CREATE_FOLDER_URL = "https://api.dropboxapi.com/2/files/create_folder_v2"
 DROPBOX_MOVE_URL = "https://api.dropboxapi.com/2/files/move_v2"
 DROPBOX_COPY_URL = "https://api.dropboxapi.com/2/files/copy_v2"
 
-
-def _dropbox_connection(connection_id):
-    return base._connected_connection(connection_id)
+# The connection lookup and the content download live in core
+# connections.providers.dropbox_api (engine.actions.dataops calls them on
+# the DataOps forwarding path; core must not import plugin code).
+from src.dapier.connections.providers.dropbox_api import (  # noqa: E402
+    dropbox_connection as _dropbox_connection,
+    dropbox_download as _dropbox_download,
+)
 
 def _upload_files(action, data):
     """Return the ``{s3, filename}`` files the action should upload."""
@@ -143,22 +146,6 @@ def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dro
         except (ValueError, UnicodeDecodeError):
             pass
         raise RuntimeError(f"dropbox call returned HTTP {status}{f' ({tag})' if tag else ''}")
-    return raw
-
-def _dropbox_download(access_token, path, *, transport=None):
-    transport = transport or base._default_transport
-    headers = {
-        "authorization": f"Bearer {access_token}",
-        "dropbox-api-arg": json.dumps({"path": path}, separators=(",", ":")),
-    }
-    try:
-        status, raw = transport(
-            "POST", DROPBOX_DOWNLOAD_URL, headers=headers, body=b"", timeout=15,
-        )
-    except Exception as exc:
-        raise RuntimeError(f"dropbox download unreachable: {type(exc).__name__}")
-    if status >= 300:
-        raise RuntimeError(f"dropbox download returned HTTP {status}")
     return raw
 
 def run_dropbox_delete(action, event, transport=None):

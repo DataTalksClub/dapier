@@ -11,9 +11,9 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src.dapier.connectors import dropbox as dropbox_connector  # noqa: F401 (registers)
+import plugins.dropbox.plugin as dropbox_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.dropbox import run_dropbox_get_temp_link
+from plugins.dropbox.runners.dropbox import run_dropbox_get_temp_link
 
 
 class FakeTransport:
@@ -48,7 +48,7 @@ LINK_RESPONSE = {
 
 def run_link(transport, action, event=None):
     action = {"type": "dropbox_get_temp_link", "connection_id": "dbx", **action}
-    with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+    with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                return_value=DROPBOX_CONNECTION), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):
@@ -107,7 +107,7 @@ class DropboxGetTempLinkTests(unittest.TestCase):
                     {"error": {".tag": "path", "path": {".tag": "not_found"}}}).encode()
 
         transport = StatusTransport()
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=DROPBOX_CONNECTION), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})):
@@ -123,7 +123,7 @@ class DropboxGetTempLinkTests(unittest.TestCase):
         def broken(method, url, *, headers=None, body=None, timeout=15):
             raise ConnectionError("no route to host")
 
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=DROPBOX_CONNECTION), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})):
@@ -139,7 +139,7 @@ class DropboxGetTempLinkTests(unittest.TestCase):
         def junk(method, url, *, headers=None, body=None, timeout=15):
             return 200, b"<html>not json</html>"
 
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=DROPBOX_CONNECTION), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})):
@@ -158,7 +158,7 @@ class DropboxGetTempLinkTests(unittest.TestCase):
 
     def test_a_linkless_response_fails_loudly(self):
         transport = FakeTransport({"metadata": {"id": "id:f1", "name": "report.pdf"}})
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=DROPBOX_CONNECTION), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("tok", {})):

@@ -11,10 +11,10 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src.dapier.connectors import dropbox as dropbox_connector  # noqa: F401 (registers)
+import plugins.dropbox.plugin as dropbox_connector  # noqa: F401 (registers)
 import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
-from src.dapier.engine.actions.dropbox import (
+from plugins.dropbox.runners.dropbox import (
     run_dropbox_copy,
     run_dropbox_create_folder,
     run_dropbox_move,
@@ -63,7 +63,7 @@ DROPBOX_CONNECTION = {"connection_id": "dbx", "provider": "dropbox",
 
 def run_dropbox(runner, transport, action, event=None):
     action = {"connection_id": "dbx", **action}
-    with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+    with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                return_value=DROPBOX_CONNECTION), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("tok", {})):

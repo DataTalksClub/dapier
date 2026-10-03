@@ -16,7 +16,9 @@ from src.dapier.connectors import registry
 from src.dapier.connectors import drive
 from src.dapier.api.designer_store import parse_workflow
 from src.dapier.engine import logic
-from src.dapier.engine.actions import date_time, dropbox, s3, sheets, dataops
+from src.dapier.engine.actions import date_time, s3, sheets, dataops
+import plugins.dropbox.runners.dropbox as dropbox
+from src.dapier.connections.providers import dropbox_api
 from plugins.slack.runners import slack
 from src.dapier.engine.actions.code import run_code
 from src.dapier.engine.actions.templating import render
@@ -379,13 +381,13 @@ def test_dataops_downloads_the_rendered_archived_path(monkeypatch):
     action = workflow("dropbox_on_upload")["actions"][-1]
     path = "/_dtc_paperwork/invoices/2026-10-02-deepseek.pdf"
     calls = []
-    monkeypatch.setattr(dataops.dropbox, "_dropbox_connection", lambda _id: {})
+    monkeypatch.setattr(dropbox_api, "dropbox_connection", lambda _id: {})
     monkeypatch.setattr(
         dataops.tokens, "get_access_token", lambda *a, **kw: ("token", {})
     )
     monkeypatch.setattr(
-        dataops.dropbox,
-        "_dropbox_download",
+        dropbox_api,
+        "dropbox_download",
         lambda token, path: (calls.append(path) or b"pdf"),
     )
     monkeypatch.setattr(dataops, "_stage_document", lambda *a: "s3://staged/file")
@@ -404,7 +406,7 @@ def test_dataops_downloads_the_rendered_archived_path(monkeypatch):
 
 
 def test_empty_landing_folder_seed_allows_first_future_file(monkeypatch):
-    from src.dapier.connectors import dropbox as source
+    import plugins.dropbox.plugin as source
 
     monkeypatch.setattr(source, "_dropbox_poll_files", lambda *a, **kw: [])
     item = {"connection_id": "dropbox", "path": "/_dtc_paperwork/invoices-landing"}

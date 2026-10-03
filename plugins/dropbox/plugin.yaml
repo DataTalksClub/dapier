@@ -1,0 +1,9 @@
+name: dropbox
+version: 1.0.0
+core_compat: ">=1.0"
+provides:
+  providers: [dropbox]
+  discovery_sources:
+    dropbox: [dropbox]
+  trigger_chips: [dropbox]
+  poll_sources: [dropbox.files]

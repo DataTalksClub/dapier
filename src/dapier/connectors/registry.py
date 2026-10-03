@@ -138,7 +138,6 @@ PROVIDER_DISCOVERY_SOURCES = {
     "google": ("google-sheets", "google-drive", "google-calendar", "gmail"),
     "youtube": ("youtube",),
     "zoom": ("zoom",),
-    "dropbox": ("dropbox",),
     "s3": ("s3",),
     "aws": ("s3",),
 }

@@ -9,13 +9,12 @@ from unittest.mock import MagicMock, patch
 
 from conftest import stubbed_action
 from plugins.slack.runners.slack import run_slack
+from plugins.dropbox.runners.dropbox import run_dropbox_delete, run_dropbox_upload
 from src.dapier.engine import (
     all_workflows,
     execute,
     matches,
     run_dataops,
-    run_dropbox_delete,
-    run_dropbox_upload,
     run_email_send,
     workflow_triggers,
 )
@@ -138,7 +137,7 @@ class DropboxUploadTests(unittest.TestCase):
 
     def run_action(self, transport, event=None, action=None):
         action = action or {"type": "dropbox_upload", "connection_id": "dropbox", "folder": "/Invoices"}
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection", return_value=dict(self.connection)), \
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
              patch("src.dapier.engine.actions.base._s3_body", return_value=b"pdf-bytes"):
             run_dropbox_upload(action, event or deepcopy(self.attachment_event), transport=transport)
@@ -241,7 +240,7 @@ class DropboxDeleteTests(unittest.TestCase):
 
     def run_action(self, transport, event=None, action=None):
         action = action or {"type": "dropbox_delete", "connection_id": "dropbox"}
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection", return_value=dict(self.connection)), \
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})):
             run_dropbox_delete(action, event or dict(self.event), transport=transport)
 
@@ -305,9 +304,9 @@ class DropboxIntakeTests(unittest.TestCase):
         s3 = MagicMock()
         with patch("src.dapier.engine.actions.base.secrets_value", return_value='{"token": "tok"}'), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \
-             patch("src.dapier.engine.actions.dropbox._dropbox_connection", return_value=dict(self.connection)), \
+             patch("src.dapier.connections.providers.dropbox_api.dropbox_connection", return_value=dict(self.connection)), \
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
-             patch("src.dapier.engine.actions.dropbox._dropbox_download", return_value=b"pdf-bytes"), \
+             patch("src.dapier.connections.providers.dropbox_api.dropbox_download", return_value=b"pdf-bytes"), \
              patch("boto3.client", return_value=s3), \
              patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging",
                                        "DATAOPS_INTAKE_URL": "https://intake.test"}):

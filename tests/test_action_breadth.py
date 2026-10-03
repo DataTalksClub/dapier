@@ -16,7 +16,7 @@ import pytest
 
 from src.dapier.connectors import registry
 from src.dapier.connections import tokens
-from src.dapier.engine.actions.dropbox import run_dropbox_get_temp_link
+from plugins.dropbox.runners.dropbox import run_dropbox_get_temp_link
 from src.dapier.engine.actions.zoom import run_zoom_create_meeting
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
@@ -142,7 +142,7 @@ def test_zoom_create_meeting_dispatches_through_the_registry():
 
 
 def run_temp_link(action, transport):
-    with mock.patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+    with mock.patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                     return_value=DROPBOX_CONNECTION):
         return run_dropbox_get_temp_link(
             {"type": "dropbox_get_temp_link", "connection_id": "dbx", **action},
@@ -211,7 +211,7 @@ def test_dropbox_get_temp_link_requires_a_path():
     transport = FakeTransport()
 
     with pytest.raises(ValueError):
-        with mock.patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with mock.patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                         return_value=DROPBOX_CONNECTION):
             run_dropbox_get_temp_link(
                 {"type": "dropbox_get_temp_link", "connection_id": "dbx",

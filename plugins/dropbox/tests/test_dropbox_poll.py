@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.connectors import dropbox as dropbox_connector
+import plugins.dropbox.plugin as dropbox_connector
 from src.dapier.connectors import trigger_discovery
 from src.dapier.engine.actions import base
 from src.dapier.connections import tokens

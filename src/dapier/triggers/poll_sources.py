@@ -27,7 +27,7 @@ DEFAULT_SOURCE = "http"
 SOURCES: dict = {}
 
 _BUILTIN_MODULES = ("..connectors.s3", "..connectors.sheets", "..connectors.drive",
-                    "..connectors.zoom", "..connectors.dropbox", "..connectors.youtube",
+                    "..connectors.zoom", "..connectors.youtube",
                     "..connectors.calendar", "..connectors.gmail")
 _loaded = False
 

@@ -12,7 +12,7 @@ import pytest
 
 from src.dapier.api import discovery as api_discovery
 from src.dapier.api import runs
-from src.dapier.connectors import dropbox as dropbox_connector  # noqa: F401 (registers)
+import plugins.dropbox.plugin as dropbox_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
 from src.dapier.connectors import trigger_discovery
 from src.dapier.connections import tokens

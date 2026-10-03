@@ -9,7 +9,7 @@ from src.dapier.connectors.registry import (
     run_action,
     validate_action_chain,
 )
-from src.dapier.engine.actions.dropbox import run_dropbox_read_file
+from plugins.dropbox.runners.dropbox import run_dropbox_read_file
 
 
 class FakeTransport:
@@ -39,7 +39,7 @@ EVENT = {"id": "evt/1", "connector": "dropbox", "event": "file.created",
 class DropboxReadFileTests(unittest.TestCase):
     def run_read(self, transport, action=None, event=None, s3_client=None):
         action = action or {"type": "dropbox_read_file", "connection_id": "dropbox"}
-        with patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+        with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=dict(CONNECTION)), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("token-123", {})), \
@@ -98,7 +98,7 @@ class DropboxReadFileTests(unittest.TestCase):
         transport = FakeTransport()
         s3 = FakeS3()
         with patch("src.dapier.engine.actions.base._default_transport", transport), \
-             patch("src.dapier.engine.actions.dropbox._dropbox_connection",
+             patch("plugins.dropbox.runners.dropbox._dropbox_connection",
                    return_value=dict(CONNECTION)), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("token-123", {})), \
