@@ -120,7 +120,7 @@ Source: Zap `153562936`; draft: `invoice-intake`.
 
 - [x] Configure archive `/_dtc_paperwork/invoices/<UTC email date>-<Subject>.pdf`, unchanged attachment bytes, overwrite disabled.
 - [x] Forward archived invoice intake to DataOps.
-- [x] Verify Dropbox account and archive folder access; DataOps intake previously accepted the TODO test. Invoice-specific receipt remains pending.
+- [x] Verify Dropbox account/archive access and actual Gmail invoice-specific DataOps receipt: `email-98789095e7d530f15a054227e36e428d` accepted, exact archived fixture verified; earlier pending preparation was superseded.
 - [x] Verify `alexey@datatalks.club` sender acceptance through actual Gmail delivery to `invoice@dtcdev.click`.
 - [x] Confirm original single/multiple/inline Attachment hydration and filename-conflict behavior through inactive copied adapter steps: single PDF unchanged; multiple PDFs and inline PNG+PDF bundled into ZIP with appended `.zip`; same-byte no-op; changed-byte autorename. Dapier single selection/strict 409 are explicit adjustments.
 - [x] Separately verify intended single selection and strict same-byte/changed-byte collision behavior.
@@ -400,3 +400,5 @@ exporter definition. Actual production ledger publication was not performed;
 required publication integration passed against isolated live providers/local
 ledger. Automatic renewal's direct rule/target/log reads remain access-limited,
 separate from the verified active authenticated hub lease and repaired stack.
+
+- [x] Chrome deleted only inactive copied Zaps `382288655` and `382289809` to recoverable Trash; neither was published/activated, originals untouched. Sanitized proof: `.tmp/zapier-copy-cleanup-proof.json`.

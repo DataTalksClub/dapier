@@ -446,9 +446,10 @@ is an intentional adjustment that avoids silently autorenaming invoice paths.
 Final adapter cleanup paginated all 17 entries (11 synthetic files), removed
 only `/dapier-integration-tests/zapier-adapter-20261003`, and verified absence
 through the parent provider listing. Temporary A/B URL files were removed.
-Proof: `.tmp/zapier-adapter-cleanup-proof.json`. Inactive copied Zaps
-`382288655` and `382289809` are owned cleanup items; original Zaps were never
-edited, activated or run. Copy deletion confirmation is recorded in handoff.
+Proof: `.tmp/zapier-adapter-cleanup-proof.json`. Chrome deleted only inactive copied Zaps `382288655` and `382289809` to
+recoverable Trash, as recorded in `.tmp/zapier-copy-cleanup-proof.json`.
+Neither copy was published/activated; original Zaps were never edited,
+activated or run.
 
 Upstream exporter search across owned repositories found only audience-export
 imports/tests/docs and folder references in Dapier triggers/tests. The
