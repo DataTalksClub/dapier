@@ -139,6 +139,8 @@ def handler(_event, _context):
     for channel_id in channel_ids:
         status = hub_request("subscribe", channel_id, callback_url=callback_url, secret=secret)
         results.append({"channel_id": channel_id, "status": status})
+    logger.info("YouTube renewal completed: channels=%d accepted=%d",
+                len(results), sum(item["status"] == 202 for item in results))
     return {"statusCode": 200, "body": json.dumps({"subscriptions": results})}
 
 

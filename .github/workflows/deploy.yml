@@ -69,3 +69,5 @@ jobs:
           fi
       - run: scripts/deploy.sh
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
+      - name: Inspect YouTube renewal infrastructure (read-only)
+        run: bash scripts/inspect-youtube-renewal.sh

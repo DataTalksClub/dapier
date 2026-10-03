@@ -83,3 +83,11 @@ class EventQueueAlarmTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_youtube_renewal_can_read_every_live_workflow_source():
+    with open("template.yaml", encoding="utf-8") as fh:
+        resource=yaml.load(fh, Loader=yaml.SafeLoader)["Resources"]["YouTubeSubscriptionFunction"]["Properties"]
+    tables={policy["DynamoDBReadPolicy"]["TableName"]["Ref"] for policy in resource["Policies"] if "DynamoDBReadPolicy" in policy}
+    assert tables == {"PublishedWorkflowsTable", "HookTriggersTable", "ScheduleTriggersTable", "PollTriggersTable"}
+    assert resource["Events"]["Renewal"]["Properties"] == {"Schedule":"rate(5 days)","Enabled":True}

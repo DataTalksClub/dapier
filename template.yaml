@@ -573,11 +573,21 @@ Resources:
       Policies:
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref YouTubeWebhookSecret
+        # all_workflows reads the managed definitions plus operator triggers.
+        - DynamoDBReadPolicy:
+            TableName: !Ref PublishedWorkflowsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref HookTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScheduleTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PollTriggersTable
       Events:
         Renewal:
           Type: Schedule
           Properties:
             Schedule: rate(5 days)
+            Enabled: true
 
   YouTubeWebhookSecret:
     Type: AWS::SecretsManager::Secret
