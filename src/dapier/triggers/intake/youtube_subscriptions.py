@@ -203,6 +203,7 @@ def subscription_status(channel_id, *, transport=None):
     import re
     from datetime import datetime, timezone
     from html.parser import HTMLParser
+    from email.utils import parsedate_to_datetime
 
     if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
         raise ValueError("a valid YouTube channel ID is required")
@@ -259,6 +260,15 @@ def subscription_status(channel_id, *, transport=None):
                 if stamp.tzinfo is None:
                     stamp = stamp.replace(tzinfo=timezone.utc)
                 expiry = stamp.astimezone(timezone.utc).isoformat()
+            else:
+                # The live hub diagnostic formats dates as RFC 2822, not ISO.
+                match = re.search(r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} (?:[+-]\d{4}|GMT|UTC)", value)
+                if match:
+                    try:
+                        stamp = parsedate_to_datetime(match[0])
+                        expiry = stamp.astimezone(timezone.utc).isoformat()
+                    except (ValueError, OverflowError):
+                        pass
     active = False if state in ("expired", "deleted", "unverified") else None if state == "unknown" or expiry is None else (
         state in ("verified", "active") and datetime.fromisoformat(expiry) > datetime.now(timezone.utc))
     return {"active": active, "state": state, "expires_at": expiry,

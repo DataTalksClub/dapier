@@ -162,3 +162,14 @@ def test_expired_diagnostic_is_inactive_even_without_expiry(monkeypatch):
     monkeypatch.setattr(youtube_subscriptions, "_settings", lambda: ("https://example.test/callback", "server-only"))
     result=youtube_subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ",transport=lambda *a,**k: (200,b"<b>State</b><span>expired</span>"))
     assert result["state"] == "expired" and result["active"] is False
+
+
+def test_hub_human_expiry_and_unknown_expiry_do_not_guess_active(monkeypatch):
+    monkeypatch.setattr(youtube_subscriptions, "_settings", lambda: ("https://example.test/callback", "server-only"))
+    sanitized_html=b"<dl><dt>State</dt><dd>verified</dd><dt>Expiration time</dt><dd>Thu, 08 Oct 2099 05:08:12 +0000</dd><dt>Last verification error</dt><dd>n/a</dd></dl>"
+    result=youtube_subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ",transport=lambda *a,**k:(200,sanitized_html))
+    assert result["expires_at"] == "2099-10-08T05:08:12+00:00"
+    assert result["active"] is True
+    unknown=sanitized_html.replace(b"Thu, 08 Oct 2099 05:08:12 +0000", b"unknown")
+    result=youtube_subscriptions.subscription_status("UCDvErgK0j5ur3aLgn6U-LqQ",transport=lambda *a,**k:(200,unknown))
+    assert result["active"] is None and result["expires_at"] is None
