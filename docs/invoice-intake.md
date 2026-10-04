@@ -11,13 +11,17 @@ in DataOps (`POST /api/v1/intake/email-documents`, contract
 
 ```
 SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
-  1. email-date — format the email date in UTC
-  2. clean-subject — a Python code step removes forwarding/reply prefixes,
+  1. triage — count document attachments; email boilerplate (text/html and
+     text/plain parts, e.g. stapled Terms of Service) is ignored end to end
+     (triage, archive naming, the Dropbox upload via exclude_content_types,
+     and the DataOps intake staging). Two or more documents fail the run.
+  2. email-date — format the email date in UTC
+  3. clean-subject — a Python code step removes forwarding/reply prefixes,
      "Invoice Available" and account/invoice brackets; AWS subjects become
      "Amazon Web Services". It returns a stable attachment checksum suffix.
-  3. archive-attachment — archive the original PDF using date, clean subject
+  4. archive-attachment — archive the original PDF using date, clean subject
      and checksum suffix, so different invoices on the same day do not collide.
-  4. file-to-dataops — stage the PDF into the DataOps documents bucket
+  5. file-to-dataops — stage the PDF into the DataOps documents bucket
      (transfer/ prefix, sha256 in object metadata), then post the intake
      envelope to DATAOPS_INTAKE_URL with x-dataops-intake-secret
 ```

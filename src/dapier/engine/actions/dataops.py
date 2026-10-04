@@ -135,6 +135,8 @@ def _email_intake_body(action, event):
     route = data.get("route") or source_data["route"]
     documents = []
     for index, attachment in enumerate(data.get("attachments", [])):
+        if not base.is_document_attachment(attachment):
+            continue  # ToS/legal boilerplate never belongs in the document intake
         ref = attachment.get("s3") or {}
         if ref.get("bucket") and ref.get("key"):
             body = _s3_bytes(ref["bucket"], ref["key"])

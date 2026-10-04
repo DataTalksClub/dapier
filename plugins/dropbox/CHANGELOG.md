@@ -13,3 +13,19 @@ The Dropbox OAuth provider adapter stays in core (`connections.providers`),
 and the `dropbox_resolver` intake Lambda (webhook → delta resolution) stays
 in `triggers.intake` with its API-router wiring — core must not import
 plugin code.
+
+## Unreleased
+
+`dropbox_upload` accepts `exclude_content_types` (list or comma-separated
+string): attachments with those MIME types (matched without parameters,
+case-insensitive) are skipped before the upload, and `attachment_selection`
+applies to what remains — so an invoice email stapled with Terms-of-Service
+HTML can still upload exactly its PDF.
+
+## Unreleased
+
+`dropbox_upload` accepts `exclude_content_types` (list or comma-separated
+string): attachments with those MIME types (matched without parameters,
+case-insensitive) are skipped before the upload, and `attachment_selection`
+applies to what remains — so an invoice email stapled with Terms-of-Service
+HTML can still upload exactly its PDF.

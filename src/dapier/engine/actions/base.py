@@ -65,6 +65,15 @@ def _safe_filename(name):
     name = str(name or "").replace("\\", "/").split("/")[-1].strip()
     return (name or "file")[:255]
 
+# Vendors staple Terms-of-Service and legal HTML onto invoice and receipt
+# emails; those parts are never the document a document intake is for. A
+# missing content type reads as a document.
+BOILERPLATE_CONTENT_TYPES = ("text/html", "text/plain")
+
+def is_document_attachment(attachment):
+    content_type = str((attachment or {}).get("content_type") or "")
+    return content_type.split(";")[0].strip().lower() not in BOILERPLATE_CONTENT_TYPES
+
 def _default_transport(method, url, *, headers, body, timeout=15):
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(request, timeout=timeout) as response:

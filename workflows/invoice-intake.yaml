@@ -1,9 +1,11 @@
 id: invoice-intake
 enabled: true
-description: 'Invoice emails: triage on arrival. A single attachment is archived
-  to Dropbox and forwarded to DataOps; a body-only email has its forwarded
-  header stripped and renders to PDF (the completion flow archives and
-  forwards it); two or more attachments fail the run.'
+description: 'Invoice emails: triage on arrival. Email boilerplate (HTML/text
+  parts such as stapled Terms of Service) is ignored end to end; a single
+  document attachment is archived to Dropbox and forwarded to DataOps; a
+  body-only email has its forwarded header stripped and renders to PDF (the
+  completion flow archives and forwards it); two or more documents fail the
+  run.'
 trigger:
   connector: email
   event: message.received
@@ -15,10 +17,16 @@ actions:
   type: code
   code: |
     attachments = input.get("attachments") or []
-    count = len(attachments)
+    boilerplate = ("text/html", "text/plain")
+    documents = [a for a in attachments
+                 if str(a.get("content_type") or "").split(";")[0].strip().lower()
+                 not in boilerplate]
+    count = len(documents)
     if count > 1:
-        raise ValueError(f"expected at most one attachment, got {count} attachments")
-    output = {"has_attachment": count == 1, "attachment_count": count}
+        raise ValueError(f"expected at most one document, got {count} documents "
+                          f"({len(attachments) - count} boilerplate attachments ignored)")
+    output = {"has_attachment": count == 1, "attachment_count": len(attachments),
+              "document_count": count}
   tests:
   - name: body-only email renders to PDF
     input:
@@ -26,6 +34,7 @@ actions:
     expected:
       has_attachment: false
       attachment_count: 0
+      document_count: 0
   - name: single attachment follows the archive path
     input:
       attachments:
@@ -33,12 +42,45 @@ actions:
     expected:
       has_attachment: true
       attachment_count: 1
+      document_count: 1
   - name: two attachments fail
     input:
       attachments:
       - {}
       - {}
-    expected_error: got 2 attachments
+    expected_error: got 2 documents
+  - name: stapled Terms-of-Service HTML is boilerplate, the body renders
+    input:
+      attachments:
+      - content_type: text/html; charset=utf-8
+        filename: Terms_of_Service_de_de.html
+      - content_type: text/html; charset=utf-8
+        filename: Terms_of_Service_de_de.html
+    expected:
+      has_attachment: false
+      attachment_count: 2
+      document_count: 0
+  - name: a PDF beside boilerplate follows the archive path
+    input:
+      attachments:
+      - content_type: text/html
+        filename: Terms_of_Service.html
+      - content_type: application/pdf
+        filename: invoice.pdf
+    expected:
+      has_attachment: true
+      attachment_count: 2
+      document_count: 1
+  - name: two documents still fail
+    input:
+      attachments:
+      - content_type: application/pdf
+        filename: a.pdf
+      - content_type: application/pdf
+        filename: b.pdf
+      - content_type: text/html
+        filename: tos.html
+    expected_error: got 2 documents
 - id: route
   type: condition
   when:
@@ -61,6 +103,11 @@ actions:
       if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
           subject = "Amazon Web Services"
       attachment = (input.get("attachments") or [{}])[0]
+      for candidate in input.get("attachments") or []:
+          if str(candidate.get("content_type") or "").split(";")[0].strip().lower() \
+                  not in ("text/html", "text/plain"):
+              attachment = candidate
+              break
       checksum = re.sub(r"^sha256:", "", str(attachment.get("checksum") or ""), flags=re.I)
       if not re.fullmatch(r"[a-f0-9]{64}", checksum, flags=re.I):
           raise ValueError("Attachment checksum is required for archive naming")
@@ -82,6 +129,18 @@ actions:
       expected:
         subject: Amazon Web Services
         document_key: bbbbbbbbbbbb
+    - name: the document checksum wins over boilerplate
+      input:
+        subject: Invoice
+        attachments:
+        - content_type: text/html
+          filename: Terms_of_Service.html
+        - checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          content_type: application/pdf
+          filename: invoice.pdf
+      expected:
+        subject: Invoice
+        document_key: cccccccccccc
     - name: a missing checksum fails
       input:
         subject: Invoice
@@ -94,7 +153,8 @@ actions:
     folder: /_dtc_paperwork/invoices
     source: attachment
     attachment_selection: single
-    filename: '{steps.email-date.output.formatted}-{steps.clean-subject.output.result.subject}-{steps.clean-subject.output.result.document_key}.pdf'
+    exclude_content_types: [text/html, text/plain]
+    filename: '{steps.route.then.email-date.output.formatted}-{steps.route.then.clean-subject.output.result.subject}-{steps.route.then.clean-subject.output.result.document_key}.pdf'
     overwrite: false
     autorename: false
     strict_conflict: true

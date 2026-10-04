@@ -44,7 +44,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None, transport=None:
         run_dropbox_upload(action, event, transport=transport, steps=steps),
     required=frozenset({"connection_id", "folder"}),
-    optional=frozenset({"source", "filename", "attachment_selection", "overwrite", "autorename", "strict_conflict"}),
+    optional=frozenset({"source", "filename", "attachment_selection", "exclude_content_types", "overwrite", "autorename", "strict_conflict"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "dropbox", "required": True},
         {"key": "source", "label": "Source", "type": "select", "options": ["attachment", "output"], "default": "attachment"},
@@ -52,6 +52,7 @@ register(Action(
          "discover": {"resource": "dropbox.folders"}},
         {"key": "filename", "label": "Filename override"},
         {"key": "attachment_selection", "label": "Attachment selection", "type": "select", "options": ["all", "single", "first"], "default": "all"},
+        {"key": "exclude_content_types", "label": "Exclude content types", "placeholder": "text/html, text/plain"},
         {"key": "overwrite", "label": "Overwrite existing file", "type": "boolean", "default": "false"},
         {"key": "strict_conflict", "label": "Reject identical file conflicts", "type": "boolean", "default": "false"},
         {"key": "autorename", "label": "Autorename on conflict", "type": "boolean", "default": "true"},

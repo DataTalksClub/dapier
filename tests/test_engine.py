@@ -166,6 +166,37 @@ class DropboxUploadTests(unittest.TestCase):
         paths = [json.loads(c["headers"]["dropbox-api-arg"])["path"] for c in transport.calls]
         self.assertEqual(paths, ["/Invoices/a.pdf", "/Invoices/b.pdf"])
 
+    def test_excluded_content_types_skip_boilerplate_before_selection(self):
+        transport = FakeTransport()
+        event = {"data": {"attachments": [
+            {"filename": "Terms_of_Service.html", "content_type": "text/html; charset=utf-8",
+             "s3": {"bucket": "mail", "key": "tos.html"}},
+            {"filename": "invoice.pdf", "content_type": "application/pdf",
+             "s3": {"bucket": "mail", "key": "invoice.pdf"}},
+        ]}}
+        action = {"type": "dropbox_upload", "connection_id": "dropbox", "folder": "/Invoices",
+                  "attachment_selection": "single",
+                  "exclude_content_types": "text/html, text/plain"}
+        self.run_action(transport, event=event, action=action)
+
+        paths = [json.loads(c["headers"]["dropbox-api-arg"])["path"] for c in transport.calls]
+        self.assertEqual(paths, ["/Invoices/invoice.pdf"])
+
+    def test_exclusion_does_not_rescue_an_ambiguous_upload(self):
+        event = {"data": {"attachments": [
+            {"filename": "a.pdf", "content_type": "application/pdf",
+             "s3": {"bucket": "mail", "key": "a.pdf"}},
+            {"filename": "b.pdf", "content_type": "application/pdf",
+             "s3": {"bucket": "mail", "key": "b.pdf"}},
+            {"filename": "tos.html", "content_type": "text/html",
+             "s3": {"bucket": "mail", "key": "tos.html"}},
+        ]}}
+        action = {"type": "dropbox_upload", "connection_id": "dropbox", "folder": "/Invoices",
+                  "attachment_selection": "single", "exclude_content_types": ["text/html"]}
+        with self.assertRaises(ValueError) as ctx:
+            self.run_action(FakeTransport(), event=event, action=action)
+        self.assertIn("single", str(ctx.exception))
+
     def test_names_rendered_output_after_the_artifact_key(self):
         transport = FakeTransport()
         action = {
@@ -411,6 +442,21 @@ class EmailIntakeTests(unittest.TestCase):
         self.assertEqual(first["messageId"], second["messageId"])
         self.assertNotEqual(first["documents"][0]["storageUri"],
                             second["documents"][0]["storageUri"])
+
+    def test_skips_boilerplate_attachments(self):
+        event = self.event("Sat, 26 Sep 2026 22:10:40 +0000")
+        event["data"]["attachments"].insert(0, {
+            "filename": "Terms_of_Service_de_de.html",
+            "content_type": "text/html; charset=utf-8",
+            "size": 41755,
+            "checksum": "sha256:" + "b" * 64,
+            "s3": {"bucket": "raw-bucket", "key": "artifacts/x/attachments/000-tos.html"},
+        })
+        body, s3 = self.run_intake_body(event)
+
+        self.assertEqual([doc["filename"] for doc in body["documents"]],
+                         ["invoice-e2e-20260926-2210.pdf"])
+        self.assertEqual(s3.put_object.call_count, 1)
 
     def test_identical_attachment_names_remain_distinct(self):
         event = self.event("")

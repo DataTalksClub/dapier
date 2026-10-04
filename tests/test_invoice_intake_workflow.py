@@ -48,14 +48,27 @@ def test_triage_routes_attachment_body_and_fails_on_two():
     def run(attachments):
         return run_code(triage, {"data": {"attachments": attachments}})["result"]
 
-    assert run([]) == {"has_attachment": False, "attachment_count": 0}
+    assert run([]) == {"has_attachment": False, "attachment_count": 0,
+                       "document_count": 0}
     assert run([{"filename": "invoice.pdf"}]) == {
-        "has_attachment": True, "attachment_count": 1}
+        "has_attachment": True, "attachment_count": 1, "document_count": 1}
 
     import pytest
 
-    with pytest.raises(RuntimeError, match="got 2 attachments"):
+    with pytest.raises(RuntimeError, match="got 2 documents"):
         run([{}, {}])
+
+    # Vendor boilerplate (stapled Terms-of-Service HTML) never counts as a
+    # document: a Google-Play-style forward takes the body-render path, and a
+    # PDF beside the boilerplate still takes the archive path.
+    boilerplate = [{"content_type": "text/html; charset=utf-8",
+                    "filename": "Terms_of_Service_de_de.html"}] * 2
+    assert run(boilerplate) == {"has_attachment": False, "attachment_count": 2,
+                                "document_count": 0}
+    mixed = boilerplate + [{"content_type": "application/pdf",
+                            "filename": "invoice.pdf"}]
+    assert run(mixed) == {"has_attachment": True, "attachment_count": 3,
+                          "document_count": 1}
 
 
 def test_subject_cleanup_and_archive_identity():
@@ -69,6 +82,11 @@ def test_subject_cleanup_and_archive_identity():
         "email-date", "clean-subject", "archive-attachment", "file-to-dataops",
     ]
     clean_subject, archive = branch[1], branch[2]
+    # Branch steps are recorded under their prefixed run-history id; bare ids
+    # silently rendered empty and archived every PDF as "--.pdf".
+    assert "steps.route.then.email-date" in archive["filename"]
+    assert "steps.route.then.clean-subject" in archive["filename"]
+    assert archive.get("exclude_content_types") == ["text/html", "text/plain"]
     subjects = [
         "Fwd: Amazon Web Services Invoice Available [Account: 123] [Invoice ID: INV-1]",
         "Re: Fwd: Amazon web services Invoice Available [Account: 456] [Invoice ID: INV-2]",
@@ -80,8 +98,8 @@ def test_subject_cleanup_and_archive_identity():
         output = run_code(clean_subject, event)
         assert output["result"]["subject"] == "Amazon Web Services"
         assert event["data"]["subject"] == subject  # retain the original intake/audit data
-        steps = {"email-date": {"output": {"formatted": "2026-10-03"}},
-                 "clean-subject": {"output": output}}
+        steps = {"route.then.email-date": {"output": {"formatted": "2026-10-03"}},
+                 "route.then.clean-subject": {"output": output}}
         names.append(render(archive["filename"], event, steps))
         assert run_code(clean_subject, event)["result"] == output["result"]
     assert len(set(names)) == len(names)

@@ -34,15 +34,28 @@ def _upload_files(action, data):
             raise ValueError("render output does not reference a stored file")
         name = action.get("filename") or str(output["key"]).split("/")[-1]
         return [{"s3": output, "filename": name}]
+    excluded = _excluded_content_types(action)
     files = [
         {"s3": attachment["s3"], "filename": attachment.get("filename") or "attachment"}
         for attachment in data.get("attachments") or []
         if isinstance(attachment.get("s3"), dict)
         and attachment["s3"].get("bucket") and attachment["s3"].get("key")
+        and _content_type(attachment) not in excluded
     ]
     if not files:
         raise ValueError("email has no stored attachments to upload")
     return files
+
+def _content_type(attachment):
+    return str((attachment or {}).get("content_type") or "").split(";")[0].strip().lower()
+
+def _excluded_content_types(action):
+    """Content types the upload skips, from a list or comma-separated string;
+    matching is on the MIME type without parameters, case-insensitive."""
+    raw = action.get("exclude_content_types") or []
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    return {str(item).split(";")[0].strip().lower() for item in raw if str(item).strip()}
 
 def _dropbox_upload(access_token, path, payload, *, transport=None,
                     overwrite=False, autorename=True, strict_conflict=False):
