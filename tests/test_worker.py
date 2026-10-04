@@ -517,6 +517,25 @@ def test_enqueue_resume_parks_the_continuation_envelope(monkeypatch):
     assert envelope["step_outputs"]["pause"]["status"] == "delayed"
 
 
+def test_enqueue_resume_trims_oversized_step_outputs(monkeypatch):
+    """One oversized output must not strand the whole continuation: the
+    envelope crosses SQS (256 KB messages), so outputs ride at the
+    run-record cap while status and error stay."""
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
+    queue = _FakeQueue()
+
+    worker._enqueue_resume(
+        "wf-1", EVENT, time.time() + 30, [],
+        {"big": {"status": "completed", "output": {"blob": "z" * 20_000}},
+         "small": {"status": "completed", "output": {"n": 1}}},
+        "pause", queue=queue,
+    )
+
+    outputs = json.loads(queue.messages[0]["MessageBody"])["dapier_resume"]["step_outputs"]
+    assert outputs["big"]["output"]["truncated"] is True
+    assert outputs["small"]["output"] == {"n": 1}
+
+
 def test_enqueue_resume_caps_one_hop_at_nine_hundred_seconds(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.test/events")
     queue = _FakeQueue()

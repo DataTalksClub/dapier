@@ -89,10 +89,11 @@ class JsCodeStepTests(unittest.TestCase):
         self.assertLess(len(output["stdout"]), 3000)
         self.assertIn("truncated", output["stdout"])
 
-    def test_oversized_result_keeps_a_preview(self):
+    def test_oversized_result_is_returned_whole_for_later_steps(self):
+        """The steps context must carry the whole value; the worker's
+        recorder trims the run record separately."""
         output = run("return {blob: 'y'.repeat(100000)}")
-        self.assertTrue(output["result"]["truncated"])
-        self.assertIn("blob", output["result"]["preview"])
+        self.assertEqual(output["result"]["blob"], "y" * 100000)
 
 
 class JsCatalogAndValidationTests(unittest.TestCase):

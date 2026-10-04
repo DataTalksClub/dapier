@@ -110,10 +110,12 @@ class CodeStepTests(unittest.TestCase):
         self.assertLess(len(output["stdout"]), 3000)
         self.assertIn("truncated", output["stdout"])
 
-    def test_oversized_result_keeps_a_preview(self):
+    def test_oversized_result_is_returned_whole_for_later_steps(self):
+        """The steps context must carry the whole value: later steps template
+        against it (the stripped email body on its way to the renderer). The
+        run record is what stays small — the worker's recorder trims it."""
         output = run("{'blob': 'y' * 100_000}")
-        self.assertTrue(output["result"]["truncated"])
-        self.assertIn("blob", output["result"]["preview"])
+        self.assertEqual(output["result"]["blob"], "y" * 100_000)
 
     def test_output_parts_stay_under_the_worker_trim_limit(self):
         import json

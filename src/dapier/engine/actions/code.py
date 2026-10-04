@@ -159,15 +159,17 @@ def _timeout_seconds(action):
     return min(max(timeout, MIN_TIMEOUT_SECONDS), MAX_TIMEOUT_SECONDS)
 
 
-def _json_safe(value, limit=_OUTPUT_PART_LIMIT):
-    """JSON-safe copy of the snippet result; oversized values keep a preview,
-    matching worker._trim."""
+def _json_safe(value):
+    """JSON-safe copy of the snippet result, whole.
+
+    Later steps template against this value through the steps context, so
+    truncating here would strand every large payload (a stripped email body
+    on its way to the renderer) as an unresolvable preview. The run record
+    is capped separately by the worker's recorder."""
     try:
         text = json.dumps(value, default=str)
     except (TypeError, ValueError):
         text = json.dumps(str(value))
-    if len(text) > limit:
-        return {"truncated": True, "preview": text[:limit]}
     return json.loads(text)
 
 

@@ -349,6 +349,14 @@ def _enqueue_resume(workflow_id, event, resume_at, segments, step_outputs,
     """
     remaining = max(float(resume_at) - time.time(), 0.0)
     chunk = int(min(math.ceil(remaining), MAX_DELAY_QUEUE_SECONDS))
+    # Step outputs ride at the run-record cap: the resume envelope crosses
+    # SQS (256 KB messages) and the event queue, and one oversized output
+    # must not strand the whole continuation.
+    trimmed_outputs = {
+        action_id: {**entry, "output": _trim(entry.get("output"))}
+        for action_id, entry in (step_outputs or {}).items()
+        if isinstance(entry, dict)
+    }
     body = json.dumps({
         RESUME_KEY: {
             "workflow_id": workflow_id,
@@ -358,7 +366,7 @@ def _enqueue_resume(workflow_id, event, resume_at, segments, step_outputs,
             "paused_ids": paused_ids or (
                 [delay_action_id] if delay_action_id else []),
             "segments": segments,
-            "step_outputs": step_outputs or {},
+            "step_outputs": trimmed_outputs,
             "run_id": _run_id(workflow_id, event or {}),
         }
     }, default=str)
