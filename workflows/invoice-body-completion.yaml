@@ -1,6 +1,6 @@
-# Paired with invoice-body-render and invoice-intake's body branch: the
-# renderer reports job.completed with the source event's route, so both the
-# invoice and invoice-pdf addresses complete through this flow.
+# Paired with invoice-intake's body branch: the renderer reports
+# job.completed with the source event's route, so a rendered invoice body
+# completes through this flow.
 id: invoice-body-completion
 enabled: true
 description: Archive the completed email PDF and forward its exact bytes to DataOps.
@@ -9,9 +9,7 @@ trigger:
   event: job.completed
   filters:
     route:
-      in:
-      - invoice
-      - invoice-pdf
+      equals: invoice
 actions:
 - id: email-date
   type: date_time
