@@ -108,9 +108,10 @@ def test_body_only_branch_strips_and_renders():
                        if action.get("id") == "route")["else"]
     assert [action["id"] for action in else_branch] == ["strip-forwarded", "render-pdf"]
     strip_forwarded, render_pdf = else_branch
-    # The render consumes the stripped body through input_value.
+    # The render consumes the stripped body through input_value; branch
+    # steps are recorded under their prefixed run-history id.
     assert render_pdf["type"] == "render_html_to_pdf"
-    assert render_pdf["input_value"] == "{steps.strip-forwarded.output.result.html}"
+    assert render_pdf["input_value"] == "{steps.route.else.strip-forwarded.output.result.html}"
 
     forwarded = ("<div>---------- Forwarded message ----------</div>"
                  "<div>From: Google Play &lt;googleplay-noreply@google.com&gt;</div>"

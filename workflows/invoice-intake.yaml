@@ -187,7 +187,7 @@ actions:
   - id: render-pdf
     type: render_html_to_pdf
     input_field: html
-    input_value: '{steps.strip-forwarded.output.result.html}'
+    input_value: '{steps.route.else.strip-forwarded.output.result.html}'
     output_key: invoice-body/{event_id}.pdf
     output_bucket_env: RENDER_ARTIFACTS_BUCKET
     pdf:
