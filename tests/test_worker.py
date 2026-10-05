@@ -282,6 +282,8 @@ def test_notify_failure_defaults_to_the_operator_address_without_notify(monkeypa
     calls = []
     _patch_table(monkeypatch, calls)
     monkeypatch.setattr(matching, "all_workflows", lambda: [{"id": "wf-1"}])
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@example.test")
     ses = FakeSes()
     exc = ValueError("boom")

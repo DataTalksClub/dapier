@@ -2,40 +2,47 @@
 
 A workflow's top-level ``notify:`` list of email addresses (managed definition or
 a published designer workflow) picks its recipients. With no ``notify:``
-key the operator address (DAPIER_EMAIL_SENDER) is notified instead — error
-visibility is the default — and an explicit ``notify: []`` opts out.
-Failures with no workflow behind them (a poll trigger that could not
-fetch) notify the operator too: the worker hands ``notify_failure`` a
-minimal envelope naming the trigger.
+key the operator inbox is notified instead — error visibility is the
+default — and an explicit ``notify: []`` opts out. Failures with no
+workflow behind them (a poll trigger that could not fetch) notify the
+operator too: the worker hands ``notify_failure`` a minimal envelope
+naming the trigger.
 
 The engine tags action exceptions with the failing workflow's id, and the
 worker calls ``notify_failure`` from its error path. Delivery is
 at-most-once per run: a conditional put of a ``failure-notice`` item into
 the executions table claims the send, so redeliveries of the failed record
-never re-notify. Notice items carry their own run id (``<run>#notice``) so
-run history never groups them into the real run.
+never re-notify. A failed SES call releases the claim so a later attempt
+can still deliver. Notice items carry their own run id (``<run>#notice``)
+so run history never groups them into the real run.
 
 The auto-pause trip wire (engine.worker) sends its own notice through the
 same path once the streak pauses a workflow — :func:`notify_auto_pause`,
 same recipients, its own claim kind.
 """
+import logging
 import os
 import time
 from datetime import datetime, timezone
 
 
-def _ses():
+logger = logging.getLogger(__name__)
+
+
+def ses_client():
+    """SES client in the region where EmailSender is verified."""
     import boto3
 
-    return boto3.client("ses")
+    region = str(os.environ.get("DAPIER_EMAIL_REGION") or "").strip() or None
+    return boto3.client("ses", region_name=region)
 
 
-def operator_recipient():
-    """The default failure recipient: the configured sender address.
+def operator_sender():
+    """The SES-verified From address for operator mail.
 
-    DAPIER_EMAIL_SENDER is the SES-verified from address (template.yaml
+    DAPIER_EMAIL_SENDER is the verified identity (template.yaml
     ``EmailSender``); with it unset, the trigger domain's no-reply plays
-    the role, matching the send path's fallback below.
+    the role. This is the From header, not the inbox that reads failures.
     """
     sender = str(os.environ.get("DAPIER_EMAIL_SENDER") or "").strip()
     if sender:
@@ -43,6 +50,26 @@ def operator_recipient():
     from ..triggers.email_triggers import trigger_domain
 
     return f"no-reply@{trigger_domain()}"
+
+
+def operator_recipient():
+    """The inbox that reads failure mail.
+
+    Prefers ``DAPIER_NOTIFY_EMAIL`` (template.yaml ``NotifyEmail``), then
+    ``BACKUP_ALERT_EMAIL`` (the same operator inbox backup failures use),
+    then the verified sender. Sending To the From address is silent: the
+    trigger domain's no-reply identity is not a mailbox anyone reads.
+    """
+    for name in ("DAPIER_NOTIFY_EMAIL", "BACKUP_ALERT_EMAIL"):
+        address = str(os.environ.get(name) or "").strip()
+        if address:
+            return address
+    return operator_sender()
+
+
+def _console_runs_url():
+    base = str(os.environ.get("HOOKS_BASE_URL") or "").rstrip("/")
+    return f"{base}/runs" if base else ""
 
 
 def notify_addresses(workflow_id):
@@ -106,15 +133,25 @@ def _claim_notice(subject, run_id, event, error, kind="failure-notice"):
     return True
 
 
+def _release_notice(subject, event, kind="failure-notice"):
+    """Drop a claim so a later attempt can send after a failed SES call."""
+    import boto3
+
+    try:
+        boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).delete_item(
+            Key={"execution_id": f"{subject}:{kind}:{event.get('id', '')}"},
+        )
+    except Exception:
+        logger.exception("could not release failure-notice claim",
+                         extra={"workflow_id": subject, "kind": kind})
+
+
 def _send(subject, run_id, addresses, lines, *, ses=None):
     """One SES send with the notice house style; returns the send summary."""
     if ses is None:
-        ses = _ses()
-    from ..triggers.email_triggers import trigger_domain
-
-    sender = os.environ.get("DAPIER_EMAIL_SENDER") or f"no-reply@{trigger_domain()}"
+        ses = ses_client()
     response = ses.send_email(
-        Source=sender,
+        Source=operator_sender(),
         Destination={"ToAddresses": addresses},
         Message={
             "Subject": {"Data": lines["subject"], "Charset": "utf-8"},
@@ -125,11 +162,30 @@ def _send(subject, run_id, addresses, lines, *, ses=None):
     return {"to": addresses, "run_id": run_id, "message_id": response.get("MessageId")}
 
 
+def _notice_body(kind_line, subject, run_id, event, error, extra=None):
+    """Plain-text notice lines, including a console link when configured."""
+    lines = [
+        kind_line,
+        "",
+        f"workflow: {subject}",
+        f"run: {run_id}",
+        f"trigger: {event.get('connector')} / {event.get('event')}",
+        "",
+        f"failing step error: {error}",
+    ]
+    console = _console_runs_url()
+    if console:
+        lines.extend(["", f"console: {console}"])
+    if extra:
+        lines.extend(["", *extra])
+    return lines
+
+
 def notify_failure(exc, event, *, ses=None):
     """Email a failed run to its notify list, once per run.
 
     Recipients: the failing workflow's ``notify`` list, defaulting to the
-    operator address when the workflow has no ``notify:`` (an explicit
+    operator inbox when the workflow has no ``notify:`` (an explicit
     ``notify: []`` opts out); a failure with no workflow behind it — the
     worker passes a minimal poll envelope — goes to the operator. Returns
     a small dict describing the send, or None when the event is not a
@@ -153,18 +209,16 @@ def notify_failure(exc, event, *, ses=None):
     if not _claim_notice(subject, run_id, event, exc):
         return None
     error = str(exc) or exc.__class__.__name__
-    return _send(subject, run_id, addresses, {
-        "subject": f"[dapier] Run failed: {subject}",
-        "body": [
-            "A dapier run failed.",
-            "",
-            f"workflow: {subject}",
-            f"run: {run_id}",
-            f"trigger: {event.get('connector')} / {event.get('event')}",
-            "",
-            f"failing step error: {error}",
-        ],
-    }, ses=ses)
+    try:
+        return _send(subject, run_id, addresses, {
+            "subject": f"[dapier] Run failed: {subject}",
+            "body": _notice_body("A dapier run failed.", subject, run_id, event, error),
+        }, ses=ses)
+    except Exception:
+        logger.exception("failure notice email could not be sent",
+                         extra={"workflow_id": subject, "run_id": run_id})
+        _release_notice(subject, event)
+        return None
 
 
 def notify_auto_pause(exc, event, *, ses=None):
@@ -190,19 +244,20 @@ def notify_auto_pause(exc, event, *, ses=None):
     if not _claim_notice(workflow_id, run_id, event, exc, kind="auto-pause-notice"):
         return None
     error = str(exc) or exc.__class__.__name__
-    return _send(workflow_id, run_id, addresses, {
-        "subject": f"[dapier] Workflow auto-paused: {workflow_id}",
-        "body": [
-            "A dapier workflow was paused after repeated failures.",
-            "",
-            f"workflow: {workflow_id}",
-            f"run: {run_id}",
-            f"trigger: {event.get('connector')} / {event.get('event')}",
-            "",
-            f"failing step error: {error}",
-            "",
-            "The workflow is paused and will not run again until it is "
-            "re-enabled (CLI: `dapier workflows on <file>.yaml`, or the "
-            "console toggle). Re-enabling clears the pause.",
-        ],
-    }, ses=ses)
+    extra = [
+        "The workflow is paused and will not run again until it is "
+        "re-enabled (CLI: `dapier workflows on <file>.yaml`, or the "
+        "console toggle). Re-enabling clears the pause.",
+    ]
+    try:
+        return _send(workflow_id, run_id, addresses, {
+            "subject": f"[dapier] Workflow auto-paused: {workflow_id}",
+            "body": _notice_body(
+                "A dapier workflow was paused after repeated failures.",
+                workflow_id, run_id, event, error, extra=extra),
+        }, ses=ses)
+    except Exception:
+        logger.exception("auto-pause notice email could not be sent",
+                         extra={"workflow_id": workflow_id, "run_id": run_id})
+        _release_notice(workflow_id, event, kind="auto-pause-notice")
+        return None

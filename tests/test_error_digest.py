@@ -152,7 +152,9 @@ def test_render_without_a_cap_adds_no_caveat():
 
 def test_handler_renders_the_summary_into_the_ses_payload(monkeypatch, ses):
     _stub_summary(monkeypatch, _failed_runs())
-    with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}):
+    with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}, clear=False):
+        monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+        monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
         result = error_digest.handler({})
 
     assert result["sent"] is True
@@ -164,6 +166,19 @@ def test_handler_renders_the_summary_into_the_ses_payload(monkeypatch, ses):
     body = kwargs["Message"]["Body"]["Text"]["Data"]
     assert "wf-1" in body and "wf-2" in body
     assert "connection timeout" in body
+
+
+def test_handler_sends_to_the_notify_inbox_from_the_sender(monkeypatch, ses):
+    _stub_summary(monkeypatch, _failed_runs())
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+
+    result = error_digest.handler({})
+
+    assert result["to"] == "ops@example.test"
+    kwargs = ses.return_value.send_email.call_args.kwargs
+    assert kwargs["Source"] == "no-reply@dtcdev.click"
+    assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
 
 
 def test_handler_with_zero_failures_skips_the_send(monkeypatch, ses):
@@ -202,6 +217,8 @@ def test_admin_digest_send_now_returns_what_was_sent(monkeypatch, ses):
 
     cookies = _admin_operator(monkeypatch)
     _stub_summary(monkeypatch, _failed_runs())
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}):
         response = admin.route(
             _admin_request("POST", "/api/admin/errors/digest", cookies=cookies),
@@ -276,6 +293,8 @@ def test_agent_digest_send_now_returns_what_was_sent(monkeypatch, ses):
         agent_api, "verify_id_token",
         lambda token, audience=None: {"sub": "op-1", "email": "op@datatalks.club"})
     _stub_summary(monkeypatch, _failed_runs())
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}):
         response = agent_api.route(
             _agent_event("dtc-id-token"), "POST", "/api/agent/errors/digest")
@@ -344,5 +363,6 @@ def test_template_schedules_the_digest_daily():
     assert "ErrorDigestFunction:" in text
     assert "src.dapier.error_digest.handler" in text
     assert "DAPIER_EMAIL_SENDER: !Ref EmailSender" in text
+    assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in text
     assert "ses:SendEmail" in text
     assert "Schedule: cron(0 7 * * ? *)" in text

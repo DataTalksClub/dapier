@@ -804,6 +804,16 @@ def _auto_pause_on_failure(exc, payload):
         return False
 
 
+def _emit_failure_notice(exc, event, *, paused=False):
+    """Best-effort operator email; a send failure must not hide the run error."""
+    try:
+        notify_failure(exc, event)
+        if paused:
+            notify_auto_pause(exc, event)
+    except Exception:
+        logger.exception("failure notice failed")
+
+
 def handler(event, _context):
     if isinstance(event, dict) and event.get("trigger") == "poll" and event.get("poll_id"):
         # EventBridge invokes the function directly (dapier-poll-* rules):
@@ -814,7 +824,7 @@ def handler(event, _context):
             poll_triggers.fire(event["poll_id"])
         except Exception as exc:
             logger.exception("poll trigger failed", extra={"poll_id": event.get("poll_id")})
-            notify_failure(exc, _poll_failure_event(event))
+            _emit_failure_notice(exc, _poll_failure_event(event))
             raise
         return {"executed": event["poll_id"]}
     if isinstance(event, dict) and event.get("trigger") == "schedule" and event.get("schedule_id"):
@@ -834,9 +844,8 @@ def handler(event, _context):
         except Exception as exc:
             logger.exception("schedule trigger failed", extra={"schedule_id": event.get("schedule_id")})
             if not _schedule_retry(exc, normalized, 0):
-                notify_failure(exc, normalized)
-                if _auto_pause_on_failure(exc, normalized):
-                    notify_auto_pause(exc, normalized)
+                _emit_failure_notice(exc, normalized,
+                                     paused=_auto_pause_on_failure(exc, normalized))
                 raise
         return {"executed": event["schedule_id"]}
     failures = []
@@ -896,9 +905,8 @@ def handler(event, _context):
                                "attempt is pending on the event queue")
                 continue
             inbox.complete(inbox_id, None, error=exc)
-            notify_failure(exc, payload)
-            if _auto_pause_on_failure(exc, payload):
-                notify_auto_pause(exc, payload)
+            _emit_failure_notice(exc, payload,
+                                 paused=_auto_pause_on_failure(exc, payload))
             failures.append({"itemIdentifier": record.get("messageId")})
         else:
             inbox.complete(inbox_id, matched)

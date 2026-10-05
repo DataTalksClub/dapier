@@ -89,6 +89,13 @@ Parameters:
     Type: String
     Default: no-reply@dtcdev.click
     Description: From address for email_send workflow actions (must be SES-verified)
+  NotifyEmail:
+    Type: String
+    Default: alexey.s.grigoriev@gmail.com
+    Description: >
+      Operator inbox for failed-run notices, CloudWatch alarms, and the
+      daily error digest. Distinct from EmailSender, which is the SES
+      From identity and is not a mailbox anyone reads.
   EmailSendRegion:
     Type: String
     Default: us-east-1
@@ -190,6 +197,7 @@ Globals:
         HOST_TASKS_TABLE: !Ref HostTasksTable
         HOST_QUEUE_URL: !Ref HostQueue
         DAPIER_EMAIL_REGION: !Ref EmailSendRegion
+        DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable

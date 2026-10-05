@@ -27,6 +27,9 @@ class _CapturingTable:
     def put_item(self, **kwargs):
         self._calls.append(("put_item", kwargs))
 
+    def delete_item(self, **kwargs):
+        self._calls.append(("delete_item", kwargs))
+
 
 def _patch_table(monkeypatch, calls):
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
@@ -44,7 +47,26 @@ def _tagged(workflow_id="wf-1"):
     return exc
 
 
-def test_operator_recipient_prefers_the_configured_sender(monkeypatch):
+def test_operator_recipient_prefers_the_notify_inbox(monkeypatch):
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("BACKUP_ALERT_EMAIL", "backup@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dapier.example.test")
+
+    assert notify.operator_recipient() == "ops@example.test"
+    assert notify.operator_sender() == "no-reply@dapier.example.test"
+
+
+def test_operator_recipient_falls_back_to_the_backup_alert(monkeypatch):
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.setenv("BACKUP_ALERT_EMAIL", "backup@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dapier.example.test")
+
+    assert notify.operator_recipient() == "backup@example.test"
+
+
+def test_operator_recipient_falls_back_to_the_configured_sender(monkeypatch):
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dapier.example.test")
     monkeypatch.setenv("TRIGGER_EMAIL_DOMAIN", "other.example.test")
 
@@ -52,16 +74,37 @@ def test_operator_recipient_prefers_the_configured_sender(monkeypatch):
 
 
 def test_operator_recipient_falls_back_to_the_trigger_domain(monkeypatch):
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.delenv("DAPIER_EMAIL_SENDER", raising=False)
     monkeypatch.setenv("TRIGGER_EMAIL_DOMAIN", "ops.example.test")
 
     assert notify.operator_recipient() == "no-reply@ops.example.test"
 
 
+def test_ses_client_uses_the_email_send_region(monkeypatch):
+    seen = {}
+
+    def fake_client(service, region_name=None):
+        seen["service"] = service
+        seen["region_name"] = region_name
+        return FakeSes()
+
+    monkeypatch.setenv("DAPIER_EMAIL_REGION", "us-east-1")
+    monkeypatch.setattr("boto3.client", fake_client)
+
+    client = notify.ses_client()
+
+    assert seen == {"service": "ses", "region_name": "us-east-1"}
+    assert isinstance(client, FakeSes)
+
+
 def test_missing_notify_defaults_to_the_operator_address(monkeypatch):
     import src.dapier.engine.matching as matching
 
     monkeypatch.setattr(matching, "all_workflows", lambda: [{"id": "wf-1"}])
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@example.test")
 
     assert notify.notify_addresses("wf-1") == ["ops@example.test"]
@@ -72,6 +115,8 @@ def test_malformed_notify_defaults_to_the_operator_address(monkeypatch):
 
     monkeypatch.setattr(matching, "all_workflows",
                         lambda: [{"id": "wf-1", "notify": {"oops": True}}])
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@example.test")
 
     assert notify.notify_addresses("wf-1") == ["ops@example.test"]
@@ -99,6 +144,8 @@ def test_unknown_workflow_stays_quiet(monkeypatch):
 def test_poll_failure_without_a_workflow_notifies_the_operator(monkeypatch):
     calls = []
     _patch_table(monkeypatch, calls)
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
     monkeypatch.delenv("DAPIER_EMAIL_SENDER", raising=False)
     monkeypatch.setenv("TRIGGER_EMAIL_DOMAIN", "ops.example.test")
     ses = FakeSes()
@@ -125,6 +172,52 @@ def test_poll_failure_without_a_workflow_notifies_the_operator(monkeypatch):
     assert item["execution_id"] == "poll:new-items:failure-notice:3f2a9c"
     assert item["workflow_id"] == "poll:new-items"
     assert item["kind"] == "failure-notice"
+
+
+def test_notify_failure_sends_to_the_notify_inbox_from_the_sender(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    import src.dapier.engine.matching as matching
+
+    monkeypatch.setattr(matching, "all_workflows", lambda: [{"id": "wf-1"}])
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    monkeypatch.setenv("HOOKS_BASE_URL", "https://dapier.example.test")
+    ses = FakeSes()
+    exc = ValueError("boom")
+    exc.dapier_workflow = "wf-1"
+
+    result = notify.notify_failure(exc, {"id": "evt-1", "connector": "email",
+                                         "event": "message.received"}, ses=ses)
+
+    assert result["to"] == ["ops@example.test"]
+    sent = ses.calls[0]
+    assert sent["Source"] == "no-reply@dtcdev.click"
+    assert sent["Destination"]["ToAddresses"] == ["ops@example.test"]
+    body = sent["Message"]["Body"]["Text"]["Data"]
+    assert "console: https://dapier.example.test/runs" in body
+
+
+class _FailingSes:
+    def send_email(self, **kwargs):
+        raise RuntimeError("SES identity is in another region")
+
+
+def test_notify_failure_releases_the_claim_when_ses_fails(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    import src.dapier.engine.matching as matching
+
+    monkeypatch.setattr(matching, "all_workflows", lambda: [{"id": "wf-1"}])
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    exc = ValueError("boom")
+    exc.dapier_workflow = "wf-1"
+    event = {"id": "evt-1"}
+
+    assert notify.notify_failure(exc, event, ses=_FailingSes()) is None
+    assert [name for name, _kwargs in calls] == ["put_item", "delete_item"]
+    assert calls[1][1]["Key"] == {"execution_id": "wf-1:failure-notice:evt-1"}
 
 
 def test_untagged_non_poll_events_stay_declined(monkeypatch):

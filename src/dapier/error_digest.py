@@ -4,9 +4,10 @@ ErrorDigestFunction (template.yaml) invokes handler() on a daily EventBridge
 schedule. It renders the same summary the console and CLI read — api/errors.py
 ``api_summary``, one domain function, no second grouping — into a short
 plain-text email and sends it to the same operator address
-``engine.notify.operator_recipient`` resolves, mirroring alarm_notify's SES
-call. A window with zero failed runs sends nothing: the digest exists to
-surface new failures, not to confirm quiet days.
+``engine.notify.operator_recipient`` resolves, sent From the verified
+``EmailSender`` identity through the SES send region. A window with zero
+failed runs sends nothing: the digest exists to surface new failures, not
+to confirm quiet days.
 
 Send-now parity (UI/CLI rule): POST /api/{admin,agent}/errors/digest and
 ``dapier errors send-digest`` call ``send()`` directly and return what was
@@ -61,7 +62,7 @@ def send(days=None, *, ses=None):
     call, no noise email.
     """
     from .api.errors import api_summary
-    from .engine.notify import operator_recipient
+    from .engine.notify import operator_recipient, operator_sender, ses_client
 
     _, summary = api_summary(days if days is not None else _window_days())
     total = int(summary.get("total_failed_runs") or 0)
@@ -74,11 +75,9 @@ def send(days=None, *, ses=None):
     subject, body = render(summary)
     recipient = operator_recipient()
     if ses is None:
-        import boto3
-
-        ses = boto3.client("ses")
+        ses = ses_client()
     response = ses.send_email(
-        Source=recipient,
+        Source=operator_sender(),
         Destination={"ToAddresses": [recipient]},
         Message={
             "Subject": {"Data": subject, "Charset": "utf-8"},

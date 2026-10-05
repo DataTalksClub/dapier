@@ -52,7 +52,10 @@ class HandlerTests(unittest.TestCase):
     def test_emails_the_operator_address(self):
         import json
 
-        with patch.dict("os.environ", {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}):
+        with patch.dict("os.environ", {
+            "DAPIER_EMAIL_SENDER": "no-reply@dtcdev.click",
+            "DAPIER_NOTIFY_EMAIL": "ops@dtcdev.click",
+        }, clear=False):
             with patch.object(alarm_notify, "_summarize",
                               return_value=("body", "[dapier] alarm: X")) as summarize:
                 with patch("boto3.client") as client:
@@ -60,8 +63,9 @@ class HandlerTests(unittest.TestCase):
                     result = alarm_notify.handler(sns_event(json.dumps({"AlarmName": "X"})))
         self.assertEqual(result, {"notified": "ops@dtcdev.click"})
         kwargs = client.return_value.send_email.call_args.kwargs
-        self.assertEqual(kwargs["Source"], "ops@dtcdev.click")
+        self.assertEqual(kwargs["Source"], "no-reply@dtcdev.click")
         self.assertEqual(kwargs["Destination"]["ToAddresses"], ["ops@dtcdev.click"])
+        client.assert_called_with("ses", region_name=unittest.mock.ANY)
 
 
 if __name__ == "__main__":

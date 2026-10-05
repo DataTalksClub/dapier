@@ -60,10 +60,12 @@ the worker reads a Secrets Manager secret containing either a plain signing secr
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
-A workflow can opt into failure notifications with a top-level `notify` list of
-email addresses. When a run of that workflow fails, the worker sends one SES
-email per failed run (workflow id, run id, failing step's error); SQS
-redeliveries of the same record never re-notify:
+Failed runs email the operator by default (the `NotifyEmail` deployment
+parameter) and appear on the console Home page, grouped by workflow. A
+workflow can override recipients with a top-level `notify` list; an explicit
+`notify: []` opts that workflow out. Each failed run sends one SES email
+(workflow id, run id, failing step's error); SQS redeliveries of the same
+record never re-notify:
 
 ```yaml
 notify: [ops@example.com, lead@example.com]
