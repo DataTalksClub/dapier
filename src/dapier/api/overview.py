@@ -5,7 +5,7 @@ import boto3
 
 from ..auth import api_tokens, visibility
 from .. import http
-from ..triggers import connection_usage, email_from, email_triggers, hook_triggers, published_workflows
+from ..triggers import connection_usage, email_from, email_triggers, published_workflows
 from ..engine import usage
 from . import runs
 from ..connections import records as connection_records
@@ -33,13 +33,6 @@ def _workflows(visible=None, owners=None):
             result[str(workflow["id"])] = _workflow_view(
                 workflow, item.get("file"), published=True,
                 failures=counts.get(str(workflow["id"]), 0))
-    for workflow, _owner in hook_triggers.listed_workflows(visible):
-        result.setdefault(str(workflow["id"]), {**_workflow_view(
-            workflow, None, published=True,
-            failures=counts.get(str(workflow["id"]), 0)),
-            # Run by its trigger (hooks), no source file: the console opens
-            # these in the designer read-only (the API serves them by id).
-            "hook_backed": True})
     return sorted(result.values(), key=lambda workflow: str(workflow["id"]))
 
 

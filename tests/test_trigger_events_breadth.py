@@ -122,15 +122,17 @@ def test_telegram_callback_query_publishes_callback_query_received(monkeypatch):
 
 
 def test_channel_post_matches_the_same_stored_trigger_filters(monkeypatch):
-    """Same filter/matching behavior as message.received: one stored telegram
-    trigger matches all three events (messages, channel announcements,
-    callback queries), so a chat_id (or any other) filter written for
-    messages applies unchanged to the other two."""
+    """Same filter/matching behavior as message.received: a designer flow
+    binding to a telegram hook lists one trigger spec per event (messages,
+    channel announcements, callback queries), so a chat_id (or any other)
+    filter written for messages applies unchanged to the other two."""
     from src.dapier.engine import matches
 
-    workflow = hook_triggers.workflow_for({
-        "hook_id": "bot-inbox", "kind": "telegram", "actions": []})
-    # workflow_for owns the trigger specs: one per telegram event, same hook
+    workflow = {"enabled": True, "actions": [], "triggers": [
+        {"connector": "telegram", "event": name,
+         "filters": {"hook": {"equals": "bot-inbox"}}}
+        for name in ("message.received", "channel_post.received",
+                     "callback_query.received")]}
     assert [t["event"] for t in workflow["triggers"]] == \
         ["message.received", "channel_post.received", "callback_query.received"]
     assert all(t["filters"]["hook"] == {"equals": "bot-inbox"}

@@ -3,7 +3,7 @@
 import json
 
 from .. import api
-from .shared import entry_label, read_json_file
+from .shared import read_json_file
 
 __all__ = ["hooks_delete", "hooks_list", "hooks_save", "hooks_show", "print_hook"]
 
@@ -24,8 +24,6 @@ def print_hook(item):
         print("auth: none — Mailchimp calls the unguessable URL directly")
     else:
         print(f"auth header: {item.get('header', 'authorization')}: Bearer {item.get('token', '')}")
-    for index, action in enumerate(item.get("actions") or [], 1):
-        print(f"action[{index}]: {json.dumps(action, sort_keys=True)}")
 
 
 def hooks_list(api_url, kind=None, debug=False):
@@ -37,7 +35,7 @@ def hooks_list(api_url, kind=None, debug=False):
     for item in items:
         enabled = "yes" if item.get("enabled", True) else "no"
         print(f"{item.get('hook_id', ''):20} {item.get('kind', ''):9} "
-              f"enabled={enabled:3} {item.get('url', '')} {entry_label(item)}")
+              f"enabled={enabled:3} {item.get('url', '')}")
     return 0
 
 

@@ -179,17 +179,19 @@ def sync_engine(monkeypatch, tmp_path):
             "hook_id": "orders", "kind": "webhook", "url": "u-orders",
             "token": "tok-123", "enabled": True, "dedupe_path": "",
             "response": {"mode": "sync"},
-            "actions": [{"id": "pause", "type": "delay", "seconds": 90}],
         })]},
         "get_item": lambda self, Key: {"Item": {
             "hook_id": "orders", "kind": "webhook", "url": "u-orders",
             "token": "tok-123", "enabled": True, "dedupe_path": "",
             "response": {"mode": "sync"},
-            "actions": [{"id": "pause", "type": "delay", "seconds": 90}],
         }} if Key["hook_id"] == "orders" else {},
         "put_item": lambda self, Item: None,
         "delete_item": lambda self, Key: None,
     })()
+    workflow = {"id": "webhook-trigger-orders", "enabled": True,
+                "trigger": {"connector": "webhook", "event": "request.received",
+                            "filters": {"hook": {"equals": "orders"}}},
+                "actions": [{"id": "pause", "type": "delay", "seconds": 90}]}
 
     monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
     monkeypatch.setattr(ingress, "_publish", publish)
@@ -200,6 +202,8 @@ def sync_engine(monkeypatch, tmp_path):
     monkeypatch.setattr("src.dapier.triggers.seen.claim", lambda scope, key, **k: True)
     monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table",
                         lambda *a, **k: hook_table)
+    monkeypatch.setattr("src.dapier.engine.matching.workflows",
+                        lambda: [workflow])
     return state
 
 

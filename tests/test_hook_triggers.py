@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 from src.dapier.api import agent as agent_api
 from src.dapier.triggers import hook_triggers
-from src.dapier.engine import all_workflows, matches
 
 
 class StubTable:
@@ -48,7 +47,7 @@ def telegram_connection(connection_id="tg-bot"):
     }
 
 
-WEBHOOK_BODY = {"name": "orders", "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
+WEBHOOK_BODY = {"name": "orders"}
 
 
 class WebhookSaveTests(unittest.TestCase):
@@ -93,17 +92,6 @@ class WebhookSaveTests(unittest.TestCase):
         self.assertEqual(payload["dedupe_path"], "data.email")
         self.assertNotIn("warnings", payload)
 
-    def test_save_uses_inline_actions_and_rejects_legacy_flow(self):
-        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
-            stub = StubTable()
-            actions = [{"type": "webhook", "url": "https://intake.test/x"}]
-            _status, payload = hook_triggers.api_save(
-                {"name": "orders", "actions": actions}, "op", table_ref=stub)
-            self.assertEqual(hook_triggers.load_workflows(table_ref=stub)[0]["actions"], actions)
-            with self.assertRaises(hook_triggers.TriggerError):
-                hook_triggers.api_save(
-                    {"name": "orders2", "flow": "order-flow"}, "op", table_ref=stub)
-
     def test_update_keeps_token_unless_rotated(self):
         stub = StubTable()
         with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks", "HOOKS_BASE_URL": "https://dapier.example.test"}):
@@ -116,25 +104,14 @@ class WebhookSaveTests(unittest.TestCase):
         self.assertEqual(updated["token"], created["token"])
         self.assertNotEqual(rotated["token"], created["token"])
 
-    def test_rejects_bad_names_and_empty_actions(self):
+    def test_rejects_bad_names(self):
         with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
             with self.assertRaises(hook_triggers.TriggerError):
-                hook_triggers.api_save({"name": "nope!", "actions": WEBHOOK_BODY["actions"]},
-                                       "op", table_ref=StubTable())
-            with self.assertRaises(hook_triggers.TriggerError):
-                hook_triggers.api_save({"name": "ok-name", "actions": []}, "op", table_ref=StubTable())
-
-    def test_telegram_send_action_is_allowed(self):
-        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
-            item, _created = hook_triggers.build_item(
-                {"name": "orders", "kind": "webhook",
-                 "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}]},
-                "op", "webhook")
-        self.assertEqual(item["actions"][0]["type"], "telegram_send")
+                hook_triggers.api_save({"name": "nope!"}, "op", table_ref=StubTable())
 
     def test_kind_cannot_hijack_an_existing_name(self):
         stub = StubTable([{"hook_id": "orders", "kind": "telegram", "token": "t",
-                           "connection_id": "tg-bot", "actions": [], "enabled": True}])
+                           "connection_id": "tg-bot", "enabled": True}])
         with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
             with self.assertRaises(hook_triggers.TriggerError) as ctx:
                 hook_triggers.api_save(dict(WEBHOOK_BODY), "op", "webhook", table_ref=stub)
@@ -168,7 +145,6 @@ class TelegramSaveTests(unittest.TestCase):
         status, payload = self.api_save({
             "name": "bot-inbox",
             "connection_id": "tg-bot",
-            "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}],
         })
         self.assertEqual(status, 200)
         self.assertEqual(payload["url"], "https://dapier.example.test/hooks/telegram/bot-inbox")
@@ -182,65 +158,34 @@ class TelegramSaveTests(unittest.TestCase):
 
     def test_requires_a_connected_telegram_connection(self):
         with self.assertRaises(hook_triggers.TriggerError) as ctx:
-            self.api_save({"name": "bot-inbox", "actions": WEBHOOK_BODY["actions"]})
+            self.api_save({"name": "bot-inbox"})
         self.assertIn("connection_id", str(ctx.exception))
         with self.assertRaises(hook_triggers.TriggerError):
-            self.api_save({"name": "bot-inbox", "connection_id": "dropbox",
-                           "actions": WEBHOOK_BODY["actions"]})
+            self.api_save({"name": "bot-inbox", "connection_id": "dropbox"})
         self.connections = StubConnections([dict(telegram_connection(), status="ready")])
         with self.assertRaises(hook_triggers.TriggerError):
-            self.api_save({"name": "bot-inbox", "connection_id": "tg-bot",
-                           "actions": WEBHOOK_BODY["actions"]})
+            self.api_save({"name": "bot-inbox", "connection_id": "tg-bot"})
 
     def test_one_webhook_per_bot(self):
         stub = StubTable()
-        self.api_save({"name": "first", "connection_id": "tg-bot",
-                       "actions": WEBHOOK_BODY["actions"]}, table=stub)
+        self.api_save({"name": "first", "connection_id": "tg-bot"}, table=stub)
         self.registered.clear()
         with self.assertRaises(hook_triggers.TriggerError) as ctx:
-            self.api_save({"name": "second", "connection_id": "tg-bot",
-                           "actions": WEBHOOK_BODY["actions"]}, table=stub)
+            self.api_save({"name": "second", "connection_id": "tg-bot"}, table=stub)
         self.assertIn("one webhook per bot", str(ctx.exception))
         self.assertEqual(self.registered, [])
 
     def test_disable_releases_the_bot(self):
         stub = StubTable()
-        self.api_save({"name": "first", "connection_id": "tg-bot",
-                       "actions": WEBHOOK_BODY["actions"]}, table=stub)
-        self.api_save({"name": "first", "connection_id": "tg-bot", "enabled": False,
-                       "actions": WEBHOOK_BODY["actions"]}, table=stub)
+        self.api_save({"name": "first", "connection_id": "tg-bot"}, table=stub)
+        self.api_save({"name": "first", "connection_id": "tg-bot", "enabled": False},
+                      table=stub)
         # A second trigger can now claim the bot.
         self.registered.clear()
-        status, _payload = self.api_save({"name": "second", "connection_id": "tg-bot",
-                                          "actions": WEBHOOK_BODY["actions"]},
+        status, _payload = self.api_save({"name": "second", "connection_id": "tg-bot"},
                                          table=StubTable())
         self.assertEqual(status, 200)
         self.assertEqual(len(self.registered), 1)
-
-    def test_trigger_matches_messages_and_channel_posts(self):
-        """One stored telegram trigger fires for every telegram event, under
-        the same hook filter — channel announcements are their own event
-        (channel_post.received) and button taps another
-        (callback_query.received), selectable, never a silent drop."""
-        stub = StubTable()
-        self.api_save({"name": "bot-inbox", "connection_id": "tg-bot",
-                       "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}]},
-                      table=stub)
-        workflow = hook_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(sorted(t["event"] for t in workflow["triggers"]),
-                         ["callback_query.received", "channel_post.received",
-                          "message.received"])
-        for event in ("message.received", "channel_post.received",
-                      "callback_query.received"):
-            self.assertTrue(matches(
-                workflow, {"connector": "telegram", "event": event,
-                           "data": {"hook": "bot-inbox", "text": "hi", "chat_id": -100}}))
-        # the hook filter still scopes: another hook's data matches neither
-        for event in ("message.received", "channel_post.received",
-                      "callback_query.received"):
-            self.assertFalse(matches(
-                workflow, {"connector": "telegram", "event": event,
-                           "data": {"hook": "other", "text": "hi", "chat_id": -100}}))
 
     def test_telegram_event_for_names_channel_announcements(self):
         self.assertEqual(hook_triggers.telegram_event_for(
@@ -320,8 +265,7 @@ class MailchimpTransport:
 
 
 class MailchimpTriggerTests(unittest.TestCase):
-    BODY = {"name": "audience", "list_id": "abc123",
-            "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
+    BODY = {"name": "audience", "list_id": "abc123"}
 
     def setUp(self):
         self.env = patch.dict(os.environ, {
@@ -384,20 +328,6 @@ class MailchimpTriggerTests(unittest.TestCase):
             ("POST", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
         ])
 
-    def test_a_delivery_matches_only_this_hook_and_subscribed_types(self):
-        stub = StubTable()
-        self.api_save(dict(self.BODY, events=["subscribe", "campaign"]), table=stub)
-        workflow = hook_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(workflow["id"], "mailchimp-trigger-audience")
-        self.assertTrue(matches(workflow, {
-            "connector": "mailchimp", "event": "subscribe", "data": {"hook": "audience"}}))
-        self.assertTrue(matches(workflow, {
-            "connector": "mailchimp", "event": "campaign", "data": {"hook": "audience"}}))
-        self.assertFalse(matches(workflow, {
-            "connector": "mailchimp", "event": "unsubscribe", "data": {"hook": "audience"}}))
-        self.assertFalse(matches(workflow, {
-            "connector": "mailchimp", "event": "subscribe", "data": {"hook": "other"}}))
-
     def test_disable_and_delete_unsubscribe_from_mailchimp(self):
         stub = StubTable()
         self.api_save(dict(self.BODY), table=stub)
@@ -451,8 +381,7 @@ class YouTubeSaveTests(unittest.TestCase):
     shared by every watcher of the channel), and the stored trigger's
     workflow matches the hub's channel-scoped deliveries."""
 
-    BODY = {"name": "uploads", "channel_id": "UCa",
-            "actions": [{"type": "webhook", "url": "https://hooks.test/x"}]}
+    BODY = {"name": "uploads", "channel_id": "UCa"}
 
     def setUp(self):
         self.env = patch.dict(os.environ, {
@@ -526,45 +455,29 @@ class YouTubeSaveTests(unittest.TestCase):
         self.assertEqual(self.transport.calls, [])
         self.assertEqual(stub.items, {})
 
-    def test_the_saved_trigger_matches_only_its_channel(self):
-        stub = StubTable()
-        self.api_save(dict(self.BODY, channel_id="UCb"), table=stub)
-        workflow = hook_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(workflow["id"], "youtube-trigger-uploads")
-        self.assertEqual(workflow["triggers"], [{
-            "connector": "youtube", "event": "video.published",
-            "filters": {"channel_id": {"equals": "UCb"}},
-        }])
-        self.assertTrue(matches(workflow, {
-            "connector": "youtube", "event": "video.published",
-            "data": {"channel_id": "UCb", "video_id": "v1", "title": "T",
-                     "url": "https://www.youtube.com/watch?v=v1"}}))
-        self.assertFalse(matches(workflow, {
-            "connector": "youtube", "event": "video.published",
-            "data": {"channel_id": "UCa", "video_id": "v2", "title": "T",
-                     "url": "https://www.youtube.com/watch?v=v2"}}))
-
     def test_channel_id_is_required_and_response_is_rejected(self):
-        actions = [{"type": "webhook", "url": "https://hooks.test/x"}]
         with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}):
             with self.assertRaises(hook_triggers.TriggerError) as ctx:
-                hook_triggers.build_item({"name": "uploads", "actions": actions},
-                                         "op", "youtube")
+                hook_triggers.build_item({"name": "uploads"}, "op", "youtube")
             self.assertIn("channel_id", str(ctx.exception))
             with self.assertRaises(hook_triggers.TriggerError):
                 hook_triggers.build_item(
                     {"name": "uploads", "channel_id": "UCa",
-                     "actions": actions, "response": {"mode": "sync"}},
+                     "response": {"mode": "sync"}},
                     "op", "youtube")
 
     def test_renewal_schedule_picks_the_channel_up_from_the_hook(self):
+        """Hooks are trigger records now — the renewal reads the hook store
+        directly, so a youtube hook's subscription outlives its save."""
         from src.dapier.triggers.intake import youtube_subscriptions
 
         stub = StubTable()
         self.api_save(dict(self.BODY), table=stub)
-        workflow = hook_triggers.load_workflows(table_ref=stub)[0]
-        self.assertEqual(
-            youtube_subscriptions.channels_from_workflows([workflow]), ["UCa"])
+        self.assertEqual(youtube_subscriptions.channels_from_hooks(table_ref=stub),
+                         ["UCa"])
+        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}), \
+                patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub):
+            self.assertEqual(youtube_subscriptions.channels_from_hooks(), ["UCa"])
 
 
 class ListAndDeleteTests(unittest.TestCase):
@@ -576,9 +489,9 @@ class ListAndDeleteTests(unittest.TestCase):
     def test_list_filters_by_kind(self):
         stub = StubTable([
             {"hook_id": "orders", "kind": "webhook", "url": "u1", "token": "t1",
-             "actions": [], "enabled": True},
+             "enabled": True},
             {"hook_id": "bot-inbox", "kind": "telegram", "url": "u2", "token": "t2",
-             "connection_id": "tg-bot", "actions": [], "enabled": True},
+             "connection_id": "tg-bot", "enabled": True},
         ])
         status, payload = hook_triggers.api_list(stub)
         self.assertEqual(status, 200)
@@ -587,7 +500,7 @@ class ListAndDeleteTests(unittest.TestCase):
         self.assertEqual([h["hook_id"] for h in only_telegram["hooks"]], ["bot-inbox"])
 
     def test_delete_missing_is_404_and_kind_mismatch_is_rejected(self):
-        stub = StubTable([{"hook_id": "orders", "kind": "webhook", "actions": [], "enabled": True}])
+        stub = StubTable([{"hook_id": "orders", "kind": "webhook", "enabled": True}])
         with self.assertRaises(hook_triggers.TriggerError):
             hook_triggers.api_delete("nope", "op", table_ref=stub)
         with self.assertRaises(hook_triggers.TriggerError):
@@ -612,34 +525,6 @@ class ListAndDeleteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(cursors.items, {})
         self.assertEqual(hooks.items, {})
-
-
-class WorkflowMergeTests(unittest.TestCase):
-    def test_webhook_workflow_matches_its_own_delivery_and_no_other(self):
-        item = {"hook_id": "orders", "kind": "webhook", "url": "u", "token": "t",
-                "actions": [{"type": "webhook", "url": "https://hooks.test/x"}], "enabled": True}
-        workflow = hook_triggers.load_workflows(table_ref=StubTable([dict(item)]))[0]
-        self.assertEqual(workflow["id"], "webhook-trigger-orders")
-        self.assertTrue(matches(workflow, {
-            "connector": "webhook", "event": "request.received", "data": {"hook": "orders"}}))
-        self.assertFalse(matches(workflow, {
-            "connector": "webhook", "event": "request.received", "data": {"hook": "other"}}))
-        self.assertFalse(matches(workflow, {
-            "connector": "telegram", "event": "request.received", "data": {"hook": "orders"}}))
-
-    def test_all_workflows_appends_hook_triggers_to_yaml(self):
-        stub = StubTable([{
-            "hook_id": "orders", "kind": "webhook", "url": "u", "token": "t",
-            "actions": [{"type": "webhook", "url": "https://hooks.test/x"}], "enabled": True,
-        }])
-        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks"}), \
-             patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub):
-            merged = all_workflows()
-        self.assertEqual(merged[-1]["id"], "webhook-trigger-orders")
-
-    def test_disabled_triggers_do_not_run(self):
-        stub = StubTable([{"hook_id": "orders", "kind": "webhook", "enabled": False, "actions": []}])
-        self.assertEqual(hook_triggers.load_workflows(table_ref=stub), [])
 
 
 class AgentApiTests(unittest.TestCase):

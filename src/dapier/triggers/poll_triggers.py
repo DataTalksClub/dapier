@@ -3,9 +3,11 @@
 A poll trigger is an EventBridge rule (the schedule machinery) plus a fetch
 spec: an endpoint, the path of the list to watch, and how to recognize new
 items. Each fire fetches one page, and every new item becomes its own
-``poll``/``item.new`` event — the engine matches workflows (including the
-trigger's bound actions) per item, so one trigger fans out into one run per
-new item without bespoke connector code.
+``poll``/``item.new`` event — the engine matches designer workflows (the
+ones filtering on the ``poll`` field every delivery carries) per item, so
+one trigger fans out into one run per new item without bespoke connector
+code. Polls are trigger records only; the bound action chains they once
+carried are retired — automations live in workflow definitions.
 
 Two cursor modes, stored in CURSORS_TABLE under ``poll#{name}``:
 
@@ -40,7 +42,7 @@ from decimal import Decimal
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from . import poll_sources, seen
-from .email_triggers import NAME_PATTERN, TriggerError, resolve_actions
+from .email_triggers import NAME_PATTERN, TriggerError
 from .schedule_triggers import validate_expression
 
 logger = logging.getLogger(__name__)
@@ -62,23 +64,21 @@ MAX_ITEMS_CAP = 100
 URL_PATTERN = re.compile(r"^https?://\S+$")
 
 # The stored item's identity/lifecycle keys: a poll source's fetch-spec
-# extras may not touch them. The fetch-spec keys (url, method, headers,
-# body, list_path, id_path, connection_id, cursor_mode, cursor_path,
-# cursor_query, max_items, dedupe_ttl_days) are deliberately NOT here —
-# build_item pops those out of the extras to validate source-provided
-# defaults; everything else a source returns merges into the item verbatim.
+# extras may not touch them — "actions"/"flow" are on the list too, so no
+# source can resurrect the retired bound-action chains. The fetch-spec keys
+# (url, method, headers, body, list_path, id_path, connection_id,
+# cursor_mode, cursor_path, cursor_query, max_items, dedupe_ttl_days) are
+# deliberately NOT here — build_item pops those out of the extras to
+# validate source-provided defaults; everything else a source returns
+# merges into the item verbatim.
 SOURCE_LOCKED_KEYS = frozenset({
-    "poll_id", "source", "expression", "description", "actions",
+    "poll_id", "source", "expression", "description", "actions", "flow",
     "enabled", "created_by", "created_at", "updated_at",
 })
 
 
 def rule_name(poll_id):
     return f"{RULE_PREFIX}{poll_id}"
-
-
-def workflow_id_for(item):
-    return f"poll-trigger-{item['poll_id']}"
 
 
 def _validate_path(value, label):
@@ -149,7 +149,6 @@ def build_item(body, operator, previous=None):
         raise TriggerError("dedupe_ttl_days must be a number") from None
     if not 1 <= dedupe_ttl_days <= 365:
         raise TriggerError("dedupe_ttl_days must be 1-365")
-    actions = resolve_actions(body)
     list_path = extras.pop("list_path", body.get("list_path"))
     if list_path is not None and str(list_path).strip():
         list_path = _validate_path(list_path, "list_path")
@@ -182,7 +181,6 @@ def build_item(body, operator, previous=None):
         "max_items": max_items,
         "dedupe_ttl_days": dedupe_ttl_days,
         "description": str(body.get("description") or "")[:200],
-        "actions": actions or [],
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -567,30 +565,6 @@ def _raw_id(item, raw):
     return item_id
 
 
-def workflow_for(item):
-    """The engine workflow for a stored poll trigger."""
-    actions = item.get("actions") or []
-    spec = poll_sources.stored_source(item)
-    return {
-        "id": workflow_id_for(item),
-        "enabled": True,
-        "trigger": {
-            "connector": spec.connector if spec else POLL_CONNECTOR,
-            "event": spec.event if spec else POLL_EVENT,
-            "filters": {"poll": {"equals": item["poll_id"]}},
-        },
-        "actions": actions,
-    }
-
-
-def load_workflows(table_ref=None):
-    return [
-        workflow for workflow in
-        (workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True))
-        if workflow is not None
-    ]
-
-
 def public_view(item, cursor=None):
     spec = poll_sources.stored_source(item) if item.get("source") else None
     view = spec.view(item) if spec is not None and spec.view else {}
@@ -614,8 +588,6 @@ def public_view(item, cursor=None):
         "max_items": item.get("max_items"),
         "dedupe_ttl_days": item.get("dedupe_ttl_days"),
         "description": item.get("description"),
-        "actions": item.get("actions"),
-        "flow": item.get("flow"),
         "enabled": item.get("enabled", True),
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),

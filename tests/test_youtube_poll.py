@@ -325,12 +325,12 @@ def test_fire_seeds_then_emits_only_the_new_video():
                                     table=cursors) == "2026-09-28T10:00:00Z"
 
 
-def test_the_fired_workflow_matches_the_chip():
-    workflow = poll_triggers.workflow_for(stored(youtube_body()))
+def test_the_fired_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(youtube_body()), {"id": "abc222"})
 
-    assert workflow["trigger"] == {
-        "connector": "youtube", "event": "video.published",
-        "filters": {"poll": {"equals": "channel-uploads"}}}
+    assert event["connector"] == "youtube"
+    assert event["event"] == "video.published"
+    assert event["data"]["poll"] == "channel-uploads"
 
 
 # --- the chip's sample pull --------------------------------------------------------

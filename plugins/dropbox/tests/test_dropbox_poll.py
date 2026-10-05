@@ -309,14 +309,12 @@ def test_fire_seeds_then_emits_only_the_new_file():
                                     table=cursors) == "2026-09-28T10:00:00Z"
 
 
-def test_the_fired_workflow_matches_the_chip():
-    item = stored(dropbox_body())
+def test_the_fired_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(dropbox_body()), {"id": "id:f-1"})
 
-    workflow = poll_triggers.workflow_for(item)
-
-    assert workflow["trigger"] == {
-        "connector": "dropbox", "event": "file.created",
-        "filters": {"poll": {"equals": "invoice-files"}}}
+    assert event["connector"] == "dropbox"
+    assert event["event"] == "file.created"
+    assert event["data"]["poll"] == "invoice-files"
 
 
 # --- the chip's sample pull --------------------------------------------------------

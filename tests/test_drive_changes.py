@@ -387,13 +387,14 @@ def test_a_refetched_page_does_not_refire_its_edits():
     assert fired == []
 
 
-def test_the_fired_workflows_match_the_chip():
-    assert poll_triggers.workflow_for(stored(updates_body()))["trigger"] == {
-        "connector": "google-drive", "event": "file.updated",
-        "filters": {"poll": {"equals": "folder-edits"}}}
-    assert poll_triggers.workflow_for(stored(deletions_body()))["trigger"] == {
-        "connector": "google-drive", "event": "file.deleted",
-        "filters": {"poll": {"equals": "drive-deletions"}}}
+def test_the_fired_events_match_the_chip():
+    for body, event_name in ((updates_body(), "file.updated"),
+                             (deletions_body(), "file.deleted")):
+        event = poll_triggers.event_for(stored(body), {"id": "f-1"})
+        assert event["connector"] == "google-drive"
+        assert event["event"] == event_name
+        # a designer workflow binds to the poll through this field
+        assert event["data"]["poll"] == body["name"]
 
 
 # --- the chip's sample pull --------------------------------------------------------

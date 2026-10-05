@@ -60,17 +60,6 @@ def validate_actions(actions):
         raise TriggerError(str(exc)) from None
 
 
-def resolve_actions(body):
-    """The trigger's inline action chain, validated against the registry.
-
-    Shared flow references are retired: a ``flow`` key fails the save with
-    the retirement error instead of resolving to anything.
-    """
-    if body.get("flow"):
-        raise TriggerError("shared flows are retired; give the trigger inline actions")
-    return validate_actions(body.get("actions"))
-
-
 def managed_routes():
     """Address routes claimed by published workflows, each with its owner.
 

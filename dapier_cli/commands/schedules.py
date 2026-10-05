@@ -1,7 +1,7 @@
 """Implementations of the `dapier schedules` commands."""
 
 from .. import api
-from .shared import entry_label, read_json_file
+from .shared import read_json_file
 
 __all__ = ["schedules_delete", "schedules_list", "schedules_save"]
 
@@ -14,7 +14,7 @@ def schedules_list(api_url, debug=False):
     for item in items:
         state = "enabled" if item.get("enabled", True) else "disabled"
         print(f"{item.get('schedule_id', ''):20} {item.get('expression', ''):40} "
-              f"{state:9} {entry_label(item)}")
+              f"{state:9}")
     return 0
 
 

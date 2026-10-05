@@ -7,7 +7,7 @@ import re
 import yaml
 
 from ...auth import visibility
-from ...triggers import hook_triggers, published_workflows
+from ...triggers import published_workflows
 from .github import SyncConfigError, SyncError, TOKEN_SECRET_ENV
 from .validation import (FILE_PATTERN, WorkflowError, _LateBinding, shared,
                          parse_workflow)
@@ -68,16 +68,6 @@ def api_save(body, operator=None, cause="save", message=None, live=False, only_i
         workflow = parse_workflow(yaml_text)
     except WorkflowError as exc:
         return 400, {"error": str(exc)}
-    # A trigger-run workflow's id is owned by its hook (webhook/telegram/...):
-    # publishing under it would silently take over the trigger's routing (the
-    # engine prefers managed definitions), so both drafts and live saves
-    # refuse it — duplicating under a fresh id is the edit path.
-    hook_kind = hook_triggers.owns_workflow_id(workflow["id"])
-    if hook_kind:
-        return 409, {"error": (
-            f"'{workflow['id']}' is run by its {hook_kind} trigger — the "
-            "trigger owns this definition. Duplicate it under a different id "
-            "to edit a copy, or edit the trigger itself.")}
     if not live:
         previous = published_workflows.get_item(workflow["id"]) or {}
         try:

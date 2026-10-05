@@ -45,11 +45,11 @@ def _post(body=b'{"hello":"world"}', headers=None, query=None, raw=False):
     return response["statusCode"], parsed
 
 
-def _workflow(workflow_id="webhook-trigger-orders"):
+def _workflow(workflow_id="webhook-trigger-orders", actions=None):
     return {"id": workflow_id, "enabled": True,
             "trigger": {"connector": "webhook", "event": "request.received",
                         "filters": {"hook": {"equals": "orders"}}},
-            "actions": []}
+            "actions": actions if actions is not None else []}
 
 
 def _own_workflow_run(event, before_action=None, after_action=None,
@@ -332,10 +332,10 @@ class _Table:
 
 @pytest.fixture
 def real_engine(monkeypatch, tmp_path):
-    """No worker seams stubbed: the real engine executes the stored trigger's
-    own workflow (matching loads it from the hook table), with the executions
-    table captured and every other workflow source (bundled YAML, published,
-    email/schedule/poll triggers) isolated away."""
+    """No worker seams stubbed: the real engine executes the designer flow
+    bound to the hook (matching loads it from the managed-store seam), with
+    the executions table captured and every other workflow source (bundled
+    YAML, published, email/schedule/poll triggers) isolated away."""
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
@@ -361,10 +361,11 @@ def real_engine(monkeypatch, tmp_path):
     monkeypatch.setattr(ingress.queue, "send_message", send_message)
     monkeypatch.setattr("src.dapier.triggers.seen.claim", lambda scope, key, **k: True)
     monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table",
-                        lambda *a, **k: _hook_stub(
-                            response={"mode": "sync"},
-                            actions=[{"id": "ack", "type": "webhook",
-                                      "url": "https://target.test/x"}]))
+                        lambda *a, **k: _hook_stub(response={"mode": "sync"}))
+    monkeypatch.setattr("src.dapier.engine.matching.workflows",
+                        lambda: [_workflow(actions=[
+                            {"id": "ack", "type": "webhook",
+                             "url": "https://target.test/x"}])])
     return state
 
 
@@ -396,11 +397,13 @@ def test_real_budget_overrun_falls_back_to_the_queue(real_engine, monkeypatch):
     monkeypatch.setattr(ingress, "time", _FakeTime())
     monkeypatch.setattr("src.dapier.triggers.hook_triggers.get_table",
                         lambda *a, **k: _hook_stub(
-                            response={"mode": "sync", "budget_seconds": 1},
-                            actions=[{"id": "slow", "type": "webhook",
-                                      "url": "https://target.test/x"},
-                                     {"id": "never", "type": "webhook",
-                                      "url": "https://target.test/y"}]))
+                            response={"mode": "sync", "budget_seconds": 1}))
+    monkeypatch.setattr("src.dapier.engine.matching.workflows",
+                        lambda: [_workflow(actions=[
+                            {"id": "slow", "type": "webhook",
+                             "url": "https://target.test/x"},
+                            {"id": "never", "type": "webhook",
+                             "url": "https://target.test/y"}])])
 
     def runner(action, event):
         real_engine["runs"].append(action["id"])

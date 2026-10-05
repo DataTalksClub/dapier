@@ -4,11 +4,6 @@ import json
 import sys
 
 
-def entry_label(item):
-    """What a trigger runs: its inline action types."""
-    return ",".join(action.get("type", "?") for action in item.get("actions") or []) or "-"
-
-
 def read_json_file(path):
     """Return the parsed JSON body, or ``(None, error_message)``."""
     try:

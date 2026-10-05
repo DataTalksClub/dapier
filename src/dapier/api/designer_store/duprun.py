@@ -38,9 +38,7 @@ def api_duplicate(source, body=None, operator=None):
     file slug), strip run-state bookkeeping, and save through the same
     commit-and-publish path api_save uses — so publishing and the git commit
     behave identically. The original file, id, and published item are left
-    untouched. The source resolves by file name or bare id — a hook-backed
-    workflow has no file, so duplicating one (into an editable managed copy)
-    addresses it by id.
+    untouched. The source resolves by file name.
 
     ``body`` optionally carries ``{"name": "..."}``; without it the copy is
     named ``<id>-copy`` (the workflow's id is its name). Returns api_save's

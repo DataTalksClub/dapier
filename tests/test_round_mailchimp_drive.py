@@ -510,14 +510,12 @@ def test_fire_seeds_then_emits_changed_members_once():
     assert fired == []
 
 
-def test_the_fired_mailchimp_workflow_matches_the_chip():
-    item = stored(mailchimp_body())
+def test_the_fired_mailchimp_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(mailchimp_body()), {"id": "mem-1"})
 
-    workflow = poll_triggers.workflow_for(item)
-
-    assert workflow["trigger"] == {
-        "connector": "mailchimp", "event": "member.new",
-        "filters": {"poll": {"equals": "roster-watch"}}}
+    assert event["connector"] == "mailchimp"
+    assert event["event"] == "member.new"
+    assert event["data"]["poll"] == "roster-watch"
 
 
 # --- drive actions: share + copy -----------------------------------------------------
@@ -841,11 +839,9 @@ def test_the_deletions_poll_fires_file_deleted():
     assert poll_triggers.get_cursor("drive-edits", table=cursors) == "tok-edge"
 
 
-def test_the_fired_drive_workflow_matches_the_chip():
-    item = stored(drive_changes_body())
+def test_the_fired_drive_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(drive_changes_body()), {"id": "f-1"})
 
-    workflow = poll_triggers.workflow_for(item)
-
-    assert workflow["trigger"] == {
-        "connector": "google-drive", "event": "file.updated",
-        "filters": {"poll": {"equals": "drive-edits"}}}
+    assert event["connector"] == "google-drive"
+    assert event["event"] == "file.updated"
+    assert event["data"]["poll"] == "drive-edits"

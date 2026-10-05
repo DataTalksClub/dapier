@@ -1,21 +1,17 @@
 """Every trigger store must walk all scan pages, never stop at Limit=200.
 
-The four stores (email, hook, schedule, poll) feed both their list APIs and
-the engine's all_workflows() from load_items(); a single Limit=200 scan
-silently dropped trigger #201 and beyond — the trigger kept its API entry
-missing and, worse, stopped firing with no error anywhere. These tests page
-the stub table exactly like the DynamoDB resource API does (Limit caps the
-page, LastEvaluatedKey/ExclusiveStartKey continue the walk) and prove each
-store loads its whole table without duplicates, and that the engine merge
-sees trigger #201.
+The trigger stores (hook, schedule, poll) feed their list APIs and fire
+paths from load_items(); a single Limit=200 scan silently dropped trigger
+#201 and beyond — the trigger kept its API entry missing and, worse,
+stopped firing with no error anywhere. These tests page the stub table
+exactly like the DynamoDB resource API does (Limit caps the page,
+LastEvaluatedKey/ExclusiveStartKey continue the walk) and prove each store
+loads its whole table without duplicates.
 """
 
 import math
-import os
 import unittest
-from unittest.mock import patch
 
-from src.dapier.engine import all_workflows
 from src.dapier.triggers import (
     hook_triggers, poll_triggers, schedule_triggers,
 )
@@ -66,7 +62,6 @@ class SinglePageTable(PagedTable):
         return {"Items": [dict(item) for item in self.items.values()]}
 
 
-ACTIONS = [{"type": "webhook", "url": "https://hooks.test/x"}]
 COUNT = 230  # > SCAN_LIMIT (200): the old single scan stopped at item 200
 
 
@@ -95,14 +90,10 @@ class PagedTableSanityTests(unittest.TestCase):
 class StoreWalkContract:
     """The shared walk contract; subclasses bind one trigger store.
 
-    ``key`` is the stored item's identity attribute, ``env`` the TABLE_ENV
-    name all_workflows() gates the store on, ``prefix`` the workflow id
-    prefix the store's workflow_for produces (``email-trigger-<name>``...).
+    ``key`` is the stored item's identity attribute.
     """
 
     key = None
-    env = None
-    prefix = None
 
     def store(self):
         raise NotImplementedError
@@ -123,29 +114,6 @@ class StoreWalkContract:
         self.assertEqual(names, sorted(names))
         self.assertGreaterEqual(table.scans, math.ceil(COUNT / store.SCAN_LIMIT))
 
-    def test_load_workflows_walks_every_page(self):
-        store = self.store()
-        table = self.seeded()
-        workflows = store.load_workflows(table_ref=table)
-        self.assertEqual(len(workflows), COUNT)
-        self.assertEqual(len({workflow["id"] for workflow in workflows}), COUNT)
-        self.assertEqual(
-            sorted(workflow["id"] for workflow in workflows),
-            sorted(f"{self.prefix}-trigger-{name_for(index)}" for index in range(COUNT)))
-
-    def test_engine_all_workflows_sees_trigger_201(self):
-        # The engine merge reads the same load_items per invocation: with the
-        # old single 200-item scan, trigger #201 silently stopped firing.
-        store = self.store()
-        table = self.seeded()
-        missing_id = f"{self.prefix}-trigger-{name_for(200)}"
-        with patch.dict(os.environ, {self.env: "triggers"}), \
-                patch(f"{store.__name__}.get_table", return_value=table):
-            merged = all_workflows()
-        ids = [workflow["id"] for workflow in merged]
-        self.assertEqual(len(ids), COUNT)
-        self.assertIn(missing_id, ids)
-
     def test_single_page_table_still_loads(self):
         store = self.store()
         table = SinglePageTable([self.item(index) for index in range(5)], key=self.key)
@@ -157,41 +125,32 @@ class StoreWalkContract:
 
 class HookStoreWalkTests(StoreWalkContract, unittest.TestCase):
     key = "hook_id"
-    env = hook_triggers.TABLE_ENV
-    prefix = "webhook"
 
     def store(self):
         return hook_triggers
 
     def item(self, index):
-        return {"hook_id": name_for(index), "kind": "webhook", "enabled": True,
-                "actions": [dict(ACTIONS[0])]}
+        return {"hook_id": name_for(index), "kind": "webhook", "enabled": True}
 
 
 class ScheduleStoreWalkTests(StoreWalkContract, unittest.TestCase):
     key = "schedule_id"
-    env = schedule_triggers.TABLE_ENV
-    prefix = "schedule"
 
     def store(self):
         return schedule_triggers
 
     def item(self, index):
-        return {"schedule_id": name_for(index), "enabled": True,
-                "actions": [dict(ACTIONS[0])]}
+        return {"schedule_id": name_for(index), "enabled": True}
 
 
 class PollStoreWalkTests(StoreWalkContract, unittest.TestCase):
     key = "poll_id"
-    env = poll_triggers.TABLE_ENV
-    prefix = "poll"
 
     def store(self):
         return poll_triggers
 
     def item(self, index):
-        return {"poll_id": name_for(index), "enabled": True,
-                "actions": [dict(ACTIONS[0])]}
+        return {"poll_id": name_for(index), "enabled": True}
 
 
 if __name__ == "__main__":

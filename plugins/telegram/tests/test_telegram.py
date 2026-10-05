@@ -152,17 +152,11 @@ class SendMessageActionTests(unittest.TestCase):
             recorded.append({"token": token, "chat_id": chat_id, "text": text})
             return {"message_id": 1}
 
-        item = {"hook_id": "bot-inbox", "kind": "telegram", "url": "u", "token": "t",
-                "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}],
-                "enabled": True}
-        stub = type("T", (), {
-            "scan": lambda self, Limit=200: {"Items": [dict(item)]},
-            "get_item": lambda self, Key: {},
-            "put_item": lambda self, Item: None,
-            "delete_item": lambda self, Key: None,
-        })()
-        with patch.dict("os.environ", {"HOOK_TRIGGERS_TABLE": "hooks"}), \
-             patch("src.dapier.triggers.hook_triggers.get_table", return_value=stub), \
+        workflow = {"id": "bot-inbox", "enabled": True,
+                    "trigger": {"connector": "telegram", "event": "message.received",
+                                "filters": {"hook": {"equals": "bot-inbox"}}},
+                    "actions": [{"type": "telegram_send", "connection_id": "tg-bot"}]}
+        with patch("src.dapier.engine.all_workflows", return_value=[workflow]), \
              patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
              patch("src.dapier.connections.providers.telegram_api.send_message", side_effect=fake_send):
@@ -244,25 +238,19 @@ class SlackTelegramFormatTests(unittest.TestCase):
 
 
 class TelegramToSlackFlowTests(unittest.TestCase):
-    """The migrated Telegram action chain runs from a managed hook."""
+    """The Telegram-to-Slack action chain runs as a designer workflow —
+    migrated verbatim from the hook action chain it once was."""
 
     actions = yaml.safe_load((Path(__file__).resolve().parents[3] /
                               "migrations/legacy-workflows/telegram-slack.yaml").read_text())[
         "flows"]["telegram-to-slack"]["actions"]
 
-    TRIGGER = {"hook_id": "automator-telegram", "kind": "telegram", "url": "u",
-               "token": "t", "flow": "", "actions": actions,
-               "connection_id": "tg-bot", "enabled": True}
-
-    def stub_tables(self):
-        trigger = dict(self.TRIGGER)
-        table = type("T", (), {
-            "scan": lambda self, Limit=200: {"Items": [dict(trigger)]},
-            "get_item": lambda self, Key: {"Item": dict(trigger)},
-            "put_item": lambda self, Item: None,
-            "delete_item": lambda self, Key: None,
-        })()
-        return table
+    WORKFLOW = {"id": "telegram-crosspost", "enabled": True, "actions": actions,
+                "triggers": [
+                    {"connector": "telegram", "event": name,
+                     "filters": {"hook": {"equals": "automator-telegram"}}}
+                    for name in ("message.received", "channel_post.received",
+                                 "callback_query.received")]}
 
     def run_event(self, data):
         calls = []
@@ -271,15 +259,15 @@ class TelegramToSlackFlowTests(unittest.TestCase):
             calls.append(payload)
             return {"ok": True, "ts": f"ts-{len(calls)}", "channel": "C"}
 
-        with patch.dict("os.environ", {"HOOK_TRIGGERS_TABLE": "hooks"}), \
-             patch("src.dapier.triggers.hook_triggers.get_table", return_value=self.stub_tables()), \
+        with patch("src.dapier.engine.all_workflows",
+                   return_value=[dict(self.WORKFLOW)]), \
              patch.object(slack_action, "_token_for", return_value="xoxb-test"), \
              patch.object(slack_action.base, "_json_request", side_effect=fake_json_request):
             execute({"connector": "telegram", "event": "message.received", "data": data})
         return calls
 
     def test_migration_source_carries_the_action_chain(self):
-        self.assertEqual(self.TRIGGER["actions"], self.actions)
+        self.assertEqual(self.WORKFLOW["actions"], self.actions)
 
     def test_channel_post_routes_to_its_slack_channel(self):
         calls = self.run_event({"hook": "automator-telegram", "chat_id": -1001730331343,

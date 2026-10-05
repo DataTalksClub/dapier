@@ -249,15 +249,14 @@ def test_the_diff_sources_share_the_s3_save_shape():
         assert view["prefix"] == "inbox/"
 
 
-def test_the_fired_workflows_match_the_chip():
-    assert poll_triggers.workflow_for(
-        build("s3.updates", name="edit-watch", bucket=BUCKET))["trigger"] == {
-        "connector": "s3", "event": "file.updated",
-        "filters": {"poll": {"equals": "edit-watch"}}}
-    assert poll_triggers.workflow_for(
-        build("s3.deletions", name="gone-watch", bucket=BUCKET))["trigger"] == {
-        "connector": "s3", "event": "file.deleted",
-        "filters": {"poll": {"equals": "gone-watch"}}}
+def test_the_fired_events_match_the_chip():
+    for source, name, event_name in (("s3.updates", "edit-watch", "file.updated"),
+                                     ("s3.deletions", "gone-watch", "file.deleted")):
+        event = poll_triggers.event_for(
+            build(source, name=name, bucket=BUCKET), {"id": "inbox/a.txt"})
+        assert event["connector"] == "s3"
+        assert event["event"] == event_name
+        assert event["data"]["poll"] == name
 
 
 @mock_aws

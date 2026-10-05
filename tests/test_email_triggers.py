@@ -63,18 +63,6 @@ class ActionValidationTests(unittest.TestCase):
         self.assertIn("bcc", str(ctx.exception))
 
 
-class FlowBindingTests(unittest.TestCase):
-    """Trigger bodies carry inline actions; flow references are retired."""
-
-    def test_rejects_flow_references(self):
-        for body in ({"flow": "invoice-dataops",
-                      "actions": [{"type": "webhook", "url": "https://x"}]},
-                     {"flow": "nope"}):
-            with self.assertRaises(email_triggers.TriggerError) as refused:
-                email_triggers.resolve_actions(body)
-            self.assertIn("shared flows are retired", str(refused.exception))
-
-
 class AgentApiTests(unittest.TestCase):
     def test_operator_reads_the_workflow_inventory(self):
         payload = {"domain": "dtcdev.click", "addresses": []}

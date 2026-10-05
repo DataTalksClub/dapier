@@ -4,8 +4,9 @@ Each trigger owns one EventBridge rule named ``dapier-schedule-{name}``
 whose schedule expression is a ``cron(...)`` or ``rate(...)`` string. The
 rule's target is the worker function with a constant input payload naming
 the trigger, so a fire is just a worker invocation: the worker turns it
-into a normal event and the engine merges the stored actions from the
-SCHEDULE_TRIGGERS_TABLE like any other trigger. Saves and deletes map
+into a normal ``schedule``/``schedule.triggered`` event and the engine
+matches the designer workflows filtering on the ``schedule`` field. Saves
+and deletes map
 straight onto ``PutRule``/``PutTargets``/``DeleteRule``, so editing a
 schedule reprograms the rule with no deploy.
 
@@ -21,7 +22,7 @@ import re
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from .email_triggers import NAME_PATTERN, TriggerError, resolve_actions
+from .email_triggers import NAME_PATTERN, TriggerError
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +56,6 @@ def rule_name(schedule_id):
     return f"{RULE_PREFIX}{schedule_id}"
 
 
-def workflow_id_for(item):
-    return f"schedule-trigger-{item['schedule_id']}"
-
-
 def build_item(body, operator, previous=None):
     """Build the stored item for a create or edit."""
     if not isinstance(body, dict):
@@ -69,12 +66,10 @@ def build_item(body, operator, previous=None):
     previous = previous or {}
     if previous and previous.get("schedule_id") != name:
         raise TriggerError(f"schedule id mismatch: stored as '{previous.get('schedule_id')}'")
-    actions = resolve_actions(body)
     return {
         "schedule_id": name,
         "expression": validate_expression(body.get("expression")),
         "description": str(body.get("description") or "")[:200],
-        "actions": actions or [],
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -189,36 +184,12 @@ def remove_rule(schedule_id, *, events_client=None):
             raise
 
 
-def workflow_for(item):
-    """The engine workflow for a stored schedule."""
-    actions = item.get("actions") or []
-    return {
-        "id": workflow_id_for(item),
-        "enabled": True,
-        "trigger": {
-            "connector": "schedule",
-            "event": SCHEDULE_EVENT,
-            "filters": {"schedule": {"equals": item["schedule_id"]}},
-        },
-        "actions": actions,
-    }
-
-
-def load_workflows(table_ref=None):
-    return [
-        workflow for workflow in
-        (workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True))
-        if workflow is not None
-    ]
-
-
 def public_view(item):
     return {
         "schedule_id": item.get("schedule_id"),
         "expression": item.get("expression"),
         "rule": rule_name(item.get("schedule_id", "")),
         "description": item.get("description"),
-        "actions": item.get("actions"),
         "enabled": item.get("enabled", True),
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),

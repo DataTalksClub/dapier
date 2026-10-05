@@ -77,6 +77,11 @@ def env(monkeypatch):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setattr(ingress, "_publish", publish)
+    monkeypatch.setattr("src.dapier.engine.matching.workflows", lambda: [{
+        "id": "webhook-trigger-orders", "enabled": True,
+        "trigger": {"connector": "webhook", "event": "request.received",
+                    "filters": {"hook": {"equals": "orders"}}},
+        "actions": []}])
     monkeypatch.setattr("src.dapier.engine.worker.execute", execute)
     monkeypatch.setattr("src.dapier.engine.worker._attempt_hooks", stub_attempt_hooks)
     monkeypatch.setattr("src.dapier.engine.worker._park_suspension", park_suspension)

@@ -1,4 +1,5 @@
-"""Zapier-style webhook and Telegram triggers: reserve a URL, bind actions.
+"""Zapier-style webhook, Telegram, Mailchimp and YouTube triggers: reserve a
+delivery URL and bind the provider.
 
 Creating a webhook trigger reserves ``/hooks/webhook/{name}`` and generates
 a random bearer token: callers POST the payload with
@@ -46,8 +47,12 @@ shared by every watcher of the channel, and the renewal schedule only
 re-subscribes channels live workflows still name, so a released channel's
 subscription simply lapses.
 
-Like email triggers, the worker merges stored hooks into the YAML workflows
-on every invocation, so a created trigger is live without a deploy.
+Hooks are trigger records only — they reserve the URL, hold the token and
+the provider binding, and publish events. What runs on a delivery is a
+designer workflow (``workflows/<name>.yaml``) whose trigger filters on the
+``hook`` field every hook delivery carries, exactly like schedules and
+polls. The old hook-bound action chains are retired: their automations live
+in workflow definitions now.
 """
 
 import hashlib
@@ -64,7 +69,7 @@ from ..connections.providers import telegram_api
 from .intake.mailchimp_webhooks import EVENT_TYPES as MAILCHIMP_EVENT_TYPES
 
 logger = logging.getLogger(__name__)
-from .email_triggers import NAME_PATTERN, TriggerError, resolve_actions
+from .email_triggers import NAME_PATTERN, TriggerError
 
 TABLE_ENV = "HOOK_TRIGGERS_TABLE"
 BASE_URL_ENV = "HOOKS_BASE_URL"
@@ -77,12 +82,12 @@ TELEGRAM_EVENT = "message.received"
 # Channel announcements (the Bot API's channel_post / edited_channel_post
 # updates) are their own event, so a workflow can filter on the event name
 # instead of poking at the raw update. Both events share the hook filter and
-# every other filter rule — see telegram_event_for and workflow_for.
+# every other filter rule — see telegram_event_for.
 TELEGRAM_CHANNEL_POST_EVENT = "channel_post.received"
 # Button taps (the Bot API's callback_query updates — the answer to an
 # inline keyboard) are their own event, like channel announcements: same
 # hook filter and fan-out, selectable by event name — see telegram_event_for
-# and workflow_for.
+# and telegram_event_for.
 TELEGRAM_CALLBACK_QUERY_EVENT = "callback_query.received"
 YOUTUBE_EVENT = "video.published"
 TOKEN_BYTES = 32
@@ -164,10 +169,6 @@ def validate_name(name):
 
 def new_token():
     return secrets.token_urlsafe(TOKEN_BYTES)
-
-
-def workflow_id_for(item):
-    return f"{item['kind']}-trigger-{item['hook_id']}"
 
 
 def validate_dedupe_path(value):
@@ -407,7 +408,6 @@ def build_item(body, operator, kind, previous=None):
     if previous and previous.get("kind") != kind:
         raise TriggerError(
             f"the name '{name}' is already used by a {previous.get('kind')} trigger")
-    actions = resolve_actions(body)
     previous = previous or {}
     created = not previous
     token = new_token() if (created or body.get("rotate_token")) else previous.get("token")
@@ -424,7 +424,6 @@ def build_item(body, operator, kind, previous=None):
             body["signature_header"] if "signature_header" in body
             else previous.get("signature_header"), kind),
         "response": validate_response(body.get("response"), kind),
-        "actions": actions or [],
         "enabled": bool(body.get("enabled", True)),
         "created_by": previous.get("created_by") or str(operator or ""),
         "created_at": previous.get("created_at") or datetime.now(timezone.utc).isoformat(),
@@ -745,136 +744,13 @@ def _register_youtube(item, *, transport=None):
     return None
 
 
-def workflow_for(item):
-    """The engine workflow for a stored hook.
-
-    A mailchimp trigger fans out into one trigger spec per subscribed event
-    type — the intake publishes ``event`` named by the delivery's ``type``
-    (subscribe, unsubscribe, ...) and matching is exact on event — each
-    scoped to this hook by the ``hook`` field the intake puts in the data.
-
-    A youtube trigger filters on ``channel_id`` instead: WebSub delivers to
-    one shared callback (api.router._youtube) whose envelopes carry no hook
-    field, so the channel is the scoping — like two designer workflows
-    watching one channel, two youtube triggers on it both fire, which is
-    normal trigger fan-out.
-    """
-    kind = item.get("kind")
-    actions = item.get("actions") or []
-    filters = {"hook": {"equals": item["hook_id"]}}
-    if kind == "mailchimp":
-        triggers = [
-            {"connector": kind, "event": name, "filters": dict(filters)}
-            for name in (item.get("events") or list(MAILCHIMP_EVENT_TYPES))
-        ]
-    elif kind == "youtube":
-        triggers = [{
-            "connector": "youtube",
-            "event": YOUTUBE_EVENT,
-            "filters": {"channel_id": {"equals": item["channel_id"]}},
-        }]
-    elif kind == "telegram":
-        # One trigger spec per telegram event, like the mailchimp fan-out:
-        # the same stored trigger (and therefore the same filters a workflow
-        # author added — chat_id, text prefix, ...) matches a direct message,
-        # a channel announcement and a button tap alike, while the event
-        # name stays selectable for workflows that want only one of them.
-        triggers = [
-            {"connector": kind, "event": name, "filters": dict(filters)}
-            for name in (TELEGRAM_EVENT, TELEGRAM_CHANNEL_POST_EVENT,
-                         TELEGRAM_CALLBACK_QUERY_EVENT)
-        ]
-    else:
-        triggers = [{
-            "connector": kind,
-            "event": WEBHOOK_EVENT,
-            "filters": filters,
-        }]
-    return {
-        "id": workflow_id_for(item),
-        "enabled": True,
-        "triggers": triggers,
-        "actions": actions,
-    }
-
-
-def load_workflows(table_ref=None):
-    return [
-        workflow for workflow in
-        (workflow_for(item) for item in load_items(table_ref=table_ref) if item.get("enabled", True))
-        if workflow is not None
-    ]
-
-
-def _item_for_workflow_id(workflow_id, table_ref=None):
-    """The stored hook projecting ``workflow_id`` (``<kind>-trigger-<hook>``), or None."""
-    if not os.environ.get(TABLE_ENV):
-        return None
-    items = load_items() if table_ref is None else load_items(table_ref=table_ref)
-    for item in items:
-        if workflow_id_for(item) == workflow_id:
-            return item
-    return None
-
-
-def workflow_by_id(workflow_id, visible=None, table_ref=None):
-    """One hook-backed engine workflow by its workflow id, or None.
-
-    The single-workflow mirror of listed_workflows: the designer and CLI
-    read a trigger-run workflow through it, projected exactly as the list
-    projects it (enabled state included, tokens never). ``visible`` (an
-    auth.visibility.Visibility, None = unrestricted) scopes the read by the
-    trigger's creator — a workflow the caller may not see answers None,
-    like the list hiding the row.
-    """
-    item = _item_for_workflow_id(str(workflow_id or ""), table_ref)
-    if item is None:
-        return None
-    if visible is not None and not visible.owner_visible(str(item.get("created_by") or "")):
-        return None
-    workflow = workflow_for(item)
-    if workflow is None:
-        return None
-    return {**workflow, "enabled": item.get("enabled", True)}
-
-
-def owns_workflow_id(workflow_id, table_ref=None):
-    """The kind of the hook trigger projecting ``workflow_id``, or None.
-
-    The engine prefers managed workflows — a published definition under a
-    trigger's id silently takes over its routing (matching.all_workflows
-    drops the hook duplicate). Saves refuse such an id so a designer save
-    cannot rewire a live trigger by accident."""
-    item = _item_for_workflow_id(workflow_id, table_ref)
-    return str(item.get("kind") or "hook") if item else None
-
-
-def listed_workflows(visible=None):
-    """Hook-backed workflows for Console and CLI, including disabled hooks.
-
-    Project through the engine definition so tokens and provider setup never
-    escape into workflow lists. Stored hooks remain managed by the trigger API.
-    """
-    if not os.environ.get("HOOK_TRIGGERS_TABLE"):
-        return []
-    result = []
-    for item in load_items():
-        owner = str(item.get("created_by") or "")
-        if visible is not None and not visible.owner_visible(owner):
-            continue
-        workflow = workflow_for(item)
-        if workflow is not None:
-            result.append(({**workflow, "enabled": item.get("enabled", True)}, owner))
-    return result
-
-
 def public_view(item):
     """Operator-facing view. The token is included on purpose: it is the
     credential callers must present, so it has to be retrievable to keep the
     hook configurable (rotate it to invalidate)."""
     view = {key: item.get(key) for key in (
         "hook_id", "kind", "url", "token", "description", "dedupe_path",
-        "response", "actions", "enabled", "created_by", "created_at", "updated_at",
+        "response", "enabled", "created_by", "created_at", "updated_at",
     )}
     if item.get("kind") == "telegram":
         view["connection_id"] = item.get("connection_id")

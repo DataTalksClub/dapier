@@ -27,23 +27,14 @@ def workflows():
             if workflow_triggers(workflow)]
 
 def all_workflows():
-    """Managed workflows and operator-created triggers, read per invocation."""
-    extra = []
-    if os.environ.get("HOOK_TRIGGERS_TABLE"):
-        from ..triggers import hook_triggers
-
-        extra = hook_triggers.load_workflows()
-    if os.environ.get("SCHEDULE_TRIGGERS_TABLE"):
-        from ..triggers import schedule_triggers
-
-        extra = extra + schedule_triggers.load_workflows()
-    if os.environ.get("POLL_TRIGGERS_TABLE"):
-        from ..triggers import poll_triggers
-
-        extra = extra + poll_triggers.load_workflows()
-    managed = workflows()
-    managed_ids = {workflow["id"] for workflow in managed}
-    return managed + [workflow for workflow in extra if workflow["id"] not in managed_ids]
+    """The workflows that can run: the managed (published designer)
+    definitions, read fresh per invocation. Stored trigger records — hooks,
+    schedules, polls — are event producers only: deliveries they publish
+    reach the managed workflows whose triggers filter on the ``hook`` /
+    ``schedule`` / ``poll`` field the delivery carries. They project no
+    workflows of their own; the bound action chains they once carried are
+    retired."""
+    return workflows()
 
 def _ordered(left, right):
     """A three-way compare for the ordering operators: numeric when BOTH

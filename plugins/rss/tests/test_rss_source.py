@@ -339,12 +339,12 @@ def test_fire_dedupes_a_relisted_entry_and_drains_the_rest():
     assert poll_triggers.get_cursor("feed-watch", table=cursors) == "post-4"
 
 
-def test_the_fired_workflow_matches_the_chip():
-    workflow = poll_triggers.workflow_for(stored())
+def test_the_fired_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(), {"id": "post-1"})
 
-    assert workflow["trigger"] == {
-        "connector": "rss", "event": "item.new",
-        "filters": {"poll": {"equals": "feed-watch"}}}
+    assert event["connector"] == "rss"
+    assert event["event"] == "item.new"
+    assert event["data"]["poll"] == "feed-watch"
 
 
 # --- the chip's sample pull --------------------------------------------------------

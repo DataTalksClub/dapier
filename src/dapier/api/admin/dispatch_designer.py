@@ -8,10 +8,8 @@ from ... import http
 from . import routes  # noqa: F401 (resolved via the module ref)
 from .dispatch import _read_scope
 
-# A workflow ref: the managed file name, or a bare id — hook-backed
-# workflows (webhook/telegram/... triggers) have no file and are addressed
-# by id on the read/duplicate/test routes. The store gates every verb, so
-# the id form still refuses writes with its own error.
+# A workflow ref: the managed file name, or a bare id. The store gates
+# every verb, so the id form still refuses writes with its own error.
 _WORKFLOW_REF = r"([a-z0-9][a-z0-9._-]*\.yaml|[a-z0-9][a-z0-9_-]{0,62})"
 
 

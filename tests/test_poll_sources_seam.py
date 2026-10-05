@@ -70,7 +70,7 @@ class TestBuildItem:
         item = build(source="fake")
         assert item["poll_id"] == "fake-poll"
         assert item["enabled"] is True
-        assert item["actions"] == [{"type": "email_send", "to": "dest@example.test"}]
+        assert "actions" not in item  # trigger records carry no actions
         assert item["bucket"] == "buck"
 
     def test_body_still_requires_a_url_for_http(self):
@@ -98,11 +98,11 @@ class TestWiring:
         assert event["connector"] == "poll"
         assert event["event"] == "item.new"
 
-    def test_workflow_and_public_view_carry_the_source(self, fake_source):
+    def test_public_view_carries_the_source(self, fake_source):
         item = self._item(fake_source)
-        workflow = poll_triggers.workflow_for(item)
-        assert workflow["trigger"]["connector"] == "fake-connector"
-        assert workflow["trigger"]["filters"] == {"poll": {"equals": "fake-poll"}}
+        event = poll_triggers.event_for(item, {"id": "one"})
+        assert event["connector"] == "fake-connector"
+        assert event["data"]["poll"] == "fake-poll"
         view = poll_triggers.public_view(item)
         assert view["source"] == "fake"
         assert view["bucket"] == "buck"

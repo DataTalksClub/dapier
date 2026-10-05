@@ -1,5 +1,4 @@
 """Cutover contract: each TODO input writes once, with its original formatting."""
-import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,9 +7,6 @@ import yaml
 
 from src.dapier import engine
 from src.dapier.engine.actions.templating import render
-from src.dapier.engine.actions.code import run_code
-from src.dapier.triggers.email_triggers import validate_actions
-from src.dapier.triggers.hook_triggers import workflow_for
 
 ROOT = Path(__file__).resolve().parents[1] / "migrations/multi-trigger-workflows"
 
@@ -18,9 +14,6 @@ ROOT = Path(__file__).resolve().parents[1] / "migrations/multi-trigger-workflows
 @pytest.mark.parametrize("event_type", [None, "message.received", "channel_post.received", "callback_query.received"])
 def test_todo_inputs_write_once_and_confirm_only_telegram(event_type):
     workflow = yaml.safe_load((ROOT / "todo-intake.yaml").read_text())
-    hook = json.loads((ROOT / "todo-telegram-ingress.json").read_text())
-    validate_actions(hook["actions"])
-    hook["hook_id"] = hook.pop("name")
     telegram = event_type is not None
     event = {"id": "merge-test", "occurred_at": "2026-09-30T12:00:00Z",
              "connector": "telegram" if telegram else "email",
@@ -29,13 +22,10 @@ def test_todo_inputs_write_once_and_confirm_only_telegram(event_type):
              if telegram else {"route": "todo", "subject": "Invoice", "from": "operator@example.test"}}
     calls = []
     def capture(action, envelope, workflow_id, steps=None):
-        if action["type"] == "code":
-            assert run_code(action, envelope)["result"] is None
-            return {}
         calls.append(action)
         return {}
     with patch.object(engine, "_run_connector", capture):
-        engine.execute(event, workflows=[workflow, workflow_for(hook)])
+        engine.execute(event, workflows=[workflow])
     assert [a["type"] for a in calls] == ["sheets_append_row", "dataops"] + (["telegram_send"] if telegram else [])
     values = calls[0]["values"][0]
     assert render(values[0], event) == "2026-09-30"

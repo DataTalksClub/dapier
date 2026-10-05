@@ -10,7 +10,7 @@ from unittest.mock import patch
 from src.dapier.api import agent as agent_api
 from src.dapier.triggers import schedule_triggers
 from src.dapier.engine import worker
-from src.dapier.engine import all_workflows, matches
+from src.dapier.engine import matches
 
 
 class StubTable:
@@ -141,38 +141,21 @@ class SaveTests(unittest.TestCase):
             [method for method, _ in events.calls][-2:],
             ["remove_targets", "delete_rule"])
 
-    def test_save_uses_inline_actions_and_rejects_legacy_flow(self):
-        events = StubEvents()
-        with patch.dict(os.environ, ENV):
-            table = StubTable()
-            actions = [{"type": "webhook", "url": "https://intake.test/x"}]
-            _status, payload = schedule_triggers.api_save(
-                {"name": "morning-digest", "expression": "cron(0 8 * * ? *)",
-                 "actions": actions}, "op", table_ref=table, events_client=events)
-            self.assertEqual(schedule_triggers.load_workflows(table_ref=table)[0]["actions"], actions)
-            with self.assertRaises(schedule_triggers.TriggerError):
-                schedule_triggers.api_save(
-                    {"name": "evening-digest", "expression": "cron(0 20 * * ? *)",
-                     "flow": "digest-flow"}, "op", table_ref=table, events_client=events)
-
 
 class EngineTests(unittest.TestCase):
     def test_schedule_workflow_matches_event(self):
-        table = StubTable()
-        with patch.dict(os.environ, ENV):
-            schedule_triggers.api_save(
-                dict(SCHEDULE_BODY), "op", table_ref=table,
-                events_client=StubEvents(), target_arn=WORKER_ARN)
-            with patch.object(schedule_triggers, "get_table", return_value=table):
-                workflows = all_workflows()
-        schedule_workflows = [wf for wf in workflows if wf["id"].startswith("schedule-trigger-")]
-        self.assertEqual(len(schedule_workflows), 1)
+        """A designer flow binds to a schedule through the ``schedule`` field
+        every fire carries — one flow per record, matched by the engine."""
+        workflow = {"id": "morning-digest", "enabled": True, "actions": [],
+                    "trigger": {"connector": "schedule",
+                                "event": "schedule.triggered",
+                                "filters": {"schedule": {"equals": "morning-digest"}}}}
         event = {"connector": "schedule", "event": "schedule.triggered",
                  "data": {"schedule": "morning-digest"}}
-        self.assertTrue(matches(schedule_workflows[0], event))
-        self.assertFalse(matches(schedule_workflows[0], {"connector": "schedule",
-                                                        "event": "schedule.triggered",
-                                                        "data": {"schedule": "other"}}))
+        self.assertTrue(matches(workflow, event))
+        self.assertFalse(matches(workflow, {"connector": "schedule",
+                                            "event": "schedule.triggered",
+                                            "data": {"schedule": "other"}}))
 
 
 class WorkerTests(unittest.TestCase):

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import yaml
 
 from ...auth import visibility
-from ...triggers import hook_triggers, published_workflows
+from ...triggers import published_workflows
 from .github import sync_status
 from .validation import FILE_PATTERN, ordered_workflow, parse_workflow
 
@@ -134,13 +134,6 @@ def api_list(q=None, tag=None, folder=None, visible=None):
             # owner_of_item) — exposed informationally like the live rows.
             summaries[str(workflow["id"])] = {**summary, "published": False,
                                               "owner": visibility.owner_of_item(item)}
-    for workflow, owner in hook_triggers.listed_workflows(visible):
-        summaries.setdefault(str(workflow["id"]), {
-            **_summary(workflow, None), "published": True, "owner": owner,
-            # Run by its trigger (hooks), not the managed store: the designer
-            # opens these read-only and saves refuse the id.
-            "hook_backed": True,
-        })
     ordered = sorted(summaries.values(), key=lambda summary: summary["id"])
     search = str(q or "").strip().lower()
     if search:
@@ -169,9 +162,8 @@ def api_list(q=None, tag=None, folder=None, visible=None):
 def workflow_yaml_text(workflow):
     """The canonical YAML text for a stored definition — the same dump the
     save/toggle/duplicate/rollback paths write, so an export re-saves
-    byte-identical. Aliases are expanded: hook-backed projections share one
-    filters mapping across their trigger fan-out, and canonical text must
-    stay hand-editable."""
+    byte-identical. Aliases are expanded (multi-trigger workflows share one
+    filters mapping), so canonical text stays hand-editable."""
     return yaml.dump(ordered_workflow(workflow), sort_keys=False,
                      Dumper=_NoAliasDumper)
 
@@ -213,11 +205,6 @@ def api_get(source, visible=None):
     ``published: false`` and the versions list carries the ``draft`` block.
     ``visible`` (G17 auth.visibility, None = unrestricted) scopes the read:
     a workflow the caller may not see answers exactly like a missing one.
-
-    A ref with no published item also resolves hook-backed workflows by id
-    (``telegram-trigger-<hook>``): their definitions live in the trigger
-    store, so the response carries ``hook_backed: true`` and the write verbs
-    refuse the id — the designer opens them read-only.
     """
     item = _published_by_file(source)
     if visible is not None and item is not None and not visible.owner_visible(
@@ -226,11 +213,5 @@ def api_get(source, visible=None):
     if item and isinstance(item.get("workflow"), dict):
         return 200, {"workflow": item["workflow"], "published": True,
                      "yaml": workflow_yaml_text(item["workflow"])}
-    hook_workflow = hook_triggers.workflow_by_id(
-        str(source or "").removesuffix(".yaml"), visible=visible)
-    if hook_workflow is not None:
-        return 200, {"workflow": hook_workflow, "published": True,
-                     "yaml": workflow_yaml_text(hook_workflow),
-                     "hook_backed": True}
     return 404, {"error": f"no such workflow: {source}"}
 

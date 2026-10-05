@@ -625,15 +625,15 @@ def test_drive_fire_seeds_then_emits_only_the_new_file():
     assert poll_triggers.get_cursor("folder-files", table=cursors) == "2099-01-01T00:00:00.000Z"
 
 
-def test_drive_fire_workflow_matches_the_chip():
+def test_drive_fire_event_matches_the_chip():
     polls, cursors = saved_trigger(drive_body())
 
-    workflow = poll_triggers.workflow_for(poll_triggers.get_item(
-        "folder-files", table_ref=polls))
+    event = poll_triggers.event_for(
+        poll_triggers.get_item("folder-files", table_ref=polls), {"id": "file-1"})
 
-    assert workflow["trigger"] == {
-        "connector": "google-drive", "event": "file.created",
-        "filters": {"poll": {"equals": "folder-files"}}}
+    assert event["connector"] == "google-drive"
+    assert event["event"] == "file.created"
+    assert event["data"]["poll"] == "folder-files"
 
 
 # --- the chips' sample pulls ---------------------------------------------------------

@@ -314,12 +314,12 @@ def test_a_relisted_member_does_not_fire_twice():
     assert fired == []
 
 
-def test_the_fired_workflow_matches_the_chip():
-    workflow = poll_triggers.workflow_for(stored(mailchimp_body()))
+def test_the_fired_event_matches_the_chip():
+    event = poll_triggers.event_for(stored(mailchimp_body()), {"id": "mem-1"})
 
-    assert workflow["trigger"] == {
-        "connector": "mailchimp", "event": "member.new",
-        "filters": {"poll": {"equals": "audience-members"}}}
+    assert event["connector"] == "mailchimp"
+    assert event["event"] == "member.new"
+    assert event["data"]["poll"] == "audience-members"
 
 
 # --- the chip's sample pull --------------------------------------------------------

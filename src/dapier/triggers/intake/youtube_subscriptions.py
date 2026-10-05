@@ -78,6 +78,26 @@ def channels_from_workflows(items):
     return channels
 
 
+def channels_from_hooks(table_ref=None):
+    """Channel IDs watched by stored youtube hook triggers (enabled only).
+
+    Hooks are trigger records, not workflows — nothing projects them into
+    all_workflows() — so the renewal reads the store directly and a hook's
+    subscription stays alive exactly like a designer flow's.
+    """
+    if not os.environ.get("HOOK_TRIGGERS_TABLE"):
+        return []
+    from .. import hook_triggers
+
+    channels = []
+    for item in hook_triggers.load_items(table_ref=table_ref):
+        channel_id = item.get("channel_id")
+        if (item.get("kind") == "youtube" and item.get("enabled", True)
+                and channel_id and channel_id not in channels):
+            channels.append(channel_id)
+    return channels
+
+
 def _settings():
     """(callback_url, hub secret); RuntimeError when the deployment runs
     without the push path (the schedule no-ops for the same reason)."""
@@ -131,7 +151,7 @@ def subscribe_channel(channel_id, *, transport=None):
 
 
 def handler(_event, _context):
-    channel_ids = channels_from_workflows(engine.all_workflows())
+    channel_ids = channels_from_workflows(engine.all_workflows()) + channels_from_hooks()
     if not channel_ids:
         return {"statusCode": 200, "body": json.dumps({"subscriptions": []})}
     callback_url, secret = _settings()
@@ -169,7 +189,7 @@ def reconcile(previous_workflow, workflow):
     try:
         others = channels_from_workflows(
             item for item in engine.all_workflows()
-            if str(item.get("id") or "") != workflow_id)
+            if str(item.get("id") or "") != workflow_id) + channels_from_hooks()
     except Exception as exc:
         # The live set only guards unsubscription from channels other
         # workflows still watch. Unreadable, the unsubscribe half cannot be
@@ -278,8 +298,10 @@ def subscription_status(channel_id, *, transport=None):
 
 
 def renew_subscription(channel_id):
-    """Renew only a channel already watched by an enabled workflow."""
-    if channel_id not in channels_from_workflows(engine.all_workflows()):
+    """Renew only a channel already watched by an enabled workflow or
+    youtube hook trigger."""
+    if (channel_id not in channels_from_workflows(engine.all_workflows())
+            and channel_id not in channels_from_hooks()):
         raise ValueError("channel is not watched by an enabled YouTube workflow")
     status = subscribe_channel(channel_id)
     return {"accepted": status == 202, "status": status, "topic": topic_url(channel_id)}
