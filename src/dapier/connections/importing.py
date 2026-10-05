@@ -4,8 +4,18 @@ from . import credentials, zoom
 from . import records as connections
 from .providers import oauth_clients, oauth_providers, slack_tokens, telegram_api
 
+TOKEN_PROVIDER_VERIFIERS = {}
+TOKEN_PROVIDER_SCOPES = {}
 
-def verify_token_provider(provider, token):
+
+def register_token_provider(provider, verify, *, scopes=()):
+    """Plugin seam for a provider whose credential is supplied directly."""
+    connections.TOKEN_PROVIDERS.add(provider)
+    TOKEN_PROVIDER_VERIFIERS[provider] = verify
+    TOKEN_PROVIDER_SCOPES[provider] = list(scopes)
+
+
+def verify_token_provider(provider, token, *, transport=None):
     """Verify a pasted token against its provider. Returns ``(account_id, title)``.
 
     Slack workspaces verify via ``auth.test``; Telegram bots via ``getMe``.
@@ -13,6 +23,8 @@ def verify_token_provider(provider, token):
     """
     from .providers import telegram_api
 
+    if provider in TOKEN_PROVIDER_VERIFIERS:
+        return TOKEN_PROVIDER_VERIFIERS[provider](token, transport=transport)
     if provider == "slack":
         token = slack_tokens.validate_token(token)
         return slack_tokens.verify_account(token)
@@ -67,6 +79,8 @@ def save_token_connection(body, *, operator_subject, connections_table, audit_ev
         fields = connections.validate_new_connection(body)
     except connections.ConnectionError as exc:
         return 400, {"error": str(exc)}
+    if fields["provider"] in TOKEN_PROVIDER_SCOPES:
+        fields["scopes"] = list(TOKEN_PROVIDER_SCOPES[fields["provider"]])
     token = str(body.get("token") or "").strip()
     if not token and reuse_stored_token:
         # An edit without a re-pasted token re-verifies the stored one.
@@ -79,13 +93,13 @@ def save_token_connection(body, *, operator_subject, connections_table, audit_ev
         if reuse_stored_token:
             error = ("A Slack bot (xoxb-) or user (xoxp-) token is required"
                      if fields["provider"] == "slack"
-                     else "A Telegram bot token from @BotFather is required")
+                     else "A provider token is required")
         else:
             error = "This provider imports with a token, not an authorized-user file"
         return 400, {"error": error}
     try:
         account_id, account_title = verify_token_provider(fields["provider"], token)
-    except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError) as exc:
+    except (slack_tokens.SlackTokenError, telegram_api.TelegramApiError, ValueError) as exc:
         audit_event(fields["connection_id"], action, actor, outcome="error", error=str(exc))
         return 400, {"error": str(exc)}
     previous = connections.get_connection(connections_table, fields["connection_id"])

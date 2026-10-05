@@ -245,7 +245,7 @@ def token_write(api_url, connection_id, agent, output, force=False, debug=False)
     return 0
 
 
-TOKEN_PROVIDERS = ("slack", "telegram", "zoom")
+TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops")
 
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
@@ -446,4 +446,3 @@ def connections_test(api_url, connection_id, debug=False):
         summary = ", ".join(f"{key}={value}" for key, value in sorted(identity.items()))
         print(f"Identity: {summary}")
     return 0 if data.get("ok") else 1
-

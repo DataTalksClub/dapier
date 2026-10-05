@@ -871,6 +871,11 @@ def test_connection(connection, *, transport=None):
     provider = connection.get("provider")
     label = PROVIDER_LABELS.get(provider, provider)
     try:
+        from .importing import TOKEN_PROVIDER_VERIFIERS, verify_token_provider
+        if provider in TOKEN_PROVIDER_VERIFIERS:
+            account_id, title = verify_token_provider(provider, access_token(connection), transport=transport)
+            return {"ok": True, "provider": provider, "detail": f"{title} verified",
+                    "identity": {"id": account_id, "name": title}}
         if provider == "slack":
             account_id, title = slack_tokens.verify_account(
                 access_token(connection), transport=transport)

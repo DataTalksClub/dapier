@@ -6,6 +6,7 @@ import { detailRows, escapeHtml, formatTimestamp, statusLine } from '../format.j
 import { refresh } from './overview.js';
 
 const CONNECT_PROVIDERS = {
+  dataops: { label: 'DataOps', blurb: 'Read invoice status through a dedicated service credential.', connectionId: 'dataops', displayName: 'DataOps invoice reader', scopes: ['invoices:read'] },
   google: {
     label: 'Google Calendar',
     blurb: 'Calendar listings, event triggers, and owned-event edits for the scheduling flows.',
@@ -53,6 +54,7 @@ const CONNECT_PROVIDERS = {
 /* Provider names for table group headers — wider than the connect cards
    (a "google" group holds calendar, Drive, and Sheets connections alike). */
 const PROVIDER_LABELS = {
+  dataops: 'DataOps',
   google: 'Google',
   youtube: 'YouTube',
   dropbox: 'Dropbox',
@@ -64,9 +66,10 @@ const PROVIDER_LABELS = {
 const providerLabel = (provider) => PROVIDER_LABELS[provider] || provider;
 
 /* Token providers paste a credential instead of browser consent. */
-const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
+const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom', 'dataops'];
 
 const TOKEN_PROVIDER_META = {
+  dataops: { heading: 'New DataOps connection', blurb: 'Paste the invoice reader service credential. It is verified with DataOps before being saved.', label: 'Service credential', placeholder: 'dops_svc_…', displayName: 'DataOps invoice reader', connectionId: 'dataops' },
   slack: {
     heading: 'New Slack connection',
     blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials. To listen for messages, open Manage afterwards and wire up event subscriptions.',
@@ -350,7 +353,7 @@ export function openEditConnection(connectionId) {
   form.token.value = '';
   $('#edit-token-field').hidden = !TOKEN_PROVIDERS.includes(connection.provider);
   $('#edit-token-field').firstChild.textContent = connection.provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
-  form.token.placeholder = connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
+  form.token.placeholder = connection.provider === 'dataops' ? 'dops_svc_…' : connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
   $('#edit-token-field .field-hint').textContent = connection.provider === 'zoom'
     ? 'Leave blank to keep the stored secret. Replacing it requires Zoom to validate the callback again.'
     : 'Leave blank to keep the stored token — it is re-verified on save.';
@@ -1179,6 +1182,7 @@ $('#connection-form').addEventListener('submit', async (event) => {
    paste their token, OAuth providers paste the authorized-user JSON whose
    refresh_token is transferred (and verified) server-side. */
 const IMPORT_PROVIDERS = {
+  dataops: { kind: 'token', label: 'Service credential' },
   google: { kind: 'oauth', label: 'Google' },
   youtube: { kind: 'oauth', label: 'YouTube' },
   dropbox: { kind: 'oauth', label: 'Dropbox', rootPath: true },
