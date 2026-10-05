@@ -34,6 +34,38 @@ def test_home_prioritizes_pauses_and_ignores_recovered_failures():
     assert result['workflows'][0]['id'] == 'recovered'
 
 
+def test_home_reads_the_api_verdict_on_a_resolved_failure():
+    """The API decides what still needs action (``resolved`` — an operator
+    marked it, or a completed rerun settled it); Home just believes it. A
+    workflow whose latest run is a resolved failure has nothing to act on."""
+    result = model({'workflows': [
+        {'id': 'marked', 'enabled': True},
+        {'id': 'recovered', 'enabled': True},
+        {'id': 'broken', 'enabled': True},
+    ], 'runs': [
+        # Latest run is a failure something settled — either verdict, same
+        # answer here: not a problem.
+        {'workflow_id': 'marked', 'status': 'failed', 'resolved': True,
+         'resolved_reason': 'acknowledged', 'started_at': '2026-09-04'},
+        {'workflow_id': 'recovered', 'status': 'failed', 'resolved': True,
+         'resolved_reason': 'recovered', 'started_at': '2026-09-04'},
+        {'workflow_id': 'broken', 'status': 'failed', 'started_at': '2026-09-04'},
+    ]})
+    assert [p['workflow']['id'] for p in result['problems']] == ['broken']
+
+
+def test_home_still_lists_an_auto_paused_workflow_with_a_resolved_failure():
+    """An auto-pause is the engine's own verdict and outranks resolution: the
+    workflow is switched off, which needs a human whatever its last run said."""
+    result = model({'workflows': [
+        {'id': 'paused', 'enabled': True, 'auto_paused': True},
+    ], 'runs': [
+        {'workflow_id': 'paused', 'status': 'failed', 'resolved': True,
+         'resolved_reason': 'recovered', 'started_at': '2026-09-04'},
+    ]})
+    assert [p['workflow']['id'] for p in result['problems']] == ['paused']
+
+
 def test_home_only_surfaces_connections_used_by_enabled_workflows():
     result = model({'workflows': [
         {'id': 'live', 'enabled': True, 'actions': [{'paths': [{'actions': [{'connection_id': 'used'}]}]}]},

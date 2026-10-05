@@ -354,7 +354,9 @@ function renderErrors() {
   if (badge) {
     badge.hidden = total <= 0;
     badge.textContent = total > 0 ? String(total) : '';
-    badge.title = total > 0 ? `${total} failed run${total === 1 ? '' : 's'} in the last 7 days` : '';
+    badge.title = total > 0
+      ? `${total} failed run${total === 1 ? '' : 's'} in the last 7 days still to fix`
+      : '';
   }
 }
 

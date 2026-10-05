@@ -105,9 +105,9 @@
         <div class="page-tools primary-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <section class="home-panel" id="overview-errors-panel" aria-labelledby="overview-errors-title">
-          <div class="section-head"><h2 id="overview-errors-title">Failed runs</h2><button id="overview-errors-send-digest" class="dk-button dk-button--secondary" type="button">Send digest now</button></div>
+          <div class="section-head"><h2 id="overview-errors-title">Failures to fix</h2><button id="overview-errors-send-digest" class="dk-button dk-button--secondary" type="button">Send digest now</button></div>
           <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th><th>Error</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
-          <div id="overview-errors-empty" class="empty-state" hidden><h3>No failed runs</h3><p>Nothing has failed in the last 7 days. Failures appear here grouped by workflow.</p></div>
+          <div id="overview-errors-empty" class="empty-state" hidden><h3>Nothing to fix</h3><p>No failure in the last 7 days still needs action. A failure a successful replay settled, or one marked fixed, drops out of this list.</p></div>
         </section>
         <div id="overview-stats" class="status-strip" hidden></div>
         <section class="home-panel" aria-labelledby="home-workflows-title">

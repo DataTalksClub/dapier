@@ -6,14 +6,21 @@ from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["print_runs", "runs_cancel", "runs_export", "runs_list", "runs_replay", "runs_replay_failed", "runs_show"]
+__all__ = ["print_runs", "runs_cancel", "runs_export", "runs_list", "runs_replay",
+           "runs_replay_failed", "runs_resolve", "runs_show"]
 
 
 def print_runs(items):
     print(f"{'RUN':42} {'STATUS':12} {'STEPS':5} STARTED")
     for item in items:
         started = (item.get("started_at") or "-")[:19]
-        print(f"{item.get('run_id', ''):42} {item.get('status', ''):12} "
+        # A resolved failure keeps its failed status; "fixed" says it no
+        # longer needs action, and why — the operator marked it, or a later
+        # run of the workflow completed.
+        status = item.get("status", "")
+        if item.get("resolved"):
+            status = f"{status} (fixed: {item.get('resolved_reason') or 'resolved'})"
+        print(f"{item.get('run_id', ''):42} {status:12} "
               f"{item.get('steps', 0):<5} {started}")
         # The same what-actually-happened line the console row carries:
         # trigger type plus the API's event summary, indented under the run.
@@ -26,10 +33,16 @@ def print_runs(items):
 
 
 def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,
-              next_token=None, query=None, debug=False):
+              next_token=None, query=None, resolved=None, debug=False):
     params = {"limit": int(limit)}
     if workflow:
         params["workflow_id"] = workflow
+    # --resolved / --unresolved are the two halves of the failure set, which
+    # the API spells `problems` and `resolved`.
+    if resolved is True:
+        status = "resolved"
+    elif resolved is False:
+        status = "problems"
     if status:
         params["status"] = status
     if since:
@@ -43,7 +56,8 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
     data = api.call(api_url, "GET", f"/api/agent/runs?{urlencode(params)}", debug=debug)
     items = data.get("runs", [])
     if not items:
-        filtered = workflow or status or since or before or next_token or query
+        filtered = (workflow or status or since or before or next_token or query
+                    or resolved is not None)
         print("No runs match these filters." if filtered else
               "No runs recorded yet. Runs appear once a workflow handles a trigger event.")
         return 0
@@ -55,13 +69,17 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
 
 
 def runs_export(api_url, out=None, max_rows=None, workflow=None, status=None,
-                since=None, before=None, query=None, debug=False):
+                since=None, before=None, query=None, resolved=None, debug=False):
     """Run history as CSV (thin client over the agent export route): the
     list's filters, one bounded export, written to --out or the server's
     suggested filename."""
     params = {}
     if workflow:
         params["workflow_id"] = workflow
+    if resolved is True:
+        status = "resolved"
+    elif resolved is False:
+        status = "problems"
     for key, value in (("status", status), ("since", since),
                        ("before", before), ("q", query)):
         if value:
@@ -84,6 +102,10 @@ def runs_show(api_url, run_id, debug=False):
     data = api.call(api_url, "GET", f"/api/agent/runs/{quote(run_id, safe='')}", debug=debug)
     run = data.get("run") or {}
     print(f"run: {run.get('run_id') or run_id}")
+    if run.get("resolved"):
+        print(f"resolved: {run.get('resolved_reason') or 'resolved'}"
+              + (f" at {run['resolved_at']}" if run.get("resolved_at") else "")
+              + (f" by {run['resolved_by']}" if run.get("resolved_by") else ""))
     for key in ("workflow_id", "status", "connector", "event_type", "steps",
                 "started_at", "finished_at", "duration_ms", "failed_step", "error"):
         if run.get(key) not in (None, ""):
@@ -126,10 +148,32 @@ def runs_cancel(api_url, run_id, debug=False):
     return 0
 
 
+def runs_resolve(api_url, run_id, note=None, debug=False):
+    """Mark a failed run fixed (thin client over the agent resolve route).
+
+    The failure keeps its status and error in history but stops counting as
+    a problem. Use it for a failure nothing will re-derive away: a dead
+    workflow's last run, a negative test meant to fail. A failure a rerun
+    already fixed needs nothing here — it resolves itself.
+    """
+    data = api.call(api_url, "POST", f"/api/agent/runs/{quote(run_id, safe='')}/resolve",
+                    body={"note": note} if note else {}, debug=debug)
+    if data.get("already_resolved"):
+        print(f"{run_id} was already fixed ({data.get('resolved_reason') or 'resolved'}"
+              + (f" at {data['resolved_at']}" if data.get("resolved_at") else "") + ").")
+        return 0
+    print(f"Marked {run_id} fixed: {data.get('steps', 0)} step record(s) stamped.")
+    print("The run keeps its failed status and error in history, but it no longer "
+          "counts as a problem.")
+    print("A new failure of the same workflow is a new run and starts unresolved again.")
+    return 0
+
+
 def runs_replay_failed(api_url, workflow_id, debug=False):
     data = api.call(api_url, "POST", "/api/agent/runs/replay-failed",
                     {"workflow_id": workflow_id}, debug=debug)
-    print(f"Replay accepted for {data.get('replayed', 0)} failed run(s) of {workflow_id}"
+    print(f"Replay accepted for {data.get('replayed', 0)} unresolved failed run(s) of "
+          f"{workflow_id}"
           + (f"; {data.get('skipped', 0)} skipped." if data.get("skipped") else "."))
     for item in data.get("runs") or []:
         if item.get("replayed"):

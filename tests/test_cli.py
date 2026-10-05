@@ -1275,6 +1275,99 @@ def test_runs_cancel_of_a_run_not_suspended_reports_the_409(isolated_home, monke
     assert "Run is not suspended; nothing to cancel" in capsys.readouterr().out
 
 
+def test_runs_resolve_hits_the_agent_resolve_endpoint(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path, body))
+        return {"resolved": True, "already_resolved": False, "run_id": "wf-1:evt-1",
+                "steps": 3, "resolved_at": "2026-09-25T12:00:00+00:00",
+                "run": {"run_id": "wf-1:evt-1", "status": "failed", "resolved": True}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "resolve", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/resolve", {})]
+    out = capsys.readouterr().out
+    assert "Marked wf-1:evt-1 fixed" in out
+    assert "no longer counts as a problem" in out
+
+
+def test_runs_resolve_forwards_the_note(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append(body)
+        return {"resolved": True, "already_resolved": False, "steps": 1}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    assert main.main(["runs", "resolve", "wf-1:evt-1", "--note", "dead workflow"]) == 0
+    assert calls == [{"note": "dead workflow"}]
+
+
+def test_runs_resolve_of_an_already_fixed_run_says_so(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"resolved": True, "already_resolved": True,
+                "resolved_reason": "recovered", "resolved_at": "2026-09-26T10:00:00+00:00"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "resolve", "wf-1:evt-1"])
+
+    assert rc == 0
+    assert "already fixed (recovered" in capsys.readouterr().out
+
+
+def test_runs_list_resolved_and_unresolved_map_to_the_api_status(isolated_home, monkeypatch, capsys):
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append(path)
+        return {"runs": []}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    main.main(["runs", "list", "--unresolved"])
+    main.main(["runs", "list", "--resolved"])
+    main.main(["runs", "list", "--unresolved", "--workflow", "wf-1"])
+    main.main(["runs", "list"])
+
+    assert "status=problems" in calls[0]
+    assert "status=resolved" in calls[1]
+    assert "status=problems" in calls[2] and "workflow_id=wf-1" in calls[2]
+    assert "status=" not in calls[3]  # no filter flag, no status
+
+
+def test_runs_list_marks_a_fixed_failure_in_the_output(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"runs": [{"run_id": "wf-1:evt-1", "status": "failed", "steps": 1,
+                          "started_at": "2026-09-25T10:00:00+00:00",
+                          "resolved": True, "resolved_reason": "recovered"}]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    assert main.main(["runs", "list"]) == 0
+    assert "failed (fixed: recovered)" in capsys.readouterr().out
+
+
+def test_runs_show_prints_the_resolution(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"run": {"run_id": "wf-1:evt-1", "status": "failed", "steps": 1,
+                        "resolved": True, "resolved_reason": "acknowledged",
+                        "resolved_at": "2026-09-25T12:00:00+00:00",
+                        "resolved_by": "op-1"},
+                "steps": [{"action_id": "post", "status": "failed"}]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    assert main.main(["runs", "show", "wf-1:evt-1"]) == 0
+    out = capsys.readouterr().out
+    assert "resolved: acknowledged at 2026-09-25T12:00:00+00:00 by op-1" in out
+
+
 # --- Audit trail, workflows export, and server-side workflow search ---
 
 def test_audit_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):

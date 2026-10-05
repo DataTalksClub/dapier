@@ -87,9 +87,21 @@ The older `dapier inbox` commands and `/inbox` console links remain compatible.
 Every run is recorded in run history (console → Runs, or `dapier runs list`),
 and any run — failed or successful — can be re-executed with its original
 trigger event via the Replay button in the run dialog or
-`dapier runs replay <run-id>`. The latest failed runs of one workflow can be
-replayed in bulk with `dapier runs replay-failed <workflow_id>` (runs whose
+`dapier runs replay <run-id>`. The unresolved failed runs of one workflow can
+be replayed in bulk with `dapier runs replay-failed <workflow_id>` (runs whose
 event data was never recorded are skipped with a reason).
+
+A failure stops needing action two ways. When a later run of the same
+workflow completes — which is what a successful replay produces — the
+earlier failure is *recovered*: the API derives it, so nothing is written and
+it drops out of the failure views on the next read, retroactively settling
+every already-fixed failure in the ledger. A failure no rerun can settle (a
+deleted workflow's last run, a negative test meant to fail) takes the **Mark
+fixed** button in the run dialog or `dapier runs resolve <run-id>`. Either
+way the run keeps its status, error, and place in history; only the verdict
+moves. `dapier runs list --unresolved` / `--resolved` (and the console's
+Failures / Fixed filters) split the two halves, and `dapier errors` and the
+daily digest count only the unresolved ones.
 
 A workflow can also retry its own transient action failures with a top-level
 `retry` mapping: `attempts` is the total try count (1–5) and `backoff_seconds`

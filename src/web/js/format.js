@@ -17,6 +17,19 @@ export function statusLine(status, labels) {
   return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
 }
 
+/* A failure that no longer needs action. The run keeps its status pill
+   (a fixed run still reads "failed" in history); this rides next to it so
+   the actionable failures stand out from the retired ones. The tooltip
+   says why it stopped being a problem. */
+export function resolvedLine(run) {
+  if (!run || !run.resolved) return '';
+  const why = run.resolved_reason === 'acknowledged'
+    ? 'Marked fixed by an operator — it stays in history but is no longer a problem.'
+    : 'Recovered: a later run of this workflow completed, so this failure no longer needs action.';
+  const at = run.resolved_at ? ` (${formatTimestamp(run.resolved_at)})` : '';
+  return `<span class="status ok" title="${escapeHtml(why)}"><span class="status-dot" aria-hidden="true"></span>fixed${escapeHtml(at)}</span>`;
+}
+
 /* Escape, then mark separator characters as safe wrap points so long machine
    values (execution IDs, scope URLs) break at ":", ".", "/", "_" — never mid-token. */
 export function wrapTokens(value) {

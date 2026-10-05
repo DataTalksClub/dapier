@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, wrapTokens, formatTimestamp, formatDuration, dataBlock } from '../format.js';
+import { escapeHtml, statusLine, resolvedLine, wrapTokens, formatTimestamp, formatDuration, dataBlock } from '../format.js';
 
 const STEP_ICONS = {
   webhook: 'webhook',
@@ -21,15 +21,23 @@ function triggerLabel(run) {
   return `${run.connector || '?'} · ${run.event_type || '?'}`;
 }
 
-function runRow(run) {
+/* A failure's step, or the "fixed" pill once it stopped needing action —
+   one of the two, never both: the step is the diagnosis, the pill is the
+   verdict, and a retired failure reads as the latter. */
+function statusCell(run) {
+  if (run.resolved) return resolvedLine(run);
   const failed = run.failed_step ? ` <span class="muted-cell mono">(${escapeHtml(run.failed_step)})</span>` : '';
   const delayedUntil = run.status === 'delayed' && run.delayed_until
     ? ` <span class="muted-cell mono">(until ${escapeHtml(formatTimestamp(run.delayed_until))})</span>` : '';
+  return `${statusLine(run.status)}${failed}${delayedUntil}`;
+}
+
+function runRow(run) {
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
     <td class="cell-title mono"><span class="cell-name">${escapeHtml(run.workflow_id || 'Run')}</span></td>
     <td class="mono muted-cell" data-label="Trigger"><div>${escapeHtml(triggerLabel(run))}</div>${run.event_summary
       ? `<div class="run-event-summary">${escapeHtml(run.event_summary)}</div>` : ''}</td>
-    <td data-label="Status">${statusLine(run.status)}${failed}${delayedUntil}</td>
+    <td data-label="Status">${statusCell(run)}</td>
     <td class="mono muted-cell" data-label="Steps">${run.steps ?? '—'}</td>
     <td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td>
   </tr>`;
@@ -46,6 +54,9 @@ let fetchSeq = 0;
 function selectedFilters() {
   return {
     workflow: $('#runs-workflow-filter').value || '',
+    // "Failures" and "Fixed" are the API's `problems` and `resolved` views
+    // of the same failed runs, so the select passes its value straight
+    // through — the API owns which failures still need action.
     status: $('#runs-status-filter').value || '',
     date: $('#runs-date-filter').value || '',
     search: ($('#runs-search-filter').value || '').trim(),
@@ -117,15 +128,21 @@ export function renderRuns() {
   if (selectedStatus && selectedStatus !== 'problems' && !statuses.includes(selectedStatus)) {
     statuses.push(selectedStatus); // keep the choice visible across paged fetches
   }
+  const hasFailures = runs.some((run) => ['failed', 'error'].includes(run.status));
+  const hasResolved = runs.some((run) => run.resolved);
   statusFilter.innerHTML = '<option value="">All statuses</option>' +
-    ((selectedStatus === 'problems' || runs.some((run) => ['failed', 'error'].includes(run.status))) ? '<option value="problems">Failures</option>' : '') +
+    ((selectedStatus === 'problems' || selectedStatus === 'resolved' || hasFailures)
+      ? '<option value="problems">Failures</option>' : '') +
+    ((selectedStatus === 'resolved' || hasResolved)
+      ? '<option value="resolved">Fixed</option>' : '') +
     statuses.sort().map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`).join('');
   workflowFilter.value = selectedWorkflow;
   statusFilter.value = selectedStatus;
   let shown = runs.filter((run) =>
     (!workflowFilter.value || run.workflow_id === workflowFilter.value) &&
     (!statusFilter.value || run.status === statusFilter.value ||
-      (statusFilter.value === 'problems' && ['failed', 'error'].includes(run.status))));
+      (statusFilter.value === 'problems' && ['failed', 'error'].includes(run.status) && !run.resolved) ||
+      (statusFilter.value === 'resolved' && run.resolved)));
   if (!serverPaged) {
     // Overview sample only: server pages already matched the filters, the
     // date window included — this just narrows the sample until the fetch.
@@ -152,7 +169,8 @@ export function renderRuns() {
   /* Bulk replay names one workflow (the API's requirement), so the button
      only shows with a workflow picked and failures actually in sight. */
   $('#runs-replay-failed').hidden = !(workflowFilter.value &&
-    (selectedStatus === 'problems' || shown.some((run) => ['failed', 'error'].includes(run.status))));
+    (selectedStatus === 'problems' ||
+      shown.some((run) => ['failed', 'error'].includes(run.status) && !run.resolved)));
 }
 
 $('#runs-load-more').addEventListener('click', () => fetchRunsPage({ append: true }));
@@ -279,18 +297,66 @@ export async function openRun(runId) {
     ? `<button class="dk-button dk-button--secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Drop the parked continuation: the remaining actions will never fire">Cancel</button>`
     : '';
+  /* Mark fixed is for the failures no rerun can settle: a dead workflow's
+     last run, a negative test meant to fail. A failure a completed replay
+     already recovered arrives here resolved (the API derives it) and shows
+     the verdict instead of the button — nothing left to press. */
+  const fixable = ['failed', 'error'].includes(run.status) && !run.resolved;
+  const markFixed = fixable
+    ? `<button class="dk-button dk-button--secondary run-mark-fixed" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+        title="Stop treating this failure as a problem: it keeps its status and error in history, but leaves the failure views">Mark fixed</button>`
+    : '';
+  const verdict = run.resolved
+    ? `<span class="detail-muted">${resolvedLine(run)}</span>`
+    : '';
   $('#run-detail').innerHTML = `
     <div class="detail-summary">
       ${statusLine(run.status)}
       <code>${wrapTokens(run.run_id || runId)}</code>
       ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
+      ${verdict}
       ${cancel}
+      ${markFixed}
       <button class="dk-button dk-button--secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Re-inject this run's original trigger event">Replay</button>
     </div>
     ${flow(data)}`;
   icons();
 }
+
+/* Mark fixed retires a failure nothing will re-derive away: it stamps the
+   run's steps server-side (the same route `dapier runs resolve` calls), so
+   the run keeps its failed status and error in history while dropping out
+   of the failure views. A completed rerun does this on its own — the API
+   derives that — so this button is only for the failures replay cannot
+   settle. Same confirm-then-refresh shape as the cancel handler below. */
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.run-mark-fixed');
+  if (!button || !button.dataset.run || button.disabled) return;
+  const runId = button.dataset.run;
+  if (!confirm(`Mark ${runId} fixed? It stays in run history with its error, but stops showing up as a problem.`)) return;
+  button.disabled = true;
+  try {
+    await api(`/api/admin/runs/${encodeURIComponent(runId)}/resolve`, {
+      method: 'POST',
+      body: '{}',
+    });
+    await openRun(runId); // re-render with the fixed verdict
+    const result = $('#run-replay-result');
+    result.classList.remove('error');
+    result.textContent = 'Marked fixed: this run keeps its failed status and error in history, '
+      + 'but it no longer counts as a problem.';
+    result.hidden = false;
+    fetchRunsPage(); // the list row reads fixed
+  } catch (error) {
+    const result = $('#run-replay-result');
+    result.textContent = error.message;
+    result.classList.add('error');
+    result.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
 
 /* Cancel drops a suspended run's parked continuation: the delay steps close
    out cancelled and the worker consumes the envelope when it next surfaces,

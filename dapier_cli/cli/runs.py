@@ -12,8 +12,16 @@ def register(sub):
     runs_list_p.add_argument("--limit", type=int, default=25)
     runs_list_p.add_argument("--workflow", help="Only runs of this workflow id")
     runs_list_p.add_argument("--status",
-                             help="success | failed | error | problems (failed or error), "
-                                  "or an exact status (completed, processing, filtered)")
+                             help="success | failed | error | problems (failed or error that "
+                                  "still needs action) | resolved (failures something "
+                                  "settled), or an exact status (completed, processing, "
+                                  "filtered)")
+    runs_list_p.add_argument("--resolved", dest="resolved", action="store_true",
+                             default=None,
+                             help="Only failures already fixed (the operator marked them, or a "
+                                  "later run of the workflow completed)")
+    runs_list_p.add_argument("--unresolved", dest="resolved", action="store_false",
+                             help="Only failures that still need action (the default set)")
     runs_list_p.add_argument("--since",
                              help="Only runs started at or after this ISO date/datetime")
     runs_list_p.add_argument("--before",
@@ -30,8 +38,15 @@ def register(sub):
     runs_replay_p.add_argument("--from-step", dest="from_step",
                                help="Replay from this top-level step id onward: earlier "
                                     "steps do not run again; their recorded outputs are reused")
+    runs_resolve_p = runs_sub.add_parser(
+        "resolve", help="Mark a failed run fixed: it stops counting as a problem")
+    runs_resolve_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
+    runs_resolve_p.add_argument("--note",
+                                help="Why it is handled (kept on the resolve call's audit entry)")
     runs_replay_failed_p = runs_sub.add_parser(
-        "replay-failed", help="Re-run the latest failed runs of one workflow")
+        "replay-failed",
+        help="Re-run the unresolved failed runs of one workflow (a completed rerun "
+             "resolves them; already-fixed ones are left alone)")
     runs_replay_failed_p.add_argument("workflow_id", help="Workflow whose failed runs to replay")
     runs_cancel_p = runs_sub.add_parser(
         "cancel", help="Cancel a suspended run: it closes out cancelled and will not resume")
@@ -39,8 +54,16 @@ def register(sub):
     runs_export_p = runs_sub.add_parser("export", help="Export run history as CSV")
     runs_export_p.add_argument("--workflow", help="Only runs of this workflow id")
     runs_export_p.add_argument("--status",
-                               help="success | failed | error | problems (failed or error), "
-                                    "or an exact status (completed, processing, filtered)")
+                               help="success | failed | error | problems (failed or error that "
+                                    "still needs action) | resolved (failures something "
+                                    "settled), or an exact status (completed, processing, "
+                                    "filtered)")
+    runs_export_p.add_argument("--resolved", dest="resolved", action="store_true",
+                               default=None,
+                               help="Only failures already fixed (the operator marked them, or a "
+                                    "later run of the workflow completed)")
+    runs_export_p.add_argument("--unresolved", dest="resolved", action="store_false",
+                               help="Only failures that still need action (the default set)")
     runs_export_p.add_argument("--since",
                                help="Only runs started at or after this ISO date/datetime")
     runs_export_p.add_argument("--before",
@@ -87,11 +110,14 @@ def run(args, api_url, debug, child=None):
         return commands.runs_list(api_url, args.limit, workflow=args.workflow,
                                   status=args.status, since=args.since,
                                   before=args.before, query=args.search,
-                                  next_token=args.next_token, debug=debug)
+                                  next_token=args.next_token,
+                                  resolved=args.resolved, debug=debug)
     if args.command == "show":
         return commands.runs_show(api_url, args.run_id, debug)
     if args.command == "replay":
         return commands.runs_replay(api_url, args.run_id, from_step=args.from_step, debug=debug)
+    if args.command == "resolve":
+        return commands.runs_resolve(api_url, args.run_id, note=args.note, debug=debug)
     if args.command == "replay-failed":
         return commands.runs_replay_failed(api_url, args.workflow_id, debug)
     if args.command == "cancel":
@@ -100,7 +126,8 @@ def run(args, api_url, debug, child=None):
         return commands.runs_export(api_url, out=args.out, max_rows=args.max_rows,
                                     workflow=args.workflow, status=args.status,
                                     since=args.since, before=args.before,
-                                    query=args.search, debug=debug)
+                                    query=args.search, resolved=args.resolved,
+                                    debug=debug)
     return 2
 
 

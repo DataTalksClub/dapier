@@ -109,6 +109,7 @@ webhook — used by trigger setup flows.
 | Capability | API | CLI | Console |
 |---|---|---|---|
 | Run replay | ✅ agent + admin | ✅ `dapier runs replay` | ✅ runs view |
+| Mark a failure fixed | ✅ agent + admin | ✅ `dapier runs resolve` | ✅ runs view "Mark fixed" |
 | Inbox replay | ✅ agent + admin | ✅ `dapier inbox replay` | ✅ Trigger inbox view |
 | Workflow test (dry-run) | ✅ agent `designer/workflows/test` (+ per-file) | ✅ `dapier workflows test` | ✅ designer Test |
 | Workflow step test (per-step, live) | ✅ agent `designer/workflows/test-step` (+ per-file) | ✅ `dapier workflows test-step` | ✅ designer inspector "Test step" |
