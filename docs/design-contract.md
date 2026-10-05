@@ -58,11 +58,10 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
   identifier texture; dataops uses sans for the same slots.
 - The workflows list expresses On/Off with a switch (it is the toggle, not a
   status readout); run status comes from the dot+word "Latest run" read.
-- Connections rows may carry two actions (Get token + Manage): token
-  retrieval is a distinct operator task. Candidate for a follow-up menu.
-  The Connections register is grouped by **service** (Gmail, Calendar,
-  Drive, Docs, Sheets, YouTube, …), not by OAuth provider; treatments
-  live in [`connections-page.md`](connections-page.md).
+- Connections rows carry Manage (and Finish setup / Reconnect when the
+  grant needs it). Provider access tokens stay on the CLI
+  (`dapier token exec|write`); the console does not reveal them.
+  Treatments live in [`connections-page.md`](connections-page.md).
 - The standalone designer's footer shows the working-copy git state
   (branch + clean/dirty). It is local tool chrome for the operator who
   commits workflows, not a family-shell element.

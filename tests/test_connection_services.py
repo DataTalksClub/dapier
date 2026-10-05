@@ -105,6 +105,8 @@ def test_console_groups_google_by_account():
     assert "CONNECT_PROVIDERS" not in JS
     assert "dk-button--secondary connection-oauth" in JS
     assert "dk-button--primary connection-oauth" not in JS
+    assert "Get token" not in JS
+    assert "provider-token-button" not in JS
 
 
 def test_zoom_oauth_rows_offer_reconnect():

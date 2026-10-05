@@ -1,8 +1,8 @@
 /* Connections view: a register of services, and the add-service picker. */
 import { state } from '../state.js';
-import { $, $$, icons, notice, serviceMark } from '../ui.js';
+import { $, $$, notice, serviceMark } from '../ui.js';
 import { api } from '../api.js';
-import { detailRows, escapeHtml, formatTimestamp, statusLine } from '../format.js';
+import { escapeHtml, formatTimestamp, statusLine } from '../format.js';
 import { refresh } from './overview.js';
 
 /* Keep ids, labels, providers, connectionId, and default scopes in lockstep
@@ -664,7 +664,6 @@ function renderConnections(connections) {
   }).join('');
   $('#connection-register').innerHTML = googlePanel + restPanels;
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
-  $$('.provider-token-button').forEach((button) => button.addEventListener('click', () => issueConnectionToken(button)));
   bindOAuthLinks();
 }
 
@@ -690,11 +689,6 @@ function accountRow(connection, serviceId) {
     const status = effectiveStatus(connection);
     const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
-    /* Console mirror of `dapier token exec`: only OAuth connections hold a
-       refreshable provider access token — token providers (slack, telegram,
-       zoom) keep a pasted secret, and the shared domain call 502s for them. */
-    const tokenAction = status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
-      ? `<button class="dk-button dk-button--secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
     const identity = accountIdentity(connection);
     const title = identity || (serviceId ? connection.connection_id : 'Not signed in');
     const products = productList(connection);
@@ -718,7 +712,7 @@ function accountRow(connection, serviceId) {
       ${statusLine(status, CONNECTION_STATUS_LABELS)}
       ${expires && status !== 'expired' ? `<span class="cell-sub">expires ${escapeHtml(expires)}</span>` : ''}
     </div>
-    <div class="service-account-actions">${nextAction}${tokenAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
+    <div class="service-account-actions">${nextAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
   </li>`;
 }
 
@@ -843,105 +837,6 @@ $('#edit-connection-test').addEventListener('click', async (event) => {
     button.textContent = 'Test';
   }
 });
-
-/* Fresh provider token: the console mirror of `dapier token exec` —
-   POST /api/admin/connections/{id}/token drives the same tokens domain the
-   agent API uses. The value is a live credential shown once; this dialog is
-   built here rather than in index.html because only this view needs it. */
-let tokenResultDialog = null;
-
-function tokenResultElements() {
-  if (tokenResultDialog) return tokenResultDialog;
-  const dialog = document.createElement('dialog');
-  dialog.id = 'provider-token-dialog';
-  dialog.setAttribute('aria-labelledby', 'provider-token-title');
-  dialog.innerHTML = `
-    <div class="dialog-head">
-      <h2 id="provider-token-title">Provider token</h2>
-      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-    </div>
-    <div class="dialog-body">
-      <p id="provider-token-meta" class="sub mono"></p>
-      <p class="sub">This is a live credential for the provider account — treat it like a password. It is shown once; closing this dialog clears it.</p>
-      <div id="provider-token-reveal" class="token-reveal" hidden>
-        <code id="provider-token-value" class="mono"></code>
-        <button id="provider-token-copy" class="dk-button dk-button--secondary" type="button">Copy</button>
-      </div>
-      <dl id="provider-token-details"></dl>
-      <p id="provider-token-error" class="form-error" role="alert"></p>
-    </div>
-    <div class="dialog-actions">
-      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
-    </div>`;
-  document.body.appendChild(dialog);
-  icons();
-  // main.js binds .dialog-close only at load, so this dynamic dialog binds its own.
-  $$('.dialog-close', dialog).forEach((button) => button.addEventListener('click', () => dialog.close()));
-  $('#provider-token-copy').addEventListener('click', async () => {
-    const value = $('#provider-token-value').textContent;
-    try {
-      await navigator.clipboard.writeText(value);
-      $('#provider-token-copy').textContent = 'Copied';
-      setTimeout(() => { $('#provider-token-copy').textContent = 'Copy'; }, 2000);
-    } catch (_) {
-      // Clipboard refused (insecure context): fall back to manual selection.
-      const range = document.createRange();
-      range.selectNodeContents($('#provider-token-value'));
-      const selection = getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-  });
-  // The token never outlives the dialog: any close (button, Esc) wipes it.
-  dialog.addEventListener('close', () => {
-    $('#provider-token-value').textContent = '';
-    $('#provider-token-details').innerHTML = '';
-  });
-  tokenResultDialog = dialog;
-  return dialog;
-}
-
-/* api() surfaces only the response body's error text, not the status, so the
-   route's per-status copy is matched on that text: a 409 binding mismatch
-   names the provider account and 502's body is exactly the string asked of
-   this view; everything else falls back to one generic line. */
-function tokenIssueErrorMessage(error) {
-  const message = error?.message || '';
-  if (message === 'Provider token is unavailable' || /provider account/i.test(message)) return message;
-  return 'Could not get a provider token. Try again.';
-}
-
-function showConnectionTokenResult(connectionId, result, error) {
-  const dialog = tokenResultElements();
-  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
-  $('#provider-token-title').textContent = error ? 'Provider token unavailable' : 'Provider token';
-  $('#provider-token-meta').textContent = `${connection?.provider || 'connection'} · ${connectionId}`;
-  $('#provider-token-reveal').hidden = !result;
-  $('#provider-token-value').textContent = result ? result.access_token : '';
-  $('#provider-token-details').innerHTML = result ? detailRows([
-    ['Provider account', [result.account_title, result.provider_account_id].filter(Boolean).join(' · ')],
-    ['Scope', result.scope],
-    ['Expires', formatTimestamp(result.expires_at)],
-    ['Refreshed', result.refreshed ? 'Yes — a fresh token was fetched from the provider' : 'No — the connection\'s current token'],
-  ]) : '';
-  $('#provider-token-error').textContent = error ? tokenIssueErrorMessage(error) : '';
-  if (!dialog.open) dialog.showModal();
-}
-
-async function issueConnectionToken(button) {
-  const connectionId = button.dataset.connection;
-  button.disabled = true;
-  button.textContent = 'Fetching…';
-  try {
-    const result = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/token`, { method: 'POST' });
-    showConnectionTokenResult(connectionId, result, null);
-  } catch (error) {
-    showConnectionTokenResult(connectionId, null, error);
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Get token';
-  }
-}
 
 /* Explore data: Zapier-style discovery over the connection's provider —
    the same api.discovery domain `dapier connections discover` drives.

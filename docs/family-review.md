@@ -103,8 +103,8 @@ and the zoom icon-buttons needed explicit 44px rules.
   uses sans — kept as dapier's identifier texture.
 - The workflows list expresses On/Off with a switch control (it is the
   toggle, not a status readout); status reads come from "Latest run".
-- Connections rows may show two row actions (Get token + Manage); token
-  retrieval is a distinct operator task. Candidate for a follow-up menu.
+- Connections rows show Manage (and Finish setup / Reconnect when needed).
+  Provider access tokens are CLI-only; the console does not reveal them.
 - Mobile page header keeps the 22px title inside the top bar block (with
   description) instead of repeating it in the canvas — same anatomy, one
   header instance; the workflow-count metadata may wrap to two lines in the

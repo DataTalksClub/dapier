@@ -138,9 +138,9 @@ webhook — used by trigger setup flows.
   hooks|schedules|polls list|save|delete`, console `/triggers` (hooks +
   polls) and `/schedules`, over the existing `/api/{admin,agent}/*-triggers`
   routes.
-- Fresh provider token on the console: Connections-view "Get token" over
-  `POST /api/admin/connections/{id}/token` (same domain call as
-  `dapier token exec|write`).
+- Fresh provider token is CLI-only (`dapier token exec|write` over
+  `POST /api/{admin,agent}/connections/{id}/token`). The console does
+  not reveal provider access tokens.
 - Designer: the "Insert from previous steps" output picker
   (`{steps.<id>.output.*}` chips).
 - Actions: `http_request` auth variety (`auth_type: basic|bearer|api_key`),

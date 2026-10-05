@@ -55,11 +55,11 @@ email is "Not signed in", never a fake Drive account.
   Sheets · google-calendar`. Sentence case, muted, not a chip.
 - **Status** is a stacked dot+word; expiry is a second line. Never inline
   with the word "connected".
-- **Actions:** Manage + Get token stay (family departure already
-  recorded). Finish setup and Reconnect are secondary. One primary on
-  the page (Add connection). Reconnect is on every OAuth row that needs
-  it (Google, YouTube, Dropbox, Zoom). Slack and Telegram paste a new
-  token in Manage.
+- **Actions:** Manage on every row. Finish setup and Reconnect are
+  secondary. One primary on the page (Add connection). Reconnect is on
+  every OAuth row that needs it (Google, YouTube, Dropbox, Zoom). Slack
+  and Telegram paste a new token in Manage. Provider access tokens are
+  CLI-only (`dapier token exec|write`); the console does not reveal them.
 - **Add picker** lists services, not OAuth providers. Google products are
   first-class cards with their own default scopes.
 - **Empty / filter empty** stay the family empty-state, no illustration.
