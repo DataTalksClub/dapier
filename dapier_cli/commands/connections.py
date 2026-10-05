@@ -28,15 +28,25 @@ def _local_expiry(item):
         return "-"
 
 
+def _services_label(item):
+    """Human service names (Gmail, Calendar, Drive…), else the provider."""
+    names = []
+    for service in item.get("services") or []:
+        if isinstance(service, dict):
+            names.append(service.get("label") or service.get("id") or "")
+        elif service:
+            names.append(str(service))
+    names = [name for name in names if name]
+    return ", ".join(names) if names else (item.get("provider") or "-")
+
+
 def print_connections(items):
-    print(f"{'CONNECTION':24} {'PROVIDER':10} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'USED IN':24} ACCOUNT")
+    print(f"{'CONNECTION':24} {'SERVICES':36} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'USED IN':24} ACCOUNT")
     for item in items:
         account = item.get("account_title") or item.get("verified_account_id") or "-"
-        scopes = ",".join((item.get("granted_scopes") or item.get("scopes") or [])[:2])
-        extra = f" [{scopes}]" if scopes else ""
-        print(f"{item.get('connection_id', ''):24} {item.get('provider', ''):10} "
+        print(f"{item.get('connection_id', ''):24} {_services_label(item):36} "
               f"{item.get('status', ''):10} {item.get('health') or '-':8} {_local_expiry(item):17} "
-              f"{_used_in_label(item):24} {account}{extra}")
+              f"{_used_in_label(item):24} {account}")
 
 
 def _used_in_label(item):
@@ -53,10 +63,13 @@ def _used_in_label(item):
 def print_connection(item):
     for key in ("connection_id", "provider", "display_name", "status", "health",
                 "verified_account_id", "account_title", "expected_account_id",
-                "granted_scopes", "scopes", "version", "updated_at", "connected_at"):
+                "services", "granted_scopes", "scopes", "version", "updated_at",
+                "connected_at"):
         if item.get(key) not in (None, "", []):
             value = item[key]
-            if isinstance(value, list):
+            if key == "services" and isinstance(value, list):
+                value = _services_label(item)
+            elif isinstance(value, list):
                 value = " ".join(value)
             print(f"{key}: {value}")
     if item.get("token_expires_at"):

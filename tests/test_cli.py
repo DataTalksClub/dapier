@@ -1449,7 +1449,14 @@ def test_connections_list_prints_health_and_expiry(capsys, monkeypatch):
         return {"connections": [
             {"connection_id": "youtube-personal", "provider": "youtube", "status": "connected",
              "health": "expired", "token_expires_at": "2026-01-02T03:04:00+00:00",
-             "account_title": "Ch"},
+             "account_title": "Ch",
+             "services": [{"id": "youtube", "label": "YouTube"}]},
+            {"connection_id": "google-calendar", "provider": "google", "status": "connected",
+             "health": "ok", "account_title": "ops@example.test",
+             "services": [
+                 {"id": "gmail", "label": "Gmail"},
+                 {"id": "calendar", "label": "Google Calendar"},
+             ]},
             {"connection_id": "slack-team", "provider": "slack", "status": "connected",
              "health": "ok"},
         ]}
@@ -1458,6 +1465,9 @@ def test_connections_list_prints_health_and_expiry(capsys, monkeypatch):
     assert commands.connections_list("https://api.example.test") == 0
     out = capsys.readouterr().out
     assert "HEALTH" in out and "EXPIRES" in out
+    assert "SERVICES" in out
+    assert "YouTube" in out
+    assert "Gmail, Google Calendar" in out
     assert "expired" in out
     assert "2026-01-02" in out
     assert " ok " in out

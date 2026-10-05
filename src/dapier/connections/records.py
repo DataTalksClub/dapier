@@ -18,6 +18,7 @@ import json
 import re
 from datetime import datetime, timezone
 
+from . import services as connection_services
 from .providers import oauth_providers
 
 CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
@@ -261,6 +262,7 @@ def public_view(item, stored=None):
         "version": item.get("version"),
         "updated_at": item.get("updated_at"),
         "connected_at": item.get("connected_at"),
+        "services": connection_services.services_for(item),
     }
 
 
