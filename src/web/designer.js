@@ -18270,7 +18270,7 @@
       type: "dropbox_upload",
       label: "Dropbox upload",
       icon: DropboxLogo,
-      description: "Upload the email's stored attachments — or a rendered output file — into a folder in the connection's Dropbox. Output: {uploaded: [paths]}.",
+      description: "Upload the email's stored attachments — or a rendered output file — into a folder in the connection's Dropbox. Output: {uploaded: [paths], already_exists}.",
       fields: [
         { key: "connection_id", label: "Dropbox connection", placeholder: "dropbox", required: true, provider: "dropbox" },
         { key: "source", label: "Source", type: "select", options: ["attachment", "output"], default: "attachment" },
@@ -18281,7 +18281,11 @@
           required: true,
           discover: { resource: "folders", value: "{path}" }
         },
-        { key: "filename", label: "Filename override" }
+        { key: "filename", label: "Filename override" },
+        { key: "overwrite", label: "Overwrite existing file", type: "boolean", default: "false" },
+        { key: "strict_conflict", label: "Reject identical file conflicts", type: "boolean", default: "false" },
+        { key: "autorename", label: "Autorename on conflict", type: "boolean", default: "true" },
+        { key: "skip_existing", label: "Skip when the path already exists", type: "boolean", default: "false" }
       ]
     },
     {
