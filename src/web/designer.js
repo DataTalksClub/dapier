@@ -22422,7 +22422,6 @@
         data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
       };
       setSourceName(null);
-      setHookBacked(false);
       setInvalidRawDrafts({});
       setWorkflowId("new-workflow");
       setEnabled(true);
