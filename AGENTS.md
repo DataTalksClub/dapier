@@ -109,10 +109,11 @@ surfaces, re-run the parity audit above before merging so the list stays empty.
 
 When a task finishes, land it in the same session: split the changes into
 focused commits — one theme per commit, with that theme's code, tests, and
-docs together — and push. Do not leave finished work as a pile of uncommitted
-local changes, and do not bundle unrelated changes into a feature commit.
-Before pushing, run `make test` at the committed tip and confirm the push
-landed (`git status -sb`, `git log origin/main`).
+docs together — and push them to `main`. Create a feature branch only when
+the operator explicitly asks for one. Do not leave finished work as a pile of
+uncommitted local changes, and do not bundle unrelated changes into a feature
+commit. Before pushing, run `make test` at the committed tip and confirm the
+push landed (`git status -sb`, `git log origin/main`).
 
 ## Deployment and live configuration (required)
 

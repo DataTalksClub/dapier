@@ -135,9 +135,12 @@ retry an upload through the authenticated event API, then checks the event
 again. It reports an ambiguous event match instead of selecting one by guess.
 It does not notify registrants unless the operator asks for that action.
 For any task that changes a Git repository, the agent stages only its intended
-files, runs the repository's required checks, commits in focused commits, pushes
-to the configured remote branch, and verifies the push. It preserves unrelated
-work and reports any check or push blocker in the completion report. When files
+files, runs the repository's required checks, commits in focused commits, and
+pushes them to the repository's default branch (`main`, or `master` when that
+is the default). It creates a feature branch or pull request only when the
+operator's own instructions explicitly ask for one. A push that deploys a live
+site is the intended completion. It preserves unrelated work and reports any
+check or push blocker in the completion report. When files
 were pushed, the reply includes direct HTTPS links to the primary files at the
 verified commit and to the commit itself, derived from the actual Git remote.
 Each full URL appears on its own line so it is clickable in plain-text email.
