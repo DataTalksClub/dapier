@@ -110,6 +110,10 @@ def _route_usage_errors(event, method, path, operator_payload, operator_subject)
     run_cancel_match = re.fullmatch(r"/api/admin/runs/([^/]+)/cancel", path)
     if method == "POST" and run_cancel_match:
         return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject)
+    run_resolve_match = re.fullmatch(r"/api/admin/runs/([^/]+)/resolve", path)
+    if method == "POST" and run_resolve_match:
+        return routes.resolve_run(unquote(run_resolve_match.group(1)),
+                                  operator_subject, event)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
         return routes.get_run(unquote(run_match.group(1)),

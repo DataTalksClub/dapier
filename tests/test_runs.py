@@ -472,8 +472,11 @@ def test_api_export_returns_the_newest_runs_as_csv(monkeypatch):
     assert payload["filename"].startswith("dapier-runs-")
     lines = payload["csv"].splitlines()
     assert lines[0] == ",".join(runs.CSV_COLUMNS)
-    # Newest first; booleans read true/false, missing fields read "".
-    assert lines[1] == ("wf-b:evt-2,wf-b,email,message.received,failed,false,1,,post,,"
+    # Newest first; booleans read true/false, missing fields read "". The
+    # failure has no resolution: nothing fixed it and no later run of wf-b
+    # completed, so resolved and resolved_reason are both empty.
+    assert lines[1] == ("wf-b:evt-2,wf-b,email,message.received,failed,false,,false,"
+                        "1,,post,,"
                         "2026-09-25T11:00:00+00:00,2026-09-25T11:00:02+00:00,1200,"
                         "Slack said no")
 

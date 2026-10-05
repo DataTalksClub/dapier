@@ -28,14 +28,19 @@ def render(summary):
     """Subject and plain-text body for one ``errors.api_summary`` payload.
 
     Short by design: one line per failing workflow (count) plus its most
-    recent failure (timestamp + truncated error).
+    recent failure (timestamp + truncated error). The summary counts only
+    failures that still need action, so this digest is the work left, not
+    every red row in history — a workflow whose failures a completed replay
+    settled, or that an operator marked fixed, is absent from it.
     """
     total = int(summary.get("total_failed_runs") or 0)
     days = int(summary.get("window_days") or 1)
     window = "24h" if days == 1 else f"{days} days"
     plural = "" if total == 1 else "s"
     subject = f"dapier error digest: {total} failed run{plural} (last {window})"
-    lines = [f"Failed runs by workflow over the last {window}: {total} total.", ""]
+    lines = [f"Failures still to fix, by workflow, over the last {window}: "
+             f"{total} total. Failures already fixed (marked, or settled by a "
+             f"successful replay) are excluded.", ""]
     if summary.get("bounded"):
         # The summary hit its scan cap: the total covers only the newest
         # ``cap`` failed runs, so the digest must not read as the full count.

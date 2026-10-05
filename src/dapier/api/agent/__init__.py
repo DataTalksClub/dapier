@@ -146,6 +146,9 @@ def route(event, method, path):
     runs_cancel_match = re.fullmatch(r"/api/agent/runs/([^/]+)/cancel", path)
     if runs_cancel_match and method == "POST":
         return runs_cancel_api(event, unquote(runs_cancel_match.group(1)))
+    runs_resolve_match = re.fullmatch(r"/api/agent/runs/([^/]+)/resolve", path)
+    if runs_resolve_match and method == "POST":
+        return runs_resolve_api(event, unquote(runs_resolve_match.group(1)))
     if path == "/api/agent/triggers/inbox" and method == "GET":
         return inbox_api(event)
     if path == "/api/agent/triggers/sample" and method == "GET":

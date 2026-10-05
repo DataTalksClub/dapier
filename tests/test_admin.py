@@ -871,9 +871,18 @@ def _configure_delayed_run(monkeypatch, items):
 
         def update_item(self, **kwargs):
             updates.append(kwargs)
+            values = kwargs["ExpressionAttributeValues"]
+            # Both runs routes write here: cancel flips a parked step to
+            # cancelled, resolve stamps the resolution. Apply whichever
+            # fields this call carried so the row reflects the write.
             for item in items:
                 if item.get("execution_id") == kwargs["Key"]["execution_id"]:
-                    item["status"] = kwargs["ExpressionAttributeValues"][":cancelled"]
+                    for attribute, name in (("status", ":cancelled"),
+                                            ("resolved_at", ":at"),
+                                            ("resolved_reason", ":reason"),
+                                            ("resolved_by", ":by")):
+                        if name in values:
+                            item[attribute] = values[name]
             return {}
 
     class Dynamo:
@@ -943,6 +952,90 @@ def test_admin_run_cancel_requires_authentication(monkeypatch):
     )
 
     assert cancelled["statusCode"] == 401
+
+
+def test_admin_run_resolve_marks_a_failure_fixed_and_leaves_a_mark(monkeypatch):
+    cookies, updates = _configure_delayed_run(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:00+01:00",
+        "error": "webhook returned HTTP 500",
+    }])
+    audited = []
+    monkeypatch.setattr(admin.routes.session, "_audit_event",
+                        lambda *a, **k: audited.append((a, k)))
+
+    resolved = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/resolve", cookies=cookies),
+        "POST", "/api/admin/runs/wf-1:evt-1/resolve",
+    )
+
+    assert resolved["statusCode"] == 200
+    body = json.loads(resolved["body"])
+    assert body["resolved"] is True
+    assert body["already_resolved"] is False
+    assert body["run"]["resolved"] is True
+    assert body["run"]["resolved_reason"] == "acknowledged"
+    assert body["run"]["resolved_by"] == "op-sub"
+    # The stamp carries the operator, and the run stays a failed run.
+    assert updates[0]["ExpressionAttributeValues"][":by"] == "op-sub"
+    assert body["run"]["status"] == "failed"
+    assert audited == [(("wf-1:evt-1", "runs.resolve", "op-sub"), {"outcome": "ok"})]
+
+
+def test_admin_run_resolve_leaves_the_failures_view(monkeypatch):
+    cookies, _ = _configure_delayed_run(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "error": "webhook returned HTTP 500",
+    }])
+
+    def list_runs(status):
+        event = operator_request("GET", "/api/admin/runs", cookies=cookies)
+        event["queryStringParameters"] = {"status": status}
+        return json.loads(admin.route(event, "GET", "/api/admin/runs")["body"])["runs"]
+
+    assert [run["run_id"] for run in list_runs("problems")] == ["wf-1:evt-1"]
+
+    admin.route(operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/resolve",
+                                 cookies=cookies),
+                "POST", "/api/admin/runs/wf-1:evt-1/resolve")
+
+    assert list_runs("problems") == []
+    assert [run["run_id"] for run in list_runs("resolved")] == ["wf-1:evt-1"]
+    # Still in history, still a failed run — only the verdict moved.
+    assert list_runs("failed")[0]["resolved_reason"] == "acknowledged"
+
+
+def test_admin_run_resolve_on_a_healthy_run_is_409(monkeypatch):
+    cookies, updates = _configure_delayed_run(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1",
+        "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+        "connector": "email", "event_type": "message.received", "status": "completed",
+        "started_at": "2026-09-25T10:00:00+00:00",
+    }])
+
+    resolved = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1%3Aevt-1/resolve", cookies=cookies),
+        "POST", "/api/admin/runs/wf-1:evt-1/resolve",
+    )
+
+    assert resolved["statusCode"] == 409
+    assert "only a failed run" in json.loads(resolved["body"])["error"]
+    assert updates == []
+
+
+def test_admin_run_resolve_requires_authentication(monkeypatch):
+    _configure_delayed_run(monkeypatch, [])
+
+    resolved = admin.route(
+        operator_request("POST", "/api/admin/runs/wf-1:evt-1/resolve", cookies=[]),
+        "POST", "/api/admin/runs/wf-1:evt-1/resolve",
+    )
+
+    assert resolved["statusCode"] == 401
 
 
 # --- Audit trail read surface (GET /api/admin/audit) ---

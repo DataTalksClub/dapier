@@ -1,5 +1,5 @@
 """Operator run endpoints: the history list, the CSV export,
-replays, cancel, and the replay-failed bulk op."""
+replays, cancel, resolve, and the replay-failed bulk op."""
 from ... import http
 import json
 from .. import runs
@@ -92,7 +92,8 @@ def cancel_run(run_id, operator):
 
 
 def replay_failed_runs(event, operator):
-    """Re-execute the latest failed runs of the workflow named in the body."""
+    """Re-execute the latest unresolved failed runs of the workflow named in
+    the body — the ones a fix has not already settled."""
     try:
         body = json.loads(event.get("body") or "{}")
     except (ValueError, json.JSONDecodeError):
@@ -102,6 +103,26 @@ def replay_failed_runs(event, operator):
     if status == 202:
         session._audit_event(workflow_id, "runs.replay-failed",
                              operator or "unknown", outcome="ok")
+    return http._json_response(status, payload)
+
+
+def resolve_run(run_id, operator, event=None):
+    """Mark a failed run fixed: it drops out of the failure views.
+
+    What the console's "Mark fixed" button and ``dapier runs resolve`` both
+    call. The stamp lands on the run's steps (runs.api_resolve), the run
+    keeps its failed status in history, and the audit trail records the
+    operator's call — resolving a failure is a decision, not a computation.
+    """
+    try:
+        body = json.loads(event.get("body") or "{}") if event else {}
+    except (ValueError, json.JSONDecodeError):
+        return http._json_response(400, {"error": "Invalid request"})
+    status, payload = runs.api_resolve(run_id, note=(body or {}).get("note"),
+                                       by=operator or "unknown")
+    if status == 200 and not payload.get("already_resolved"):
+        session._audit_event(run_id, "runs.resolve", operator or "unknown",
+                             outcome="ok")
     return http._json_response(status, payload)
 
 

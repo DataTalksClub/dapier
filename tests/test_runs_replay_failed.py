@@ -258,7 +258,7 @@ def test_cli_replay_failed_posts_the_workflow(monkeypatch, capsys):
     assert (seen["method"], seen["path"]) == ("POST", "/api/agent/runs/replay-failed")
     assert seen["body"] == {"workflow_id": "wf-1"}
     out, _ = capsys.readouterr()
-    assert "Replay accepted for 1 failed run(s) of wf-1; 1 skipped." in out
+    assert "Replay accepted for 1 unresolved failed run(s) of wf-1; 1 skipped." in out
     assert "wf-1:evt-1: replayed as wf-1:replay-1" in out
     assert "wf-1:evt-2: skipped (too large)" in out
 

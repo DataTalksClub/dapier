@@ -26,7 +26,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
+__all__ = ["agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "runs_resolve_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
 
 
 
@@ -366,12 +366,33 @@ def runs_cancel_api(event, run_id):
     return _no_store(_json_response(status, payload))
 
 
+def runs_resolve_api(event, run_id):
+    """Operator-only mark-a-failure-fixed, mirroring the console's button.
+
+    Stamps ``runs.resolve`` on the run's steps (runs.api_resolve) so the
+    failure stops counting as a problem in every view and in
+    ``dapier errors``; the run keeps its failed status and error in history.
+    The stamp is audited — resolving a failure is an operator's decision
+    about work nobody will do, and the trail should say who and when.
+    """
+    subject, error = require_operator(event, "runs.resolve")
+    if error:
+        return error
+    status, payload = runs.api_resolve(run_id, note=_request_body(event).get("note"),
+                                       by=subject)
+    if status == 200 and not payload.get("already_resolved"):
+        audit.emit(run_id, "runs.resolve", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
 def runs_replay_failed_api(event):
-    """Operator-only bulk replay: re-inject the workflow's latest failed runs.
+    """Operator-only bulk replay: re-inject the workflow's unresolved failures.
 
     Same path as a single replay, applied to up to MAX_REPLAY_FAILED failed
-    runs of the workflow named in the body; runs without recorded event data
-    are skipped with a reason.
+    runs of the workflow named in the body that are still unresolved — a run
+    an operator marked fixed, or one a completed rerun already recovered, is
+    not what this is for. Runs without recorded event data are skipped with a
+    reason.
     """
     subject, error = require_operator(event, "runs.replay-failed")
     if error:

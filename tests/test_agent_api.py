@@ -1221,9 +1221,17 @@ def _configure_cancellable_runs_table(monkeypatch, items):
 
         def update_item(self, **kwargs):
             updates.append(kwargs)
+            values = kwargs["ExpressionAttributeValues"]
+            # Both runs writes land here: cancel flips a parked step,
+            # resolve stamps the resolution. Apply whichever this call had.
             for item in items:
                 if item.get("execution_id") == kwargs["Key"]["execution_id"]:
-                    item["status"] = kwargs["ExpressionAttributeValues"][":cancelled"]
+                    for attribute, name in (("status", ":cancelled"),
+                                            ("resolved_at", ":at"),
+                                            ("resolved_reason", ":reason"),
+                                            ("resolved_by", ":by")):
+                        if name in values:
+                            item[attribute] = values[name]
             return {}
 
     monkeypatch.setattr(agent_api.runs, "_table", lambda: RunsTable())
@@ -1277,6 +1285,61 @@ def test_runs_cancel_over_bearer_rejects_a_run_not_suspended(monkeypatch):
 
     assert cancelled["statusCode"] == 409
     assert json.loads(cancelled["body"])["error"] == "Run is not suspended; nothing to cancel"
+
+
+FAILED_STEP = {
+    "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+    "action_id": "post", "action_type": "webhook", "connector": "email",
+    "event_type": "message.received", "status": "failed",
+    "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+    "error": "webhook returned HTTP 500",
+}
+
+
+def test_runs_resolve_over_bearer_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "subject-1", "email": "agent@example.test"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_cancellable_runs_table(monkeypatch, [dict(FAILED_STEP)])
+
+    resolved = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/resolve")
+
+    assert resolved["statusCode"] == 403
+
+
+def test_runs_resolve_over_bearer_marks_the_failure_fixed(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    updates = _configure_cancellable_runs_table(monkeypatch, [dict(FAILED_STEP)])
+    audited = []
+    monkeypatch.setattr(agent_api.audit, "emit", lambda *a, **k: audited.append((a, k)))
+
+    resolved = agent_api.route(event(), "POST", "/api/agent/runs/wf-1%3Aevt-1/resolve")
+
+    assert resolved["statusCode"] == 200
+    body = json.loads(resolved["body"])
+    assert body["resolved"] is True
+    assert body["run"]["resolved_reason"] == "acknowledged"
+    assert body["run"]["resolved_by"] == "op-1"
+    assert body["run"]["status"] == "failed"
+    assert updates[0]["ExpressionAttributeValues"][":by"] == "op-1"
+    assert audited == [(("wf-1:evt-1", "runs.resolve", "op-1"), {"outcome": "ok"})]
+
+    missing = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:missing/resolve")
+    assert missing["statusCode"] == 404
+
+
+def test_runs_resolve_over_bearer_rejects_a_healthy_run(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    _configure_cancellable_runs_table(monkeypatch, [{
+        "execution_id": "wf-1:post:evt-1", "run_id": "wf-1:evt-1", "workflow_id": "wf-1",
+        "action_id": "post", "connector": "email", "event_type": "message.received",
+        "status": "completed", "started_at": "2026-09-25T10:00:00+00:00",
+    }])
+
+    resolved = agent_api.route(event(), "POST", "/api/agent/runs/wf-1:evt-1/resolve")
+
+    assert resolved["statusCode"] == 409
 
 
 # --- Audit trail read (GET /api/agent/audit, mirroring /api/admin/audit) ---

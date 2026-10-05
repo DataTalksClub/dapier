@@ -3,6 +3,11 @@
 Reuses the runs module's grouped, bounded scans (api/runs.py) instead of a
 second walk over the executions ledger — the same ``problems`` alias that
 covers every failed-run shape (``failed`` and ``error``) on the runs list.
+
+Counts the failures that still need action: the ``problems`` alias excludes
+resolved ones, so a workflow whose failures a completed rerun (or an
+operator's Mark fixed) settled stops appearing here and stops counting in
+the total.
 """
 from datetime import datetime, timedelta, timezone
 
@@ -11,11 +16,13 @@ MAX_DAYS = 90
 
 
 def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
-    """Failed-run counts by workflow for the last ``days`` days.
+    """Unresolved failed-run counts by workflow for the last ``days`` days.
 
     The window is the runs list's own filter (newest-first scan, bounded
     like every list call), so counts cover the scanned window rather than
-    the whole ledger — the same trade the runs list makes.
+    the whole ledger — the same trade the runs list makes. Resolution rides
+    along: a failure a later completed run of the workflow recovered, or one
+    an operator marked fixed, is not counted.
 
     ``visible`` (G17 auth.visibility, None = unrestricted) scopes the
     counts to the workflows the caller may see, like the runs list does.

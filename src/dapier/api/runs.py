@@ -13,6 +13,17 @@ outputs of everything before it.
 Content search answers "which run carried X": the ``q`` filter matches the
 recorded step input/output/error inside the same bounded scan window the
 list already walks.
+
+Failure resolution tracks what still needs action. A failed run is
+*resolved* two ways: the operator says so (the Fixed button / ``runs
+resolve``, stamped on the run's steps), or a later run of the same workflow
+*completed* — the fix works, so the old failure is derived as recovered with
+nothing written. Derived recovery is what makes a replay settle the failure
+it was meant to fix: the rerun lands as a new run of the same workflow, and
+the earlier failure drops out of the failure views on the next read. Only a
+``completed`` rerun recovers — a ``filtered`` run never reached the step that
+failed, so it proves nothing. Resolved runs keep their status and error and
+stay in history; they just stop counting as problems.
 """
 import base64
 import csv
@@ -35,7 +46,8 @@ STEP_FIELDS = (
     "execution_id", "run_id", "workflow_id", "action_id", "action_type",
     "connector", "event_type", "correlation_id", "status", "started_at",
     "finished_at", "occurred_at", "duration_ms", "error", "input", "output",
-    "expires_at", "retry_attempt",
+    "expires_at", "retry_attempt", "resolved_at", "resolved_reason",
+    "resolved_by",
 )
 
 DEFAULT_LIMIT = 25
@@ -49,8 +61,9 @@ EXPORT_MAX_ROWS = 5000
 # One row per run; the fields of run_summary, in CSV order.
 CSV_COLUMNS = (
     "run_id", "workflow_id", "connector", "event_type", "status",
-    "had_skipped", "steps", "attempts", "failed_step", "delayed_until",
-    "started_at", "finished_at", "duration_ms", "error",
+    "resolved", "resolved_reason", "had_skipped", "steps", "attempts",
+    "failed_step", "delayed_until", "started_at", "finished_at",
+    "duration_ms", "error",
 )
 
 # The list row's "what actually arrived" line: keys that carry the event's
@@ -68,11 +81,20 @@ MAX_REPLAY_FAILED = 50
 
 # Friendly status names over the stored run statuses (worst-step rollup in
 # run_summary): success covers deliberate early exits, problems covers every
-# failure shape. Any other value matches a run status exactly.
+# failure shape *that still needs action*, resolved is the other half of that
+# split (the failures something settled), and any other value matches a run
+# status exactly. problems and resolved are complements over the failure
+# statuses; a healthy run is in neither.
 STATUS_ALIASES = {
     "success": ("completed", "filtered"),
     "problems": ("failed", "error"),
 }
+RESOLVED_STATUSES = ("failed", "error")
+
+# Why a failure stopped counting as a problem. ``acknowledged`` is the
+# operator pressing Fixed; ``recovered`` is derived from a later completed
+# run of the same workflow and is never written.
+RESOLVE_REASONS = ("acknowledged",)
 
 # DynamoDB can't filter grouped runs server-side, so the list walks scan
 # pages (never a whole table): page size and page count are both bounded.
@@ -180,6 +202,11 @@ def run_summary(run_id, items):
     failed = next((item for item in items if item.get("status") == "failed"), None)
     delayed = next((item for item in items if item.get("status") == "delayed"), None)
     errors = [item.get("error") for item in items if item.get("error")]
+    # An operator's Fixed button stamps every step of the run, so the rollup
+    # takes the latest stamp and its reason. ``recovered`` is applied later,
+    # across runs, by _derive_recovered — nothing writes it.
+    resolved_at = max((str(item.get("resolved_at") or "") for item in items),
+                      default="")
     return {
         "run_id": run_id,
         "workflow_id": first.get("workflow_id") or run_id.split(":")[0],
@@ -191,6 +218,15 @@ def run_summary(run_id, items):
         # still rolls up completed (the failure was absorbed), so the flag —
         # additive, no new run status — is how a list row surfaces the skip.
         "had_skipped": any(value == "skipped" for value in statuses),
+        # Whether this failure still needs action. False for a healthy run;
+        # for a failure, True until an operator marks it fixed or a later
+        # run of the workflow completes (mark_resolved / _derive_recovered).
+        "resolved": bool(resolved_at),
+        "resolved_at": resolved_at or None,
+        "resolved_reason": (max((str(item.get("resolved_reason") or "")
+                                 for item in items), default="") or None),
+        "resolved_by": (max((str(item.get("resolved_by") or "")
+                             for item in items), default="") or None),
         "steps": len(items),
         "attempts": _max_attempts(items),
         "failed_step": failed.get("action_id") if failed else None,
@@ -328,8 +364,20 @@ def _wanted(run, workflow_id=None, status=None, since=None, before=None):
     """Whether one run summary passes the list filters."""
     if workflow_id and run.get("workflow_id") != workflow_id:
         return False
-    if status:
+    if status == "resolved":
+        # The other half of ``problems``: the failures something settled,
+        # wherever the verdict came from. A healthy run has nothing to
+        # resolve, so it is in neither set.
+        if not (run.get("resolved") and run.get("status") in RESOLVED_STATUSES):
+            return False
+    elif status:
         if run.get("status") not in STATUS_ALIASES.get(status, (status,)):
+            return False
+        # ``problems`` is the actionable set: a failure an operator marked
+        # fixed, or one a later completed run recovered, keeps its failed
+        # status but is no longer a problem. Ask for the exact ``failed`` /
+        # ``error`` status to see them all.
+        if status == "problems" and run.get("resolved"):
             return False
     return not _out_of_window(run.get("started_at") or "", since=since, before=before)
 
@@ -390,6 +438,47 @@ def _group_runs(items):
     return [run_summary(run_id, group) for run_id, group in _grouped(items).items()]
 
 
+def _derive_recovered(runs):
+    """Mark the failed runs a later completed run of the same workflow fixed.
+
+    This is what makes a replay settle the failure it was meant to fix, and
+    it is derived rather than written: the rerun lands in history as an
+    ordinary completed run of the same workflow, and from then on the older
+    failure reads as ``recovered`` on every read — no worker write, no
+    bookkeeping to lose, and every already-fixed failure in the ledger
+    corrects itself the moment the fix is exercised.
+
+    Only ``completed`` recovers. A ``filtered`` rerun stopped before the
+    step that failed, so it proves the trigger still matches and nothing
+    more; a ``processing`` or ``delayed`` one has not finished judging. An
+    operator's own stamp (``acknowledged``) always wins, and a failure with
+    no later completed run of its workflow stays unresolved — that is the
+    whole point: it still needs action.
+
+    Recovery needs both runs in the same window, which the caller's bounded
+    scan already read; a failure whose recovering run aged out of the window
+    stays unresolved (conservative — the operator can still mark it fixed).
+    """
+    recovered_at = {}
+    for run in runs:
+        if run.get("status") != "completed":
+            continue
+        workflow_id = run.get("workflow_id")
+        started = run.get("started_at") or ""
+        if started > (recovered_at.get(workflow_id) or ""):
+            recovered_at[workflow_id] = started
+    for run in runs:
+        if run.get("resolved") or run.get("status") not in RESOLVED_STATUSES:
+            continue
+        fixing = recovered_at.get(run.get("workflow_id"))
+        if not fixing or fixing <= (run.get("started_at") or ""):
+            continue
+        run["resolved"] = True
+        run["resolved_at"] = fixing
+        run["resolved_reason"] = "recovered"
+    return runs
+
+
 def _search_blob(run_id, items):
     """The lowercase text one run's content search matches against.
 
@@ -438,6 +527,12 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     answers from history. The shape is backward compatible — ``runs`` is
     unchanged, ``paging`` is additive.
 
+    Every row carries its resolution (``resolved``, ``resolved_at``,
+    ``resolved_reason``), derived before filtering so a replay that fixed a
+    failure takes it out of ``problems`` on the next read. ``problems`` and
+    ``resolved`` are the two halves of the failure set: what still needs
+    action, and what something settled.
+
     ``visible`` (an auth.visibility.Visibility, None = unrestricted)
     read-filters the list, G17 Phase 2: a non-operator keeps only the runs
     of workflows it owns; a run whose workflow no longer exists resolves to
@@ -452,6 +547,7 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     owners = visibility.owners_for(visible)
     grouped = _grouped(_scan_items(limit))
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
+    _derive_recovered(runs)
     runs = [run for run in runs
             if _wanted(run, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
@@ -500,12 +596,12 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
                since=None, before=None, q=None, now=None, visible=None):
     """The filtered run history as CSV: ``(status, payload)``.
 
-    Same filters as api_list (including content search), newest first,
-    capped at ``max_rows`` rows (``truncated`` flags the clip). Returns
-    ``{filename, count, truncated, csv}`` — the caller decides delivery
-    (CLI file write, console download), like the audit trail's export.
-    ``visible`` applies the same G17 read filter as the list, so the CSV
-    cannot see past it.
+    Same filters as api_list (including content search and resolution),
+    newest first, capped at ``max_rows`` rows (``truncated`` flags the
+    clip). Returns ``{filename, count, truncated, csv}`` — the caller
+    decides delivery (CLI file write, console download), like the audit
+    trail's export. ``visible`` applies the same G17 read filter as the
+    list, so the CSV cannot see past it.
     """
     try:
         max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
@@ -514,6 +610,7 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     owners = visibility.owners_for(visible)
     grouped = _grouped(_export_window(max_rows))
     rows = [run_summary(run_id, group) for run_id, group in grouped.items()]
+    _derive_recovered(rows)
     rows = [row for row in rows
             if _wanted(row, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
@@ -537,10 +634,13 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     }
 
 
-def api_get(run_id, visible=None):
-    run_id = str(run_id or "").strip()
-    if not run_id:
-        return 400, {"error": "run_id is required"}
+def _run_items(run_id):
+    """One run's stored steps, oldest first: ``(status, payload)``.
+
+    The read behind api_get, split out so the replay and cancel paths —
+    which run in a loop over up to MAX_REPLAY_FAILED runs and never need
+    the list's cross-run derivation — don't pay for the extra scan it costs.
+    """
     items = _table().query(
         IndexName=GSI_NAME,
         KeyConditionExpression=Key("run_id").eq(run_id),
@@ -555,6 +655,15 @@ def api_get(run_id, visible=None):
             ).get("Items", [])
             if run_id_of(item) == run_id
         ]
+    items.sort(key=lambda item: (str(item.get("started_at") or ""), str(item.get("execution_id") or "")))
+    return items
+
+
+def api_get(run_id, visible=None):
+    run_id = str(run_id or "").strip()
+    if not run_id:
+        return 400, {"error": "run_id is required"}
+    items = _run_items(run_id)
     if not items:
         return 404, {"error": "Run not found"}
     owners = visibility.owners_for(visible)
@@ -564,9 +673,16 @@ def api_get(run_id, visible=None):
         # Same answer as a missing run: a hidden run must not reveal that
         # it exists (the list the caller came from already dropped it).
         return 404, {"error": "Run not found"}
-    items.sort(key=lambda item: (str(item.get("started_at") or ""), str(item.get("execution_id") or "")))
+    run = run_summary(run_id, items)
+    # Derive recovery for this one run too, so the detail view and the list
+    # agree on whether it still needs action. The GSI already gave us this
+    # run; the recovering evidence is whatever completed run of the same
+    # workflow the list scan reads, so reuse that bounded walk.
+    if not run.get("resolved") and run.get("status") in RESOLVED_STATUSES:
+        candidates = _derive_recovered([run] + _group_runs(_scan_items(DEFAULT_LIMIT)))
+        run = next((row for row in candidates if row["run_id"] == run_id), run)
     return 200, {
-        "run": run_summary(run_id, items),
+        "run": run,
         "steps": [_step_view(item) for item in items],
     }
 
@@ -738,9 +854,11 @@ def api_replay(run_id, *, queue=None, from_step=None):
     from_step = str(from_step or "").strip()
     if not run_id:
         return 400, {"error": "run_id is required"}
-    status, payload = api_get(run_id)
-    if status != 200:
-        return status, payload
+    items = _run_items(run_id)
+    if not items:
+        return 404, {"error": "Run not found"}
+    payload = {"run": run_summary(run_id, items),
+               "steps": [_step_view(item) for item in items]}
     steps = payload.get("steps") or []
     event, error = replay_event(run_id, steps)
     if error:
@@ -823,19 +941,93 @@ def api_cancel(run_id):
     }
 
 
+def api_resolve(run_id, *, note=None, by=None):
+    """Mark a failed run fixed: it stops counting as a problem.
+
+    The counterpart to the failure views — an operator saying "this is
+    handled" about a failure nothing will ever re-derive away. A dead
+    workflow's last run, a negative test that is supposed to fail, a
+    one-off event whose cause is gone: none of them get a later completed
+    run, so only an explicit mark retires them.
+
+    Like api_cancel, the durable record is the run history itself: the
+    stamp lands on every step of the run, and run_summary rolls it up, so
+    the mark survives whatever the scan window does. Steps are written
+    unconditionally and the write is idempotent — pressing the button twice
+    stamps the same moment twice rather than racing, and a second press
+    reports ``already_resolved`` instead of failing.
+
+    Only a failure can be resolved (a healthy run has nothing to retire),
+    hence 409. The write never changes a step's status: a resolved run still
+    reads ``failed`` with its error in history — it just leaves the
+    actionable sets.
+    """
+    run_id = str(run_id or "").strip()
+    if not run_id:
+        return 400, {"error": "run_id is required"}
+    status, payload = api_get(run_id)
+    if status != 200:
+        return status, payload
+    run = payload.get("run") or {}
+    if run.get("status") not in RESOLVED_STATUSES:
+        return 409, {"error": f"Run '{run_id}' is {run.get('status') or 'unknown'}; "
+                              "only a failed run can be marked fixed"}
+    if run.get("resolved"):
+        return 200, {
+            "resolved": True,
+            "already_resolved": True,
+            "run_id": run_id,
+            "resolved_at": run.get("resolved_at"),
+            "resolved_reason": run.get("resolved_reason"),
+            "run": run,
+        }
+    moment = datetime.now(timezone.utc).isoformat()
+    table = _table()
+    written = 0
+    for step in payload.get("steps") or []:
+        key = step.get("execution_id")
+        if not key:
+            continue
+        table.update_item(
+            Key={"execution_id": key},
+            UpdateExpression=("SET resolved_at = :at, resolved_reason = :reason, "
+                              "resolved_by = :by"),
+            ExpressionAttributeValues={
+                ":at": moment,
+                ":reason": "acknowledged",
+                ":by": str(by or "unknown"),
+            },
+        )
+        written += 1
+    _, refreshed = api_get(run_id)
+    return 200, {
+        "resolved": True,
+        "already_resolved": False,
+        "run_id": run_id,
+        "steps": written,
+        "resolved_at": moment,
+        "resolved_reason": "acknowledged",
+        "note": str(note) if note else None,
+        "run": refreshed.get("run") or {},
+    }
+
+
 def api_replay_failed(workflow_id, *, queue=None):
     """Replay the latest failed runs of one workflow, Zapier-style.
 
     Enumerates the workflow's failed runs through the same filtered list the
     operator sees (bounded to MAX_REPLAY_FAILED) and re-injects each through
-    api_replay. Runs whose event data was never recorded, or only as a
+    api_replay. Failures already resolved are left alone — a run the operator
+    marked fixed, or one a completed rerun recovered, is not what "replay
+    failed" is for. Runs whose event data was never recorded, or only as a
     truncated preview, are skipped with a reason instead of failing the
     batch. Asynchronous like a single replay, hence 202.
     """
     workflow_id = str(workflow_id or "").strip()
     if not workflow_id:
         return 400, {"error": "workflow_id is required"}
-    status, payload = api_list(MAX_REPLAY_FAILED, workflow_id=workflow_id, status="failed")
+    status, payload = api_list(MAX_REPLAY_FAILED, workflow_id=workflow_id,
+                               status="problems")
     if status != 200:
         return status, payload
     results = []
