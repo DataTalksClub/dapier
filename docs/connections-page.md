@@ -53,7 +53,9 @@ second Google credential.
   with the word "connected".
 - **Actions:** Manage + Get token stay (family departure already
   recorded). Finish setup and Reconnect are secondary. One primary on
-  the page (Add connection).
+  the page (Add connection). Reconnect is on every OAuth row that needs
+  it (Google, YouTube, Dropbox, Zoom). Slack and Telegram paste a new
+  token in Manage.
 - **Add picker** lists services, not OAuth providers. Google products are
   first-class cards with their own default scopes.
 - **Empty / filter empty** stay the family empty-state, no illustration.

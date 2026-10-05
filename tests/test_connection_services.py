@@ -103,3 +103,10 @@ def test_console_groups_by_service_not_provider():
     assert "CONNECT_PROVIDERS" not in JS
     assert "dk-button--secondary connection-oauth" in JS
     assert "dk-button--primary connection-oauth" not in JS
+
+
+def test_zoom_oauth_rows_offer_reconnect():
+    """Zoom meetings use OAuth start, same as YouTube; Slack/Telegram paste a token."""
+    assert "usesOAuthConsent" in JS
+    assert "provider !== 'slack' && provider !== 'telegram'" in JS
+    assert "usesOAuthConsent(connection.provider) && status !== 'connected'" in JS

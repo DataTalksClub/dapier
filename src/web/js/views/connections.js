@@ -146,8 +146,10 @@ function connectionHasService(connection, serviceId) {
   return servicesFor(connection).some((service) => service.id === serviceId);
 }
 
-/* Token providers paste a credential instead of browser consent. */
+/* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
+   starts consent); the webhook secret is a Manage field, not the reconnect path. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
+const usesOAuthConsent = (provider) => provider !== 'slack' && provider !== 'telegram';
 
 const TOKEN_PROVIDER_META = {
   slack: {
@@ -549,7 +551,7 @@ export function openEditConnection(connectionId) {
   dropboxSetup.hidden = connection.provider !== 'dropbox';
   if (connection.provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
   const reconnect = $('#edit-connection-reconnect');
-  reconnect.hidden = TOKEN_PROVIDERS.includes(connection.provider) || connection.status === 'ready';
+  reconnect.hidden = !usesOAuthConsent(connection.provider) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
   $('#edit-connection-revoke').hidden = !(['connected', 'expired'].includes(connection.status) ||
     (connection.provider === 'zoom' && connection.status === 'ready'));
@@ -650,7 +652,7 @@ function accountRow(connection, serviceId) {
        token turns a connected row into "needs reconnection" (the label the
        status map already carried) without rewriting the stored record. */
     const status = effectiveStatus(connection);
-    const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && status !== 'connected'
+    const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     /* Console mirror of `dapier token exec`: only OAuth connections hold a
        refreshable provider access token — token providers (slack, telegram,
