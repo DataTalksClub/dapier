@@ -82,7 +82,7 @@ p { margin: 0 0 16px; }
 .feature:last-child { border-bottom: 0; }
 .feature h3 { margin: 0 0 6px; }
 .feature p { margin: 0; color: var(--dk-text-muted); font-size: var(--dk-text-body); }
-.callout { margin-top: 48px; padding: 24px; border-left: 3px solid var(--dk-accent-default); background: var(--dk-bg-surface); }
+.callout { margin-top: 48px; padding: 24px; border: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); }
 .callout p:last-child { margin-bottom: 0; }
 
 .legal-page { max-width: 760px; }
