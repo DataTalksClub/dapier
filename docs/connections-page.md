@@ -30,25 +30,29 @@ Verified against the live `/connections` register (2026-10-05):
 
 ## Direction
 
-A vertical **register of services**. Gmail, Calendar, Drive, Docs, Sheets,
-and YouTube each own a family panel (muted header band, hairline rows).
-Dropbox, Slack, Telegram, and Zoom sit in the same rhythm. An account
-that grants several Google products appears under each product and names
-the shared grant in a quiet line.
+A vertical **register of accounts and services**. Google is one panel of
+**accounts**: each row is an email, and the products on that grant
+(Calendar, Drive, Docs, Sheets, Gmail) sit under it. Two Google logins
+are two rows, not the same emails repeated under four product headers.
+YouTube, Dropbox, Slack, Telegram, and Zoom keep one panel per service.
 
-Under the hood the Google products still share one connection record and
-one refresh token. Adding Gmail to an account that already has Drive
-merges Gmail scopes onto that record and reconnects; it does not mint a
-second Google credential.
+Under the hood the Google products on one email still share one connection
+record and one refresh token. Adding Gmail to an account that already has
+Drive merges Gmail scopes onto that record and reconnects; it does not
+mint a second Google credential. An unfinished grant with no verified
+email is "Not signed in", never a fake Drive account.
 
 ## Pinned treatments
 
-- **Section heading** is the service name (Gmail, Calendar, Drive…),
-  Google G / product mark only in the panel header — not on every row.
+- **Google heading** is "Google accounts". Other headings are the service
+  name (YouTube, Dropbox…). Google G / product mark only in the panel
+  header — not on every row.
 - **Row identity** is the verified account (email, channel, workspace).
-  The connection id is mono, secondary. Display names stay in Manage.
-- **Shared grant** copy: `Same grant as Drive, Sheets · google-sheets`.
-  Sentence case, muted, not a chip.
+  Never the mashed display name ("Google Calendar + Drive (Gmail)").
+  Unverified Google grants title **Not signed in**. The connection id is
+  mono, secondary. Display names stay in Manage as a nickname.
+- **Google product list** on the account row: `Calendar, Drive, Docs,
+  Sheets · google-calendar`. Sentence case, muted, not a chip.
 - **Status** is a stacked dot+word; expiry is a second line. Never inline
   with the word "connected".
 - **Actions:** Manage + Get token stay (family departure already
@@ -65,15 +69,18 @@ second Google credential.
 ## Banned on this page
 
 Provider-grouped "GOOGLE" headers; mashed multi-product titles as the
-row name; inline status+expiry; a connect catalog that only offers
-"Google Calendar" and "YouTube" for the whole Google family; pastel
-service pills; an icon on every account row.
+row name; the same two emails repeated under Calendar/Drive/Docs/Sheets;
+an unfinished `google-drive` row pretending to be a Drive account;
+inline status+expiry; a connect catalog that only offers "Google
+Calendar" and "YouTube" for the whole Google family; pastel service
+pills; an icon on every account row.
 
 ## Surfaces
 
 The API's public connection view carries `services` (id + label), derived
 from granted (else requested) scopes. The CLI list prints a SERVICES
-column. The console groups by that list. All three read the catalog in
+column and an ACCOUNT column. The console groups Google rows by account
+and other providers by service. All three read the catalog in
 `src/dapier/connections/services.py`; the console duplicates ids/scopes
 and a test pins them together.
 

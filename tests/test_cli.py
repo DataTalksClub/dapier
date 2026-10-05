@@ -1580,6 +1580,29 @@ def test_connections_show_prints_health(capsys, monkeypatch):
     assert "token_expires_at: 2026-01-02" in out
 
 
+def test_connections_show_prints_account_before_display_name(capsys, monkeypatch):
+    def fake_call(url, method, path, body=None, debug=False):
+        return {
+            "connection_id": "google-sheets",
+            "provider": "google",
+            "display_name": "Google Drive, Docs & Sheets (DataTalks)",
+            "status": "connected",
+            "account_title": "alexey@datatalks.club",
+            "verified_account_id": "alexey@datatalks.club",
+            "services": [
+                {"id": "drive", "label": "Google Drive"},
+                {"id": "docs", "label": "Google Docs"},
+                {"id": "sheets", "label": "Google Sheets"},
+            ],
+        }
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_show("https://api.example.test", "google-sheets") == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "account: alexey@datatalks.club"
+    assert "display_name: Google Drive, Docs & Sheets (DataTalks)" in lines
+
+
 def test_templates_command_is_removed():
     with pytest.raises(SystemExit) as exc:
         main.main(["templates", "list"])

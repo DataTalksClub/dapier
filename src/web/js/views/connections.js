@@ -146,6 +146,20 @@ function connectionHasService(connection, serviceId) {
   return servicesFor(connection).some((service) => service.id === serviceId);
 }
 
+/* Verified identity (email, channel) — never the mashed display_name leftover
+   like "Google Calendar + Drive (Gmail)". Unverified grants have no identity. */
+function accountIdentity(connection) {
+  return connection.account_title || connection.verified_account_id || '';
+}
+
+function accountLabel(connection) {
+  return accountIdentity(connection) || connection.connection_id;
+}
+
+function productList(connection) {
+  return servicesFor(connection).map((service) => service.label.replace(/^Google /, '')).join(', ');
+}
+
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
@@ -370,8 +384,8 @@ function openReuseDialog(serviceId, candidates) {
   $('#reuse-connection-blurb').textContent =
     `Use an existing Google account to add ${meta.label} to that grant. You'll approve the extra permissions. The same credential then covers every service on that account.`;
   $('#reuse-connection-list').innerHTML = candidates.map((connection) => {
-    const identity = connection.account_title || connection.verified_account_id || connection.connection_id;
-    const already = servicesFor(connection).map((service) => service.label).join(', ');
+    const identity = accountLabel(connection);
+    const already = productList(connection);
     return `<button class="reuse-account" type="button" data-connection="${escapeHtml(connection.connection_id)}">
       <span class="cell-name">${escapeHtml(identity)}</span>
       <span class="cell-sub">${escapeHtml(already ? `Already has ${already} · ${connection.connection_id}` : connection.connection_id)}</span>
@@ -511,7 +525,7 @@ export function openEditConnection(connectionId) {
   form.dataset.connectionId = connection.connection_id;
   form.dataset.provider = connection.provider;
   const refs = usageRefs(connection);
-  $('#edit-connection-title').textContent = `Manage ${connection.display_name || connection.connection_id}`;
+  $('#edit-connection-title').textContent = `Manage ${accountLabel(connection)}`;
   $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}${refs.length ? ` · used by ${refs.length === 1 ? '1 flow/trigger' : `${refs.length} flows/triggers`}` : ' · unused'}`;
   form.display_name.value = connection.display_name || connection.connection_id;
   form.scopes.value = (connection.scopes || []).join(' ');
@@ -594,27 +608,48 @@ function renderConnections(connections) {
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
   const withinGroup = (a, b) => {
-    const name = (connection) => connection.account_title || connection.verified_account_id
-      || connection.display_name || connection.connection_id;
+    const name = (connection) => accountIdentity(connection) || connection.connection_id;
     return String(name(a)).localeCompare(String(name(b)));
   };
+  /* Google is one panel of accounts (email → products). Splitting the same
+     two emails under Calendar, Drive, Docs, and Sheets made it impossible
+     to see what each account actually has. Other providers stay one panel
+     per service. */
+  const google = filtered.filter((connection) => connection.provider === 'google');
+  const rest = filtered.filter((connection) => connection.provider !== 'google');
   const groups = new Map();
-  for (const connection of filtered) {
+  for (const connection of rest) {
     for (const service of servicesFor(connection)) {
+      if (GOOGLE_FAMILY.has(service.id) || service.id === 'google') continue;
       groups.set(service.id, [...(groups.get(service.id) || []), connection]);
     }
   }
   const ordered = [];
   for (const id of SERVICE_ORDER) {
+    if (GOOGLE_FAMILY.has(id)) continue;
     if (groups.has(id)) ordered.push([id, groups.get(id)]);
   }
   for (const [id, group] of groups) {
-    if (!SERVICE_ORDER.includes(id)) ordered.push([id, group]);
+    if (!SERVICE_ORDER.includes(id) && id !== 'google') ordered.push([id, group]);
   }
-  /* One panel per service — a Google grant that covers Calendar and Drive
-     appears under both, with a same-grant line so the shared credential is
-     visible. Attention states surface through the status stack and summary. */
-  $('#connection-register').innerHTML = ordered.map(([serviceId, group]) => {
+  const googlePanel = google.length ? (() => {
+    const signedIn = google.filter(accountIdentity).sort(withinGroup);
+    const unfinished = google.filter((connection) => !accountIdentity(connection));
+    const group = [...signedIn, ...unfinished];
+    const needs = group.filter(needsAttention).length;
+    const meta = [
+      `${signedIn.length} account${signedIn.length === 1 ? '' : 's'}`,
+      unfinished.length ? `${unfinished.length} not signed in` : '',
+      needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
+    ].filter(Boolean).join(' · ');
+    const rows = group.map((connection) => accountRow(connection, null)).join('');
+    return `<section class="data-panel service-panel" data-service="google-accounts">
+      <div class="section-head"><h2 class="service-panel-title">${serviceMark('google')}<span>Google accounts</span></h2>
+      <p class="sub">${escapeHtml(meta)}</p></div>
+      <ul class="service-accounts">${rows}</ul>
+    </section>`;
+  })() : '';
+  const restPanels = ordered.map(([serviceId, group]) => {
     const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, serviceId)).join('');
     const needs = group.filter(needsAttention).length;
     const meta = [
@@ -627,6 +662,7 @@ function renderConnections(connections) {
       <ul class="service-accounts">${rows}</ul>
     </section>`;
   }).join('');
+  $('#connection-register').innerHTML = googlePanel + restPanels;
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.provider-token-button').forEach((button) => button.addEventListener('click', () => issueConnectionToken(button)));
   bindOAuthLinks();
@@ -659,12 +695,17 @@ function accountRow(connection, serviceId) {
        zoom) keep a pasted secret, and the shared domain call 502s for them. */
     const tokenAction = status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
       ? `<button class="dk-button dk-button--secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
-    const identity = connection.account_title || connection.verified_account_id;
-    const title = identity || connection.display_name || connection.connection_id;
-    const others = servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label);
+    const identity = accountIdentity(connection);
+    const title = identity || (serviceId ? connection.connection_id : 'Not signed in');
+    const products = productList(connection);
+    const others = serviceId
+      ? servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label)
+      : [];
     const shareHtml = [
-      others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '',
-      identity ? `<span class="mono">${escapeHtml(connection.connection_id)}</span>` : '',
+      serviceId
+        ? (others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '')
+        : (products ? escapeHtml(products) : ''),
+      `<span class="mono">${escapeHtml(connection.connection_id)}</span>`,
     ].filter(Boolean).join(' · ');
     const expires = formatTimestamp(connection.token_expires_at);
     return `<li class="service-account">
@@ -929,7 +970,7 @@ function renderDiscoverResource() {
 async function openDiscover(connectionId) {
   discoverCatalog = { connectionId, resources: [] };
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
-  $('#connection-discover-title').textContent = `Explore data — ${connection?.display_name || connectionId}`;
+  $('#connection-discover-title').textContent = `Explore data — ${connection ? accountLabel(connection) : connectionId}`;
   $('#connection-discover-meta').textContent = connection ? `${connection.provider} · ${connectionId}` : connectionId;
   $('#discover-error').textContent = '';
   $('#discover-result').hidden = true;
@@ -1031,7 +1072,7 @@ function renderSampleConnections() {
   const connections = ((state.data || {}).connections || []);
   $('#sample-connection').innerHTML = ['<option value="">(no account — example or recorded run)</option>']
     .concat(connections.map((connection) =>
-      `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(connection.display_name || connection.connection_id)} (${escapeHtml(connection.provider)})</option>`))
+      `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(accountLabel(connection))} (${escapeHtml(connection.provider)})</option>`))
     .join('');
   $('#sample-connection-field').hidden = !connections.length;
 }
@@ -1285,7 +1326,7 @@ export async function openAccessGrants(connectionId, prefill = null) {
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   resetGrantForm();
   $('#connection-grant-form').dataset.connectionId = connectionId;
-  $('#connection-access-title').textContent = `Access · ${connection?.display_name || connectionId}`;
+  $('#connection-access-title').textContent = `Access · ${connection ? accountLabel(connection) : connectionId}`;
   await loadGrants(connectionId);
   if ($('#edit-connection-dialog').open) $('#edit-connection-dialog').close();
   $('#connection-access-dialog').showModal();

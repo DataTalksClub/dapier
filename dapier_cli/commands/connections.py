@@ -61,6 +61,9 @@ def _used_in_label(item):
 
 
 def print_connection(item):
+    account = item.get("account_title") or item.get("verified_account_id")
+    if account:
+        print(f"account: {account}")
     for key in ("connection_id", "provider", "display_name", "status", "health",
                 "verified_account_id", "account_title", "expected_account_id",
                 "services", "granted_scopes", "scopes", "version", "updated_at",

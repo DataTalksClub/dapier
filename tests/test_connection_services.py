@@ -1,4 +1,4 @@
-"""Google connections group by product (Gmail, Calendar, Drive…), not provider."""
+"""Google connections group by verified account; products are listed on the row."""
 
 from pathlib import Path
 
@@ -94,11 +94,13 @@ def test_console_catalog_matches_python():
             assert scope in JS
 
 
-def test_console_groups_by_service_not_provider():
+def test_console_groups_google_by_account():
     assert "connection-register" in HTML
     assert "Add a service" in HTML
-    assert "service-panel" in JS
-    assert "Same grant as" in JS
+    assert "Google accounts" in JS
+    assert "Not signed in" in JS
+    assert "data-service=\"google-accounts\"" in JS
+    assert "accountIdentity" in JS
     assert "provider-group-row" not in JS
     assert "CONNECT_PROVIDERS" not in JS
     assert "dk-button--secondary connection-oauth" in JS
