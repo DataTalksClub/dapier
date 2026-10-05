@@ -59,6 +59,10 @@
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
+        <div class="sidebar-foot-actions">
+          <button id="refresh" class="nav-item sidebar-tool-button" type="button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i><span>Refresh</span><span id="last-updated" class="last-updated mono"></span></button>
+          <button id="account-button" class="account-button sidebar-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span><span class="account-button-name" data-account-name>Account</span><svg class="account-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+        </div>
       </div>
     </aside>
 
@@ -71,9 +75,7 @@
         <div class="topbar-title"><h1 id="view-title">Home</h1><p id="view-description" class="sub"></p></div>
         <div id="topbar-tools"></div>
         <div class="top-actions">
-          <span id="last-updated" class="last-updated mono"></span>
-          <button id="refresh" class="icon-button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
-          <button id="account-button" class="account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span><span class="account-button-name" data-account-name>Account</span><svg class="account-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+          <button id="mobile-account-button" class="account-button mobile-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span></button>
         </div>
       </header>
 

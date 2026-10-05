@@ -208,10 +208,20 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
 .sidebar-foot {
   margin-top: auto;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--dk-space-2);
   border-top: 1px solid var(--dk-border-default);
   padding: var(--dk-space-3) var(--dk-space-1) 0;
 }
+/* Global utilities and the account trigger: the footer is the shell's only
+   global strip — there is no top toolbar on desktop. */
+.sidebar-foot-actions { display: grid; gap: 2px; }
+.sidebar-foot .nav-item { width: 100%; flex: auto; border: 0; background: transparent; cursor: pointer; font-family: inherit; }
+.sidebar-tool-button .last-updated { margin-left: auto; font-size: var(--dk-text-xs); }
+.sidebar-account-button { width: 100%; justify-content: flex-start; }
+.sidebar-account-button .account-button-name { flex: 1 1 auto; max-width: none; text-align: left; }
+.account-button.mobile-account-button { display: none; }
 .environment { display: inline-flex; align-items: center; gap: 7px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); white-space: nowrap; }
 .env-dot { width: 8px; height: 8px; flex: none; border-radius: var(--dk-radius-full); background: var(--dk-accent-default); }
 .sidebar .icon-button { border-color: transparent; color: var(--dk-text-muted); }
@@ -316,7 +326,8 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
 .menu-toggle { display: none; }
 
-/* Family account chrome: identity, appearance, and sign-out in the top bar. */
+/* Family account chrome: identity, appearance, and sign-out in the sidebar
+   footer popover; the mobile top bar keeps an avatar-only twin trigger. */
 .account-button {
   display: inline-flex;
   min-height: var(--dk-size-control-md);
@@ -360,11 +371,11 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 }
 .account-menu {
   position: fixed;
-  top: 76px;
-  right: var(--dk-space-4);
+  left: 16px;
+  bottom: 150px;
   z-index: 30;
   width: min(380px, calc(100vw - 32px));
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh - 170px);
   overflow: auto;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-lg);
@@ -1183,9 +1194,14 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 
 /* Family account trigger: avatar only in the 64px top bar at ≤820px. */
 @media (max-width: 820px) {
-  .account-button-name,
-  .account-chevron { display: none; }
-  .account-button { width: var(--dk-size-touch); padding: 0; }
+  /* Only the top-bar twin collapses to the bare avatar; the sidebar rows in
+     the drawer keep their labels at the touch scale. */
+  .top-actions .account-button-name,
+  .top-actions .account-chevron { display: none; }
+  .top-actions .account-button { width: var(--dk-size-touch); padding: 0; }
+  .account-button.mobile-account-button { display: inline-flex; }
+  .sidebar-foot .nav-item,
+  .sidebar-foot .account-button { min-height: var(--dk-size-touch); }
   .account-menu {
     inset: 0;
     top: 0;

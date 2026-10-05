@@ -1,5 +1,5 @@
 /* Family account chrome: identity, appearance, and sign-out live in a
-   top-toolbar popover. Theme still persists under dakit-theme; sign-out
+   sidebar-footer popover. Theme still persists under dakit-theme; sign-out
    still goes through /auth/logout after the designer leave prompt. */
 import { $, $$ } from './ui.js';
 import { currentTheme, toggleTheme } from './theme.js';
@@ -55,7 +55,7 @@ export function applyAccountIdentity(me) {
 }
 
 export function bindAccountChrome() {
-  const button = $('#account-button');
+  const buttons = $$('.account-button');
   const menu = $('#account-menu');
   const close = $('#account-menu-close');
   const theme = $('#account-theme-toggle');
@@ -69,20 +69,22 @@ export function bindAccountChrome() {
   function closeMenu() {
     if (!menu || menu.hidden) return;
     menu.hidden = true;
-    button.setAttribute('aria-expanded', 'false');
+    for (const trigger of buttons) trigger.setAttribute('aria-expanded', 'false');
     if (opener && opener.isConnected) opener.focus();
     opener = null;
   }
 
   function openMenu() {
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : button;
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : buttons[0];
     syncThemeToggle();
     menu.hidden = false;
-    button.setAttribute('aria-expanded', 'true');
+    for (const trigger of buttons) trigger.setAttribute('aria-expanded', 'true');
     close.focus();
   }
 
-  button.addEventListener('click', () => { if (isOpen()) closeMenu(); else openMenu(); });
+  for (const trigger of buttons) {
+    trigger.addEventListener('click', () => { if (isOpen()) closeMenu(); else openMenu(); });
+  }
   close.addEventListener('click', closeMenu);
   theme.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -94,7 +96,7 @@ export function bindAccountChrome() {
   });
   document.addEventListener('click', (event) => {
     if (!isOpen()) return;
-    if (menu.contains(event.target) || button.contains(event.target)) return;
+    if (menu.contains(event.target) || buttons.some((trigger) => trigger.contains(event.target))) return;
     closeMenu();
   });
   document.addEventListener('keydown', (event) => {

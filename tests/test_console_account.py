@@ -1,4 +1,4 @@
-"""Family account chrome: identity, theme, and sign-out live in the top bar."""
+"""Family account chrome: identity, theme, and sign-out live in the sidebar."""
 import json
 import re
 import shutil
@@ -33,7 +33,7 @@ class TopActions(HTMLParser):
             self._depth = 1
         elif self._depth:
             self._depth += 1
-        if attrs.get("id") == "account-button":
+        if "account-button" in classes:
             self.account_label = attrs.get("aria-label")
             self.account_haspopup = attrs.get("aria-haspopup")
         if self._depth:
@@ -44,27 +44,33 @@ class TopActions(HTMLParser):
             self._depth -= 1
 
 
-def test_sidebar_foot_is_region_status_only():
+def test_sidebar_foot_holds_region_status_refresh_and_account_trigger():
     assert 'id="theme-toggle"' not in INDEX
     assert 'id="logout"' not in INDEX
-    assert "sidebar-foot-actions" not in INDEX
-    foot = INDEX.split('class="sidebar-foot">', 1)[1].split("</div>", 1)[0]
+    foot = INDEX.split('class="sidebar-foot">', 1)[1].split('id="account-menu"', 1)[0]
     assert "eu-west-1" in foot
+    assert 'id="refresh"' in foot
+    assert 'id="last-updated"' in foot
+    assert 'id="account-button"' in foot
+    assert "account-button-name" in foot
     assert "theme-toggle" not in foot
     assert "Sign out" not in foot
-    assert "data-lucide" not in foot
+    assert "logout" not in foot
+    assert "moon" not in foot
 
 
-def test_account_button_lives_in_the_topbar():
+def test_account_triggers_live_in_the_sidebar_and_mobile_topbar():
     parser = TopActions()
     parser.feed(INDEX)
     assert parser.account_label == "Account"
     assert parser.account_haspopup == "true"
-    assert 'id="account-button"' in parser.markup
+    assert 'id="mobile-account-button"' in parser.markup
     assert "account-avatar" in parser.markup
-    assert "account-button-name" in parser.markup
-    assert "account-chevron" in parser.markup
-    assert 'id="refresh"' in parser.markup
+    # The desktop trigger and the global utilities left the top bar.
+    assert 'id="account-button"' not in parser.markup
+    assert 'id="refresh"' not in parser.markup
+    assert 'id="last-updated"' not in parser.markup
+    assert "account-button-name" not in parser.markup
 
 
 def test_account_popover_has_family_sections_without_dataops_only_ones():
