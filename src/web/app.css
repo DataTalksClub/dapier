@@ -230,7 +230,9 @@ main { min-width: 0; padding: 0 40px 64px; }
 /* Auto margins center regular views, but width:auto shrink-wraps a flex
    child around the iframe's intrinsic width. The editor fills the main. */
 body[data-view="designer"] .view.active { padding-top: 0; width: 100%; }
-body[data-view="agents"] .view.active { padding-top: 0; width: auto; }
+/* agents runs the same full-bleed canvas: width:auto shrink-wraps inside the
+   flex main, so the whole workspace visibly re-sizes while a run loads */
+body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .topbar {
   min-height: 0;
   display: flex;
