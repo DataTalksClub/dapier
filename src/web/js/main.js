@@ -6,11 +6,11 @@ import { api } from './api.js';
 import { setView, viewFromPath } from './router.js';
 import { refresh, openRowFor, openWorkflow, openVersions, restoreVersion } from './views/overview.js';
 import { renderRuns, openRun } from './views/runs.js';
-import { openDesigner, designerFromLocation, confirmDesignerLeave } from './views/designer.js';
+import { openDesigner, designerFromLocation } from './views/designer.js';
 import { showOAuthResult, openEditConnection } from './views/connections.js';
 import './views/storage.js';
 import { refreshAudit } from './views/audit.js';
-import { toggleTheme } from './theme.js';
+import { applyAccountIdentity, bindAccountChrome } from './account.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
   if (event.target instanceof Element && event.target.closest('.secret-input')) event.preventDefault();
@@ -287,10 +287,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 window.matchMedia('(min-width: 861px)').addEventListener('change', (event) => { if (event.matches) closeMobileMenu(); });
-$('#logout').addEventListener('click', async () => {
-  if (await confirmDesignerLeave()) window.location.assign('/auth/logout');
-});
-$('#theme-toggle').addEventListener('click', toggleTheme);
+bindAccountChrome();
 
 window.addEventListener('DOMContentLoaded', async () => {
   icons();
@@ -301,6 +298,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   if (!me.operator) { showForbidden(); return; }
+  applyAccountIdentity(me);
   const initialView = viewFromPath(window.location.pathname);
   await setView(initialView, false);
   if (initialView === 'designer') await designerFromLocation();

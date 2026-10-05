@@ -31,6 +31,11 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
   selected page is the filled `--dk-accent-soft` row only — no rail, no
   stripe. Mobile ≤860px: one top bar + modal drawer (scrim, Escape, focus
   trap, restoration).
+- **Account chrome**: identity, appearance, and sign-out live in a top-toolbar
+  Account popover (avatar initial + display name + chevron; avatar-only at
+  ≤820px). Overlay uses `--dk-radius-lg` and `--dk-shadow-overlay`. The
+  sidebar footer may keep the region label; it must not hold a theme or
+  sign-out control.
 - **Page anatomy**: one 32px `h1` + one-line muted description; primary
   actions in the header band; content in one bordered container with muted
   header bands and hairline-divided rows; Home is the strip-and-panels

@@ -59,10 +59,6 @@
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
-        <span class="sidebar-foot-actions">
-          <button id="theme-toggle" class="icon-button" title="Toggle dark mode" aria-label="Toggle dark mode"><i data-lucide="moon" class="theme-icon-moon"></i><i data-lucide="sun" class="theme-icon-sun"></i></button>
-          <button id="logout" class="icon-button" title="Sign out" aria-label="Sign out"><i data-lucide="log-out"></i></button>
-        </span>
       </div>
     </aside>
 
@@ -77,6 +73,7 @@
         <div class="top-actions">
           <span id="last-updated" class="last-updated mono"></span>
           <button id="refresh" class="icon-button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+          <button id="account-button" class="account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span><span class="account-button-name" data-account-name>Account</span><svg class="account-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
         </div>
       </header>
 
@@ -389,6 +386,22 @@
         <button id="audit-log-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
       </section>
     </main>
+
+    <div id="account-menu" class="account-menu" hidden role="dialog" aria-modal="false" aria-labelledby="account-menu-title">
+      <header class="account-menu-header">
+        <strong id="account-menu-title">Account</strong>
+        <button id="account-menu-close" class="icon-button account-menu-close" type="button" aria-label="Close account menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </header>
+      <div class="account-menu-body">
+        <section class="account-identity" aria-live="polite">
+          <span class="account-avatar account-avatar-large" data-account-actor-avatar aria-hidden="true">?</span>
+          <span class="account-identity-copy"><small>Signed in as</small><strong data-account-actor-name>Account</strong><span data-account-actor-email hidden></span></span>
+        </section>
+        <p class="account-section-label">Appearance</p>
+        <button id="account-theme-toggle" class="account-menu-item account-theme-toggle" type="button" aria-pressed="false"><span class="account-menu-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></svg></span><span class="account-theme-label">Dark mode</span><span class="account-toggle-track" aria-hidden="true"><span></span></span></button>
+        <button id="account-sign-out" class="account-menu-item account-sign-out" type="button"><span class="account-menu-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/></svg></span><span><strong>Sign out</strong><small>End this browser session.</small></span></button>
+      </div>
+    </div>
   </div>
 
 

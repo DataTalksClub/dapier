@@ -209,22 +209,13 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
   margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--dk-space-1);
   border-top: 1px solid var(--dk-border-default);
   padding: var(--dk-space-3) var(--dk-space-1) 0;
 }
 .environment { display: inline-flex; align-items: center; gap: 7px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); white-space: nowrap; }
 .env-dot { width: 8px; height: 8px; flex: none; border-radius: var(--dk-radius-full); background: var(--dk-accent-default); }
-.sidebar-foot-actions { display: inline-flex; align-items: center; gap: var(--dk-space-1); }
 .sidebar .icon-button { border-color: transparent; color: var(--dk-text-muted); }
-.sidebar-foot .icon-button { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); }
 .sidebar .icon-button:hover { border-color: transparent; background: var(--dk-bg-hover); color: var(--dk-text-primary); }
-
-/* theme toggle: moon invites dark, sun invites light */
-#theme-toggle .theme-icon-sun { display: none; }
-[data-theme="dark"] #theme-toggle .theme-icon-moon { display: none; }
-[data-theme="dark"] #theme-toggle .theme-icon-sun { display: block; }
 
 /* --- topbar / loading / notice -------------------------------------------- */
 main { min-width: 0; padding: 0 40px 64px; }
@@ -324,6 +315,188 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
 .menu-toggle { display: none; }
+
+/* Family account chrome: identity, appearance, and sign-out in the top bar. */
+.account-button {
+  display: inline-flex;
+  min-height: var(--dk-size-control-md);
+  align-items: center;
+  justify-content: center;
+  gap: var(--dk-space-2);
+  border: 0;
+  border-radius: var(--dk-radius-md);
+  background: transparent;
+  color: var(--dk-text-primary);
+  padding: var(--dk-space-1) var(--dk-space-2);
+  font-size: var(--dk-text-md);
+  font-weight: var(--dk-weight-semibold);
+}
+.account-button:hover { background: var(--dk-bg-hover); }
+.account-avatar {
+  display: inline-grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--dk-radius-full);
+  background: var(--dk-accent-default);
+  color: var(--dk-text-on-accent);
+  font-size: var(--dk-text-xs);
+  font-weight: var(--dk-weight-bold);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.account-button-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--dk-text-muted);
+}
+.account-menu {
+  position: fixed;
+  top: 76px;
+  right: var(--dk-space-4);
+  z-index: 30;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-lg);
+  background: var(--dk-bg-surface);
+  box-shadow: var(--dk-shadow-overlay);
+}
+.account-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dk-space-3);
+  border-bottom: 1px solid var(--dk-border-default);
+  background: var(--dk-bg-muted);
+  min-height: 54px;
+  padding: var(--dk-space-2) 10px var(--dk-space-2) var(--dk-space-4);
+}
+.account-menu-header strong {
+  color: var(--dk-text-heading);
+  font-size: var(--dk-text-lg);
+}
+.account-menu-close { flex: none; }
+.account-menu-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.account-menu-body { display: grid; }
+.account-section-label {
+  margin: 0;
+  border-bottom: 1px solid var(--dk-border-default);
+  background: var(--dk-bg-muted);
+  color: var(--dk-text-muted);
+  padding: var(--dk-space-2) var(--dk-space-4);
+  font-size: var(--dk-text-sm);
+  font-weight: var(--dk-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.account-identity {
+  display: grid;
+  grid-template-columns: var(--dk-size-control-lg) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--dk-space-3);
+  border-bottom: 1px solid var(--dk-border-default);
+  background: var(--dk-bg-surface);
+  padding: 14px var(--dk-space-4);
+}
+.account-avatar-large {
+  width: var(--dk-size-control-lg);
+  height: var(--dk-size-control-lg);
+  flex-basis: var(--dk-size-control-lg);
+  font-size: var(--dk-text-body);
+}
+.account-identity-copy { display: grid; min-width: 0; }
+.account-identity-copy small,
+.account-identity-copy > span {
+  color: var(--dk-text-muted);
+  font-size: var(--dk-text-sm);
+}
+.account-identity-copy strong,
+.account-identity-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-identity-copy strong {
+  color: var(--dk-text-heading);
+  font-size: var(--dk-text-body);
+}
+.account-menu-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-bottom: 1px solid var(--dk-border-default);
+  border-radius: 0;
+  background: var(--dk-bg-surface);
+  color: var(--dk-text-primary);
+  padding: 10px var(--dk-space-4);
+  text-align: left;
+}
+.account-menu-item:hover { background: var(--dk-bg-hover); }
+.account-menu-item > span:nth-child(2) { display: grid; gap: 2px; }
+.account-menu-item strong { color: var(--dk-text-heading); font-size: var(--dk-text-body); }
+.account-menu-item small {
+  display: block;
+  color: var(--dk-text-muted);
+  font-size: var(--dk-text-sm);
+  font-weight: 400;
+}
+.account-menu-icon {
+  display: grid;
+  place-items: center;
+  color: var(--dk-text-muted);
+}
+.account-theme-label {
+  color: var(--dk-text-heading);
+  font-weight: var(--dk-weight-semibold);
+}
+.account-toggle-track {
+  display: flex;
+  width: 36px;
+  height: 20px;
+  align-items: center;
+  border-radius: var(--dk-radius-full);
+  background: var(--dk-border-strong);
+  padding: 2px;
+}
+.account-toggle-track span {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--dk-radius-full);
+  background: var(--dk-text-on-deep);
+}
+.account-theme-toggle[aria-pressed="true"] .account-toggle-track {
+  background: var(--dk-accent-default);
+}
+.account-theme-toggle[aria-pressed="true"] .account-toggle-track span {
+  transform: translateX(16px);
+}
+.account-sign-out,
+.account-sign-out strong,
+.account-sign-out .account-menu-icon {
+  color: var(--dk-danger-text);
+}
 
 .loading { height: 2px; display: flex; gap: 3px; margin: 0 -40px; overflow: hidden; }
 .loading span { flex: 1; background: var(--dk-accent-default); opacity: .12; animation: pulse 1s infinite alternate ease-in-out; }
@@ -1000,11 +1173,47 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   main { padding: 0 24px 48px; }
   .loading { margin: 0 -24px; }
   .menu-toggle { display: inline-grid; }
+  .account-button { min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); }
   .connection-filters { width: 100%; order: 3; margin-left: 0; }
   .connection-filters input { width: min(240px, 55vw); }
   .connect-card { grid-template-columns: minmax(155px, 28%) minmax(0, 1fr); }
   .connect-card-actions { grid-column: 2; grid-row: auto; justify-content: flex-start; }
   .connect-pending { grid-column: 2; }
+}
+
+/* Family account trigger: avatar only in the 64px top bar at ≤820px. */
+@media (max-width: 820px) {
+  .account-button-name,
+  .account-chevron { display: none; }
+  .account-button { width: var(--dk-size-touch); padding: 0; }
+  .account-menu {
+    inset: 0;
+    top: 0;
+    right: 0;
+    z-index: 60;
+    width: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .account-menu-header {
+    display: grid;
+    grid-template-columns: var(--dk-size-touch) minmax(0, 1fr) var(--dk-size-touch);
+    min-height: 64px;
+    padding: 0 var(--dk-space-2);
+  }
+  .account-menu-header strong {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: center;
+  }
+  .account-menu-close {
+    grid-column: 1;
+    grid-row: 1;
+    width: var(--dk-size-touch);
+    height: var(--dk-size-touch);
+  }
 }
 
 /* --- mobile (≤560): stacked ledger rows ---------------------------------------- */

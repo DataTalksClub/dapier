@@ -23,10 +23,14 @@ export function currentTheme() {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 }
 
-export function toggleTheme() {
-  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+export function setTheme(theme) {
+  const next = theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem(KEY, next); } catch (_) { /* private mode: theme applies for the session only */ }
+}
+
+export function toggleTheme() {
+  setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
 }
 
 /* With no explicit choice, keep tracking the OS setting while open. */
