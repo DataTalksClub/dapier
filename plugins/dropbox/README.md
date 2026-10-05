@@ -169,3 +169,6 @@ explains the source files that define defaults and validation.
 Upload and move/copy errors preserve Dropbox's HTTP status and conflict tag.
 An HTTP 409 conflict is reported as a provider rejection rather than an
 unreachable endpoint, including when the default urllib transport raises it.
+`dropbox_upload` with `skip_existing: true` treats a path 409 as success
+(`already_exists: true`) so a replay of the same archive path does not fail
+the run.

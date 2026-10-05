@@ -140,7 +140,7 @@ class DropboxUploadTests(unittest.TestCase):
         with patch("plugins.dropbox.runners.dropbox._dropbox_connection", return_value=dict(self.connection)), \
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
              patch("src.dapier.engine.actions.base._s3_body", return_value=b"pdf-bytes"):
-            run_dropbox_upload(action, event or deepcopy(self.attachment_event), transport=transport)
+            return run_dropbox_upload(action, event or deepcopy(self.attachment_event), transport=transport)
 
     def test_uploads_attachment_to_folder(self):
         transport = FakeTransport()
@@ -253,6 +253,28 @@ class DropboxUploadTests(unittest.TestCase):
             self.run_action(transport)
         self.assertIn("409", str(ctx.exception))
         self.assertIn("path/conflict", str(ctx.exception))
+
+    def test_skip_existing_treats_a_path_conflict_as_already_there(self):
+        transport = FakeTransport(status=409, body=b'{"error": {".tag": "path", "path": {".tag": "conflict"}}}')
+        action = {"type": "dropbox_upload", "connection_id": "dropbox",
+                  "folder": "/Invoices", "skip_existing": True}
+        output = self.run_action(transport, action=action)
+        self.assertEqual(output, {
+            "uploaded": ["/Invoices/invoice.pdf"], "already_exists": True})
+
+    def test_skip_existing_still_raises_on_a_non_path_conflict(self):
+        transport = FakeTransport(status=409, body=b'{"error": {".tag": "too_many_write_operations"}}')
+        action = {"type": "dropbox_upload", "connection_id": "dropbox",
+                  "folder": "/Invoices", "skip_existing": True}
+        with self.assertRaises(RuntimeError) as ctx:
+            self.run_action(transport, action=action)
+        self.assertIn("409", str(ctx.exception))
+        self.assertIn("too_many_write_operations", str(ctx.exception))
+
+    def test_a_new_upload_reports_already_exists_false(self):
+        output = self.run_action(FakeTransport())
+        self.assertEqual(output["already_exists"], False)
+        self.assertEqual(output["uploaded"], ["/Invoices/x"])
 
     def test_raises_when_unreachable(self):
         def transport(method, url, *, headers, body, timeout=15):

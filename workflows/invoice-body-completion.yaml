@@ -16,15 +16,64 @@ actions:
   value: '{source_event.data.date}'
   timezone: UTC
   format: '%Y-%m-%d'
+- id: clean-subject
+  type: code
+  code: |
+    import re
+    source = input.get("source_event") or {}
+    payload = source.get("data") if isinstance(source, dict) else {}
+    if not isinstance(payload, dict):
+        payload = {}
+    subject = str(payload.get("subject") or "").strip()
+    subject = re.sub(r"^(?:(?:fwd?|re)\s*:\s*)+", "", subject, flags=re.I).strip()
+    subject = re.sub(r"\s*\[(?:account|invoice\s*id)\s*:[^\]]*\]", "", subject, flags=re.I).strip()
+    subject = re.sub(r"\s+Invoice\s+Available\b.*$", "", subject, flags=re.I).strip()
+    if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
+        subject = "Amazon Web Services"
+    checksum = re.sub(r"^sha256:", "", str(input.get("checksum") or ""), flags=re.I)
+    if not re.fullmatch(r"[a-f0-9]{64}", checksum, flags=re.I):
+        raise ValueError("Rendered PDF checksum is required for archive naming")
+    output = {"subject": subject or "Invoice", "document_key": checksum.lower()[:12]}
+  tests:
+  - name: forward prefix comes off
+    input:
+      checksum: 839f39e8a3ba40d9ab870cc949a2340c93c22a2b6a5f652c9e9828196a1d1ed0
+      source_event:
+        data:
+          subject: 'Fwd: Your Google Play Order Receipt from Oct 2, 2026'
+    expected:
+      subject: Your Google Play Order Receipt from Oct 2, 2026
+      document_key: 839f39e8a3ba
+  - name: AWS subjects normalize
+    input:
+      checksum: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      source_event:
+        data:
+          subject: 'Fwd: Amazon Web Services Invoice Available [Account: 1234]'
+    expected:
+      subject: Amazon Web Services
+      document_key: bbbbbbbbbbbb
+  - name: a missing checksum fails
+    input:
+      source_event:
+        data:
+          subject: Invoice
+    expected_error: checksum is required
 - id: archive-rendered
   type: dropbox_upload
   connection_id: dropbox
   source: output
   folder: /_dtc_paperwork/invoices
-  filename: '{steps.email-date.output.formatted}-{source_event.data.subject}.pdf'
+  filename: '{steps.email-date.output.formatted}-{steps.clean-subject.output.result.subject}-{steps.clean-subject.output.result.document_key}.pdf'
   overwrite: false
   autorename: false
   strict_conflict: true
+  skip_existing: true
+- id: skip-duplicate
+  type: filter
+  when:
+    steps.archive-rendered.output.already_exists:
+      not_equals: true
 - id: intake-rendered
   type: dataops
   auth_secret_id: dapier/dataops

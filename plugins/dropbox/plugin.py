@@ -44,7 +44,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None, transport=None:
         run_dropbox_upload(action, event, transport=transport, steps=steps),
     required=frozenset({"connection_id", "folder"}),
-    optional=frozenset({"source", "filename", "attachment_selection", "exclude_content_types", "overwrite", "autorename", "strict_conflict"}),
+    optional=frozenset({"source", "filename", "attachment_selection", "exclude_content_types", "overwrite", "autorename", "strict_conflict", "skip_existing"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "dropbox", "required": True},
         {"key": "source", "label": "Source", "type": "select", "options": ["attachment", "output"], "default": "attachment"},
@@ -56,6 +56,7 @@ register(Action(
         {"key": "overwrite", "label": "Overwrite existing file", "type": "boolean", "default": "false"},
         {"key": "strict_conflict", "label": "Reject identical file conflicts", "type": "boolean", "default": "false"},
         {"key": "autorename", "label": "Autorename on conflict", "type": "boolean", "default": "true"},
+        {"key": "skip_existing", "label": "Skip when the path already exists", "type": "boolean", "default": "false"},
     ),
 ))
 

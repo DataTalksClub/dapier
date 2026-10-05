@@ -57,8 +57,24 @@ def _excluded_content_types(action):
         raw = raw.split(",")
     return {str(item).split(";")[0].strip().lower() for item in raw if str(item).strip()}
 
+def _conflict_tag(raw):
+    """Dropbox error `.tag`, nested as `path/conflict` when present."""
+    try:
+        error = json.loads(raw.decode() or "{}").get("error")
+        if isinstance(error, dict):
+            tag = error.get(".tag") or ""
+            nested = error.get(tag)
+            if isinstance(nested, dict) and nested.get(".tag"):
+                return f"{tag}/{nested['.tag']}"
+            return tag
+    except (ValueError, UnicodeDecodeError):
+        pass
+    return ""
+
+
 def _dropbox_upload(access_token, path, payload, *, transport=None,
-                    overwrite=False, autorename=True, strict_conflict=False):
+                    overwrite=False, autorename=True, strict_conflict=False,
+                    skip_existing=False):
     transport = transport or base._default_transport
     headers = {
         "authorization": f"Bearer {access_token}",
@@ -79,16 +95,9 @@ def _dropbox_upload(access_token, path, payload, *, transport=None,
     except Exception as exc:
         raise RuntimeError(f"dropbox upload unreachable: {type(exc).__name__}")
     if status >= 300:
-        tag = ""
-        try:
-            error = json.loads(raw.decode() or "{}").get("error")
-            if isinstance(error, dict):
-                tag = error.get(".tag") or ""
-                nested = error.get(tag)
-                if isinstance(nested, dict) and nested.get(".tag"):
-                    tag = f"{tag}/{nested['.tag']}"
-        except (ValueError, UnicodeDecodeError):
-            pass
+        tag = _conflict_tag(raw)
+        if skip_existing and status == 409 and tag.startswith("path"):
+            return {"path_display": path, "already_exists": True}
         raise RuntimeError(f"dropbox upload returned HTTP {status}{f' ({tag})' if tag else ''}")
     try:
         return json.loads(raw.decode() or "{}")
@@ -124,14 +133,19 @@ def run_dropbox_upload(action, event, transport=None, steps=None):
         raise ValueError("dropbox_upload filename rendered empty")
     if override and len(files) > 1:
         raise ValueError("filename override requires selecting a single file")
+    skip_existing = _boolean(action, "skip_existing")
+    existed = []
     for file in files:
         path = f"{folder}/{base._safe_filename(override or file['filename'])}"
         metadata = _dropbox_upload(access_token, path, base._s3_body(file["s3"]), transport=transport,
                                    overwrite=_boolean(action, "overwrite"),
                                    autorename=_boolean(action, "autorename", True),
-                                   strict_conflict=_boolean(action, "strict_conflict"))
+                                   strict_conflict=_boolean(action, "strict_conflict"),
+                                   skip_existing=skip_existing)
         uploaded.append(metadata.get("path_display") or metadata.get("path_lower") or path)
-    return {"uploaded": uploaded}
+        if metadata.get("already_exists"):
+            existed.append(uploaded[-1])
+    return {"uploaded": uploaded, "already_exists": bool(existed) and len(existed) == len(uploaded)}
 
 def _dropbox_rpc(url, access_token, payload, *, transport=None, unreachable="dropbox call unreachable"):
     transport = transport or base._default_transport

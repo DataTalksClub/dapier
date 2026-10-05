@@ -22,10 +22,6 @@ case-insensitive) are skipped before the upload, and `attachment_selection`
 applies to what remains — so an invoice email stapled with Terms-of-Service
 HTML can still upload exactly its PDF.
 
-## Unreleased
-
-`dropbox_upload` accepts `exclude_content_types` (list or comma-separated
-string): attachments with those MIME types (matched without parameters,
-case-insensitive) are skipped before the upload, and `attachment_selection`
-applies to what remains — so an invoice email stapled with Terms-of-Service
-HTML can still upload exactly its PDF.
+`dropbox_upload` accepts `skip_existing`: an HTTP 409 path conflict returns
+`already_exists: true` instead of failing the step, so replaying an archive
+of a file that is already at that path succeeds.
