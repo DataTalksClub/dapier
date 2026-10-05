@@ -279,6 +279,12 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .page-tools .workflow-filters label:first-child { flex: 1.3 1 180px; max-width: 280px; }
 .page-tools .workflow-page-actions { flex: none; }
 .page-tools.section-head { margin: 0; padding: 0; flex: 1; }
+/* In-flow toolbars keep a step of air above the register they control —
+   the family rhythm `.list-tools` carried before `.page-tools` flattened
+   margins. The hoisted .primary-tools lives in the topbar, so it never
+   matches; the agents tab strip flows into its workspace and opts out. */
+.view > .page-tools { margin-bottom: 12px; }
+.view > .agent-toolbar.page-tools { margin-bottom: 0; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
 .menu-toggle { display: none; }
@@ -511,6 +517,9 @@ td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text
 .cell-title > .cell-sub { margin-top: 2px; }
 .cell-name { font-weight: var(--dk-weight-semibold); font-size: var(--dk-text-body); color: var(--dk-text-primary); }
 .cell-sub { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+/* Status cells outside .cell-title (workers check-ins, connection token
+   expiry) stack the sub line under the dot instead of jamming inline. */
+td .status + .cell-sub, td .cell-name + .cell-sub { display: block; margin-top: 2px; }
 td[data-label="Retention"] { white-space: nowrap; }
 
 /* Section header per provider — one register of services, every group
