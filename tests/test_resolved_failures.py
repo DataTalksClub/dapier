@@ -500,3 +500,201 @@ def test_the_export_carries_the_resolution_columns(monkeypatch):
     header, row = payload["csv"].splitlines()[:2]
     assert header == ",".join(runs.CSV_COLUMNS)
     assert row.startswith("wf-a:evt-1,wf-a,email,message.received,failed,true,recovered")
+
+
+# --- the scan window: what the list searches must not depend on the page size
+
+
+class PagedLedger:
+    """A ledger whose scan walks DynamoDB's page order — arbitrary, not
+    newest-first — so a row's visibility depends only on how deep the walk
+    reached. This is what made a filtered list's answer depend on ``limit``."""
+
+    def __init__(self, size, deep_failure_at=None):
+        self.size = size
+        self.deep_failure_at = deep_failure_at
+        self.offset = 0
+
+    def scan(self, **kwargs):
+        limit = kwargs.get("Limit", 300)
+        rows = []
+        for index in range(self.offset, min(self.offset + limit, self.size)):
+            if index == self.deep_failure_at:
+                rows.append({
+                    "execution_id": "wf-real:step:evt-1", "run_id": "wf-real:evt-1",
+                    "workflow_id": "wf-real", "action_id": "step",
+                    "connector": "email", "event_type": "message.received",
+                    "status": "failed", "error": "Slack said no",
+                    "started_at": "2026-10-04T21:24:49+00:00",
+                })
+            else:
+                rows.append({
+                    "execution_id": f"wf-noise:step:{index}",
+                    "run_id": f"wf-noise:{index}", "workflow_id": "wf-noise",
+                    "action_id": "step", "connector": "email",
+                    "event_type": "message.received", "status": "completed",
+                    "started_at": "2026-09-01T00:00:00+00:00",
+                })
+        end = self.offset + limit
+        self.offset = end
+        page = {"Items": rows}
+        if end < self.size:
+            page["LastEvaluatedKey"] = {"i": end}
+        return page
+
+    @property
+    def searched(self):
+        return self.offset
+
+
+def _configure_ledger(monkeypatch, ledger):
+    class Dynamo:
+        def Table(self, _name):
+            return ledger
+
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setattr(boto3, "resource", lambda service: Dynamo())
+    return ledger
+
+
+def test_the_searched_window_does_not_depend_on_the_requested_page_size(monkeypatch):
+    """The bug this pins: the window used to be sized off ``limit``
+    (``Limit: min(max(limit * 6, 150), 600)``), so asking for fewer rows
+    searched *less* of the ledger and a filtered list silently returned
+    fewer matches — a failure invisible at the default limit, visible at a
+    larger one, with nothing in the response to explain the difference."""
+    depth = runs.SCAN_PAGE_SIZE * 6
+    searched = []
+    for limit in (5, 25, 100, 200):
+        ledger = _configure_ledger(monkeypatch,
+                                   PagedLedger(depth + runs.SCAN_PAGE_SIZE,
+                                               deep_failure_at=depth))
+        status, payload = runs.api_list(limit, status="problems")
+        searched.append(ledger.searched)
+        assert _run_ids(payload) == ["wf-real:evt-1"], (
+            f"the failure went missing at --limit {limit}")
+    assert len(set(searched)) == 1, f"window varied with page size: {searched}"
+
+
+def test_a_filtered_call_searches_more_than_an_unfiltered_one(monkeypatch):
+    """Filters are applied client-side after the scan, so a filtered call
+    needs a wider net to fill the same number of rows — and the failures
+    query, the narrowest and most important one, must not get the least."""
+    ledger = _configure_ledger(monkeypatch, PagedLedger(100_000))
+    runs.api_list(25, status="problems")
+    filtered_window = ledger.searched
+
+    ledger = _configure_ledger(monkeypatch, PagedLedger(100_000))
+    runs.api_list(25)
+    unfiltered_window = ledger.searched
+
+    assert filtered_window > unfiltered_window
+    assert filtered_window == runs.SCAN_PAGE_SIZE * runs.MAX_FILTERED_SCAN_PAGES
+    assert unfiltered_window == runs.SCAN_PAGE_SIZE * runs.MAX_SCAN_PAGES
+
+
+def test_a_clipped_window_is_reported_so_an_empty_answer_is_not_mistaken_for_clean(monkeypatch):
+    """A filtered list that ran out of budget must say so: "no failures" and
+    "no failures where we looked" are different answers, and only the caller
+    knows which one it got."""
+    over = runs.SCAN_PAGE_SIZE * runs.MAX_FILTERED_SCAN_PAGES + runs.SCAN_PAGE_SIZE
+    _configure_ledger(monkeypatch, PagedLedger(over))
+
+    status, payload = runs.api_list(25, status="problems")
+
+    assert status == 200
+    assert payload["runs"] == []
+    assert payload["paging"]["bounded"] is True
+    assert payload["paging"]["filtered"] is True
+
+
+def test_a_window_that_reached_the_end_is_not_reported_as_clipped(monkeypatch):
+    under = runs.SCAN_PAGE_SIZE * 2
+    _configure_ledger(monkeypatch, PagedLedger(under))
+
+    status, payload = runs.api_list(25, status="problems")
+
+    assert status == 200
+    assert payload["runs"] == []
+    assert payload["paging"]["bounded"] is False
+
+
+def test_the_clip_flag_is_also_set_without_a_filter(monkeypatch):
+    _configure_ledger(monkeypatch, PagedLedger(100_000))
+
+    status, payload = runs.api_list(25)
+
+    assert payload["paging"]["bounded"] is True
+    assert payload["paging"]["filtered"] is False
+
+
+class RecoveryLedger:
+    """The failure near the front of the walk, and one completing run planted
+    at a chosen depth — inside the reachable window, or past its budget."""
+
+    FIX = {
+        "execution_id": "wf-real:post:evt-fix", "run_id": "wf-real:evt-fix",
+        "workflow_id": "wf-real", "action_id": "post", "connector": "email",
+        "event_type": "message.received", "status": "completed",
+        # Newer than the failure, so it is a genuine recovery if it is seen.
+        "started_at": "2026-10-05T09:00:00+00:00",
+    }
+
+    def __init__(self, size, fix_at):
+        self.size, self.fix_at, self.offset = size, fix_at, 0
+
+    def scan(self, **kwargs):
+        limit = kwargs.get("Limit", 300)
+        rows = []
+        for index in range(self.offset, min(self.offset + limit, self.size)):
+            rows.append({
+                "execution_id": f"wf-noise:step:{index}",
+                "run_id": f"wf-noise:{index}", "workflow_id": "wf-noise",
+                "action_id": "step", "connector": "email",
+                "event_type": "message.received", "status": "completed",
+                "started_at": "2026-09-01T00:00:00+00:00",
+            })
+            if index == 0:
+                rows.append({
+                    "execution_id": "wf-real:step:evt-1", "run_id": "wf-real:evt-1",
+                    "workflow_id": "wf-real", "action_id": "step",
+                    "connector": "email", "event_type": "message.received",
+                    "status": "failed", "error": "Slack said no",
+                    "started_at": "2026-10-04T21:24:49+00:00",
+                })
+            if index == self.fix_at:
+                rows.append(dict(self.FIX))
+        end = self.offset + limit
+        self.offset = end
+        page = {"Items": rows}
+        if end < self.size:
+            page["LastEvaluatedKey"] = {"i": end}
+        return page
+
+
+def test_recovery_is_derived_when_the_fixing_run_is_inside_the_window(monkeypatch):
+    budget = runs.SCAN_PAGE_SIZE * runs.MAX_FILTERED_SCAN_PAGES
+    _configure_ledger(monkeypatch, RecoveryLedger(budget + runs.SCAN_PAGE_SIZE, fix_at=10))
+
+    status, payload = runs.api_list(25, status="problems")
+
+    assert status == 200
+    assert payload["runs"] == []  # recovered: no longer needs action
+
+
+def test_a_fixing_run_past_the_budget_leaves_the_failure_unresolved(monkeypatch):
+    """The documented trade, pinned so it cannot drift silently: recovery
+    needs both runs inside the scanned window. When the completing run sits
+    past the budget the failure stays unresolved — conservative, never a
+    wrong "recovered" — and the Mark fixed button still covers it."""
+    budget = runs.SCAN_PAGE_SIZE * runs.MAX_FILTERED_SCAN_PAGES
+    size = budget + runs.SCAN_PAGE_SIZE
+    _configure_ledger(monkeypatch, RecoveryLedger(size, fix_at=size - 1))
+
+    status, payload = runs.api_list(25, status="problems")
+
+    assert status == 200
+    assert _run_ids(payload) == ["wf-real:evt-1"]
+    assert payload["runs"][0]["resolved"] is False
+    # And the caller is told the window was the reason it cannot say more.
+    assert payload["paging"]["bounded"] is True

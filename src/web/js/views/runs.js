@@ -48,7 +48,7 @@ function runRow(run) {
    API's `since` timestamp), and Load more appends the next page through the
    API's paging token. Until a server fetch happens, the view shows the
    overview's recent sample (state.data.runs), filtered locally as before. */
-const runsPage = { runs: null, nextToken: null, workflow: '', status: '', date: '', search: '' };
+const runsPage = { runs: null, nextToken: null, bounded: false, workflow: '', status: '', date: '', search: '' };
 let fetchSeq = 0;
 
 function selectedFilters() {
@@ -89,6 +89,7 @@ async function fetchRunsPage({ append = false } = {}) {
     if (seq !== fetchSeq) return; // a newer fetch superseded this one
     const fresh = data.runs || [];
     runsPage.nextToken = (data.paging || {}).next || null;
+    runsPage.bounded = Boolean((data.paging || {}).bounded);
     runsPage.runs = append && runsPage.runs ? [...runsPage.runs, ...fresh] : fresh;
   } catch (error) {
     if (seq === fetchSeq && !append) { runsPage.runs = []; runsPage.nextToken = null; }
@@ -157,14 +158,25 @@ export function renderRuns() {
       shown = shown.filter((run) => JSON.stringify(run).toLowerCase().includes(search));
     }
   }
-  const emptyText = workflowFilter.value ? 'No recent runs for this workflow'
-    : runs.length || statusFilter.value ? 'No runs match these filters' : 'No runs yet';
+  const clippedNote = serverPaged && runsPage.bounded
+    ? ' (the search window was clipped, so older rows may not have been reached)'
+    : '';
+  const emptyText = (workflowFilter.value ? 'No recent runs for this workflow'
+    : runs.length || statusFilter.value ? 'No runs match these filters' : 'No runs yet')
+    + clippedNote;
   $('#run-table').innerHTML = shown.map(runRow).join('') ||
     `<tr><td colspan="5" class="muted-cell">${emptyText}</td></tr>`;
+  /* The API flags a window its scan budget clipped: with a filter applied,
+     the rows shown are the ones that matched inside the window, not proof
+     there are no others. Say so — an empty failures list that was only
+     empty where we looked is the worst possible thing to imply. */
+  const clipped = serverPaged && runsPage.bounded;
   $('#runs-sample-note').textContent = serverPaged
-    ? `${shown.length} of ${runs.length}${runsPage.nextToken ? ' · more' : ''}`
+    ? `${shown.length} of ${runs.length}${runsPage.nextToken ? ' · more' : ''}${clipped ? ' · window clipped' : ''}`
     : `${shown.length} of ${runs.length} · sample of 25`;
-  $('#runs-sample-note').title = 'Records are kept for 90 days.';
+  $('#runs-sample-note').title = clipped
+    ? 'Records are kept for 90 days. The search window was clipped, so older rows may exist that these filters did not reach.'
+    : 'Records are kept for 90 days.';
   $('#runs-load-more').hidden = !(serverPaged && runsPage.nextToken);
   /* Bulk replay names one workflow (the API's requirement), so the button
      only shows with a workflow picked and failures actually in sight. */

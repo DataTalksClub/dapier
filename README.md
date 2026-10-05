@@ -103,6 +103,14 @@ moves. `dapier runs list --unresolved` / `--resolved` (and the console's
 Failures / Fixed filters) split the two halves, and `dapier errors` and the
 daily digest count only the unresolved ones.
 
+Those filtered views read a bounded window of the ledger rather than all of
+it, so the API reports whether the window reached the end: `paging.bounded`
+is true when the search budget ran out first, and the console and CLI both
+say so. An empty failures list under a clipped window means "none where we
+looked", not "none". For the same reason a failure stays unresolved when the
+completing run that would settle it has aged out of that window — mark it
+fixed by hand rather than waiting for evidence that may never come.
+
 A workflow can also retry its own transient action failures with a top-level
 `retry` mapping: `attempts` is the total try count (1–5) and `backoff_seconds`
 the delay between tries (1–900). The failed event is re-enqueued on the event

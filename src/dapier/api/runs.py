@@ -98,7 +98,21 @@ RESOLVE_REASONS = ("acknowledged",)
 
 # DynamoDB can't filter grouped runs server-side, so the list walks scan
 # pages (never a whole table): page size and page count are both bounded.
+#
+# The page size is a constant, never derived from the caller's ``limit``. A
+# window that grew with the requested page size meant asking for fewer rows
+# searched *less* of the ledger, so a filtered list silently returned fewer
+# matches — the newest failure could be invisible at the default limit and
+# visible at a larger one, with nothing in the response to say so. How much
+# history the list searches is a property of the ledger, not of the request.
+SCAN_PAGE_SIZE = 300
 MAX_SCAN_PAGES = 10
+
+# A filtered call filters client-side, after the scan, so it has to read more
+# raw executions to fill the same number of rows: double the page budget when
+# any filter narrows the result. Without this, the narrowest and most
+# important query — the failures list — would have the smallest window.
+MAX_FILTERED_SCAN_PAGES = 20
 
 # The delayed-run gate on workflow delete walks more pages than a list (a
 # parked run can sit up to 90 days back), but still never reads the whole
@@ -382,24 +396,32 @@ def _wanted(run, workflow_id=None, status=None, since=None, before=None):
     return not _out_of_window(run.get("started_at") or "", since=since, before=before)
 
 
-def _scan_items(limit):
-    """The scanned window for a list call: paged scan pulls.
+def _scan_items(filtered=False):
+    """The scanned window for a list call: ``(items, bounded)``.
 
-    Each pull is bounded and the walk stops at the table's end or
-    MAX_SCAN_PAGES, whichever comes first — enough to fill a filtered page
-    without ever reading the whole ledger.
+    Each pull is bounded and the walk stops at the table's end or the page
+    budget, whichever comes first — never the whole ledger. ``bounded`` says
+    the budget ran out rather than the table ending, which is the caller's
+    only honest signal that a filtered result may be incomplete: a clipped
+    window that happened to match nothing is otherwise indistinguishable
+    from a clean "no failures".
+
+    ``filtered`` doubles the page budget (MAX_FILTERED_SCAN_PAGES), because
+    filters are applied client-side after the scan and a narrow query needs a
+    wider net to find the same number of rows.
     """
     table = _table()
     items = []
-    kwargs = {"Limit": min(max(limit * 6, 150), 600)}
-    for _ in range(MAX_SCAN_PAGES):
+    kwargs = {"Limit": SCAN_PAGE_SIZE}
+    budget = MAX_FILTERED_SCAN_PAGES if filtered else MAX_SCAN_PAGES
+    for _ in range(budget):
         page = table.scan(**kwargs)
         items.extend(page.get("Items", []))
         last = page.get("LastEvaluatedKey")
         if not last:
-            break
+            return items, False
         kwargs["ExclusiveStartKey"] = last
-    return items
+    return items, True
 
 
 def _export_window(max_rows):
@@ -533,6 +555,12 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     ``resolved`` are the two halves of the failure set: what still needs
     action, and what something settled.
 
+    ``paging.bounded`` flags a window the scan budget clipped: with a filter
+    applied, the rows are the ones that matched inside the window, not proof
+    that no others exist. The console's page note and the CLI footer say so,
+    because "no failures" and "no failures in the part we looked at" are
+    different answers and only the caller knows which one it got.
+
     ``visible`` (an auth.visibility.Visibility, None = unrestricted)
     read-filters the list, G17 Phase 2: a non-operator keeps only the runs
     of workflows it owns; a run whose workflow no longer exists resolves to
@@ -545,7 +573,9 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
         return 400, {"error": "Invalid page token"}
     query = str(q or "").strip().lower()
     owners = visibility.owners_for(visible)
-    grouped = _grouped(_scan_items(limit))
+    narrowed = bool(workflow_id or status or since or before or query)
+    items, clipped = _scan_items(filtered=narrowed)
+    grouped = _grouped(items)
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     _derive_recovered(runs)
     runs = [run for run in runs
@@ -567,8 +597,8 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
         "paging": {
             "next": _encode_token(page[-1]) if more and page else None,
             "limit": limit,
-            "filtered": bool(workflow_id or status or since or before
-                             or query or next_token),
+            "filtered": bool(narrowed or next_token),
+            "bounded": clipped,
         },
     }
 
@@ -679,7 +709,8 @@ def api_get(run_id, visible=None):
     # run; the recovering evidence is whatever completed run of the same
     # workflow the list scan reads, so reuse that bounded walk.
     if not run.get("resolved") and run.get("status") in RESOLVED_STATUSES:
-        candidates = _derive_recovered([run] + _group_runs(_scan_items(DEFAULT_LIMIT)))
+        window, _ = _scan_items(filtered=True)
+        candidates = _derive_recovered([run] + _group_runs(window))
         run = next((row for row in candidates if row["run_id"] == run_id), run)
     return 200, {
         "run": run,

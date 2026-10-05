@@ -1275,6 +1275,46 @@ def test_runs_cancel_of_a_run_not_suspended_reports_the_409(isolated_home, monke
     assert "Run is not suspended; nothing to cancel" in capsys.readouterr().out
 
 
+def test_runs_list_warns_when_the_search_window_was_clipped(isolated_home, monkeypatch, capsys):
+    """An empty failures list under a clipped window means "none where we
+    looked" - the one answer that must never read as a clean bill of health."""
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"runs": [], "paging": {"bounded": True, "filtered": True}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["runs", "list", "--unresolved"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "No runs match these filters." in out
+    assert "search window was clipped" in out
+
+
+def test_runs_list_notes_the_clip_alongside_rows(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"runs": [{"run_id": "wf-1:evt-1", "status": "failed", "steps": 1,
+                          "started_at": "2026-09-25T10:00:00+00:00"}],
+                "paging": {"bounded": True, "filtered": True}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    assert main.main(["runs", "list", "--unresolved"]) == 0
+    assert "search window was clipped" in capsys.readouterr().out
+
+
+def test_runs_list_is_quiet_when_the_window_was_not_clipped(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"runs": [{"run_id": "wf-1:evt-1", "status": "failed", "steps": 1,
+                          "started_at": "2026-09-25T10:00:00+00:00"}],
+                "paging": {"bounded": False, "filtered": True}}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    assert main.main(["runs", "list", "--unresolved"]) == 0
+    assert "clipped" not in capsys.readouterr().out
+
+
 def test_runs_resolve_hits_the_agent_resolve_endpoint(isolated_home, monkeypatch, capsys):
     calls = []
 

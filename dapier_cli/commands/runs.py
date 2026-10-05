@@ -55,16 +55,28 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
         params["next"] = next_token
     data = api.call(api_url, "GET", f"/api/agent/runs?{urlencode(params)}", debug=debug)
     items = data.get("runs", [])
+    paging = data.get("paging") or {}
+    # The server flags a window its scan budget clipped. An empty list under
+    # a clipped window means "none where we looked", which is the one case
+    # that must never read as a clean bill of health - the failures query is
+    # exactly the one an operator trusts when it comes back empty.
+    clipped = bool(paging.get("bounded"))
     if not items:
         filtered = (workflow or status or since or before or next_token or query
                     or resolved is not None)
         print("No runs match these filters." if filtered else
               "No runs recorded yet. Runs appear once a workflow handles a trigger event.")
+        if clipped:
+            print("The search window was clipped; older rows may not have been reached.")
         return 0
     print_runs(items)
-    next_page = (data.get("paging") or {}).get("next")
-    if next_page:
-        print(f"\nnext page: {next_page}  (pass it to --next)")
+    if paging.get("next"):
+        print(f"\nnext page: {paging['next']}  (pass it to --next)")
+    if clipped:
+        # The server's scan budget clipped the window, so with filters on,
+        # "no rows" means "none in the part searched" - say so rather than
+        # letting an empty list read as a clean bill of health.
+        print("note: the search window was clipped; older rows may not have been reached.")
     return 0
 
 
