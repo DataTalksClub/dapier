@@ -508,57 +508,8 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 .action-col { text-align: right; }
 .action-cell { text-align: right; white-space: nowrap; }
 .action-cell .dk-button + .dk-button { margin-left: 6px; }
-[data-page="connections"] th:first-child { width: 56%; }
-[data-page="connections"] th:nth-child(2) { width: 22%; }
-
-/* Provider chooser reads as a register of services, below existing accounts. */
-.connect-grid { display: block; border-top: 1px solid var(--dk-border-default); margin: 4px 0 30px; }
-.connect-card { display: grid; grid-template-columns: minmax(170px, 23%) minmax(180px, 1fr) minmax(210px, auto); align-items: center; gap: 8px 20px; padding: 15px 0; border-bottom: 1px solid var(--dk-border-default); }
-.connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.connect-title { display: inline-flex; align-items: center; gap: 9px; }
-.connect-name { font-weight: var(--dk-weight-semibold); letter-spacing: -0.01em; }
-.connect-count { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-.brand-mark { flex: none; }
-.provider-cell { display: inline-flex; align-items: center; gap: 8px; }
-.connect-blurb { margin: 0; color: var(--dk-text-primary); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); line-height: 1.45; }
-.connect-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; grid-column: 3; grid-row: 1 / span 2; }
-.connect-pending { color: var(--dk-info-text); font-size: var(--dk-text-sm); grid-column: 2; }
-#connect-picker { margin-top: 28px; border-top: 1px solid var(--dk-border-strong); }
-#connect-picker .section-head { margin-top: 20px; }
-.grant-list { border-top: 1px solid var(--dk-border-default); }
-.grant-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--dk-border-default); }
-.grant-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
-.grant-meta { display: block; margin-top: 3px; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow-wrap: anywhere; }
-.grant-actions { display: flex; gap: 6px; flex: none; }
-.grant-actions .dk-button { height: var(--dk-size-control-sm); padding: 0 10px; font-size: var(--dk-text-sm); }
-#connection-access-dialog { width: min(620px, calc(100vw - 32px)); }
-#connection-grant-form { display: grid; gap: 14px; border-top: 1px solid var(--dk-border-default); padding-top: 18px; }
-#connection-grant-form h3 { font-size: var(--dk-text-md); }
-.grant-operations { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; border: 0; padding: 0; }
-.grant-operations legend { margin-bottom: 6px; font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-.grant-operations label { display: inline-flex; align-items: center; gap: 6px; }
-.grant-operations input { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
-#edit-connection-dialog { width: min(680px, calc(100vw - 32px)); }
-#edit-connection-dialog .dialog-actions { flex-wrap: wrap; }
-#edit-connection-access { margin-right: auto; }
-#edit-connection-revoke { color: var(--dk-danger-text); border-color: var(--dk-danger-border); }
-.sub-head { font-size: var(--dk-text-lg); }
-.section-head h2.sub-head { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
-td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
-.muted-cell { color: var(--dk-text-primary); }
-/* .cell-title stays a real table-cell — display:grid here would strip the td of
-   its cell role, so its border paints at content height and rows split apart
-   whenever another cell (e.g. a wrapped date) is taller. Stack spans instead. */
-.cell-title > .cell-name, .cell-title > .cell-sub { display: block; }
-.cell-title > .cell-sub { margin-top: 2px; }
-.cell-name { font-weight: var(--dk-weight-semibold); font-size: var(--dk-text-body); color: var(--dk-text-primary); }
-.cell-sub { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-/* Status cells outside .cell-title (workers check-ins, connection token
-   expiry) stack the sub line under the dot instead of jamming inline. */
-td .status + .cell-sub, td .cell-name + .cell-sub { display: block; margin-top: 2px; }
-td[data-label="Retention"] { white-space: nowrap; }
-
-/* Connections register: one family panel per service, account rows inside. */
+/* Connections register: Google is one panel of accounts; other services
+   keep one family panel each. Account rows inside. */
 #connection-register { margin-top: 8px; }
 #connection-register .service-panel { margin-top: 16px; }
 #connection-register .service-panel:first-child { margin-top: 0; }
@@ -613,6 +564,53 @@ td[data-label="Retention"] { white-space: nowrap; }
 .reuse-account:hover { background: var(--dk-bg-hover); }
 .reuse-account:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
 .reuse-account .cell-sub { display: block; }
+
+/* Provider chooser reads as a register of services, below existing accounts. */
+.connect-grid { display: block; border-top: 1px solid var(--dk-border-default); margin: 4px 0 30px; }
+.connect-card { display: grid; grid-template-columns: minmax(170px, 23%) minmax(180px, 1fr) minmax(210px, auto); align-items: center; gap: 8px 20px; padding: 15px 0; border-bottom: 1px solid var(--dk-border-default); }
+.connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.connect-title { display: inline-flex; align-items: center; gap: 9px; }
+.connect-name { font-weight: var(--dk-weight-semibold); letter-spacing: -0.01em; }
+.connect-count { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
+.brand-mark { flex: none; }
+.provider-cell { display: inline-flex; align-items: center; gap: 8px; }
+.connect-blurb { margin: 0; color: var(--dk-text-primary); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); line-height: 1.45; }
+.connect-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; grid-column: 3; grid-row: 1 / span 2; }
+.connect-pending { color: var(--dk-info-text); font-size: var(--dk-text-sm); grid-column: 2; }
+#connect-picker { margin-top: 28px; border-top: 1px solid var(--dk-border-strong); }
+#connect-picker .section-head { margin-top: 20px; }
+.grant-list { border-top: 1px solid var(--dk-border-default); }
+.grant-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--dk-border-default); }
+.grant-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.grant-meta { display: block; margin-top: 3px; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow-wrap: anywhere; }
+.grant-actions { display: flex; gap: 6px; flex: none; }
+.grant-actions .dk-button { height: var(--dk-size-control-sm); padding: 0 10px; font-size: var(--dk-text-sm); }
+#connection-access-dialog { width: min(620px, calc(100vw - 32px)); }
+#connection-grant-form { display: grid; gap: 14px; border-top: 1px solid var(--dk-border-default); padding-top: 18px; }
+#connection-grant-form h3 { font-size: var(--dk-text-md); }
+.grant-operations { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; border: 0; padding: 0; }
+.grant-operations legend { margin-bottom: 6px; font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
+.grant-operations label { display: inline-flex; align-items: center; gap: 6px; }
+.grant-operations input { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
+#edit-connection-dialog { width: min(680px, calc(100vw - 32px)); }
+#edit-connection-dialog .dialog-actions { flex-wrap: wrap; }
+#edit-connection-access { margin-right: auto; }
+#edit-connection-revoke { color: var(--dk-danger-text); border-color: var(--dk-danger-border); }
+.sub-head { font-size: var(--dk-text-lg); }
+.section-head h2.sub-head { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
+td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
+.muted-cell { color: var(--dk-text-primary); }
+/* .cell-title stays a real table-cell — display:grid here would strip the td of
+   its cell role, so its border paints at content height and rows split apart
+   whenever another cell (e.g. a wrapped date) is taller. Stack spans instead. */
+.cell-title > .cell-name, .cell-title > .cell-sub { display: block; }
+.cell-title > .cell-sub { margin-top: 2px; }
+.cell-name { font-weight: var(--dk-weight-semibold); font-size: var(--dk-text-body); color: var(--dk-text-primary); }
+.cell-sub { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+/* Status cells outside .cell-title (workers check-ins, connection token
+   expiry) stack the sub line under the dot instead of jamming inline. */
+td .status + .cell-sub, td .cell-name + .cell-sub { display: block; margin-top: 2px; }
+td[data-label="Retention"] { white-space: nowrap; }
 
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }
