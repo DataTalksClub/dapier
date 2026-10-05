@@ -141,11 +141,12 @@ is the default). It creates a feature branch or pull request only when the
 operator's own instructions explicitly ask for one. A push that deploys a live
 site is the intended completion. It preserves unrelated work and reports any
 check or push blocker in the completion report. When files
-were pushed, the reply includes direct HTTPS links to the primary files at the
-verified commit and to the commit itself, derived from the actual Git remote.
-Each full URL appears on its own line so it is clickable in plain-text email.
-Private repository links keep their existing access controls. A local path or
-commit hash alone is not a sufficient result link.
+were pushed, the reply opens with those HTTPS links — the primary files at the
+verified commit and the commit itself, derived from the actual Git remote —
+before any narrative. Each full URL appears on its own line at the start of
+the email body so it is clickable in plain-text email. Private repository
+links keep their existing access controls. A local path or commit hash alone
+is not a sufficient result link.
 
 Open **Workflows → email-trigger-agents** in the console to see the email
 trigger, agent action, and completion email. Agent actions can also run
