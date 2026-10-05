@@ -843,15 +843,6 @@ a.brand:hover span:last-child {
   color: var(--dk-text-muted);
 }
 
-/* The trigger-run (hook-backed) notice: a slim strip under the topbar
-   explaining why the canvas is read-only. */
-.read-only-note {
-  background: var(--muted-bg);
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: 6px 16px;
-}
-
 .spin {
   animation: spin 1s linear infinite;
 }

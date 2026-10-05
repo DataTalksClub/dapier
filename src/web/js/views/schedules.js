@@ -9,15 +9,10 @@ let current = { schedules: [] };
 let fetching = false;
 let editing = null; // schedule being edited, or null when creating
 
-function runsLabel(item) {
-  return (item.actions || []).map((action) => action.type).join(' → ') || '—';
-}
-
 function scheduleRow(item) {
   return `<tr>
     <td class="cell-title"><span class="cell-name mono">${escapeHtml(item.schedule_id)}</span><span class="cell-sub">${escapeHtml(item.description || '')}</span></td>
     <td class="mono muted-cell" data-label="Expression">${escapeHtml(item.expression || '—')}</td>
-    <td class="mono muted-cell" data-label="Runs">${escapeHtml(runsLabel(item))}</td>
     <td data-label="Status">${statusLine(item.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' })}</td>
     <td class="mono muted-cell" data-label="Updated">${escapeHtml(formatTimestamp(item.updated_at) || '—')}</td>
     <td class="action-cell">
@@ -72,14 +67,13 @@ function bindRowButtons() {
 }
 
 /* The PUT body is the full item: toggling or editing must restate the
-   expression and actions, exactly like `schedules save`. */
+   expression, exactly like `schedules save`. */
 function saveBody(item, enabled) {
   return {
     name: item.schedule_id,
     expression: item.expression,
     description: item.description || '',
     enabled: Boolean(enabled),
-    actions: item.actions || [],
   };
 }
 
@@ -94,8 +88,6 @@ function openDialog(item) {
   form.expression.value = item ? (item.expression || '') : '';
   form.description.value = item ? (item.description || '') : '';
   form.enabled.checked = item ? Boolean(item.enabled) : true;
-  form.actions.value = item && Array.isArray(item.actions)
-    ? JSON.stringify(item.actions, null, 2) : '';
   $('#schedule-dialog').showModal();
   if (!item) form.name.focus();
 }
@@ -110,15 +102,11 @@ $('#schedule-form').addEventListener('submit', async (event) => {
   submit.disabled = true;
   $('#schedule-error').textContent = '';
   try {
-    let actions;
-    try { actions = JSON.parse(form.actions.value); } catch (_) { throw new Error('Actions must be valid JSON'); }
-    if (!Array.isArray(actions)) throw new Error('Actions must be a JSON list');
     const body = {
       name: form.name.value.trim(),
       expression: form.expression.value.trim(),
       description: form.description.value.trim(),
       enabled: form.enabled.checked,
-      actions,
     };
     await api('/api/admin/schedule-triggers', { method: 'PUT', body: JSON.stringify(body) });
     $('#schedule-dialog').close();

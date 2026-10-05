@@ -21470,8 +21470,6 @@
     };
   }
   const EMPTY_SHAPES = [];
-  const noopSetShapes = () => {
-  };
   const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
   function readStepClipboard() {
     try {
@@ -21952,7 +21950,6 @@
     const [summaries, setSummaries] = reactExports.useState([]);
     const [sourceName, setSourceName] = reactExports.useState(null);
     const [workflowId, setWorkflowId] = reactExports.useState("new-workflow");
-    const [hookBacked, setHookBacked] = reactExports.useState(false);
     const [initialWorkflowLoaded, setInitialWorkflowLoaded] = reactExports.useState(false);
     const [enabled, setEnabled] = reactExports.useState(true);
     const [shapes, setShapes] = reactExports.useState(EMPTY_SHAPES);
@@ -22012,7 +22009,6 @@
       setEditHistory((current) => pushHistory(current, previous, coalesceKey ? { key: coalesceKey } : {}));
     }
     function editShapes(updater, coalesceKey) {
-      if (hookBacked) return;
       const current = draftRef.current;
       const nextShapes = updater(current.shapes);
       if (nextShapes === current.shapes) return;
@@ -22030,14 +22026,12 @@
       setSelectedId((current) => snapshot.shapes.some((shape) => shape.id === current) ? current : null);
     }
     function undo() {
-      if (hookBacked) return;
       const step = undoHistory(editHistory, draftRef.current);
       if (!step) return;
       applySnapshot(step.snapshot);
       setEditHistory(step.state);
     }
     function redo() {
-      if (hookBacked) return;
       const step = redoHistory(editHistory, draftRef.current);
       if (!step) return;
       applySnapshot(step.snapshot);
@@ -22047,17 +22041,14 @@
       setEditHistory(initHistory());
     }
     function renameWorkflow(id) {
-      if (hookBacked) return;
       commitEdit(draftRef.current, "workflow-id");
       setWorkflowId(id);
     }
     function toggleEnabled(next) {
-      if (hookBacked) return;
       commitEdit(draftRef.current);
       setEnabled(next);
     }
     function deleteSelectedShape() {
-      if (hookBacked) return;
       const id = selectedId;
       if (!id) return;
       commitEdit(draftRef.current);
@@ -22065,7 +22056,6 @@
       setSelectedId(null);
     }
     function duplicateStep(id) {
-      if (hookBacked) return;
       const shape = draftRef.current.shapes.find((entry) => entry.id === id);
       if (!shape || shape.type !== "node" || shape.data?.nodeKind !== "action") return;
       const data = shape.data;
@@ -22109,7 +22099,7 @@
     }
     function pasteStep(at) {
       const step = readStepClipboard();
-      if (!step || view !== "canvas" || hookBacked) return;
+      if (!step || view !== "canvas") return;
       const anchor = at ?? (selected ? { x: selected.x + 36, y: selected.y + 36 } : { x: 420, y: 260 });
       const type2 = step.actionType ?? "webhook";
       const label = step.label ?? actionMeta(type2)?.label ?? type2;
@@ -22286,12 +22276,12 @@
           id: workflowId,
           enabled,
           source: sourceName,
-          editable: view === "canvas" && !hookBacked,
+          editable: view === "canvas",
           dirty
         },
         window.location.origin
       );
-    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty, hookBacked]);
+    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
     reactExports.useEffect(() => {
       if (!config.embedded) return;
       const onLeaveRequest = async (event) => {
@@ -22395,7 +22385,6 @@
         const shapes2 = shapesFromWorkflow(workflow);
         const yaml2 = workflowYaml(workflow);
         setSourceName(summary.source);
-        setHookBacked(data.hook_backed === true);
         setWorkflowId(workflow.id);
         setEnabled(workflow.enabled !== false);
         setShapes(shapes2);
@@ -22502,10 +22491,6 @@
       setView(next);
     }
     async function save() {
-      if (hookBacked) {
-        setStatus({ kind: "error", message: "This workflow runs from its trigger and is read-only here — duplicate it to edit a copy." });
-        return false;
-      }
       if (Object.keys(invalidRawDrafts).length) {
         setStatus({ kind: "error", message: "Fix the invalid action JSON before saving." });
         return false;
@@ -22645,7 +22630,7 @@
       newWorkflow();
     }
     async function duplicateWorkflow() {
-      const ref = sourceName || (hookBacked ? workflowId : null);
+      const ref = sourceName;
       if (!ref) return;
       const name = window.prompt("Duplicate workflow as (blank for the suggested name):", `${workflowId}-copy`);
       if (name === null) return;
@@ -23391,8 +23376,8 @@
                 value: workflowId,
                 "aria-label": "Workflow ID",
                 placeholder: "workflow-id",
-                disabled: view === "yaml" || hookBacked,
-                title: hookBacked ? "Runs from its trigger — read-only" : view === "yaml" ? "Edit the id in the YAML view" : void 0,
+                disabled: view === "yaml",
+                title: view === "yaml" ? "Edit the id in the YAML view" : void 0,
                 onChange: (event) => renameWorkflow(event.target.value)
               }
             ),
@@ -23410,8 +23395,7 @@
                     {
                       type: "checkbox",
                       checked: enabled,
-                      disabled: view === "yaml" || hookBacked,
-                      title: hookBacked ? "Runs from its trigger — the on/off switch lives in Triggers" : void 0,
+                      disabled: view === "yaml",
                       onChange: (event) => toggleEnabled(event.target.checked),
                       "aria-label": "Workflow state after saving"
                     }
@@ -23436,8 +23420,8 @@
                 className: "dk-button dk-button--secondary",
                 type: "button",
                 onClick: duplicateWorkflow,
-                disabled: status.kind === "busy" || !sourceName && !hookBacked,
-                title: hookBacked ? "Copy this trigger-run workflow under a new id — the copy is an ordinary editable workflow" : !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
+                disabled: status.kind === "busy" || !sourceName,
+                title: !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
               }
             ),
@@ -23480,8 +23464,8 @@
                 className: "dk-button dk-button--secondary",
                 type: "button",
                 onClick: revertChanges,
-                disabled: hookBacked || status.kind === "busy" || !dirty,
-                title: hookBacked ? "Runs from its trigger — read-only" : "Throw unsaved changes away — back to the last saved state",
+                disabled: status.kind === "busy" || !dirty,
+                title: "Throw unsaved changes away — back to the last saved state",
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Revert" })
               }
             ),
@@ -23491,17 +23475,15 @@
                 className: dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary",
                 type: "button",
                 onClick: save,
-                disabled: hookBacked || status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,
-                title: hookBacked ? "Runs from its trigger — read-only" : void 0,
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: hookBacked ? "Read-only" : Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" })
+                disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" })
               }
             )
           ] })
         ] }),
-        hookBacked && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "read-only-note", role: "note", children: "This workflow runs from its trigger (webhook/telegram/…) — the designer shows it read-only. Edit the trigger in Triggers, or Duplicate it to edit an editable copy." }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor-bar", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mono-file", children: hookBacked ? workflowId : `workflows/${sourceName ?? `${workflowId}.yaml`}` }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mono-file", children: `workflows/${sourceName ?? `${workflowId}.yaml`}` }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "yaml-hint", children: "comments are not preserved on save" })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23511,7 +23493,6 @@
               value: yamlText,
               spellCheck: false,
               "aria-label": "Workflow YAML",
-              readOnly: hookBacked,
               onChange: (event) => setYamlText(event.target.value)
             }
           )
@@ -23520,7 +23501,7 @@
             WorkflowBoard,
             {
               shapes,
-              setShapes: hookBacked ? noopSetShapes : setShapes,
+              setShapes,
               editShapes,
               commitDrag,
               selectedId,

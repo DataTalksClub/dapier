@@ -8,11 +8,8 @@ import { $, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 
-const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
-  { type: 'webhook', url: 'https://example.test/hook' },
-], null, 2);
 /* Optional poll extras beyond the form fields; merged into the PUT body and
-   validated server-side (headers, cursor, and the actions list). Provider
+   validated server-side (headers, cursor). Provider
    sources (source: s3 | s3.updates | s3.deletions | google-sheets.rows |
    google-sheets.updates |
    google-drive.files | google-drive.updates | google-drive.deletions |
@@ -22,7 +19,7 @@ const HOOK_ACTIONS_TEMPLATE = JSON.stringify([
    spreadsheet_id/worksheet, folder_id, for_email, path, channel_id,
    list_id, calendar_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
-  'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days', 'actions', 'flow',
+  'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days',
   'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'drive_id', 'for_email',
   'path', 'channel_id', 'list_id', 'calendar_id'];
 
@@ -39,11 +36,6 @@ let hooks = [];
 let polls = [];
 let fetching = false;
 
-function actionSummary(item) {
-  if (item.flow) return `flow: ${item.flow}`;
-  return (item.actions || []).map((action) => action.type).join(' → ') || '—';
-}
-
 function findHook(name) {
   return hooks.find((item) => item.hook_id === name);
 }
@@ -56,7 +48,6 @@ function hookRow(hook) {
   return `<tr>
       <td class="cell-title"><span class="cell-name mono">${escapeHtml(hook.hook_id)}</span><span class="cell-sub">${escapeHtml(hook.description || '')}</span></td>
       <td data-label="Kind">${escapeHtml(hook.kind || 'webhook')}</td>
-      <td class="mono muted-cell" data-label="Runs">${escapeHtml(actionSummary(hook))}</td>
       <td data-label="Status">${statusLine(hook.enabled ? 'enabled' : 'disabled')}</td>
       <td class="mono muted-cell" data-label="Updated">${formatTimestamp(hook.updated_at) || '—'}</td>
       <td class="action-cell">
@@ -83,7 +74,6 @@ function pollRow(poll) {
       <td class="cell-title"><span class="cell-name mono">${escapeHtml(poll.poll_id)}</span><span class="cell-sub">${escapeHtml(poll.description || '')}</span></td>
       <td class="mono muted-cell" data-label="Watches">${escapeHtml(pollWatches(poll))}</td>
       <td class="mono muted-cell" data-label="Schedule">${escapeHtml(poll.expression || '')}</td>
-      <td class="mono muted-cell" data-label="Runs">${escapeHtml(actionSummary(poll))}</td>
       <td data-label="Status">${statusLine(poll.enabled ? 'enabled' : 'disabled')}</td>
       <td class="action-cell">
         <button class="dk-button dk-button--secondary trigger-sample" data-name="${escapeHtml(poll.poll_id)}" type="button">Sample</button>
@@ -160,10 +150,6 @@ function openHookDialog(hook) {
   $('#hook-clear-secret-field').hidden = !signed;
   $('#hook-secret-field').hidden = form.kind.value !== 'webhook';
   form.enabled.checked = hook ? Boolean(hook.enabled) : true;
-  form.actions.value = hook && hook.actions
-    ? JSON.stringify(hook.actions, null, 2)
-    : HOOK_ACTIONS_TEMPLATE;
-  form.actions.disabled = Boolean(hook && hook.flow);
   $('#hook-connection-field').hidden = form.kind.value !== 'telegram';
   $('#hook-list-field').hidden = form.kind.value !== 'mailchimp';
   $('#hook-dialog').showModal();
@@ -247,14 +233,6 @@ $('#hook-form').addEventListener('submit', async (event) => {
         try { response.template = JSON.parse(form.response_template.value); } catch (_) { throw new Error('Response template must be valid JSON'); }
       }
       body.response = response;
-    }
-    if (editingHook && editingHook.flow) {
-      body.flow = editingHook.flow;
-    } else {
-      let actions;
-      try { actions = JSON.parse(form.actions.value); } catch (_) { throw new Error('Actions must be valid JSON'); }
-      if (!Array.isArray(actions)) throw new Error('Actions must be a JSON list');
-      body.actions = actions;
     }
     const saved = await api('/api/admin/hook-triggers', { method: 'PUT', body: JSON.stringify(body) });
     $('#hook-dialog').close();

@@ -89,9 +89,6 @@ export interface WorkflowSummary {
   published?: boolean;
   /** A drafted edit sits on top of the live definition (Publish/Discard). */
   has_draft?: boolean;
-  /** Run by its trigger (webhook/telegram/...) — no source file; the API
-      serves it by id and saves refuse the id, so it opens read-only. */
-  hook_backed?: boolean;
 }
 
 /** The `draft` block the API attaches where a saved draft exists. */

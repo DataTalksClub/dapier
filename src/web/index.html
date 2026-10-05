@@ -135,7 +135,7 @@
         <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
         <div id="hook-table-wrap" class="table-wrap" hidden>
           <table>
-            <thead><tr><th>Hook</th><th>Kind</th><th>Runs</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th>Hook</th><th>Kind</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="hook-table"></tbody>
           </table>
         </div>
@@ -148,7 +148,7 @@
         <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
         <div id="poll-table-wrap" class="table-wrap" hidden>
           <table>
-            <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Runs</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="poll-table"></tbody>
           </table>
         </div>
@@ -292,7 +292,7 @@
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
         <div id="schedule-table-wrap" class="table-wrap" hidden>
           <table>
-            <thead><tr><th>Schedule</th><th>Expression</th><th>Runs</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th>Schedule</th><th>Expression</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="schedule-table"></tbody>
           </table>
         </div>
@@ -553,8 +553,8 @@
         <label>Name<input name="name" class="mono-input" placeholder="morning-digest" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. The name is fixed after creation — it names the EventBridge rule.</small></label>
         <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(1 day)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> — use <code>?</code> for day-or-weekday, e.g. <code>cron(0 7 * * ? *)</code> for 07:00 UTC daily — or <code>rate(&lt;number&gt; minutes|hours|days)</code>.</small></label>
         <label>Description<input name="description" placeholder="What runs and why" maxlength="200"></label>
-        <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input"></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
+        <p class="field-hint">The schedule publishes its fires as events; the designer workflows filtering on <code>schedule: {equals: &lt;name&gt;}</code> run on them.</p>
         <p id="schedule-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
@@ -593,7 +593,7 @@
           <label id="hook-clear-secret-field" hidden><input type="checkbox" name="clear_secret"> Remove the signature lock (callers go back to the bearer token)</label>
         </div>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
-        <label>Actions (JSON)<textarea name="actions" rows="8" class="mono-input" required></textarea><small class="field-hint">A list of actions, validated against the connector registry server-side.</small></label>
+        <p class="field-hint">The hook publishes its deliveries as events; the designer workflows filtering on <code>hook: {equals: &lt;name&gt;}</code> run on them.</p>
         <p id="hook-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
@@ -617,7 +617,7 @@
         <label>Connection<input name="connection_id" class="mono-input" placeholder="(none)"><small class="field-hint">Optional: a connected account whose credentials authenticate the request.</small></label>
         <label>Description<input name="description" placeholder="What it watches and why" maxlength="200"></label>
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
-        <label>Options (JSON)<textarea name="options" rows="6" class="mono-input"></textarea><small class="field-hint">Optional extras: <code>{"headers": {…}, "body": …, "list_path": "data.items", "id_path": "id", "cursor_mode": "watermark", "max_items": 25, "dedupe_ttl_days": 7, "actions": […]}</code>; for <code>s3</code> (all three file watches): <code>{"bucket": "…", "prefix": "…"}</code>, for Sheets/Drive: <code>{"spreadsheet_id": "…"}</code> / <code>{"folder_id": "…"}</code>, for Zoom: <code>{"for_email": "me"}</code>, for Dropbox/YouTube: <code>{"path": "/Invoices"}</code> / <code>{"channel_id": "UC…"}</code>, for Mailchimp/Slack: <code>{"list_id": "…"}</code> / <code>{"channel_id": "C…"}</code>. Server-validated.</small></label>
+        <label>Options (JSON)<textarea name="options" rows="6" class="mono-input"></textarea><small class="field-hint">Optional extras: <code>{"headers": {…}, "body": …, "list_path": "data.items", "id_path": "id", "cursor_mode": "watermark", "max_items": 25, "dedupe_ttl_days": 7}</code>; for <code>s3</code> (all three file watches): <code>{"bucket": "…", "prefix": "…"}</code>, for Sheets/Drive: <code>{"spreadsheet_id": "…"}</code> / <code>{"folder_id": "…"}</code>, for Zoom: <code>{"for_email": "me"}</code>, for Dropbox/YouTube: <code>{"path": "/Invoices"}</code> / <code>{"channel_id": "UC…"}</code>, for Mailchimp/Slack: <code>{"list_id": "…"}</code> / <code>{"channel_id": "C…"}</code>. Server-validated.</small></label>
         <p id="poll-error" class="form-error" role="alert"></p>
       </div>
       <div class="dialog-actions">
