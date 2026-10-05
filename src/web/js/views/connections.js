@@ -1,75 +1,155 @@
-/* Connections view: the create-new provider grid and the accounts table. */
+/* Connections view: a register of services, and the add-service picker. */
 import { state } from '../state.js';
-import { $, $$, icons, notice, providerMark } from '../ui.js';
+import { $, $$, icons, notice, serviceMark } from '../ui.js';
 import { api } from '../api.js';
 import { detailRows, escapeHtml, formatTimestamp, statusLine } from '../format.js';
 import { refresh } from './overview.js';
 
-const CONNECT_PROVIDERS = {
-  dataops: { label: 'DataOps', blurb: 'Read invoice status through a dedicated service credential.', connectionId: 'dataops', displayName: 'DataOps invoice reader', scopes: ['invoices:read'] },
-  google: {
+/* Keep ids, labels, providers, connectionId, and default scopes in lockstep
+   with src/dapier/connections/services.py — tests/test_connection_services.py
+   pins the pair. Google products share one OAuth provider; the picker still
+   offers each product on its own. */
+const CONNECT_SERVICES = {
+  gmail: {
+    label: 'Gmail',
+    blurb: 'Read mail and send from the connected inbox.',
+    provider: 'google',
+    connectionId: 'gmail',
+    scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/userinfo.email'],
+  },
+  calendar: {
     label: 'Google Calendar',
-    blurb: 'Calendar listings, event triggers, and owned-event edits for the scheduling flows.',
+    blurb: 'Calendar listings, event triggers, and owned-event edits.',
+    provider: 'google',
     connectionId: 'google-calendar',
-    displayName: 'Google Calendar',
     scopes: ['https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.events.owned', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
+  },
+  drive: {
+    label: 'Google Drive',
+    blurb: 'Find, read, and watch files in Drive.',
+    provider: 'google',
+    connectionId: 'google-drive',
+    scopes: ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
+  },
+  docs: {
+    label: 'Google Docs',
+    blurb: 'Read and edit Google Docs the account can access.',
+    provider: 'google',
+    connectionId: 'google-docs',
+    scopes: ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email'],
+  },
+  sheets: {
+    label: 'Google Sheets',
+    blurb: 'Read and write spreadsheets, including row triggers.',
+    provider: 'google',
+    connectionId: 'google-sheets',
+    scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/userinfo.email'],
   },
   youtube: {
     label: 'YouTube',
     blurb: 'Published-video triggers for your channel.',
+    provider: 'youtube',
     connectionId: 'youtube',
-    displayName: 'YouTube channel',
     scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
   },
   dropbox: {
     label: 'Dropbox',
     blurb: 'File watchers, uploads, and the invoice pipeline.',
+    provider: 'dropbox',
     connectionId: 'dropbox',
-    displayName: 'Dropbox',
     scopes: ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write'],
-  },
-  zoom: {
-    label: 'Zoom',
-    blurb: 'Start workflows when a Zoom cloud recording video finishes processing.',
-    connectionId: 'zoom',
-    displayName: 'Zoom recordings',
-    scopes: [],
   },
   slack: {
     label: 'Slack',
     blurb: 'Connect a Slack account for agent access with a bot or user token. Workflow Slack actions can also use the shared Service credential.',
+    provider: 'slack',
     connectionId: 'slack',
-    displayName: 'DataTalks Slack',
     scopes: [],
   },
   telegram: {
     label: 'Telegram',
     blurb: 'Message triggers and bot posts — paste a bot token from @BotFather.',
+    provider: 'telegram',
     connectionId: 'telegram-bot',
-    displayName: 'Telegram bot',
+    scopes: [],
+  },
+  zoom: {
+    label: 'Zoom',
+    blurb: 'Start workflows when a Zoom cloud recording video finishes processing.',
+    provider: 'zoom',
+    connectionId: 'zoom',
     scopes: [],
   },
 };
 
-/* Provider names for table group headers — wider than the connect cards
-   (a "google" group holds calendar, Drive, and Sheets connections alike). */
-const PROVIDER_LABELS = {
-  dataops: 'DataOps',
-  google: 'Google',
-  youtube: 'YouTube',
-  dropbox: 'Dropbox',
-  zoom: 'Zoom',
-  slack: 'Slack',
-  telegram: 'Telegram',
+const SERVICE_MARKERS = {
+  gmail: ['/auth/gmail.'],
+  calendar: ['/auth/calendar'],
+  drive: ['/auth/drive'],
+  docs: ['/auth/documents'],
+  sheets: ['/auth/spreadsheets'],
+  youtube: ['/auth/youtube', 'youtube.force-ssl', 'yt-analytics'],
 };
 
-const providerLabel = (provider) => PROVIDER_LABELS[provider] || provider;
+const SERVICE_ORDER = Object.keys(CONNECT_SERVICES);
+const GOOGLE_FAMILY = new Set(['gmail', 'calendar', 'drive', 'docs', 'sheets']);
+
+function serviceLabel(serviceId) {
+  return CONNECT_SERVICES[serviceId]?.label || (serviceId === 'google' ? 'Google' : serviceId);
+}
+
+function oauthClientProvider(meta) {
+  return (meta.provider === 'google' || meta.provider === 'youtube') ? 'google' : meta.provider;
+}
+
+function scopesOf(connection) {
+  const granted = connection.granted_scopes || [];
+  if (granted.length) return granted.map(String);
+  return (connection.scopes || []).map(String);
+}
+
+function deriveServices(connection) {
+  const provider = connection.provider || '';
+  const scopes = scopesOf(connection);
+  const found = [];
+  const seen = new Set();
+  for (const [id, meta] of Object.entries(CONNECT_SERVICES)) {
+    if (['dropbox', 'slack', 'telegram', 'zoom'].includes(id)) {
+      if (provider === meta.provider && !seen.has(id)) { found.push({ id, label: meta.label }); seen.add(id); }
+      continue;
+    }
+    if (id === 'youtube' && provider === 'youtube' && !seen.has(id)) {
+      found.push({ id, label: meta.label }); seen.add(id); continue;
+    }
+    if ((provider === 'google' || provider === 'youtube')
+        && (SERVICE_MARKERS[id] || []).some((marker) => scopes.some((scope) => scope.includes(marker)))
+        && !seen.has(id)) {
+      found.push({ id, label: meta.label }); seen.add(id);
+    }
+  }
+  if (found.length) return found;
+  if (provider === 'google') return [{ id: 'google', label: 'Google' }];
+  return [{ id: provider || 'unknown', label: serviceLabel(provider || 'unknown') }];
+}
+
+function servicesFor(connection) {
+  const listed = connection.services;
+  if (Array.isArray(listed) && listed.length) {
+    return listed.map((entry) => (typeof entry === 'string'
+      ? { id: entry, label: serviceLabel(entry) }
+      : { id: entry.id, label: entry.label || serviceLabel(entry.id) }));
+  }
+  return deriveServices(connection);
+}
+
+function connectionHasService(connection, serviceId) {
+  return servicesFor(connection).some((service) => service.id === serviceId);
+}
 
 /* Token providers paste a credential instead of browser consent. */
-const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom', 'dataops'];
+const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
 
 const TOKEN_PROVIDER_META = {
-  dataops: { heading: 'New DataOps connection', blurb: 'Paste the invoice reader service credential. It is verified with DataOps before being saved.', label: 'Service credential', placeholder: 'dops_svc_…', displayName: 'DataOps invoice reader', connectionId: 'dataops' },
   slack: {
     heading: 'New Slack connection',
     blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials. To listen for messages, open Manage afterwards and wire up event subscriptions.',
@@ -111,11 +191,11 @@ const needsAttention = (connection) => ['ready', 'expired', 'revoked'].includes(
 
 let addPickerOpen = false;
 
-/* Server-paged accounts table: the overview snapshot clips at its scan
+/* Server-paged accounts register: the overview snapshot clips at its scan
    limit, so once this page is open the view fetches /api/admin/connections
    (the paged list the API owns) and Load more appends the next page through
    the paging token — the same pattern as the runs view. Until the fetch
-   lands, the table shows the snapshot (state.data.connections); the
+   lands, the register shows the snapshot (state.data.connections); the
    snapshot keeps feeding the header widgets either way. */
 const connectionsPage = { connections: null, nextToken: null, seq: 0 };
 
@@ -157,7 +237,7 @@ function connectionsLoadMoreButton() {
   button.type = 'button';
   button.hidden = true;
   button.textContent = 'Load more';
-  $('#connection-table')?.closest('.table-wrap')?.after(button);
+  $('#connection-register')?.after(button);
   button.addEventListener('click', () => fetchConnectionsPage({ append: true }));
   return button;
 }
@@ -215,23 +295,26 @@ $('#oauth-retry').addEventListener('click', (event) => {
 $('#oauth-dismiss').addEventListener('click', () => { $('#oauth-result').hidden = true; });
 
 function renderConnectCards(connections) {
-  $('#connect-grid').innerHTML = Object.entries(CONNECT_PROVIDERS).map(([provider, meta]) => {
-    const clientProvider = provider === 'youtube' ? 'google' : provider;
+  $('#connect-grid').innerHTML = Object.entries(CONNECT_SERVICES).map(([serviceId, meta]) => {
+    const clientProvider = oauthClientProvider(meta);
     const oauthClient = ((state.data || {}).oauth_clients || []).find((item) => item.provider === clientProvider);
-    const needsClient = !TOKEN_PROVIDERS.includes(provider) && oauthClient && !oauthClient.configured;
-    const pending = !TOKEN_PROVIDERS.includes(provider)
-      ? connections.find((connection) => connection.provider === provider && connection.status === 'ready') : null;
-    const accounts = connections.filter((connection) => connection.provider === provider);
+    const needsClient = !TOKEN_PROVIDERS.includes(meta.provider) && oauthClient && !oauthClient.configured;
+    const pending = !TOKEN_PROVIDERS.includes(meta.provider)
+      ? connections.find((connection) => connection.status === 'ready' && connectionHasService(connection, serviceId)) : null;
+    const accounts = connections.filter((connection) => connectionHasService(connection, serviceId));
+    const reusable = reusableGoogleConnections(serviceId, connections);
+    const addLabel = meta.provider === 'zoom' ? 'Add Zoom app'
+      : reusable.length ? 'Add to an account' : 'Connect';
     const action = pending
-      ? `<a class="dk-button dk-button--primary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
-         <button class="dk-button dk-button--secondary connect-button" data-provider="${provider}" type="button">Add another account</button>`
-      : `<button class="dk-button dk-button--secondary connect-button" data-provider="${provider}" type="button">${provider === 'zoom' ? 'Add Zoom app' : 'Add account'}</button>`;
+      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
+         <button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button">Add another account</button>`
+      : `<button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button">${addLabel}</button>`;
     return `
     <div class="connect-card">
-      <div class="connect-card-head"><span class="connect-title">${providerMark(provider)}<span class="connect-name">${meta.label}</span></span>${accounts.length > 1 ? `<span class="connect-count">${accounts.length} accounts</span>` : ''}</div>
+      <div class="connect-card-head"><span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>${accounts.length ? `<span class="connect-count">${accounts.length} account${accounts.length === 1 ? '' : 's'}</span>` : ''}</div>
       <p class="connect-blurb">${meta.blurb}</p>
       ${needsClient ? `<p class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> before consent.</p>` : ''}
-      ${pending ? `<p class="connect-pending">${escapeHtml(pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
+      ${pending ? `<p class="connect-pending">${escapeHtml(pending.account_title || pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
       <div class="connect-card-actions">${action}</div>
     </div>`;
   }).join('');
@@ -240,24 +323,107 @@ function renderConnectCards(connections) {
     button.disabled = true;
     const label = button.textContent;
     button.textContent = 'Starting…';
-    try { await connectProvider(button.dataset.provider); }
+    try { await connectService(button.dataset.service); }
     finally { button.disabled = false; button.textContent = label; }
   }));
+}
+
+function allKnownConnections() {
+  if (connectionsPage.connections) return connectionsPage.connections;
+  return (state.data || {}).connections || [];
 }
 
 /* New connections must not clobber existing records, so derive the first
    free "<base>", "<base>-2", … ID and number the display name to match. */
 function nextConnectionId(base) {
-  const taken = new Set(((state.data || {}).connections || []).map((connection) => connection.connection_id));
+  const taken = new Set(allKnownConnections().map((connection) => connection.connection_id));
   if (!taken.has(base)) return { id: base, suffix: 0 };
   let suffix = 2;
   while (taken.has(`${base}-${suffix}`)) suffix += 1;
   return { id: `${base}-${suffix}`, suffix };
 }
 
-async function connectProvider(provider) {
-  if (TOKEN_PROVIDERS.includes(provider)) return openTokenDialog(provider);
-  const meta = CONNECT_PROVIDERS[provider];
+function reusableGoogleConnections(serviceId, connections) {
+  if (!GOOGLE_FAMILY.has(serviceId)) return [];
+  const list = connections || allKnownConnections();
+  return list.filter((connection) =>
+    connection.provider === 'google'
+    && connection.status === 'connected'
+    && !connectionHasService(connection, serviceId));
+}
+
+async function connectService(serviceId) {
+  const meta = CONNECT_SERVICES[serviceId];
+  if (!meta) return;
+  if (TOKEN_PROVIDERS.includes(meta.provider)) return openTokenDialog(meta.provider);
+  const reuse = reusableGoogleConnections(serviceId);
+  if (reuse.length) return openReuseDialog(serviceId, reuse);
+  return startNewOAuthConnection(meta);
+}
+
+function openReuseDialog(serviceId, candidates) {
+  const meta = CONNECT_SERVICES[serviceId];
+  const dialog = $('#reuse-connection-dialog');
+  $('#reuse-connection-title').textContent = `Add ${meta.label}`;
+  $('#reuse-connection-blurb').textContent =
+    `Use an existing Google account to add ${meta.label} to that grant. You'll approve the extra permissions. The same credential then covers every service on that account.`;
+  $('#reuse-connection-list').innerHTML = candidates.map((connection) => {
+    const identity = connection.account_title || connection.verified_account_id || connection.connection_id;
+    const already = servicesFor(connection).map((service) => service.label).join(', ');
+    return `<button class="reuse-account" type="button" data-connection="${escapeHtml(connection.connection_id)}">
+      <span class="cell-name">${escapeHtml(identity)}</span>
+      <span class="cell-sub">${escapeHtml(already ? `Already has ${already} · ${connection.connection_id}` : connection.connection_id)}</span>
+    </button>`;
+  }).join('');
+  $$('.reuse-account', dialog).forEach((button) => button.addEventListener('click', async () => {
+    const connection = candidates.find((item) => item.connection_id === button.dataset.connection);
+    dialog.close();
+    if (connection) await addServiceToConnection(serviceId, connection);
+  }));
+  $('#reuse-connection-new').onclick = () => {
+    dialog.close();
+    void startNewOAuthConnection(meta);
+  };
+  dialog.showModal();
+}
+
+async function addServiceToConnection(serviceId, connection) {
+  const meta = CONNECT_SERVICES[serviceId];
+  const scopes = [...new Set([
+    ...(connection.granted_scopes || []),
+    ...(connection.scopes || []),
+    ...(meta.scopes || []),
+  ])];
+  const popup = window.open('', '_blank', 'width=680,height=760');
+  if (!popup) return notice('Allow pop-ups to add this service, then try again.', true);
+  popup.document.title = `Add ${meta.label}`;
+  if (popup.document.body) popup.document.body.textContent = 'Preparing extra permissions…';
+  const stopWatching = watchOAuthPopup(popup, connection.connection_id);
+  try {
+    const body = {
+      connection_id: connection.connection_id,
+      provider: connection.provider,
+      display_name: connection.display_name || connection.connection_id,
+      scopes,
+    };
+    if (connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
+    await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
+    const startUrl = `/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start`;
+    if (!popup.closed) {
+      popup.location.assign(startUrl);
+      popup.focus();
+    } else {
+      notice('Scopes saved. Reconnect from the account row to finish.');
+    }
+    await refreshConnections();
+  } catch (error) {
+    stopWatching();
+    if (!popup.closed) popup.close();
+    notice(error.message, true);
+  }
+}
+
+async function startNewOAuthConnection(meta) {
   const { id } = nextConnectionId(meta.connectionId);
   // Open during the click: browsers block windows opened after the PUT awaits.
   const popup = window.open('', '_blank', 'width=680,height=760');
@@ -266,7 +432,7 @@ async function connectProvider(provider) {
   if (popup.document.body) popup.document.body.textContent = 'Preparing connection…';
   const stopWatching = watchOAuthPopup(popup, id);
   try {
-    // Provision the new record with the provider's standard scopes, then
+    // Provision the new record with the service's standard scopes, then
     // bounce straight to the consent screen. No display name: once consent
     // verifies the account, the record takes the verified identity (the
     // account email) as its name — that is what tells same-provider
@@ -275,7 +441,7 @@ async function connectProvider(provider) {
       method: 'PUT',
       body: JSON.stringify({
         connection_id: id,
-        provider,
+        provider: meta.provider,
         scopes: meta.scopes,
       }),
     });
@@ -284,7 +450,7 @@ async function connectProvider(provider) {
       popup.location.assign(startUrl);
       popup.focus();
     } else {
-      notice('Connection created. Use Connect in the accounts table to finish setup.');
+      notice('Connection created. Use Finish setup on the account to complete consent.');
     }
     await refreshConnections();
   } catch (error) {
@@ -353,7 +519,7 @@ export function openEditConnection(connectionId) {
   form.token.value = '';
   $('#edit-token-field').hidden = !TOKEN_PROVIDERS.includes(connection.provider);
   $('#edit-token-field').firstChild.textContent = connection.provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
-  form.token.placeholder = connection.provider === 'dataops' ? 'dops_svc_…' : connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
+  form.token.placeholder = connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
   $('#edit-token-field .field-hint').textContent = connection.provider === 'zoom'
     ? 'Leave blank to keep the stored secret. Replacing it requires Zoom to validate the callback again.'
     : 'Leave blank to keep the stored token — it is re-verified on save.';
@@ -412,7 +578,7 @@ function renderConnections(connections) {
   $('#connect-picker').hidden = !addPickerOpen && connections.length > 0;
   $('#add-connection').setAttribute('aria-expanded', String(!$('#connect-picker').hidden));
   $('#connection-empty').hidden = connections.length > 0;
-  $('.table-wrap', $('[data-page=connections]')).hidden = connections.length === 0;
+  $('#connection-register').hidden = connections.length === 0;
   const query = ($('#connection-search')?.value || '').trim().toLowerCase();
   const statusFilter = $('#connection-status-filter')?.value || 'all';
   const filtered = connections.filter((connection) => {
@@ -421,28 +587,43 @@ function renderConnections(connections) {
     if (!query) return true;
     return [connection.display_name, connection.connection_id, connection.provider,
       connection.account_title, connection.verified_account_id,
+      ...servicesFor(connection).flatMap((service) => [service.id, service.label]),
       ...(connection.used_in || []).map((entry) => entry.ref)].some((value) => String(value || '').toLowerCase().includes(query));
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
-  const withinGroup = (a, b) =>
-    String(a.display_name || a.connection_id).localeCompare(String(b.display_name || b.connection_id));
+  const withinGroup = (a, b) => {
+    const name = (connection) => connection.account_title || connection.verified_account_id
+      || connection.display_name || connection.connection_id;
+    return String(name(a)).localeCompare(String(name(b)));
+  };
   const groups = new Map();
   for (const connection of filtered) {
-    groups.set(connection.provider, [...(groups.get(connection.provider) || []), connection]);
+    for (const service of servicesFor(connection)) {
+      groups.set(service.id, [...(groups.get(service.id) || []), connection]);
+    }
   }
-  /* One section per provider — every group gets a header, so single-account
-     providers read the same as multi-account ones and the table scans as a
-     register of services. Rows order alphabetically; attention states surface
-     through the status column, the header meta, and the summary line. */
-  $('#connection-table').innerHTML = [...groups.entries()].sort(([a], [b]) =>
-    providerLabel(a).localeCompare(providerLabel(b))).map(([provider, group]) => {
-    const rows = [...group].sort(withinGroup).map(connectionRow).join('');
-    const attention = group.filter(needsAttention).length;
+  const ordered = [];
+  for (const id of SERVICE_ORDER) {
+    if (groups.has(id)) ordered.push([id, groups.get(id)]);
+  }
+  for (const [id, group] of groups) {
+    if (!SERVICE_ORDER.includes(id)) ordered.push([id, group]);
+  }
+  /* One panel per service — a Google grant that covers Calendar and Drive
+     appears under both, with a same-grant line so the shared credential is
+     visible. Attention states surface through the status stack and summary. */
+  $('#connection-register').innerHTML = ordered.map(([serviceId, group]) => {
+    const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, serviceId)).join('');
+    const needs = group.filter(needsAttention).length;
     const meta = [
-      group.length > 1 ? `${group.length} account${group.length === 1 ? '' : 's'}` : '',
-      attention ? `${attention} ${attention === 1 ? 'needs' : 'need'} attention` : '',
+      `${group.length} account${group.length === 1 ? '' : 's'}`,
+      needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
     ].filter(Boolean).join(' · ');
-    return `<tr class="provider-group-row"><th colspan="3" scope="colgroup">${providerMark(provider)}<span class="provider-group-name">${escapeHtml(providerLabel(provider))}</span>${meta ? `<span class="provider-group-meta">${escapeHtml(meta)}</span>` : ''}</th></tr>${rows}`;
+    return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
+      <div class="section-head"><h2 class="service-panel-title">${serviceMark(serviceId)}<span>${escapeHtml(serviceLabel(serviceId))}</span></h2>
+      <p class="sub">${escapeHtml(meta)}</p></div>
+      <ul class="service-accounts">${rows}</ul>
+    </section>`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.provider-token-button').forEach((button) => button.addEventListener('click', () => issueConnectionToken(button)));
@@ -464,25 +645,38 @@ function usageLabel(connection) {
   return `Used in: ${shown}${refs.length > 3 ? ` +${refs.length - 3}` : ''}`;
 }
 
-function connectionRow(connection) {
+function accountRow(connection, serviceId) {
     /* health is computed by the API from the stored token expiry; an expired
        token turns a connected row into "needs reconnection" (the label the
        status map already carried) without rewriting the stored record. */
     const status = effectiveStatus(connection);
     const nextAction = !TOKEN_PROVIDERS.includes(connection.provider) && status !== 'connected'
-      ? `<a class="dk-button ${status === 'ready' ? 'dk-button--primary' : 'dk-button--secondary'} connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     /* Console mirror of `dapier token exec`: only OAuth connections hold a
        refreshable provider access token — token providers (slack, telegram,
        zoom) keep a pasted secret, and the shared domain call 502s for them. */
     const tokenAction = status === 'connected' && !TOKEN_PROVIDERS.includes(connection.provider)
       ? `<button class="dk-button dk-button--secondary provider-token-button" data-connection="${escapeHtml(connection.connection_id)}" type="button">Get token</button>` : '';
     const identity = connection.account_title || connection.verified_account_id;
+    const title = identity || connection.display_name || connection.connection_id;
+    const others = servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label);
+    const shareHtml = [
+      others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '',
+      identity ? `<span class="mono">${escapeHtml(connection.connection_id)}</span>` : '',
+    ].filter(Boolean).join(' · ');
     const expires = formatTimestamp(connection.token_expires_at);
-    return `<tr>
-    <td class="cell-title"><span class="cell-name">${escapeHtml(connection.display_name || connection.connection_id)}</span><span class="cell-sub">${identity ? escapeHtml(identity) : 'No account verified yet'}</span><span class="cell-sub muted-cell">${escapeHtml(usageLabel(connection))}</span></td>
-    <td data-label="Status">${statusLine(status, CONNECTION_STATUS_LABELS)}${expires && status !== 'expired' ? `<span class="cell-sub muted-cell">token expires ${escapeHtml(expires)}</span>` : ''}</td>
-    <td class="action-cell">${nextAction}${tokenAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></td>
-  </tr>`;
+    return `<li class="service-account">
+    <div class="service-account-main">
+      <span class="cell-name">${escapeHtml(title)}</span>
+      ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
+      <span class="cell-sub">${escapeHtml(identity ? usageLabel(connection) : 'No account verified yet')}</span>
+    </div>
+    <div class="service-account-status">
+      ${statusLine(status, CONNECTION_STATUS_LABELS)}
+      ${expires && status !== 'expired' ? `<span class="cell-sub">expires ${escapeHtml(expires)}</span>` : ''}
+    </div>
+    <div class="service-account-actions">${nextAction}${tokenAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
+  </li>`;
 }
 
 $('#connection-search')?.addEventListener('input', () => renderConnections((state.data || {}).connections || []));
@@ -1182,7 +1376,6 @@ $('#connection-form').addEventListener('submit', async (event) => {
    paste their token, OAuth providers paste the authorized-user JSON whose
    refresh_token is transferred (and verified) server-side. */
 const IMPORT_PROVIDERS = {
-  dataops: { kind: 'token', label: 'Service credential' },
   google: { kind: 'oauth', label: 'Google' },
   youtube: { kind: 'oauth', label: 'YouTube' },
   dropbox: { kind: 'oauth', label: 'Dropbox', rootPath: true },

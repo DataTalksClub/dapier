@@ -60,6 +60,9 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
   status readout); run status comes from the dot+word "Latest run" read.
 - Connections rows may carry two actions (Get token + Manage): token
   retrieval is a distinct operator task. Candidate for a follow-up menu.
+  The Connections register is grouped by **service** (Gmail, Calendar,
+  Drive, Docs, Sheets, YouTube, …), not by OAuth provider; treatments
+  live in [`connections-page.md`](connections-page.md).
 - The standalone designer's footer shows the working-copy git state
   (branch + clean/dirty). It is local tool chrome for the operator who
   commits workflows, not a family-shell element.

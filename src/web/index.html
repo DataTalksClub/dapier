@@ -195,15 +195,11 @@
           <button id="pull-trigger-sample" class="dk-button dk-button--secondary" type="button">Pull sample</button>
           <button id="import-connection" class="dk-button dk-button--secondary" type="button">Import</button>
         </div>
-        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a provider to connect your first account.</p></div>
-        <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div><div class="table-wrap">
-          <table>
-            <thead><tr><th>Connection</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="connection-table"></tbody>
-          </table>
-        </div>
+        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a service to connect your first account.</p></div>
+        <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
+        <div id="connection-register"></div>
         <div id="connect-picker" hidden>
-          <div class="section-head"><h2>Add an account</h2></div>
+          <div class="section-head"><h2>Add a service</h2></div>
           <div class="connect-grid" id="connect-grid"></div>
         </div>
       </section>
@@ -676,6 +672,19 @@
     </div>
   </dialog>
 
+  <dialog id="reuse-connection-dialog" aria-labelledby="reuse-connection-title">
+    <div class="dialog-head">
+      <h2 id="reuse-connection-title">Add Gmail</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dialog-body">
+      <p id="reuse-connection-blurb" class="sub"></p>
+      <div id="reuse-connection-list" class="reuse-list"></div>
+    </div>
+    <div class="dialog-actions">
+      <button id="reuse-connection-new" class="dk-button dk-button--secondary" type="button">Connect a different account</button>
+    </div>
+  </dialog>
 
   <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title">
     <form id="edit-connection-form" method="dialog" autocomplete="off">

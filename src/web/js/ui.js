@@ -60,6 +60,15 @@ export function providerMark(provider) {
   return PROVIDER_MARKS[provider] || '';
 }
 
+/* Google products share the Google mark; YouTube and the rest keep theirs.
+   Service headers carry the mark — account rows do not. */
+const GOOGLE_SERVICE_IDS = new Set(['gmail', 'calendar', 'drive', 'docs', 'sheets', 'google']);
+
+export function serviceMark(serviceId) {
+  if (GOOGLE_SERVICE_IDS.has(serviceId)) return providerMark('google');
+  return providerMark(serviceId);
+}
+
 /* Secret fields render masked bullets without being real password inputs where
    the engine can draw them itself (-webkit-text-security): the browser's
    password manager never sees a password field, so it neither autofills saved

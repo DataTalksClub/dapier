@@ -83,3 +83,23 @@ def test_public_view_includes_services():
         {"id": "calendar", "label": "Google Calendar"},
         {"id": "drive", "label": "Google Drive"},
     ]
+
+
+def test_console_catalog_matches_python():
+    for spec in CATALOG:
+        assert f"{spec['id']}:" in JS
+        assert spec["connection_id"] in JS
+        assert spec["label"] in JS
+        for scope in spec.get("default_scopes") or ():
+            assert scope in JS
+
+
+def test_console_groups_by_service_not_provider():
+    assert "connection-register" in HTML
+    assert "Add a service" in HTML
+    assert "service-panel" in JS
+    assert "Same grant as" in JS
+    assert "provider-group-row" not in JS
+    assert "CONNECT_PROVIDERS" not in JS
+    assert "dk-button--secondary connection-oauth" in JS
+    assert "dk-button--primary connection-oauth" not in JS

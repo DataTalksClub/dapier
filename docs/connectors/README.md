@@ -192,7 +192,7 @@ verification. For the current required scopes by provider, see its guide.
 
 | Change | Update |
 |--------|--------|
-| Default scopes for newly created connections | `CONNECT_PROVIDERS` in [`src/web/js/views/connections.js`](../../src/web/js/views/connections.js) |
+| Default scopes for newly created connections | `CONNECT_SERVICES` in [`src/web/js/views/connections.js`](../../src/web/js/views/connections.js), pinned to [`src/dapier/connections/services.py`](../../src/dapier/connections/services.py) |
 | Scopes on an existing connection | Console **Connectors → Edit**, or `uv run dapier connections edit <connection-id> --scopes ...` (`connections edit` also updates scopes) |
 | Scopes allowed by Google consent | Google Cloud project `dtcdev-click` → **Google Auth Platform → Data access** |
 | Scopes allowed by Dropbox | Dropbox App Console → app **Permissions**; also check Full Dropbox vs App Folder access |
