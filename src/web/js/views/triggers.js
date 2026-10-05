@@ -1,8 +1,7 @@
 /* Hooks and polls — the trigger kinds behind /api/admin/hook-triggers and
    /api/admin/poll-triggers, the same operator endpoints `dapier hooks` and
-   `dapier polls` drive. They render inside the Workflows view (triggers are
-   part of the flows they start, not a separate panel). (Email triggers live
-   in the Emails view; schedules in Schedules.) */
+   `dapier polls` drive. They render as Workflows family tabs (start methods
+   of a flow). Email triggers live in the Emails tab; schedules in Schedules. */
 import { state } from '../state.js';
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
@@ -362,10 +361,10 @@ document.addEventListener('click', async (event) => {
   }
 });
 
-/* Entering the Workflows view (nav click, view link, back/forward) fetches
-   fresh triggers — its tables live there now. */
+/* Entering the Workflows family (nav, page tabs, back/forward) fetches
+   fresh hooks and polls. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nav-item[data-view="workflows"], .view-link[data-target="workflows"]')) void fetchTriggers();
+  if (event.target.closest('[data-view="workflows"], [data-target="workflows"]')) void fetchTriggers();
 });
 window.addEventListener('popstate', () => {
   if (state.view === 'workflows') void fetchTriggers();

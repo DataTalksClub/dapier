@@ -47,21 +47,15 @@
     <aside id="main-sidebar" class="sidebar">
       <div class="brand"><span class="workspace-mark" aria-hidden="true">D</span><span class="wordmark">Dapier</span><button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close menu"><i data-lucide="x"></i></button></div>
       <nav aria-label="Main navigation">
-        <p class="nav-group-label">Monitor</p>
         <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Home</span></a>
+        <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span><span id="nav-runs-count" class="nav-count" hidden></span></a>
         <a class="nav-item" href="/agents" data-view="agents"><i data-lucide="bot"></i><span>Agents</span></a>
-        <a class="nav-item" href="/workers" data-view="workers"><i data-lucide="server"></i><span>Workers</span></a>
-        <p class="nav-group-label">Automate</p>
-        <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
-        <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
-        <a class="nav-item" href="/schedules" data-view="schedules"><i data-lucide="clock"></i><span>Schedules</span></a>
-        <p class="nav-group-label">Administration</p>
-        <a class="nav-item" href="/credentials" data-view="credentials"><i data-lucide="key-round"></i><span>Credentials</span></a>
-        <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>API tokens</span></a>
-        <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data store</span></a>
-        <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit log</span></a>
+        <p class="nav-group-label">Settings</p>
+        <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>Access</span></a>
+        <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data</span></a>
+        <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit</span></a>
       </nav>
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
@@ -85,6 +79,24 @@
           <button id="refresh" class="icon-button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
         </div>
       </header>
+
+      <nav id="page-tabs" class="page-tabs" hidden aria-label="Section">
+        <div class="page-tab-set" data-family="workflows">
+          <a class="view-link" href="/workflows" data-view="workflows" data-tab="list">Workflows</a>
+          <a class="view-link" href="/emails" data-view="emails">Emails</a>
+          <a class="view-link" href="/schedules" data-view="schedules">Schedules</a>
+          <a class="view-link" href="/workflows?tab=hooks" data-view="workflows" data-tab="hooks">Hooks</a>
+          <a class="view-link" href="/workflows?tab=polls" data-view="workflows" data-tab="polls">Polls</a>
+        </div>
+        <div class="page-tab-set" data-family="connections">
+          <a class="view-link" href="/connections" data-view="connections">Accounts</a>
+          <a class="view-link" href="/credentials" data-view="credentials">App setup</a>
+        </div>
+        <div class="page-tab-set" data-family="agents">
+          <a class="view-link" href="/agents" data-view="agents">Tasks</a>
+          <a class="view-link" href="/workers" data-view="workers">Workers</a>
+        </div>
+      </nav>
 
       <div id="loading" class="loading" hidden><span></span><span></span><span></span></div>
       <div id="notice" class="notice" role="status" hidden></div>
@@ -111,7 +123,7 @@
       </section>
 
       <section class="view" data-page="workflows">
-        <div class="page-tools primary-tools">
+        <div class="page-tools primary-tools" data-panel-tools="list">
           <div class="workflow-page-actions">
           <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
           <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
@@ -119,6 +131,13 @@
           <a id="new-workflow" class="dk-button dk-button--primary" href="/workflows/new">New workflow</a>
           </div>
         </div>
+        <div class="page-tools primary-tools" data-panel-tools="hooks" hidden>
+          <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
+        </div>
+        <div class="page-tools primary-tools" data-panel-tools="polls" hidden>
+          <button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button>
+        </div>
+        <div data-workflow-panel="list">
         <div class="page-tools">
           <div class="list-tools workflow-filters"><label class="workflow-search-field"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
           </div>
@@ -132,11 +151,8 @@
             <tbody id="workflow-table"></tbody>
           </table>
         </div>
-        <section class="workflow-trigger-section data-panel" aria-labelledby="workflow-hooks-title">
-        <div class="section-head">
-          <h2 id="workflow-hooks-title" class="sub-head">Hooks</h2>
-          <button id="new-hook" class="dk-button dk-button--secondary" type="button">New hook</button>
         </div>
+        <div data-workflow-panel="hooks" hidden>
         <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
         <div id="hook-table-wrap" class="table-wrap" hidden>
           <table>
@@ -144,12 +160,8 @@
             <tbody id="hook-table"></tbody>
           </table>
         </div>
-        </section>
-        <section class="workflow-trigger-section data-panel" aria-labelledby="workflow-polls-title">
-        <div class="section-head">
-          <h2 id="workflow-polls-title" class="sub-head">API polls</h2>
-          <button id="new-poll" class="dk-button dk-button--secondary" type="button">New poll</button>
         </div>
+        <div data-workflow-panel="polls" hidden>
         <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
         <div id="poll-table-wrap" class="table-wrap" hidden>
           <table>
@@ -157,7 +169,7 @@
             <tbody id="poll-table"></tbody>
           </table>
         </div>
-        </section>
+        </div>
       </section>
 
       <section class="view" data-page="designer">
@@ -206,7 +218,7 @@
           </table>
         </div>
         <div class="section-head">
-          <h2 class="sub-head">Service credentials</h2><a class="text-link view-link" href="/connections" data-target="connections">Connections</a>
+          <h2 class="sub-head">Service credentials</h2>
         </div>
         <div class="table-wrap">
           <table>
@@ -267,7 +279,7 @@
             <button type="button" data-agent-filter="completed" aria-pressed="false">Completed <span>0</span></button>
           </div>
         </div>
-        <p id="agent-worker-note" class="sub" hidden></p>
+        <p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p>
         <div class="agent-workspace">
           <aside class="agent-run-sidebar" aria-label="Agent runs">
             <label class="visually-hidden" for="agent-runs-search">Search agent runs</label>
@@ -663,6 +675,7 @@
       <label class="token-grant-choice">Connection<select id="token-grant-connection"></select></label><button id="token-grant" class="dk-button dk-button--secondary" type="button">Grant connection access</button><button class="dk-button dk-button--primary dialog-close" type="button">Done</button>
     </div>
   </dialog>
+
 
   <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title">
     <form id="edit-connection-form" method="dialog" autocomplete="off">

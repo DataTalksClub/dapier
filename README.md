@@ -171,13 +171,14 @@ The sandbox deployment is available at `https://dapier.dtcdev.click`.
 
 ## Administration console
 
-Home prioritizes paused workflows and latest-run failures, followed by recently
-used workflows and execution results. Create a workflow from home; inspect
-failures in Runs and manage accounts in Connections. Usage and the
-monthly task limit live under Administration → Usage; the error digest action
-lives in Runs and the operator activity trail in Audit log. The CLI reaches the
-same actions with `dapier workflows`, `dapier runs`, `dapier connections`,
-`dapier quota`, `dapier errors send-digest`, and `dapier audit`.
+Home is the glance page: paused workflows, latest-run failures, and recent
+results. Create and edit automations in Workflows (emails, schedules, hooks,
+and polls are start methods on that page). Inspect failures in Runs, agent
+tasks in Agents, and connected accounts in Connections (OAuth clients and
+provider keys sit under App setup). Access, Data, and Audit live under
+Settings. The CLI reaches the same actions with `dapier workflows`,
+`dapier runs`, `dapier connections`, `dapier quota`, `dapier errors send-digest`,
+and `dapier audit`.
 
 Open `https://dapier.dtcdev.click` and sign in as `admin`. Retrieve the generated
 password from Secrets Manager without putting it in source control:

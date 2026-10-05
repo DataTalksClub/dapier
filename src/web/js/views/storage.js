@@ -136,7 +136,7 @@ export function renderStorage() { fillWorkflowSelect(); }
 /* Re-fill the picker and re-list when the view is re-entered, so both stay
    fresh without fetching on every page load. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nav-item[data-view="storage"]')) {
+  if (event.target.closest('[data-view="storage"]')) {
     fillWorkflowSelect();
     if (workflow) void listKeys();
   }

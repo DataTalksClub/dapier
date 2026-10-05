@@ -165,7 +165,7 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
   font-weight: var(--dk-weight-bold);
 }
 .sidebar-close { display: none; }
-nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
+.sidebar nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
 .nav-group-label {
   margin: var(--dk-space-4) var(--dk-space-2) var(--dk-space-1);
   color: var(--dk-text-muted);
@@ -174,7 +174,6 @@ nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-spa
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.nav-group-label:first-child { margin-top: 0; }
 /* Icon + text rows; the filled row is the only selection signal — no rail. */
 .nav-item {
   display: flex;
@@ -237,12 +236,49 @@ main { min-width: 0; padding: 0 40px 64px; }
 .view.active[data-page="workflows"],
 .view.active[data-page="runs"],
 .view.active[data-page="connections"],
+.view.active[data-page="credentials"],
+.view.active[data-page="emails"],
+.view.active[data-page="schedules"],
+.view.active[data-page="workers"],
 .view.active[data-page="audit"],
 .view.active[data-page="inbox"],
 .view.active[data-page="triggers"] { width: min(var(--content-wide), 100%); }
+.page-tabs {
+  width: min(var(--content-wide), 100%);
+  margin: 0 auto;
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--dk-border-default);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.page-tabs[hidden] { display: none; }
+.page-tab-set { display: flex; flex-wrap: nowrap; gap: 4px; }
+.page-tab-set[hidden] { display: none; }
+.page-tabs a {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  min-height: var(--dk-size-control-md);
+  padding: 0 12px;
+  margin-bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--dk-text-muted);
+  font: 500 var(--dk-text-body) var(--dk-font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.page-tabs a:hover { color: var(--dk-text-primary); }
+.page-tabs a[aria-current="page"] {
+  color: var(--dk-accent-default);
+  border-bottom-color: var(--dk-accent-default);
+  font-weight: var(--dk-weight-semibold);
+}
 /* Auto margins center regular views, but width:auto shrink-wraps a flex
    child around the iframe's intrinsic width. The editor fills the main. */
 body[data-view="designer"] .view.active { padding-top: 0; width: 100%; }
+body[data-view="designer"] #page-tabs { display: none; }
 /* agents runs the same full-bleed canvas: width:auto shrink-wraps inside the
    flex main, so the whole workspace visibly re-sizes while a run loads */
 body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
@@ -878,6 +914,8 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .top-actions { grid-area: actions; }
   #view-description { grid-area: desc; align-self: start; margin: 10px 0 0; }
   #topbar-tools { grid-area: tools; align-self: start; margin-top: 12px; }
+  .page-tabs { width: 100%; }
+  .page-tabs a { min-height: var(--dk-size-touch); }
   /* Empty header rows collapse so the designer's frame keeps no dead band. */
   #view-description:empty { display: none; }
   /* Every phone control meets the 44px touch scale. */
@@ -1088,6 +1126,8 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
 .workflow-menu .dk-button:hover { background: var(--dk-bg-hover); }
 .workflow-menu .dk-button:disabled { opacity: .45; cursor: default; }
 .workflow-menu .workflow-delete { border-top: 1px solid var(--dk-border-default); margin-top: 4px !important; }
+.agent-workers-strip { margin: 0 0 12px; }
+.agent-workers-strip a { color: var(--dk-accent-default); }
 .workflow-trigger-section { margin-top: 20px; padding-top: 0; border-top: 1px solid var(--dk-border-default); }
 .workflow-trigger-section .section-head { margin: 0; gap: 12px 24px; align-items: flex-start; }
 .workflow-trigger-section .section-head-text { flex: 1; min-width: 220px; }

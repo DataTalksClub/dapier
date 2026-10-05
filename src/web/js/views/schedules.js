@@ -142,7 +142,7 @@ export function renderSchedules() {
 
 /* Entering the view (nav click, back/forward) fetches fresh schedules. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nav-item[data-view="schedules"]')) void fetchSchedules();
+  if (event.target.closest('[data-view="schedules"]')) void fetchSchedules();
 });
 window.addEventListener('popstate', () => {
   if (state.view === 'schedules') void fetchSchedules();

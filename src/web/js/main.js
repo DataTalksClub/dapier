@@ -196,7 +196,8 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   // layer before the asynchronous guard can show that prompt.
   closeMobileMenu(true);
   const target = link.dataset.view || link.dataset.target;
-  if (!await setView(target)) return;
+  const tab = link.dataset.tab;
+  if (!await setView(target, true, tab ? { tab } : {})) return;
   if (target === 'agents') renderAgentTasks();
   if (target === 'workers') renderWorkers();
   if (target === 'audit') refreshAudit();

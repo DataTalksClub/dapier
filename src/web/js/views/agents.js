@@ -111,18 +111,24 @@ async function selectTask(id, { updateUrl = true } = {}) {
    waiting and none has checked in recently, say so: nothing will move until
    one starts. */
 async function renderWorkerNote(tasks, seq) {
-  const note = $('#agent-worker-note');
-  if (!note) return;
-  if (!tasks.some(task => ACTIVE.has(task.status))) { note.hidden = true; note.innerHTML = ''; return; }
+  const strip = $('#agent-workers-strip');
+  if (!strip) return;
   try {
     const data = await api('/api/admin/workers');
     if (seq !== listSeq) return;
-    const active = (data.workers || []).some(worker => worker.active);
-    note.hidden = active;
-    note.innerHTML = active ? '' :
-      'No worker is running — tasks stay queued until you start one with <code>dapier worker</code>. See the <a href="/workers" data-view="workers" class="view-link">Workers</a> tab.';
+    const workers = data.workers || [];
+    const active = workers.filter((worker) => worker.active).length;
+    const queued = tasks.some((task) => ACTIVE.has(task.status));
+    const link = '<a href="/workers" data-view="workers" class="view-link">Workers</a>';
+    strip.hidden = false;
+    if (!workers.length) {
+      strip.innerHTML = `No worker has checked in. Start one with <code>dapier worker</code> — agent tasks stay queued until a worker picks them up. ${link}`;
+      return;
+    }
+    const wait = queued && active === 0 ? ' Queued tasks wait until a worker is running.' : '';
+    strip.innerHTML = `${active} active · ${workers.length - active} offline.${wait} ${link}`;
   } catch (error) {
-    if (seq === listSeq) note.hidden = true;
+    if (seq === listSeq) strip.hidden = true;
   }
 }
 
