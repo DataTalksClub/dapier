@@ -193,6 +193,19 @@ nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-spa
 .nav-item:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
 .nav-item.active, .nav-item[aria-current="page"] { background: var(--dk-accent-soft); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); }
 .nav-item svg { width: 20px; height: 20px; flex: none; }
+.nav-count {
+  margin-left: auto;
+  min-width: 1.25em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--dk-danger-bg);
+  color: var(--dk-danger-text);
+  font-size: var(--dk-text-xs);
+  font-weight: var(--dk-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
 .sidebar-foot {
   margin-top: auto;
   display: flex;

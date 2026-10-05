@@ -122,7 +122,7 @@ document.addEventListener('click', async (event) => {
   if (button.classList.contains('workflow-run-link')) return void openRun(button.dataset.run);
   if (!await setView('runs')) return;
   $('#runs-workflow-filter').value = button.dataset.workflow;
-  $('#runs-status-filter').value = '';
+  $('#runs-status-filter').value = button.dataset.status || '';
   $('#runs-date-filter').value = '';
   renderRuns();
 });

@@ -345,10 +345,17 @@ function renderAttention(data) {
 
 function renderErrors() {
   const rows = (state.errors && state.errors.workflows) || [];
-  $('#overview-errors').innerHTML = rows.slice(0, 5).map((row) =>
-    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(row.workflow_id)}">${escapeHtml(row.workflow_id)}</button></td><td data-label="Failed">${escapeHtml(row.failed_runs)}</td><td class="mono muted-cell" data-label="Last failure">${escapeHtml(formatTimestamp(row.last_failed_at) || '—')}</td></tr>`).join('');
+  const total = Number(state.errors && state.errors.total_failed_runs) || 0;
+  $('#overview-errors').innerHTML = rows.slice(0, 8).map((row) =>
+    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(row.workflow_id)}" data-status="problems">${escapeHtml(row.workflow_id)}</button></td><td data-label="Failed">${escapeHtml(row.failed_runs)}</td><td class="mono muted-cell" data-label="Last failure">${escapeHtml(formatTimestamp(row.last_failed_at) || '—')}</td><td class="muted-cell" data-label="Error">${escapeHtml(String(row.last_error || '—').slice(0, 160))}</td></tr>`).join('');
   $('#overview-errors-empty').hidden = rows.length > 0;
   $('#overview-errors-table').hidden = rows.length === 0;
+  const badge = $('#nav-runs-count');
+  if (badge) {
+    badge.hidden = total <= 0;
+    badge.textContent = total > 0 ? String(total) : '';
+    badge.title = total > 0 ? `${total} failed run${total === 1 ? '' : 's'} in the last 7 days` : '';
+  }
 }
 
 /* Usage: the per-workflow-per-month task rollup the overview payload
