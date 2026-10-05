@@ -23522,7 +23522,7 @@
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Test run" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", title: "Close", onClick: () => setTestOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) })
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run for real” executes the actions with live side effects." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "test-hint", children: "Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent. “Run” executes the actions with live side effects." }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
               "Sample event (JSON)",
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23543,7 +23543,7 @@
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--danger", type: "button", disabled: testBusy, onClick: () => runTest(true, testStrict), children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 20, strokeWidth: 1.8 }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run for real" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Run" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 "button",

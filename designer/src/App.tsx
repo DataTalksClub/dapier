@@ -2271,7 +2271,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               </header>
               <p className="test-hint">
                 Dry-run this canvas against a sample event: every step's inputs are rendered, nothing is sent.
-                &ldquo;Run for real&rdquo; executes the actions with live side effects.
+                &ldquo;Run&rdquo; executes the actions with live side effects.
               </p>
               <label>Sample event (JSON)
                 <textarea
@@ -2288,7 +2288,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                   <span>Dry run</span>
                 </button>
                 <button className="dk-button dk-button--danger" type="button" disabled={testBusy} onClick={() => runTest(true, testStrict)}>
-                  <Play size={20} strokeWidth={1.8} /><span>Run for real</span>
+                  <Play size={20} strokeWidth={1.8} /><span>Run</span>
                 </button>
                 <button
                   className="dk-button dk-button--secondary"

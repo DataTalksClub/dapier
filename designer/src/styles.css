@@ -1196,8 +1196,9 @@ input[type="checkbox"], input[type="radio"] {
 
 /* ---- test run ---- */
 
-/* "Run for real" stays an explicitly-labelled destructive action; dakit owns
-   its look (.dk-button--danger). The active toggle tint is local state. */
+/* "Run" stays an explicitly-labelled destructive action; dakit owns its look
+   (.dk-button--danger) next to the safe "Dry run". The active toggle tint is
+   local state. */
 .dk-button--secondary.active {
   border-color: var(--dk-accent-default);
   color: var(--dk-accent-default);
