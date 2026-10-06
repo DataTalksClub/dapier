@@ -53,6 +53,26 @@ def __getattr__(name):
 
 
 def route(event, method, path):
+    """Dispatch one ``/api/agent/*`` request.
+
+    An unhandled exception escapes today as a bare API-Gateway 500 whose
+    only trace is the Lambda log. DTC-authenticated operators instead get
+    the traceback in the response body — the same evidence the log holds,
+    reachable from the CLI without log access. Everyone else sees exactly
+    the old failure (the exception re-raises).
+    """
+    try:
+        return _route(event, method, path)
+    except Exception as exc:
+        subject, error = authenticate(event)
+        if error or not _is_operator(event, subject):
+            raise
+        import traceback
+        from ... import http
+        return http._operator_error_500(event, exc, traceback_text=traceback.format_exc())
+
+
+def _route(event, method, path):
     if method == "GET" and path == "/api/agent/config":
         return public_config()
     if method == "POST" and path == "/api/agent/device/start":

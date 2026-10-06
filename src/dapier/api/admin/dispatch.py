@@ -266,6 +266,18 @@ def route(event, method, path):
     response, operator_payload, operator_subject = _gate(event, method, path)
     if response is not None:
         return response
+    # The operator gate passed, so a crash in the domain routers can carry
+    # its traceback in the body — the evidence the Lambda log holds,
+    # reachable from the console without log access. Pre-gate paths (login,
+    # the OAuth callback) keep the bare failure.
+    try:
+        return _route_domains(event, method, path, operator_payload, operator_subject)
+    except Exception as exc:
+        import traceback
+        return http._operator_error_500(event, exc, traceback_text=traceback.format_exc())
+
+
+def _route_domains(event, method, path, operator_payload, operator_subject):
     for router in (_route_overview_runs, _route_usage_errors, _route_inbox,
                    _route_connections, _route_grants_tokens, _route_ops_email,
                    _route_storage, _route_triggers, _route_connection_tokens):
