@@ -44,6 +44,9 @@ def tokens_create(api_url, name, agent, debug=False, output=None):
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            from src.dapier.private_files import protect
+
+            protect(path)
             handle.write(data["token"] + "\n")
         print(f"Stored the one-time token in {path} (owner-only).")
     else:

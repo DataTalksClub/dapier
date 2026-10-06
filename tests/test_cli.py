@@ -38,7 +38,11 @@ def test_session_roundtrip_restricted(isolated_home):
     config.save_session({"id_token": "abc", "subject": "s"})
     assert config.load_session() == {"id_token": "abc", "subject": "s"}
     mode = stat.S_IMODE(os.stat(config.session_file()).st_mode)
-    assert mode == 0o600
+    if os.name == "nt":
+        from src.dapier.private_files import require_private
+        require_private(config.session_file())
+    else:
+        assert mode == 0o600
     assert config.clear_session() is True
     assert config.load_session() is None
 
@@ -334,7 +338,12 @@ def test_token_write_private_file(monkeypatch, tmp_path, capsys):
     assert commands.token_write("https://api.example.test", "youtube-personal",
                                 "buildcamp-uploader", output) == 0
     assert open(output).read() == "live-token-value\n"
-    assert stat.S_IMODE(os.stat(output).st_mode) == 0o600
+    if os.name == "nt":
+        from pathlib import Path
+        from src.dapier.private_files import require_private
+        require_private(Path(output))
+    else:
+        assert stat.S_IMODE(os.stat(output).st_mode) == 0o600
     out, _ = capsys.readouterr()
     assert out.strip() == output
     assert "live-token-value" not in out
@@ -929,7 +938,8 @@ def test_tokens_create_writes_owner_only_file(isolated_home, monkeypatch, capsys
     assert main.main(["tokens", "create", "--name", "host-worker", "--agent",
                       "host-worker", "--output", str(path)]) == 0
     assert path.read_text().strip() == "dap_SECRET_VALUE"
-    assert path.stat().st_mode & 0o077 == 0
+    from src.dapier.private_files import require_private
+    require_private(path)
     assert "SECRET_VALUE" not in capsys.readouterr().out
 
 

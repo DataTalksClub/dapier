@@ -69,6 +69,11 @@ def clear_session():
 
 
 def _restrict(path):
+    if os.name == "nt":
+        from src.dapier.private_files import protect
+
+        protect(path)
+        return
     try:
         os.chmod(path, 0o600)
     except OSError:

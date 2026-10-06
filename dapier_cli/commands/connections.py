@@ -251,6 +251,9 @@ def token_write(api_url, connection_id, agent, output, force=False, debug=False)
         return 2
     try:
         with os.fdopen(fd, "w") as handle:
+            from src.dapier.private_files import protect
+
+            protect(output)
             handle.write(token["access_token"] + "\n")
     finally:
         try:
