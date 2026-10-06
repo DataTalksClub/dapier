@@ -88,6 +88,20 @@ On a Windows machine with Codex and the Chrome extension connected, run:
 uv run dapier worker --engine codex --capability browser --capability chrome
 ```
 
+To keep the Windows worker running independently of the terminal and start it
+at login, install the scheduled task after issuing the private worker token:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows-worker.ps1
+```
+
+The task runs hidden as the logged-in user, preserving access to that user's
+Codex configuration and Chrome session. It restarts failed workers up to three
+times, one minute apart. Logs are in `~/.config/dapier/browser-worker.log` and
+`browser-worker.err.log`. Use `Stop-ScheduledTask -TaskName 'Dapier Browser Worker'`
+to stop it and `Unregister-ScheduledTask -TaskName 'Dapier Browser Worker'`
+to remove automatic startup. Keep the desktop app and Chrome connection running.
+
 Configure the action in the workflow editor or save the same definition through
 `dapier workflows save` and `dapier workflows publish`:
 
