@@ -315,8 +315,9 @@ def test_console_email_page_uses_csp_allowed_assets():
 
 def test_ingress_role_can_read_overview_failure_counts():
     template = pathlib.Path("template.yaml").read_text()
-    ingress_policy = template.split("\n  IngressFunction:\n", 1)[1].split("\n  # Standalone", 1)[0]
-    assert "DynamoDBReadPolicy:\n            TableName: !Ref CursorsTable" in ingress_policy
+    role_policy = template.split("\n  ApiExecutionRole:\n", 1)[1].split("\n  IngressFunction:", 1)[0]
+    assert "CursorsTable.Arn" in role_policy
+    assert "dynamodb:GetItem" in role_policy
 
 
 # --- Webhook and Telegram trigger hooks -------------------------------------

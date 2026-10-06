@@ -241,27 +241,38 @@ Resources:
         - arm64
       RetentionPolicy: Delete
 
-  IngressFunction:
-    Type: AWS::Serverless::Function
+  # The API's execution role, explicit and named. The implicit role this
+  # replaces accumulated inline policy documents deploy after deploy until
+  # its total crossed IAM's 10240-byte cap — from then on every PutRolePolicy
+  # failed with ServiceLimitExceeded, the role drifted from the template
+  # (the connections table's dynamodb grants vanished; every connections
+  # route answered 500), and no deploy could repair it. A new role starts
+  # with an empty budget. The statements below consolidate the previous
+  # per-table policy documents (identical actions, identical tables —
+  # DynamoDBCrudPolicy/DynamoDBReadPolicy spelled out) into a handful of
+  # documents, leaving years of headroom under the cap. If this role ever
+  # fills again, the repair is the same: a new logical id here mints a
+  # fresh role on the next deploy.
+  ApiExecutionRole:
+    Type: AWS::IAM::Role
     Properties:
-      CodeUri: .
-      Handler: src.dapier.api.router.handler
-      Runtime: python3.12
-      Architectures: [arm64]
-      Layers:
-        - Ref: JsRuntimeLayer
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      # The managed policies SAM attaches to an implicit execution role:
+      # function logs and X-Ray tracing. Managed policies never count
+      # against the inline-policy budget.
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Sub arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
       Policies:
         - Statement:
             Effect: Allow
             Action: sts:AssumeRole
             Resource: !Ref AwsAssumableRoleArns
-        # One statement for both queues: fewer policy documents keep this
-        # role's inline total away from IAM's 10240-byte cap, which a
-        # previous deploy overshot and wedged the stack in rollback. The
-        # merged shape also re-puts every policy document on deploy —
-        # after a rollback that skipped this role, the live documents
-        # drifted from the template (ConnectionsTable GetItem vanished),
-        # and a no-op deploy repaired nothing.
         - Statement:
             Effect: Allow
             Action: sqs:SendMessage
@@ -287,11 +298,44 @@ Resources:
                 Action: secretsmanager:GetSecretValue
                 Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
           - !Ref AWS::NoValue
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ConnectionsTable
-        # The overview reads consecutive-failure counts from this table.
-        - DynamoDBReadPolicy:
-            TableName: !Ref CursorsTable
+        # Every table the API reads and writes at full CRUD, one document.
+        # DynamoDBCrudPolicy's per-table documents carried exactly these
+        # actions (streams reads included for parity with the SAM policy).
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:BatchGetItem, dynamodb:BatchWriteItem,
+                     dynamodb:ConditionCheckItem, dynamodb:DeleteItem,
+                     dynamodb:DescribeTable, dynamodb:GetItem,
+                     dynamodb:GetRecords, dynamodb:GetShardIterator,
+                     dynamodb:Query, dynamodb:Scan, dynamodb:PutItem,
+                     dynamodb:UpdateItem]
+            Resource:
+              - !GetAtt ConnectionsTable.Arn
+              - !GetAtt ExecutionsTable.Arn
+              - !GetAtt GrantsTable.Arn
+              - !GetAtt AuditTable.Arn
+              - !GetAtt EmailFromTable.Arn
+              - !GetAtt HostTasksTable.Arn
+              - !GetAtt HookTriggersTable.Arn
+              - !GetAtt ApiTokensTable.Arn
+              - !GetAtt DeviceSessionsTable.Arn
+              - !GetAtt ScheduleTriggersTable.Arn
+              - !GetAtt PollTriggersTable.Arn
+              - !GetAtt PublishedWorkflowsTable.Arn
+              - !GetAtt StorageTable.Arn
+              - !GetAtt DigestsTable.Arn
+        # Read-only tables: cursor failure counts, the trigger inbox, the
+        # usage rollup (DynamoDBReadPolicy, one document).
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:BatchGetItem, dynamodb:ConditionCheckItem,
+                     dynamodb:DescribeTable, dynamodb:GetItem,
+                     dynamodb:GetRecords, dynamodb:GetShardIterator,
+                     dynamodb:Query, dynamodb:Scan]
+            Resource:
+              - !GetAtt CursorsTable.Arn
+              - !GetAtt TriggerInboxTable.Arn
+              - !GetAtt TaskUsageTable.Arn
         # Operator teardown and authenticated hook retry claims share this
         # table. Keep writes within trigger cursor/seen keys.
         - Statement:
@@ -305,22 +349,12 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]
             Resource: !GetAtt CredentialsTable.Arn
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ExecutionsTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref GrantsTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref AuditTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EmailFromTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref HostTasksTable
-        # SendMessage belongs in this same statement: the role's total inline
-        # policy sits under IAM's 10240-byte cap, and a separate policy for
-        # one action pushed it over and wedged the stack in rollback. API-side
-        # paths enqueue host tasks directly (workflows test --execute, redo
-        # rows built outside a running flow); a denied send strands the
-        # HostTasks row queued forever with no message to lease.
+        # SendMessage belongs in this same statement: a separate policy for
+        # one action once pushed this role over the cap and wedged the stack
+        # in rollback. API-side paths enqueue host tasks directly (workflows
+        # test --execute, redo rows built outside a running flow); a denied
+        # send strands the HostTasks row queued forever with no message to
+        # lease.
         - Statement:
             Effect: Allow
             Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility,
@@ -330,30 +364,6 @@ Resources:
             Effect: Allow
             Action: [ses:SendEmail, ses:SendRawEmail]
             Resource: '*'
-        - DynamoDBCrudPolicy:
-            TableName: !Ref HookTriggersTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref TriggerInboxTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ApiTokensTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref DeviceSessionsTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ScheduleTriggersTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref PollTriggersTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref PublishedWorkflowsTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref TaskUsageTable
-        # The router runs designer test-runs in-process, so a workflow under
-        # test can exercise its storage_* (and run_workflow) steps exactly as
-        # the worker would.
-        - DynamoDBCrudPolicy:
-            TableName: !Ref StorageTable
-        # ... and its digest steps.
-        - DynamoDBCrudPolicy:
-            TableName: !Ref DigestsTable
         - Statement:
             Effect: Allow
             Action: [events:PutRule, events:PutTargets, events:DeleteRule,
@@ -376,6 +386,17 @@ Resources:
             Effect: Allow
             Action: [s3:GetObject, s3:PutObject]
             Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
+
+  IngressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.api.router.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Layers:
+        - Ref: JsRuntimeLayer
+      Role: !GetAtt ApiExecutionRole.Arn
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
@@ -560,7 +581,7 @@ Resources:
     Condition: HasGithubWorkflowsToken
     Properties:
       PolicyName: dapier-designer-github-token-read
-      Roles: [!Ref IngressFunctionRole]
+      Roles: [!Ref ApiExecutionRole]
       PolicyDocument:
         Version: '2012-10-17'
         Statement:

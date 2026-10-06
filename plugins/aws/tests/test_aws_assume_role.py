@@ -23,7 +23,9 @@ def test_api_can_stage_file_bytes_and_assume_only_configured_roles():
     source = Path(__file__).resolve().parents[3] / "template.yaml"
     document = yaml.load(source.read_text(), Loader=yaml.BaseLoader)
     resources = document["Resources"]
-    api_policies = resources["IngressFunction"]["Properties"]["Policies"]
+    # The API's execution role is explicit (ApiExecutionRole — a fresh role
+    # sidesteps the inline-policy size cap the implicit role filled up).
+    api_policies = resources["ApiExecutionRole"]["Properties"]["Policies"]
     assert any(
         isinstance(policy, dict) and policy.get("Statement") == {
             "Effect": "Allow",
@@ -32,8 +34,8 @@ def test_api_can_stage_file_bytes_and_assume_only_configured_roles():
         }
         for policy in api_policies
     )
-    for name in ("IngressFunction", "WorkerFunction"):
-        policies = resources[name]["Properties"]["Policies"]
+    for policies in (api_policies,
+                     resources["WorkerFunction"]["Properties"]["Policies"]):
         assert any(
             isinstance(policy, dict) and policy.get("Statement") == {
                 "Effect": "Allow", "Action": "sts:AssumeRole",
