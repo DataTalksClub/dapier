@@ -350,6 +350,10 @@ Resources:
         # the inbound mail bucket.
         - S3ReadPolicy:
             BucketName: !Ref DatamailerInboundBucketName
+        # Oversized replay: runs/inbox replay rehydrates a clipped trigger
+        # from the raw email copy its s3 pointer names (MailBucket).
+        - S3ReadPolicy:
+            BucketName: !Ref MailBucket
         # Designer/CLI execution tests run file-read steps in the API process.
         # Stage and read their bytes just as the worker does.
         - Statement:

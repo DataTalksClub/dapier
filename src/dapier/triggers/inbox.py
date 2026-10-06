@@ -75,6 +75,20 @@ def _trim(value, limit=6000):
     return {"truncated": True, "preview": text[:limit]}
 
 
+def _trim_event_data(data, limit=DATA_LIMIT):
+    """Cap stored event data like :func:`_trim`, but keep the replay
+    pointers: an oversized email event stays replayable through the raw
+    s3 copy its pointer names."""
+    trimmed = _trim(data, limit=limit)
+    if not (isinstance(trimmed, dict) and trimmed.get("truncated")):
+        return trimmed
+    if isinstance(data, dict):
+        for key in ("s3", "message_id"):
+            if data.get(key) is not None:
+                trimmed[key] = data[key]
+    return trimmed
+
+
 def _table():
     name = os.environ.get(TABLE_ENV)
     if not name:
@@ -118,7 +132,7 @@ def record(event, *, table_ref=None):
         "occurred_at": event.get("occurred_at"),
         "received_at": _now_iso(),
         "status": RECEIVED,
-        "data": _trim(event.get("data") or {}, limit=DATA_LIMIT),
+        "data": _trim_event_data(event.get("data") or {}),
         "matched": [],
         "expires_at": now + RETENTION_DAYS * 86400,
     }
@@ -306,15 +320,51 @@ def api_get(inbox_id, *, table_ref=None, visible=None):
     return 200, {"event": _view(item)}
 
 
+def stored(inbox_id, *, table_ref=None):
+    """The stored inbox row for one event id, decoded, or None.
+
+    Read for the replay paths: a run whose step input was clipped falls
+    back to the inbox row's s3 pointer to rehydrate its trigger data.
+    """
+    inbox_id = str(inbox_id or "").strip()
+    if not inbox_id:
+        return None
+    try:
+        table = table_ref if table_ref is not None else _table()
+    except InboxError:
+        return None
+    item = table.get_item(Key={"inbox_id": inbox_id}).get("Item")
+    return _decode_numbers(item) if item else None
+
+
+def rehydrate(data):
+    """Full event data for a truncated stored row, rebuilt from the raw
+    email copy its ``s3`` pointer names. Returns ``(data, None)``, or
+    ``(None, error)`` when there is no pointer or the copy is unreadable —
+    callers keep their explicit replay refusal in that case."""
+    pointer = data.get("s3") if isinstance(data, dict) else None
+    if not pointer:
+        return None, "The event data was too large to store; it cannot be replayed"
+    from .intake import email_ingress
+
+    full, error = email_ingress.replay_data(pointer)
+    if error:
+        return None, f"The stored raw email {error}; it cannot be replayed"
+    return full, None
+
+
 def replay_event(item):
     """Rebuild the stored envelope for replay, or ``(None, error)``.
 
     A fresh event id (fresh run in history) with ``correlation_id`` pointing
-    at the original event, mirroring the run-history replay.
+    at the original event, mirroring the run-history replay. Truncated data
+    rehydrates from the raw s3 copy its pointer names.
     """
     data = item.get("data")
     if isinstance(data, dict) and data.get("truncated"):
-        return None, "The event data was too large to store; it cannot be replayed"
+        data, error = rehydrate(data)
+        if error:
+            return None, error
     event_id = f"inbox-replay-{uuid.uuid4()}"
     return {
         "schema_version": "1.0",

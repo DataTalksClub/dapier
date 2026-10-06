@@ -718,13 +718,34 @@ def api_get(run_id, visible=None):
     }
 
 
+def _replay_data(data, original_event_id):
+    """Full trigger data for a clipped step input, rebuilt from the raw
+    email copy the event's inbox row points at. Returns ``(data, None)``,
+    or ``(None, error)`` — no pointer, unreadable copy — and the caller
+    keeps its explicit replay refusal."""
+    from ..triggers import inbox as inbox_store
+    from ..triggers.intake import email_ingress
+
+    pointer = data.get("s3")
+    if not pointer:
+        item = inbox_store.stored(original_event_id) or {}
+        pointer = (item.get("data") or {}).get("s3")
+    if not pointer:
+        return None, "The original event data was too large to store; it cannot be replayed"
+    full, error = email_ingress.replay_data(pointer)
+    if error:
+        return None, f"The stored raw email {error}; it cannot be replayed"
+    return full, None
+
+
 def replay_event(run_id, steps):
     """Rebuild the original trigger envelope from a run's stored steps.
 
     Every step of a run records the same event data as its input, so the
     first step with data carries the trigger. The replay gets a fresh event
     id (a fresh run in history) while ``correlation_id`` keeps the original
-    event id, tying the rerun to the run it came from.
+    event id, tying the rerun to the run it came from. A clipped input
+    rehydrates from the raw email copy its inbox row points at.
 
     Returns ``(event, None)``, or ``(None, error)`` when the stored steps
     cannot be replayed.
@@ -738,7 +759,9 @@ def replay_event(run_id, steps):
         return None, "This run's event data was not recorded; it cannot be replayed"
     data = first.get("input")
     if isinstance(data, dict) and data.get("truncated"):
-        return None, "The original event data was too large to store; it cannot be replayed"
+        data, error = _replay_data(data, original_event_id)
+        if error:
+            return None, error
     event_id = f"replay-{uuid.uuid4()}"
     return {
         "schema_version": "1.0",
