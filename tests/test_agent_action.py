@@ -65,7 +65,14 @@ def test_template_host_queue_is_send_only():
     assert "maxReceiveCount: 5" in text
     assert "HostDeadLetterQueue:" in text
     assert "HostDeadLetterAlarm:" in text
-    assert "Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility]" in text
+    # The API leases on behalf of host workers and enqueues agent tasks from
+    # API-side paths (test-execute, redo rows), so its lease statement also
+    # sends.
+    assert (
+        "Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility,"
+        in text
+    )
+    assert "sqs:SendMessage]" in text
     # The workflow function may send, and does not subscribe.
     assert "QueueName: !GetAtt HostQueue.QueueName" in text
     worker = text.split("WorkerFunction:", 1)[1].split("\n  # Standalone", 1)[0]

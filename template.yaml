@@ -306,15 +306,17 @@ Resources:
             TableName: !Ref EmailFromTable
         - DynamoDBCrudPolicy:
             TableName: !Ref HostTasksTable
+        # SendMessage belongs in this same statement: the role's total inline
+        # policy sits under IAM's 10240-byte cap, and a separate policy for
+        # one action pushed it over and wedged the stack in rollback. API-side
+        # paths enqueue host tasks directly (workflows test --execute, redo
+        # rows built outside a running flow); a denied send strands the
+        # HostTasks row queued forever with no message to lease.
         - Statement:
             Effect: Allow
-            Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility]
+            Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility,
+                     sqs:SendMessage]
             Resource: !GetAtt HostQueue.Arn
-        # API-side paths enqueue host tasks directly (workflows test
-        # --execute, redo rows built outside a running flow); a denied send
-        # strands the HostTasks row queued forever with no message to lease.
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt HostQueue.QueueName
         - Statement:
             Effect: Allow
             Action: [ses:SendEmail, ses:SendRawEmail]
