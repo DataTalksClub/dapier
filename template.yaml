@@ -269,123 +269,170 @@ Resources:
         - !Sub arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - !Sub arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
       Policies:
-        - Statement:
-            Effect: Allow
-            Action: sts:AssumeRole
-            Resource: !Ref AwsAssumableRoleArns
-        - Statement:
-            Effect: Allow
-            Action: sqs:SendMessage
-            Resource:
-              - !GetAtt EventQueue.Arn
-              - !GetAtt DropboxQueue.Arn
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref YouTubeWebhookSecret
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref DapierAdminSecret
-        - Statement:
-            Effect: Allow
-            Action: secretsmanager:GetSecretValue
-            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
-        - Statement:
-            Effect: Allow
-            Action: s3:PutObject
-            Resource: !Sub 'arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*'
-        - !If
-          - HasGithubWorkflowsToken
-          - Statement:
+        # Named inline documents (an explicit role takes raw policy
+        # documents, not SAM policy templates). Same grants the implicit
+        # role carried, consolidated into a handful of documents.
+        - PolicyName: dapier-api-assume-configured-roles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !Ref AwsAssumableRoleArns
+        - PolicyName: dapier-api-enqueue-work
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource:
+                  - !GetAtt EventQueue.Arn
+                  - !GetAtt DropboxQueue.Arn
+        - PolicyName: dapier-api-provider-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
+                Resource:
+                  - !Ref YouTubeWebhookSecret
+                  - !Ref DapierAdminSecret
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
+        - !If
+          - HasGithubWorkflowsToken
+          - PolicyName: dapier-api-github-token-read
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
           - !Ref AWS::NoValue
+        - PolicyName: dapier-api-dataops-intake-stage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*'
         # Every table the API reads and writes at full CRUD, one document.
-        # DynamoDBCrudPolicy's per-table documents carried exactly these
+        # The per-table DynamoDBCrudPolicy documents carried exactly these
         # actions (streams reads included for parity with the SAM policy).
-        - Statement:
-            Effect: Allow
-            Action: [dynamodb:BatchGetItem, dynamodb:BatchWriteItem,
-                     dynamodb:ConditionCheckItem, dynamodb:DeleteItem,
-                     dynamodb:DescribeTable, dynamodb:GetItem,
-                     dynamodb:GetRecords, dynamodb:GetShardIterator,
-                     dynamodb:Query, dynamodb:Scan, dynamodb:PutItem,
-                     dynamodb:UpdateItem]
-            Resource:
-              - !GetAtt ConnectionsTable.Arn
-              - !GetAtt ExecutionsTable.Arn
-              - !GetAtt GrantsTable.Arn
-              - !GetAtt AuditTable.Arn
-              - !GetAtt EmailFromTable.Arn
-              - !GetAtt HostTasksTable.Arn
-              - !GetAtt HookTriggersTable.Arn
-              - !GetAtt ApiTokensTable.Arn
-              - !GetAtt DeviceSessionsTable.Arn
-              - !GetAtt ScheduleTriggersTable.Arn
-              - !GetAtt PollTriggersTable.Arn
-              - !GetAtt PublishedWorkflowsTable.Arn
-              - !GetAtt StorageTable.Arn
-              - !GetAtt DigestsTable.Arn
+        - PolicyName: dapier-api-dynamodb-crud
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:BatchGetItem, dynamodb:BatchWriteItem,
+                         dynamodb:ConditionCheckItem, dynamodb:DeleteItem,
+                         dynamodb:DescribeTable, dynamodb:GetItem,
+                         dynamodb:GetRecords, dynamodb:GetShardIterator,
+                         dynamodb:Query, dynamodb:Scan, dynamodb:PutItem,
+                         dynamodb:UpdateItem]
+                Resource:
+                  - !GetAtt ConnectionsTable.Arn
+                  - !GetAtt ExecutionsTable.Arn
+                  - !GetAtt GrantsTable.Arn
+                  - !GetAtt AuditTable.Arn
+                  - !GetAtt EmailFromTable.Arn
+                  - !GetAtt HostTasksTable.Arn
+                  - !GetAtt HookTriggersTable.Arn
+                  - !GetAtt ApiTokensTable.Arn
+                  - !GetAtt DeviceSessionsTable.Arn
+                  - !GetAtt ScheduleTriggersTable.Arn
+                  - !GetAtt PollTriggersTable.Arn
+                  - !GetAtt PublishedWorkflowsTable.Arn
+                  - !GetAtt StorageTable.Arn
+                  - !GetAtt DigestsTable.Arn
         # Read-only tables: cursor failure counts, the trigger inbox, the
         # usage rollup (DynamoDBReadPolicy, one document).
-        - Statement:
-            Effect: Allow
-            Action: [dynamodb:BatchGetItem, dynamodb:ConditionCheckItem,
-                     dynamodb:DescribeTable, dynamodb:GetItem,
-                     dynamodb:GetRecords, dynamodb:GetShardIterator,
-                     dynamodb:Query, dynamodb:Scan]
-            Resource:
-              - !GetAtt CursorsTable.Arn
-              - !GetAtt TriggerInboxTable.Arn
-              - !GetAtt TaskUsageTable.Arn
+        - PolicyName: dapier-api-dynamodb-read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:BatchGetItem, dynamodb:ConditionCheckItem,
+                         dynamodb:DescribeTable, dynamodb:GetItem,
+                         dynamodb:GetRecords, dynamodb:GetShardIterator,
+                         dynamodb:Query, dynamodb:Scan]
+                Resource:
+                  - !GetAtt CursorsTable.Arn
+                  - !GetAtt TriggerInboxTable.Arn
+                  - !GetAtt TaskUsageTable.Arn
         # Operator teardown and authenticated hook retry claims share this
         # table. Keep writes within trigger cursor/seen keys.
-        - Statement:
-            Effect: Allow
-            Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
-            Resource: !GetAtt CursorsTable.Arn
-            Condition:
-              ForAllValues:StringLike:
-                dynamodb:LeadingKeys: ['poll#*', 'seen#poll#*', 'seen#hook#*']
-        - Statement:
-            Effect: Allow
-            Action: [dynamodb:GetItem, dynamodb:PutItem]
-            Resource: !GetAtt CredentialsTable.Arn
+        - PolicyName: dapier-api-cursor-scoped-writes
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
+                Resource: !GetAtt CursorsTable.Arn
+                Condition:
+                  ForAllValues:StringLike:
+                    dynamodb:LeadingKeys: ['poll#*', 'seen#poll#*', 'seen#hook#*']
+        - PolicyName: dapier-api-credentials-store
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Resource: !GetAtt CredentialsTable.Arn
         # SendMessage belongs in this same statement: a separate policy for
-        # one action once pushed this role over the cap and wedged the stack
-        # in rollback. API-side paths enqueue host tasks directly (workflows
-        # test --execute, redo rows built outside a running flow); a denied
-        # send strands the HostTasks row queued forever with no message to
-        # lease.
-        - Statement:
-            Effect: Allow
-            Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility,
-                     sqs:SendMessage]
-            Resource: !GetAtt HostQueue.Arn
-        - Statement:
-            Effect: Allow
-            Action: [ses:SendEmail, ses:SendRawEmail]
-            Resource: '*'
-        - Statement:
-            Effect: Allow
-            Action: [events:PutRule, events:PutTargets, events:DeleteRule,
-                     events:RemoveTargets, events:DescribeRule]
-            Resource:
-              - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
-              - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-poll-*
+        # one action once pushed the previous role over the cap and wedged
+        # the stack in rollback. API-side paths enqueue host tasks directly
+        # (workflows test --execute, redo rows built outside a running
+        # flow); a denied send strands the HostTasks row queued forever
+        # with no message to lease.
+        - PolicyName: dapier-api-host-queue-lease
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [sqs:ReceiveMessage, sqs:DeleteMessage,
+                         sqs:ChangeMessageVisibility, sqs:SendMessage]
+                Resource: !GetAtt HostQueue.Arn
+        - PolicyName: dapier-api-send-email
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ses:SendEmail, ses:SendRawEmail]
+                Resource: '*'
+        - PolicyName: dapier-api-trigger-rules
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [events:PutRule, events:PutTargets, events:DeleteRule,
+                         events:RemoveTargets, events:DescribeRule]
+                Resource:
+                  - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-schedule-*
+                  - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/dapier-poll-*
         # host-jobs/attachment streams a claimed job's stored trigger
         # attachments to the lease-holding worker over HTTPS, straight from
-        # the inbound mail bucket.
-        - S3ReadPolicy:
-            BucketName: !Ref DatamailerInboundBucketName
-        # Oversized replay: runs/inbox replay rehydrates a clipped trigger
-        # from the raw email copy its s3 pointer names (MailBucket).
-        - S3ReadPolicy:
-            BucketName: !Ref MailBucket
+        # the inbound mail bucket; oversized replay rehydrates a clipped
+        # trigger from the raw email copy its s3 pointer names.
+        - PolicyName: dapier-api-read-inbound-buckets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !Sub arn:aws:s3:::${DatamailerInboundBucketName}
+                  - !Sub arn:aws:s3:::${DatamailerInboundBucketName}/*
+                  - !Sub arn:aws:s3:::${MailBucket}
+                  - !Sub arn:aws:s3:::${MailBucket}/*
         # Designer/CLI execution tests run file-read steps in the API process.
         # Stage and read their bytes just as the worker does.
-        - Statement:
-            Effect: Allow
-            Action: [s3:GetObject, s3:PutObject]
-            Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
+        - PolicyName: dapier-api-render-artifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
 
   IngressFunction:
     Type: AWS::Serverless::Function

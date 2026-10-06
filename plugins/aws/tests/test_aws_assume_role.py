@@ -24,24 +24,40 @@ def test_api_can_stage_file_bytes_and_assume_only_configured_roles():
     document = yaml.load(source.read_text(), Loader=yaml.BaseLoader)
     resources = document["Resources"]
     # The API's execution role is explicit (ApiExecutionRole — a fresh role
-    # sidesteps the inline-policy size cap the implicit role filled up).
-    api_policies = resources["ApiExecutionRole"]["Properties"]["Policies"]
+    # sidesteps the inline-policy size cap the implicit role filled up);
+    # its Policies are named documents whose Statement may be one dict or
+    # a list.
+    def statements_of(policies):
+        flat = []
+        for policy in policies:
+            if not isinstance(policy, dict):
+                continue
+            document = policy.get("PolicyDocument", policy)
+            statement = document.get("Statement") if isinstance(document, dict) else None
+            if statement is None:
+                continue
+            flat.extend(statement if isinstance(statement, list) else [statement])
+        return flat
+
+    api_statements = statements_of(
+        resources["ApiExecutionRole"]["Properties"]["Policies"])
     assert any(
-        isinstance(policy, dict) and policy.get("Statement") == {
+        statement == {
             "Effect": "Allow",
             "Action": ["s3:GetObject", "s3:PutObject"],
             "Resource": "${RenderArtifactsBucket.Arn}/*",
         }
-        for policy in api_policies
+        for statement in api_statements
     )
-    for policies in (api_policies,
-                     resources["WorkerFunction"]["Properties"]["Policies"]):
+    worker_statements = statements_of(
+        resources["WorkerFunction"]["Properties"]["Policies"])
+    for statements in (api_statements, worker_statements):
         assert any(
-            isinstance(policy, dict) and policy.get("Statement") == {
+            statement == {
                 "Effect": "Allow", "Action": "sts:AssumeRole",
                 "Resource": "AwsAssumableRoleArns",
             }
-            for policy in policies
+            for statement in statements
         )
 
 

@@ -68,11 +68,13 @@ def test_template_host_queue_is_send_only():
     # The API leases on behalf of host workers and enqueues agent tasks from
     # API-side paths (test-execute, redo rows), so its lease statement also
     # sends.
+    api_role = text.split("ApiExecutionRole:", 1)[1].split("\n  IngressFunction:", 1)[0]
     assert (
-        "Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility,"
-        in text
+        "Action: [sqs:ReceiveMessage, sqs:DeleteMessage,\n"
+        "                         sqs:ChangeMessageVisibility, sqs:SendMessage]"
+        in api_role
     )
-    assert "sqs:SendMessage]" in text
+    assert "sqs:SendMessage]" in api_role
     # The workflow function may send, and does not subscribe.
     assert "QueueName: !GetAtt HostQueue.QueueName" in text
     worker = text.split("WorkerFunction:", 1)[1].split("\n  # Standalone", 1)[0]
