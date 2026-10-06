@@ -83,5 +83,3 @@ jobs:
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh
-      - name: Inspect connections-list 500 (read-only)
-        run: bash scripts/inspect-connections-500.sh

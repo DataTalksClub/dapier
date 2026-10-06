@@ -255,10 +255,19 @@ Resources:
             Effect: Allow
             Action: sts:AssumeRole
             Resource: !Ref AwsAssumableRoleArns
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt EventQueue.QueueName
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt DropboxQueue.QueueName
+        # One statement for both queues: fewer policy documents keep this
+        # role's inline total away from IAM's 10240-byte cap, which a
+        # previous deploy overshot and wedged the stack in rollback. The
+        # merged shape also re-puts every policy document on deploy —
+        # after a rollback that skipped this role, the live documents
+        # drifted from the template (ConnectionsTable GetItem vanished),
+        # and a no-op deploy repaired nothing.
+        - Statement:
+            Effect: Allow
+            Action: sqs:SendMessage
+            Resource:
+              - !GetAtt EventQueue.Arn
+              - !GetAtt DropboxQueue.Arn
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref YouTubeWebhookSecret
         - AWSSecretsManagerGetSecretValuePolicy:
