@@ -30,7 +30,6 @@ operator CLI session:
 uv run dapier tokens create --name host-worker --agent host-worker \
   --output ~/.config/dapier/host-worker.token
 mkdir -p ~/dapier-ws
-mkdir -p ~/dapier-ws/.claude
 ln -s ~/git/.agents/skills ~/dapier-ws/.claude/skills
 uv run dapier worker --workspace-root ~/dapier-ws
 ```
@@ -42,8 +41,19 @@ per-job limit, and `--once` to poll once. The root defaults to `~/dapier-ws`;
 An explicit relative workspace must exist beneath the root. An absolute
 workspace must also resolve beneath the root; symlink escapes are rejected.
 The symlink makes the shared skills under `~/git/.agents/skills` available
-to Claude Code in the new workspace. Keep any project-specific skills in
-the relevant project directory when adding workspaces beneath the root.
+to Claude Code in the new workspace.
+
+Set `DAPIER_SKILL_DIRS` to a colon-separated list of extra skill directories
+to expose more skills to worker sessions **without** publishing them to every
+agent on the machine (the global `~/.claude/skills` stays untouched). Before
+each job the worker turns the job workspace's `.claude/skills` into a real
+directory linking the shared pool plus every entry of the listed directories,
+so sessions discover them by name — the pools themselves are never modified.
+The pool wins name clashes, hand-placed entries are preserved, and links to
+skills that later disappear are pruned on the next job. For example, a worker
+that forwards AI Shipping Labs work runs with
+`DAPIER_SKILL_DIRS=/home/alexey/git/ai-shipping-labs/.agents/skills`, which
+makes the `ai-shipping-labs-*` skills discoverable in every job workspace.
 
 The worker starts `claude --print --output-format json` as a foreground child,
 with no persisted Claude session. It supplies the prompt on stdin and does

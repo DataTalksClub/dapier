@@ -17,6 +17,7 @@ DEFAULT_ROOT = "~/dapier-ws"
 DEFAULT_TOKEN_FILE = "~/.config/dapier/host-worker.token"
 HEARTBEAT_SECONDS = 40
 MAX_RUNTIME_SECONDS = 3600
+SKILL_DIRS_ENV = "DAPIER_SKILL_DIRS"
 # Matches host_jobs.MAX_ATTACHMENT_CHUNK: one download call moves at most
 # this many raw bytes so each response clears the API payload cap.
 CHUNK_BYTES = 4_000_000
@@ -112,6 +113,57 @@ def workspace_for(root, requested):
     return path
 
 
+def env_skill_dirs(environ=None):
+    """Colon-separated extra skill directories for worker agent sessions."""
+    environ = os.environ if environ is None else environ
+    return [os.path.expanduser(part.strip())
+            for part in (environ.get(SKILL_DIRS_ENV) or "").split(":") if part.strip()]
+
+
+def ensure_workspace_skills(workspace, extra_dirs=(), pool=None):
+    """Make extra skills discoverable to agent sessions in this workspace only.
+
+    Claude discovers skills from ~/.claude/skills — machine-global — and from
+    the session start directory's .claude/skills. Jobs start in the workspace,
+    so that copy is the only place to add skills without publishing them to
+    every agent on the machine. With extras configured, the pool symlink is
+    replaced by a real directory linking the pool plus each extra entry (the
+    pool wins name clashes); links to skills that disappeared are pruned on
+    the next job. Without extras the workspace is left exactly as set up.
+    """
+    if not extra_dirs:
+        return
+    sources = [source for source in [pool or os.path.expanduser("~/.claude/skills"),
+                                     *extra_dirs] if os.path.isdir(source)]
+    if not sources:
+        return
+    skills_dir = os.path.join(os.fspath(workspace), ".claude", "skills")
+    if os.path.islink(skills_dir):
+        os.unlink(skills_dir)
+    os.makedirs(skills_dir, exist_ok=True)
+    for source in sources:
+        for name in sorted(os.listdir(source)):
+            if name.startswith("."):
+                continue
+            entry = os.path.join(skills_dir, name)
+            if os.path.lexists(entry):
+                if os.path.islink(entry) and not os.path.exists(entry):
+                    os.unlink(entry)
+                else:
+                    continue
+            try:
+                os.symlink(os.path.join(source, name), entry)
+            except FileExistsError:
+                pass  # a concurrent job wired the same name
+    for name in os.listdir(skills_dir):
+        entry = os.path.join(skills_dir, name)
+        if os.path.islink(entry) and not os.path.exists(entry):
+            try:
+                os.unlink(entry)
+            except FileNotFoundError:
+                pass
+
+
 def _summary(output_path, status, returncode):
     raw = output_path.read_bytes()[-100_000:]
     text = raw.decode("utf-8", "replace")
@@ -161,6 +213,7 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
     output_path = error_path = None
     try:
         workspace = workspace_for(workspace_root, job.get("workspace"))
+        ensure_workspace_skills(workspace, env_skill_dirs())
         argv = harness_argv(job.get("engine"))
         prompt = job.get("prompt") or ""
         staged = fetch_attachments(api, job, workspace)
