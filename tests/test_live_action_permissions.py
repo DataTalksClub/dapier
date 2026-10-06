@@ -35,6 +35,13 @@ def test_api_and_worker_can_send_attachment_email_and_api_can_stage_intake():
                for p in ingress if isinstance(p, dict))
 
 
+def test_api_can_enqueue_agent_host_tasks():
+    policies = _resources()["IngressFunction"]["Properties"]["Policies"]
+    send_queues = [p["SQSSendMessagePolicy"]["QueueName"] for p in policies
+                   if isinstance(p, dict) and "SQSSendMessagePolicy" in p]
+    assert "HostQueue.QueueName" in send_queues
+
+
 def test_hook_claims_and_poll_cleanup_have_scoped_cursor_write_permissions():
     policies = _resources()["IngressFunction"]["Properties"]["Policies"]
     grants = [p["Statement"] for p in policies if isinstance(p, dict)

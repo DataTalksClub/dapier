@@ -310,6 +310,11 @@ Resources:
             Effect: Allow
             Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:ChangeMessageVisibility]
             Resource: !GetAtt HostQueue.Arn
+        # API-side paths enqueue host tasks directly (workflows test
+        # --execute, redo rows built outside a running flow); a denied send
+        # strands the HostTasks row queued forever with no message to lease.
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt HostQueue.QueueName
         - Statement:
             Effect: Allow
             Action: [ses:SendEmail, ses:SendRawEmail]
