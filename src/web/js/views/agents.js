@@ -84,6 +84,7 @@ function renderDetail() {
     </details>
     <details class="agent-technical"><summary>Run details</summary><dl>
       <dt>Task ID</dt><dd class="mono">${escapeHtml(task.task_id)}</dd>
+      <dt>Required capabilities</dt><dd>${escapeHtml((task.requires || []).join(", ") || "None")}</dd>
       <dt>Workspace</dt><dd>${escapeHtml(task.workspace || 'Worker default')}</dd>
       ${task.exit_code != null ? `<dt>Exit code</dt><dd>${escapeHtml(String(task.exit_code))}</dd>` : ''}
       ${task.notified_at ? `<dt>Completion email sent</dt><dd>${escapeHtml(formatTimestamp(task.notified_at))}</dd>` : ''}

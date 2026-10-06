@@ -6,6 +6,7 @@ from ...triggers.email_from import bare_address, sender_addresses
 from .base import _safe_filename
 
 from .templating import render
+from ...worker_capabilities import capabilities
 
 # The trigger event's stored attachments ride the host job as s3 pointers so
 # the worker can stage the files into the agent's workspace. Pointers are a
@@ -48,6 +49,9 @@ def build_message(action, event, workflow_id, steps=None):
     # root. The Lambda must never guess a path on another machine.
     workspace = str(action.get("workspace") or "").strip()
     engine = str(action.get("engine") or "").strip()
+    if engine not in ("", "claude", "codex"):
+        raise ValueError("agent engine must be claude or codex")
+    required = capabilities(action.get("requires"))
     tag_prefix = str(action.get("tag_prefix") or "agent").strip() or "agent"
     action_id = str(action.get("id") or "agent")
     task_id = f"agent:{workflow_id}:{event.get('id', '')}:{action_id}"
@@ -64,6 +68,7 @@ def build_message(action, event, workflow_id, steps=None):
         "kind": "agent",
         "task_id": task_id,
         "engine": engine,
+        "requires": required,
         "workspace": workspace,
         "tag_prefix": tag_prefix,
         "prompt": render(str(prompt_template), event, steps),
@@ -99,6 +104,10 @@ def run_agent(action, event, workflow_id, steps=None, *, queue=None, tasks=None,
         existing = table.get_item(Key={"task_id": message["task_id"]}).get("Item") or {}
         if existing.get("status") not in ("queued", "claimed"):
             return {"task_id": message["task_id"], "status": existing.get("status", "unknown")}
+    # Routed tasks never enter the shared queue: old workers cannot steal
+    # them, and unmatched tasks cannot exhaust SQS redrive attempts.
+    if message.get("requires") or message.get("engine") == "codex":
+        return {"task_id": message["task_id"], "status": "queued"}
     sender = queue
     if sender is None:
         import boto3

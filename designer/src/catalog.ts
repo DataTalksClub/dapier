@@ -138,6 +138,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "prompt", label: "Prompt", type: "textarea", required: true, placeholder: "{subject}\n\n{text}" },
       { key: "workspace", label: "Workspace", required: true, placeholder: "/home/alexey/git/dapier" },
       { key: "engine", label: "Engine", placeholder: "claude" },
+      { key: "requires", label: "Required capabilities", placeholder: "browser" },
       { key: "tag_prefix", label: "Tag prefix", placeholder: "agent" },
       { key: "attachments", label: "Pass trigger attachments", type: "select", options: ["default", "off"], default: "default" }
     ]

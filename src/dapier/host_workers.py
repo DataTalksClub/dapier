@@ -10,6 +10,8 @@ checking in drops out through the table TTL instead of lingering forever.
 
 import time
 
+from .worker_capabilities import capabilities
+
 from .host_tasks import tasks_table
 
 # Claim long-polls every ~10s and heartbeats every 40s while a task runs,
@@ -30,6 +32,8 @@ def meta_of(body):
     compatible.
     """
     meta = body.get("worker") if isinstance(body, dict) else None
+    if not isinstance(meta, dict):
+        return None
     worker_id = str((meta or {}).get("worker_id") or "").strip()
     if not worker_id:
         return None
@@ -39,6 +43,8 @@ def meta_of(body):
         "hostname": str(meta.get("hostname") or "")[:255],
         "pid": pid if isinstance(pid, int) and not isinstance(pid, bool) else None,
         "workspace_root": str(meta.get("workspace_root") or "")[:400],
+        **({"capabilities": capabilities(meta["capabilities"])} if "capabilities" in meta else {}),
+        **({"engine": meta["engine"]} if meta.get("engine") in ("claude", "codex") else {}),
     }
 
 
@@ -64,7 +70,7 @@ def checkin(owner, meta, *, task_id=None, finished=None, table_ref=None, now=Non
     # and last_seen ride names for symmetry with the mapped keys below.
     names.update({"#kind": "kind", "#seen": "last_seen", "#owner": "owner",
                   "#worker": "worker_id"})
-    for key in ("hostname", "pid", "workspace_root"):
+    for key in ("hostname", "pid", "workspace_root", "capabilities", "engine"):
         if meta.get(key) is not None:
             names[f"#{key}"] = key
             values[f":{key}"] = meta[key]
@@ -106,6 +112,8 @@ def api_list(table_ref=None, now=None):
         # in the row key; fall back so they don't render a blank worker.
         if not worker["worker_id"]:
             worker["worker_id"] = str(item.get("task_id") or "").removeprefix("worker:")
+        worker["capabilities"] = item.get("capabilities") or []
+        worker["engine"] = item.get("engine") or "claude"
         worker["active"] = int(item.get("last_seen") or 0) > current - ACTIVE_WINDOW_SECONDS
         workers.append(worker)
     workers.sort(key=lambda worker: (int(worker.get("last_seen") or 0),

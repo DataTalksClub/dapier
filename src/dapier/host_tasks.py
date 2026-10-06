@@ -4,7 +4,7 @@ import os
 # The display projection. ``workflow`` is derived from the task id
 # (``agent:<workflow_id>:<event_id>:<action_id>``), not stored.
 PUBLIC_FIELDS = (
-    "task_id", "kind", "engine", "workspace", "tag_prefix", "status",
+    "task_id", "kind", "engine", "requires", "workspace", "tag_prefix", "status",
     "session_id", "tag", "error", "created_at", "sent_at",
     "started_at", "finished_at", "exit_code", "summary", "notified_at", "email_subject",
 )

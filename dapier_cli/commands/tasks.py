@@ -26,6 +26,8 @@ def agent_tasks_list(api_url, debug=False, limit=None, status=None):
     for item in items:
         print(f"{item.get('status', ''):10} {str(item.get('workflow') or ''):30} "
               f"{item.get('task_id') or ''}")
+        if item.get("requires"):
+            print("           requires " + ", ".join(item["requires"]))
         if item.get("email_subject"):
             print(f"           task {item['email_subject']}")
         if item.get("summary"):
@@ -52,6 +54,8 @@ def workers_list(api_url, debug=False):
                                              worker.get("workspace_root")) if part)
         if where:
             print(f"           {where}")
+        print(f"           {worker.get('engine') or 'claude'}; capabilities: "
+              + (", ".join(worker.get("capabilities") or []) or "none"))
         if worker.get("last_task_id"):
             print(f"           last {worker['last_task_id']}"
                   f" -> {worker.get('last_status') or 'unknown'}")
@@ -66,12 +70,12 @@ def agent_tasks_show(api_url, task_id, debug=False):
 
 
 def worker_run(api_url=None, *, token_file=None, workspace_root=None,
-               max_runtime=3600, once=False):
+               max_runtime=3600, once=False, capabilities=(), engine="claude"):
     """Run headless jobs through the authenticated HTTPS host API."""
     from src.dapier.headless_worker import DEFAULT_ROOT, DEFAULT_TOKEN_FILE, serve
 
     serve(api_url=api_url or config.api_url(),
           token_file=token_file or DEFAULT_TOKEN_FILE,
           workspace_root=workspace_root or DEFAULT_ROOT,
-          max_runtime=max_runtime, once=once)
+          max_runtime=max_runtime, once=once, capabilities=capabilities, engine=engine)
     return 0

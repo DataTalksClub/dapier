@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import signal
+import shutil
 import socket
 import subprocess
 import time
@@ -62,7 +63,7 @@ def fetch_attachments(api, job, workspace, *, chunk=CHUNK_BYTES):
                 offset += len(data)
                 if response.get("done"):
                     break
-        staged.append(str(path.relative_to(workspace)))
+        staged.append(path.relative_to(workspace).as_posix())
     return staged
 
 
@@ -76,8 +77,9 @@ class WorkerApi:
     def __init__(self, api_url, token_file):
         self.api_url = api_url.rstrip("/")
         path = Path(token_file).expanduser()
-        if path.stat().st_mode & 0o077:
-            raise ValueError(f"Worker token file must be owner-only: {path}")
+        from .private_files import require_private
+
+        require_private(path)
         self.token = path.read_text().strip()
         if not self.token.startswith("dap_"):
             raise ValueError("Worker token file does not contain a Dapier API token")
@@ -172,7 +174,16 @@ def _summary(output_path, status, returncode):
         answer = str(data.get("result") or data.get("error") or "")
     except ValueError:
         answer = text
-    return (answer.strip() or f"Claude exited with code {returncode} ({status}).")[:2000]
+        # Codex emits JSONL; retain its final agent message as the summary.
+        for line in text.splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            item = event.get("item") or {}
+            if item.get("type") == "agent_message":
+                answer = str(item.get("text") or answer)
+    return (answer.strip() or f"Agent exited with code {returncode} ({status}).")[:2000]
 
 
 def harness_argv(engine):
@@ -180,11 +191,20 @@ def harness_argv(engine):
     if engine in (None, "", "claude"):
         return ["claude", "--print", "--output-format", "json",
                 "--no-session-persistence", "--dangerously-skip-permissions"]
+    if engine == "codex":
+        executable = shutil.which("codex.exe") or shutil.which("codex.cmd") or "codex"
+        return [executable, "exec", "--json", "--ephemeral", "--skip-git-repo-check",
+                "--dangerously-bypass-approvals-and-sandbox", "-"]
     raise ValueError(f"Unsupported headless harness: {engine}")
 
 
 def _stop(process):
     if process.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                       capture_output=True, check=False)
+        process.wait(timeout=10)
         return
     try:
         os.killpg(process.pid, signal.SIGTERM)
@@ -206,9 +226,9 @@ def identity(workspace_root):
 
 
 def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SECONDS,
-            worker_id=None, popen=subprocess.Popen, clock=time.monotonic, sleep=time.sleep):
+            worker_id=None, worker_meta=None, popen=subprocess.Popen, clock=time.monotonic, sleep=time.sleep):
     task_id, lease_id = job["task_id"], job["lease_id"]
-    presence = {"worker_id": worker_id} if worker_id else None
+    presence = worker_meta or ({"worker_id": worker_id} if worker_id else None)
     status, code, summary = "failed", None, ""
     output_path = error_path = None
     try:
@@ -281,12 +301,17 @@ def run_job(job, api, *, workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SE
 
 def serve(*, api_url="https://dapier.dtcdev.click", token_file=DEFAULT_TOKEN_FILE,
           workspace_root=DEFAULT_ROOT, max_runtime=MAX_RUNTIME_SECONDS, once=False,
-          api=None):
+          api=None, capabilities=(), engine="claude"):
+    from .worker_capabilities import capabilities as normalize_capabilities
+
+    capabilities = normalize_capabilities(capabilities)
+    harness_argv(engine)
     if max_runtime < 1:
         raise ValueError("Maximum runtime must be positive")
     root = workspace_for(workspace_root, "")
     api = api or WorkerApi(api_url, token_file)
     worker_id, meta = identity(root)
+    meta.update({"capabilities": capabilities, "engine": engine})
     print(f"dapier worker {worker_id} on {api_url} — polling for agent tasks",
           flush=True)
     while True:
@@ -294,6 +319,8 @@ def serve(*, api_url="https://dapier.dtcdev.click", token_file=DEFAULT_TOKEN_FIL
         job = response.get("job")
         if job:
             run_job(job, api, workspace_root=workspace_root, max_runtime=max_runtime,
-                    worker_id=worker_id)
+                    worker_id=worker_id, worker_meta=meta)
         if once:
             return
+        if not job and engine == "codex":
+            time.sleep(10)

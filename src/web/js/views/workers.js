@@ -39,6 +39,7 @@ export async function renderWorkers() {
       <td class="cell-title mono"><span class="cell-name">${wrapTokens(worker.worker_id || '')}</span><span class="cell-sub">${escapeHtml([worker.hostname, worker.pid ? `pid ${worker.pid}` : ''].filter(Boolean).join(' · '))}</span></td>
       <td data-label="Status">${statusLine(worker.active ? 'active' : 'offline')}<span class="cell-sub">seen ${escapeHtml(formatTimestamp(worker.last_seen)) || '—'}</span></td>
       <td class="mono muted-cell" data-label="Tasks">${tasks}</td>
+      <td class="mono muted-cell" data-label="Capabilities">${escapeHtml((worker.capabilities || []).join(', ') || 'None')}<span class="cell-sub">${escapeHtml(worker.engine || 'claude')}</span></td>
       <td class="mono muted-cell" data-label="Workspace">${escapeHtml(worker.workspace_root || '—')}</td>
       <td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(worker.started_at)) || '—'}</td>
     </tr>`;

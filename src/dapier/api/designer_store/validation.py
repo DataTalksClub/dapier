@@ -299,6 +299,15 @@ def _validate_steps(steps, where="actions"):
                 if not isinstance(default_steps, list):
                     raise WorkflowError(f"step '{label}': paths default must be a list of steps")
                 _validate_steps(default_steps, where=f"{label}.default")
+        if kind == "agent":
+            from ...worker_capabilities import capabilities
+
+            try:
+                capabilities(step.get("requires"))
+            except ValueError as exc:
+                raise WorkflowError(f"step '{label}': {exc}") from exc
+            if str(step.get("engine") or "").strip() not in ("", "claude", "codex"):
+                raise WorkflowError(f"step '{label}': agent engine must be claude or codex")
         if kind == "delay":
             _validate_delay(step, label)
         if kind == "digest":

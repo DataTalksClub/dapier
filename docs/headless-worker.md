@@ -74,6 +74,46 @@ have changed files or called external services.
 
 ## Worker presence
 
+### Capabilities and Codex with Chrome
+
+Workers advertise their engine and optional capabilities. Agent steps specify
+`requires` as a list or comma-separated names; all requirements must be present
+on the worker, and the engine must match. Names use lowercase letters, numbers,
+underscores and hyphens. The Workers view and `dapier workers list` show these
+values. Existing workers default to Claude with no capabilities.
+
+On a Windows machine with Codex and the Chrome extension connected, run:
+
+```powershell
+uv run dapier worker --engine codex --capability browser --capability chrome
+```
+
+Configure the action in the workflow editor or save the same definition through
+`dapier workflows save` and `dapier workflows publish`:
+
+```yaml
+- type: agent
+  engine: codex
+  requires: browser,chrome
+  prompt: "Use Chrome to complete the requested task: {text}"
+```
+
+The worker uses `codex exec` with the host's existing Codex configuration and
+plugins. Verify that a noninteractive Codex session can reach Chrome before
+advertising browser capabilities; installing Chrome alone does not provide
+agent browser tools. Keep the desktop app and extension connection available.
+Capabilities are explicit operator declarations, not automatic hardware checks.
+Tasks without `requires` still match only their engine (Claude by default).
+
+Codex tasks and tasks with requirements are leased directly from the task table
+through the same authenticated host API. They never enter the legacy shared SQS
+queue, so older workers cannot claim them, and waiting for a capable worker
+does not exhaust queue retry limits. Matching uses a paginated scan and
+conditional updates; only one worker can acquire a task. Heartbeats extend the
+table lease, and expired runs become interrupted rather than being rerun.
+Other Claude tasks retain their existing SQS path. A Codex worker polls every
+ten seconds when idle. Windows token files use owner-only ACLs.
+
 Every `dapier worker` process registers itself under a stable id
 (`hostname-pid-random`), sent with each claim, heartbeat, and finish call.
 Dapier records the check-ins in the host task table (rows keyed

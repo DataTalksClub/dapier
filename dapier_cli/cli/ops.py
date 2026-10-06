@@ -49,6 +49,10 @@ def register(sub):
                           help="Host job root directory (default ~/dapier-ws)")
     worker_p.add_argument("--max-runtime", type=int, default=3600,
                           help="Maximum seconds per headless job")
+    worker_p.add_argument("--capability", action="append", default=[],
+                          help="Advertise a capability, e.g. browser (repeatable)")
+    worker_p.add_argument("--engine", choices=("claude", "codex"), default="claude",
+                          help="Agent engine available on this worker")
     worker_p.add_argument("--once", action="store_true", help="Poll once and exit")
     catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
     catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
@@ -82,7 +86,8 @@ def run(args, api_url, debug, child=None):
     if args.group == "worker":
         return commands.worker_run(api_url, token_file=args.token_file,
                                    workspace_root=args.workspace_root,
-                                   max_runtime=args.max_runtime, once=args.once)
+                                   max_runtime=args.max_runtime, once=args.once,
+                                   capabilities=args.capability, engine=args.engine)
     if args.group == "catalog":
         return commands.catalog_show(api_url, debug, as_json=args.json)
     return 2

@@ -384,7 +384,7 @@ def test_agent_workers_list_through_the_shared_list(workers_table, agent_identit
         "workspace_root": None, "owner": None, "started_at": now - 900,
         "last_seen": now - 10,
         "current_task_id": None, "last_task_id": None, "last_status": None,
-        "active": True,
+        "active": True, "capabilities": [], "engine": "claude",
     }]
 
 

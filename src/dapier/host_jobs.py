@@ -71,9 +71,18 @@ def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, n
     # Presence first: an idle worker polls this every ~10s, so the check-in
     # doubles as the worker's heartbeat. Older workers send no meta and
     # simply never appear in the registry.
-    meta = meta_of(body)
+    try:
+        meta = meta_of(body)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
     if meta:
         checkin(owner, meta, table_ref=table, now=now)
+    routed = _claim_routed(table, owner, meta, int(now or time.time()))
+    if routed:
+        return 200, {"job": routed}
+    # Codex workers must never consume the legacy Claude queue.
+    if meta and meta.get("engine") == "codex":
+        return 200, {"job": None}
     url = _queue_url(queue_url)
     response = queue.receive_message(
         QueueUrl=url, WaitTimeSeconds=WAIT_SECONDS, MaxNumberOfMessages=1,
@@ -91,6 +100,11 @@ def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, n
         return 502, {"error": "Invalid host queue message"}
     task_id = message["task_id"]
     row = _row(table, task_id)
+    # The persisted requirements are authoritative, including when an old
+    # enqueue retry or stale message puts a routed task in the legacy queue.
+    if row.get("requires") or row.get("engine") == "codex":
+        _delete(queue, receipt, url)
+        return 200, {"job": None}
     status = row.get("status")
     if status in TERMINAL:
         _notify(table, task_id, row)
@@ -147,6 +161,60 @@ def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, n
                           "attachments": message.get("attachments") or []}}
 
 
+def _claim_routed(table, owner, meta, now):
+    """Conditionally lease matching tasks from the table, oldest first.
+
+    Restricted jobs bypass SQS so workers without capabilities never receive
+    them. Expired leases are interrupted, never automatically executed twice.
+    """
+    from botocore.exceptions import ClientError
+
+    items, start = [], None
+    while True:
+        page = table.scan(**({"ExclusiveStartKey": start} if start else {}))
+        items.extend(row for row in page.get("Items", [])
+                     if row.get("kind") == "agent" and
+                     (row.get("requires") or row.get("engine") == "codex"))
+        start = page.get("LastEvaluatedKey")
+        if not start:
+            break
+    items.sort(key=lambda row: (int(row.get("created_at") or 0), row["task_id"]))
+    for row in items:
+        if row.get("status") == "running" and int(row.get("lease_until") or 0) <= now:
+            try:
+                _set(table, row["task_id"], {
+                    "status": "interrupted", "finished_at": now,
+                    "error": "The worker lost its lease before reporting completion",
+                }, "#status = :running AND lease_id = :lease AND lease_until <= :now",
+                     {":running": "running", ":lease": row.get("lease_id"), ":now": now})
+            except ClientError as exc:
+                if exc.response["Error"]["Code"] != "ConditionalCheckFailedException":
+                    raise
+            row = _row(table, row["task_id"])
+        if row.get("status") in TERMINAL:
+            _notify(table, row["task_id"], row)
+            continue
+        if (not meta or row.get("status") != "queued" or
+                (row.get("engine") or "claude") != (meta.get("engine") or "claude") or
+                not set(row.get("requires") or []).issubset(meta.get("capabilities") or [])):
+            continue
+        lease = uuid.uuid4().hex
+        try:
+            _set(table, row["task_id"], {
+                "status": "running", "lease_id": lease, "lease_owner": owner,
+                "lease_until": now + VISIBILITY_SECONDS, "started_at": now,
+            }, "#status = :queued", {":queued": "queued"})
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] != "ConditionalCheckFailedException":
+                raise
+            continue
+        checkin(owner, meta, task_id=row["task_id"], table_ref=table, now=now)
+        return {"task_id": row["task_id"], "lease_id": lease,
+                "engine": row.get("engine") or "claude",
+                "workspace": row.get("workspace") or "", "prompt": row.get("prompt") or "",
+                "attachments": row.get("attachments") or [], "requires": row.get("requires") or []}
+
+
 def _owned(table, task_id, lease_id, owner):
     row = _row(table, task_id)
     if not row or row.get("lease_id") != lease_id or row.get("lease_owner") != owner:
@@ -160,7 +228,10 @@ def heartbeat(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, no
     table = tasks_table(table_ref)
     # Refresh presence even when the lease has lapsed: the worker is alive
     # either way, and the next claim will reconcile the task state.
-    meta = meta_of(body)
+    try:
+        meta = meta_of(body)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
     if meta:
         checkin(owner, meta, task_id=body["task_id"], table_ref=table, now=now)
     row = _owned(table, body["task_id"], body["lease_id"], owner)
@@ -169,10 +240,11 @@ def heartbeat(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, no
     now = int(now or time.time())
     if int(row.get("lease_until") or 0) < now:
         return 409, {"error": "Task lease expired"}
-    queue_client(queue_ref).change_message_visibility(
-        QueueUrl=_queue_url(queue_url), ReceiptHandle=row["receipt_handle"],
-        VisibilityTimeout=VISIBILITY_SECONDS,
-    )
+    if row.get("receipt_handle"):
+        queue_client(queue_ref).change_message_visibility(
+            QueueUrl=_queue_url(queue_url), ReceiptHandle=row["receipt_handle"],
+            VisibilityTimeout=VISIBILITY_SECONDS,
+        )
     _set(table, body["task_id"], {"lease_until": now + VISIBILITY_SECONDS},
          "lease_id = :lease AND lease_owner = :owner AND #status = :running",
          {":lease": body["lease_id"], ":owner": owner, ":running": "running"})
@@ -257,7 +329,10 @@ def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=N
     status = body.get("status")
     if status not in ("succeeded", "failed", "timed_out"):
         return 400, {"error": "Invalid terminal status"}
-    meta = meta_of(body)
+    try:
+        meta = meta_of(body)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
     table = tasks_table(table_ref)
     row = _owned(table, body["task_id"], body["lease_id"], owner)
     if not row or row.get("status") not in ({"running"} | TERMINAL):
@@ -287,7 +362,8 @@ def finish(body, owner, *, table_ref=None, queue_ref=None, queue_url=None, now=N
              {":lease": body["lease_id"], ":owner": owner, ":running": "running"})
         row = _row(table, body["task_id"])
     _notify(table, body["task_id"], row, ses_ref=ses_ref)
-    _delete(queue_client(queue_ref), row["receipt_handle"], _queue_url(queue_url))
+    if row.get("receipt_handle"):
+        _delete(queue_client(queue_ref), row["receipt_handle"], _queue_url(queue_url))
     if meta:
         checkin(owner, meta, finished=(body["task_id"], row["status"]),
                 table_ref=table, now=now)

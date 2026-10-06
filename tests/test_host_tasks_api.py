@@ -160,7 +160,7 @@ def test_agent_agent_tasks_list_through_the_shared_list(tasks_table, agent_ident
     assert response["statusCode"] == 200
     payload = json.loads(response["body"])
     assert payload["tasks"] == [{
-        "task_id": "agent:f:e1:wake", "kind": "agent", "engine": None,
+        "task_id": "agent:f:e1:wake", "kind": "agent", "engine": None, "requires": None,
         "workspace": "/work", "tag_prefix": None, "status": "started",
         "session_id": None, "tag": None, "error": None,
         "created_at": 100, "sent_at": 105, "started_at": None,
