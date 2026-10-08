@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dapier Refresh Connections"
+  short_description: "Refresh and verify Alexey's Dapier OAuth connections"
