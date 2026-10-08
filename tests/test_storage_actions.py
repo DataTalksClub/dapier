@@ -58,6 +58,10 @@ class FakeStorageTable:
         name, expected = leaf._values[0].name, leaf._values[1]
         actual = scope if name == "scope" else key
         if type(leaf).__name__ == "BeginsWith":
+            # The live service rejects an empty key-condition value
+            # (ValidationException); fail the same way here.
+            if expected == "":
+                raise ValueError("The AttributeValue for a key attribute cannot contain an empty string value")
             return actual.startswith(expected)
         return actual == expected
 
@@ -129,6 +133,17 @@ def test_find_lists_keys_under_the_prefix_ascending(storage_table):
                   {"key": "counter:sms", "value": "v:counter:sms"}],
         "count": 2,
     }
+
+
+def test_find_with_an_empty_prefix_lists_every_key_in_the_scope(storage_table):
+    for key in ("b", "a", "counter:sms"):
+        run("run_storage_set", {"type": "storage_set", "key": key, "value": key})
+    storage.kv_set("other-wf", "a", "elsewhere")
+
+    items = storage.kv_find("wf-1", "")
+
+    assert [item["key"] for item in items] == ["a", "b", "counter:sms"]
+    assert [item["key"] for item in storage.kv_find("wf-1", None)] == ["a", "b", "counter:sms"]
 
 
 def test_find_defaults_to_20_and_caps_at_50(storage_table):

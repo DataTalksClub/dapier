@@ -92,6 +92,19 @@ def test_get_without_key_lists_under_prefix(operator, storage_table):
     assert body["count"] == 2
 
 
+def test_get_without_key_or_prefix_lists_every_key(operator, storage_table):
+    # The console lists a workflow's keys with no prefix the moment it is
+    # chosen; DynamoDB rejects begins_with(""), so this used to 500.
+    storage.kv_set("wf-1", "seen/alpha", "1")
+    storage.kv_set("wf-1", "other", "3")
+    storage.kv_set("wf-2", "elsewhere", "4")
+    response = agent_api.route(agent_event(), "GET", "/api/agent/storage/wf-1")
+    body = json.loads(response["body"])
+    assert response["statusCode"] == 200
+    assert [item["key"] for item in body["items"]] == ["other", "seen/alpha"]
+    assert body["prefix"] == ""
+
+
 def test_post_stores_and_delete_removes(operator, storage_table):
     response = agent_api.route(
         agent_event(body={"key": "cursor", "value": "a", "ttl_seconds": 60}),

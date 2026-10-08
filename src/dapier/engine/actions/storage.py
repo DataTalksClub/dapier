@@ -107,11 +107,13 @@ def kv_find(scope, prefix, limit=None):
     count = FIND_MAX_LIMIT if limit is None else max(1, min(int(limit), FIND_MAX_LIMIT))
     from boto3.dynamodb.conditions import Key
 
-    response = _table().query(
-        KeyConditionExpression=Key("scope").eq(_scope(scope))
-        & Key("key").begins_with(_kv_key(prefix, allow_empty=True)),
-        Limit=count,
-    )
+    condition = Key("scope").eq(_scope(scope))
+    prefix = _kv_key(prefix, allow_empty=True)
+    # DynamoDB rejects an empty string in a key condition, so "no prefix"
+    # (every key in the scope) is the partition match alone.
+    if prefix:
+        condition = condition & Key("key").begins_with(prefix)
+    response = _table().query(KeyConditionExpression=condition, Limit=count)
     return response.get("Items") or []
 
 
