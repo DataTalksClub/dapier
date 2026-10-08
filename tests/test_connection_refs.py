@@ -110,3 +110,31 @@ def test_cli_prints_candidates_on_ambiguity(monkeypatch):
     with pytest.raises(api.ApiError) as exc:
         commands.resolve_connection_id("https://x", ["docs", "alexey"])
     assert "docs a" in str(exc.value) and "docs b" in str(exc.value)
+
+
+def test_show_and_resolve_carry_used_in_for_operators(monkeypatch):
+    from src.dapier.api.agent import connections as agent_connections
+    from src.dapier.triggers import connection_usage
+
+    class Table:
+        def scan(self, **kwargs):
+            return {"Items": ROWS}
+
+        def get_item(self, Key):
+            return {"Item": next(r for r in ROWS if r["connection_id"] == Key["connection_id"])}
+
+    entry = {"ref": "todo-intake", "kind": "workflow", "enabled": True, "where": "step"}
+    monkeypatch.setattr(connection_usage, "collect", lambda: {"google-sheets": [entry]})
+    import src.dapier.api.agent as agent
+    monkeypatch.setattr(agent, "authenticate", lambda event: ("op", None))
+    monkeypatch.setattr(agent, "_is_operator", lambda event, subject: True)
+    monkeypatch.setattr(agent, "_tables", lambda: (Table(), None))
+    monkeypatch.setattr(agent_connections.tokens, "stored_value", lambda cid: {})
+
+    resp = agent_connections.resolve_connection(
+        {"queryStringParameters": {"ref": "drive datatalks"}})
+    body = json.loads(resp["body"])
+    assert body["connection_id"] == "google-sheets"
+    assert body["used_in"] == [entry]
+    shown = json.loads(agent_connections.show_connection({}, "google-sheets")["body"])
+    assert shown["used_in"] == [entry]

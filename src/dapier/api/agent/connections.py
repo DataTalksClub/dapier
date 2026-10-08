@@ -247,7 +247,27 @@ def resolve_connection(event):
             payload["candidates"] = exc.candidates
         return _json_response(404 if not exc.candidates else 409, payload)
     stored = tokens.stored_value(connection["connection_id"])
-    return _json_response(200, connections.public_view(connection, stored))
+    view = connections.public_view(connection, stored)
+    if _is_operator(event, subject):
+        view = _with_usage(view, connections_table)
+    return _json_response(200, view)
+
+
+def _with_usage(view, connections_table):
+    """Stamp one connection view with ``used_in`` exactly as the list does:
+    usage is attached over every row, so provider-level trigger references
+    land on a provider's single connection and never on one of several."""
+    from ...triggers import connection_usage
+    try:
+        rows = [{"connection_id": item.get("connection_id"), "provider": item.get("provider")}
+                for item in connections._scan_all(connections_table)]
+        connection_usage.attach(rows)
+        match = next((row for row in rows
+                      if row.get("connection_id") == view.get("connection_id")), {})
+        view["used_in"] = match.get("used_in", [])
+    except Exception:  # noqa: BLE001 — usage is best-effort metadata
+        view.setdefault("used_in", [])
+    return view
 
 
 def show_connection(event, connection_id):
@@ -262,7 +282,8 @@ def show_connection(event, connection_id):
         return _json_response(404, {"error": "Connection not found"})
     stored = tokens.stored_value(connection_id)
     if _is_operator(event, subject):
-        return _json_response(200, connections.public_view(connection, stored))
+        return _json_response(200, _with_usage(
+            connections.public_view(connection, stored), connections_table))
     if agent:
         try:
             authz.validate_agent(agent)
