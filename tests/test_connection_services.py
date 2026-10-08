@@ -118,3 +118,13 @@ def test_zoom_oauth_rows_offer_reconnect():
     assert "usesOAuthConsent" in JS
     assert "provider !== 'slack' && provider !== 'telegram'" in JS
     assert "usesOAuthConsent(connection.provider) && status !== 'connected'" in JS
+
+
+def test_console_puts_expiry_on_the_row_not_a_banner():
+    """Expiring tokens are a row status + Reconnect; the daily digest emails."""
+    assert "expiring soon" in JS
+    assert "EXPIRY_HORIZON_HOURS = 48" in JS
+    assert "tokenExpiringSoon" in JS
+    assert "connection-expiry-banner" not in JS
+    assert "Email re-auth reminder" not in JS
+    assert "/api/admin/connections/expiry-digest" not in JS

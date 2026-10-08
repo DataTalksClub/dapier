@@ -5,14 +5,12 @@ The digest reads the same connections register the console and CLI read
 (records.api_list_connections rendered through public_view, expiry from the
 credentials store) and emails the operator every connection whose token
 expires within the window or already has; zero expiring connections skip
-the send. Send-now parity lives on POST
-/api/{admin,agent}/connections/expiry-digest and
-``dapier connections send-expiry-digest``.
+the send. The console reconnects from the row; operator fire-now is
+CLI-only (POST /api/agent/connections/expiry-digest,
+``dapier connections send-expiry-digest``).
 """
 
 import json
-import os
-import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -203,59 +201,14 @@ def test_send_with_nothing_expiring_skips(monkeypatch, ses):
     ses.return_value.send_email.assert_not_called()
 
 
-# --- POST /api/admin/connections/expiry-digest (console path) ---
-
-def _admin_request(method, path, cookies=None):
-    return {
-        "requestContext": {"http": {"method": method, "path": path}},
-        "headers": {"host": "dapier.example.test",
-                    "origin": "https://dapier.example.test"},
-        "cookies": cookies or [],
-        "body": "{}",
-    }
-
-
-def _admin_operator(monkeypatch):
-    from src.dapier.auth import session
-
-    monkeypatch.setattr(session, "_credentials",
-                        lambda: {"username": "admin", "password": "pw"})
-    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
-                            "exp": int(time.time()) + 600})
-    return [f"dapier_session={cookie}"]
-
-
-def test_admin_expiry_digest_send_now_returns_what_was_sent(monkeypatch, ses):
-    from src.dapier.api import admin
-
-    cookies = _admin_operator(monkeypatch)
-    monkeypatch.setattr(connection_digest, "expiring",
-                        lambda *a, **k: _expiring_rows())
-    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@dtcdev.click")
-    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@dtcdev.click")
-    response = admin.route(
-        _admin_request("POST", "/api/admin/connections/expiry-digest",
-                       cookies=cookies),
-        "POST", "/api/admin/connections/expiry-digest",
-    )
-
-    assert response["statusCode"] == 200
-    body = json.loads(response["body"])
-    assert body["sent"] is True
-    assert body["to"] == "ops@dtcdev.click"
-    assert body["connections"] == ["google-sheets", "dropbox"]
-    ses.return_value.send_email.assert_called_once()
-
-
-def test_admin_expiry_digest_requires_authentication(monkeypatch):
-    from src.dapier.api import admin
-
-    response = admin.route(
-        _admin_request("POST", "/api/admin/connections/expiry-digest"),
-        "POST", "/api/admin/connections/expiry-digest",
-    )
-
-    assert response["statusCode"] == 401
+def test_console_has_no_send_now_expiry_digest():
+    """The daily schedule emails; the register reconnects on the row."""
+    js = open("src/web/js/views/connections.js", encoding="utf-8").read()
+    dispatch = open("src/dapier/api/admin/dispatch.py", encoding="utf-8").read()
+    assert "expiry-digest" not in js
+    assert "Email re-auth reminder" not in js
+    assert "connection-expiry-banner" not in js
+    assert "/api/admin/connections/expiry-digest" not in dispatch
 
 
 # --- POST /api/agent/connections/expiry-digest (CLI path, operator-gated) ---

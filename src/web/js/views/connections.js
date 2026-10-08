@@ -194,81 +194,39 @@ const TOKEN_PROVIDER_META = {
   },
 };
 
-/* Each connection is individually connected, awaiting consent, or expired
-   (needs refreshing) — say so in plain words, not raw DynamoDB values. */
+/* Each connection is individually connected, awaiting consent, expiring
+   soon, or expired (needs refreshing) — say so in plain words, not raw
+   DynamoDB values. */
 const CONNECTION_STATUS_LABELS = {
   ready: 'setup incomplete',
   expired: 'needs reconnection',
   revoked: 'revoked',
+  expiring: 'expiring soon',
 };
 
-/* A stored token can expire while the record still reads 'connected' — the
-   API flags that via health; treat such rows as needing reconnection
-   everywhere the list aggregates, not just in the row rendering. */
-const effectiveStatus = (connection) =>
-  (connection.health === 'expired' && connection.status === 'connected' ? 'expired' : connection.status);
-const needsAttention = (connection) => ['ready', 'expired', 'revoked'].includes(effectiveStatus(connection));
-
-/* Tokens expiring inside this horizon head a banner above the register —
-   keep in lockstep with the digest window (DAPIER_CONNECTION_DIGEST_HOURS,
-   src/dapier/connection_digest.py). Rows whose token already lapsed show
-   as needing attention, so the banner is for the ones that still work. */
+/* Tokens inside this horizon still work, but the daily digest will email
+   them — keep in lockstep with DAPIER_CONNECTION_DIGEST_HOURS
+   (src/dapier/connection_digest.py). The register shows them on the row
+   (status + Reconnect); there is no send-now email button. */
 const EXPIRY_HORIZON_HOURS = 48;
 
-const expiringSoon = (connections) => {
-  const horizon = Date.now() + EXPIRY_HORIZON_HOURS * 3600 * 1000;
-  return (connections || []).filter((connection) => {
-    if (connection.health === 'expired' || !connection.token_expires_at) return false;
-    const when = Date.parse(connection.token_expires_at);
-    return !Number.isNaN(when) && when <= horizon;
-  });
+const tokenExpiringSoon = (connection) => {
+  if (connection.health === 'expired' || !connection.token_expires_at) return false;
+  const when = Date.parse(connection.token_expires_at);
+  return !Number.isNaN(when) && when <= Date.now() + EXPIRY_HORIZON_HOURS * 3600 * 1000;
 };
 
-function connectionExpiryBanner() {
-  const existing = $('#connection-expiry-banner');
-  if (existing) return existing;
-  const banner = document.createElement('div');
-  banner.id = 'connection-expiry-banner';
-  banner.className = 'attention-panel';
-  banner.setAttribute('aria-live', 'polite');
-  banner.hidden = true;
-  $('#connection-register')?.before(banner);
-  return banner;
-}
-
-function renderExpiryBanner(connections) {
-  const soon = expiringSoon(connections);
-  const banner = connectionExpiryBanner();
-  banner.hidden = soon.length === 0;
-  if (soon.length === 0) return;
-  const items = soon.map((connection) => {
-    const when = formatTimestamp(connection.token_expires_at) || 'soon';
-    return `<div class="attention-item">` +
-      `<strong>${escapeHtml(connection.display_name || connection.connection_id)}</strong>` +
-      `<span>token expires ${escapeHtml(when)}</span></div>`;
-  }).join('');
-  banner.innerHTML =
-    `<h3>Tokens expiring soon</h3>` +
-    `<p class="sub">Reconnect these accounts before their tokens lapse — ` +
-    `workflows using them start failing, and the CLI or API re-auth command is ` +
-    `<code>dapier connections connect &lt;id&gt;</code>.</p>` +
-    `<div class="attention-items">${items}</div>` +
-    `<button id="connection-expiry-alert" class="dk-button dk-button--secondary" type="button">Email re-auth reminder now</button>`;
-  $('#connection-expiry-alert')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const data = await api('/api/admin/connections/expiry-digest', { method: 'POST', body: '{}' });
-      notice(data.sent
-        ? `Re-auth reminder emailed to ${data.to}`
-        : `Nothing expires within ${data.window_hours}h — no email sent.`);
-    } catch (error) {
-      notice(error.message, true);
-    } finally {
-      button.disabled = false;
-    }
-  });
-}
+/* A stored token can expire (or be about to) while the record still reads
+   'connected' — the API flags a lapse via health; the horizon flags the
+   ones that still work. Treat both as needing attention everywhere the
+   list aggregates, not just in the row rendering. */
+const effectiveStatus = (connection) => {
+  if (connection.health === 'expired' && connection.status === 'connected') return 'expired';
+  if (connection.status === 'connected' && tokenExpiringSoon(connection)) return 'expiring';
+  return connection.status;
+};
+const needsAttention = (connection) =>
+  ['ready', 'expired', 'revoked', 'expiring'].includes(effectiveStatus(connection));
 
 let addPickerOpen = false;
 
@@ -656,7 +614,6 @@ function renderConnections(connections) {
   $('#connection-summary').textContent = connections.length
     ? `${connected} connected · ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
     : 'No accounts connected';
-  renderExpiryBanner(connections);
   $('#connect-picker').hidden = !addPickerOpen && connections.length > 0;
   $('#add-connection').setAttribute('aria-expanded', String(!$('#connect-picker').hidden));
   $('#connection-empty').hidden = connections.length > 0;
@@ -664,7 +621,7 @@ function renderConnections(connections) {
   const query = ($('#connection-search')?.value || '').trim().toLowerCase();
   const statusFilter = $('#connection-status-filter')?.value || 'all';
   const filtered = connections.filter((connection) => {
-    if (statusFilter === 'connected' && connection.status !== 'connected') return false;
+    if (statusFilter === 'connected' && effectiveStatus(connection) !== 'connected') return false;
     if (statusFilter === 'attention' && !needsAttention(connection)) return false;
     if (!query) return true;
     return [connection.display_name, connection.connection_id, connection.provider,
@@ -731,8 +688,9 @@ function usageLabel(connection) {
 
 function accountRow(connection, serviceId) {
     /* health is computed by the API from the stored token expiry; an expired
-       token turns a connected row into "needs reconnection" (the label the
-       status map already carried) without rewriting the stored record. */
+       token turns a connected row into "needs reconnection", and a token
+       inside the digest horizon into "expiring soon", without rewriting
+       the stored record. Reconnect is the row action either way. */
     const status = effectiveStatus(connection);
     const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
@@ -752,7 +710,7 @@ function accountRow(connection, serviceId) {
     </div>
     <div class="service-account-status">
       ${statusLine(status, CONNECTION_STATUS_LABELS)}
-      ${expires && status !== 'expired' ? `<span class="cell-sub">expires ${escapeHtml(expires)}</span>` : ''}
+      ${expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}
     </div>
     <div class="service-account-actions">${nextAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
   </li>`;

@@ -2,7 +2,6 @@
 credentials, the save/list flows, grants, and the maintenance ops
 (import, token revoke, delete, token issue, discovery, test)."""
 from ... import audit as audit_log
-from ... import connection_digest
 from ...auth import authz
 import boto3
 from ...connections import records as connection_model
@@ -118,19 +117,6 @@ def list_connections(event):
         from ...triggers import connection_usage
         connection_usage.attach(payload["connections"])
     return http._json_response(status, payload)
-
-def send_expiry_digest(event, operator):
-    """Render-and-send the connection expiry digest now.
-
-    The same domain function the daily ConnectionDigestFunction schedule
-    runs; the response reports what was sent, or ``skipped`` when nothing
-    expires in the window (no noise email).
-    """
-    payload = connection_digest.send()
-    if payload.get("sent"):
-        session._audit_event("connections", "connections.send-expiry-digest",
-                             operator or "unknown", outcome="ok")
-    return http._json_response(200, payload)
 
 def list_grants(event):
     query = event.get("queryStringParameters") or {}

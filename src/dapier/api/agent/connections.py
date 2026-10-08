@@ -171,7 +171,8 @@ def list_for_caller(event):
 def expiry_digest_api(event):
     """Operator-only send-now for the daily connection-expiry digest.
 
-    Same domain function the scheduled ConnectionDigestFunction Lambda runs
+    CLI fire-now (`dapier connections send-expiry-digest`). Same domain
+    function the scheduled ConnectionDigestFunction Lambda runs
     (connection_digest.send); the response reports what was sent, or
     ``skipped`` when nothing expires in the window — no noise email.
     """

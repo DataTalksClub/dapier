@@ -732,6 +732,7 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 .service-account-main .cell-sub { display: block; margin-top: 3px; }
 .service-account-status { display: grid; gap: 2px; justify-items: start; }
 .service-account-status .cell-sub { display: block; }
+.service-account-status .cell-sub.expiring { color: var(--dk-warning-text); }
 .service-account-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .reuse-list { display: grid; gap: 8px; margin-top: 12px; }
 .reuse-account {

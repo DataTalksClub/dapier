@@ -55,12 +55,18 @@ email is "Not signed in", never a fake Drive account.
   `Same grant as Calendar, Drive · google-calendar`. Sentence case,
   muted, not a chip.
 - **Status** is a stacked dot+word; expiry is a second line. Never inline
-  with the word "connected".
+  with the word "connected". A token still valid but inside the 48h digest
+  horizon reads **expiring soon** (warning) with `expires …` underneath;
+  a lapsed token reads **needs reconnection**. Both count as needing
+  attention, including the Connected / Needs attention filter.
 - **Actions:** Manage on every row. Finish setup and Reconnect are
   secondary. One primary on the page (Add connection). Reconnect is on
-  every OAuth row that needs it (Google, YouTube, Dropbox, Zoom). Slack
-  and Telegram paste a new token in Manage. Provider access tokens are
+  every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
+  already lapsed, or still connected but expiring soon. Slack and
+  Telegram paste a new token in Manage. Provider access tokens are
   CLI-only (`dapier token exec|write`); the console does not reveal them.
+  Expiry reminder email is the daily ConnectionDigestFunction schedule,
+  not a send-now button on this page.
 - **Add picker** lists services, not OAuth providers. Google products are
   first-class cards with their own default scopes.
 - **Empty / filter empty** stay the family empty-state, no illustration.
@@ -71,9 +77,11 @@ email is "Not signed in", never a fake Drive account.
 
 Provider-grouped "GOOGLE" headers; mashed multi-product titles as the
 row name; an unfinished `google-drive` row pretending to be a Drive
-account (it reads "Not signed in"); inline status+expiry; a connect
-catalog that only offers "Google Calendar" and "YouTube" for the whole
-Google family; pastel service pills; an icon on every account row.
+account (it reads "Not signed in"); inline status+expiry; a "Tokens
+expiring soon" banner that repeats mashed display names above the
+register; a send-now "Email re-auth reminder" button; a connect catalog
+that only offers "Google Calendar" and "YouTube" for the whole Google
+family; pastel service pills; an icon on every account row.
 
 ## Surfaces
 

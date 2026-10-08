@@ -11,15 +11,17 @@ a workflow fails on it. A register with nothing expiring sends nothing:
 the digest exists to surface upcoming lapses, not to confirm quiet days.
 
 Each listed connection carries a one-click re-auth link — the same GET the
-console Connect button issues, wrapped in ``/auth/login`` so a cold phone
+console Reconnect button issues, wrapped in ``/auth/login`` so a cold phone
 browser signs in before provider consent — because an email is read where a
 shell command is not. The base comes from ``OAUTH_CALLBACK_URL``; without it
 the email falls back to the CLI instruction alone.
 
-Send-now parity (UI/CLI rule): POST
-/api/{admin,agent}/connections/expiry-digest and
-``dapier connections send-expiry-digest`` call ``send()`` directly and
-return what was sent (or ``{"skipped": true}``).
+The console Connections register shows the same lapses on the row
+(status + Reconnect). There is no send-now email button: this schedule is
+the email path. Operator fire-now is CLI-only:
+``dapier connections send-expiry-digest`` → POST
+/api/agent/connections/expiry-digest, which calls ``send()`` and returns
+what was sent (or ``{"skipped": true}``).
 """
 import os
 import urllib.parse
