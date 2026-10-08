@@ -403,7 +403,9 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
   flex-wrap: wrap;
   align-items: center;
   gap: var(--dk-gap-control);
-  padding: var(--dk-space-3) var(--dk-space-4);
+  /* gap-block above and below: the band's controls keep the same 16px from
+     the rows that every control keeps from a block */
+  padding: var(--dk-gap-block) var(--dk-space-4);
   border-top: 1px solid var(--dk-border-default);
   background: var(--dk-bg-muted);
   color: var(--dk-text-muted);
@@ -443,7 +445,8 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
    body scrolls; head and foot stay put. At phone width the dialog becomes a
    full-screen sheet with the foot pinned to the bottom. */
 .dk-dialog {
-  width: min(560px, calc(100vw - 2 * var(--dk-space-4)));
+  /* Wider dialogs set --dk-dialog-width; the phone sheet ignores it. */
+  width: min(var(--dk-dialog-width, 560px), calc(100vw - 2 * var(--dk-space-4)));
   max-height: calc(100dvh - 2 * var(--dk-space-7));
   padding: 0;
   overflow: hidden;
