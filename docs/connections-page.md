@@ -44,6 +44,15 @@ email is "Not signed in", never a fake Drive account.
 
 ## Pinned treatments
 
+- **Zoom connection types** appear in separate **Zoom API** and **Zoom Webhooks**
+  panels, each with a sentence explaining its purpose. API connections read
+  and manage meetings and recordings within granted permissions; webhooks
+  receive event notifications to start workflows. Count connections rather
+  than accounts. Webhook rows use their configured nickname because their
+  Zoom account ID is not a person's identity. The API supplies distinct
+  service labels and descriptions; CLI show prints the purpose too. Both
+  retain the `zoom` service reference and existing connection IDs.
+
 - **Headings** are the service name (Gmail, Google Calendar, YouTube,
   Dropbox…), one panel per service. Google G / product mark only in the
   panel header — not on every row.

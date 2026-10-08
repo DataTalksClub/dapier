@@ -1,6 +1,9 @@
 """Console register groups rows one panel per service; identity on the row."""
 
 from pathlib import Path
+import json
+
+from py_mini_racer import MiniRacer
 
 from src.dapier.connections.records import public_view
 from src.dapier.connections.services import CATALOG, services_for
@@ -60,6 +63,62 @@ def test_google_connection_with_youtube_scopes_lists_youtube():
 def test_standalone_provider_is_one_service():
     assert _ids({"provider": "dropbox"}) == ["dropbox"]
     assert _ids({"provider": "slack"}) == ["slack"]
+
+
+def test_zoom_types_have_distinct_labels_and_purposes_without_changing_refs():
+    for field in ("scopes", "granted_scopes"):
+        api = public_view({"provider": "zoom", "connection_id": "arbitrary", field: ["user:read:user"]})
+        assert api["services"][0]["id"] == "zoom"
+        assert api["services"][0]["label"] == "Zoom API"
+        assert "permissions granted" in api["services"][0]["description"]
+    webhook = public_view({"provider": "zoom", "connection_id": "not-a-special-name", "scopes": []})
+    assert webhook["services"][0]["id"] == "zoom"
+    assert webhook["services"][0]["label"] == "Zoom Webhooks"
+    assert "event notifications" in webhook["services"][0]["description"]
+
+
+def test_console_renders_zoom_types_in_separate_described_panels():
+    connections = [
+        {"provider": "zoom", "connection_id": "one", "scopes": ["user:read:user"],
+         "status": "connected", "account_title": "Alexey"},
+        {"provider": "zoom", "connection_id": "two", "status": "ready",
+         "account_title": "opaque-id", "display_name": "AISL recordings"},
+    ]
+    # Exercise both the API response and the console's metadata fallback.
+    for with_services in (False, True):
+        if with_services:
+            for connection in connections:
+                connection["services"] = services_for(connection)
+        with MiniRacer() as js:
+            js.eval('''
+                const nodes = {};
+                const $ = id => nodes[id] ||= {value: '', dataset: {},
+                    setAttribute() {}, addEventListener() {}};
+                const $$ = () => [];
+                const state = {data: {}};
+                const escapeHtml = value => String(value);
+                const formatTimestamp = () => '';
+                const statusLine = value => value;
+                const serviceMark = value => value;
+                const document = {body: {dataset: {}}};
+                const connectionsLoadMoreButton = () => ({});
+                const renderConnectCards = () => {};
+                const bindOAuthLinks = () => {};
+            ''')
+            js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('let addPickerOpen')])
+            js.eval('let addPickerOpen = false; const connectionsPage = {connections: null};')
+            js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
+            js.eval(f'renderConnections({json.dumps(connections)});')
+            markup = js.eval("nodes['#connection-register'].innerHTML")
+        assert markup.count('<section ') == 2
+        assert 'data-service="zoom-api"' in markup
+        assert 'data-service="zoom-webhooks"' in markup
+        assert 'Zoom API' in markup and 'Zoom Webhooks' in markup
+        assert 'permissions granted' in markup and 'event notifications' in markup
+        assert 'AISL recordings' in markup and 'opaque-id' not in markup
+        assert '2 accounts' not in markup
+        assert '1 connection' in markup
+        assert 'Same sign-in' not in markup
 
 
 def test_google_without_product_scopes_falls_back_to_google():

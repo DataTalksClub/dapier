@@ -74,7 +74,7 @@ const CONNECT_SERVICES = {
     scopes: [],
   },
   zoom: {
-    label: 'Zoom',
+    label: 'Zoom Webhooks',
     blurb: 'Start workflows when a Zoom cloud recording video finishes processing.',
     provider: 'zoom',
     connectionId: 'zoom',
@@ -111,6 +111,10 @@ function scopesOf(connection) {
 function deriveServices(connection) {
   const provider = connection.provider || '';
   const scopes = scopesOf(connection);
+  if (provider === 'zoom') return [{ id: 'zoom', label: scopes.length ? 'Zoom API' : 'Zoom Webhooks',
+    description: scopes.length
+      ? "Read and manage meetings and recordings through Zoom's API, within the permissions granted."
+      : 'Receive Zoom event notifications, such as completed cloud recordings, to start workflows.' }];
   const found = [];
   const seen = new Set();
   for (const [id, meta] of Object.entries(CONNECT_SERVICES)) {
@@ -137,7 +141,7 @@ function servicesFor(connection) {
   if (Array.isArray(listed) && listed.length) {
     return listed.map((entry) => (typeof entry === 'string'
       ? { id: entry, label: serviceLabel(entry) }
-      : { id: entry.id, label: entry.label || serviceLabel(entry.id) }));
+      : { ...entry, label: entry.label || serviceLabel(entry.id) }));
   }
   return deriveServices(connection);
 }
@@ -157,6 +161,9 @@ function accountIdentity(connection) {
    several services). A grant that never finished consent has no account
    yet, so it is named by what it was meant to cover. */
 function accountLabel(connection) {
+  if (connection.provider === 'zoom' && !scopesOf(connection).length) {
+    return connection.display_name || 'Zoom webhook';
+  }
   return accountIdentity(connection) || `Unfinished ${productList(connection) || connection.provider} setup`;
 }
 
@@ -344,7 +351,8 @@ function renderConnectCards(connections) {
     const needsClient = !TOKEN_PROVIDERS.includes(meta.provider) && oauthClient && !oauthClient.configured;
     const pending = !TOKEN_PROVIDERS.includes(meta.provider)
       ? connections.find((connection) => connection.status === 'ready' && connectionHasService(connection, serviceId)) : null;
-    const accounts = connections.filter((connection) => connectionHasService(connection, serviceId));
+    const accounts = connections.filter((connection) => connectionHasService(connection, serviceId)
+      && (serviceId !== 'zoom' || !scopesOf(connection).length));
     const reusable = reusableGoogleConnections(serviceId, connections);
     const addLabel = meta.provider === 'zoom' ? 'Add Zoom app'
       : reusable.length ? 'Add to an account' : 'Connect';
@@ -354,7 +362,7 @@ function renderConnectCards(connections) {
       : `<button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button">${addLabel}</button>`;
     return `
     <div class="connect-card">
-      <div class="connect-card-head"><span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>${accounts.length ? `<span class="connect-count">${accounts.length} account${accounts.length === 1 ? '' : 's'}</span>` : ''}</div>
+      <div class="connect-card-head"><span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>${accounts.length ? `<span class="connect-count">${accounts.length} ${serviceId === 'zoom' ? 'connection' : 'account'}${accounts.length === 1 ? '' : 's'}</span>` : ''}</div>
       <p class="connect-blurb">${meta.blurb}</p>
       ${needsClient ? `<p class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> before consent.</p>` : ''}
       ${pending ? `<p class="connect-pending">${escapeHtml(pending.account_title || pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
@@ -649,7 +657,9 @@ function renderConnections(connections) {
   const groups = new Map();
   for (const connection of filtered) {
     for (const service of servicesFor(connection)) {
-      groups.set(service.id, [...(groups.get(service.id) || []), connection]);
+      const groupId = service.id === 'zoom'
+        ? (scopesOf(connection).length ? 'zoom-api' : 'zoom-webhooks') : service.id;
+      groups.set(groupId, [...(groups.get(groupId) || []), connection]);
     }
   }
   const ordered = [];
@@ -660,18 +670,21 @@ function renderConnections(connections) {
     if (!SERVICE_ORDER.includes(id)) ordered.push([id, group]);
   }
   $('#connection-register').innerHTML = ordered.map(([serviceId, group]) => {
-    const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, serviceId)).join('');
+    const zoom = serviceId === 'zoom-api' || serviceId === 'zoom-webhooks';
+    const service = zoom ? servicesFor(group[0]).find((entry) => entry.id === 'zoom') : null;
+    const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, zoom ? 'zoom' : serviceId)).join('');
     const unfinished = group.filter((connection) => !accountIdentity(connection)
       && verifiesIdentity(connection)).length;
     const needs = group.filter(needsAttention).length;
     const meta = [
-      `${group.length} account${group.length === 1 ? '' : 's'}`,
+      `${group.length} ${zoom ? 'connection' : 'account'}${group.length === 1 ? '' : 's'}`,
       unfinished ? `${unfinished} not signed in` : '',
       needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
     ].filter(Boolean).join(' · ');
     return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
-      <div class="section-head"><h2 class="service-panel-title">${serviceMark(serviceId)}<span>${escapeHtml(serviceLabel(serviceId))}</span></h2>
-      <p class="sub">${escapeHtml(meta)}</p></div>
+      <div class="section-head"><h2 class="service-panel-title">${serviceMark(zoom ? 'zoom' : serviceId)}<span>${escapeHtml(service?.label || serviceLabel(serviceId))}</span></h2>
+      <p class="sub">${escapeHtml(meta)}</p>
+      ${service?.description ? `<p class="sub service-purpose">${escapeHtml(service.description)}</p>` : ''}</div>
       <ul class="service-accounts">${rows}</ul>
     </section>`;
   }).join('');
@@ -702,7 +715,8 @@ function accountRow(connection, serviceId) {
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     const identity = accountIdentity(connection);
     const unfinished = !identity && verifiesIdentity(connection);
-    const title = identity || (unfinished ? 'Not signed in' : accountLabel(connection));
+    const title = connection.provider === 'zoom' && !scopesOf(connection).length
+      ? accountLabel(connection) : identity || (unfinished ? 'Not signed in' : accountLabel(connection));
     /* One sign-in can back several services; say so quietly instead of
        naming the internal connection_id, which nobody needs to read. */
     const others = servicesFor(connection).filter((service) => service.id !== serviceId)
@@ -716,7 +730,7 @@ function accountRow(connection, serviceId) {
     <div class="service-account-main">
       <span class="cell-name">${escapeHtml(title)}</span>
       ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
-      <span class="cell-sub">${escapeHtml(identity ? usageLabel(connection) : 'Sign-in was never finished')}</span>
+      <span class="cell-sub">${escapeHtml(identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished')}</span>
     </div>
     <div class="service-account-status">
       ${statusLine(status, CONNECTION_STATUS_LABELS)}

@@ -154,6 +154,18 @@ def services_for(connection):
     """
     provider = str(connection.get("provider") or "").strip()
     scopes = _scopes_of(connection)
+    if provider == "zoom":
+        # OAuth connections require requested scopes; webhook connections
+        # carry a signing secret and no API scopes. Never infer from an ID.
+        return [{
+            "id": "zoom",
+            "label": "Zoom API" if scopes else "Zoom Webhooks",
+            "description": (
+                "Read and manage meetings and recordings through Zoom's API, within the permissions granted."
+                if scopes else
+                "Receive Zoom event notifications, such as completed cloud recordings, to start workflows."
+            ),
+        }]
     found = []
     seen = set()
     for spec in CATALOG:

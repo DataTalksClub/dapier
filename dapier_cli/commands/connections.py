@@ -69,6 +69,9 @@ def print_connection(item):
     print(f"account: {account or 'not signed in'}")
     if item.get("services"):
         print(f"services: {_services_label(item)}")
+        for service in item["services"]:
+            if isinstance(service, dict) and service.get("description"):
+                print(f"purpose: {service['description']}")
     refs = item.get("refs") or []
     if refs:
         print(f"address as: {refs[0]}" + (f"  (also: {', '.join(refs[1:])})" if refs[1:] else ""))

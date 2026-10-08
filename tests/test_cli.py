@@ -1620,6 +1620,20 @@ def test_connections_list_prints_health_and_expiry(capsys, monkeypatch):
     assert " ok " in out
 
 
+def test_zoom_connections_show_explains_each_type(capsys, monkeypatch):
+    from src.dapier.connections.records import public_view
+
+    for scopes, label, purpose in (
+        (["user:read:user"], "Zoom API", "permissions granted"),
+        ([], "Zoom Webhooks", "event notifications"),
+    ):
+        view = public_view({"connection_id": "example", "provider": "zoom", "scopes": scopes})
+        monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: view)
+        assert commands.connections_show("https://api.example.test", "example") == 0
+        out = capsys.readouterr().out
+        assert label in out and purpose in out
+
+
 def test_connections_show_prints_health(capsys, monkeypatch):
     def fake_call(url, method, path, body=None, debug=False):
         assert path == "/api/agent/connections/youtube-personal"

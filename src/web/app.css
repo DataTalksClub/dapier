@@ -709,6 +709,7 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
   font-weight: var(--dk-weight-semibold);
 }
 .service-panel-title .brand-mark { flex: none; }
+.service-panel .section-head .service-purpose { flex-basis: 100%; line-height: 1.5; }
 .service-accounts { list-style: none; margin: 0; padding: 0; }
 .service-account {
   display: grid;
