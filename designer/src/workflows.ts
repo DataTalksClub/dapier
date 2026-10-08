@@ -46,6 +46,22 @@ export function actionNodeTitle(data: NodeData): string {
 
 export function actionNodeSubtitle(data: NodeData): string {
   const fields = data.fields ?? {};
+  // A condition reads as its test ("channel = course-ml"), so a chain of
+  // Conditions stays tellable apart on the canvas and in the node list.
+  if (data.actionType === "condition") {
+    const symbols: Record<string, string> = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
+    const test = (field: string, operator: string, value: unknown) =>
+      `${field} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
+    if ((fields.field ?? "").trim()) return test(fields.field.trim(), fields.operator || "equals", fields.value ?? "");
+    // The YAML's `when:` mapping form ({field: {operator: value}}) rides in raw.
+    const when = data.raw?.when;
+    const first = isRecord(when) ? Object.entries(when)[0] : undefined;
+    if (first) {
+      const [field, rule] = first;
+      const clause = isRecord(rule) ? Object.entries(rule)[0] : undefined;
+      return clause ? test(field, clause[0], clause[1]) : test(field, "equals", rule);
+    }
+  }
   const meta = actionMeta(data.actionType ?? "webhook");
   const first = meta?.fields.find((field) => fields[field.key]);
   return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
@@ -148,6 +164,17 @@ export function orderedActionNodes(shapes: DiagramShape[]): DiagramShape[] {
     .filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger")
     .sort((a, b) => a.y - b.y || a.x - b.x);
   return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
+}
+
+/** The id a save writes for one action node: its own `fields.id`, else the
+    `action-<n>` fallback from its run-order position. Null for a node not
+    connected to a trigger (a save drops it). Step ids are internal — the
+    inspector keeps them under Advanced — so tests and pickers use this. */
+export function effectiveActionId(shapes: DiagramShape[], nodeId: string): string | null {
+  const chain = orderedActionNodes(shapes);
+  const index = chain.findIndex((node) => node.id === nodeId);
+  if (index < 0) return null;
+  return (chain[index].data?.fields?.id ?? "").trim() || `action-${index + 1}`;
 }
 
 function filterRulesToYaml(rules: FilterRule[] | undefined, problems: string[]): Record<string, Record<string, unknown>> {

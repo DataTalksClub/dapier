@@ -17534,6 +17534,49 @@
       return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
     });
   }
+  function openingViewport(shapes, world, margin = 48) {
+    const nodes = shapes.filter((shape) => shape.type === "node" || shape.type === "note");
+    const byPosition = (a, b) => a.y - b.y || a.x - b.x;
+    const anchor = nodes.filter((shape) => shape.data?.nodeKind === "trigger").sort(byPosition)[0] ?? [...nodes].sort(byPosition)[0];
+    if (!anchor) return { zoom: 1, pan: { x: 0, y: 0 } };
+    const top = Math.min(anchor.y, anchor.y + anchor.height);
+    return {
+      zoom: 1,
+      pan: { x: centerOf(anchor).x - world.width / 2, y: top - margin }
+    };
+  }
+  function wheelGesture(input) {
+    if (input.ctrlKey || input.metaKey) return "zoom";
+    if (input.shiftKey) return "pan";
+    if (input.deltaMode !== 0) return "zoom";
+    if (input.deltaX !== 0) return "pan";
+    return Number.isInteger(input.deltaY) && Math.abs(input.deltaY) >= 50 ? "zoom" : "pan";
+  }
+  function wheelViewport(view, input, offset, size, world) {
+    if (size.width <= 0 || size.height <= 0 || world.width <= 0 || world.height <= 0) return view;
+    const unit = input.deltaMode === 1 ? 16 : input.deltaMode === 2 ? size.height : 1;
+    const dx = input.deltaX * unit;
+    const dy = input.deltaY * unit;
+    const perPxX = world.width / view.zoom / size.width;
+    const perPxY = world.height / view.zoom / size.height;
+    if (wheelGesture(input) === "pan") {
+      const [panX, panY] = input.shiftKey && dx === 0 ? [dy, 0] : [dx, dy];
+      return { zoom: view.zoom, pan: { x: view.pan.x + panX * perPxX, y: view.pan.y + panY * perPxY } };
+    }
+    const rate = Math.abs(dy) < 50 ? 0.01 : 15e-4;
+    const delta = Math.max(-100, Math.min(100, dy));
+    const zoom = Math.min(maxZoom, Math.max(minZoom, view.zoom * Math.exp(-delta * rate)));
+    if (zoom === view.zoom) return view;
+    const nextPerPxX = world.width / zoom / size.width;
+    const nextPerPxY = world.height / zoom / size.height;
+    return {
+      zoom,
+      pan: {
+        x: view.pan.x + offset.x * (perPxX - nextPerPxX),
+        y: view.pan.y + offset.y * (perPxY - nextPerPxY)
+      }
+    };
+  }
   function brandMark(title, paths) {
     return function BrandMark({ size = 16, className, x, y }) {
       return /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -19947,6 +19990,55 @@
     { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
     { name: "custom", label: "Custom", logo: Webhook, events: [] }
   ];
+  const connectorEventInfo = {
+    "dropbox/file.created": ["File added", "A new file appears in the watched Dropbox folder"],
+    "dropbox/file.updated": ["File changed", "A file in the watched Dropbox folder is modified"],
+    "dropbox/file.deleted": ["File deleted", "A file is removed from the watched Dropbox folder"],
+    "email/message.received": ["Email arrives", "A message reaches one of this workflow's Dapier addresses"],
+    "email/bounce.received": ["Email bounced", "A message Dapier sent could not be delivered"],
+    "email/complaint.received": ["Spam complaint", "A recipient marked a message Dapier sent as spam"],
+    "gmail/message.received": ["Email arrives", "A new message lands in the watched Gmail inbox or label"],
+    "google-calendar/event.new": ["Event created", "A new event is added to the watched calendar"],
+    "google-drive/file.created": ["File created", "A new file appears in the watched Drive folder"],
+    "google-drive/file.updated": ["File changed", "A file in the watched Drive folder is modified"],
+    "google-drive/file.deleted": ["File deleted", "A file is removed from the watched Drive folder"],
+    "google-sheets/row.new": ["Row added", "A new row appears in the watched worksheet"],
+    "google-sheets/row.updated": ["Row changed", "An existing row in the watched worksheet is edited"],
+    "mailchimp/subscribe": ["Subscribed", "Someone joins the audience"],
+    "mailchimp/unsubscribe": ["Unsubscribed", "Someone leaves the audience"],
+    "mailchimp/profile": ["Profile updated", "A subscriber changes their profile fields"],
+    "mailchimp/upemail": ["Email changed", "A subscriber changes their email address"],
+    "mailchimp/cleaned": ["Address cleaned", "Mailchimp removes an address that keeps bouncing"],
+    "mailchimp/campaign": ["Campaign sent", "A campaign is sent to the audience"],
+    "mailchimp/member.new": ["New member (poll)", "A polled audience lists a member not seen before"],
+    "poll/item.new": ["New item", "A polled API returns an item not seen before"],
+    "renderer/job.completed": ["Render finished", "A renderer job finished and its output is ready"],
+    "rss/item.new": ["New feed item", "The feed publishes an entry not seen before"],
+    "s3/file.created": ["Object added", "A new object lands in the watched S3 bucket or prefix"],
+    "s3/file.updated": ["Object changed", "An object in the watched bucket is overwritten"],
+    "s3/file.deleted": ["Object deleted", "An object is removed from the watched bucket"],
+    "schedule/schedule.triggered": ["On schedule", "The workflow's cron or rate schedule fires"],
+    "slack/message.received": ["Message posted", "A message is posted in a channel the app can see"],
+    "slack/app.mention": ["App mentioned", "Someone @-mentions the app"],
+    "slack/reaction.added": ["Reaction added", "Someone adds an emoji reaction to a message"],
+    "slack/member.joined": ["Member joined", "Someone joins a channel"],
+    "telegram/message.received": ["Message received", "Someone sends the bot a message, directly or in a group"],
+    "telegram/channel_post.received": ["Channel post received", "A post appears in a channel the bot administers"],
+    "telegram/callback_query.received": ["Button pressed (callback query)", "Someone taps an inline button on a bot message"],
+    "youtube/video.published": ["Video published", "A new video goes live on the channel"],
+    "zoom/recording.completed": ["Recording ready", "A cloud recording finishes processing"],
+    "zoom/recording.transcript_completed": ["Transcript ready", "A cloud recording's transcript is ready"],
+    "zoom/meeting.started": ["Meeting started", "A meeting begins"],
+    "zoom/meeting.ended": ["Meeting ended", "A meeting ends"],
+    "zoom/meeting.registration_created": ["Meeting registration", "Someone registers for a meeting"],
+    "zoom/webinar.started": ["Webinar started", "A webinar begins"],
+    "zoom/webinar.ended": ["Webinar ended", "A webinar ends"],
+    "zoom/webinar.registration_created": ["Webinar registration", "Someone registers for a webinar"]
+  };
+  function eventInfo(connector, event) {
+    const hit = connectorEventInfo[`${connector}/${event}`];
+    return hit ? { label: hit[0], description: hit[1] } : null;
+  }
   const filterOperators = [
     "equals",
     "not_equals",
@@ -20073,6 +20165,18 @@
   }
   function actionNodeSubtitle(data) {
     const fields = data.fields ?? {};
+    if (data.actionType === "condition") {
+      const symbols = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
+      const test = (field, operator, value) => `${field} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
+      if ((fields.field ?? "").trim()) return test(fields.field.trim(), fields.operator || "equals", fields.value ?? "");
+      const when = data.raw?.when;
+      const first2 = isRecord(when) ? Object.entries(when)[0] : void 0;
+      if (first2) {
+        const [field, rule] = first2;
+        const clause = isRecord(rule) ? Object.entries(rule)[0] : void 0;
+        return clause ? test(field, clause[0], clause[1]) : test(field, "equals", rule);
+      }
+    }
     const meta = actionMeta(data.actionType ?? "webhook");
     const first = meta?.fields.find((field) => fields[field.key]);
     return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
@@ -20151,6 +20255,12 @@
   function orderedActionNodes(shapes) {
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger").sort((a, b) => a.y - b.y || a.x - b.x);
     return triggerNodes.length ? orderedActions(shapes, triggerNodes).actions : [];
+  }
+  function effectiveActionId(shapes, nodeId) {
+    const chain = orderedActionNodes(shapes);
+    const index = chain.findIndex((node) => node.id === nodeId);
+    if (index < 0) return null;
+    return (chain[index].data?.fields?.id ?? "").trim() || `action-${index + 1}`;
   }
   function filterRulesToYaml(rules, problems) {
     const filters = {};
@@ -20675,6 +20785,7 @@
     const pointersRef = reactExports.useRef(/* @__PURE__ */ new Map());
     const pinchRef = reactExports.useRef(null);
     const didFitRef = reactExports.useRef(false);
+    const viewRef = reactExports.useRef({ zoom: 1, pan: { x: 0, y: 0 }, world: { width: 0, height: 0 } });
     const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
     const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
     const canvasClass = reactExports.useMemo(() => ["drawing-surface", panStart ? "panning" : ""].filter(Boolean).join(" "), [panStart]);
@@ -21122,10 +21233,35 @@
         window.removeEventListener("resize", updateViewBox);
       };
     }, []);
+    viewRef.current = { zoom, pan, world: canvasViewBox };
+    reactExports.useEffect(() => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const target = svg;
+      function onWheel(event) {
+        event.preventDefault();
+        const rect = target.getBoundingClientRect();
+        const { world } = viewRef.current;
+        const next = wheelViewport(
+          viewRef.current,
+          event,
+          { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 },
+          { width: rect.width, height: rect.height },
+          world
+        );
+        viewRef.current = { ...next, world };
+        setZoom(next.zoom);
+        setPan(next.pan);
+      }
+      target.addEventListener("wheel", onWheel, { passive: false });
+      return () => target.removeEventListener("wheel", onWheel);
+    }, []);
     reactExports.useEffect(() => {
       if (didFitRef.current || !shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
       didFitRef.current = true;
-      fitToContent();
+      const opening = openingViewport(shapes, canvasViewBox);
+      setZoom(opening.zoom);
+      setPan(opening.pan);
     }, [shapes, canvasViewBox]);
     const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
     const editorFontSize = toViewportFontSize();
@@ -21528,6 +21664,11 @@
   function connectionMatches(connection, value) {
     const wanted = value.trim().toLowerCase();
     return connection.connection_id === wanted || (connection.refs ?? []).some((ref) => ref.toLowerCase() === wanted);
+  }
+  function nodeListLabel(shape) {
+    const summary = nodeSubtitle(shape).replace(/\s+/g, " ").trim();
+    const clipped = summary.length > 48 ? `${summary.slice(0, 47)}…` : summary;
+    return [nodeTitle(shape), clipped].filter(Boolean).join(" · ");
   }
   function connectionHint(connection) {
     const title = connectionTitle(connection);
@@ -22800,9 +22941,9 @@
     async function testSelectedStep(execute) {
       if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
       const nodeId = selected.id;
-      const actionId = (selected.data.fields?.id ?? "").trim();
+      const actionId = effectiveActionId(shapes, nodeId);
       if (!actionId) {
-        setStatus({ kind: "error", message: "Give this action an Action ID first — the step test targets it." });
+        setStatus({ kind: "error", message: "Connect this step to the trigger first — the step test runs it in the workflow." });
         return;
       }
       const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
@@ -22889,9 +23030,9 @@
     async function runCodeTests() {
       if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
       const nodeId = selected.id;
-      const actionId = (selected.data.fields?.id ?? "").trim();
+      const actionId = effectiveActionId(shapes, nodeId);
       if (!actionId) {
-        setStatus({ kind: "error", message: "Give this action an Action ID first — its tests target it." });
+        setStatus({ kind: "error", message: "Connect this step to the trigger first — its tests run it in the workflow." });
         return;
       }
       const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
@@ -22952,7 +23093,7 @@
       }
       const data = selected.data;
       if (data.nodeKind === "trigger") {
-        const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom")) ?? { events: [] };
+        const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom")) ?? { name: "custom", events: [] };
         return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Source" }),
@@ -22962,23 +23103,49 @@
                 "select",
                 {
                   value: data.connector ?? "custom",
-                  onChange: (event) => updateSelected((current) => ({ ...current, connector: event.target.value })),
+                  onChange: (event) => {
+                    const connector = event.target.value;
+                    const firstEvent = connectorCatalog.find((entry) => entry.name === connector)?.events[0];
+                    updateSelected((current) => ({ ...current, connector, event: firstEvent ?? current.event }));
+                  },
                   children: connectorCatalog.map((entry) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: entry.name, children: entry.label }, entry.name))
                 }
               )
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            connectorEntry.events.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+              "Event",
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "select",
+                {
+                  value: data.event ?? "",
+                  onChange: (event) => updateSelected((current) => ({ ...current, event: event.target.value })),
+                  children: [
+                    connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: event, children: [
+                      eventInfo(connectorEntry.name, event)?.label ?? event,
+                      " (",
+                      event,
+                      ")"
+                    ] }, event)),
+                    data.event && !connectorEntry.events.includes(data.event) && /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: data.event, children: [
+                      data.event,
+                      " (not in catalog)"
+                    ] })
+                  ]
+                }
+              ),
+              data.event && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: eventInfo(connectorEntry.name, data.event)?.description ?? "Not a catalog event for this source — the trigger only fires if something emits it." })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
               "Event",
               /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "input",
                 {
                   className: "mono-input",
                   value: data.event ?? "",
-                  list: "trigger-events",
+                  placeholder: "order.created",
                   onChange: (event) => updateSelected((current) => ({ ...current, event: event.target.value }))
                 }
               ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: "trigger-events", children: connectorEntry.events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: event }, event)) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: "Any event name — this source has no fixed list." })
             ] })
           ] }),
           triggerSample && triggerSample.fields.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
@@ -23076,7 +23243,7 @@
       }));
       return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Identity" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Action" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
             "Action type",
             meta ? /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23097,18 +23264,6 @@
                 className: "mono-input",
                 value: data.actionType ?? "",
                 onChange: (event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
-            "Action ID",
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "input",
-              {
-                className: "mono-input",
-                value: data.fields?.id ?? "",
-                placeholder: "action-1",
-                onChange: (event) => setField("id", event.target.value)
               }
             )
           ] })
@@ -23265,9 +23420,31 @@
             "."
           ] })
         ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-group inspector-advanced", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("summary", { children: "Advanced" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+            "Step ID",
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input",
+                value: data.fields?.id ?? "",
+                placeholder: effectiveActionId(shapes, selected.id) ?? "action-1",
+                onChange: (event) => setField("id", event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint", children: [
+              "Names this step in ",
+              "{steps.<id>.output…}",
+              " templates. Leave blank to use the generated ",
+              effectiveActionId(shapes, selected.id) ?? "action-<n>",
+              "."
+            ] })
+          ] })
+        ] }),
         config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Test step" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Runs just this step against the Test run panel’s sample event. “Run step” executes it for real — side effects limited to this step — and its output feeds the next step’s test." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Test this step on the Test run panel’s sample event. Dry run renders its inputs and evaluates conditions — nothing is sent. Run step executes it for real (side effects limited to this step) and feeds its output to the next step’s test." }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "test-actions", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
@@ -23278,7 +23455,7 @@
                 onClick: () => testSelectedStep(false),
                 children: [
                   stepTest.busy ? /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 20, strokeWidth: 1.8, className: "spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(FlaskConical, { size: 20, strokeWidth: 1.8 }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry" })
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dry run" })
                 ]
               }
             ),
@@ -23462,10 +23639,12 @@
                       checked: enabled,
                       disabled: view === "yaml",
                       onChange: (event) => toggleEnabled(event.target.checked),
-                      "aria-label": "Workflow state after saving"
+                      "aria-label": "Workflow state after saving",
+                      className: "switch-input"
                     }
                   ),
-                  enabled ? "On" : "Off"
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "switch-track", "aria-hidden": "true" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "switch-text", children: enabled ? "On" : "Off" })
                 ]
               }
             ),
@@ -23680,9 +23859,9 @@
             selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ") })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : nodeListLabel(selected) })
             ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
-            shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
+            selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Nodes" }),
               shapes.filter((shape) => shape.type === "node").map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "button",
@@ -23691,7 +23870,7 @@
                   className: shape.id === selectedId ? "node-jump-item selected" : "node-jump-item",
                   "aria-current": shape.id === selectedId ? "true" : void 0,
                   onClick: () => setSelectedId(shape.id),
-                  children: shape.label || shape.data?.actionType || shape.id
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: nodeListLabel(shape) })
                 },
                 shape.id
               ))

@@ -10,7 +10,8 @@
     "build:console": "vite build --config vite.console.config.ts",
     "start": "node server.mjs",
     "typecheck": "tsc",
-    "test:email": "node tests/email-workflows.cjs"
+    "test:email": "node tests/email-workflows.cjs",
+    "test:board": "node --test tests/board.cjs"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

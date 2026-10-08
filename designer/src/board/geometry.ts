@@ -129,3 +129,92 @@ export function findConnectorAt(shapes: DiagramShape[], point: Point) {
     return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
   });
 }
+
+/** The viewport a workflow opens at: 100% zoom (never shrunk to fit — the
+    wheel pans to the rest), with the first trigger (else the topmost node)
+    centered horizontally and `margin` world units below the top edge.
+    `world` is the unzoomed view box. */
+export function openingViewport(shapes: DiagramShape[], world: { width: number; height: number }, margin = 48): Viewport {
+  const nodes = shapes.filter((shape) => shape.type === "node" || shape.type === "note");
+  const byPosition = (a: DiagramShape, b: DiagramShape) => a.y - b.y || a.x - b.x;
+  const anchor = nodes.filter((shape) => shape.data?.nodeKind === "trigger").sort(byPosition)[0]
+    ?? [...nodes].sort(byPosition)[0];
+  if (!anchor) return { zoom: 1, pan: { x: 0, y: 0 } };
+  const top = Math.min(anchor.y, anchor.y + anchor.height);
+  return {
+    zoom: 1,
+    pan: { x: centerOf(anchor).x - world.width / 2, y: top - margin }
+  };
+}
+
+/** The slice of a WheelEvent the canvas reads. */
+export interface WheelInput {
+  deltaX: number;
+  deltaY: number;
+  /** 0 = pixels, 1 = lines, 2 = pages (WheelEvent.DOM_DELTA_*). */
+  deltaMode: number;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
+export interface Viewport {
+  zoom: number;
+  pan: Point;
+}
+
+/** Wheel gestures the way node editors (Figma, n8n, Miro) read them:
+    - pinch (browsers send it as ctrl+wheel) and Ctrl/Cmd+wheel zoom;
+    - a mouse wheel notch (line mode, or a large whole-pixel vertical step
+      with no horizontal part) zooms;
+    - shift+wheel and trackpad two-finger scrolls (fractional, small or
+      horizontal pixel deltas) pan. */
+export function wheelGesture(input: WheelInput): "zoom" | "pan" {
+  if (input.ctrlKey || input.metaKey) return "zoom";
+  if (input.shiftKey) return "pan";
+  if (input.deltaMode !== 0) return "zoom";
+  if (input.deltaX !== 0) return "pan";
+  return Number.isInteger(input.deltaY) && Math.abs(input.deltaY) >= 50 ? "zoom" : "pan";
+}
+
+/** Next viewport for one wheel event. `offset` is the pointer's position
+    relative to the canvas center in screen px, `size` the canvas size in px,
+    `world` the unzoomed view box — the WorkflowBoard model, where the visible
+    box is world/zoom centered on world/2 + pan. Zoom keeps the world point
+    under the pointer fixed and clamps to minZoom..maxZoom; pan moves the
+    view by the scroll delta in screen px. */
+export function wheelViewport(
+  view: Viewport,
+  input: WheelInput,
+  offset: Point,
+  size: { width: number; height: number },
+  world: { width: number; height: number }
+): Viewport {
+  if (size.width <= 0 || size.height <= 0 || world.width <= 0 || world.height <= 0) return view;
+  const unit = input.deltaMode === 1 ? 16 : input.deltaMode === 2 ? size.height : 1;
+  const dx = input.deltaX * unit;
+  const dy = input.deltaY * unit;
+  const perPxX = world.width / view.zoom / size.width;
+  const perPxY = world.height / view.zoom / size.height;
+  if (wheelGesture(input) === "pan") {
+    // Shift+wheel on a mouse scrolls sideways; some browsers already swap
+    // the axes for it, so take whichever delta is set.
+    const [panX, panY] = input.shiftKey && dx === 0 ? [dy, 0] : [dx, dy];
+    return { zoom: view.zoom, pan: { x: view.pan.x + panX * perPxX, y: view.pan.y + panY * perPxY } };
+  }
+  // Pinch deltas are small and frequent, wheel notches large: a steeper
+  // curve for small steps keeps both feeling proportional.
+  const rate = Math.abs(dy) < 50 ? 0.01 : 0.0015;
+  const delta = Math.max(-100, Math.min(100, dy));
+  const zoom = Math.min(maxZoom, Math.max(minZoom, view.zoom * Math.exp(-delta * rate)));
+  if (zoom === view.zoom) return view;
+  const nextPerPxX = world.width / zoom / size.width;
+  const nextPerPxY = world.height / zoom / size.height;
+  return {
+    zoom,
+    pan: {
+      x: view.pan.x + offset.x * (perPxX - nextPerPxX),
+      y: view.pan.y + offset.y * (perPxY - nextPerPxY)
+    }
+  };
+}

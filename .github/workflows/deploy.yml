@@ -32,6 +32,7 @@ jobs:
       - run: npm ci --prefix designer
       - run: npm --prefix designer run typecheck
       - run: npm --prefix designer run test:email
+      - run: npm --prefix designer run test:board
       - run: npm --prefix designer run build:console
       - run: git diff --exit-code -- src/web/designer.js src/web/designer.css
       - run: make layer

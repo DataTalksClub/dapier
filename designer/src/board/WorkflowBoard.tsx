@@ -13,7 +13,8 @@ import {
 } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt } from "./geometry";
+import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt, openingViewport, wheelViewport } from "./geometry";
+import type { Viewport } from "./geometry";
 import { PaletteKind, paletteLabel, nodeDataForKind, nodeIcon, nodeTitle, nodeSubtitle } from "./nodes";
 import { PickerMode, StepPicker } from "./StepPicker";
 import { actionMeta, defaultFields, defaultNodeData, NODE_HEIGHT, NODE_WIDTH } from "../workflows";
@@ -81,6 +82,7 @@ export function WorkflowBoard({
   const pointersRef = useRef(new Map<number, Point>());
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const didFitRef = useRef(false);
+  const viewRef = useRef<Viewport & { world: { width: number; height: number } }>({ zoom: 1, pan: { x: 0, y: 0 }, world: { width: 0, height: 0 } });
 
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
@@ -592,10 +594,42 @@ export function WorkflowBoard({
     };
   }, []);
 
+  // Wheel/trackpad navigation (see wheelViewport): zoom around the pointer,
+  // pan on scroll. React's onWheel is passive, so the listener is attached
+  // natively to call preventDefault — only on the canvas, so the inspector
+  // and other panels keep their own scrolling. viewRef carries the latest
+  // viewport between events that land before React re-renders.
+  viewRef.current = { zoom, pan, world: canvasViewBox };
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const target = svg;
+    function onWheel(event: WheelEvent) {
+      event.preventDefault();
+      const rect = target.getBoundingClientRect();
+      const { world } = viewRef.current;
+      const next = wheelViewport(
+        viewRef.current,
+        event,
+        { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 },
+        { width: rect.width, height: rect.height },
+        world
+      );
+      viewRef.current = { ...next, world };
+      setZoom(next.zoom);
+      setPan(next.pan);
+    }
+    target.addEventListener("wheel", onWheel, { passive: false });
+    return () => target.removeEventListener("wheel", onWheel);
+  }, []);
+
   useEffect(() => {
     if (didFitRef.current || !shapes.length || canvasViewBox.width <= 0 || canvasViewBox.height <= 0) return;
     didFitRef.current = true;
-    fitToContent();
+    // Open at 100% with the trigger near the top center; Fit stays a button.
+    const opening = openingViewport(shapes, canvasViewBox);
+    setZoom(opening.zoom);
+    setPan(opening.pan);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shapes, canvasViewBox]);
 

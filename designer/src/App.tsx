@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react"
 import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "./icons";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
-import { actionCatalog, connectorCatalog, errorActionsField, filterOperators, onErrorField, onFailField } from "./catalog";
-import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { nodeTitle, nodeSubtitle } from "./board/nodes";
+import { actionCatalog, connectorCatalog, errorActionsField, eventInfo, filterOperators, onErrorField, onFailField } from "./catalog";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -96,6 +97,13 @@ function connectionMatches(connection: ConnectionOption, value: string): boolean
   const wanted = value.trim().toLowerCase();
   return connection.connection_id === wanted
     || (connection.refs ?? []).some((ref) => ref.toLowerCase() === wanted);
+}
+
+/** "<title> · <summary>" for a node, matching its canvas card. */
+function nodeListLabel(shape: DiagramShape): string {
+  const summary = nodeSubtitle(shape).replace(/\s+/g, " ").trim();
+  const clipped = summary.length > 48 ? `${summary.slice(0, 47)}…` : summary;
+  return [nodeTitle(shape), clipped].filter(Boolean).join(" · ");
 }
 
 /** "display_name · status" for the datalist entries and the selected hint. */
@@ -1574,9 +1582,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   async function testSelectedStep(execute: boolean) {
     if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
     const nodeId = selected.id;
-    const actionId = (selected.data.fields?.id ?? "").trim();
+    const actionId = effectiveActionId(shapes, nodeId);
     if (!actionId) {
-      setStatus({ kind: "error", message: "Give this action an Action ID first — the step test targets it." });
+      setStatus({ kind: "error", message: "Connect this step to the trigger first — the step test runs it in the workflow." });
       return;
     }
     const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
@@ -1672,9 +1680,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   async function runCodeTests() {
     if (!selected || selected.type !== "node" || !selected.data || selected.data.nodeKind !== "action") return;
     const nodeId = selected.id;
-    const actionId = (selected.data.fields?.id ?? "").trim();
+    const actionId = effectiveActionId(shapes, nodeId);
     if (!actionId) {
-      setStatus({ kind: "error", message: "Give this action an Action ID first — its tests target it." });
+      setStatus({ kind: "error", message: "Connect this step to the trigger first — its tests run it in the workflow." });
       return;
     }
     const { workflow, problems } = workflowFromShapes(shapes, workflowId, enabled);
@@ -1764,22 +1772,52 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <label>Connector
               <select
                 value={data.connector ?? "custom"}
-                onChange={(event) => updateSelected((current) => ({ ...current, connector: event.target.value as NodeData["connector"] }))}
+                onChange={(event) => {
+                  const connector = event.target.value;
+                  // A new source starts on its own default event; a source
+                  // with no catalog events (custom) keeps the typed one.
+                  const firstEvent = connectorCatalog.find((entry) => entry.name === connector)?.events[0];
+                  updateSelected((current) => ({ ...current, connector, event: firstEvent ?? current.event }));
+                }}
               >
                 {connectorCatalog.map((entry) => <option key={entry.name} value={entry.name}>{entry.label}</option>)}
               </select>
             </label>
-            <label>Event
-              <input
-                className="mono-input"
-                value={data.event ?? ""}
-                list="trigger-events"
-                onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
-              />
-              <datalist id="trigger-events">
-                {connectorEntry.events.map((event) => <option key={event} value={event} />)}
-              </datalist>
-            </label>
+            {connectorEntry.events.length > 0 ? (
+              <label>Event
+                <select
+                  value={data.event ?? ""}
+                  onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
+                >
+                  {connectorEntry.events.map((event) => (
+                    <option key={event} value={event}>
+                      {eventInfo(connectorEntry.name, event)?.label ?? event} ({event})
+                    </option>
+                  ))}
+                  {/* A YAML-authored event outside the catalog stays selectable
+                     so opening the workflow never rewrites it. */}
+                  {data.event && !connectorEntry.events.includes(data.event) && (
+                    <option value={data.event}>{data.event} (not in catalog)</option>
+                  )}
+                </select>
+                {data.event && (
+                  <span className="connection-hint">
+                    {eventInfo(connectorEntry.name, data.event)?.description
+                      ?? "Not a catalog event for this source — the trigger only fires if something emits it."}
+                  </span>
+                )}
+              </label>
+            ) : (
+              <label>Event
+                <input
+                  className="mono-input"
+                  value={data.event ?? ""}
+                  placeholder="order.created"
+                  onChange={(event) => updateSelected((current) => ({ ...current, event: event.target.value }))}
+                />
+                <span className="connection-hint">Any event name — this source has no fixed list.</span>
+              </label>
+            )}
           </section>
           {triggerSample && triggerSample.fields.length > 0 && (
             <section className="inspector-group">
@@ -1876,7 +1914,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     return (
       <>
         <section className="inspector-group">
-          <h3>Identity</h3>
+          <h3>Action</h3>
           <label>Action type
             {meta ? (
               <select
@@ -1897,14 +1935,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 onChange={(event) => updateSelected((current) => ({ ...current, actionType: event.target.value }))}
               />
             )}
-          </label>
-          <label>Action ID
-            <input
-              className="mono-input"
-              value={data.fields?.id ?? ""}
-              placeholder="action-1"
-              onChange={(event) => setField("id", event.target.value)}
-            />
           </label>
         </section>
         {meta ? (
@@ -2057,21 +2087,40 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             </p>
           </section>
         )}
+        {/* The step id is internal plumbing: saves fill in action-<n> when
+           it is blank. It only matters for {steps.<id>.output} references,
+           so it sits behind a disclosure, never as a primary field. */}
+        <details className="inspector-group inspector-advanced">
+          <summary>Advanced</summary>
+          <label>Step ID
+            <input
+              className="mono-input"
+              value={data.fields?.id ?? ""}
+              placeholder={effectiveActionId(shapes, selected.id) ?? "action-1"}
+              onChange={(event) => setField("id", event.target.value)}
+            />
+            <span className="connection-hint">
+              Names this step in {"{steps.<id>.output…}"} templates. Leave blank
+              to use the generated {effectiveActionId(shapes, selected.id) ?? "action-<n>"}.
+            </span>
+          </label>
+        </details>
         {/* Console only, like the Test run panel: local mode has no admin
            API to run the step against. */}
         {config.mode === "console" && (
           <section className="inspector-group">
             <h3>Test step</h3>
             <p className="inspector-hint">
-              Runs just this step against the Test run panel&rsquo;s sample event.
-              &ldquo;Run step&rdquo; executes it for real — side effects limited to
-              this step — and its output feeds the next step&rsquo;s test.
+              Test this step on the Test run panel&rsquo;s sample event.
+              Dry run renders its inputs and evaluates conditions — nothing is
+              sent. Run step executes it for real (side effects limited to this
+              step) and feeds its output to the next step&rsquo;s test.
             </p>
             <div className="test-actions">
               <button className="dk-button dk-button--secondary" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(false)}>
                 {stepTest.busy ? <Loader2 size={20} strokeWidth={1.8} className="spin" /> : <FlaskConical size={20} strokeWidth={1.8} />}
-                <span>Dry</span>
+                <span>Dry run</span>
               </button>
               <button className="dk-button dk-button--danger" type="button" disabled={stepTest.busy}
                       onClick={() => testSelectedStep(true)}>
@@ -2228,8 +2277,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 disabled={view === "yaml"}
                 onChange={(event) => toggleEnabled(event.target.checked)}
                 aria-label="Workflow state after saving"
+                className="switch-input"
               />
-              {enabled ? "On" : "Off"}
+              <span className="switch-track" aria-hidden="true" />
+              <span className="switch-text">{enabled ? "On" : "Off"}</span>
             </label>
             {enabled !== savedEnabled && <span className="state-save-hint">Save to apply</span>}
             {status.message && (
@@ -2447,14 +2498,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : "Action"}</h2>
                 <p className="inspector-summary">{selected.data.nodeKind === "trigger"
                   ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}`
-                  : [selected.data.actionType, selected.data.fields?.id].filter(Boolean).join(" · ")}</p>
+                  : nodeListLabel(selected)}</p>
               </header>
             ) : (
               <header className="inspector-head">
                 <h2>Inspector</h2>
               </header>
             )}
-            {shapes.some((shape) => shape.type === "node") && (
+            {/* The node list is a way in when nothing is selected; with a node
+               open its fields start right under the header (the canvas is
+               the map). Entries use the canvas card's title and summary so
+               repeated steps (eight Conditions) stay distinguishable. */}
+            {selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && (
               <nav className="node-jump" aria-label="Select a workflow node">
                 <p>Nodes</p>
                 {shapes.filter((shape) => shape.type === "node").map((shape) => (
@@ -2465,7 +2520,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                     aria-current={shape.id === selectedId ? "true" : undefined}
                     onClick={() => setSelectedId(shape.id)}
                   >
-                    {shape.label || shape.data?.actionType || shape.id}
+                    <span>{nodeListLabel(shape)}</span>
                   </button>
                 ))}
               </nav>

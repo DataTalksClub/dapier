@@ -379,21 +379,33 @@ a.brand:hover span:last-child {
 }
 
 /* The workflow's On/Off reads as the console's switch: same 34px track,
-   token colors, knob slides. */
-.check-label.enabled-toggle input {
+   token colors, knob slides. The track is its own span beside the (hidden,
+   still focusable) checkbox, and the text has a fixed slot: the switch
+   never paints over its label, whatever a browser does with styled
+   checkboxes or however tight the toolbar gets. */
+.check-label.enabled-toggle { flex: 0 0 auto; position: relative; }
+.check-label.enabled-toggle .switch-input {
   appearance: none;
+  cursor: pointer;
+  flex: none;
+  height: 100%;
+  inset: 0;
+  margin: 0;
+  min-width: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+}
+.switch-track {
   background: var(--dk-border-strong);
   border-radius: 999px;
-  cursor: pointer;
   flex: 0 0 34px;
   height: 20px;
-  margin: 0;
-  min-width: 34px;
   position: relative;
   transition: background .15s ease;
   width: 34px;
 }
-.check-label.enabled-toggle input::before {
+.switch-track::before {
   background: var(--dk-bg-surface);
   border-radius: 50%;
   content: "";
@@ -404,9 +416,12 @@ a.brand:hover span:last-child {
   transition: transform .15s ease;
   width: 16px;
 }
-.check-label.enabled-toggle input:checked { background: var(--dk-accent-default); }
-.check-label.enabled-toggle input:checked::before { transform: translateX(14px); }
-.check-label.enabled-toggle input:disabled { cursor: default; opacity: .5; }
+.switch-text { flex: 0 0 auto; min-width: 3ch; }
+.switch-input:checked + .switch-track { background: var(--dk-accent-default); }
+.switch-input:checked + .switch-track::before { transform: translateX(14px); }
+.switch-input:focus-visible + .switch-track { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
+.switch-input:disabled { cursor: default; }
+.switch-input:disabled + .switch-track { opacity: .5; }
 
 
 .status-message {
@@ -1263,8 +1278,22 @@ input[type="checkbox"], input[type="radio"] {
 
 .test-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
+/* Button labels ("Dry run", "Run step") wrap as whole buttons, never clip. */
+.test-actions .dk-button { flex: 0 0 auto; white-space: nowrap; }
+
+/* Advanced: internal knobs (the step id) behind a disclosure. */
+.inspector-advanced > summary {
+  color: var(--dk-text-faint);
+  cursor: pointer;
+  font-size: var(--dk-text-xs);
+  font-weight: 500;
+  list-style-position: inside;
+}
+.inspector-advanced > summary:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
+.inspector-advanced:not([open]) { gap: 0; }
 
 .test-result {
   border-top: 1px solid var(--dk-border-default);
