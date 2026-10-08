@@ -85,3 +85,34 @@ export function hardenSecretInputs(root = document) {
     }
   });
 }
+
+/* Row overflow menus (`.row-menu[popover]` opened by a
+   `[popovertarget]` trigger): anchored under the trigger's right edge and
+   kept inside the viewport; choosing an item closes the menu. The native
+   popover handles Escape, outside clicks, and one open menu at a time. */
+document.addEventListener('toggle', (event) => {
+  const menu = event.target;
+  if (!menu.matches?.('.row-menu') || event.newState !== 'open') return;
+  const trigger = document.querySelector(`[popovertarget="${menu.id}"]`);
+  if (!trigger) return;
+  const anchor = trigger.getBoundingClientRect();
+  const bounds = menu.getBoundingClientRect();
+  const gap = 4;
+  menu.style.left = `${Math.max(12, Math.min(anchor.right - bounds.width, window.innerWidth - bounds.width - 12))}px`;
+  const below = anchor.bottom + gap;
+  menu.style.top = `${Math.max(12, below + bounds.height <= window.innerHeight - 12 ? below : anchor.top - bounds.height - gap)}px`;
+}, true);
+document.addEventListener('click', (event) => {
+  const item = event.target.closest('.row-menu button, .row-menu a');
+  if (item && !item.disabled) item.closest('.row-menu').hidePopover?.();
+});
+
+/* A row's action cell: one visible action, the rest behind "More". */
+export function rowActions(primary, menuItems = [], { id, label }) {
+  const menu = menuItems.filter(Boolean);
+  const more = menu.length
+    ? `<button class="icon-button row-more" type="button" popovertarget="${id}" aria-label="More actions for ${label}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
+       <div id="${id}" class="row-menu" popover aria-label="Actions for ${label}">${menu.join('')}</div>`
+    : '<span class="row-more-slot" aria-hidden="true"></span>';
+  return `<div class="row-actions">${primary}${more}</div>`;
+}

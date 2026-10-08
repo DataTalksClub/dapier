@@ -17,14 +17,21 @@
 .mono { font-family: var(--dk-font-mono); }
 .wordmark { font-weight: var(--dk-weight-semibold); letter-spacing: -0.01em; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Mono is for machine values and maxes at 500 (dakit guidelines): a name
+   set in mono drops to medium instead of a faux bold. */
+.mono .cell-name, .cell-name.mono, .mono-cell .cell-name { font-weight: var(--dk-weight-medium); }
+.nowrap { white-space: nowrap; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* One-line clip with the full value in title (long ids, addresses). */
+.clip { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 
-/* Content measure, dataops-style: pages read in one centered column
-   (56rem, the family's readable measure); wide registers (tables) get
-   70rem; the designer canvas stays full-bleed as the sanctioned dense
-   exception (dakit/docs/family.md). */
+/* One measure for every page header and its content: the 70rem register
+   measure. The designer and agents canvases are the full-bleed exceptions
+   (dakit/docs/family.md). */
 :root {
-  --content-width: 56rem;
   --content-wide: 70rem;
+  --page-gutter: var(--dk-space-8);
 }
 
 /* --- buttons ------------------------------------------------------------- */
@@ -88,7 +95,7 @@ svg.icon { width: 20px; height: 20px; flex: none; }
   display: inline-flex;
   align-items: center;
   height: var(--dk-size-control-md);
-  padding: 0 2px;
+  padding: 0;
   color: var(--dk-accent-default);
   font-size: var(--dk-text-md);
   font-weight: var(--dk-weight-medium);
@@ -97,7 +104,7 @@ svg.icon { width: 20px; height: 20px; flex: none; }
 .text-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* --- forms ---------------------------------------------------------------- */
-label { display: grid; gap: 6px; font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
+label { display: grid; gap: var(--dk-space-2); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
 input, select {
   height: var(--dk-size-control-md);
   width: 100%;
@@ -109,7 +116,17 @@ input, select {
   color: var(--dk-text-primary);
 }
 input:hover:not(:disabled):not([type="checkbox"]), select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
-input::placeholder { color: var(--dk-text-muted); opacity: 1; }
+input::placeholder, textarea::placeholder { color: var(--dk-text-muted); opacity: 1; }
+textarea {
+  width: 100%;
+  min-height: var(--dk-size-control-md);
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-md);
+  background: var(--dk-bg-page);
+  padding: var(--dk-space-2) var(--dk-space-3);
+  font-size: var(--dk-text-md);
+  color: var(--dk-text-primary);
+}
 /* Chevron, offset and clearance come from the dakit bundle's base layer. */
 select:disabled { opacity: .5; cursor: default; }
 /* The family focus recipe (vendor/dakit.css base + components): a 3px ring
@@ -127,13 +144,13 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
 
 /* --- login ---------------------------------------------------------------- */
 .login-view { min-height: 100vh; display: flex; flex-direction: column; background: var(--dk-bg-page); }
-.login-panel { width: min(400px, calc(100% - 48px)); margin: auto; display: grid; gap: 28px; padding: 40px 0 24px; }
-.login-head .wordmark { font-size: var(--dk-text-page); line-height: 1.1; }
-.login-sub { margin-top: 7px; font-size: var(--dk-text-md); color: var(--dk-text-muted); }
-.login-panel form, .login-formless { display: grid; gap: 18px; border-top: 1px solid var(--dk-border-strong); padding-top: 26px; }
+.login-panel { width: min(400px, calc(100% - 2 * var(--dk-space-6))); margin: auto; display: grid; gap: var(--dk-space-7); padding: var(--dk-space-8) 0 var(--dk-space-6); }
+.login-head .wordmark { font-size: var(--dk-text-page); line-height: var(--dk-leading-tight); }
+.login-sub { margin-top: var(--dk-space-2); font-size: var(--dk-text-md); color: var(--dk-text-muted); }
+.login-panel form, .login-formless { display: grid; gap: var(--dk-space-5); border-top: 1px solid var(--dk-border-strong); padding-top: var(--dk-space-6); }
 
 .login-formless .form-error { min-height: 0; }
-.login-foot { margin: 0 auto; padding: 18px 24px 22px; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.login-foot { margin: 0 auto; padding: var(--dk-space-5) var(--dk-space-6); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 
 /* --- shell: the family's 268px sidebar + main canvas ----------------------- */
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--dk-size-sidebar) minmax(0, 1fr); }
@@ -152,12 +169,14 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
      shell (family.md's recipe says bg-page — reconciled in docs/family-review) */
   background: var(--dk-bg-muted);
   border-right: 1px solid var(--dk-border-default);
-  padding: var(--dk-space-4) var(--dk-space-3);
+  /* 24px top: the brand row and the page h1 share one band */
+  padding: var(--dk-space-6) var(--dk-space-3) var(--dk-space-4);
   z-index: 20;
 }
 .sidebar-backdrop { display: none; }
-/* Product mark + workspace name, the family's sidebar header. */
-.brand { display: flex; align-items: center; justify-content: space-between; gap: var(--dk-space-2); min-height: 40px; margin-bottom: var(--dk-space-4); padding: 0 var(--dk-space-1); font-size: var(--dk-text-lg); }
+/* Product mark + workspace name, the family's sidebar header. The close
+   button exists only in the drawer and sits at the far end. */
+.brand { display: flex; align-items: center; gap: var(--dk-space-3); min-height: var(--dk-size-control-lg); margin-bottom: var(--dk-space-4); padding: 0 var(--dk-space-1); font-size: var(--dk-text-lg); }
 .workspace-mark {
   display: grid;
   flex: 0 0 32px;
@@ -170,8 +189,8 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
   font-size: var(--dk-text-lg);
   font-weight: var(--dk-weight-bold);
 }
-.sidebar-close { display: none; }
-.sidebar nav { display: grid; align-content: start; gap: 2px; margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
+.sidebar-close { display: none; margin-left: auto; }
+.sidebar nav { display: grid; align-content: start; gap: var(--dk-space-1); margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
 .nav-group-label {
   margin: var(--dk-space-4) var(--dk-space-2) var(--dk-space-1);
   color: var(--dk-text-muted);
@@ -187,6 +206,7 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
   gap: var(--dk-space-2);
   height: 32px;
   flex: none;
+  min-width: 0;
   padding: 0 var(--dk-space-3);
   border-radius: var(--dk-radius-md);
   color: var(--dk-text-primary);
@@ -197,18 +217,21 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
 }
 .nav-item:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
 .nav-item.active, .nav-item[aria-current="page"] { background: var(--dk-accent-soft); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); }
+/* The nav scrolls, so an outset ring would be clipped at its edges: rows
+   inset the ring (family focus recipe for full-bleed rows). */
+.nav-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
 .nav-item svg { width: 20px; height: 20px; flex: none; }
 .nav-count {
   margin-left: auto;
   min-width: 1.25em;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 var(--dk-space-2);
+  border-radius: var(--dk-radius-full);
   background: var(--dk-danger-bg);
   color: var(--dk-danger-text);
   font-size: var(--dk-text-xs);
   font-weight: var(--dk-weight-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: 18px;
+  line-height: 1.6;
   text-align: center;
 }
 .sidebar-foot {
@@ -217,44 +240,53 @@ input:focus:not([type="checkbox"]), select:focus, textarea:focus { outline: none
   flex-direction: column;
   align-items: stretch;
   gap: var(--dk-space-2);
+  min-width: 0;
   border-top: 1px solid var(--dk-border-default);
   padding: var(--dk-space-3) var(--dk-space-1) 0;
 }
 /* Global utilities and the account trigger: the footer is the shell's only
-   global strip — there is no top toolbar on desktop. */
-.sidebar-foot-actions { display: grid; gap: 2px; }
+   global strip — there is no top toolbar on desktop. One shrinkable column,
+   so a long name or the "Updated" stamp never pushes past the sidebar edge. */
+.sidebar-foot-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--dk-space-1); }
 .sidebar-foot .nav-item { width: 100%; flex: auto; border: 0; background: transparent; cursor: pointer; font-family: inherit; }
-.sidebar-tool-button .last-updated { margin-left: auto; font-size: var(--dk-text-xs); }
-.sidebar-account-button { width: 100%; justify-content: flex-start; }
-.sidebar-account-button .account-button-name { flex: 1 1 auto; max-width: none; text-align: left; }
+.sidebar-tool-button .last-updated { margin-left: auto; font-size: var(--dk-text-xs); font-weight: var(--dk-weight-regular); }
+.sidebar-account-button { width: 100%; min-width: 0; justify-content: flex-start; }
+.sidebar-account-button .account-button-name { flex: 1 1 auto; min-width: 0; max-width: none; text-align: left; }
 .account-button.mobile-account-button { display: none; }
-.environment { display: inline-flex; align-items: center; gap: 7px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); white-space: nowrap; }
+.environment { display: inline-flex; align-items: center; gap: var(--dk-space-2); padding: 0 var(--dk-space-3); font-size: var(--dk-text-xs); color: var(--dk-text-muted); white-space: nowrap; }
 .env-dot { width: 8px; height: 8px; flex: none; border-radius: var(--dk-radius-full); background: var(--dk-accent-default); }
 .sidebar .icon-button { border-color: transparent; color: var(--dk-text-muted); }
 .sidebar .icon-button:hover { border-color: transparent; background: var(--dk-bg-hover); color: var(--dk-text-primary); }
 
-/* --- topbar / loading / notice -------------------------------------------- */
-main { min-width: 0; padding: 0 40px 64px; }
-/* The page header and every view live in the centered content column;
-   wide registers opt out via --content-width below. */
-.topbar { width: min(var(--content-wide), 100%); margin: 0 auto; }
-.view { display: none; }
-.view.active { display: block; padding-top: 10px; width: min(var(--content-width), 100%); margin: 0 auto; }
-.view.active[data-page="workflows"],
-.view.active[data-page="runs"],
-.view.active[data-page="connections"],
-.view.active[data-page="credentials"],
-.view.active[data-page="emails"],
-.view.active[data-page="schedules"],
-.view.active[data-page="workers"],
-.view.active[data-page="audit"],
-.view.active[data-page="inbox"],
-.view.active[data-page="triggers"] { width: min(var(--content-wide), 100%); }
-.page-tabs {
+/* --- page header / views ---------------------------------------------------
+   One header pattern: a 32px/700 h1 and a one-line muted description, the
+   primary action on the same row at the right; header and content share
+   one 70rem measure, so the h1 and the content start on the same edge and
+   the action ends where the content ends. */
+main { min-width: 0; padding: 0 var(--page-gutter) var(--dk-space-8); }
+.topbar {
   width: min(var(--content-wide), 100%);
   margin: 0 auto;
   display: flex;
-  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--dk-space-4);
+  padding: var(--dk-space-6) 0 0;
+}
+.topbar-title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--dk-space-1); }
+.topbar h1 { font-size: var(--dk-text-page); font-weight: var(--dk-weight-bold); letter-spacing: -.02em; line-height: var(--dk-leading-tight); }
+#view-description { margin: 0; font-size: var(--dk-text-md); line-height: var(--dk-leading-normal); color: var(--dk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-title:has(#view-description:empty) { gap: 0; }
+#topbar-tools { flex: none; min-width: 0; display: flex; align-items: center; justify-content: flex-end; }
+#topbar-tools:empty { display: none; }
+#topbar-tools > .page-tools { justify-content: flex-end; }
+.view { display: none; }
+.view.active { display: block; padding-top: var(--dk-gap-section); width: min(var(--content-wide), 100%); margin: 0 auto; }
+.page-tabs {
+  width: min(var(--content-wide), 100%);
+  margin: var(--dk-gap-section) auto 0;
+  display: flex;
+  gap: var(--dk-space-1);
   border-bottom: 1px solid var(--dk-border-default);
   /* overflow-x: auto alone computes overflow-y to auto, and the 2px
      tab underline then paints a thin vertical scrollbar. */
@@ -263,15 +295,15 @@ main { min-width: 0; padding: 0 40px 64px; }
   scrollbar-width: thin;
 }
 .page-tabs[hidden] { display: none; }
-.page-tab-set { display: flex; flex-wrap: nowrap; gap: 4px; }
+.page-tab-set { display: flex; flex-wrap: nowrap; gap: var(--dk-space-1); }
 .page-tab-set[hidden] { display: none; }
 .page-tabs a {
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
   min-height: var(--dk-size-control-md);
-  padding: 0 12px;
-  margin-bottom: -1px;
+  padding: 0 var(--dk-space-3);
+  margin-bottom: -1px; /* hairline nudge: the 2px underline sits on the strip's 1px rule */
   display: inline-flex;
   align-items: center;
   color: var(--dk-text-muted);
@@ -280,6 +312,7 @@ main { min-width: 0; padding: 0 40px 64px; }
   white-space: nowrap;
 }
 .page-tabs a:hover { color: var(--dk-text-primary); }
+.page-tabs a:focus-visible { outline-offset: -3px; }
 .page-tabs a[aria-current="page"] {
   color: var(--dk-accent-default);
   border-bottom-color: var(--dk-accent-default);
@@ -292,28 +325,14 @@ body[data-view="designer"] #page-tabs { display: none; }
 /* agents runs the same full-bleed canvas: width:auto shrink-wraps inside the
    flex main, so the whole workspace visibly re-sizes while a run loads */
 body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
-.topbar {
-  min-height: 0;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 8px 14px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--dk-border-default);
-}
-/* Page header: 32px semibold, tight leading; description muted. */
-.topbar-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.topbar h1 { flex: 0 0 auto; font-size: var(--dk-text-page); font-weight: var(--dk-weight-semibold); letter-spacing: -.02em; line-height: 1.15; }
-#view-description { margin: 0; font-size: var(--dk-text-sm); line-height: 1.35; color: var(--dk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar-title:has(#view-description:empty) { gap: 0; }
-#topbar-tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; }
-#topbar-tools:empty { display: none; }
-#topbar-tools > .page-tools { flex: 1; min-width: 0; justify-content: flex-end; }
-.page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0; padding: 0; min-width: 0; }
+body[data-view="designer"] .topbar, body[data-view="agents"] .topbar { width: 100%; padding-bottom: var(--dk-space-4); }
+/* Toolbars: page-tools is the shell's toolbar hook (it stays visible while
+   a view's data is pending). Gaps follow the dakit roles. */
+.page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-gap-control); margin: 0; padding: 0; min-width: 0; }
 .page-tools .sub { margin: 0; flex: 1 1 160px; min-width: 0; font-size: var(--dk-text-md); font-weight: 400; color: var(--dk-text-muted); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .dk-button { flex: none; }
 .page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.page-tools .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; }
+.page-tools .inline-form { display: flex; align-items: center; gap: var(--dk-gap-control); margin: 0; }
 .page-tools .inline-form input { width: 140px; }
 .page-tools .run-filters,
 .page-tools.run-filters { padding: 0; margin: 0; flex: 1 1 280px; align-items: center; }
@@ -325,15 +344,20 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .page-tools .workflow-filters label:first-child { flex: 1.3 1 180px; max-width: 280px; }
 .page-tools .workflow-page-actions { flex: none; }
 .page-tools.section-head { margin: 0; padding: 0; flex: 1; }
-/* In-flow toolbars keep a step of air above the register they control —
-   the family rhythm `.list-tools` carried before `.page-tools` flattened
-   margins. Standalone pages hoist .primary-tools into the topbar; family
-   tabs keep theirs here so the header above the tabs stays still. The
-   agents tab strip flows into its workspace and opts out. */
-.view > .page-tools { margin-bottom: 12px; }
+/* In-flow toolbars keep the block gap above the register they control.
+   Standalone pages hoist .primary-tools into the header row; family tabs
+   keep theirs here so the header above the tabs stays still. The agents
+   tab strip flows into its workspace and opts out. */
+.view > .page-tools { margin-bottom: var(--dk-gap-block); }
 .view > .page-tools.primary-tools { justify-content: flex-end; }
 .view > .agent-toolbar.page-tools { margin-bottom: 0; }
-.top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+/* The register toolbar (dakit .dk-toolbar): search and filters left,
+   actions right, one row that wraps as a unit. */
+.register-toolbar .toolbar-filters { flex: 1 1 520px; }
+.register-toolbar .toolbar-filters > label { flex: 0 1 184px; min-width: 132px; }
+.register-toolbar .toolbar-filters > label.toolbar-search { flex: 1 1 220px; max-width: 320px; }
+/* The bar's account twin exists only in the phone app bar. */
+.top-actions { display: none; margin-left: auto; align-items: center; gap: var(--dk-gap-control); }
 .last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
 .menu-toggle { display: none; }
 
@@ -401,7 +425,7 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   border-bottom: 1px solid var(--dk-border-default);
   background: var(--dk-bg-muted);
   min-height: 54px;
-  padding: var(--dk-space-2) 10px var(--dk-space-2) var(--dk-space-4);
+  padding: var(--dk-space-2) var(--dk-space-3) var(--dk-space-2) var(--dk-space-4);
 }
 .account-menu-header strong {
   color: var(--dk-text-heading);
@@ -436,7 +460,7 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   gap: var(--dk-space-3);
   border-bottom: 1px solid var(--dk-border-default);
   background: var(--dk-bg-surface);
-  padding: 14px var(--dk-space-4);
+  padding: var(--dk-space-3) var(--dk-space-4);
 }
 .account-avatar-large {
   width: var(--dk-size-control-lg);
@@ -464,7 +488,7 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--dk-space-3);
   width: 100%;
   min-height: 54px;
   border: 0;
@@ -472,11 +496,11 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   border-radius: 0;
   background: var(--dk-bg-surface);
   color: var(--dk-text-primary);
-  padding: 10px var(--dk-space-4);
+  padding: var(--dk-space-3) var(--dk-space-4);
   text-align: left;
 }
 .account-menu-item:hover { background: var(--dk-bg-hover); }
-.account-menu-item > span:nth-child(2) { display: grid; gap: 2px; }
+.account-menu-item > span:nth-child(2) { display: grid; gap: var(--dk-space-1); }
 .account-menu-item strong { color: var(--dk-text-heading); font-size: var(--dk-text-body); }
 .account-menu-item small {
   display: block;
@@ -500,7 +524,7 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   align-items: center;
   border-radius: var(--dk-radius-full);
   background: var(--dk-border-strong);
-  padding: 2px;
+  padding: 2px; /* icon nudge: the knob's inset inside its track */
 }
 .account-toggle-track span {
   width: 16px;
@@ -514,75 +538,62 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .account-theme-toggle[aria-pressed="true"] .account-toggle-track span {
   transform: translateX(16px);
 }
+/* Sign-out is its own section: a gap and a rule part it from Appearance. */
+.account-sign-out { margin-top: var(--dk-space-2); border-top: 1px solid var(--dk-border-default); }
 .account-sign-out,
 .account-sign-out strong,
 .account-sign-out .account-menu-icon {
   color: var(--dk-danger-text);
 }
 
-.loading { height: 2px; display: flex; gap: 3px; margin: 0 -40px; overflow: hidden; }
+.loading { height: 2px; display: flex; gap: var(--dk-space-1); margin: 0 calc(-1 * var(--page-gutter)); overflow: hidden; }
 .loading span { flex: 1; background: var(--dk-accent-default); opacity: .12; animation: pulse 1s infinite alternate ease-in-out; }
 .loading span:nth-child(2) { animation-delay: .18s; }
 .loading span:nth-child(3) { animation-delay: .36s; }
 @keyframes pulse { from { opacity: .12; } to { opacity: .8; } }
+/* Reduced motion: the bar holds still, and app transitions are off (the
+   dakit base layer shortens durations; this removes the loops outright). */
+@media (prefers-reduced-motion: reduce) {
+  .loading span { animation: none; opacity: .5; }
+  .sidebar, .help-tip::after, .account-toggle-track span { transition: none !important; }
+}
 
-.notice { margin-top: 16px; border: 1px solid var(--dk-accent-border); border-radius: var(--dk-radius-md); background: var(--dk-accent-soft); padding: 10px 14px; font-size: var(--dk-text-md); color: var(--dk-text-primary); }
+.notice { width: min(var(--content-wide), 100%); margin: var(--dk-space-4) auto 0; border: 1px solid var(--dk-accent-border); border-radius: var(--dk-radius-md); background: var(--dk-accent-soft); padding: var(--dk-space-3) var(--dk-space-4); font-size: var(--dk-text-md); color: var(--dk-text-primary); }
 .notice.error { border-color: var(--dk-danger-border); background: var(--dk-danger-bg); color: var(--dk-danger-text); }
-.notice a { margin-left: 5px; color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
-.dialog-feedback { border-top: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); padding: 10px 22px; color: var(--dk-text-primary); font-size: var(--dk-text-md); }
+.notice a { margin-left: var(--dk-space-1); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
+.dialog-feedback { flex: none; border-top: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); padding: var(--dk-space-3) var(--dk-space-5); color: var(--dk-text-primary); font-size: var(--dk-text-md); }
 .dialog-feedback.error { border-color: var(--dk-danger-border); background: var(--dk-danger-bg); color: var(--dk-danger-text); }
-.dialog-feedback a { margin-left: 4px; color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
+.dialog-feedback a { margin-left: var(--dk-space-1); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
 .inline-status { color: var(--dk-accent-default); font-size: var(--dk-text-md); min-height: 1em; }
-.run-filters, .connection-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
-.run-filters { padding: 10px 0 6px; }
+.run-filters, .connection-filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--dk-gap-control); }
 .run-filters label { min-width: 150px; }
-.run-filters .field-hint { margin: 0 0 10px auto; }
 .connection-filters { margin-left: auto; }
 .connection-filters input { width: min(190px, 30vw); }
 .connection-filters select { width: 150px; }
 .token-grant-choice { margin-right: auto; min-width: 170px; }
 
-/* data store view: the browse bar shares .run-filters; the write form is a
-   top-aligned grid so every label sits on one line — the value textarea
-   starts at input height and autogrows downward as it fills */
-.storage-form { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(260px, 2.2fr) minmax(170px, 1fr) auto; align-items: start; gap: 10px 14px; padding: 8px 0; margin-top: 16px; border-top: 1px solid var(--dk-border-default); }
-.storage-form h3 { grid-column: 1 / -1; margin: 0; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); }
-.storage-form label { min-width: 0; }
-.storage-form .dk-button { align-self: end; }
-.storage-form textarea { width: 100%; max-height: 14rem; border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); background: var(--dk-bg-page); padding: 8px 12px; font: inherit; font-size: var(--dk-text-md); color: var(--dk-text-primary); resize: none; overflow-y: auto; }
-.storage-put-target { font-weight: 400; color: var(--dk-text-muted); }
-#storage-table-wrap { margin-top: 12px; }
-.storage-value-cell { max-width: 480px; }
-.storage-value-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; cursor: zoom-in; }
+/* --- Data (storage) -------------------------------------------------------
+   Browse toolbar above the register; the write form is a panel with its
+   fields on one grid and the Store action in the panel's footer band. */
+.storage-form { margin-top: var(--dk-gap-section); }
+.storage-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--dk-gap-block); padding: var(--dk-pad-panel); }
+.storage-fields .storage-value-field { grid-column: 1 / -1; }
+.storage-fields label { min-width: 0; }
+.storage-form textarea { max-height: 14rem; resize: vertical; overflow-y: auto; }
+.storage-form .dk-form-actions { margin-top: 0; }
+.storage-table { table-layout: fixed; }
+.storage-table .col-key { width: 26%; }
+.storage-table .col-when { width: 10.5rem; }
+.storage-table .col-action { width: 6.5rem; }
+.storage-value-cell { min-width: 0; }
+.storage-value-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; cursor: zoom-in; }
 .storage-value-cell.expanded .storage-value-text { display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; cursor: zoom-out; }
-@media (max-width: 860px) { .storage-form { grid-template-columns: 1fr; } .storage-form .dk-button { justify-self: start; } }
 
-/* --- metrics --------------------------------------------------------------- */
-.metrics {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.45fr) repeat(3, minmax(110px, 1fr));
-  gap: 0;
-  padding: 30px 0 27px;
-  border-bottom: 1px solid var(--dk-border-default);
-}
-.metric { display: grid; gap: 6px; align-content: end; min-width: 0; padding: 0 26px; border-left: 1px solid var(--dk-border-default); }
-.metric:first-child { padding-left: 0; border-left: 0; }
-.metric-label { font-size: var(--dk-text-md); color: var(--dk-text-muted); }
-.metric-value { font-size: var(--dk-text-xl); font-weight: var(--dk-weight-medium); line-height: 1; color: var(--dk-text-primary); }
-.metric-detail { min-height: 1em; font-family: var(--dk-font-mono); font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
-.metric:first-child .metric-value { font-size: var(--dk-text-page); }
-
-/* Put actionable health signals before inventory; keep the two lists scannable. */
-.page-intro { margin-top: 12px; }
-.page-intro h2 { font-size: var(--dk-text-xl); }
-.attention-panel { margin-top: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--dk-border-strong); background: transparent; }
-.attention-panel h3 { font-size: var(--dk-text-body); margin-bottom: 6px; }
-.attention-panel .sub { max-width: 70ch; }
-.attention-items { display: flex; flex-wrap: wrap; gap: 12px 32px; }
-.attention-item { display: grid; gap: 3px; color: var(--dk-text-primary); text-decoration: none; }
-.attention-item strong { font-size: var(--dk-text-body); }
-.attention-item span { color: var(--dk-accent-default); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); }
-.attention-item:hover span { text-decoration: underline; }
+/* --- Home: a status strip and three banded panels -------------------------- */
+/* The attention panel only renders when something needs action; its rows'
+   own dots carry the severity, the frame stays neutral. */
+.attention-panel { margin: 0; }
+.attention-panel[hidden] { display: none; }
 /* Home status strip — the family's segmented summary row (dataops
    .home-status-strip): one bordered container, hairline-divided segments,
    dot+label over the value. No card grid. */
@@ -590,54 +601,64 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
-  margin-top: 16px;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
   background: var(--dk-bg-surface);
 }
-.status-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 58px; padding: 10px 14px; }
+.status-item { display: flex; flex-direction: column; align-items: flex-start; gap: var(--dk-space-1); padding: var(--dk-space-3) var(--dk-space-4); }
 .status-item + .status-item { border-left: 1px solid var(--dk-border-default); }
-.status-item-label { display: flex; align-items: center; gap: 7px; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.status-item-value { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); line-height: 1.2; color: var(--dk-text-primary); }
-@media (max-width: 560px) {
-  /* Keep the strip one segmented row on phones; tighten, don't grid. */
-  .status-item { min-height: 0; padding: 8px 10px; }
-  .status-item-label { font-size: var(--dk-text-xs); }
-  .status-item-value { font-size: var(--dk-text-md); }
-  /* Row actions meet the 44px touch scale the filters already have. */
-  .home-workflow > .dk-button, .workflow-actions .dk-button, .workflow-resume { height: var(--dk-size-touch); }
-}
+.status-item-label { display: flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.status-item-value { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); line-height: var(--dk-leading-tight); color: var(--dk-text-primary); font-variant-numeric: tabular-nums; }
 
 /* Home + register sections read as the family's panel: muted header band
    over divided rows, one container per question. */
 .home-panel,
 .data-panel {
-  margin-top: 24px;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
   background: var(--dk-bg-surface);
 }
+/* Panels that hold only bands and rows clip them to the rounded frame
+   (Connections' panels keep overflow visible for their help tips). */
+.home-panel, details.data-panel, [data-page="credentials"] .data-panel, .storage-form { overflow: hidden; }
+.data-panel + .data-panel { margin-top: var(--dk-gap-section); }
 .home-panel > .section-head,
 .data-panel > .section-head {
   align-items: center;
-  gap: 12px;
-  margin-top: 0;
-  padding: var(--dk-space-3) var(--dk-space-4);
+  gap: var(--dk-space-1) var(--dk-gap-control);
+  margin: 0;
+  min-height: 52px;
+  padding: var(--dk-space-2) var(--dk-space-4);
   border-bottom: 1px solid var(--dk-border-default);
   background: var(--dk-bg-muted);
   border-radius: var(--dk-radius-md) var(--dk-radius-md) 0 0;
 }
+.home-panel > .section-head .sub,
+.data-panel > .section-head .sub { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-panel .section-head .text-link { margin-left: auto; }
-.home-panel .home-workflows, .home-panel .home-results { padding: 0 var(--dk-space-4); }
-.home-panel .home-workflow:last-child, .home-panel .home-result:last-child { border-bottom: 0; }
-.home-panel .empty-state, .data-panel .empty-state { border-top: 0; padding: var(--dk-space-4); }
+.home-panel .empty-state, .data-panel .empty-state { border: 0; border-radius: 0; }
 /* A table inside a panel loses its own container — the panel is the frame. */
-.data-panel .table-wrap { border: 0; border-radius: 0; background: transparent; }
-.data-panel > .table-wrap { border-top: 0; }
-.data-panel > .dk-button { margin: 10px var(--dk-space-4); }
-/* The quota editor speaks the family form recipe: caption above, control
-   row below — never a floating unlabeled input. */
-.data-panel .list-tools { flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; padding: var(--dk-space-3) var(--dk-space-4) 0; }
+.data-panel .table-wrap, .home-panel .table-wrap { border: 0; border-radius: 0; background: transparent; }
+.panel-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
+.panel-tools > .sub { flex: 1 1 100%; margin: 0; }
+/* The quota editor speaks the family form recipe: a visible label beside
+   the control on one row, the button at the control gap. */
+.quota-form { flex: 1 1 auto; }
+.quota-form label { display: block; color: var(--dk-text-primary); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); }
+.quota-form input { width: 10rem; }
+
+/* Collapsible register sections (Runs: Task usage, Incoming events): the
+   band is the summary; closed they take one line below the run history. */
+details.data-panel { margin-top: var(--dk-gap-section); }
+details.data-panel > summary.section-head { cursor: pointer; list-style: none; flex-wrap: nowrap; border-bottom: 0; }
+details.data-panel > summary.section-head h2 { flex: none; }
+details.data-panel > summary.section-head::-webkit-details-marker { display: none; }
+details.data-panel[open] > summary.section-head { border-bottom: 1px solid var(--dk-border-default); }
+details.data-panel > summary.section-head:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
+details.data-panel > summary.section-head:hover { background: var(--dk-bg-hover); }
+.section-chevron { flex: none; width: 10px; height: 6px; margin-left: auto; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
+details[open] > summary .section-chevron { transform: rotate(180deg); }
+
 .workflow-trigger-section.data-panel { margin-top: 24px; border-top: 1px solid var(--dk-border-default); }
 .workflow-trigger-section.data-panel .section-head { margin: 0; gap: 12px 24px; align-items: center; }
 .list-tools { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px 18px; margin: 8px 0 12px; }
@@ -651,15 +672,15 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  margin-top: 20px;
-  padding-bottom: 6px;
+  gap: var(--dk-space-1) var(--dk-space-4);
+  margin-top: var(--dk-space-5);
+  padding-bottom: var(--dk-space-2);
 }
 .view > .section-head:first-child { margin-top: 0; }
 .section-head h2 { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 .section-head .sub { margin: 0; flex: 1; font-size: var(--dk-text-sm); font-weight: 400; line-height: 1.3; }
 .section-head .text-link { margin-left: auto; height: var(--dk-size-control-md); }
-.sub { margin-top: 3px; font-size: var(--dk-text-md); line-height: 1.5; font-weight: var(--dk-weight-regular); color: var(--dk-text-muted); }
+.sub { margin-top: var(--dk-space-1); font-size: var(--dk-text-md); line-height: 1.5; font-weight: var(--dk-weight-regular); color: var(--dk-text-muted); }
 .register-summary { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 .oauth-result { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding: 16px 18px; border: 1px solid var(--dk-info-border); border-radius: var(--dk-radius-md); background: var(--dk-info-bg); }
 .oauth-result strong { font-size: var(--dk-text-body); }
@@ -684,25 +705,52 @@ th {
   color: var(--dk-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: var(--dk-space-2) var(--dk-space-4);
+  padding: var(--dk-pad-cell);
   background: var(--dk-bg-muted);
   border-bottom: 1px solid var(--dk-border-default);
   white-space: nowrap;
 }
+/* Cells use the dakit cell padding; the outer columns take the panel
+   padding so cell text lines up with the band text above it. A row is at
+   least 40px (the family row). */
 td {
-  padding: var(--dk-space-3) var(--dk-space-4);
+  height: var(--dk-size-control-lg);
+  padding: var(--dk-pad-cell);
   border-bottom: 1px solid var(--dk-border-default);
   font-size: var(--dk-text-md);
   color: var(--dk-text-primary);
   vertical-align: middle;
   overflow-wrap: break-word;
 }
+th:first-child, td:first-child { padding-left: var(--dk-space-4); }
 th:last-child, td:last-child { padding-right: var(--dk-space-4); }
+th.num { text-align: right; }
 .table-wrap tbody tr:last-child td { border-bottom: 0; }
 .table-wrap tbody tr:hover td { background: var(--dk-bg-hover); }
 .action-col { text-align: right; }
 .action-cell { text-align: right; white-space: nowrap; }
-.action-cell .dk-button + .dk-button { margin-left: 6px; }
+.action-cell .dk-button + .dk-button { margin-left: var(--dk-gap-control); }
+/* Register footer band (dakit .dk-table-footer) sits inside the container:
+   the count on the left, Load more at the end. */
+.table-wrap > .dk-table-footer { justify-content: space-between; }
+.table-wrap > .dk-table-footer[hidden] { display: none; }
+/* A register's own empty row: one quiet line inside the container. */
+tr.register-empty td { height: auto; padding: var(--dk-space-6) var(--dk-space-4); text-align: center; color: var(--dk-text-muted); }
+tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-weight-semibold); }
+.register-empty:hover td { background: transparent; }
+/* One visible action per row plus an overflow menu; the menu slot is kept
+   on rows without one so the action column lines up. */
+.row-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--dk-space-2); }
+.row-actions .row-more, .row-more-slot { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); flex: none; }
+.row-actions > .dk-button { min-width: 5.5rem; }
+.row-actions .row-more { border-color: transparent; }
+.row-actions .row-more:hover { border-color: var(--dk-border-default); }
+.row-actions .row-more svg { width: 18px; height: 18px; }
+.row-menu { position: fixed; inset: auto; margin: 0; min-width: 11rem; padding: var(--dk-space-1); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); }
+.row-menu:popover-open { display: grid; gap: var(--dk-space-1); }
+.row-menu-item { display: flex; align-items: center; width: 100%; min-height: var(--dk-size-control-md); padding: 0 var(--dk-space-3); border-radius: var(--dk-radius-md); color: var(--dk-text-primary); font-size: var(--dk-text-md); text-align: left; }
+.row-menu-item:hover { background: var(--dk-bg-hover); }
+.row-menu-item:focus-visible { outline-offset: -3px; }
 /* Connections register: Google is one panel of accounts; other services
    keep one family panel each. Account rows inside. */
 #connection-register { margin-top: 8px; }
@@ -889,18 +937,22 @@ td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text
    its cell role, so its border paints at content height and rows split apart
    whenever another cell (e.g. a wrapped date) is taller. Stack spans instead. */
 .cell-title > .cell-name, .cell-title > .cell-sub { display: block; }
-.cell-title > .cell-sub { margin-top: 2px; }
+.cell-title > .cell-sub { margin-top: var(--dk-space-1); }
 .cell-name { font-weight: var(--dk-weight-semibold); font-size: var(--dk-text-body); color: var(--dk-text-primary); }
 .cell-sub { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 /* Status cells outside .cell-title (workers check-ins, connection token
    expiry) stack the sub line under the dot instead of jamming inline. */
-td .status + .cell-sub, td .cell-name + .cell-sub { display: block; margin-top: 2px; }
+td .status + .cell-sub, td .cell-name + .cell-sub { display: block; margin-top: var(--dk-space-1); }
+/* A prose subline under a cell's value (sans, muted): what arrived, where
+   a run stopped. .cell-sub stays the mono machine-value subline. */
+.cell-note { display: block; margin-top: var(--dk-space-1); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 td[data-label="Retention"] { white-space: nowrap; }
 
 /* rows that open dialogs */
 tr.workflow-open, tr.run-open { cursor: pointer; }
 tr.workflow-open:hover td, tr.run-open:hover td { background: var(--dk-bg-hover); }
-tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -2px; }
+tr.workflow-open:focus-visible, tr.run-open:focus-visible, tr.inbox-open:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
+tr.inbox-open { cursor: pointer; }
 
 /* --- status (dot + word, one language everywhere) ----------------------------- */
 .status { display: inline-flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: nowrap; }
@@ -915,9 +967,13 @@ tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 3px solid v
 .status.off { color: var(--dk-text-muted); }
 
 /* --- empty state --------------------------------------------------------------- */
-.empty-state { border-top: 1px solid var(--dk-border-default); padding: 28px 0; display: grid; justify-items: center; gap: 6px; color: var(--dk-text-muted); font-size: var(--dk-text-md); }
-.empty-state h3 { margin: 0; font-size: var(--dk-text-body); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-.empty-state p { margin: 0; }
+/* One empty-state pattern: inside the register's own container (the frame
+   the rows would sit in), a 16px/600 title, one sentence, at most one safe
+   action. Inside a panel the panel is the frame. */
+.empty-state { border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); padding: var(--dk-space-7) var(--dk-space-4); display: grid; justify-items: center; gap: var(--dk-space-2); text-align: center; color: var(--dk-text-muted); font-size: var(--dk-text-md); }
+.empty-state h3 { margin: 0; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); }
+.empty-state p { margin: 0; max-width: 60ch; }
+.empty-state .dk-button { margin-top: var(--dk-space-2); }
 #workers-empty { margin: 0; }
 /* Workers register: fixed columns so long ids, task keys and paths clip to
    one line (full value in the title) instead of stretching the table. */
@@ -940,44 +996,23 @@ tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 3px solid v
 .worker-path { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .worker-started { white-space: nowrap; color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 
-/* --- dialogs --------------------------------------------------------------------- */
-dialog {
-  width: min(520px, calc(100vw - 32px));
-  border: 1px solid var(--dk-border-default);
-  /* Overlays are the family's one rounded-plus-shadowed surface
-     (family.md): radius-lg + the overlay shadow; static containers and
-     controls stay at radius-md with no shadow. */
-  border-radius: var(--dk-radius-lg);
-  padding: 0;
-  background: var(--dk-bg-surface);
-  color: var(--dk-text-primary);
-  box-shadow: var(--dk-shadow-overlay);
-  overscroll-behavior: contain;
-}
-dialog::backdrop { background: var(--dk-bg-backdrop); }
+/* --- dialogs ---------------------------------------------------------------------
+   Every dialog is a dakit .dk-dialog (head / scrolling body / foot, a
+   full-screen sheet with a pinned foot at 820px and below). The app only
+   sets widths through --dk-dialog-width and its body content. */
 dialog form { display: contents; }
-#run-dialog { width: min(640px, calc(100vw - 32px)); }
-#workflow-dialog { width: min(680px, calc(100vw - 32px)); }
-.sample-json { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--dk-border-default); padding: 10px 12px; max-height: 260px; overflow-y: auto; }
-.dialog-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: var(--dk-space-4) var(--dk-space-5);
-  background: var(--dk-bg-muted);
-  border-bottom: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-lg) var(--dk-radius-lg) 0 0;
-}
+#run-dialog { --dk-dialog-width: 760px; }
+#workflow-dialog { --dk-dialog-width: 680px; }
+#inbox-event-dialog { --dk-dialog-width: 680px; }
+.sample-json { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--dk-border-default); padding: var(--dk-space-2) var(--dk-space-3); max-height: 260px; overflow-y: auto; }
 .dialog-head h2 { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
-#run-title, #workflow-title { font-family: var(--dk-font-mono); font-size: var(--dk-text-lg); font-weight: var(--dk-weight-medium); }
+#workflow-title { font-family: var(--dk-font-mono); font-size: var(--dk-text-lg); font-weight: var(--dk-weight-medium); }
 .dialog-head .icon-button { border-color: transparent; }
 .dialog-head .icon-button:hover { border-color: var(--dk-border-strong); }
-.dialog-body { padding: 20px 22px; display: grid; gap: 16px; max-height: min(62vh, 580px); overflow-y: auto; align-content: start; }
-.token-reveal { display: flex; gap: 10px; align-items: stretch; }
+.token-reveal { display: flex; gap: var(--dk-gap-control); align-items: stretch; }
 .token-reveal code {
   flex: 1;
-  padding: 10px 12px;
+  padding: var(--dk-space-2) var(--dk-space-3);
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
   background: var(--dk-bg-inset);
@@ -986,16 +1021,12 @@ dialog form { display: contents; }
   overflow-wrap: anywhere;
   user-select: all;
 }
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: var(--dk-space-3) var(--dk-space-5);
-  border-top: 1px solid var(--dk-border-default);
-  background: var(--dk-bg-muted);
-  border-radius: 0 0 var(--dk-radius-lg) var(--dk-radius-lg);
-}
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* A loading or failed dialog body: centered in the body, never a bare
+   line in the corner; failure copy names the source and offers retry. */
+.dialog-state { display: grid; justify-items: center; align-content: center; gap: var(--dk-space-2); min-height: 12rem; text-align: center; color: var(--dk-text-muted); }
+.dialog-state strong { color: var(--dk-text-primary); font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
+.dialog-state p { max-width: 52ch; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-gap-block); }
 
 /* OAuth callout */
 .callout { border: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); border-radius: var(--dk-radius-md); padding: 13px 14px; display: grid; gap: 9px; }
@@ -1007,19 +1038,18 @@ dialog form { display: contents; }
 .copy-field .icon-button:hover { border-color: var(--dk-border-strong); }
 
 /* run / workflow detail */
-.detail { gap: 20px; }
-.detail-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.detail { gap: var(--dk-space-5); }
+.detail-summary { display: flex; align-items: center; gap: var(--dk-gap-control); flex-wrap: wrap; }
 .detail-summary code { background: none; padding: 0; color: var(--dk-text-muted); font-size: var(--dk-text-md); }
-.detail-block h3 { font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); margin-bottom: 10px; }
-.detail-block h4 { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); margin: 14px 0 6px; }
+.detail-block h3, .detail-heading { font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); margin-bottom: var(--dk-space-2); }
+.detail-block h4 { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); margin: var(--dk-space-3) 0 var(--dk-space-2); }
 .detail-trigger { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); color: var(--dk-text-primary); }
-.detail-action { border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); padding: 12px 14px; margin-bottom: 10px; background: var(--dk-bg-page); }
-.detail-action:last-child { margin-bottom: 0; }
-.detail-action-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.detail-action { border-top: 1px solid var(--dk-border-default); padding: var(--dk-space-3) 0; }
+.detail-action-head { display: flex; align-items: baseline; gap: var(--dk-space-2) var(--dk-gap-control); flex-wrap: wrap; margin-bottom: var(--dk-space-2); }
 .action-id { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-.action-type { font-family: var(--dk-font-mono); font-size: var(--dk-text-xs); color: var(--dk-text-muted); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-sm); padding: 1px 6px; }
+.action-type { font-family: var(--dk-font-mono); font-size: var(--dk-text-xs); color: var(--dk-text-muted); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-sm); padding: 0 var(--dk-space-2); }
 .detail-list { margin: 0; }
-.detail-list > div { display: grid; grid-template-columns: minmax(96px, 132px) minmax(0, 1fr); gap: 4px 14px; padding: 7px 0; border-bottom: 1px solid var(--dk-border-default); align-items: start; }
+.detail-list > div { display: grid; grid-template-columns: minmax(96px, 132px) minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-gap-control); padding: var(--dk-space-2) 0; border-bottom: 1px solid var(--dk-border-default); align-items: start; }
 .detail-list > div:last-child { border-bottom: 0; }
 .detail-list dt { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .detail-list dd { margin: 0; min-width: 0; }
@@ -1028,35 +1058,34 @@ dialog form { display: contents; }
 .detail-error {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--dk-space-2);
   border: 1px solid var(--dk-danger-border);
   border-radius: var(--dk-radius-md);
   background: var(--dk-danger-bg);
-  padding: 10px 12px;
+  padding: var(--dk-space-2) var(--dk-space-3);
   color: var(--dk-danger-text);
   font-size: var(--dk-text-md);
+  overflow-wrap: anywhere;
 }
-.detail-error svg { width: 20px; height: 20px; flex: none; margin-top: 2px; }
+.detail-error svg { width: 20px; height: 20px; flex: none; }
 
-/* audit view: outcome cells for error/denied rows */
-.audit-problem { color: var(--dk-danger-text); }
+/* Run dialog: a label/value summary, then the flow as ONE divided list —
+   trigger, then each step — with no card nested inside another. */
+.run-summary { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--dk-space-2) var(--dk-space-5); margin: 0; }
+.run-summary > div { display: contents; }
+.run-summary dt { color: var(--dk-text-muted); font-size: var(--dk-text-sm); line-height: var(--dk-size-control-sm); }
+.run-summary dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); line-height: var(--dk-size-control-sm); font-size: var(--dk-text-md); }
+.run-summary dd .clip { flex: 1 1 0; }
+.flow { list-style: none; margin: 0; padding: 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); }
+.flow-step { display: grid; gap: var(--dk-space-3); padding: var(--dk-pad-panel); min-width: 0; }
+.flow-step + .flow-step { border-top: 1px solid var(--dk-border-default); }
 
-/* run flow: the trigger feeding each step, Zapier-history style */
-#run-dialog { width: min(760px, calc(100vw - 32px)); }
-.flow { display: flex; flex-direction: column; }
-.flow-step {
-  border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
-  background: var(--dk-bg-surface);
-  padding: 12px 14px;
-  display: grid;
-  gap: 10px;
-}
-.flow-step.failed { border-color: var(--dk-danger-border); }
+/* Emails lists workflow-owned entry points; sender admission is managed
+   independently below the inventory. */
 /* Checkboxes opt out of the text-input sizing above — otherwise the dialog
    "Enabled" control renders as a full-width control-height browser-blue box. */
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
-label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: var(--dk-space-2); }
 .table-footnote { margin-top: 10px; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); }
 .sender-add { display: flex; gap: 10px; align-items: center; max-width: 440px; }
 .sender-add input { flex: 1; min-width: 0; }
@@ -1211,19 +1240,7 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
   .email-runs .dk-button { height: var(--dk-size-touch); }
 }
 #poll-sample-data { max-height: 50vh; overflow: auto; }
-.flow-link {
-  width: 1px;
-  height: 16px;
-  margin-left: 33px;
-  background: var(--dk-border-strong);
-}
-.flow-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.flow-head .run-replay-from-step {
-  margin-left: auto;
-  height: var(--dk-size-control-sm);
-  padding: 0 8px;
-  font-size: var(--dk-text-xs);
-}
+.flow-head { display: flex; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); flex-wrap: wrap; min-width: 0; }
 .flow-icon {
   width: var(--dk-size-control-sm);
   height: var(--dk-size-control-sm);
@@ -1232,18 +1249,24 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
   place-items: center;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-sm);
-  background: var(--dk-bg-page);
+  background: var(--dk-bg-muted);
   color: var(--dk-text-primary);
 }
-.flow-icon svg { width: 20px; height: 20px; }
-.flow-title { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-.flow-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.flow-total { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.flow-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.flow-data-item { border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-page); padding: 8px 10px; min-width: 0; }
-.flow-data-item h4 { font-size: var(--dk-text-xs); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.flow-icon svg { width: 18px; height: 18px; }
+.flow-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--dk-space-1) var(--dk-space-2); min-width: 0; flex: 1 1 12rem; }
+.flow-title { font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); overflow-wrap: anywhere; }
+.flow-title.mono { font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); }
+.flow-type { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.flow-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-space-1) var(--dk-gap-control); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.flow-meta .status { font-size: var(--dk-text-sm); }
+.flow-data { display: grid; gap: var(--dk-gap-control); min-width: 0; }
+.flow-data-item { min-width: 0; }
+.flow-data-item h4 { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); margin: 0 0 var(--dk-space-2); }
 .json-block {
   margin: 0;
+  padding: var(--dk-space-2) var(--dk-space-3);
+  border-radius: var(--dk-radius-md);
+  background: var(--dk-bg-inset);
   font-family: var(--dk-font-mono);
   font-size: var(--dk-text-sm);
   line-height: 1.5;
@@ -1256,40 +1279,27 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8
 .j-key { color: var(--dk-accent-default); }
 .j-lit { color: var(--dk-text-muted); font-style: italic; }
 
-/* The readable layer of a data block: one row per informative field, dotted
-   path left, value right; long text stays on one line and truncates. */
-.json-digest { margin: 0 0 8px; display: grid; gap: 3px; }
-.json-digest > div { display: grid; grid-template-columns: minmax(80px, 45%) minmax(0, 1fr); gap: 2px 12px; align-items: baseline; }
-.json-digest dt { font-family: var(--dk-font-mono); font-size: var(--dk-text-xs); color: var(--dk-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.json-digest dd { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); overflow-wrap: anywhere; }
+/* The readable layer of a data block: one row per informative field, path
+   left in a column sized to its labels (capped), value right. */
+.json-digest { margin: 0 0 var(--dk-space-2); display: grid; grid-template-columns: minmax(4rem, max-content) minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-space-4); }
+.json-digest > div { display: contents; }
+.json-digest dt { max-width: 14rem; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.json-digest dd { margin: 0; min-width: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); overflow-wrap: anywhere; }
 .json-digest-solo dd, .json-digest-rest dd { grid-column: 1 / -1; }
 .json-digest-rest dd { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 
-/* Raw JSON folded away until asked for; the summary reads like the h4 labels. */
+/* Raw JSON folded away until asked for: a sentence-case disclosure. */
 .json-raw summary {
   cursor: pointer;
   user-select: none;
   width: fit-content;
-  font-size: var(--dk-text-xs);
+  font-size: var(--dk-text-sm);
   font-weight: var(--dk-weight-medium);
-  color: var(--dk-text-muted);
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  color: var(--dk-accent-default);
 }
-.json-raw summary:hover { color: var(--dk-text-primary); }
-.json-raw[open] summary { margin-bottom: 6px; }
+.json-raw summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.json-raw[open] summary { margin-bottom: var(--dk-space-2); }
 .json-raw .json-block { max-height: 300px; }
-
-/* The runs list row's second Trigger line: what actually arrived (an email
-   subject, a telegram post). Sans so it reads like content under the mono
-   connector label; one clipped line keeps the table row height steady. */
-.run-event-summary {
-  font-family: var(--dk-font-sans);
-  max-width: 340px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* --- embedded designer -------------------------------------------------------- */
 /* The canvas is the view: main becomes a flex column pinned to the dynamic
@@ -1359,10 +1369,13 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 /* --- drawer behaviour (≤860) --------------------------------------------------- */
 @media (max-width: 860px) {
   .app-shell { grid-template-columns: 1fr; }
+  /* One 16px gutter on phones for the header, tabs, toolbar, cards and
+     detail panes alike. */
+  :root { --page-gutter: var(--dk-space-4); }
+  main { padding: 0 var(--page-gutter) var(--dk-space-7); }
   /* Mobile page anatomy (family.md): a fixed 64px app bar — menu, title,
-     refresh — with the page description and tools in the content column
-     below the full-bleed hairline, the way the dataops reference reads. */
-  main { --page-pad: 24px; }
+     account — with the page description and the primary action in the
+     content column below the bar's full-bleed hairline. */
   .topbar {
     position: relative;
     display: grid;
@@ -1370,29 +1383,43 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     grid-template-areas: "lead title actions" "desc desc desc" "tools tools tools";
     grid-template-rows: 64px auto auto;
     align-items: center;
+    column-gap: var(--dk-gap-control);
     row-gap: 0;
     width: 100%;
-    /* the base 8px block padding would push the 64px row down and sag the
-       bar buttons below the optical center of dataops' 64px bar */
     padding: 0;
   }
-  .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-pad)); right: calc(-1 * var(--page-pad)); border-bottom: 1px solid var(--dk-border-default); }
+  .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-gutter)); right: calc(-1 * var(--page-gutter)); border-bottom: 1px solid var(--dk-border-default); }
   .topbar-title { display: contents; }
-  .topbar h1 { grid-area: title; font-size: var(--dk-text-xl); min-width: 0; overflow-wrap: anywhere; }
+  .topbar h1 { grid-area: title; font-size: var(--dk-text-xl); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #menu-toggle, #designer-back { grid-area: lead; }
-  .top-actions { grid-area: actions; }
-  #view-description { grid-area: desc; align-self: start; margin: 10px 0 0; }
-  #topbar-tools { grid-area: tools; align-self: start; margin-top: 12px; }
-  .page-tabs { width: 100%; }
+  .top-actions { grid-area: actions; display: flex; }
+  #view-description { grid-area: desc; align-self: start; margin: var(--dk-space-4) 0 0; }
+  /* The primary action is the first control under the description, sized
+     to its label. */
+  #topbar-tools { grid-area: tools; align-self: start; justify-content: flex-start; margin-top: var(--dk-gap-control); }
+  #topbar-tools > .page-tools { justify-content: flex-start; }
+  body[data-view="designer"] .topbar, body[data-view="agents"] .topbar { padding: 0; }
+  .view.active { padding-top: var(--dk-gap-block); }
+  .page-tabs { width: 100%; margin-top: var(--dk-gap-block); }
   .page-tabs a { min-height: var(--dk-size-touch); }
+  /* A tab strip wider than the screen scrolls; its trailing edge fades so
+     the clipped tab reads as "more this way". */
+  .page-tabs { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--dk-space-6)), transparent); mask-image: linear-gradient(to right, #000 calc(100% - var(--dk-space-6)), transparent); }
   /* Empty header rows collapse so the designer's frame keeps no dead band. */
   #view-description:empty { display: none; }
-  /* Every phone control meets the 44px touch scale. */
+  /* Every phone control meets the 44px touch scale: buttons, text inputs,
+     selects and textareas everywhere (dialogs included). */
   .dk-button { height: var(--dk-size-touch); }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea { min-height: var(--dk-size-touch); }
   .run-filters input, .run-filters select,
   .connection-filters input, .connection-filters select,
   .workflow-filters input, .workflow-filters select,
   .list-tools input, .list-tools select { min-height: var(--dk-size-touch); }
+  .text-link { min-height: var(--dk-size-touch); }
+  button.cell-name { min-height: var(--dk-size-touch); }
+  .json-raw summary { display: flex; align-items: center; min-height: var(--dk-size-touch); }
+  .row-actions .row-more, .row-more-slot { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  .row-menu-item { min-height: var(--dk-size-touch); }
   /* Row state controls keep their labels readable at touch scale. */
   .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 12px; }
   .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-touch); height: var(--dk-size-touch); }
@@ -1401,7 +1428,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .workflow-list-row .select-col input[type="checkbox"] { width: var(--dk-size-touch); height: var(--dk-size-touch); padding: 13px; background-clip: content-box; }
   .dk-input, .dk-select, .dk-textarea { min-height: var(--dk-size-touch); }
   .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  .sidebar-close { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   /* the drawer's own controls outrank the generic bump — re-assert here */
   .sidebar .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .workflow-state-control .dk-button, .workflow-menu .dk-button,
@@ -1412,6 +1438,8 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     left: 0;
     top: 0;
     width: var(--dk-size-sidebar);
+    /* the drawer's brand row sits in the same 64px band as the app bar */
+    padding-top: var(--dk-space-3);
     visibility: hidden;
     transform: translateX(-100%);
     transition: transform .2s ease, visibility 0s linear .2s;
@@ -1424,13 +1452,21 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
     transition-delay: 0s;
     box-shadow: var(--dk-shadow-overlay);
   }
-  .sidebar-close { display: inline-grid; width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); }
-  main { padding: 0 24px 48px; }
-  .loading { margin: 0 -24px; }
+  .sidebar-close { display: inline-grid; }
   .menu-toggle { display: inline-grid; }
   .account-button { min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); }
   .connection-filters { width: 100%; order: 3; margin-left: 0; }
   .connection-filters input { width: min(240px, 55vw); }
+  /* The register toolbar stacks: search on its own row, filters two up,
+     actions after them at the start. */
+  /* The register toolbar becomes one two-up grid: search across, then the
+     filters and the actions as equal cells. */
+  .register-toolbar { display: grid; grid-template-columns: 1fr 1fr; }
+  .register-toolbar .toolbar-filters, .register-toolbar .dk-toolbar__end { display: contents; }
+  .register-toolbar .toolbar-filters > label { min-width: 0; }
+  .register-toolbar .toolbar-filters > label.toolbar-search { grid-column: 1 / -1; max-width: none; }
+  .register-toolbar .dk-toolbar__end > .dk-button { width: 100%; }
+  .storage-fields { grid-template-columns: 1fr; }
 }
 
 /* Family account trigger: avatar only in the 64px top bar at ≤820px. */
@@ -1475,23 +1511,21 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 
 /* --- mobile (≤560): stacked ledger rows ---------------------------------------- */
 @media (max-width: 560px) {
-  main { padding: 0 18px 40px; --page-pad: 18px; }
-  .loading { margin: 0 -18px; }
-  .topbar h1 { font-size: var(--dk-text-xl); }
   body[data-view="designer"] .topbar h1 { font-size: var(--dk-text-lg); }
-  #topbar-tools > .page-tools,
-  .page-tools.run-filters {
+  #topbar-tools > .page-tools {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
   }
+  /* A lone primary action keeps its label width (header pattern). */
+  #topbar-tools > .page-tools.primary-tools { display: flex; }
   .page-tools .connection-filters { display: contents; }
   .page-tools .register-summary,
   .page-tools .sub,
   .page-tools .workflow-page-actions,
   .page-tools .list-tools,
   .page-tools .inline-form { grid-column: 1 / -1; }
-  #topbar-tools > .page-tools.section-head { gap: 4px 8px; }
+  #topbar-tools > .page-tools.section-head { gap: var(--dk-space-1) var(--dk-space-2); }
   .page-tools .list-tools,
   .page-tools .workflow-filters {
     display: grid;
@@ -1506,20 +1540,18 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .page-tools .field-hint { flex-basis: auto; margin: 0; }
   #topbar-tools > .agent-toolbar.page-tools { display: flex; flex-wrap: wrap; align-items: stretch; }
   .run-filters label { flex: 1 1 140px; }
-  .run-filters .field-hint { margin: 4px 0 0; flex-basis: 100%; }
   .connection-filters input, .connection-filters select { width: 100%; flex: 1 1 130px; }
   .list-tools { align-items: stretch; }
   .list-tools label, .list-tools label:first-child { min-width: 0; flex: 1 1 100%; max-width: none; }
   .list-tools > .field-hint { margin: 0; }
   .last-updated { display: none; }
 
-  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 0; padding: 22px 0 20px; }
-  .metric { padding: 0 12px; }
-  .metric:first-child { grid-column: 1 / -1; padding: 0 0 14px; border-bottom: 1px solid var(--dk-border-default); }
-  .metric:nth-child(2), .metric:nth-child(4) { padding-left: 0; border-left: 0; }
-  .metric-value { font-size: var(--dk-text-xl); }
+  /* Home: the strip stays one segmented row; panels' rows stack. */
+  .status-item { padding: var(--dk-space-2) var(--dk-space-3); }
+  .status-item-label { font-size: var(--dk-text-xs); }
+  .status-item-value { font-size: var(--dk-text-md); }
 
-  .section-head { margin-top: 18px; }
+  .section-head { margin-top: var(--dk-space-4); }
   [data-page="connections"] > .section-head { align-items: flex-start; gap: 12px; }
   [data-page="connections"] > .section-head .dk-button { margin-left: auto; }
   [data-page="connections"] > .section-head.page-tools {
@@ -1554,32 +1586,38 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .manage-actions .dk-button { flex: 1 1 calc(50% - 4px); }
   .manage-danger-row { flex-direction: column; align-items: stretch; gap: 8px; }
 
-  /* tables become stacked rows: identity first, labelled slots beneath */
+  /* Tables become labelled cards: identity first, labelled slots beneath
+     (label in sans, value in its own font), empty fields hidden, and the
+     card padded so text never touches the container. */
   .table-wrap thead { display: none; }
   .table-wrap table, .table-wrap tbody { display: block; width: 100%; }
-  .table-wrap tr { display: block; padding: 13px 0; border-bottom: 1px solid var(--dk-border-default); }
+  .table-wrap tr { display: block; padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
+  .table-wrap tbody tr:last-child { border-bottom: 0; }
   .service-account { grid-template-columns: 1fr; gap: 8px; }
   .service-account-actions { justify-content: flex-start; }
   .service-account-actions .dk-button { flex: 1; }
-  .table-wrap td { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 3px 12px; padding: 2px 0; border: 0; }
-  .table-wrap td[data-label]::before { content: attr(data-label); font-size: var(--dk-text-xs); color: var(--dk-text-muted); padding-top: 2px; }
+  .table-wrap td { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-gap-control); height: auto; padding: var(--dk-space-1) 0; border: 0; }
+  .table-wrap td:first-child, .table-wrap td:last-child { padding-left: 0; padding-right: 0; }
+  .table-wrap td[data-label]::before { content: attr(data-label); font-family: var(--dk-font-sans); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+  .table-wrap td[data-empty] { display: none; }
+  .table-wrap td.num { text-align: left; }
   .table-wrap td:first-child, .table-wrap td.action-cell { grid-template-columns: none; }
-  .table-wrap td.action-cell[data-label] { grid-template-columns: 92px minmax(0, 1fr); align-items: center; }
-  .table-wrap td:first-child { padding-bottom: 5px; }
-  .table-wrap td.action-cell { padding-top: 7px; }
+  .table-wrap td.action-cell[data-label] { grid-template-columns: 6rem minmax(0, 1fr); align-items: center; }
+  .table-wrap td.action-cell { padding-top: var(--dk-space-2); text-align: left; }
   .table-wrap td.action-cell .dk-button { width: 100%; }
+  .table-wrap td.action-cell .row-actions { display: flex; width: 100%; }
+  .table-wrap td.action-cell .row-actions .dk-button { flex: 1; width: auto; }
   .table-wrap td.workflow-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 10px; }
   .table-wrap td.workflow-actions::before { display: none; }
   .table-wrap td.workflow-actions .dk-button { width: auto; }
   /* Status suffixes (failed step, delayed-until) keep the status read's wide
-     column — auto-placement would drop them into the 92px label column and
+     column — auto-placement would drop them into the label column and
      wrap mono tokens mid-word. */
-  .table-wrap td[data-label="Status"] > .mono { grid-column: 2; }
+  .table-wrap td[data-label="Status"] > .mono, .table-wrap td[data-label="Status"] > .cell-note { grid-column: 2; }
+  tr.register-empty td { display: block; }
 
   .form-grid { grid-template-columns: 1fr; }
-  dialog { width: calc(100vw - 24px); }
-  .dialog-body { max-height: calc(100dvh - 190px); }
-  .login-panel { width: min(400px, calc(100% - 40px)); }
+  .login-panel { width: min(400px, calc(100% - 2 * var(--dk-space-5))); }
 }
 
 /* Workflow library: compact controls and a paired trigger/action definition. */
@@ -1681,47 +1719,186 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
   #workflow-table-wrap tbody tr:last-child { border-bottom: 0; }
 }
 
-/* Home: actions first, then workflows and their latest results. */
-.home-intro { padding-bottom: 12px; border-bottom: 1px solid var(--dk-border-strong); flex-wrap: wrap; gap: 12px; }
-.home-create-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.home-workflow, .home-problem { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--dk-border-default); }
-.home-workflow > div, .home-problem > div { min-width: 0; }
-.home-workflow .cell-name { overflow-wrap: anywhere; text-align: left; }
-.home-workflow .sub { margin-top: 6px; }
-.home-workflow-state { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; }
-.home-workflow-state .sub { margin: 0; }
-.home-result { display: grid; gap: 8px; width: 100%; padding: 18px 0; border: 0; border-bottom: 1px solid var(--dk-border-default); background: transparent; color: var(--dk-text-primary); text-align: left; cursor: pointer; }
-.home-result-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-weight: var(--dk-weight-medium); overflow-wrap: anywhere; }
-.home-result:hover .home-result-title { color: var(--dk-accent-default); }
-/* Attention panel: the family's neutral banded container (dataops "Needs
-   your attention") — the failure's own danger dot carries the alarm; the
-   frame stays neutral. */
+/* --- Home -------------------------------------------------------------------
+   One column at the section gap. The dominant question first: what needs
+   attention, then failures to fix — but an empty failures panel collapses
+   to its one-line band and drops below the status strip. */
+.view.active[data-page="overview"] { display: flex; flex-direction: column; gap: var(--dk-gap-section); }
+#overview-errors-panel.is-empty { order: 1; }
+#overview-errors-panel.is-empty > .section-head { border-bottom: 0; border-radius: var(--dk-radius-md); }
+#overview-errors-panel.is-empty #overview-errors-title { font-size: var(--dk-text-body); }
+[data-page="overview"] > .home-panel:not(#overview-errors-panel) { order: 2; }
+.home-errors-table { table-layout: fixed; }
+.home-errors-table .col-wf { width: 28%; }
+.home-errors-table .col-count { width: 6rem; }
+.home-errors-table .col-when { width: 10.5rem; }
+.home-errors-table button.cell-name { max-width: 100%; text-align: left; color: var(--dk-text-link); }
+.home-errors-table button.cell-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Workflow and result rows: the whole row is the button (one target, the
+   family row recipe) — name and a muted line left, state at the right. */
+.home-workflows, .home-results { display: grid; }
+.home-workflow, .home-result {
+  display: grid;
+  align-items: center;
+  gap: var(--dk-space-1) var(--dk-space-5);
+  width: 100%;
+  min-height: var(--dk-size-control-lg);
+  padding: var(--dk-space-3) var(--dk-space-4);
+  border: 0;
+  border-bottom: 1px solid var(--dk-border-default);
+  background: transparent;
+  color: var(--dk-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-workflow:last-child, .home-result:last-child { border-bottom: 0; }
+.home-workflow:hover, .home-result:hover { background: var(--dk-bg-hover); }
+.home-workflow:focus-visible, .home-result:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
+.home-workflow { grid-template-columns: minmax(0, 1fr) auto; }
+/* Result rows read status, workflow, then when — the verdict sits next to
+   the name it belongs to. */
+.home-result { grid-template-columns: 7.5rem minmax(0, 1fr) auto; }
+.home-result-status { grid-column: 1; grid-row: 1; }
+.home-result .home-row-main { grid-column: 2; grid-row: 1; }
+.home-row-main { display: grid; min-width: 0; }
+.home-row-main .cell-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-workflow:hover .cell-name, .home-result:hover .cell-name { color: var(--dk-accent-default); }
+.home-row-sub { font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-row-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--dk-space-5); }
+.home-latest { min-width: 11rem; }
+.home-latest { display: inline-flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-md); }
+.home-latest-label { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
+.home-result-when { color: var(--dk-text-muted); font-size: var(--dk-text-sm); text-align: right; white-space: nowrap; }
+
+/* Needs attention: the family's neutral banded container (dataops "Needs
+   your attention"); the failure's own danger dot carries the alarm. */
 .home-needs-attention {
-  margin-top: 16px;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
   background: var(--dk-bg-surface);
-  padding: 0;
+  overflow: hidden;
 }
 .home-needs-attention h3 {
   margin: 0;
   padding: var(--dk-space-3) var(--dk-space-4);
   border-bottom: 1px solid var(--dk-border-default);
   background: var(--dk-bg-muted);
-  border-radius: var(--dk-radius-md) var(--dk-radius-md) 0 0;
-  font-size: var(--dk-text-body);
+  font-size: var(--dk-text-lg);
 }
-.home-needs-attention .home-problem { padding: 12px var(--dk-space-4); }
-.home-needs-attention .home-problem:last-child { border-bottom: 0; }
-.home-problem:last-child { border-bottom: 0; padding-bottom: 0; }
+.home-problem { display: flex; justify-content: space-between; align-items: center; gap: var(--dk-gap-control) var(--dk-space-5); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
+.home-problem:last-child { border-bottom: 0; }
+.home-problem > div:first-child { min-width: 0; }
 .home-problem strong { font-size: var(--dk-text-body); overflow-wrap: anywhere; }
-.home-problem-title { display: flex; align-items: center; gap: 8px; margin: 0; }
-.home-problem .sub { margin-top: 6px; max-width: 70ch; overflow-wrap: anywhere; }
-@media (max-width: 600px) {
-  .home-intro .home-create-actions { width: 100%; }
-  .home-problem { flex-direction: column; align-items: flex-start; }
-  .home-workflow { align-items: flex-start; }
-  .home-workflow > .dk-button { flex-shrink: 0; }
+.home-problem-title { display: flex; align-items: center; gap: var(--dk-space-2); margin: 0; }
+.home-problem .sub { margin-top: var(--dk-space-1); max-width: 70ch; overflow-wrap: anywhere; }
+.home-create-actions { flex: none; }
+/* The Workflows list styles .workflow-run-link as a bare link; in an
+   attention row it is a real button like its neighbour. */
+.home-create-actions .dk-button.workflow-run-link { display: inline-flex; padding: 0 var(--dk-space-3); border: 1px solid var(--dk-border-default); background: var(--dk-bg-muted); }
+.home-create-actions .dk-button.workflow-run-link:hover { border-color: var(--dk-border-control-hover); background: var(--dk-bg-hover); }
+.home-panel > .section-head { flex-wrap: nowrap; }
+.home-panel > .section-head h2 { flex: none; }
+/* A band that holds a control keeps the block gap around it. */
+.home-panel > .section-head:has(.dk-button), .data-panel > .section-head:has(.dk-button) { padding-block: var(--dk-gap-block); }
+@media (max-width: 560px) {
+  .home-problem { flex-direction: column; align-items: stretch; }
+  .status-strip { grid-template-columns: 1fr 1fr; }
+  .status-item:nth-child(3) { border-left: 0; }
+  .status-item:nth-child(n+3) { border-top: 1px solid var(--dk-border-default); }
+  .home-workflow { grid-template-columns: minmax(0, 1fr); }
+  .home-row-meta { display: flex; flex-wrap: wrap; gap: var(--dk-space-1) var(--dk-space-4); }
+  .home-result { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .home-result-when { grid-column: 2; grid-row: 2; text-align: left; }
+}
+
+/* --- Registers: Runs, Audit, Access, App setup -------------------------------
+   Fixed layouts with declared column priorities: the identity column flexes,
+   timestamps and numbers keep one line, actions get a fixed width; long ids
+   clip with the full value in their title. */
+.runs-table, .audit-table, .token-table, .setup-table, .inbox-table, .usage-table { table-layout: fixed; }
+.runs-table .col-run { width: 24%; }
+.runs-table .col-status { width: 12.5rem; }
+.runs-table .col-steps { width: 4.5rem; }
+.runs-table .col-when, .inbox-table .col-when, .audit-table .col-when, .token-table .col-when { width: 10.5rem; }
+.run-trigger .clip + .run-event-summary { margin-top: 0; }
+/* Name over its id: both one line, clipped, the id small and mono. */
+.workflow-label.clip .workflow-id, .home-row-main .workflow-id { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--dk-weight-regular); }
+.run-status .cell-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-table .col-trigger { width: 24%; }
+.inbox-table .col-source { width: 18%; }
+.inbox-table .col-action { width: 7rem; }
+.usage-table td:first-child { overflow: hidden; }
+.usage-table button.cell-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--dk-text-link); }
+.usage-table th:not(:first-child), .usage-table td:not(:first-child) { width: 10rem; }
+
+.audit-table .col-action { width: 13%; }
+.audit-table .col-actor { width: 12%; }
+.audit-table .col-agent { width: 11%; }
+.audit-table .col-outcome { width: 11rem; }
+.audit-table .col-error { width: 18%; }
+.runs-table th, .audit-table th, .token-table th, .setup-table th, .inbox-table th { overflow: hidden; text-overflow: ellipsis; }
+/* No errors in view: the Error column gives its width back. */
+.audit-table.no-errors .col-error { display: none; width: 0; }
+
+.token-table .col-token { width: auto; }
+.token-table .col-prefix { width: 8rem; }
+.token-table .col-agent { width: 15%; }
+.token-table .col-status { width: 6.5rem; }
+.token-table .col-action { width: 6.5rem; }
+/* A revoked token stays listed for its audit trail, visibly demoted. */
+.token-table tr.is-revoked td { color: var(--dk-text-muted); }
+.token-table tr.is-revoked .cell-name { color: var(--dk-text-muted); font-weight: var(--dk-weight-medium); }
+
+.setup-table .col-name { width: 24%; }
+.setup-table .col-source { width: 11rem; }
+.setup-table .col-status { width: 8rem; }
+.setup-table .col-action { width: 9.5rem; }
+
+@media (max-width: 560px) {
+  /* Run, audit and token rows read as compact cards: primary line with the
+     status beside it, then one or two meta lines — no label column. */
+  #run-table tr:not(.register-empty), #audit-log-table tr:not(.register-empty), #token-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--dk-space-1) var(--dk-gap-control);
+  }
+  #run-table td, #audit-log-table td, #token-table td { display: block; min-width: 0; padding: 0; }
+  #run-table td::before, #audit-log-table td::before, #token-table td::before { display: none; }
+  #run-table .run-name { grid-column: 1; }
+  #run-table .run-status { grid-column: 2; grid-row: 1; text-align: right; }
+  #run-table .run-status .cell-note { display: none; }
+  #run-table .run-trigger { grid-column: 1 / -1; display: flex; gap: var(--dk-space-2); font-size: var(--dk-text-sm); }
+  #run-table .run-trigger > .clip:first-child { flex: none; max-width: 50%; }
+  #run-table .run-trigger > .run-event-summary { flex: 1 1 0; margin: 0; }
+  #run-table .run-trigger > .run-event-summary::before { content: "· "; }
+  #run-table .run-when { grid-column: 1; grid-row: 3; font-size: var(--dk-text-sm); }
+  #run-table .run-steps { grid-column: 2; grid-row: 3; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+  #run-table .run-steps::before { display: inline; content: "Steps "; font-family: var(--dk-font-sans); }
+
+  /* Audit cards: action and outcome, then when · resource, actor · agent;
+     empty fields drop out. */
+  #audit-log-table tr:not(.register-empty) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #audit-log-table .audit-action { grid-column: 1; grid-row: 1; }
+  #audit-log-table .audit-outcome { grid-column: 2; grid-row: 1; justify-self: end; max-width: 100%; overflow: hidden; }
+  #audit-log-table .audit-when { grid-column: 1; grid-row: 2; }
+  #audit-log-table .audit-resource { grid-column: 2; grid-row: 2; }
+  #audit-log-table .audit-actor { grid-column: 1; grid-row: 3; }
+  #audit-log-table .audit-agent { grid-column: 2; grid-row: 3; }
+  #audit-log-table .audit-error { grid-column: 1 / -1; grid-row: 4; }
+  #audit-log-table td:not(.audit-action):not(.audit-outcome) { display: flex; gap: var(--dk-space-1); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+  #audit-log-table td:not(.audit-action):not(.audit-outcome):not(.audit-when)::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); }
+  #audit-log-table td[data-empty]:not(.audit-action):not(.audit-outcome) { display: none; }
+
+  #token-table .cell-title { grid-column: 1; }
+  #token-table .action-cell { grid-column: 2; grid-row: 1 / span 2; padding: 0; }
+  #token-table .action-cell .dk-button { width: auto; }
+  #token-table td[data-label="Status"] { grid-column: 1; grid-row: 2; }
+  #token-table td:not(.cell-title):not(.action-cell):not([data-label="Status"]) { grid-column: 1; display: flex; gap: var(--dk-space-2); font-size: var(--dk-text-sm); }
+  #token-table td:not(.cell-title):not(.action-cell):not([data-label="Status"])::before { display: inline; content: attr(data-label); flex: none; width: 4.5rem; font-family: var(--dk-font-sans); color: var(--dk-text-muted); }
+  #token-table td[data-label="Prefix"], #token-table td[data-label="Created"] { display: none; }
 }
 
 /* Agents: a run inbox with a readable outcome beside it. */
@@ -1832,7 +2009,7 @@ body[data-view="agents"] .agent-workspace { flex: 1; height: auto; min-height: 0
 /* Keep pending views navigable without presenting unloaded data as empty. */
 .view[data-pending="true"] > :not(.section-loading):not(.page-tools) { display: none; }
 section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loading) { visibility: hidden; }
-.section-loading { padding: 12px 0; }
+.section-loading { padding: var(--dk-space-3) 0; }
 
 /* Workflow names: the API's human name leads; the stable id rides beneath
    as small mono text, the description behind the (?) tip. */

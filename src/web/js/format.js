@@ -7,28 +7,106 @@ export function escapeHtml(value) {
   return element.innerHTML;
 }
 
+/* One status vocabulary across pages (sentence case): On/Off for
+   switchable things, Succeeded/Failed/Running/Delayed/Fixed for runs,
+   Active/Revoked for tokens, Set up/Not set up for configuration. A
+   caller's labels win; anything unmapped is sentence-cased. */
+const STATUS_LABELS = {
+  completed: 'Succeeded',
+  succeeded: 'Succeeded',
+  failed: 'Failed',
+  error: 'Failed',
+  timed_out: 'Timed out',
+  interrupted: 'Interrupted',
+  running: 'Running',
+  processing: 'Running',
+  queued: 'Queued',
+  delayed: 'Delayed',
+  cancelled: 'Cancelled',
+  skipped: 'Skipped',
+  reused: 'Reused',
+  enabled: 'On',
+  disabled: 'Off',
+  active: 'Active',
+  offline: 'Offline',
+  revoked: 'Revoked',
+  configured: 'Set up',
+  missing: 'Not set up',
+  connected: 'Connected',
+  expired: 'Needs reconnect',
+  expiring: 'Expiring',
+  ready: 'Ready',
+  draft: 'Draft',
+  'auto-paused': 'Auto-paused',
+};
+
+export function sentenceCase(value) {
+  const text = String(value == null ? '' : value).replace(/[_]+/g, ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+export function statusLabel(status) {
+  const value = String(status || 'unknown');
+  return STATUS_LABELS[value] || sentenceCase(value);
+}
+
 export function statusLine(status, labels) {
   const value = String(status || 'unknown');
   const kind = ['completed', 'succeeded', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
-    : ['processing', 'running', 'ready'].includes(value) ? 'run'
-    : ['failed', 'timed_out', 'interrupted', 'error', 'missing', 'expired', 'auto-paused'].includes(value) ? 'err'
+    : ['processing', 'running', 'ready', 'queued', 'delayed'].includes(value) ? 'run'
+    : ['failed', 'timed_out', 'interrupted', 'error', 'expired', 'auto-paused'].includes(value) ? 'err'
     : ['expiring'].includes(value) ? 'warn'
     : 'off';
-  const text = (labels || {})[value] || value;
+  const text = (labels || {})[value] || statusLabel(value);
   return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
 }
 
 /* A failure that no longer needs action. The run keeps its status pill
    (a fixed run still reads "failed" in history); this rides next to it so
    the actionable failures stand out from the retired ones. The tooltip
-   says why it stopped being a problem. */
+   says why it stopped being a problem, and when. */
 export function resolvedLine(run) {
   if (!run || !run.resolved) return '';
   const why = run.resolved_reason === 'acknowledged'
     ? 'Marked fixed by an operator — it stays in history but is no longer a problem.'
     : 'Recovered: a later run of this workflow completed, so this failure no longer needs action.';
-  const at = run.resolved_at ? ` (${formatTimestamp(run.resolved_at)})` : '';
-  return `<span class="status ok" title="${escapeHtml(why)}"><span class="status-dot" aria-hidden="true"></span>fixed${escapeHtml(at)}</span>`;
+  const at = run.resolved_at ? ` Fixed ${formatTimestamp(run.resolved_at)}.` : '';
+  return `<span class="status ok" title="${escapeHtml(why + at)}"><span class="status-dot" aria-hidden="true"></span>Fixed</span>`;
+}
+
+/* Trigger events in operator words ("Email received"), not the connector's
+   machine pair ("email · message.received"). Unmapped pairs read as the
+   connector name plus the event's words. */
+const TRIGGER_EVENT_LABELS = {
+  'email.message.received': 'Email received',
+  'email.bounce': 'Email bounced',
+  'email.complaint': 'Email complaint',
+  'webhook.request.received': 'Webhook request',
+  'google-drive.file.created': 'Drive file created',
+  'dropbox.file.created': 'Dropbox file created',
+  'renderer.job.completed': 'Render finished',
+  'telegram.channel_post.received': 'Telegram channel post',
+  'telegram.message.received': 'Telegram message',
+  'youtube.video.published': 'YouTube video published',
+  'zoom.recording.completed': 'Zoom recording ready',
+  'schedule.tick': 'Schedule',
+  'custom.received': 'Custom event',
+};
+const CONNECTOR_NAMES = {
+  'google-drive': 'Drive', youtube: 'YouTube', github: 'GitHub', aws: 'AWS', http: 'HTTP',
+};
+
+export function connectorName(connector) {
+  const key = String(connector || '');
+  return CONNECTOR_NAMES[key] || sentenceCase(key.replace(/-/g, ' '));
+}
+
+export function triggerEventLabel(connector, event) {
+  if (!connector) return 'No trigger';
+  const key = `${connector}.${event || ''}`;
+  if (TRIGGER_EVENT_LABELS[key]) return TRIGGER_EVENT_LABELS[key];
+  const words = String(event || '').replace(/[._]+/g, ' ').replace(/\breceived\b/, '').trim();
+  return `${connectorName(connector)}${words ? ` ${words}` : ''}`;
 }
 
 /* Escape, then mark separator characters as safe wrap points so long machine
@@ -157,7 +235,7 @@ export function dataBlock(value, { openRaw = false } = {}) {
       ? `<div class="json-digest-rest"><dd>+ ${rows.length - DIGEST_ROWS} more fields — see raw JSON</dd></div>`
       : '');
   return `${digest ? `<dl class="json-digest">${digest}</dl>` : ''}
-    <details class="json-raw"${openRaw ? ' open' : ''}><summary>Raw JSON</summary>${jsonBlock(value)}</details>`;
+    <details class="json-raw"${openRaw ? ' open' : ''}><summary>Show raw JSON</summary>${jsonBlock(value)}</details>`;
 }
 
 export function emptyRow(columns) {

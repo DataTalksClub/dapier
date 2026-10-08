@@ -61,7 +61,7 @@
       <div class="sidebar-foot">
         <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
         <div class="sidebar-foot-actions">
-          <button id="refresh" class="nav-item sidebar-tool-button" type="button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i><span>Refresh</span><span id="last-updated" class="last-updated mono"></span></button>
+          <button id="refresh" class="nav-item sidebar-tool-button" type="button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i><span>Refresh</span><span id="last-updated" class="last-updated"></span></button>
           <button id="account-button" class="account-button sidebar-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span><span class="account-button-name" data-account-name>Account</span><svg class="account-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
         </div>
       </div>
@@ -101,9 +101,8 @@
         <div class="page-tools primary-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <section class="home-panel" id="overview-errors-panel" aria-labelledby="overview-errors-title">
-          <div class="section-head"><h2 id="overview-errors-title">Failures to fix</h2><button id="overview-errors-send-digest" class="dk-button dk-button--secondary" type="button">Send digest now</button></div>
-          <div id="overview-errors-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>Failed</th><th>Last failure</th><th>Error</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
-          <div id="overview-errors-empty" class="empty-state" hidden><h3>Nothing to fix</h3><p>No failure in the last 7 days still needs action. A failure a successful replay settled, or one marked fixed, drops out of this list.</p></div>
+          <div class="section-head"><h2 id="overview-errors-title">Failures to fix</h2><p id="overview-errors-empty" class="sub" hidden title="A failure a successful replay settled, or one marked fixed, drops out of this list.">None in the last 7 days</p><button id="overview-errors-send-digest" class="dk-button dk-button--secondary dk-button--sm" type="button">Send digest now</button></div>
+          <div id="overview-errors-table" class="table-wrap"><table class="home-errors-table"><colgroup><col class="col-wf"><col class="col-count"><col class="col-when"><col></colgroup><thead><tr><th>Workflow</th><th class="num">Failed</th><th>Last failure</th><th>Error</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
         </section>
         <div id="overview-stats" class="status-strip" hidden></div>
         <section class="home-panel" aria-labelledby="home-workflows-title">
@@ -229,23 +228,27 @@
       </section>
 
       <section class="view" data-page="credentials">
-        <div class="page-tools"><p class="sub">OAuth clients</p></div>
-        <div id="oauth-client-empty" class="empty-state" hidden><h3>No OAuth clients</h3><p>Add a Google or Dropbox client before connecting those accounts.</p></div>
-        <div id="oauth-client-wrap" class="table-wrap">
-          <table>
-            <thead><tr><th>Client</th><th>Client ID</th><th>Source</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="oauth-client-list"></tbody>
-          </table>
-        </div>
-        <div class="section-head">
-          <h2 class="sub-head">Service credentials</h2>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Credential</th><th>Updated</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="credential-list"></tbody>
-          </table>
-        </div>
+        <section class="data-panel" aria-labelledby="oauth-clients-title">
+          <div class="section-head"><h2 id="oauth-clients-title">OAuth clients</h2><p class="sub">The apps your Google and Dropbox accounts sign in through</p></div>
+          <div id="oauth-client-empty" class="empty-state" hidden><h3>No OAuth clients</h3><p>Add a Google or Dropbox client before connecting those accounts.</p></div>
+          <div id="oauth-client-wrap" class="table-wrap">
+            <table class="setup-table">
+              <colgroup><col class="col-name"><col class="col-detail"><col class="col-source"><col class="col-status"><col class="col-action"></colgroup>
+              <thead><tr><th>Client</th><th>Client ID</th><th>Source</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="oauth-client-list"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="data-panel" aria-labelledby="service-credentials-title">
+          <div class="section-head"><h2 id="service-credentials-title">Service credentials</h2><p class="sub">Keys and tokens workflow steps use for services without an account sign-in</p></div>
+          <div class="table-wrap">
+            <table class="setup-table">
+              <colgroup><col class="col-name"><col class="col-detail"><col class="col-source"><col class="col-status"><col class="col-action"></colgroup>
+              <thead><tr><th>Credential</th><th>Updated</th><th><span class="visually-hidden">Source</span></th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="credential-list"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <section class="view" data-page="emails">
@@ -360,78 +363,87 @@
           <button id="new-token" class="dk-button dk-button--primary" type="button">New token</button>
         </div>
         <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Token</th><th>Agent</th><th>Created</th><th>Last used</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+        <div class="table-wrap register">
+          <table class="token-table">
+            <colgroup><col class="col-token"><col class="col-prefix"><col class="col-agent"><col class="col-when"><col class="col-when"><col class="col-status"><col class="col-action"></colgroup>
+            <thead><tr><th>Token</th><th>Prefix</th><th>Agent</th><th>Created</th><th>Last used</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="token-table"></tbody>
           </table>
         </div>
       </section>
       <section class="view" data-page="storage">
-        <form id="storage-browse" class="run-filters page-tools">
-          <label><span class="visually-hidden">Workflow</span><select name="workflow" required><option value="">Choose a workflow…</option></select></label>
-          <label><span class="visually-hidden">Key prefix</span><input name="prefix" placeholder="Key prefix"></label>
-          <button class="dk-button dk-button--secondary" type="submit">List keys</button>
+        <form id="storage-browse" class="dk-toolbar page-tools register-toolbar">
+          <div class="dk-cluster toolbar-filters"><label><span class="visually-hidden">Workflow</span><select name="workflow" required><option value="">Choose a workflow…</option></select></label><label class="toolbar-search"><span class="visually-hidden">Key prefix</span><input name="prefix" placeholder="Key prefix"></label></div>
+          <div class="dk-toolbar__end"><button class="dk-button dk-button--secondary" type="submit">List keys</button></div>
         </form>
-        <div id="storage-idle" class="empty-state"><h3>Pick a workflow to inspect its keys</h3><p>Choose a workflow above — the keys its storage steps wrote appear here, with values and expiry.</p></div>
+        <div id="storage-idle" class="empty-state"><h3>Pick a workflow to inspect its keys</h3><p>The keys its storage steps wrote appear here, with values and expiry.</p></div>
         <div id="storage-empty" class="empty-state" hidden><h3 id="storage-empty-title">No stored keys</h3><p>Keys appear as this workflow's storage steps run. Store one below to try it, then read it back with a storage_get step.</p></div>
-        <div id="storage-table-wrap" class="table-wrap" hidden>
-          <table>
+        <div id="storage-table-wrap" class="table-wrap register" hidden>
+          <table class="storage-table">
+            <colgroup><col class="col-key"><col><col class="col-when"><col class="col-when"><col class="col-action"></colgroup>
             <thead><tr><th>Key</th><th>Value</th><th>Updated</th><th>Expires</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="storage-table"></tbody>
           </table>
         </div>
-        <form id="storage-put" class="storage-form">
-          <h3>Store a value <span id="storage-put-target" hidden>for <code id="storage-put-workflow"></code></span></h3>
-          <label>Key<input name="key" required placeholder="dedupe:message-123"></label>
-          <label class="storage-value-field">Value<textarea name="value" rows="1" required placeholder="true"></textarea></label>
-          <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="optional"></label>
-          <button class="dk-button dk-button--primary" type="submit">Store</button>
+        <form id="storage-put" class="data-panel storage-form">
+          <div class="section-head"><h2>Store a value</h2><p class="sub" id="storage-put-target" hidden>For <span id="storage-put-workflow" class="mono"></span></p></div>
+          <div class="storage-fields">
+            <label>Key<input name="key" class="mono-input" required placeholder="dedupe:message-123"></label>
+            <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="Optional"></label>
+            <label class="storage-value-field">Value<textarea name="value" rows="2" class="mono-input" required placeholder="true"></textarea></label>
+          </div>
+          <div class="dk-form-actions"><button class="dk-button dk-button--primary" type="submit">Store</button></div>
         </form>
       </section>
 
       <section class="view" data-page="runs">
-        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="runs-search-filter" type="search" placeholder="Search runs" title="Text in a run's data, or its id"></label><label><span class="visually-hidden">Workflow</span><select id="runs-workflow-filter" aria-label="Workflow"><option value="">All workflows</option></select></label><label><span class="visually-hidden">Status</span><select id="runs-status-filter" aria-label="Status"><option value="">All statuses</option></select></label><label><span class="visually-hidden">Date</span><select id="runs-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="runs-sample-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 runs</span></div>
-        <div class="page-tools primary-tools"><button id="runs-replay-failed" class="dk-button dk-button--secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="dk-button dk-button--secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Steps</th><th>Started</th></tr></thead>
+        <div class="dk-toolbar page-tools register-toolbar">
+          <div class="dk-cluster toolbar-filters"><label class="toolbar-search"><span class="visually-hidden">Search</span><input id="runs-search-filter" type="search" placeholder="Search runs" title="Text in a run's data, or its id"></label><label><span class="visually-hidden">Workflow</span><select id="runs-workflow-filter" aria-label="Workflow"><option value="">All workflows</option></select></label><label><span class="visually-hidden">Status</span><select id="runs-status-filter" aria-label="Status"><option value="">All statuses</option></select></label><label><span class="visually-hidden">Date</span><select id="runs-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label></div>
+          <div class="dk-toolbar__end"><button id="runs-replay-failed" class="dk-button dk-button--secondary" type="button" hidden title="Re-inject this workflow's recent failed runs">Replay failed</button><button id="runs-export" class="dk-button dk-button--secondary" type="button" title="Download the filtered run history as CSV">Export CSV</button></div>
+        </div>
+        <div class="table-wrap register">
+          <table class="runs-table">
+            <colgroup><col class="col-run"><col class="col-trigger"><col class="col-status"><col class="col-steps"><col class="col-when"></colgroup>
+            <thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th class="num">Steps</th><th>Started</th></tr></thead>
             <tbody id="run-table"></tbody>
           </table>
+          <div class="dk-table-footer"><span id="runs-sample-note" title="Records are kept for 90 days.">Up to 25 runs</span><button id="runs-load-more" class="dk-button dk-button--secondary dk-button--sm" type="button" hidden>Load more</button></div>
         </div>
-        <button id="runs-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
-      <section class="data-panel" aria-labelledby="runs-usage-title">
-          <div class="section-head"><h2 id="runs-usage-title">Task usage</h2></div>
-          <div class="list-tools"><p class="sub" id="overview-quota-line" hidden></p><form id="quota-form" class="inline-form" autocomplete="off" hidden><label class="visually-hidden" for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="no limit"><button class="dk-button dk-button--secondary" type="submit">Set limit</button></form></div>
-          <div id="overview-usage-table" class="table-wrap"><table><thead><tr><th>Workflow</th><th>This month</th><th>3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
-          <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
-      </section>
 
-      <section class="data-panel" aria-labelledby="runs-events-title">
-        <div class="section-head">
-          <h2 id="runs-events-title">Incoming events</h2>
-        </div>
-        <div id="inbox-empty" class="empty-state" hidden><h3>No incoming events</h3><p>Inbound trigger events land here as they arrive — including ones no workflow matched, so nothing silently disappears.</p></div>
-        <div id="inbox-table-wrap" class="table-wrap">
-          <table>
-            <thead><tr><th>Received</th><th>Trigger</th><th>Matched</th><th>Source</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="inbox-table"></tbody>
-          </table>
-        </div>
-        <button id="inbox-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
-      </section>
+        <details class="data-panel runs-section" id="runs-usage-section" aria-labelledby="runs-usage-title">
+          <summary class="section-head"><h2 id="runs-usage-title">Task usage</h2><p class="sub" id="overview-quota-summary"></p><span class="section-chevron" aria-hidden="true"></span></summary>
+          <div class="panel-tools"><p class="sub" id="overview-quota-line" hidden></p><form id="quota-form" class="dk-cluster quota-form" autocomplete="off" hidden><label for="quota-limit">Monthly task limit</label><input id="quota-limit" name="limit" type="number" min="1" class="mono-input" placeholder="No limit"><button class="dk-button dk-button--secondary" type="submit">Set limit</button></form></div>
+          <div id="overview-usage-table" class="table-wrap"><table class="usage-table"><thead><tr><th>Workflow</th><th class="num">This month</th><th class="num">3-month total</th></tr></thead><tbody id="overview-usage"></tbody></table></div>
+          <div id="overview-usage-empty" class="empty-state" hidden><h3>No usage recorded</h3><p>Completed action steps are counted per workflow per month and appear here after the first run.</p></div>
+        </details>
+
+        <details class="data-panel runs-section" id="runs-events-section" aria-labelledby="runs-events-title">
+          <summary class="section-head"><h2 id="runs-events-title">Incoming events</h2><p class="sub">Every inbound trigger event, matched or not</p><span class="section-chevron" aria-hidden="true"></span></summary>
+          <div id="inbox-empty" class="empty-state" hidden><h3>No incoming events</h3><p>Inbound trigger events land here as they arrive, including ones no workflow matched, so nothing silently disappears.</p></div>
+          <div id="inbox-table-wrap" class="table-wrap">
+            <table class="inbox-table">
+              <colgroup><col class="col-when"><col class="col-trigger"><col><col class="col-source"><col class="col-action"></colgroup>
+              <thead><tr><th>Received</th><th>Trigger</th><th>Matched</th><th>Source</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="inbox-table"></tbody>
+            </table>
+            <div class="dk-table-footer" id="inbox-footer" hidden><button id="inbox-load-more" class="dk-button dk-button--secondary dk-button--sm" type="button" hidden>Load more</button></div>
+          </div>
+        </details>
       </section>
 
       <section class="view" data-page="audit">
-        <div class="run-filters page-tools"><label><span class="visually-hidden">Search</span><input id="audit-log-search" type="search" placeholder="Search the audit log" title="Action, connection, actor, or error"></label><label><span class="visually-hidden">Action</span><select id="audit-log-action-filter" aria-label="Action" data-blank="All actions"><option value="">All actions</option></select></label><label><span class="visually-hidden">Outcome</span><select id="audit-log-outcome-filter" aria-label="Outcome" data-blank="All outcomes"><option value="">All outcomes</option></select></label><label><span class="visually-hidden">Date</span><select id="audit-log-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label><span id="audit-log-note" class="field-hint" title="Records are kept for 90 days.">Up to 25 events</span></div>
-        <div class="page-tools primary-tools"><button id="audit-log-export" class="dk-button dk-button--secondary" type="button">Export CSV</button></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>When</th><th>Action</th><th>Resource</th><th>Actor</th><th>Agent</th><th>Outcome</th><th>Error</th></tr></thead>
+        <div class="dk-toolbar page-tools register-toolbar">
+          <div class="dk-cluster toolbar-filters"><label class="toolbar-search"><span class="visually-hidden">Search</span><input id="audit-log-search" type="search" placeholder="Search the audit log" title="Action, connection, actor, or error"></label><label><span class="visually-hidden">Action</span><select id="audit-log-action-filter" aria-label="Action" data-blank="All actions"><option value="">All actions</option></select></label><label><span class="visually-hidden">Outcome</span><select id="audit-log-outcome-filter" aria-label="Outcome" data-blank="All outcomes"><option value="">All outcomes</option></select></label><label><span class="visually-hidden">Date</span><select id="audit-log-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label></div>
+          <div class="dk-toolbar__end"><button id="audit-log-export" class="dk-button dk-button--secondary" type="button">Export CSV</button></div>
+        </div>
+        <div class="table-wrap register">
+          <table class="audit-table">
+            <colgroup><col class="col-when"><col class="col-action"><col class="col-resource"><col class="col-actor"><col class="col-agent"><col class="col-outcome"><col class="col-error"></colgroup>
+            <thead><tr><th>When</th><th>Action</th><th>Resource</th><th>Actor</th><th>Agent</th><th>Outcome</th><th class="col-error">Error</th></tr></thead>
             <tbody id="audit-log-table"></tbody>
           </table>
+          <div class="dk-table-footer"><span id="audit-log-note" title="Records are kept for 90 days.">Up to 25 events</span><button id="audit-log-load-more" class="dk-button dk-button--secondary dk-button--sm" type="button" hidden>Load more</button></div>
         </div>
-        <button id="audit-log-load-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
       </section>
     </main>
 
@@ -454,135 +466,137 @@
 
 
 
-  <dialog id="user-confirm-dialog" aria-labelledby="user-confirm-title" aria-describedby="user-confirm-message">
+  <dialog id="user-confirm-dialog" aria-labelledby="user-confirm-title" aria-describedby="user-confirm-message" class="dk-dialog">
     <form method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="user-confirm-title"></h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body"><p id="user-confirm-message"></p></div>
-      <div class="dialog-actions">
+      <div class="dialog-body dk-dialog__body"><p id="user-confirm-message"></p></div>
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" value="confirm" type="submit">Remove</button>
       </div>
     </form>
   </dialog>
-  <dialog id="credential-dialog" aria-labelledby="credential-title">
+  <dialog id="credential-dialog" aria-labelledby="credential-title" class="dk-dialog">
     <form id="credential-form" method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="credential-title">Add credential</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <input type="hidden" name="provider">
         <div id="credential-fields"></div>
         <p id="credential-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save credential</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="oauth-client-dialog" aria-labelledby="oauth-client-title">
+  <dialog id="oauth-client-dialog" aria-labelledby="oauth-client-title" class="dk-dialog">
     <form id="oauth-client-form" method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="oauth-client-title">OAuth client</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <p class="sub">From the provider's app console (Google Cloud Console → Credentials, or Dropbox App Console). The redirect URI is <code>https://dapier.dtcdev.click/oauth/callback</code>.</p>
         <label>Client ID<input name="client_id" class="mono-input" autocomplete="off" required></label>
         <label>Client secret<input name="client_secret" class="secret-input" type="password" autocomplete="new-password" required></label>
         <p id="oauth-client-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save client</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="run-dialog" aria-labelledby="run-title">
-    <div class="dialog-head">
+  <dialog id="run-dialog" aria-labelledby="run-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="run-title">Run</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="run-detail" class="dialog-body detail"></div>
+    <div id="run-detail" class="dialog-body dk-dialog__body detail"></div>
     <div id="run-replay-result" class="dialog-feedback" role="status" hidden></div>
-    <div class="dialog-actions">
+    <div class="dialog-actions dk-dialog__foot">
+      <span id="run-actions-start" class="dk-dialog__start"></span>
+      <span id="run-actions" class="dk-cluster"></span>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
-  <dialog id="workflow-dialog" aria-labelledby="workflow-title">
-    <div class="dialog-head">
+  <dialog id="workflow-dialog" aria-labelledby="workflow-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="workflow-title">Workflow</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="workflow-detail" class="dialog-body detail"></div>
-    <div class="dialog-actions">
+    <div id="workflow-detail" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot">
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
       <button id="workflow-download-yaml" class="dk-button dk-button--secondary" type="button" hidden>Download YAML</button>
       <a id="workflow-edit" class="dk-button dk-button--primary">Edit in designer</a>
     </div>
   </dialog>
 
-  <dialog id="versions-dialog" aria-labelledby="versions-title">
-    <div class="dialog-head">
+  <dialog id="versions-dialog" aria-labelledby="versions-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="versions-title">Version history</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="versions-detail" class="dialog-body detail"></div>
+    <div id="versions-detail" class="dialog-body dk-dialog__body detail"></div>
     <div id="versions-feedback" class="dialog-feedback" role="status" hidden></div>
-    <div class="dialog-actions">
+    <div class="dialog-actions dk-dialog__foot">
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
-  <dialog id="connection-dialog" aria-labelledby="connection-heading">
+  <dialog id="connection-dialog" aria-labelledby="connection-heading" class="dk-dialog">
     <form id="connection-form" method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="connection-heading">New Slack connection</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <p id="connection-blurb" class="sub"></p>
         <label id="connection-token-label">Token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-…" required></label>
         <p id="connection-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Create connection</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="token-dialog" aria-label="New API token">
+  <dialog id="token-dialog" aria-label="New API token" class="dk-dialog">
     <form id="token-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2>New API token</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <label>Token ID<input name="token_id" class="mono-input" placeholder="personal-scheduler" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">Lowercase letters, numbers, dashes; the subject becomes <code>token:&lt;id&gt;</code>.</small></label>
         <label>Agent<input name="agent" class="mono-input" placeholder="personal-scheduler" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">The one agent name this token may act as.</small></label>
         <p id="token-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Create token</button>
       </div>
     </form>
   </dialog>
-  <dialog id="schedule-dialog" aria-label="Configure schedule">
+  <dialog id="schedule-dialog" aria-label="Configure schedule" class="dk-dialog">
     <form id="schedule-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="schedule-dialog-title">New schedule</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <label>Name<input name="name" class="mono-input" placeholder="morning-digest" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. The name is fixed after creation — it names the EventBridge rule.</small></label>
         <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(1 day)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> — use <code>?</code> for day-or-weekday, e.g. <code>cron(0 7 * * ? *)</code> for 07:00 UTC daily — or <code>rate(&lt;number&gt; minutes|hours|days)</code>.</small></label>
         <label>Description<input name="description" placeholder="What runs and why" maxlength="200"></label>
@@ -590,26 +604,26 @@
         <p class="field-hint">The schedule publishes its fires as events; the designer workflows filtering on <code>schedule: {equals: &lt;name&gt;}</code> run on them.</p>
         <p id="schedule-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save</button>
       </div>
     </form>
   </dialog>
-  <dialog id="schedule-confirm-dialog" aria-label="Delete schedule">
+  <dialog id="schedule-confirm-dialog" aria-label="Delete schedule" class="dk-dialog">
     <form method="dialog" autocomplete="off">
-      <div class="dialog-head"><h2 id="schedule-confirm-title">Delete schedule</h2></div>
-      <div class="dialog-body"><p id="schedule-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
+      <div class="dialog-head dk-dialog__head"><h2 id="schedule-confirm-title">Delete schedule</h2></div>
+      <div class="dialog-body dk-dialog__body"><p id="schedule-confirm-message"></p></div>
+      <div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
     </form>
   </dialog>
-  <dialog id="hook-dialog" aria-label="Configure hook">
+  <dialog id="hook-dialog" aria-label="Configure hook" class="dk-dialog">
     <form id="hook-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="hook-dialog-title">New hook</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <label>Name<input name="name" class="mono-input" placeholder="orders" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. Fixed after creation — it is the last segment of the hook URL.</small></label>
         <label>Kind<select name="kind"><option value="webhook">Webhook</option><option value="telegram">Telegram</option><option value="mailchimp">Mailchimp</option></select><small class="field-hint">Telegram forwards bot messages to the trigger; Mailchimp posts its webhook types; webhook callers POST to its URL.</small></label>
         <label id="hook-connection-field" hidden>Telegram bot connection<input name="connection_id" class="mono-input" placeholder="telegram-bot" required><small class="field-hint">The connection whose bot receives messages; its webhook registration is managed for you.</small></label>
@@ -629,50 +643,50 @@
         <p class="field-hint">The hook publishes its deliveries as events; the designer workflows filtering on <code>hook: {equals: &lt;name&gt;}</code> run on them.</p>
         <p id="hook-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save</button>
       </div>
     </form>
   </dialog>
-  <dialog id="hook-delivery-dialog" aria-labelledby="hook-delivery-title">
-    <div class="dialog-head">
+  <dialog id="hook-delivery-dialog" aria-labelledby="hook-delivery-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="hook-delivery-title">Delivery</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="hook-delivery-detail" class="dialog-body detail"></div>
-    <div class="dialog-actions">
+    <div id="hook-delivery-detail" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot">
       <button id="hook-delivery-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
-  <dialog id="hook-test-dialog" aria-labelledby="hook-test-title">
+  <dialog id="hook-test-dialog" aria-labelledby="hook-test-title" class="dk-dialog">
     <form id="hook-test-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="hook-test-title">Send test request</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <label>Hook<select name="name" required></select></label>
         <p id="hook-test-target" class="field-hint mono break-all"></p>
         <label>Payload (JSON)<textarea name="data" rows="7" class="mono-input" spellcheck="false"></textarea><small class="field-hint">Sent as the request body with the hook's own token or signature, marked as a test. It is a real delivery: workflows listening on the hook run.</small></label>
         <div id="hook-test-result" class="hook-test-result" role="status" hidden></div>
         <p id="hook-test-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
         <button id="hook-test-view" class="dk-button dk-button--secondary" type="button" hidden>View delivery</button>
         <button class="dk-button dk-button--primary" type="submit">Send</button>
       </div>
     </form>
   </dialog>
-  <dialog id="poll-dialog" aria-label="Configure poll trigger">
+  <dialog id="poll-dialog" aria-label="Configure poll trigger" class="dk-dialog">
     <form id="poll-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="poll-dialog-title">New poll</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <label>Name<input name="name" class="mono-input" placeholder="inbox-watch" pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" maxlength="32" required><small class="field-hint">Lowercase letters, numbers, dashes. Fixed after creation — it names the EventBridge rule.</small></label>
         <label>Schedule expression<input name="expression" class="mono-input" placeholder="rate(15 minutes)" pattern="(cron|rate)\(.*\)" required><small class="field-hint"><code>cron(minute hour day month weekday year)</code> or <code>rate(&lt;number&gt; minutes|hours|days)</code>, like schedules.</small></label>
         <label>Source<select name="source"><option value="">HTTP URL</option><option value="rss">RSS feed</option><option value="s3">S3 bucket</option><option value="s3.updates">S3 updates</option><option value="s3.deletions">S3 deletions</option><option value="google-sheets.rows">Google Sheets rows</option><option value="google-sheets.updates">Google Sheets row updates</option><option value="google-drive.files">Google Drive files</option><option value="google-drive.updates">Google Drive updates</option><option value="google-drive.deletions">Google Drive deletions</option><option value="zoom.recordings">Zoom recordings</option><option value="dropbox.files">Dropbox files</option><option value="youtube.videos">YouTube videos</option><option value="mailchimp.members">Mailchimp members</option><option value="slack.messages">Slack messages</option><option value="google-calendar.events">Google Calendar events</option><option value="gmail.messages">Gmail messages</option></select><small class="field-hint">What gets polled. Provider sources fetch through a stored connection or credential (new objects / rows / files / recordings / members / messages only; the S3 update/delete watches diff consecutive listings); the URL and Method apply to the HTTP and RSS sources.</small></label>
@@ -684,31 +698,31 @@
         <label>Options (JSON)<textarea name="options" rows="6" class="mono-input"></textarea><small class="field-hint">Optional extras: <code>{"headers": {…}, "body": …, "list_path": "data.items", "id_path": "id", "cursor_mode": "watermark", "max_items": 25, "dedupe_ttl_days": 7}</code>; for <code>s3</code> (all three file watches): <code>{"bucket": "…", "prefix": "…"}</code>, for Sheets/Drive: <code>{"spreadsheet_id": "…"}</code> / <code>{"folder_id": "…"}</code>, for Zoom: <code>{"for_email": "me"}</code>, for Dropbox/YouTube: <code>{"path": "/Invoices"}</code> / <code>{"channel_id": "UC…"}</code>, for Mailchimp/Slack: <code>{"list_id": "…"}</code> / <code>{"channel_id": "C…"}</code>. Server-validated.</small></label>
         <p id="poll-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save</button>
       </div>
     </form>
   </dialog>
-  <dialog id="poll-sample-dialog" aria-label="Trigger sample">
-    <div class="dialog-head">
+  <dialog id="poll-sample-dialog" aria-label="Trigger sample" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="poll-sample-title">Trigger sample</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body dk-dialog__body">
       <p id="poll-sample-meta" class="sub mono"></p>
       <pre id="poll-sample-data" class="mono break-all"></pre>
       <p class="field-hint">The newest event the poll would publish — pulled live from the provider when it can, else the newest recorded run, else a documented example. This is the shape <code>{trigger.*}</code> templates read.</p>
     </div>
-    <div class="dialog-actions"><button class="dk-button dk-button--primary dialog-close" type="button">Close</button></div>
+    <div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--primary dialog-close" type="button">Close</button></div>
   </dialog>
-  <dialog id="poll-detail-dialog" aria-labelledby="poll-detail-title">
-    <div class="dialog-head">
+  <dialog id="poll-detail-dialog" aria-labelledby="poll-detail-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <div class="poll-detail-heading"><h2 id="poll-detail-title" class="mono">Poll</h2><span id="poll-detail-health"></span></div>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="poll-detail-body" class="dialog-body detail"></div>
-    <div class="dialog-actions poll-detail-actions">
+    <div id="poll-detail-body" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot poll-detail-actions">
       <div class="poll-detail-manage">
         <button class="dk-button dk-button--secondary" type="button" data-poll-action="edit">Edit</button>
         <button class="dk-button dk-button--secondary" type="button" data-poll-action="sample">Sample</button>
@@ -721,84 +735,84 @@
       </div>
     </div>
   </dialog>
-  <dialog id="poll-item-dialog" aria-labelledby="poll-item-title">
-    <div class="dialog-head">
+  <dialog id="poll-item-dialog" aria-labelledby="poll-item-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="poll-item-title">Picked-up item</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="poll-item-body" class="dialog-body detail"></div>
-    <div class="dialog-actions">
+    <div id="poll-item-body" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot">
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
       <button id="poll-item-replay" class="dk-button dk-button--primary" type="button">Replay</button>
     </div>
   </dialog>
-  <dialog id="poll-reset-dialog" aria-labelledby="poll-reset-title">
+  <dialog id="poll-reset-dialog" aria-labelledby="poll-reset-title" class="dk-dialog">
     <form id="poll-reset-form" method="dialog" autocomplete="off">
-      <div class="dialog-head"><h2 id="poll-reset-title">Reset position</h2><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
-      <div class="dialog-body">
+      <div class="dialog-head dk-dialog__head"><h2 id="poll-reset-title">Reset position</h2><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="dialog-body dk-dialog__body">
         <p class="sub">Choose where the next check starts reading. Nothing runs until then.</p>
         <label class="poll-reset-option"><span><input type="radio" name="to" value="now" checked> From now</span><small class="field-hint">Skip everything waiting right now. Only items that arrive after this run their workflows.</small></label>
         <label class="poll-reset-option"><span><input type="radio" name="to" value="date"> From a date</span><input name="date" type="date" disabled><small id="poll-reset-date-hint" class="field-hint"></small></label>
         <p id="poll-reset-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Reset position</button>
       </div>
     </form>
   </dialog>
-  <dialog id="poll-replay-confirm-dialog" aria-labelledby="poll-replay-confirm-title">
-    <form method="dialog"><div class="dialog-head"><h2 id="poll-replay-confirm-title">Replay this item?</h2></div><div class="dialog-body"><p>The item goes through its workflows again as a new run. Actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--primary" value="confirm">Replay</button></div></form>
+  <dialog id="poll-replay-confirm-dialog" aria-labelledby="poll-replay-confirm-title" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="poll-replay-confirm-title">Replay this item?</h2></div><div class="dialog-body dk-dialog__body"><p>The item goes through its workflows again as a new run. Actions may send messages or change external data a second time.</p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--primary" value="confirm">Replay</button></div></form>
   </dialog>
-  <dialog id="trigger-confirm-dialog" aria-label="Delete trigger">
+  <dialog id="trigger-confirm-dialog" aria-label="Delete trigger" class="dk-dialog">
     <form method="dialog" autocomplete="off">
-      <div class="dialog-head"><h2 id="trigger-confirm-title">Delete trigger</h2></div>
-      <div class="dialog-body"><p id="trigger-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
+      <div class="dialog-head dk-dialog__head"><h2 id="trigger-confirm-title">Delete trigger</h2></div>
+      <div class="dialog-body dk-dialog__body"><p id="trigger-confirm-message"></p></div>
+      <div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete</button></div>
     </form>
   </dialog>
 
-  <dialog id="token-reveal-dialog" aria-labelledby="token-reveal-title">
-    <div class="dialog-head">
+  <dialog id="token-reveal-dialog" aria-labelledby="token-reveal-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="token-reveal-title">Token created</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body dk-dialog__body">
       <p class="sub">Copy it now — this value is never shown or stored again. Store it in the consumer's secret store.</p>
       <div class="token-reveal">
         <code id="token-reveal-value" class="mono"></code>
         <button id="token-copy" class="dk-button dk-button--secondary" type="button">Copy</button>
       </div>
     </div>
-    <div class="dialog-actions">
+    <div class="dialog-actions dk-dialog__foot">
       <label class="token-grant-choice">Connection<select id="token-grant-connection"></select></label><button id="token-grant" class="dk-button dk-button--secondary" type="button">Grant connection access</button><button class="dk-button dk-button--primary dialog-close" type="button">Done</button>
     </div>
   </dialog>
 
-  <dialog id="reuse-connection-dialog" aria-labelledby="reuse-connection-title">
-    <div class="dialog-head">
+  <dialog id="reuse-connection-dialog" aria-labelledby="reuse-connection-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="reuse-connection-title">Add Gmail</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body dk-dialog__body">
       <p id="reuse-connection-blurb" class="sub"></p>
       <div id="reuse-connection-list" class="reuse-list"></div>
     </div>
-    <div class="dialog-actions">
+    <div class="dialog-actions dk-dialog__foot">
       <button id="reuse-connection-new" class="dk-button dk-button--secondary" type="button">Connect a different account</button>
     </div>
   </dialog>
 
-  <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title">
+  <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title" class="dk-dialog">
     <form id="edit-connection-form" method="dialog" autocomplete="off">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <div class="manage-head">
           <h2 id="edit-connection-title">Manage connection</h2>
           <p id="edit-connection-meta" class="manage-meta"></p>
         </div>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body manage-body">
+      <div class="dialog-body dk-dialog__body manage-body">
         <dl id="edit-connection-details" class="manage-summary"></dl>
         <div class="manage-actions" role="group" aria-label="Connection actions">
           <button id="edit-connection-test" class="dk-button dk-button--secondary" type="button">Test</button>
@@ -856,19 +870,19 @@
         </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button id="edit-connection-save" class="dk-button dk-button--primary" type="submit" disabled>Save changes</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="connection-discover-dialog" aria-labelledby="connection-discover-title">
-    <div class="dialog-head">
+  <dialog id="connection-discover-dialog" aria-labelledby="connection-discover-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="connection-discover-title">Explore data</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body dk-dialog__body">
       <p id="connection-discover-meta" class="sub mono"></p>
       <label>Resource<select id="discover-resource"></select></label>
       <p id="discover-resource-description" class="sub" hidden></p>
@@ -876,18 +890,18 @@
       <p id="discover-error" class="form-error" role="alert"></p>
       <div id="discover-result" hidden></div>
     </div>
-    <div class="dialog-actions">
+    <div class="dialog-actions dk-dialog__foot">
       <button id="discover-run" class="dk-button dk-button--primary" type="button">Fetch items</button>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
 
-  <dialog id="connection-access-dialog" aria-labelledby="connection-access-title">
-    <div class="dialog-head">
+  <dialog id="connection-access-dialog" aria-labelledby="connection-access-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="connection-access-title">Access grants</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body dk-dialog__body">
       <p class="sub">Grant an identity and agent permission to use or reconnect this account.</p>
       <div id="connection-grant-list" class="grant-list"></div>
       <form id="connection-grant-form" autocomplete="off">
@@ -905,88 +919,88 @@
         <p id="connection-grant-error" class="form-error" role="alert"></p><p id="connection-grant-status" class="inline-status" role="status"></p>
       </form>
     </div>
-    <div class="dialog-actions"><button id="connection-grant-cancel" class="dk-button dk-button--secondary" type="button" hidden>Cancel edit</button><button class="dk-button dk-button--secondary dialog-close" type="button">Done</button><button class="dk-button dk-button--primary" type="submit" form="connection-grant-form">Save grant</button></div>
+    <div class="dialog-actions dk-dialog__foot"><button id="connection-grant-cancel" class="dk-button dk-button--secondary" type="button" hidden>Cancel edit</button><button class="dk-button dk-button--secondary dialog-close" type="button">Done</button><button class="dk-button dk-button--primary" type="submit" form="connection-grant-form">Save grant</button></div>
   </dialog>
 
-  <dialog id="connection-confirm-dialog" aria-labelledby="connection-confirm-title">
+  <dialog id="connection-confirm-dialog" aria-labelledby="connection-confirm-title" class="dk-dialog">
     <form method="dialog">
-      <div class="dialog-head"><h2 id="connection-confirm-title">Revoke access</h2></div>
-      <div class="dialog-body"><p id="connection-confirm-message"></p></div>
-      <div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="connection-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke</button></div>
+      <div class="dialog-head dk-dialog__head"><h2 id="connection-confirm-title">Revoke access</h2></div>
+      <div class="dialog-body dk-dialog__body"><p id="connection-confirm-message"></p></div>
+      <div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="connection-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke</button></div>
     </form>
   </dialog>
-  <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body"><p id="token-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke token</button></div></form>
+  <dialog id="token-confirm-dialog" aria-labelledby="token-confirm-title" aria-describedby="token-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="token-confirm-title">Revoke API token</h2></div><div class="dialog-body dk-dialog__body"><p id="token-confirm-message"></p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="token-confirm-yes" class="dk-button dk-button--danger" value="confirm">Revoke token</button></div></form>
   </dialog>
-  <dialog id="token-remove-confirm-dialog" aria-labelledby="token-remove-confirm-title" aria-describedby="token-remove-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Remove token</button></div></form>
+  <dialog id="token-remove-confirm-dialog" aria-labelledby="token-remove-confirm-title" aria-describedby="token-remove-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="token-remove-confirm-title">Remove API token</h2></div><div class="dialog-body dk-dialog__body"><p id="token-remove-confirm-message"></p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Remove token</button></div></form>
   </dialog>
-<dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Replay event</button></div></form>
+<dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body dk-dialog__body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Replay event</button></div></form>
   </dialog>
-  <dialog id="email-dialog" class="email-dialog" aria-labelledby="email-dialog-title">
-    <div class="dialog-head">
+  <dialog id="email-dialog" class="dk-dialog email-dialog" aria-labelledby="email-dialog-title">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="email-dialog-title">Email</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="email-dialog-body" class="dialog-body"></div>
-    <div class="dialog-actions">
+    <div id="email-dialog-body" class="dialog-body dk-dialog__body"></div>
+    <div class="dialog-actions dk-dialog__foot">
       <button id="email-allow-sender" class="dk-button dk-button--primary" type="button" hidden>Allow this sender</button>
       <button id="email-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
-  <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title">
-    <div class="dialog-head">
+  <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title" class="dk-dialog">
+    <div class="dialog-head dk-dialog__head">
       <h2 id="inbox-event-title">Inbox event</h2>
       <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
-    <div id="inbox-event-detail" class="dialog-body detail"></div>
-    <div class="dialog-actions">
+    <div id="inbox-event-detail" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot">
       <button id="inbox-replay-button" class="dk-button dk-button--secondary" type="button">Replay</button>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
-  <dialog id="replay-confirm-dialog" aria-labelledby="replay-confirm-title" aria-describedby="replay-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="replay-confirm-yes" class="dk-button dk-button--danger" value="confirm">Replay run</button></div></form>
+  <dialog id="replay-confirm-dialog" aria-labelledby="replay-confirm-title" aria-describedby="replay-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="replay-confirm-title">Replay run</h2></div><div class="dialog-body dk-dialog__body"><p id="replay-confirm-message">This runs the original trigger again. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button id="replay-confirm-yes" class="dk-button dk-button--danger" value="confirm">Replay run</button></div></form>
   </dialog>
-  <dialog id="versions-confirm-dialog" aria-labelledby="versions-confirm-title" aria-describedby="versions-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body"><p id="versions-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Restore version</button></div></form>
+  <dialog id="versions-confirm-dialog" aria-labelledby="versions-confirm-title" aria-describedby="versions-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="versions-confirm-title">Restore version</h2></div><div class="dialog-body dk-dialog__body"><p id="versions-confirm-message"></p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Restore version</button></div></form>
   </dialog>
-  <dialog id="workflow-delete-confirm-dialog" aria-labelledby="workflow-delete-confirm-title" aria-describedby="workflow-delete-confirm-message">
-    <form method="dialog"><div class="dialog-head"><h2 id="workflow-delete-confirm-title">Delete workflow</h2></div><div class="dialog-body"><p id="workflow-delete-confirm-message"></p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete permanently</button></div></form>
+  <dialog id="workflow-delete-confirm-dialog" aria-labelledby="workflow-delete-confirm-title" aria-describedby="workflow-delete-confirm-message" class="dk-dialog">
+    <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="workflow-delete-confirm-title">Delete workflow</h2></div><div class="dialog-body dk-dialog__body"><p id="workflow-delete-confirm-message"></p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Delete permanently</button></div></form>
   </dialog>
-  <dialog id="workflow-tags-dialog" aria-labelledby="workflow-tags-title">
+  <dialog id="workflow-tags-dialog" aria-labelledby="workflow-tags-title" class="dk-dialog">
     <form id="workflow-tags-form" method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="workflow-tags-title">Tags</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <p class="sub" id="workflow-tags-blurb"></p>
         <label>Tags<input id="workflow-tags-input" class="mono-input" type="text" placeholder="billing, ops, weekly-report" autocomplete="off"></label>
         <p class="field-hint">Comma-separated labels; they live in the workflow YAML and are saved live like any other change. Leave empty to remove all tags.</p>
         <p id="workflow-tags-error" class="form-error" role="alert" hidden></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button id="workflow-tags-save" class="dk-button dk-button--primary" type="submit">Save tags</button>
       </div>
     </form>
   </dialog>
-  <dialog id="workflow-folder-dialog" aria-labelledby="workflow-folder-title">
+  <dialog id="workflow-folder-dialog" aria-labelledby="workflow-folder-title" class="dk-dialog">
     <form id="workflow-folder-form" method="dialog">
-      <div class="dialog-head">
+      <div class="dialog-head dk-dialog__head">
         <h2 id="workflow-folder-title">Folder</h2>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body dk-dialog__body">
         <p class="sub" id="workflow-folder-blurb"></p>
         <label>Folder<input id="workflow-folder-input" type="text" placeholder="Invoices" autocomplete="off"></label>
         <p class="field-hint">Flat Zapier-style folders: one per workflow, a plain name (no slashes). It lives in the workflow YAML and is saved live like any other change. Leave empty to remove the folder.</p>
         <p id="workflow-folder-error" class="form-error" role="alert" hidden></p>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button id="workflow-folder-save" class="dk-button dk-button--primary" type="submit">Save folder</button>
       </div>

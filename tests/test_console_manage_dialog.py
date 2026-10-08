@@ -15,7 +15,7 @@ CSS = (ROOT / "src/web/app.css").read_text()
 
 
 def _dialog():
-    match = re.search(r'<dialog id="edit-connection-dialog".*?</dialog>', HTML, re.S)
+    match = re.search(r'<dialog id="edit-connection-dialog"[^>]*>.*?</dialog>', HTML, re.S)
     assert match
     return match.group(0)
 
@@ -29,7 +29,7 @@ def test_manage_dialog_reads_top_to_bottom():
     dialog = _dialog()
     order = ['id="edit-connection-details"', 'class="manage-actions"',
              'id="edit-slack-setup"', 'id="edit-advanced"', 'class="manage-danger"',
-             'class="dialog-actions"']
+             'class="dialog-actions']
     positions = [dialog.index(marker) for marker in order]
     assert positions == sorted(positions)
 
@@ -42,7 +42,7 @@ def test_everyday_actions_are_grouped_and_destructive_ones_are_apart():
         assert f'id="{button}"' in actions
     danger = _between(dialog, 'class="manage-danger"', '</section>')
     assert 'id="edit-connection-revoke"' in danger and 'id="edit-connection-delete"' in danger
-    footer = _between(dialog, 'class="dialog-actions"', '</form>')
+    footer = _between(dialog, 'class="dialog-actions', '</form>')
     assert footer.count("<button") == 2
     assert "Cancel" in footer and 'id="edit-connection-save"' in footer
     assert "Revoke" not in footer and "Delete" not in footer
