@@ -26,9 +26,10 @@ let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 export function setViewGuard(guard) { viewGuard = guard; }
 export function rememberViewUrl(url) { rememberedUrl = url; }
 
-/* The title row has an empty middle. Each view's .page-tools fills it, and
-   comes back to the view before the next one is mounted so inactive pages
-   keep their controls. */
+/* The title row has an empty middle. A standalone view's .page-tools fills
+   it, and comes back to the view before the next one is mounted so inactive
+   pages keep their controls. Family tabs (Connections, Workflows, Agents)
+   keep their actions in the body — the header above the tabs stays still. */
 let mountedTools = null;
 function mountPageTools() {
   if (mountedTools) {
@@ -36,9 +37,10 @@ function mountPageTools() {
     mountedTools = null;
   }
   const view = document.querySelector('.view.active');
-  /* Only a page's primary actions join the topbar (the family's header
-     pattern: title left, actions right). Filter and search bars stay in the
-     content column, above the register they control. */
+  if (TAB_FAMILY[view?.dataset.page]) return;
+  /* Only a page's primary actions join the topbar (title left, actions
+     right). Filter and search bars stay in the content column, above the
+     register they control. */
   const tools = view?.querySelector(':scope > .page-tools.primary-tools:not([hidden])');
   const slot = $('#topbar-tools');
   if (!tools || !slot) return;
@@ -120,25 +122,23 @@ export async function setView(view, push = true, options = {}) {
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
   if (view === 'workflows') applyWorkflowTab(workflowTab);
   syncPageTabs(view, workflowTab);
+  /* Family tabs swap the body under the strip, not the page header above
+     it. Child views (App setup, Emails, Workers, Hooks…) keep their own
+     routes; the title stays the parent page. */
+  const FAMILY_META = {
+    workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
+    connections: ['Connections', 'The connected accounts workflows act through.'],
+    agents: ['Agents', 'Agent tasks and the runs behind them.'],
+  };
   const VIEW_META = {
     overview: ['Home', 'Automations and their latest results at a glance.'],
-    workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
-    connections: ['Connections', 'The connected accounts workflows act through.'],
-    credentials: ['App setup', 'OAuth clients and provider keys.'],
-    agents: ['Agents', 'Agent tasks and the runs behind them.'],
-    workers: ['Workers', 'Worker check-ins and capacity.'],
     tokens: ['Access', 'Machine tokens for API access.'],
     storage: ['Data', 'Key-value data shared with workflows.'],
-    schedules: ['Schedules', 'Cron schedules that run workflows on a clock.'],
-    emails: ['Emails', 'Email addresses that trigger workflows.'],
     audit: ['Audit', 'Who changed what — newest first.'],
   };
-  const workflowTitles = {
-    hooks: ['Hooks', 'Webhook and Telegram triggers that start workflows.'],
-    polls: ['Polls', 'API polls that start workflows when new items appear.'],
-  };
-  const [title, description] = (view === 'workflows' && workflowTitles[workflowTab])
+  const family = TAB_FAMILY[view];
+  const [title, description] = (family && FAMILY_META[family])
     || VIEW_META[view]
     || [view[0].toUpperCase() + view.slice(1), ''];
   $('#view-title').textContent = title;

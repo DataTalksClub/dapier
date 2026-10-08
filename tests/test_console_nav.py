@@ -92,6 +92,23 @@ def test_page_tabs_clip_vertical_overflow():
     assert "overflow-y: hidden" in block
 
 
+def test_family_tabs_keep_the_parent_header():
+    """Switching Accounts / App setup (or Workflows / Emails, Tasks /
+    Workers) swaps the body under the tab strip, not the title or
+    primary action above it."""
+    assert "FAMILY_META" in ROUTER
+    assert "connections: ['Connections'" in ROUTER
+    assert "workflows: ['Workflows'" in ROUTER
+    assert "agents: ['Agents'" in ROUTER
+    assert "credentials: ['App setup'" not in ROUTER
+    assert "emails: ['Emails'" not in ROUTER
+    assert "workers: ['Workers'" not in ROUTER
+    assert "if (TAB_FAMILY[view?.dataset.page]) return;" in ROUTER
+    html = INDEX
+    assert 'id="add-connection"' in html
+    assert 'class="page-tools primary-tools"' not in html.split('data-page="connections"')[1].split('data-page="credentials"')[0]
+
+
 def test_parent_nav_highlights_folded_views():
     assert "emails: 'workflows'" in ROUTER
     assert "schedules: 'workflows'" in ROUTER

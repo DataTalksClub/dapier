@@ -79,7 +79,9 @@ email is "Not signed in", never a fake Drive account.
   lapsed tokens read **needs reconnection**. Both count as needing attention.
 - **Actions:** Manage on every row. Finish setup and Reconnect are
   secondary. An unfinished setup also gets **Remove** on the row (the
-  same delete as Manage → Delete). One primary on the page (Add connection). Reconnect is on
+  same delete as Manage → Delete). One primary on the Accounts toolbar
+  (Add connection), below the family tabs — App setup does not steal the
+  page title or that button. Reconnect is on
   every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
   already lapsed, or still connected but expiring soon. Slack and
   Telegram paste a new token in Manage. Provider access tokens are

@@ -321,9 +321,11 @@ body[data-view="agents"] .view.active { padding-top: 0; width: 100%; }
 .page-tools.section-head { margin: 0; padding: 0; flex: 1; }
 /* In-flow toolbars keep a step of air above the register they control —
    the family rhythm `.list-tools` carried before `.page-tools` flattened
-   margins. The hoisted .primary-tools lives in the topbar, so it never
-   matches; the agents tab strip flows into its workspace and opts out. */
+   margins. Standalone pages hoist .primary-tools into the topbar; family
+   tabs keep theirs here so the header above the tabs stays still. The
+   agents tab strip flows into its workspace and opts out. */
 .view > .page-tools { margin-bottom: 12px; }
+.view > .page-tools.primary-tools { justify-content: flex-end; }
 .view > .agent-toolbar.page-tools { margin-bottom: 0; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
