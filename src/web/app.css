@@ -250,7 +250,10 @@ main { min-width: 0; padding: 0 40px 64px; }
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--dk-border-default);
+  /* overflow-x: auto alone computes overflow-y to auto, and the 2px
+     tab underline then paints a thin vertical scrollbar. */
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 .page-tabs[hidden] { display: none; }

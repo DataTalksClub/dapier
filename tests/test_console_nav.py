@@ -81,6 +81,17 @@ def test_folded_pages_are_family_tabs_not_sidebar_items():
     assert _family_labels("agents") == ["Tasks", "Workers"]
 
 
+def test_page_tabs_clip_vertical_overflow():
+    """overflow-x: auto computes overflow-y to auto unless y is set, and
+    the 2px tab underline then paints a thin vertical scrollbar."""
+    css = pathlib.Path("src/web/app.css").read_text()
+    match = re.search(r"\.page-tabs \{[^}]+\}", css)
+    assert match, ".page-tabs rule missing"
+    block = match.group(0)
+    assert "overflow-x: auto" in block
+    assert "overflow-y: hidden" in block
+
+
 def test_parent_nav_highlights_folded_views():
     assert "emails: 'workflows'" in ROUTER
     assert "schedules: 'workflows'" in ROUTER
