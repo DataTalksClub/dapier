@@ -317,7 +317,8 @@ register_source(PollSource(
 # the connector registry is global.
 
 connector(Connector(name="gmail", label="Gmail",
-                    events=("message.received",), icon="mail"))
+                    events=("message.received",), icon="mail",
+                    event_info={"message.received": ("Email arrives", "A new message lands in the watched Gmail inbox or label")}))
 
 
 # --- trigger discovery: the chip's sample pull --------------------------------

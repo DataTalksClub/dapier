@@ -28,7 +28,12 @@ from src.dapier.triggers.poll_sources import PollSource, register_source
 
 connector(Connector(name="s3", label="S3",
                     events=("file.created", "file.updated", "file.deleted"),
-                    icon="database"))
+                    icon="database",
+                    event_info={
+                        "file.created": ("Object added", "A new object lands in the watched S3 bucket or prefix"),
+                        "file.updated": ("Object changed", "An object in the watched bucket is overwritten"),
+                        "file.deleted": ("Object deleted", "An object is removed from the watched bucket"),
+                    }))
 
 register(Action(
     type="s3_upload",

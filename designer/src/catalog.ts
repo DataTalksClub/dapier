@@ -1773,6 +1773,63 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "custom", label: "Custom", logo: Webhook, events: [] }
 ];
 
+/** Mirrors each registered Connector's event_info (connectors.registry): the
+ * label and one-line description the inspector's Event dropdown shows,
+ * keyed "<connector>/<event>". tests/test_designer_catalog.py keeps it in
+ * sync with the registry — change descriptions there first. */
+export const connectorEventInfo: Record<string, [label: string, description: string]> = {
+  "dropbox/file.created": ["File added", "A new file appears in the watched Dropbox folder"],
+  "dropbox/file.updated": ["File changed", "A file in the watched Dropbox folder is modified"],
+  "dropbox/file.deleted": ["File deleted", "A file is removed from the watched Dropbox folder"],
+  "email/message.received": ["Email arrives", "A message reaches one of this workflow's Dapier addresses"],
+  "email/bounce.received": ["Email bounced", "A message Dapier sent could not be delivered"],
+  "email/complaint.received": ["Spam complaint", "A recipient marked a message Dapier sent as spam"],
+  "gmail/message.received": ["Email arrives", "A new message lands in the watched Gmail inbox or label"],
+  "google-calendar/event.new": ["Event created", "A new event is added to the watched calendar"],
+  "google-drive/file.created": ["File created", "A new file appears in the watched Drive folder"],
+  "google-drive/file.updated": ["File changed", "A file in the watched Drive folder is modified"],
+  "google-drive/file.deleted": ["File deleted", "A file is removed from the watched Drive folder"],
+  "google-sheets/row.new": ["Row added", "A new row appears in the watched worksheet"],
+  "google-sheets/row.updated": ["Row changed", "An existing row in the watched worksheet is edited"],
+  "mailchimp/subscribe": ["Subscribed", "Someone joins the audience"],
+  "mailchimp/unsubscribe": ["Unsubscribed", "Someone leaves the audience"],
+  "mailchimp/profile": ["Profile updated", "A subscriber changes their profile fields"],
+  "mailchimp/upemail": ["Email changed", "A subscriber changes their email address"],
+  "mailchimp/cleaned": ["Address cleaned", "Mailchimp removes an address that keeps bouncing"],
+  "mailchimp/campaign": ["Campaign sent", "A campaign is sent to the audience"],
+  "mailchimp/member.new": ["New member (poll)", "A polled audience lists a member not seen before"],
+  "poll/item.new": ["New item", "A polled API returns an item not seen before"],
+  "renderer/job.completed": ["Render finished", "A renderer job finished and its output is ready"],
+  "rss/item.new": ["New feed item", "The feed publishes an entry not seen before"],
+  "s3/file.created": ["Object added", "A new object lands in the watched S3 bucket or prefix"],
+  "s3/file.updated": ["Object changed", "An object in the watched bucket is overwritten"],
+  "s3/file.deleted": ["Object deleted", "An object is removed from the watched bucket"],
+  "schedule/schedule.triggered": ["On schedule", "The workflow's cron or rate schedule fires"],
+  "slack/message.received": ["Message posted", "A message is posted in a channel the app can see"],
+  "slack/app.mention": ["App mentioned", "Someone @-mentions the app"],
+  "slack/reaction.added": ["Reaction added", "Someone adds an emoji reaction to a message"],
+  "slack/member.joined": ["Member joined", "Someone joins a channel"],
+  "telegram/message.received": ["Message received", "Someone sends the bot a message, directly or in a group"],
+  "telegram/channel_post.received": ["Channel post received", "A post appears in a channel the bot administers"],
+  "telegram/callback_query.received": ["Button pressed (callback query)", "Someone taps an inline button on a bot message"],
+  "youtube/video.published": ["Video published", "A new video goes live on the channel"],
+  "zoom/recording.completed": ["Recording ready", "A cloud recording finishes processing"],
+  "zoom/recording.transcript_completed": ["Transcript ready", "A cloud recording's transcript is ready"],
+  "zoom/meeting.started": ["Meeting started", "A meeting begins"],
+  "zoom/meeting.ended": ["Meeting ended", "A meeting ends"],
+  "zoom/meeting.registration_created": ["Meeting registration", "Someone registers for a meeting"],
+  "zoom/webinar.started": ["Webinar started", "A webinar begins"],
+  "zoom/webinar.ended": ["Webinar ended", "A webinar ends"],
+  "zoom/webinar.registration_created": ["Webinar registration", "Someone registers for a webinar"],
+};
+
+/** Label and description for one connector event, or null when the
+ * catalog has none (custom events). */
+export function eventInfo(connector: string, event: string): { label: string; description: string } | null {
+  const hit = connectorEventInfo[`${connector}/${event}`];
+  return hit ? { label: hit[0], description: hit[1] } : null;
+}
+
 /** Mirrors registry.FILTER_OPERATORS (engine/matching.py): the operators a
  * trigger's `filters` rules accept — the same evaluator as the logic steps. */
 export const filterOperators = [

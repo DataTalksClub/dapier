@@ -17,4 +17,14 @@ connector(Connector(name="zoom", label="Zoom",
                             "meeting.registration_created",
                             "webinar.started", "webinar.ended",
                             "webinar.registration_created"),
-                    icon="video"))
+                    icon="video",
+                    event_info={
+                        "recording.completed": ("Recording ready", "A cloud recording finishes processing"),
+                        "recording.transcript_completed": ("Transcript ready", "A cloud recording's transcript is ready"),
+                        "meeting.started": ("Meeting started", "A meeting begins"),
+                        "meeting.ended": ("Meeting ended", "A meeting ends"),
+                        "meeting.registration_created": ("Meeting registration", "Someone registers for a meeting"),
+                        "webinar.started": ("Webinar started", "A webinar begins"),
+                        "webinar.ended": ("Webinar ended", "A webinar ends"),
+                        "webinar.registration_created": ("Webinar registration", "Someone registers for a webinar"),
+                    }))

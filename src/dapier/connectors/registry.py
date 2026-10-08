@@ -24,7 +24,7 @@ package lazily inside the call.
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class ActionError(ValueError):
@@ -68,12 +68,26 @@ class Action:
 
 @dataclass(frozen=True)
 class Connector:
-    """One trigger connector: the palette chip and its suggested events."""
+    """One trigger connector: the palette chip and its suggested events.
+
+    ``event_info`` describes each event for people choosing one (designer
+    dropdown, ``dapier catalog``): ``{event: (label, description)}``. A
+    connector with no ``events`` accepts any event name (custom webhooks).
+    """
 
     name: str
     label: str
     events: tuple = ()
     icon: str = "webhook"
+    event_info: dict = field(default_factory=dict, compare=False, hash=False)
+
+    def describe_events(self):
+        """One ``{event, label, description}`` per event, in declared order."""
+        out = []
+        for event in self.events:
+            label, description = self.event_info.get(event, (event, ""))
+            out.append({"event": event, "label": label, "description": description})
+        return out
 
 
 @dataclass(frozen=True)
@@ -524,7 +538,8 @@ def catalog():
         + [_entry_json(entry)
            for entry in sorted(LOGIC.values(), key=lambda e: e.type)],
         "connectors": [
-            {"name": entry.name, "label": entry.label, "events": list(entry.events), "icon": entry.icon}
+            {"name": entry.name, "label": entry.label, "events": list(entry.events),
+             "event_info": entry.describe_events(), "icon": entry.icon}
             for entry in sorted(CONNECTORS.values(), key=lambda e: e.name)
         ],
         # Discovery manifests: which provider listings exist and the query

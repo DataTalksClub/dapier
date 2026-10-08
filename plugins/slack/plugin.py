@@ -54,7 +54,13 @@ connector(Connector(
     name="slack", label="Slack",
     events=("message.received", "app.mention",
             "reaction.added", "member.joined"),
-    icon="slack"))
+    icon="slack",
+    event_info={
+        "message.received": ("Message posted", "A message is posted in a channel the app can see"),
+        "app.mention": ("App mentioned", "Someone @-mentions the app"),
+        "reaction.added": ("Reaction added", "Someone adds an emoji reaction to a message"),
+        "member.joined": ("Member joined", "Someone joins a channel"),
+    }))
 
 register(Action(
     type="slack",

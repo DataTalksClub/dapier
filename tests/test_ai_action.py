@@ -310,7 +310,7 @@ class ChipMirrorTests(unittest.TestCase):
 
     def test_catalog_json_carries_the_chip_and_action(self):
         catalog = registry.catalog()
-        assert {"name": "ai", "label": "AI", "events": [], "icon": "sparkles"} \
+        assert {"name": "ai", "label": "AI", "events": [], "event_info": [], "icon": "sparkles"} \
             in catalog["connectors"]
         assert any(entry["type"] == "ai_complete" for entry in catalog["actions"])
 

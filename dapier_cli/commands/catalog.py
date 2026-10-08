@@ -18,8 +18,16 @@ def catalog_show(api_url, debug=False, as_json=False):
         print(f"  {entry.get('type', ''):20} {entry.get('label', '')}")
     print("Trigger connectors:")
     for entry in data.get("connectors", []):
-        events = ", ".join(entry.get("events") or []) or "(any event)"
-        print(f"  {entry.get('name', ''):20} {entry.get('label', ''):20} {events}")
+        info = entry.get("event_info") or []
+        if not info:
+            events = ", ".join(entry.get("events") or []) or "(any event)"
+            print(f"  {entry.get('name', ''):20} {entry.get('label', ''):20} {events}")
+            continue
+        print(f"  {entry.get('name', ''):20} {entry.get('label', '')}")
+        for event in info:
+            description = event.get("description") or ""
+            line = f"    {event.get('event', ''):32} {event.get('label', '')}"
+            print(f"{line} — {description}" if description else line)
     return 0
 
 

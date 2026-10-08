@@ -10,6 +10,7 @@ missing link as a test: every registered chip must appear in the mirror
 with the same label and the same events (order is presentational), and the
 mirror may not carry chips the registry does not know.
 """
+import json
 import re
 from pathlib import Path
 
@@ -78,3 +79,36 @@ def test_mirrored_labels_match_the_registry():
         if name in mirrored and entry["label"] != mirrored[name]["label"]
     }
     assert not drifted, f"labels drifted between the registry and the mirror: {drifted}"
+
+
+EVENT_INFO_LINE = re.compile(r'^\s*("[^"]+/[^"]+"):\s*(\[.*\]),$', re.MULTILINE)
+
+
+def mirrored_event_info():
+    """connectorEventInfo parsed out of the TS source: "conn/event" → [label, description]."""
+    source = CATALOG_TS.read_text(encoding="utf-8")
+    block = re.search(
+        r"export const connectorEventInfo[^=]*=\s*\{(.*?)\n\};", source, re.DOTALL)
+    assert block, "connectorEventInfo not found in designer/src/catalog.ts"
+    return {json.loads(key): json.loads(value)
+            for key, value in EVENT_INFO_LINE.findall(block.group(1))}
+
+
+def test_every_registered_event_has_a_description():
+    """The Event dropdown (designer) and `dapier catalog` explain each event."""
+    undescribed = [
+        f"{entry['name']}/{info['event']}"
+        for entry in registry.catalog()["connectors"]
+        for info in entry["event_info"]
+        if not info["description"] or info["label"] == info["event"]
+    ]
+    assert not undescribed, f"events without a label/description in event_info: {undescribed}"
+
+
+def test_mirrored_event_info_matches_the_registry():
+    registered = {
+        f"{entry['name']}/{info['event']}": [info["label"], info["description"]]
+        for entry in registry.catalog()["connectors"]
+        for info in entry["event_info"]
+    }
+    assert mirrored_event_info() == registered

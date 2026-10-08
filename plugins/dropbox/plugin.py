@@ -30,7 +30,12 @@ from src.dapier.triggers.poll_sources import PollSource, register_source
 
 connector(Connector(name="dropbox", label="Dropbox",
                     events=("file.created", "file.updated", "file.deleted"),
-                    icon="dropbox"))
+                    icon="dropbox",
+                    event_info={
+                        "file.created": ("File added", "A new file appears in the watched Dropbox folder"),
+                        "file.updated": ("File changed", "A file in the watched Dropbox folder is modified"),
+                        "file.deleted": ("File deleted", "A file is removed from the watched Dropbox folder"),
+                    }))
 
 DROPBOX_LIST_FOLDER_URL = "https://api.dropboxapi.com/2/files/list_folder"
 DROPBOX_LIST_CONTINUE_URL = "https://api.dropboxapi.com/2/files/list_folder/continue"

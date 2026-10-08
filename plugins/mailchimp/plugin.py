@@ -40,7 +40,16 @@ from src.dapier.triggers.poll_sources import PollSource, register_source
 connector(Connector(name="mailchimp", label="Mailchimp",
                     events=("subscribe", "unsubscribe", "profile", "upemail",
                             "cleaned", "campaign", "member.new"),
-                    icon="mail"))
+                    icon="mail",
+                    event_info={
+                        "subscribe": ("Subscribed", "Someone joins the audience"),
+                        "unsubscribe": ("Unsubscribed", "Someone leaves the audience"),
+                        "profile": ("Profile updated", "A subscriber changes their profile fields"),
+                        "upemail": ("Email changed", "A subscriber changes their email address"),
+                        "cleaned": ("Address cleaned", "Mailchimp removes an address that keeps bouncing"),
+                        "campaign": ("Campaign sent", "A campaign is sent to the audience"),
+                        "member.new": ("New member (poll)", "A polled audience lists a member not seen before"),
+                    }))
 
 register(Action(
     type="mailchimp_find_member",

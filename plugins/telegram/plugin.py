@@ -42,7 +42,12 @@ from src.dapier.connectors.trigger_discovery import (
 connector(Connector(name="telegram", label="Telegram",
                     events=("message.received", "channel_post.received",
                             "callback_query.received"),
-                    icon="send"))
+                    icon="send",
+                    event_info={
+                        "message.received": ("Message received", "Someone sends the bot a message, directly or in a group"),
+                        "channel_post.received": ("Channel post received", "A post appears in a channel the bot administers"),
+                        "callback_query.received": ("Button pressed (callback query)", "Someone taps an inline button on a bot message"),
+                    }))
 
 register(Action(
     type="telegram_send",

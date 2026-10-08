@@ -1676,3 +1676,18 @@ def test_templates_command_is_removed():
         main.main(["templates", "list"])
     assert exc.value.code == 2
 
+
+def test_catalog_lists_each_event_with_its_description(monkeypatch, capsys):
+    catalog = {"actions": [], "connectors": [
+        {"name": "custom", "label": "Custom", "events": [], "event_info": []},
+        {"name": "youtube", "label": "YouTube", "events": ["video.published"],
+         "event_info": [{"event": "video.published", "label": "Video published",
+                         "description": "A new video goes live on the channel"}]},
+    ]}
+    monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: catalog)
+    assert main.main(["catalog"]) == 0
+    out = capsys.readouterr().out
+    assert "(any event)" in out
+    assert "video.published" in out
+    assert "Video published — A new video goes live on the channel" in out
+

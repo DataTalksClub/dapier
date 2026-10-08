@@ -26,7 +26,8 @@ from src.dapier.connectors.trigger_discovery import (
 )
 from src.dapier.triggers.poll_sources import PollSource, register_source
 
-connector(Connector(name="rss", label="RSS", events=("item.new",), icon="rss"))
+connector(Connector(name="rss", label="RSS", events=("item.new",), icon="rss",
+                    event_info={"item.new": ("New feed item", "The feed publishes an entry not seen before")}))
 
 RSS_TIMEOUT = 10
 RSS_SUMMARY_CHARS = 500

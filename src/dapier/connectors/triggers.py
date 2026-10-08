@@ -16,10 +16,18 @@ each owns its sample.
 from .registry import Connector, connector
 
 connector(Connector(name="email", label="Email",
-                    events=("message.received", "bounce.received", "complaint.received"), icon="mail"))
-connector(Connector(name="renderer" , label="Renderer", events=("job.completed",), icon="file-text"))
-connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock"))
-connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw"))
+                    events=("message.received", "bounce.received", "complaint.received"), icon="mail",
+                    event_info={
+                        "message.received": ("Email arrives", "A message reaches one of this workflow's Dapier addresses"),
+                        "bounce.received": ("Email bounced", "A message Dapier sent could not be delivered"),
+                        "complaint.received": ("Spam complaint", "A recipient marked a message Dapier sent as spam"),
+                    }))
+connector(Connector(name="renderer" , label="Renderer", events=("job.completed",), icon="file-text",
+                    event_info={"job.completed": ("Render finished", "A renderer job finished and its output is ready")}))
+connector(Connector(name="schedule", label="Schedule", events=("schedule.triggered",), icon="clock",
+                    event_info={"schedule.triggered": ("On schedule", "The workflow's cron or rate schedule fires")}))
+connector(Connector(name="poll", label="Poll", events=("item.new",), icon="refresh-cw",
+                    event_info={"item.new": ("New item", "A polled API returns an item not seen before")}))
 connector(Connector(name="custom", label="Custom", events=(), icon="webhook"))
 
 
