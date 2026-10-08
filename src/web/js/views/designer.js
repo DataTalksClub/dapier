@@ -131,6 +131,7 @@ export function postConnectionsToDesigner() {
     display_name: connection.display_name || '',
     account_title: connection.account_title || '',
     status: connection.status || '',
+    refs: connection.refs || [],
   }));
   frame.postMessage({ type: 'designer:set-connections', connections }, window.location.origin);
 }

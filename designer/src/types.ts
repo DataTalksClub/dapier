@@ -115,6 +115,9 @@ export interface ConnectionOption {
   display_name?: string;
   account_title?: string;
   status?: string;
+  /** "<service> <account>" references for this connection (drive alexey@…),
+      the form flows write instead of the internal connection_id. */
+  refs?: string[];
 }
 
 /** One action of a test run: what it would receive, or what went wrong. */

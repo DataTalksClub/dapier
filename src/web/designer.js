@@ -21516,6 +21516,15 @@
     }
     return connection.account_title || connection.connection_id;
   }
+  function connectionRef(connection, nodeType) {
+    const refs = connection.refs ?? [];
+    const service = (nodeType ?? "").split("_")[0];
+    return refs.find((ref) => ref.split(" ")[0] === service) ?? refs[0] ?? connection.connection_id;
+  }
+  function connectionMatches(connection, value) {
+    const wanted = value.trim().toLowerCase();
+    return connection.connection_id === wanted || (connection.refs ?? []).some((ref) => ref.toLowerCase() === wanted);
+  }
   function connectionHint(connection) {
     const title = connectionTitle(connection);
     const status = CONNECTION_STATUS_LABELS[connection.status ?? ""] ?? connection.status;
@@ -21623,7 +21632,7 @@
       )
     ] });
   }
-  function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }) {
+  function FieldInput({ field, value, onChange, connections, fields, siblingFields, config, nodeType }) {
     const [discovering, setDiscovering] = reactExports.useState(false);
     if (field.type === "boolean") {
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
@@ -21673,7 +21682,7 @@
     }
     if (field.provider && connections) {
       const matches = connections.filter((connection) => connection.provider === field.provider);
-      const current = matches.find((connection) => connection.connection_id === value);
+      const current = matches.find((connection) => connectionMatches(connection, value));
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
         field.label,
         field.required ? " *" : "",
@@ -21683,23 +21692,24 @@
             className: "mono-input",
             list: `connections-${field.key}`,
             value,
-            placeholder: matches.length === 1 && !value ? matches[0].connection_id : field.placeholder,
+            placeholder: matches.length === 1 && !value ? connectionRef(matches[0], nodeType) : field.placeholder,
             onChange: (event) => onChange(event.target.value)
           }
         ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connection.connection_id, children: connectionHint(connection) }, connection.connection_id)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connectionRef(connection, nodeType), children: connectionHint(connection) }, connection.connection_id)) }),
         value !== "" && current && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: connectionHint(current) }),
         value !== "" && !current && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint warn", children: [
           "Not one of your ",
           field.provider,
-          " connections — pick one from the list or check the ID."
+          " connections — pick one from the list."
         ] })
       ] });
     }
     if (field.discover && config?.mode === "console") {
       const discover = field.discover;
       const fromKey = discover.from ?? "connection_id";
-      const account = discover.account ?? (fields?.[fromKey] ?? "").trim();
+      const named = (fields?.[fromKey] ?? "").trim();
+      const account = discover.account ?? connections?.find((connection) => connectionMatches(connection, named))?.connection_id ?? named;
       const fromLabel = discover.from ? siblingFields?.find((sibling) => sibling.key === fromKey)?.label.toLowerCase() : void 0;
       return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
@@ -23065,6 +23075,7 @@
                 fields: data.fields,
                 siblingFields: meta.fields,
                 config,
+                nodeType: data.actionType,
                 onChange: (value) => setField(field.key, value)
               },
               field.key

@@ -72,6 +72,23 @@ function connectionTitle(connection: ConnectionOption): string {
   return connection.account_title || connection.connection_id;
 }
 
+/** The "<service> <account>" a flow writes for this connection: the
+    reference whose service matches the step (drive_find_file → drive), else
+    its first. Never the internal connection_id unless nothing else exists
+    (a connection that never finished sign-in has no account to name). */
+function connectionRef(connection: ConnectionOption, nodeType?: string): string {
+  const refs = connection.refs ?? [];
+  const service = (nodeType ?? "").split("_")[0];
+  return refs.find((ref) => ref.split(" ")[0] === service) ?? refs[0] ?? connection.connection_id;
+}
+
+/** Whether a field value names this connection: its id or any reference. */
+function connectionMatches(connection: ConnectionOption, value: string): boolean {
+  const wanted = value.trim().toLowerCase();
+  return connection.connection_id === wanted
+    || (connection.refs ?? []).some((ref) => ref.toLowerCase() === wanted);
+}
+
 /** "display_name · status" for the datalist entries and the selected hint. */
 function connectionHint(connection: ConnectionOption): string {
   const title = connectionTitle(connection);
@@ -154,7 +171,7 @@ function PromptField({ field, value, onChange }: {
 }
 
 /** One catalog field, rendered per its declared type. */
-function FieldInput({ field, value, onChange, connections, fields, siblingFields, config }: {
+function FieldInput({ field, value, onChange, connections, fields, siblingFields, config, nodeType }: {
   field: CatalogField;
   value: string;
   onChange: (value: string) => void;
@@ -164,6 +181,8 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
   /** Sibling field definitions, for the discovery hint's label. */
   siblingFields?: CatalogField[];
   config?: DesignerConfig;
+  /** The step's action type, which picks the service in a connection reference. */
+  nodeType?: string;
 }) {
   const [discovering, setDiscovering] = useState(false);
   if (field.type === "boolean") {
@@ -212,23 +231,25 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
   }
   // Connection fields suggest the operator's real connections (display name,
   // verified identity, status) over a bare ID typed from memory; the value
-  // stays the plain connection_id in the YAML, and free text still works for
-  // anything the snapshot does not know (offline mode, brand-new records).
+  // written to the YAML is the "<service> <account>" reference (drive
+  // alexey@…), which the engine resolves at run time. Existing internal ids
+  // still match, and free text still works for anything the snapshot does
+  // not know (offline mode, brand-new records).
   if (field.provider && connections) {
     const matches = connections.filter((connection) => connection.provider === field.provider);
-    const current = matches.find((connection) => connection.connection_id === value);
+    const current = matches.find((connection) => connectionMatches(connection, value));
     return (
       <label>{field.label}{field.required ? " *" : ""}
         <input
           className="mono-input"
           list={`connections-${field.key}`}
           value={value}
-          placeholder={matches.length === 1 && !value ? matches[0].connection_id : field.placeholder}
+          placeholder={matches.length === 1 && !value ? connectionRef(matches[0], nodeType) : field.placeholder}
           onChange={(event) => onChange(event.target.value)}
         />
         <datalist id={`connections-${field.key}`}>
           {matches.map((connection) => (
-            <option key={connection.connection_id} value={connection.connection_id}>
+            <option key={connection.connection_id} value={connectionRef(connection, nodeType)}>
               {connectionHint(connection)}
             </option>
           ))}
@@ -236,7 +257,7 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
         {value !== "" && current && <span className="connection-hint">{connectionHint(current)}</span>}
         {value !== "" && !current && (
           <span className="connection-hint warn">
-            Not one of your {field.provider} connections — pick one from the list or check the ID.
+            Not one of your {field.provider} connections — pick one from the list.
           </span>
         )}
       </label>
@@ -248,7 +269,12 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
   if (field.discover && config?.mode === "console") {
     const discover = field.discover;
     const fromKey = discover.from ?? "connection_id";
-    const account = discover.account ?? (fields?.[fromKey] ?? "").trim();
+    // The field may hold a "<service> <account>" reference; discovery's
+    // route wants the connection's internal id.
+    const named = (fields?.[fromKey] ?? "").trim();
+    const account = discover.account
+      ?? connections?.find((connection) => connectionMatches(connection, named))?.connection_id
+      ?? named;
     const fromLabel = discover.from
       ? siblingFields?.find((sibling) => sibling.key === fromKey)?.label.toLowerCase()
       : undefined;
@@ -1830,6 +1856,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 fields={data.fields}
                 siblingFields={meta.fields}
                 config={config}
+                nodeType={data.actionType}
                 onChange={(value) => setField(field.key, value)}
               />
             ))}
