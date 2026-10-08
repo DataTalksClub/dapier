@@ -70,6 +70,8 @@ def register(sub):
                             help="Discovery param, repeatable (e.g. --param folder=/invoices)")
     test_p = conn_sub.add_parser("test", help="Test a connection's stored tokens against its provider")
     test_p.add_argument("connection_id")
+    conn_sub.add_parser("send-expiry-digest",
+                        help="Render and email the connection expiry digest now (operator)")
     token_p = sub.add_parser("token", help="Short-lived provider access tokens")
     token_sub = token_p.add_subparsers(dest="command", required=True)
     exec_p = token_sub.add_parser("exec", help="Run a command with a fresh token in its environment")
@@ -131,4 +133,6 @@ def run(args, api_url, debug, child=None):
             params=[pair for group in args.param for pair in group], debug=debug)
     if args.command == "test":
         return commands.connections_test(api_url, args.connection_id, debug)
+    if args.command == "send-expiry-digest":
+        return commands.connections_send_expiry_digest(api_url, debug)
     return 2

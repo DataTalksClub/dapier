@@ -205,6 +205,67 @@ const effectiveStatus = (connection) =>
   (connection.health === 'expired' && connection.status === 'connected' ? 'expired' : connection.status);
 const needsAttention = (connection) => ['ready', 'expired', 'revoked'].includes(effectiveStatus(connection));
 
+/* Tokens expiring inside this horizon head a banner above the register —
+   keep in lockstep with the digest window (DAPIER_CONNECTION_DIGEST_HOURS,
+   src/dapier/connection_digest.py). Rows whose token already lapsed show
+   as needing attention, so the banner is for the ones that still work. */
+const EXPIRY_HORIZON_HOURS = 48;
+
+const expiringSoon = (connections) => {
+  const horizon = Date.now() + EXPIRY_HORIZON_HOURS * 3600 * 1000;
+  return (connections || []).filter((connection) => {
+    if (connection.health === 'expired' || !connection.token_expires_at) return false;
+    const when = Date.parse(connection.token_expires_at);
+    return !Number.isNaN(when) && when <= horizon;
+  });
+};
+
+function connectionExpiryBanner() {
+  const existing = $('#connection-expiry-banner');
+  if (existing) return existing;
+  const banner = document.createElement('div');
+  banner.id = 'connection-expiry-banner';
+  banner.className = 'attention-panel';
+  banner.setAttribute('aria-live', 'polite');
+  banner.hidden = true;
+  $('#connection-register')?.before(banner);
+  return banner;
+}
+
+function renderExpiryBanner(connections) {
+  const soon = expiringSoon(connections);
+  const banner = connectionExpiryBanner();
+  banner.hidden = soon.length === 0;
+  if (soon.length === 0) return;
+  const items = soon.map((connection) => {
+    const when = formatTimestamp(connection.token_expires_at) || 'soon';
+    return `<div class="attention-item">` +
+      `<strong>${escapeHtml(connection.display_name || connection.connection_id)}</strong>` +
+      `<span>token expires ${escapeHtml(when)}</span></div>`;
+  }).join('');
+  banner.innerHTML =
+    `<h3>Tokens expiring soon</h3>` +
+    `<p class="sub">Reconnect these accounts before their tokens lapse — ` +
+    `workflows using them start failing, and the CLI or API re-auth command is ` +
+    `<code>dapier connections connect &lt;id&gt;</code>.</p>` +
+    `<div class="attention-items">${items}</div>` +
+    `<button id="connection-expiry-alert" class="dk-button dk-button--secondary" type="button">Email re-auth reminder now</button>`;
+  $('#connection-expiry-alert')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const data = await api('/api/admin/connections/expiry-digest', { method: 'POST', body: '{}' });
+      notice(data.sent
+        ? `Re-auth reminder emailed to ${data.to}`
+        : `Nothing expires within ${data.window_hours}h — no email sent.`);
+    } catch (error) {
+      notice(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 let addPickerOpen = false;
 
 /* Server-paged accounts register: the overview snapshot clips at its scan
@@ -591,6 +652,7 @@ function renderConnections(connections) {
   $('#connection-summary').textContent = connections.length
     ? `${connected} connected · ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
     : 'No accounts connected';
+  renderExpiryBanner(connections);
   $('#connect-picker').hidden = !addPickerOpen && connections.length > 0;
   $('#add-connection').setAttribute('aria-expanded', String(!$('#connect-picker').hidden));
   $('#connection-empty').hidden = connections.length > 0;

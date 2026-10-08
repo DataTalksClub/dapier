@@ -179,6 +179,176 @@ def test_send_with_nothing_expiring_skips(monkeypatch, ses):
     ses.return_value.send_email.assert_not_called()
 
 
+# --- POST /api/admin/connections/expiry-digest (console path) ---
+
+def _admin_request(method, path, cookies=None):
+    return {
+        "requestContext": {"http": {"method": method, "path": path}},
+        "headers": {"host": "dapier.example.test",
+                    "origin": "https://dapier.example.test"},
+        "cookies": cookies or [],
+        "body": "{}",
+    }
+
+
+def _admin_operator(monkeypatch):
+    from src.dapier.auth import session
+
+    monkeypatch.setattr(session, "_credentials",
+                        lambda: {"username": "admin", "password": "pw"})
+    cookie = session._sign({"sub": "op@datatalks.club", "subject": "op-sub",
+                            "exp": int(time.time()) + 600})
+    return [f"dapier_session={cookie}"]
+
+
+def test_admin_expiry_digest_send_now_returns_what_was_sent(monkeypatch, ses):
+    from src.dapier.api import admin
+
+    cookies = _admin_operator(monkeypatch)
+    monkeypatch.setattr(connection_digest, "expiring",
+                        lambda *a, **k: _expiring_rows())
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@dtcdev.click")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@dtcdev.click")
+    response = admin.route(
+        _admin_request("POST", "/api/admin/connections/expiry-digest",
+                       cookies=cookies),
+        "POST", "/api/admin/connections/expiry-digest",
+    )
+
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["sent"] is True
+    assert body["to"] == "ops@dtcdev.click"
+    assert body["connections"] == ["google-sheets", "dropbox"]
+    ses.return_value.send_email.assert_called_once()
+
+
+def test_admin_expiry_digest_requires_authentication(monkeypatch):
+    from src.dapier.api import admin
+
+    response = admin.route(
+        _admin_request("POST", "/api/admin/connections/expiry-digest"),
+        "POST", "/api/admin/connections/expiry-digest",
+    )
+
+    assert response["statusCode"] == 401
+
+
+# --- POST /api/agent/connections/expiry-digest (CLI path, operator-gated) ---
+
+def _agent_operator(monkeypatch):
+    from src.dapier.api import agent as agent_api
+
+    agent_api.reset_rate_limits()
+
+    class Table:
+        def get_item(self, **kwargs):
+            return {}
+
+        def put_item(self, **kwargs):
+            return {}
+
+        def scan(self, **kwargs):
+            return {"Items": []}
+
+    class DynamoResource:
+        def Table(self, _name):
+            return Table()
+
+    import boto3
+
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setenv("GRANTS_TABLE", "grants")
+    monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setenv("API_TOKENS_TABLE", "api-tokens")
+    monkeypatch.setenv("AUTH_CLI_CLIENT_ID", "cli-client")
+    monkeypatch.delenv("AUDIT_TABLE", raising=False)
+    monkeypatch.setattr(boto3, "resource", lambda service: DynamoResource())
+    return agent_api
+
+
+def _agent_event(token, body=None):
+    headers = {"host": "dapier.example.test"}
+    if token is not None:
+        headers["authorization"] = f"Bearer {token}"
+    request = {"headers": headers, "cookies": []}
+    if body is not None:
+        request["body"] = json.dumps(body)
+    return request
+
+
+def test_agent_expiry_digest_send_now_returns_what_was_sent(monkeypatch, ses):
+    agent_api = _agent_operator(monkeypatch)
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    monkeypatch.setattr(
+        agent_api, "verify_id_token",
+        lambda token, audience=None: {"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setattr(connection_digest, "expiring",
+                        lambda *a, **k: _expiring_rows())
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@dtcdev.click")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "ops@dtcdev.click")
+    response = agent_api.route(
+        _agent_event("dtc-id-token"), "POST",
+        "/api/agent/connections/expiry-digest")
+
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["sent"] is True
+    assert body["connections"] == ["google-sheets", "dropbox"]
+    ses.return_value.send_email.assert_called_once()
+
+
+def test_agent_expiry_digest_requires_operator(monkeypatch):
+    agent_api = _agent_operator(monkeypatch)
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    monkeypatch.setattr(
+        agent_api, "verify_id_token",
+        lambda token, audience=None: {"sub": "subject-1", "email": "agent@example.test"})
+
+    response = agent_api.route(
+        _agent_event("dtc-id-token"), "POST",
+        "/api/agent/connections/expiry-digest")
+
+    assert response["statusCode"] == 403
+
+
+# --- `dapier connections send-expiry-digest` (thin client over the agent route) ---
+
+def test_cli_send_expiry_digest_hits_the_agent_endpoint(isolated_home, monkeypatch, capsys):
+    from dapier_cli import commands, main
+
+    calls = []
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        calls.append((method, path))
+        return {"sent": True, "to": "ops@dtcdev.click", "subject": "x",
+                "connections": ["google-sheets"], "window_hours": 48}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["connections", "send-expiry-digest"])
+
+    assert rc == 0
+    assert calls == [("POST", "/api/agent/connections/expiry-digest")]
+    out = capsys.readouterr().out
+    assert "Digest sent to ops@dtcdev.click" in out
+    assert "google-sheets" in out
+
+
+def test_cli_send_expiry_digest_reports_the_skip(isolated_home, monkeypatch, capsys):
+    from dapier_cli import commands, main
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        return {"skipped": True, "window_hours": 48, "expiring": 0}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["connections", "send-expiry-digest"])
+
+    assert rc == 0
+    assert "skipped" in capsys.readouterr().out
+
+
 # --- deploy wiring: the daily EventBridge schedule targets the handler ---
 
 def test_template_schedules_the_connection_digest_daily():

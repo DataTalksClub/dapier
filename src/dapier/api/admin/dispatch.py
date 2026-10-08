@@ -153,6 +153,8 @@ flows, discovery, and the health check."""
         return routes.list_connections(event)
     if method == "POST" and path == "/api/admin/connections/import":
         return routes.import_connection(event, operator_subject)
+    if method == "POST" and path == "/api/admin/connections/expiry-digest":
+        return routes.send_expiry_digest(event, operator_subject)
     discover_resource_match = re.fullmatch(
         r"/api/admin/connections/([a-z0-9_-]+)/discover/([a-z0-9_-]+)", path)
     if method == "GET" and discover_resource_match:

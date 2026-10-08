@@ -157,6 +157,8 @@ def _route(event, method, path):
         return errors_summary_api(event)
     if path == "/api/agent/errors/digest" and method == "POST":
         return errors_digest_api(event)
+    if path == "/api/agent/connections/expiry-digest" and method == "POST":
+        return connections.expiry_digest_api(event)
     runs_match = re.fullmatch(r"/api/agent/runs/([^/]+)", path)
     if runs_match and method == "GET":
         return runs_api(event, run_id=unquote(runs_match.group(1)))

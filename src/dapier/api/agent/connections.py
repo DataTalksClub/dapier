@@ -19,6 +19,8 @@ from ...connections.tokens import TokenError
 from ...connections import oauth_flow
 from .. import overview
 
+from ... import connection_digest
+
 from .common import _json_response, _no_store, _check_rate, _api_token, _check_agent_binding, _b64encode
 
 from .common import _LateBinding
@@ -33,7 +35,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "import_connection", "issue_token", "list_for_caller", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
+__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "expiry_digest_api", "import_connection", "issue_token", "list_for_caller", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
 
 
 
@@ -164,6 +166,23 @@ def list_for_caller(event):
             "limit": limit,
         },
     })
+
+
+def expiry_digest_api(event):
+    """Operator-only send-now for the daily connection-expiry digest.
+
+    Same domain function the scheduled ConnectionDigestFunction Lambda runs
+    (connection_digest.send); the response reports what was sent, or
+    ``skipped`` when nothing expires in the window — no noise email.
+    """
+    subject, error = require_operator(event, "connections.send-expiry-digest")
+    if error:
+        return error
+    payload = connection_digest.send()
+    if payload.get("sent"):
+        audit.emit("connections", "connections.send-expiry-digest",
+                   subject, outcome="ok")
+    return _no_store(_json_response(200, payload))
 
 
 def _int(value):

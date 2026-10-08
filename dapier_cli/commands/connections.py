@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "token_exec", "token_write"]
+__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "token_exec", "token_write"]
 
 
 # Documented child-process variables. The provider-specific alias exists so
@@ -365,6 +365,24 @@ def connections_revoke(api_url, connection_id, debug=False):
                     f"/api/agent/connections/{connection_id}/tokens", debug=debug)
     print(f"Revoked tokens for {data.get('connection_id', connection_id)}; "
           f"status is now {data.get('status')}.")
+    return 0
+
+
+def connections_send_expiry_digest(api_url, debug=False):
+    """Render and email the connection expiry digest now (thin client over
+    the agent route — the same function the daily schedule runs)."""
+    data = api.call(api_url, "POST", "/api/agent/connections/expiry-digest",
+                    body={}, debug=debug)
+    if data.get("skipped"):
+        print(f"No connection tokens expire within {data.get('window_hours', 48)}h; "
+              "digest skipped (no email sent).")
+        return 0
+    ids = ", ".join(data.get("connections") or [])
+    print(f"Digest sent to {data.get('to', '')} "
+          f"({len(data.get('connections') or [])} connection(s) need "
+          f"re-authentication: {ids}).")
+    if data.get("subject"):
+        print(data["subject"])
     return 0
 
 
