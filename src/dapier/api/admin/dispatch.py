@@ -139,7 +139,7 @@ def _route_inbox(event, method, path, operator_payload, operator_subject):
 
 
 def _route_connections(event, method, path, operator_payload, operator_subject):
-    """Credentials, OAuth clients, the connection save/list/import
+    """Credentials, OAuth clients, the connection save/list
 flows, discovery, and the health check."""
     if method == "PUT" and path.startswith("/api/admin/credentials/"):
         return routes.save_credential(path.rsplit("/", 1)[1], event)
@@ -151,8 +151,6 @@ flows, discovery, and the health check."""
         return routes.save_connection(event)
     if method == "GET" and path == "/api/admin/connections":
         return routes.list_connections(event)
-    if method == "POST" and path == "/api/admin/connections/import":
-        return routes.import_connection(event, operator_subject)
     discover_resource_match = re.fullmatch(
         r"/api/admin/connections/([a-z0-9_-]+)/discover/([a-z0-9_-]+)", path)
     if method == "GET" and discover_resource_match:

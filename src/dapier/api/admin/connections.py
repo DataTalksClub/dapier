@@ -158,16 +158,6 @@ def _connection(connection_id):
         connection_id,
     )
 
-def import_connection(event, operator):
-    """One-time operator import of an existing provider credential (cookie path)."""
-    try:
-        body = http._request_json(event)
-    except (ValueError, json.JSONDecodeError):
-        return http._json_response(400, {"error": "Invalid request"})
-    connections_table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
-    status, payload = importing.import_core(body, operator_subject=operator, connections_table=connections_table)
-    return http._json_response(status, payload)
-
 def revoke_connection_tokens(connection_id, operator):
     from ...connections import tokens as token_lifecycle
 
