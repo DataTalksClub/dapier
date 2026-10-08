@@ -1162,17 +1162,22 @@ section.view[data-page="designer"].active {
   min-height: 0;
 }
 body[data-view="designer"] .topbar h1 {
-  font-family: var(--dk-font-mono);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   font-size: var(--dk-text-lg);
   letter-spacing: 0;
 }
-/* The h1 doubles as the workflow rename affordance; the edit commits with
-   the designer's "Save to git", so it stays a draft until then. */
+body[data-view="designer"] .topbar h1 .view-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The h1 doubles as the workflow rename affordance (the human name; the id
+   never changes there); the edit saves with the draft. */
 body[data-view="designer"] .topbar h1.renamable { cursor: text; }
-body[data-view="designer"] .topbar h1.renamable:hover {
+body[data-view="designer"] .topbar h1.renamable:hover .view-title-text {
   text-decoration: underline dashed var(--dk-text-muted);
   text-underline-offset: 5px;
 }
+.topbar h1 .help-tip { font-weight: var(--dk-weight-regular, 400); letter-spacing: 0; }
 .topbar h1 .title-input {
   background: transparent;
   border: 0;
@@ -1679,3 +1684,9 @@ body[data-view="agents"] .agent-workspace { flex: 1; height: auto; min-height: 0
 .view[data-pending="true"] > :not(.section-loading):not(.page-tools) { display: none; }
 section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loading) { visibility: hidden; }
 .section-loading { padding: 12px 0; }
+
+/* Workflow names: the API's human name leads; the stable id rides beneath
+   as small mono text, the description behind the (?) tip. */
+.workflow-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.workflow-id { display: block; margin-top: 2px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); overflow-wrap: anywhere; }
+.workflow-label .workflow-id { font-weight: var(--dk-weight-regular, 400); }

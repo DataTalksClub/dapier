@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { renderMarkdown } from '../md.js';
 import { state } from '../state.js';
+import { workflowName } from '../workflow-names.js';
 
 const ACTIVE = new Set(['queued', 'running', 'claimed', 'starting', 'started']);
 const FAILED = new Set(['failed', 'timed_out', 'interrupted']);
@@ -12,6 +13,9 @@ let tasks = [], selected = null, detail = null, filter = 'all', search = '', fet
 let listSeq = 0, detailSeq = 0;
 
 function title(task) {
+  if (!task.email_subject?.trim() && task.workflow && workflowName(task.workflow) !== task.workflow) {
+    return workflowName(task.workflow);
+  }
   return task.email_subject?.trim() || (task.workflow || 'Agent run').replace(/^email-trigger-/, '').replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase());
 }
 function badge(task) { return statusLine(task.status, LABELS); }
@@ -25,7 +29,7 @@ function duration(task) {
 }
 function shown() {
   return tasks.filter(task => (filter === 'all' || filter === 'active' && ACTIVE.has(task.status) || filter === 'attention' && FAILED.has(task.status) || filter === 'completed' && task.status === 'succeeded') &&
-    (!search || [title(task), task.workflow, task.engine, task.summary, task.task_id].join(' ').toLowerCase().includes(search)));
+    (!search || [title(task), task.workflow, task.workflow ? workflowName(task.workflow) : '', task.engine, task.summary, task.task_id].join(' ').toLowerCase().includes(search)));
 }
 function renderList() {
   const rows = shown();
@@ -37,7 +41,7 @@ function renderList() {
   $('#agent-runs-note').textContent = fetched ? `${rows.length} ${rows.length === 1 ? 'run' : 'runs'}${tasks.length === 200 ? ' · newest 200 loaded' : ''}` : 'Loading runs…';
   $('#agent-runs-list').innerHTML = rows.length ? rows.map(task => `<button type="button" class="agent-run-item ${task.task_id === selected ? 'selected' : ''}" data-agent-task="${escapeHtml(task.task_id).replace(/"/g, '&quot;')}" aria-current="${task.task_id === selected ? 'true' : 'false'}">
     <span class="agent-run-line"><strong>${escapeHtml(title(task))}</strong>${badge(task)}</span>
-    <span class="agent-run-meta"><span>${escapeHtml(task.workflow || 'Agent run')}</span><time>${escapeHtml(date(task))}</time></span>
+    <span class="agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span><time>${escapeHtml(date(task))}</time></span>
   </button>`).join('') : `<div class="agent-list-empty"><h3>${tasks.length ? 'No matching runs' : 'No agent runs yet'}</h3><p>${tasks.length ? 'Try another status or search.' : 'Runs appear here when a workflow starts an agent.'}</p></div>`;
 }
 function setTaskUrl(id) {
@@ -69,7 +73,7 @@ function renderDetail() {
       <button class="agent-back dk-button dk-button--secondary" type="button">Back to runs</button>
       <div class="agent-detail-status">${badge(task)}<span>${escapeHtml(task.engine || 'Agent')} · ${escapeHtml(duration(task))}</span></div>
       <h2 tabindex="-1">${escapeHtml(title(task))}</h2>
-      <a class="agent-workflow-link" href="/workflows/${encodeURIComponent(task.workflow || '')}">${escapeHtml(task.workflow || 'Workflow')}</a>
+      <a class="agent-workflow-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a>
       <p class="agent-detail-date">${task.started_at ? 'Started' : task.status === 'queued' ? 'Queued' : 'Created'} ${escapeHtml(formatTimestamp(task.started_at || task.created_at) || '—')}${task.finished_at ? ` · Finished ${escapeHtml(formatTimestamp(task.finished_at))}` : ''}</p>
     </div>
     <section class="agent-result" aria-labelledby="agent-result-heading">

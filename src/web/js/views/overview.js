@@ -18,6 +18,7 @@ import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
 import { renderStorage } from './storage.js';
+import { workflowName, workflowIdLine, workflowLabelHtml, helpTip } from '../workflow-names.js';
 
 const TRIGGER_TEXT = {
   'email.message.received': 'An email arrives',
@@ -63,8 +64,8 @@ function workflowState(workflow) {
 function workflowRow(workflow) {
   const latest = homeModel(state.data).latest.get(workflow.id);
   return `<article class="home-workflow">
-    <div><button type="button" class="cell-name workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${escapeHtml(workflow.id)}</button>
-      <p class="sub">${escapeHtml(workflow.description || workflowTriggerText(workflow))}</p>
+    <div><div class="workflow-name-line"><button type="button" class="cell-name workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${escapeHtml(workflowName(workflow))}</button>${helpTip(workflow.description)}</div>
+      ${workflowIdLine(workflow)}
       <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : `<span class="sub">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading recent runs…'}</span>`}</div>
     </div>
     <button type="button" class="dk-button dk-button--secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
@@ -91,7 +92,7 @@ export function openWorkflow(id) {
      file. */
   if (workflow.source) return openDesigner(workflow.id);
   const many = (workflow.triggerCount || 1) > 1;
-  $('#workflow-title').textContent = workflow.id;
+  $('#workflow-title').textContent = workflowName(workflow);
   $('#workflow-detail').innerHTML = `
     <div class="detail-summary">
       ${workflowState(workflow)}
@@ -159,7 +160,7 @@ function render(section) {
   if (section === 'activity') {
     $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
       `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}">
-        <span class="home-result-title">${escapeHtml(run.workflow_id || 'Run')}${statusLine(run.status)}</span>
+        <span class="home-result-title"><span class="workflow-label">${workflowLabelHtml(run.workflow_id)}</span>${statusLine(run.status)}</span>
         <span class="sub">${escapeHtml(formatTimestamp(run.started_at) || '—')}${run.failed_step ? ` · Failed at ${escapeHtml(run.failed_step)}` : ''}</span>
       </button>`).join('');
     $('#overview-runs-empty').hidden = model.runs.length > 0;
@@ -220,7 +221,7 @@ export function renderWorkflows() {
   // the loaded payload filters client-side.
   const serverIds = query ? state.workflowSearchIds : null;
   const matchesText = (workflow) =>
-    `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
+    `${workflow.id} ${workflow.name || ''} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
   const shown = all.filter((workflow) =>
     (serverIds ? serverIds.has(workflow.id) : matchesText(workflow)) &&
     (status === 'all' || workflow.enabled === (status === 'enabled')) &&
@@ -232,10 +233,11 @@ export function renderWorkflows() {
     const recent = runs.find((run) => run.workflow_id === workflow.id);
     const actions = (workflow.actions || []).map((action) => escapeHtml(workflowActionText(action))).join(' <span class="workflow-separator" aria-hidden="true">→</span> ');
     const id = escapeHtml(workflow.id);
+    const name = escapeHtml(workflowName(workflow));
     const opensDesigner = workflow.source;
-    const detail = opensDesigner
-      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${id}</a>`
-      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${id}</button>`;
+    const detail = `<div class="workflow-name-line">${opensDesigner
+      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${name}</a>`
+      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${name}</button>`}${helpTip(workflow.description)}</div>${workflowIdLine(workflow)}`;
     const edit = opensDesigner
       ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;

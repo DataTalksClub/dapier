@@ -69,6 +69,7 @@ def _static(path):
         "/assets/js/overview-loader.js": ("js/overview-loader.js", "text/javascript; charset=utf-8"),
         "/assets/js/home-model.js": ("js/home-model.js", "text/javascript; charset=utf-8"),
         "/assets/js/state.js": ("js/state.js", "text/javascript; charset=utf-8"),
+        "/assets/js/workflow-names.js": ("js/workflow-names.js", "text/javascript; charset=utf-8"),
         "/assets/js/ui.js": ("js/ui.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/connections.js": ("js/views/connections.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/credentials.js": ("js/views/credentials.js", "text/javascript; charset=utf-8"),

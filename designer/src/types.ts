@@ -73,6 +73,8 @@ export interface Workflow {
   flow?: string;
   flows?: Record<string, FlowSpec>;
   description?: string;
+  /** Human name override; absent = the API's generated name shows. */
+  name?: string;
 }
 
 export interface WorkflowSummary {

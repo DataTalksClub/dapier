@@ -20080,7 +20080,7 @@
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+  const WORKFLOW_KEY_ORDER = ["id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
   function orderedWorkflow(workflow) {
     const source = workflow;
     const ordered = {};
@@ -21475,6 +21475,8 @@
     };
   }
   const EMPTY_SHAPES = [];
+  const NEW_WORKFLOW_ID = "new-workflow";
+  const MAX_NAME_LENGTH = 80;
   const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
   function readStepClipboard() {
     try {
@@ -21986,6 +21988,8 @@
     const [yamlText, setYamlText] = reactExports.useState("");
     const [savedYaml, setSavedYaml] = reactExports.useState("");
     const [base, setBase] = reactExports.useState(null);
+    const [autoName, setAutoName] = reactExports.useState("");
+    const customName = typeof base?.name === "string" ? base.name.trim() : "";
     const [draftInfo, setDraftInfo] = reactExports.useState(null);
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
@@ -22291,6 +22295,10 @@
         {
           type: "designer:meta",
           id: workflowId,
+          saved: Boolean(sourceName),
+          name: customName || autoName,
+          nameSource: customName ? "custom" : "auto",
+          description: typeof base?.description === "string" ? base.description : "",
           enabled,
           source: sourceName,
           editable: view === "canvas",
@@ -22298,7 +22306,7 @@
         },
         window.location.origin
       );
-    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
+    }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty, customName, autoName, base]);
     reactExports.useEffect(() => {
       if (!config.embedded) return;
       const onLeaveRequest = async (event) => {
@@ -22324,6 +22332,32 @@
           return;
         }
         renameWorkflow(id);
+      };
+      window.addEventListener("message", onMessage);
+      return () => window.removeEventListener("message", onMessage);
+    }, [config.embedded, view]);
+    reactExports.useEffect(() => {
+      if (!config.embedded) return;
+      const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data;
+        if (data?.type !== "designer:set-name" || typeof data.name !== "string") return;
+        if (view !== "canvas") {
+          setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit name: in the YAML." });
+          return;
+        }
+        const name = data.name.replace(/\s+/g, " ").trim();
+        if (name.length > MAX_NAME_LENGTH) {
+          setStatus({ kind: "error", message: `A workflow name may be at most ${MAX_NAME_LENGTH} characters.` });
+          return;
+        }
+        setBase((current) => {
+          const next = { ...current ?? {} };
+          if (name) next.name = name;
+          else delete next.name;
+          return next;
+        });
+        setCanvasExtraDirty(true);
       };
       window.addEventListener("message", onMessage);
       return () => window.removeEventListener("message", onMessage);
@@ -22411,6 +22445,7 @@
         setCanvasExtraDirty(false);
         setInvalidRawDrafts({});
         setBase(workflow);
+        setAutoName(data.name_source === "custom" ? "" : data.name ?? "");
         setYamlText(yaml2);
         setSavedYaml(yaml2);
         setDraftInfo(draft);
@@ -22448,6 +22483,7 @@
       setSavedEnabled(true);
       setCanvasExtraDirty(false);
       setBase(null);
+      setAutoName("");
       setYamlText("");
       setSavedYaml("");
       setDraftInfo(null);
@@ -22530,12 +22566,24 @@
         yamlOut = workflowYaml(workflow);
         nextShapes = shapes;
       }
+      if (!sourceName && workflow.id === NEW_WORKFLOW_ID) {
+        const rest = { ...workflow };
+        delete rest.id;
+        yamlOut = workflowYaml(rest);
+      }
       setStatus({ kind: "busy", message: "Saving…" });
       try {
         const result = await api(config, "/workflows", {
           method: "PUT",
           body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
         });
+        if (result.id && result.id !== workflow.id) {
+          workflow = { ...workflow, id: result.id };
+          yamlOut = workflowYaml(workflow);
+          setWorkflowId(result.id);
+          if (view === "yaml") setYamlText(yamlOut);
+        }
+        setAutoName(result.name_source === "custom" ? "" : result.name ?? "");
         setBase(workflow);
         setSavedYaml(yamlOut);
         setSavedId(workflow.id);

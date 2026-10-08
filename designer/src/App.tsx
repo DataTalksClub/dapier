@@ -10,6 +10,10 @@ import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterR
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
+/** The id a never-saved canvas carries until the API assigns one from its name. */
+const NEW_WORKFLOW_ID = "new-workflow";
+/** engine.naming.MAX_NAME_LENGTH: the longest `name:` override the API accepts. */
+const MAX_NAME_LENGTH = 80;
 
 /** localStorage key copying a step across workflows: Copy step writes it,
     Paste step (any workflow's editor) reads it. */
@@ -596,6 +600,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [savedYaml, setSavedYaml] = useState("");
   /** The workflow as last loaded or saved; carries `flows:`/`flow:` through canvas saves. */
   const [base, setBase] = useState<Workflow | null>(null);
+  /** The API's generated name for the open workflow ("<trigger> → <actions>",
+      engine.naming) as of the last load or save; "" for a never-saved one.
+      A `name:` override in the draft wins over it. */
+  const [autoName, setAutoName] = useState("");
+  const customName = typeof base?.name === "string" ? base.name.trim() : "";
   /** The saved server-side draft for the open workflow (G15): a save writes a
       draft, Publish/Discard promote or throw it. Null = no draft known. */
   const [draftInfo, setDraftInfo] = useState<DraftInfo | null>(null);
@@ -992,6 +1001,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       {
         type: "designer:meta",
         id: workflowId,
+        saved: Boolean(sourceName),
+        name: customName || autoName,
+        nameSource: customName ? "custom" : "auto",
+        description: typeof base?.description === "string" ? base.description : "",
         enabled,
         source: sourceName,
         editable: view === "canvas",
@@ -999,7 +1012,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       },
       window.location.origin
     );
-  }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty]);
+  }, [initialWorkflowLoaded, config.embedded, workflowId, enabled, sourceName, view, dirty, customName, autoName, base]);
 
   useEffect(() => {
     if (!config.embedded) return;
@@ -1027,6 +1040,36 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         return;
       }
       renameWorkflow(id);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [config.embedded, view]);
+
+  /** The console's h1 edits the human name (the `name:` override): the
+      value lands in the draft and saves with it; an empty one drops the
+      override so the generated name shows again. The id never changes here. */
+  useEffect(() => {
+    if (!config.embedded) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; name?: unknown };
+      if (data?.type !== "designer:set-name" || typeof data.name !== "string") return;
+      if (view !== "canvas") {
+        setStatus({ kind: "error", message: "Switch to Canvas to rename — or edit name: in the YAML." });
+        return;
+      }
+      const name = data.name.replace(/\s+/g, " ").trim();
+      if (name.length > MAX_NAME_LENGTH) {
+        setStatus({ kind: "error", message: `A workflow name may be at most ${MAX_NAME_LENGTH} characters.` });
+        return;
+      }
+      setBase((current) => {
+        const next = { ...(current ?? {}) } as Workflow;
+        if (name) next.name = name;
+        else delete next.name;
+        return next;
+      });
+      setCanvasExtraDirty(true);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -1107,7 +1150,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       // draft block so the Publish/Discard buttons know what they act on.
       const draftOnly = summary.published === false;
       const ref = summary.source || summary.id;
-      const data = await api<{ workflow: Workflow; draft?: DraftInfo }>(
+      const data = await api<{ workflow: Workflow; draft?: DraftInfo; name?: string; name_source?: string }>(
         config, `/workflows/${encodeURIComponent(ref)}${draftOnly ? "/draft" : ""}`);
       const workflow = data.workflow;
       let draft = data.draft ?? null;
@@ -1129,6 +1172,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setCanvasExtraDirty(false);
       setInvalidRawDrafts({});
       setBase(workflow);
+      setAutoName(data.name_source === "custom" ? "" : (data.name ?? ""));
       setYamlText(yaml);
       setSavedYaml(yaml);
       setDraftInfo(draft);
@@ -1167,6 +1211,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setSavedEnabled(true);
     setCanvasExtraDirty(false);
     setBase(null);
+    setAutoName("");
     setYamlText("");
     setSavedYaml("");
     setDraftInfo(null);
@@ -1254,12 +1299,26 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       yamlOut = workflowYaml(workflow);
       nextShapes = shapes;
     }
+    // A never-saved workflow still on the placeholder id lets the API pick
+    // the id: the slug of its name (unique), so nobody has to type one.
+    if (!sourceName && workflow.id === NEW_WORKFLOW_ID) {
+      const rest: Record<string, unknown> = { ...workflow };
+      delete rest.id;
+      yamlOut = workflowYaml(rest as unknown as Workflow);
+    }
     setStatus({ kind: "busy", message: "Saving…" });
     try {
-      const result = await api<{ commit?: string | null; published?: boolean; revision?: number; draft?: DraftInfo; git_sync_error?: string }>(config, "/workflows", {
+      const result = await api<{ id?: string; name?: string; name_source?: string; commit?: string | null; published?: boolean; revision?: number; draft?: DraftInfo; git_sync_error?: string }>(config, "/workflows", {
         method: "PUT",
         body: JSON.stringify({ yaml: yamlOut, renameFrom: sourceName })
       });
+      if (result.id && result.id !== workflow.id) {
+        workflow = { ...workflow, id: result.id };
+        yamlOut = workflowYaml(workflow);
+        setWorkflowId(result.id);
+        if (view === "yaml") setYamlText(yamlOut);
+      }
+      setAutoName(result.name_source === "custom" ? "" : (result.name ?? ""));
       setBase(workflow);
       setSavedYaml(yamlOut);
       setSavedId(workflow.id);

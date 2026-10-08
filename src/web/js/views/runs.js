@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, resolvedLine, wrapTokens, formatTimestamp, formatDuration, dataBlock } from '../format.js';
+import { workflowName, workflowLabelHtml } from '../workflow-names.js';
 
 const STEP_ICONS = {
   webhook: 'webhook',
@@ -34,7 +35,7 @@ function statusCell(run) {
 
 function runRow(run) {
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
-    <td class="cell-title mono"><span class="cell-name">${escapeHtml(run.workflow_id || 'Run')}</span></td>
+    <td class="cell-title"><span class="cell-name workflow-label">${workflowLabelHtml(run.workflow_id)}</span></td>
     <td class="mono muted-cell" data-label="Trigger"><div>${escapeHtml(triggerLabel(run))}</div>${run.event_summary
       ? `<div class="run-event-summary">${escapeHtml(run.event_summary)}</div>` : ''}</td>
     <td data-label="Status">${statusCell(run)}</td>
@@ -122,9 +123,9 @@ export function renderRuns() {
     ...runs.map((run) => run.workflow_id),
     ...(state.data?.workflows || []).map((workflow) => workflow.id),
     selectedWorkflow,
-  ].filter(Boolean))].sort();
+  ].filter(Boolean))].sort((a, b) => workflowName(a).localeCompare(workflowName(b)));
   workflowFilter.innerHTML = '<option value="">All workflows</option>' +
-    workflowIds.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+    workflowIds.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(workflowName(id))}</option>`).join('');
   const statuses = [...new Set(runs.map((run) => run.status).filter(Boolean))];
   if (selectedStatus && selectedStatus !== 'problems' && !statuses.includes(selectedStatus)) {
     statuses.push(selectedStatus); // keep the choice visible across paged fetches
@@ -304,7 +305,7 @@ export async function openRun(runId) {
     return;
   }
   const run = data.run || {};
-  $('#run-title').textContent = run.workflow_id || 'Run';
+  $('#run-title').textContent = run.workflow_id ? workflowName(run.workflow_id) : 'Run';
   const cancel = run.status === 'delayed'
     ? `<button class="dk-button dk-button--secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
         title="Drop the parked continuation: the remaining actions will never fire">Cancel</button>`

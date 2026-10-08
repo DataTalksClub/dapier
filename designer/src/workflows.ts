@@ -58,7 +58,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Top-level key order for workflow YAML dumps — the server's
     WORKFLOW_KEY_ORDER: identity, state, trigger, then the action graph.
     Keys outside the canon keep their relative order at the end. */
-const WORKFLOW_KEY_ORDER = ["id", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+const WORKFLOW_KEY_ORDER = ["id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
 
 export function orderedWorkflow(workflow: Workflow): Workflow {
   const source = workflow as unknown as Record<string, unknown>;

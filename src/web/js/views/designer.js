@@ -1,16 +1,22 @@
 /* Designer view: hosts the designer app shell (/designer/app) in an iframe.
    This is the console's workflow view — every workflow row opens it at
    /workflows/<id>. The canvas owns the viewport under the topbar: the
-   topbar's h1 names the open workflow and the adjacent Rename button edits
-   the name (the edit lands in the iframe's draft and commits with "Save to
-   git"). The iframe reports what the title should show via designer:meta
+   topbar's h1 shows the workflow's human name (the API's generated
+   "<trigger> → <actions>", or the `name:` override) with the description
+   behind a (?) tip, and the stable id as small mono text under it. Clicking
+   the name edits the override (empty = back to the generated name); the
+   edit lands in the iframe's draft and saves with it — the id never changes
+   here. The iframe reports what the title should show via designer:meta
    messages below, and the console answers with the connections snapshot the
    inspector's connection suggestions render from. */
 import { state } from '../state.js';
 import { $ } from '../ui.js';
+import { escapeHtml } from '../format.js';
 import { setView, rememberViewUrl, setViewGuard } from '../router.js';
+import { workflowName, helpTip } from '../workflow-names.js';
 
-/* Last designer:meta from the iframe: { id, enabled, source, editable }. */
+/* Last designer:meta from the iframe: { id, saved, name, nameSource,
+   description, enabled, source, editable, dirty }. */
 let meta = null;
 let editing = false;
 let leaveSequence = 0;
@@ -28,20 +34,34 @@ function frameSrc(source) {
   return `/designer/app?${params}`;
 }
 
-/* Paints the topbar from the iframe's live meta (id, file, renamable) and
-   keeps /workflows/<id> in step so the view stays deep-linkable — a rename
-   moves the URL with it. */
+/* The h1: the human name plus the description's (?) tip; the id goes on
+   the line under it as secondary mono text. */
+function paintTitle(name, description, id) {
+  $('#view-title').innerHTML = `<span class="view-title-text">${escapeHtml(name)}</span>${helpTip(description)}`;
+  $('#view-description').innerHTML = id ? `<span class="workflow-id mono">${escapeHtml(id)}</span>` : '';
+}
+
+function savedId() {
+  return meta && meta.saved ? meta.id : null;
+}
+
+/* Paints the topbar from the iframe's live meta (name, id, renamable) and
+   keeps /workflows/<id> in step so the view stays deep-linkable. */
 function applyMeta() {
   if (state.view !== 'designer') return;
   const title = $('#view-title');
   title.classList.toggle('renamable', !!meta && meta.editable && !editing);
   if (meta) {
-    if (!editing) title.textContent = meta.id || 'Designer';
-    title.title = '';
+    if (!editing) paintTitle(meta.name || (meta.saved ? meta.id : 'New workflow'), meta.description, savedId());
+    title.title = meta.editable
+      ? (meta.nameSource === 'custom'
+        ? 'Click to rename — clear the name to use the generated one'
+        : 'Generated from the trigger and actions — click to rename')
+      : '';
   } else {
     title.title = '';
   }
-  const url = workflowUrl(meta && meta.id);
+  const url = workflowUrl(savedId());
   if (`${window.location.pathname}${window.location.search}` !== url) {
     history.replaceState(null, '', url);
   }
@@ -60,22 +80,29 @@ function syncHead(ref) {
   const workflow = ref
     ? (state.data?.workflows || []).find((item) => item.id === ref || item.source === ref)
     : null;
-  $('#view-title').textContent = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : 'Designer';
+  const id = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : '';
+  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow', workflow?.description, id);
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
 }
 
 /* Swaps the h1 for an input; Enter or blur accepts, Escape restores. The
-   edit only changes the designer's draft until the workflow is saved. */
-function startRename() {
+   edit only changes the designer's draft until the workflow is saved; an
+   empty name drops the override and the generated name comes back. */
+const MAX_NAME_LENGTH = 80;
+
+function startRename(event) {
   const title = $('#view-title');
+  if (event?.target?.closest?.('.help-tip')) return;
   if (editing || state.view !== 'designer' || !meta?.editable) return;
-  const current = title.textContent;
+  const current = meta.name || '';
   editing = true;
   title.classList.remove('renamable');
   const input = document.createElement('input');
   input.className = 'title-input';
   input.value = current;
+  input.maxLength = MAX_NAME_LENGTH;
+  input.placeholder = 'Name (empty = generated)';
   input.setAttribute('aria-label', 'Workflow name');
   input.spellcheck = false;
   title.textContent = '';
@@ -86,13 +113,12 @@ function startRename() {
   const finish = (commit) => {
     if (done) return;
     done = true;
-    const value = input.value.trim();
+    const value = input.value.replace(/\s+/g, ' ').trim();
     input.remove();
     editing = false;
-    title.textContent = commit && value ? value : current;
-    if (commit && value && value !== current) {
+    if (commit && value !== current && !(meta.nameSource !== 'custom' && !value)) {
       $('#designer-frame').contentWindow?.postMessage(
-        { type: 'designer:set-id', id: value },
+        { type: 'designer:set-name', name: value },
         window.location.origin
       );
     }
@@ -151,6 +177,10 @@ window.addEventListener('message', (event) => {
   if (!data || data.type !== 'designer:meta') return;
   meta = {
     id: typeof data.id === 'string' ? data.id : '',
+    saved: data.saved === true,
+    name: typeof data.name === 'string' ? data.name : '',
+    nameSource: data.nameSource === 'custom' ? 'custom' : 'auto',
+    description: typeof data.description === 'string' ? data.description : '',
     enabled: data.enabled !== false,
     source: typeof data.source === 'string' && data.source ? data.source : null,
     editable: data.editable === true,
@@ -214,7 +244,7 @@ export function designerFromLocation() {
   const match = window.location.pathname.match(/^\/workflows\/(.+)$/);
   const ref = match ? decodeURIComponent(match[1]) : new URLSearchParams(window.location.search).get('workflow');
   return openDesigner(ref === 'new' ? null : ref, false).then((opened) => {
-    if (!opened) history.pushState(null, '', workflowUrl(meta && meta.id));
+    if (!opened) history.pushState(null, '', workflowUrl(savedId()));
     return opened;
   });
 }
