@@ -21,7 +21,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_delivery_api", "hook_test_api", "hook_triggers_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
+__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_delivery_api", "hook_test_api", "hook_triggers_api", "poll_activity_api", "poll_trigger_action_api", "poll_trigger_show_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
 
 
 
@@ -245,3 +245,55 @@ def hook_test_api(event):
     audit.emit(str(body.get("name") or "unknown"), "hook-trigger.test", subject,
                outcome="ok" if status == 200 else "error")
     return _no_store(_json_response(status, payload))
+
+
+def poll_trigger_show_api(event, name):
+    """Operator-only: one poll's monitor view (health, last checks, workflows)."""
+    subject, error = require_operator(event, "poll-trigger")
+    if error:
+        return error
+    try:
+        status, payload = poll_triggers.api_show(name)
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    return _no_store(_json_response(status, payload))
+
+
+def poll_activity_api(event):
+    """Operator-only: items polls picked up (from the trigger inbox) with
+    the runs they started — `dapier polls activity`."""
+    subject, error = require_operator(event, "poll-trigger")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    try:
+        status, payload = poll_triggers.api_activity(query.get("name"), query.get("limit", 25))
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    return _no_store(_json_response(status, payload))
+
+
+def poll_trigger_action_api(event, name, action):
+    """Operator-only Poll now / pause / resume / reset — the CLI twin of the
+    console's POST /api/admin/poll-triggers/<name>/<action>."""
+    subject, error = require_operator(event, "poll-trigger")
+    if error:
+        return error
+    try:
+        if action == "check":
+            status, payload = poll_triggers.api_check(name)
+        elif action in ("pause", "resume"):
+            status, payload = poll_triggers.api_set_enabled(name, action == "resume", subject)
+        else:
+            body = json.loads(event.get("body") or "{}")
+            status, payload = poll_triggers.api_reset(name, body, subject)
+    except email_triggers.TriggerError as exc:
+        code = 404 if str(exc).startswith("no poll trigger") else 400
+        return _json_response(code, {"error": str(exc)})
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    except RuntimeError as exc:
+        return _json_response(502, {"error": str(exc) or "poll fetch failed"})
+    audit.emit(name, f"poll-trigger.{action}", subject,
+               outcome="ok" if status < 300 else "error")
+    return _json_response(status, payload)

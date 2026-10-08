@@ -255,6 +255,16 @@ def _route_triggers(event, method, path, operator_payload, operator_subject):
         return routes.save_poll_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/poll-triggers":
         return routes.delete_poll_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/poll-triggers/activity":
+        return routes.poll_activity(event)
+    poll_action = re.fullmatch(
+        r"/api/admin/poll-triggers/([a-z0-9-]+)/(check|pause|resume|reset)", path)
+    if method == "POST" and poll_action:
+        return routes.poll_trigger_action(event, poll_action.group(1), poll_action.group(2),
+                                          operator_subject)
+    poll_match = re.fullmatch(r"/api/admin/poll-triggers/([a-z0-9-]+)", path)
+    if method == "GET" and poll_match:
+        return routes.show_poll_trigger(event, poll_match.group(1))
     return None
 
 

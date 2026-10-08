@@ -834,6 +834,19 @@ def _emit_failure_notice(exc, event, *, paused=False):
         logger.exception("failure notice failed")
 
 
+def _poll_now(message):
+    """Run one manual poll check; failures are logged and notified like a
+    scheduled fire's, never re-raised (no SQS retry of an operator click)."""
+    from ..triggers import poll_triggers
+
+    try:
+        return poll_triggers.run_poll_now(message)
+    except Exception as exc:
+        logger.exception("poll now failed", extra={"poll_id": (message or {}).get("poll_id")})
+        _emit_failure_notice(exc, _poll_failure_event({"poll_id": (message or {}).get("poll_id")}))
+        return None
+
+
 def handler(event, _context):
     if isinstance(event, dict) and event.get("trigger") == "poll" and event.get("poll_id"):
         # EventBridge invokes the function directly (dapier-poll-* rules):
@@ -880,6 +893,15 @@ def handler(event, _context):
         attempt = _message_attempt(record)
         try:
             payload = json.loads(record["body"])
+            if (isinstance(payload, dict) and "connector" not in payload
+                    and isinstance(payload.get("poll_now"), dict)):
+                # Poll now (POST …/poll-triggers/<name>/check): one manual
+                # fire. Not a trigger event, so no inbox row of its own (the
+                # items it finds get theirs). A failed check is recorded in
+                # the poll's health row and not retried — the operator asked
+                # once, the schedule keeps going.
+                _poll_now(payload["poll_now"])
+                continue
             if (isinstance(payload, dict) and "connector" not in payload
                     and isinstance(payload.get(RESUME_KEY), dict)):
                 # A parked run's continuation, not a trigger event: no inbox

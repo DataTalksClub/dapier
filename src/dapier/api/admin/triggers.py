@@ -153,3 +153,42 @@ def delete_poll_trigger(event, operator):
                  operator, outcome="deleted")
     return http._json_response(status, payload)
 
+
+def _poll_query(event):
+    return event.get("queryStringParameters") or {}
+
+def show_poll_trigger(event, name):
+    try:
+        status, payload = poll_triggers.api_show(name)
+    except email_triggers.TriggerError as exc:
+        return http._json_response(404, {"error": str(exc)})
+    return http._json_response(status, payload)
+
+def poll_activity(event):
+    query = _poll_query(event)
+    try:
+        status, payload = poll_triggers.api_activity(query.get("name"), query.get("limit", 25))
+    except email_triggers.TriggerError as exc:
+        return http._json_response(404, {"error": str(exc)})
+    return http._json_response(status, payload)
+
+def poll_trigger_action(event, name, action, operator):
+    """Poll now (check), pause, resume, and reset for one poll — the same
+    poll_triggers calls `dapier polls check|pause|resume|reset` reach."""
+    try:
+        if action == "check":
+            status, payload = poll_triggers.api_check(name)
+        elif action in ("pause", "resume"):
+            status, payload = poll_triggers.api_set_enabled(name, action == "resume", operator)
+        else:
+            status, payload = poll_triggers.api_reset(name, http._request_json(event), operator)
+    except email_triggers.TriggerError as exc:
+        code = 404 if str(exc).startswith("no poll trigger") else 400
+        return http._json_response(code, {"error": str(exc)})
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    except RuntimeError as exc:
+        return http._json_response(502, {"error": str(exc) or "poll fetch failed"})
+    session._audit_event(name, f"poll-trigger.{action}", operator,
+                         outcome="ok" if status < 300 else "error")
+    return http._json_response(status, payload)

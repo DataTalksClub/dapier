@@ -493,6 +493,26 @@ dapier schedules run morning-digest    # Run now (a manual fire via the event qu
 dapier schedules pause morning-digest  # / resume: the rule's state, noted in history
 ```
 
+Poll triggers check a source (an API, RSS feed, Drive/Dropbox folder, sheet,
+...) on a schedule and start their workflow once per new item. The console's
+Workflows › Polls tab is their health monitor, and the CLI reaches the same
+API:
+
+```bash
+dapier polls list                      # health, last check, last new item, workflows it starts
+dapier polls show blog-feed            # one poll: last error, position, resets it supports
+dapier polls activity [blog-feed]      # items polls picked up and the runs they started
+dapier polls check blog-feed           # Poll now (queued on the worker)
+dapier polls pause blog-feed           # or resume; the position is kept
+dapier polls reset blog-feed --now     # skip everything waiting
+dapier polls reset blog-feed --from 2026-10-01   # timestamp-positioned polls: re-read from a date
+dapier inbox show <inbox-id>           # a picked-up item; `dapier inbox replay <id>` re-runs it
+```
+
+Each check records its outcome (`pollstat#<name>` in the cursors table), so
+health reads `ok`, `failing` (with the last error), `late` (a rate schedule
+missed three checks), `paused`, or `waiting` (not checked yet).
+
 One-time migration of the existing DataTalksClub YouTube credential (bytes are
 transferred, never logged; refresh and channel ID are verified first; backups
 are untouched). `--client-id`/`--client-secret-file` are optional — they are

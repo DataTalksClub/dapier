@@ -139,6 +139,16 @@ def _route(event, method, path):
         return schedule_action_api(event, *schedule_action.groups())
     if path == "/api/agent/poll-triggers" and method in ("GET", "PUT", "DELETE"):
         return poll_triggers_api(event, method)
+    if path == "/api/agent/poll-triggers/activity" and method == "GET":
+        return poll_activity_api(event)
+    poll_action_match = re.fullmatch(
+        r"/api/agent/poll-triggers/([a-z0-9-]+)/(check|pause|resume|reset)", path)
+    if poll_action_match and method == "POST":
+        return poll_trigger_action_api(event, poll_action_match.group(1),
+                                       poll_action_match.group(2))
+    poll_match = re.fullmatch(r"/api/agent/poll-triggers/([a-z0-9-]+)", path)
+    if poll_match and method == "GET":
+        return poll_trigger_show_api(event, poll_match.group(1))
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):
         return grants_api(event, method)
     if path == "/api/agent/tokens" and method in ("GET", "PUT", "DELETE"):

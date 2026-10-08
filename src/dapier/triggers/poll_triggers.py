@@ -62,6 +62,7 @@ CURSOR_MODES = ("watermark", "next_cursor")
 METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
 MAX_ITEMS_CAP = 100
 URL_PATTERN = re.compile(r"^https?://\S+$")
+ISO_CURSOR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
 # The stored item's identity/lifecycle keys: a poll source's fetch-spec
 # extras may not touch them — "actions"/"flow" are on the list too, so no
@@ -456,7 +457,7 @@ def event_for(item, raw):
     }
 
 
-def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
+def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None, reason="schedule"):
     """One scheduled fire: fetch, emit each new item, advance the cursor.
 
     Emits at most ``max_items`` per fire; a failed item stops the fire with
@@ -481,7 +482,23 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
         return {"poll": name, "fired": 0, "skipped": "missing"}
     if not item.get("enabled", True):
         return {"poll": name, "fired": 0, "skipped": "disabled"}
+    from . import poll_status
 
+    # Every check lands in the poll's health row: a fetch that raised, an
+    # item whose workflows failed, or a clean pass with what it found.
+    try:
+        result = _fire_enabled(item, name, cursor_table_ref=cursor_table_ref,
+                               transport=transport)
+    except Exception as exc:
+        poll_status.record(name, error=exc, reason=reason, table_ref=cursor_table_ref)
+        raise
+    poll_status.record(name, found=result["fired"], error=result.pop("error", None),
+                       reason=reason, table_ref=cursor_table_ref)
+    return result
+
+
+def _fire_enabled(item, name, *, cursor_table_ref=None, transport=None):
+    """The body of :func:`fire` for a stored, enabled poll."""
     from ..engine import execute
     from ..engine.notify import notify_failure
     from ..engine.worker import _is_pending, _mark_completed, _release_action
@@ -507,6 +524,7 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
         seen_ids = seen.load(f"poll#{name}", table_ref=cursor_table_ref)
     fired = 0
     failed = False
+    failure = None
     leftover_fresh = False
     for raw in items:
         if seen_ids is not None:
@@ -535,6 +553,7 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
             notify_failure(exc, event)
             logger.exception("poll trigger '%s' item failed", name, extra={"item_id": event["data"]["item_id"]})
             failed = True
+            failure = f"item {event['data']['item_id']}: {str(exc) or exc.__class__.__name__}"
             break
         inbox.complete(inbox_id, matched)
         if watermark:
@@ -554,6 +573,8 @@ def fire(name, *, table_ref=None, cursor_table_ref=None, transport=None):
     result = {"poll": name, "fired": fired}
     if skipped_seen:
         result["skipped_seen"] = skipped_seen
+    if failure:
+        result["error"] = failure
     return result
 
 
@@ -595,13 +616,302 @@ def public_view(item, cursor=None):
     }
 
 
-def api_list(table_ref=None, cursor_table_ref=None):
+def _safe_cursor(name, table=None):
+    """The stored cursor, or None when the cursors table is unavailable —
+    a monitoring read must not fail the whole list."""
+    try:
+        return get_cursor(name, table=table)
+    except Exception:  # noqa: BLE001
+        logger.warning("poll cursor read failed", extra={"poll_id": name})
+        return None
+
+
+def _iso_cursor(cursor):
+    return bool(cursor) and bool(ISO_CURSOR.match(str(cursor)))
+
+
+def reset_modes(item, cursor):
+    """How this poll's position can be moved: ``now`` (skip what is waiting)
+    always; ``date`` only when the stored cursor is a timestamp, so a date
+    is a position the fetch understands."""
+    return ["now", "date"] if _iso_cursor(cursor) else ["now"]
+
+
+def _workflow_poll_filter_matches(rule, name):
+    from ..engine.matching import _matches_filter
+
+    try:
+        return _matches_filter(name, rule)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def bound_workflows(item, workflows=None):
+    """The published workflows this poll starts: a trigger on the poll's own
+    connector and event whose ``poll`` filter accepts the poll's name (no
+    ``poll`` filter accepts every poll of that connector). Best-effort:
+    an unreadable store reads as no workflows."""
+    from ..engine.matching import workflow_triggers
+    from . import published_workflows
+
+    if workflows is None:
+        try:
+            workflows = (published_workflows.load_workflows()
+                         if published_workflows.configured() else [])
+        except Exception:  # noqa: BLE001 — labels must never break the list
+            workflows = []
+    try:
+        spec = poll_sources.stored_source(item)
+    except RuntimeError:
+        spec = None
+    connector = spec.connector if spec else POLL_CONNECTOR
+    event = spec.event if spec else POLL_EVENT
+    name = item.get("poll_id")
+    found = []
+    for workflow in workflows or []:
+        if not isinstance(workflow, dict) or not workflow.get("id"):
+            continue
+        for trigger in workflow_triggers(workflow):
+            if trigger.get("connector") != connector or trigger.get("event") != event:
+                continue
+            rule = (trigger.get("filters") or {}).get("poll")
+            if rule is None or _workflow_poll_filter_matches(rule, name):
+                found.append({"id": str(workflow["id"]),
+                              "name": str(workflow.get("name") or workflow["id"]),
+                              "enabled": bool(workflow.get("enabled", True))
+                              and not workflow.get("auto_paused")})
+                break
+    return found
+
+
+def monitor_view(item, *, cursor=None, workflows=None, cursor_table_ref=None, now=None):
+    """public_view plus the health the Polls tab and `dapier polls` show:
+    the last checks' status row, one health word, the workflows it starts,
+    and the position resets it supports."""
+    from . import poll_status
+
+    status = poll_status.get(item["poll_id"], table_ref=cursor_table_ref)
+    return {
+        **public_view(item, cursor=cursor),
+        "status": status,
+        "health": poll_status.health(item, status, now=now),
+        "interval_seconds": poll_status.interval_seconds(item.get("expression")),
+        "workflows": bound_workflows(item, workflows),
+        "reset_modes": reset_modes(item, cursor),
+    }
+
+
+def api_list(table_ref=None, cursor_table_ref=None, workflows=None):
+    from . import published_workflows
+
+    if workflows is None:
+        try:
+            workflows = (published_workflows.load_workflows()
+                         if published_workflows.configured() else [])
+        except Exception:  # noqa: BLE001
+            workflows = []
     return 200, {
         "polls": [
-            public_view(item, cursor=get_cursor(item["poll_id"], table=cursor_table_ref))
+            monitor_view(item, cursor=_safe_cursor(item["poll_id"], table=cursor_table_ref),
+                         workflows=workflows, cursor_table_ref=cursor_table_ref)
             for item in load_items(table_ref=table_ref)
         ],
     }
+
+
+def _require(name, table_ref=None):
+    name = str(name or "").strip().lower()
+    item = get_item(name, table_ref=table_ref) if name else None
+    if not item:
+        raise TriggerError(f"no poll trigger named '{name}'")
+    return item
+
+
+def api_show(name, *, table_ref=None, cursor_table_ref=None, workflows=None):
+    item = _require(name, table_ref=table_ref)
+    cursor = _safe_cursor(item["poll_id"], table=cursor_table_ref)
+    return 200, {"poll": monitor_view(item, cursor=cursor, workflows=workflows,
+                                      cursor_table_ref=cursor_table_ref)}
+
+
+def api_set_enabled(name, enabled, operator, *, table_ref=None, cursor_table_ref=None,
+                    events_client=None, target_arn=None):
+    """Pause (``enabled=False``) or resume a poll: the stored flag and its
+    EventBridge rule state move together, the cursor stays where it is."""
+    item = _require(name, table_ref=table_ref)
+    item = {**item, "enabled": bool(enabled),
+            "updated_at": datetime.now(timezone.utc).isoformat()}
+    sync_rule(item, events_client=events_client, target_arn=target_arn)
+    get_table(table_ref).put_item(Item=item)
+    return 200, {"poll_id": item["poll_id"], "enabled": item["enabled"]}
+
+
+POLL_NOW_KEY = "poll_now"
+
+
+def api_check(name, *, table_ref=None, queue=None):
+    """Poll now: queue one check of the poll on the worker (asynchronous,
+    202). The worker runs exactly the scheduled fire, recorded as a manual
+    check in the poll's health row."""
+    item = _require(name, table_ref=table_ref)
+    if not item.get("enabled", True):
+        return 409, {"error": f"poll '{item['poll_id']}' is paused; resume it first"}
+    queue_url = os.environ.get("EVENT_QUEUE_URL")
+    if not queue_url:
+        return 503, {"error": "the event queue is not configured"}
+    if queue is None:
+        import boto3
+
+        queue = boto3.client("sqs")
+    queue.send_message(QueueUrl=queue_url, MessageBody=json.dumps(
+        {POLL_NOW_KEY: {"poll_id": item["poll_id"]}}))
+    return 202, {"accepted": True, "poll_id": item["poll_id"]}
+
+
+def run_poll_now(message):
+    """The worker side of :func:`api_check`: one manual fire."""
+    name = str((message or {}).get("poll_id") or "").strip().lower()
+    if not name:
+        return {"skipped": "missing poll_id"}
+    return fire(name, reason="manual")
+
+
+def _date_cursor(value, like=None):
+    """An operator date as a cursor in the stored cursor's style: providers
+    compare ISO text, so a ``Z`` cursor gets a ``Z`` date."""
+    text = str(value or "").strip()
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        raise TriggerError("date must be an ISO date like 2026-10-01 or "
+                           "2026-10-01T09:00:00Z") from None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    parsed = parsed.astimezone(timezone.utc).replace(microsecond=0)
+    if like and not str(like).endswith("Z"):
+        return parsed.isoformat()
+    return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def api_reset(name, body, operator, *, table_ref=None, cursor_table_ref=None, transport=None):
+    """Move a poll's position without running anything.
+
+    ``{"to": "now"}`` fetches the current page and marks what is waiting
+    as already seen (the watermark jumps to the newest id, a continuation
+    cursor parks), so the next check only picks up items that arrive after
+    this. ``{"to": "date", "date": "2026-10-01"}`` — for polls whose
+    position is a timestamp — sets it to that date, so the next check
+    picks up everything newer, and forgets the seen-set so those items
+    can run again.
+    """
+    item = _require(name, table_ref=table_ref)
+    name = item["poll_id"]
+    body = body if isinstance(body, dict) else {}
+    to = str(body.get("to") or "").strip().lower()
+    cursor = get_cursor(name, table=cursor_table_ref)
+    if to == "now":
+        items, next_cursor = fetch_page_response(item, cursor=cursor, transport=transport)
+        skipped = 0
+        if item.get("cursor_mode") == "watermark":
+            ids = [_raw_id(item, raw) for raw in items]
+            ids = [value for value in ids if value is not None]
+            if cursor is not None:
+                ids = [value for value in ids if _sort_key(value) > _sort_key(cursor)]
+            skipped = len(ids)
+            if ids:
+                cursor = str(max(ids, key=_sort_key))
+                put_cursor(name, cursor, table=cursor_table_ref)
+        else:
+            entries = seen.load(f"poll#{name}", table_ref=cursor_table_ref)
+            ttl_days = item.get("dedupe_ttl_days") or seen.TTL_DAYS
+            for raw in items:
+                raw_id = _raw_id(item, raw)
+                if raw_id is None:
+                    continue
+                key = _stable_event_id(name, raw_id)
+                if key in entries:
+                    continue
+                entries = seen.remember(f"poll#{name}", key, entries,
+                                        table_ref=cursor_table_ref, ttl_days=ttl_days)
+                skipped += 1
+            if next_cursor is not None:
+                cursor = next_cursor
+                put_cursor(name, cursor, table=cursor_table_ref)
+        return 200, {"poll_id": name, "to": "now", "cursor": cursor, "skipped": skipped}
+    if to == "date":
+        if "date" not in reset_modes(item, cursor):
+            raise TriggerError(f"poll '{name}' does not keep its position as a date; "
+                               "reset it to now instead")
+        cursor = _date_cursor(body.get("date"), like=cursor)
+        put_cursor(name, cursor, table=cursor_table_ref)
+        if item.get("cursor_mode") != "watermark":
+            seen.drop(f"poll#{name}", table_ref=cursor_table_ref)
+        return 200, {"poll_id": name, "to": "date", "cursor": cursor}
+    raise TriggerError("to must be 'now' or 'date'")
+
+
+ACTIVITY_SCAN_PAGES = 10
+
+
+def api_activity(name=None, limit=25, *, table_ref=None, inbox_table_ref=None):
+    """Items polls picked up, newest first, from the trigger inbox: every
+    poll-published event carries ``data.poll`` naming its trigger. Each row
+    adds the runs it started (``<workflow>:<event id>``) so the console and
+    the CLI link straight to them; replay goes through the inbox endpoints.
+    """
+    from . import inbox
+
+    try:
+        limit = max(1, min(int(limit), inbox.MAX_LIMIT))
+    except (TypeError, ValueError):
+        limit = inbox.DEFAULT_LIMIT
+    name = str(name or "").strip().lower() or None
+    if name:
+        _require(name, table_ref=table_ref)
+    try:
+        table = inbox_table_ref if inbox_table_ref is not None else inbox._table()
+    except inbox.InboxError as exc:
+        return 503, {"error": str(exc)}
+    names = {"#d": "data", "#p": "poll"}
+    kwargs = {"FilterExpression": "attribute_exists(#d.#p)",
+              "ExpressionAttributeNames": names}
+    if name:
+        kwargs = {"FilterExpression": "#d.#p = :poll",
+                  "ExpressionAttributeNames": names,
+                  "ExpressionAttributeValues": {":poll": name}}
+    rows, start = [], None
+    for _ in range(ACTIVITY_SCAN_PAGES):
+        page = table.scan(**({**kwargs, "ExclusiveStartKey": start} if start else kwargs))
+        rows.extend(page.get("Items", []))
+        start = page.get("LastEvaluatedKey")
+        if not start:
+            break
+    events = [inbox._view(row) for row in rows]
+    events.sort(key=inbox._sort_key, reverse=True)
+    items = []
+    for event in events[:limit]:
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        items.append({
+            **event,
+            "poll": data.get("poll"),
+            "item_id": data.get("item_id"),
+            "title": _item_title(data),
+            "runs": [f"{workflow}:{event.get('inbox_id')}" for workflow in event.get("matched") or []],
+        })
+    return 200, {"items": items, "total": len(events), "poll": name}
+
+
+_TITLE_KEYS = ("title", "name", "subject", "summary", "text", "key", "path_display", "path")
+
+
+def _item_title(data):
+    """A short human label for one picked-up item: the first familiar
+    title-ish field, else the item id."""
+    for key in _TITLE_KEYS:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:200]
+    return str(data.get("item_id") or "")
 
 
 def api_save(body, operator, *, table_ref=None, cursor_table_ref=None, events_client=None, target_arn=None):
@@ -626,6 +936,9 @@ def api_delete(name, operator, *, table_ref=None, cursor_table_ref=None, events_
     # The seen-set goes too: a recreated trigger starts clean instead of
     # suppressing its old items for the rest of the dedupe window.
     seen.drop(f"poll#{name}", table_ref=cursor_table_ref)
+    from . import poll_status
+
+    poll_status.drop(name, table_ref=cursor_table_ref)
     # Retain the trigger record if cursor cleanup failed, so the operator
     # can retry deletion after fixing the problem.
     get_table(table_ref).delete_item(Key={"poll_id": item["poll_id"]})
