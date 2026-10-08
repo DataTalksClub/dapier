@@ -50,8 +50,15 @@ def _pre_routes(event, method, path):
         return http._json_response(401, {"error": "Authentication required"})
     if method == "GET" and path == "/api/admin/me":
         payload = session._session_payload(event)
+        username = payload.get("sub")
+        # The account chrome shows a person, never a raw subject id: the
+        # session's sub is the sign-in email, and the name is the ID
+        # token's name claim when the identity provider sent one.
+        email = username if isinstance(username, str) and "@" in username else ""
         return http._json_response(200, {
-            "username": payload.get("sub"),
+            "username": username,
+            "email": email,
+            "name": str(payload.get("name") or ""),
             "operator": authz.is_operator(payload),
         })
     if not session._csrf_ok(event, method):

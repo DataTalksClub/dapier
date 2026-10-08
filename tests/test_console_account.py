@@ -137,3 +137,21 @@ console.log(JSON.stringify(cases));
     assert result[1] == {"username": "alexey.grin@datatalks.club", "name": "Alexey Grin", "initials": "AG"}
     assert result[2] == {"username": "", "name": "Account", "initials": "A"}
 
+
+def test_account_identity_prefers_the_name_and_never_shows_a_subject_id():
+    if not shutil.which("node"):
+        pytest.skip("node is needed to evaluate account identity helpers")
+    source = "\n".join(line for line in ACCOUNT_JS.splitlines() if not line.startswith("import "))
+    source = source.replace("export function", "function")
+    script = source + """
+console.log(JSON.stringify([
+  accountIdentity({ username: 'alexey@datatalks.club', email: 'alexey@datatalks.club', name: 'Alexey Grigorev' }),
+  accountIdentity({ username: 'grace@datatalks.club' }),
+  accountIdentity({ username: '84b8d488-2001-70be-d465-f84bfd64ef96' }),
+]));
+"""
+    result = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", script], text=True))
+    assert result[0] == {"name": "Alexey Grigorev", "email": "alexey@datatalks.club", "initials": "AG"}
+    assert result[1] == {"name": "Grace", "email": "grace@datatalks.club", "initials": "G"}
+    assert result[2] == {"name": "Operator", "email": "", "initials": "O"}
+

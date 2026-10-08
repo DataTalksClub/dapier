@@ -203,7 +203,7 @@ def seed_youtube_connection(table, **overrides):
     return item
 
 
-def sign_in(monkeypatch, http):
+def sign_in(monkeypatch, http, **claims):
     """Walk the operator through /auth/login -> /auth/callback -> session."""
     monkeypatch.setenv("AUTH_BASE_URL", AUTH_BASE)
     monkeypatch.setenv("AUTH_CLIENT_ID", OIDC_CLIENT)
@@ -217,7 +217,7 @@ def sign_in(monkeypatch, http):
     state_cookie = cookie_value(login, "dapier_auth_state=")
 
     nonce = session._verify(state_cookie, kind="oidc")["nonce"]
-    minted["id_token"] = mint_token(nonce=nonce, email=EMAIL)
+    minted["id_token"] = mint_token(nonce=nonce, email=EMAIL, **claims)
 
     from urllib.parse import parse_qs, urlparse
 
@@ -232,6 +232,27 @@ def sign_in(monkeypatch, http):
     return cookie_value(callback, "dapier_session=")
 
 
+def test_me_names_the_signed_in_person_from_the_id_token(monkeypatch):
+    http = HttpFake()
+    configure(monkeypatch, http)
+    session = sign_in(monkeypatch, http, given_name="Alexey", family_name="Grigorev")
+
+    me = invoke(http_event(
+        "GET", "/api/admin/me", cookies=[f"dapier_session={session}"],
+    ))
+    assert json.loads(me["body"]) == {
+        "username": EMAIL, "email": EMAIL, "name": "Alexey Grigorev", "operator": True,
+    }
+
+
+def test_display_name_prefers_the_name_claim_and_tidies_it():
+    from src.dapier.api.admin import login
+
+    assert login._display_name({"name": "  Ada   Lovelace ", "given_name": "X"}) == "Ada Lovelace"
+    assert login._display_name({"given_name": "Ada"}) == "Ada"
+    assert login._display_name({"email": EMAIL}) == ""
+
+
 def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
     http = HttpFake()
     dynamo, stored = configure(monkeypatch, http)
@@ -242,7 +263,9 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
         "GET", "/api/admin/me", cookies=[f"dapier_session={session}"],
     ))
     assert me["statusCode"] == 200
-    assert json.loads(me["body"]) == {"username": EMAIL, "operator": True}
+    assert json.loads(me["body"]) == {
+        "username": EMAIL, "email": EMAIL, "name": "", "operator": True,
+    }
 
     seed_youtube_connection(dynamo.tables["connections"])
 

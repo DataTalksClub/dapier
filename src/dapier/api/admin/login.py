@@ -63,11 +63,27 @@ def auth_callback(event):
     email = claims.get("email")
     if not isinstance(email, str) or not email:
         return _auth_error_redirect(clear_state)
-    token = session._sign({"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS})
+    payload = {"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS}
+    name = _display_name(claims)
+    if name:
+        payload["name"] = name
+    token = session._sign(payload)
     return http._redirect(
         _safe_next(pending.get("next")),
         cookies=[clear_state, f"{SESSION_COOKIE}={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax"],
     )
+
+def _display_name(claims):
+    """The person's name from the ID token, for the console's account chrome.
+
+    Cognito passes Google's ``name`` (or ``given_name``/``family_name``)
+    through when the pool maps them; absent claims mean no name, and the
+    console falls back to the email address."""
+    name = claims.get("name")
+    if not isinstance(name, str) or not name.strip():
+        parts = [claims.get("given_name"), claims.get("family_name")]
+        name = " ".join(part.strip() for part in parts if isinstance(part, str) and part.strip())
+    return " ".join(str(name or "").split())[:120]
 
 def _auth_error_redirect(clear_state):
     return http._redirect(
