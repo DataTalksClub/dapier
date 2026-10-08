@@ -124,6 +124,12 @@ def _route(event, method, path):
         return hook_triggers_api(event, method)
     if path == "/api/agent/schedule-triggers" and method in ("GET", "PUT", "DELETE"):
         return schedule_triggers_api(event, method)
+    if path == "/api/agent/schedule-triggers/upcoming" and method == "GET":
+        return schedule_upcoming_api(event)
+    schedule_action = re.fullmatch(
+        r"/api/agent/schedule-triggers/([a-z0-9-]+)/(run|pause|resume)", path)
+    if schedule_action and method == "POST":
+        return schedule_action_api(event, *schedule_action.groups())
     if path == "/api/agent/poll-triggers" and method in ("GET", "PUT", "DELETE"):
         return poll_triggers_api(event, method)
     if path == "/api/agent/grants" and method in ("GET", "PUT", "DELETE"):

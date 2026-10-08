@@ -72,6 +72,32 @@ def delete_schedule_trigger(event, operator):
                  operator, outcome="deleted")
     return http._json_response(status, payload)
 
+def upcoming_schedule_triggers(event):
+    query = event.get("queryStringParameters") or {}
+    status, payload = schedule_triggers.api_upcoming(query.get("hours", 24))
+    return http._json_response(status, payload)
+
+def run_schedule_trigger(name, operator):
+    """Run now: one manual fire through the event queue."""
+    try:
+        status, payload = schedule_triggers.api_run_now(name, operator)
+    except email_triggers.TriggerError as exc:
+        return http._json_response(404, {"error": str(exc)})
+    session._audit_event(payload.get("schedule_id", "unknown"), "schedule-trigger.run",
+                 operator, outcome="ok")
+    return http._json_response(status, payload)
+
+def set_schedule_trigger_enabled(name, enabled, operator):
+    """Pause or resume a schedule (its EventBridge rule state)."""
+    try:
+        status, payload = schedule_triggers.api_set_enabled(name, enabled, operator)
+    except email_triggers.TriggerError as exc:
+        return http._json_response(404, {"error": str(exc)})
+    session._audit_event(payload.get("schedule_id", "unknown"),
+                 "schedule-trigger.resume" if enabled else "schedule-trigger.pause",
+                 operator, outcome="ok")
+    return http._json_response(status, payload)
+
 def list_poll_triggers(event):
     status, payload = poll_triggers.api_list()
     return http._json_response(status, payload)

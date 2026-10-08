@@ -634,6 +634,26 @@ def _schedule_event(payload):
     }
 
 
+def _note_schedule_fire(event, outcome=None, matched=None, error=None):
+    """Record a schedule fire on its schedule's history (the Schedules tab's
+    "did it run?"). Only schedule events; best-effort, never raises."""
+    if not isinstance(event, dict) or event.get("connector") != "schedule":
+        return
+    try:
+        from ..triggers import schedule_triggers
+
+        if outcome is None:
+            outcome = schedule_triggers.RAN if matched else schedule_triggers.NO_LISTENERS
+        schedule_triggers.record_fire(event, outcome, matched, error)
+    except Exception:
+        logger.warning("schedule fire not recorded", extra={"event_id": event.get("id")})
+
+
+def _failed_workflow(exc):
+    workflow = getattr(exc, "dapier_workflow", None)
+    return [workflow] if workflow else []
+
+
 def _poll_failure_event(event):
     """A minimal envelope naming a failed poll-trigger fire.
 
@@ -833,20 +853,25 @@ def handler(event, _context):
         normalized = None
         try:
             normalized = _schedule_event(event)
-            execute(
+            matched = execute(
                 normalized,
                 **_attempt_hooks(0),
             )
         except RunSuspended as susp:
             # The run parked on a long delay; the continuation re-enters
             # through the event queue when the wait is over. Not a failure.
+            _note_schedule_fire(normalized, matched=[susp.workflow_id])
             _park_suspension(susp)
         except Exception as exc:
             logger.exception("schedule trigger failed", extra={"schedule_id": event.get("schedule_id")})
             if not _schedule_retry(exc, normalized, 0):
+                _note_schedule_fire(normalized, "failed", _failed_workflow(exc), exc)
                 _emit_failure_notice(exc, normalized,
                                      paused=_auto_pause_on_failure(exc, normalized))
                 raise
+            _note_schedule_fire(normalized, "retrying", _failed_workflow(exc), exc)
+        else:
+            _note_schedule_fire(normalized, matched=matched)
         return {"executed": event["schedule_id"]}
     failures = []
     for record in event.get("Records", []):
@@ -895,6 +920,7 @@ def handler(event, _context):
                 failures.append({"itemIdentifier": record.get("messageId")})
             else:
                 inbox.complete(inbox_id, [susp.workflow_id])
+                _note_schedule_fire(payload, matched=[susp.workflow_id])
         except Exception as exc:
             logger.exception("workflow record failed", extra={"message_id": record.get("messageId")})
             if _schedule_retry(exc, payload, attempt):
@@ -903,11 +929,14 @@ def handler(event, _context):
                 # own close-out rewrites it (matched, or the final failure).
                 inbox.complete(inbox_id, None, error="retry scheduled: a later "
                                "attempt is pending on the event queue")
+                _note_schedule_fire(payload, "retrying", _failed_workflow(exc), exc)
                 continue
             inbox.complete(inbox_id, None, error=exc)
+            _note_schedule_fire(payload, "failed", _failed_workflow(exc), exc)
             _emit_failure_notice(exc, payload,
                                  paused=_auto_pause_on_failure(exc, payload))
             failures.append({"itemIdentifier": record.get("messageId")})
         else:
             inbox.complete(inbox_id, matched)
+            _note_schedule_fire(payload, matched=matched)
     return {"batchItemFailures": failures}

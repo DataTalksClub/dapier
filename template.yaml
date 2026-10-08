@@ -780,7 +780,8 @@ Resources:
             TableName: !Ref HookTriggersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref TriggerInboxTable
-        - DynamoDBReadPolicy:
+        # Crud, not Read: each fire is noted on its schedule's history.
+        - DynamoDBCrudPolicy:
             TableName: !Ref ScheduleTriggersTable
         - DynamoDBReadPolicy:
             TableName: !Ref PollTriggersTable

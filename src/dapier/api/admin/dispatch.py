@@ -232,6 +232,15 @@ def _route_triggers(event, method, path, operator_payload, operator_subject):
         return routes.save_schedule_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/schedule-triggers":
         return routes.delete_schedule_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/schedule-triggers/upcoming":
+        return routes.upcoming_schedule_triggers(event)
+    schedule_action = re.fullmatch(
+        r"/api/admin/schedule-triggers/([a-z0-9-]+)/(run|pause|resume)", path)
+    if method == "POST" and schedule_action:
+        name, action = schedule_action.groups()
+        if action == "run":
+            return routes.run_schedule_trigger(name, operator_subject)
+        return routes.set_schedule_trigger_enabled(name, action == "resume", operator_subject)
     if method == "GET" and path == "/api/admin/poll-triggers":
         return routes.list_poll_triggers(event)
     if method == "PUT" and path == "/api/admin/poll-triggers":

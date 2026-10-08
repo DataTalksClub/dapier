@@ -21,7 +21,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_triggers_api", "poll_triggers_api", "schedule_triggers_api", "trigger_sample_api"]
+__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_triggers_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
 
 
 
@@ -154,6 +154,35 @@ def schedule_triggers_api(event, method):
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit(payload.get("schedule_id", "unknown"), "schedule-trigger", subject,
                outcome="ok" if status == 200 else "error")
+    return _json_response(status, payload)
+
+
+def schedule_upcoming_api(event):
+    """Operator-only: every enabled schedule's fires in the next N hours."""
+    subject, error = require_operator(event, "schedule-trigger")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = schedule_triggers.api_upcoming(query.get("hours", 24))
+    return _json_response(status, payload)
+
+
+def schedule_action_api(event, name, action):
+    """Operator-only Run now / Pause / Resume for one schedule — the CLI
+    twin of the console's buttons (same schedule_triggers functions)."""
+    subject, error = require_operator(event, "schedule-trigger")
+    if error:
+        return error
+    try:
+        if action == "run":
+            status, payload = schedule_triggers.api_run_now(name, subject)
+        else:
+            status, payload = schedule_triggers.api_set_enabled(
+                name, action == "resume", subject)
+    except email_triggers.TriggerError as exc:
+        return _json_response(404, {"error": str(exc)})
+    audit.emit(payload.get("schedule_id", "unknown"), f"schedule-trigger.{action}", subject,
+               outcome="ok")
     return _json_response(status, payload)
 
 

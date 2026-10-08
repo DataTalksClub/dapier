@@ -468,6 +468,21 @@ trigger disables it. The rules fire without any deploy, and the CLI, the
 console API (`/api/agent/schedule-triggers`, `/api/admin/schedule-triggers`),
 and the worker all see the same stored actions.
 
+The console's Schedules tab and the CLI answer "when do things run, and did
+they?" from the same API: every fire is noted on its schedule (ran, fired
+with no workflow listening, failed), each schedule carries a plain-language
+reading of its expression, its next fires, the workflows a fire reaches, and
+a health verdict that flags a schedule that went quiet ("Last fired 3 days
+ago; expected every hour"):
+
+```bash
+dapier schedules list              # health and next fire per schedule
+dapier schedules show morning-digest   # timing, workflows, recent fires and runs
+dapier schedules upcoming --days 7 # fires coming up across all schedules
+dapier schedules run morning-digest    # Run now (a manual fire via the event queue)
+dapier schedules pause morning-digest  # / resume: the rule's state, noted in history
+```
+
 One-time migration of the existing DataTalksClub YouTube credential (bytes are
 transferred, never logged; refresh and channel ID are verified first; backups
 are untouched). `--client-id`/`--client-secret-file` are optional — they are
