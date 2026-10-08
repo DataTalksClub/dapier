@@ -880,6 +880,26 @@ tr.workflow-open:focus-visible, tr.run-open:focus-visible { outline: 3px solid v
 .empty-state h3 { margin: 0; font-size: var(--dk-text-body); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
 .empty-state p { margin: 0; }
 #workers-empty { margin: 0; }
+/* Workers register: fixed columns so long ids, task keys and paths clip to
+   one line (full value in the title) instead of stretching the table. */
+.workers-table table { table-layout: fixed; }
+.workers-table .col-worker { width: 23%; }
+.workers-table .col-status { width: 14%; }
+.workers-table .col-task { width: 20%; }
+.workers-table .col-engine { width: 16%; }
+.workers-table .col-workspace { width: 17%; }
+.workers-table .col-started { width: 10%; }
+.workers-table td { vertical-align: top; }
+.worker-clip { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workers-table .cell-title > .worker-clip.cell-sub { margin-top: 2px; }
+.worker-stack, .worker-status { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.worker-stack > .worker-clip, .worker-status > .cell-sub { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.worker-status > .status { white-space: nowrap; }
+.worker-task { font-weight: var(--dk-weight-medium); }
+.worker-engine { font-family: var(--dk-font-mono); }
+.worker-capabilities { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.worker-path { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.worker-started { white-space: nowrap; color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 
 /* --- dialogs --------------------------------------------------------------------- */
 dialog {

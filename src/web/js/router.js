@@ -9,7 +9,6 @@ const NAV_FOR = {
   emails: 'workflows',
   schedules: 'workflows',
   credentials: 'connections',
-  workers: 'agents',
 };
 const TAB_FAMILY = {
   workflows: 'workflows',
@@ -17,8 +16,6 @@ const TAB_FAMILY = {
   schedules: 'workflows',
   connections: 'connections',
   credentials: 'connections',
-  agents: 'agents',
-  workers: 'agents',
 };
 let viewGuard = null;
 let rememberedUrl = `${window.location.pathname}${window.location.search}`;
@@ -28,7 +25,7 @@ export function rememberViewUrl(url) { rememberedUrl = url; }
 
 /* The title row has an empty middle. A standalone view's .page-tools fills
    it, and comes back to the view before the next one is mounted so inactive
-   pages keep their controls. Family tabs (Connections, Workflows, Agents)
+   pages keep their controls. Family tabs (Connections, Workflows)
    keep their actions in the body — the header above the tabs stays still. */
 let mountedTools = null;
 function mountPageTools() {
@@ -123,16 +120,17 @@ export async function setView(view, push = true, options = {}) {
   if (view === 'workflows') applyWorkflowTab(workflowTab);
   syncPageTabs(view, workflowTab);
   /* Family tabs swap the body under the strip, not the page header above
-     it. Child views (App setup, Emails, Workers, Hooks…) keep their own
+     it. Child views (App setup, Emails, Hooks…) keep their own
      routes; the title stays the parent page. */
   const FAMILY_META = {
     workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
     connections: ['Connections', 'The connected accounts workflows act through.'],
-    agents: ['Agents', 'Agent tasks and the runs behind them.'],
   };
   const VIEW_META = {
     overview: ['Home', 'Automations and their latest results at a glance.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
+    agents: ['Agents', 'Agent tasks and the runs behind them.'],
+    workers: ['Workers', 'Machines that run agent tasks. Active means a check-in within two minutes; tasks stay queued until a worker is running.'],
     tokens: ['Access', 'Machine tokens for API access.'],
     storage: ['Data', 'Key-value data shared with workflows.'],
     audit: ['Audit', 'Who changed what — newest first.'],

@@ -1,7 +1,7 @@
 """Presence registry for host workers (`dapier worker` processes).
 
 A worker checks in on every claim poll and task heartbeat, so the console's
-Workers tab and `dapier workers list` can show which machines are picking up
+Workers page and `dapier workers list` can show which machines are picking up
 agent tasks — and whether any is running at all (idle tasks stay queued
 until one is). Rows live beside the agent tasks they run, in the same table
 with a ``worker:`` id prefix and ``kind: worker``; a worker that stops

@@ -92,7 +92,7 @@ def workers_api(event):
     """Operator-only host worker list mirroring /api/admin/workers.
 
     Same domain function (host_workers.api_list) as the console route, so
-    `dapier workers list` and the console Workers tab see the same rows:
+    `dapier workers list` and the console Workers page see the same rows:
     which `dapier worker` processes checked in, which is active, what each
     is running. Like the agent-tasks read it is not itself audited —
     require_operator records the denials.

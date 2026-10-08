@@ -1,4 +1,4 @@
-"""Worker presence: what the Workers tab and `dapier workers list` show.
+"""Worker presence: what the Workers page and `dapier workers list` show.
 
 The registry rides the host job protocol (`dapier worker` checks in with
 every claim poll and heartbeat), so the tests cover three layers the way

@@ -51,6 +51,7 @@
         <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
         <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span><span id="nav-runs-count" class="nav-count" hidden></span></a>
         <a class="nav-item" href="/agents" data-view="agents"><i data-lucide="bot"></i><span>Agents</span></a>
+        <a class="nav-item" href="/workers" data-view="workers"><i data-lucide="server"></i><span>Workers</span></a>
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <p class="nav-group-label">Settings</p>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>Access</span></a>
@@ -90,10 +91,6 @@
         <div class="page-tab-set" data-family="connections">
           <a class="view-link" href="/connections" data-view="connections">Accounts</a>
           <a class="view-link" href="/credentials" data-view="credentials">App setup</a>
-        </div>
-        <div class="page-tab-set" data-family="agents">
-          <a class="view-link" href="/agents" data-view="agents">Tasks</a>
-          <a class="view-link" href="/workers" data-view="workers">Workers</a>
         </div>
       </nav>
 
@@ -279,13 +276,11 @@
         </div>
       </section>
       <section class="view" data-page="workers">
-        <div class="page-tools">
-          <p class="sub" title="Active means a check-in within two minutes. Tasks stay queued until a worker is running.">Active means a check-in within two minutes. Tasks stay queued until a worker is running.</p>
-        </div>
         <p id="workers-empty" class="sub"></p>
-        <div id="workers-wrap" class="table-wrap" hidden>
+        <div id="workers-wrap" class="table-wrap workers-table" hidden>
           <table>
-            <thead><tr><th>Worker</th><th>Status</th><th>Tasks</th><th>Capabilities</th><th>Workspace</th><th>Started</th></tr></thead>
+            <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
+            <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
             <tbody id="workers"></tbody>
           </table>
         </div>
