@@ -1926,6 +1926,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .sched-facts > div { grid-template-columns: minmax(0, 1fr); }
   .sched-actions .dk-button { flex: 1 1 40%; min-height: 44px; }
   .sched-actions .dk-button--danger { margin-left: 0; }
+}
 
 /* --- Hooks tab: recent deliveries (main) beside endpoint cards ---------------- */
 body[data-view="workflows"] .hooks-tools { display: flex; gap: 10px; margin-left: auto; }
