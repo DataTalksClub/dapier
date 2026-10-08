@@ -653,52 +653,73 @@
   <dialog id="edit-connection-dialog" aria-labelledby="edit-connection-title">
     <form id="edit-connection-form" method="dialog" autocomplete="off">
       <div class="dialog-head">
-        <h2 id="edit-connection-title">Manage connection</h2>
+        <div class="manage-head">
+          <h2 id="edit-connection-title">Manage connection</h2>
+          <p id="edit-connection-meta" class="manage-meta"></p>
+        </div>
         <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
-      <div class="dialog-body">
-        <p id="edit-connection-meta" class="sub mono"></p>
-          <label id="edit-scopes-field">Scopes<input name="scopes" class="mono-input" placeholder="space-separated scope list"><small class="field-hint">Advanced provider permission identifiers. Changes take effect after reconnect; revoke the old token before reducing scopes.</small></label>
-        <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">Dropbox only: the folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
-        <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
-        <section id="edit-zoom-setup" class="detail-block" hidden>
+      <div class="dialog-body manage-body">
+        <dl id="edit-connection-details" class="manage-summary"></dl>
+        <div class="manage-actions" role="group" aria-label="Connection actions">
+          <button id="edit-connection-test" class="dk-button dk-button--secondary" type="button">Test</button>
+          <a id="edit-connection-reconnect" class="dk-button dk-button--secondary" target="_blank" rel="noopener" hidden>Reconnect</a>
+          <button id="edit-connection-discover" class="dk-button dk-button--secondary" type="button">Explore data</button>
+          <button id="edit-connection-access" class="dk-button dk-button--secondary" type="button">Access grants</button>
+        </div>
+        <p id="edit-connection-test-result" class="manage-test-result" role="status" hidden></p>
+        <section id="edit-zoom-setup" class="manage-section" hidden>
           <h3>Zoom event subscription</h3>
           <p>Set this Event Notification Endpoint URL in your Zoom app, select <code>recording.completed</code>, then click Validate in Zoom. Cloud recording must be enabled for the host.</p>
-          <code id="edit-zoom-url" class="break-all"></code>
+          <code id="edit-zoom-url" class="manage-url break-all"></code>
           <p class="field-hint">The connection becomes active after Zoom validates the URL. Use the <code>zoom / recording.completed</code> trigger in a workflow.</p>
         </section>
-        <section id="edit-slack-setup" class="detail-block" hidden>
+        <section id="edit-slack-setup" class="manage-section" hidden>
           <h3>Slack event subscriptions</h3>
           <p>Set this Request URL in your Slack app's Event Subscriptions, subscribe to the <code>message.channels</code>, <code>message.groups</code>, <code>message.im</code>, <code>message.mpim</code> and <code>app_mention</code> events, then reinstall the app.</p>
-          <code id="edit-slack-url" class="break-all"></code>
+          <code id="edit-slack-url" class="manage-url break-all"></code>
           <label>Signing secret<input name="signing_secret" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="the app's Signing Secret (fa…)"><small class="field-hint">Required for events — Slack signs every delivery with it. Leave blank to keep the stored value. Bot posts never fire the trigger, so a workflow posting into the channel it listens on cannot loop.</small></label>
           <p class="field-hint">Use the <code>slack / message.received</code> trigger in a workflow; filter on <code>channel_id</code> or <code>type</code> (e.g. <code>app_mention</code>).</p>
         </section>
-        <section id="edit-youtube-setup" class="detail-block" hidden>
+        <section id="edit-youtube-setup" class="manage-section" hidden>
           <h3>YouTube video push</h3>
           <p>New uploads arrive as PubSubHubbub (WebSub) pushes to this callback URL:</p>
-          <code id="edit-youtube-url" class="break-all"></code>
+          <code id="edit-youtube-url" class="manage-url break-all"></code>
           <p>Subscribe the channel on the hub — pass the callback above, the topic <code>https://www.youtube.com/xml/feeds/videos.xml?channel_id=<em>CHANNEL_ID</em></code>, and <code>hub.secret</code> set to the configured webhook secret:</p>
           <pre id="edit-youtube-curl" class="sample-json mono"></pre>
           <p class="field-hint">The renewal schedule re-subscribes every channel a <code>youtube / video.published</code> workflow item filters on every four days, so subscriptions stay live; the manual subscribe above starts watching immediately. With a webhook secret configured, unsigned deliveries are rejected.</p>
         </section>
-        <section id="edit-dropbox-setup" class="detail-block" hidden>
+        <section id="edit-dropbox-setup" class="manage-section" hidden>
           <h3>Dropbox webhook</h3>
           <p>Set this Webhook URI in your Dropbox app's settings (App Console → Webhooks). Dapier answers Dropbox's validation challenge.</p>
-          <code id="edit-dropbox-url" class="break-all"></code>
+          <code id="edit-dropbox-url" class="manage-url break-all"></code>
+          <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">The folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
           <p class="field-hint">Dropbox signs every delivery with the app secret, so the secret stored for the dropbox OAuth client (<a href="/credentials">Credentials</a>, or <code>dapier oauth-clients set dropbox</code>) must match the App Console secret. Use the <code>dropbox / file.created</code> trigger (also <code>file.updated</code>, <code>file.deleted</code>) in a workflow.</p>
         </section>
+        <details id="edit-advanced" class="manage-advanced">
+          <summary>Advanced <span id="edit-advanced-count" class="manage-advanced-count"></span></summary>
+          <div class="manage-advanced-body">
+            <label id="edit-scopes-field">Scopes<textarea name="scopes" class="mono-input manage-scopes" rows="4" spellcheck="false" placeholder="one scope per line"></textarea><small class="field-hint">One per line; Google scopes may drop the <code>https://www.googleapis.com/auth/</code> prefix. Changes take effect after Reconnect — revoke the old token before reducing scopes.</small></label>
+            <label id="edit-token-field" hidden>Replace token<input name="token" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="xoxb-… or 123456:ABC-…"><small class="field-hint">Leave blank to keep the stored token — it is re-verified on save.</small></label>
+            <p id="edit-connection-cli" class="manage-cli" hidden></p>
+          </div>
+        </details>
+        <section class="manage-danger" aria-labelledby="edit-danger-title">
+          <h3 id="edit-danger-title">Danger zone</h3>
+          <div id="edit-revoke-row" class="manage-danger-row">
+            <p><strong id="edit-revoke-label">Revoke tokens</strong><span id="edit-revoke-hint" class="field-hint">Clears the stored tokens. Flows using it stop working until you reconnect.</span></p>
+            <button id="edit-connection-revoke" class="dk-button dk-button--danger" type="button">Revoke tokens</button>
+          </div>
+          <div class="manage-danger-row">
+            <p><strong>Delete connection</strong><span class="field-hint">Removes the connection, its credential and its access grants.</span></p>
+            <button id="edit-connection-delete" class="dk-button dk-button--danger" type="button">Delete</button>
+          </div>
+        </section>
         <p id="edit-connection-error" class="form-error" role="alert"></p>
-        <p id="edit-connection-test-result" class="sub" hidden></p>
       </div>
       <div class="dialog-actions">
-        <button id="edit-connection-access" class="dk-button dk-button--secondary" type="button">Access grants</button>
-        <button id="edit-connection-test" class="dk-button dk-button--secondary" type="button">Test</button>
-        <button id="edit-connection-discover" class="dk-button dk-button--secondary" type="button">Explore data</button>
-        <button id="edit-connection-revoke" class="dk-button dk-button--secondary" type="button">Revoke tokens</button>
-        <a id="edit-connection-reconnect" class="dk-button dk-button--secondary" target="_blank" rel="noopener" hidden>Reconnect</a>
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
-        <button class="dk-button dk-button--primary" type="submit">Save changes</button>
+        <button id="edit-connection-save" class="dk-button dk-button--primary" type="submit" disabled>Save changes</button>
       </div>
     </form>
   </dialog>

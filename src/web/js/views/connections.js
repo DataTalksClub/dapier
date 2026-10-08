@@ -614,41 +614,66 @@ function openTokenDialog(provider) {
   form.token.focus();
 }
 
+/* Google scopes read better without their shared URL prefix; Save puts it
+   back, so the API still receives the full identifiers. */
+const GOOGLE_SCOPE_PREFIX = 'https://www.googleapis.com/auth/';
+const BARE_GOOGLE_SCOPES = new Set(['openid', 'email', 'profile']);
+const usesGoogleScopes = (provider) => provider === 'google' || provider === 'youtube';
+
+function scopesForEditing(connection) {
+  return (connection.scopes || []).map((scope) => (usesGoogleScopes(connection.provider) && scope.startsWith(GOOGLE_SCOPE_PREFIX)
+    ? scope.slice(GOOGLE_SCOPE_PREFIX.length) : scope)).join('\n');
+}
+
+function scopesFromEditing(text, provider) {
+  return text.split(/\s+/).filter(Boolean).map((scope) => (usesGoogleScopes(provider)
+    && !scope.includes(':') && !BARE_GOOGLE_SCOPES.has(scope) ? `${GOOGLE_SCOPE_PREFIX}${scope}` : scope));
+}
+
+/* Manage reads top to bottom: who the connection is (head), what it covers
+   and where it is used (summary), the everyday actions, provider setup,
+   rarely-touched settings behind Advanced, and destructive actions last.
+   Save stays disabled until something editable changes. */
 export function openEditConnection(connectionId) {
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (!connection) return;
+  const provider = connection.provider;
+  const tokenProvider = TOKEN_PROVIDERS.includes(provider);
   const form = $('#edit-connection-form');
   form.reset();
   form.dataset.connectionId = connection.connection_id;
-  form.dataset.provider = connection.provider;
-  const refs = usageRefs(connection);
-  $('#edit-connection-title').textContent = `Manage ${accountLabel(connection)}`;
-  $('#edit-connection-meta').textContent = [productList(connection), connection.status === 'ready' ? 'not signed in' : '']
-    .filter(Boolean).join(' · ');
-  renderManageDetails(connection, refs);
-  form.scopes.value = (connection.scopes || []).join(' ');
-  $('#edit-scopes-field').hidden = TOKEN_PROVIDERS.includes(connection.provider);
-  form.root_path.value = connection.root_path || '';
-  $('#edit-root-path-field').hidden = connection.provider !== 'dropbox';
+  form.dataset.provider = provider;
+  $('#edit-connection-title').textContent = accountLabel(connection);
+  $('#edit-connection-meta').innerHTML = statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS);
+  renderManageDetails(connection, usageRefs(connection));
+
+  form.scopes.value = scopesForEditing(connection);
+  $('#edit-scopes-field').hidden = tokenProvider;
+  const scopeCount = (connection.scopes || []).length;
+  $('#edit-advanced-count').textContent = tokenProvider ? ''
+    : `· ${scopeCount} scope${scopeCount === 1 ? '' : 's'}`;
   form.token.value = '';
-  $('#edit-token-field').hidden = !TOKEN_PROVIDERS.includes(connection.provider);
-  $('#edit-token-field').firstChild.textContent = connection.provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
-  form.token.placeholder = connection.provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
-  $('#edit-token-field .field-hint').textContent = connection.provider === 'zoom'
+  $('#edit-token-field').hidden = !tokenProvider;
+  $('#edit-token-field').firstChild.textContent = provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
+  form.token.placeholder = provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
+  $('#edit-token-field .field-hint').textContent = provider === 'zoom'
     ? 'Leave blank to keep the stored secret. Replacing it requires Zoom to validate the callback again.'
     : 'Leave blank to keep the stored token — it is re-verified on save.';
-  const zoomSetup = $('#edit-zoom-setup');
-  zoomSetup.hidden = connection.provider !== 'zoom';
-  if (connection.provider === 'zoom') $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
-  const slackSetup = $('#edit-slack-setup');
-  slackSetup.hidden = connection.provider !== 'slack';
-  if (connection.provider === 'slack') {
+  const cliRef = (connection.refs || [])[0];
+  $('#edit-connection-cli').hidden = !cliRef;
+  $('#edit-connection-cli').innerHTML = cliRef
+    ? `From the CLI: <code>dapier token exec ${escapeHtml(cliRef)} --agent …</code>` : '';
+  $('#edit-advanced').open = false;
+
+  $('#edit-zoom-setup').hidden = provider !== 'zoom';
+  if (provider === 'zoom') $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
+  $('#edit-slack-setup').hidden = provider !== 'slack';
+  if (provider === 'slack') {
     $('#edit-slack-url').textContent = `${window.location.origin}/hooks/slack/${encodeURIComponent(connectionId)}`;
     form.signing_secret.value = '';
   }
-  const youtubeSetup = $('#edit-youtube-setup');
-  youtubeSetup.hidden = connection.provider !== 'youtube';
-  if (connection.provider === 'youtube') {
+  $('#edit-youtube-setup').hidden = provider !== 'youtube';
+  if (provider === 'youtube') {
     const callback = `${window.location.origin}/hooks/youtube`;
     $('#edit-youtube-url').textContent = callback;
     $('#edit-youtube-curl').textContent = [
@@ -659,20 +684,33 @@ export function openEditConnection(connectionId) {
       '  https://pubsubhubbub.appspot.com/subscribe',
     ].join('\n');
   }
-  const dropboxSetup = $('#edit-dropbox-setup');
-  dropboxSetup.hidden = connection.provider !== 'dropbox';
-  if (connection.provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
+  $('#edit-dropbox-setup').hidden = provider !== 'dropbox';
+  form.root_path.value = connection.root_path || '';
+  $('#edit-root-path-field').hidden = provider !== 'dropbox';
+  if (provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
+
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = !usesOAuthConsent(connection) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
-  $('#edit-connection-revoke').hidden = !(['connected', 'expired'].includes(connection.status) ||
-    (connection.provider === 'zoom' && connection.status === 'ready'));
-  $('#edit-connection-revoke').textContent = connection.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens';
-  $('#edit-connection-access').hidden = connection.provider === 'zoom';
+  $('#edit-connection-access').hidden = provider === 'zoom';
+  const revocable = ['connected', 'expired'].includes(connection.status)
+    || (provider === 'zoom' && connection.status === 'ready');
+  $('#edit-revoke-row').hidden = !revocable;
+  $('#edit-revoke-label').textContent = revokeLabel(provider);
+  $('#edit-connection-revoke').textContent = revokeLabel(provider);
+  $('#edit-revoke-hint').textContent = provider === 'zoom'
+    ? 'Clears the stored secret, so Zoom deliveries are rejected until you set it again.'
+    : 'Clears the stored tokens. Flows using it stop working until you reconnect.';
+  $('#edit-connection-save').disabled = true;
   $('#edit-connection-error').textContent = '';
   $('#edit-connection-test-result').hidden = true;
   $('#edit-connection-dialog').showModal();
 }
+
+const revokeLabel = (provider) => (provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens');
+
+/* Save wakes up once an editable field changes. */
+$('#edit-connection-form').addEventListener('input', () => { $('#edit-connection-save').disabled = false; });
 
 function renderConnections(connections) {
   /* Server-paged rows win once fetched; the argument (the overview snapshot)
@@ -843,21 +881,11 @@ $('#edit-connection-reconnect').addEventListener('click', (event) => {
 });
 
 /* Delete removes the connection record outright — revoke only clears the
-   tokens and leaves the row. Built here rather than in index.html because
-   only this view needs it (the same call as the token-result dialog). The
+   tokens and leaves the row. Both sit in Manage's Danger zone. The
    confirm names the referencing flows; the API re-checks server-side and
    answers 409 with the same list, so a stale view cannot delete a
    connection that just gained a reference. */
-const editDeleteButton = document.getElementById('edit-connection-delete')
-  || (() => {
-    const button = document.createElement('button');
-    button.id = 'edit-connection-delete';
-    button.className = 'dk-button dk-button--danger';
-    button.type = 'button';
-    button.textContent = 'Delete';
-    $('#edit-connection-revoke').after(button);
-    return button;
-  })();
+const editDeleteButton = $('#edit-connection-delete');
 
 /* Manage's Delete and an unfinished row's Remove share one path: confirm
    (naming the flows that would lose access), then DELETE through the API,
@@ -893,29 +921,24 @@ editDeleteButton.addEventListener('click', async () => {
   }
 });
 
-/* Manage's details block: where the connection is used and how to address
-   it from the CLI. The internal connection_id is never shown. */
+/* Manage's summary: what the connection covers, who it acts as, and where
+   it is used. The internal connection_id is never shown. */
 function renderManageDetails(connection, refs) {
-  const meta = $('#edit-connection-meta');
-  let details = document.getElementById('edit-connection-details');
-  if (!details) {
-    details = document.createElement('div');
-    details.id = 'edit-connection-details';
-    details.className = 'connection-details';
-    meta.after(details);
-  }
   const usage = refs.length
-    ? `<p class="connection-details-label">Used in ${refs.length} flow${refs.length === 1 ? '' : 's'}</p>
-       <ul class="connection-usage">${refs.map((ref) => {
-         const entry = (connection.used_in || []).find((item) => String(item.ref) === ref) || {};
-         return entry.kind === 'workflow'
-           ? `<li><a href="/workflows/${encodeURIComponent(ref)}">${escapeHtml(ref)}</a></li>`
-           : `<li>${escapeHtml(ref)} <span class="sub">(${escapeHtml(entry.kind || 'trigger')})</span></li>`;
-       }).join('')}</ul>`
-    : '<p class="connection-details-label">Not used by any flow</p>';
-  const cliRef = (connection.refs || [])[0];
-  details.innerHTML = `${usage}
-    ${cliRef ? `<p class="sub">CLI: <code>dapier token exec ${escapeHtml(cliRef)} --agent …</code></p>` : ''}`;
+    ? `<ul class="manage-usage">${refs.map((ref) => {
+        const entry = (connection.used_in || []).find((item) => String(item.ref) === ref) || {};
+        return entry.kind === 'workflow'
+          ? `<li><a href="/workflows/${encodeURIComponent(ref)}">${escapeHtml(ref)}</a></li>`
+          : `<li>${escapeHtml(ref)} <span class="sub">(${escapeHtml(entry.kind || 'trigger')})</span></li>`;
+      }).join('')}</ul>`
+    : '<span class="sub">Not used by any flow</span>';
+  const rows = [
+    ['Services', escapeHtml(productList(connection) || connection.provider)],
+    actsAsLabel(connection) ? ['Acts as', escapeHtml(actsAsLabel(connection))] : null,
+    [refs.length ? `Used in ${refs.length} flow${refs.length === 1 ? '' : 's'}` : 'Used in', usage],
+  ].filter(Boolean);
+  $('#edit-connection-details').innerHTML = rows
+    .map(([term, value]) => `<div class="manage-summary-row"><dt>${term}</dt><dd>${value}</dd></div>`).join('');
 }
 
 $('#edit-connection-revoke').addEventListener('click', async (event) => {
@@ -1279,7 +1302,7 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     provider,
   };
   if (!TOKEN_PROVIDERS.includes(provider)) {
-    body.scopes = form.scopes.value.split(/\s+/).filter(Boolean);
+    body.scopes = scopesFromEditing(form.scopes.value, provider);
   } else {
     const token = form.token.value.trim();
     if (token) body.token = token;

@@ -786,13 +786,8 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 }
 .service-share .mono { font-size: inherit; }
 /* Who the credential acts as when one account holds several (Slack app vs. person). */
-.account-acts-as { display: block; margin-top: 2px; font-size: var(--dk-text-sm); color: var(--dk-text); }
+.account-acts-as { display: block; margin-top: 2px; font-size: var(--dk-text-sm); color: var(--dk-text-primary); }
 .service-account-main .cell-sub { display: block; margin-top: 3px; }
-.connection-details { margin: 4px 0 14px; }
-.connection-details-label { margin: 0 0 4px; font-weight: 600; }
-.connection-usage { margin: 0 0 10px; padding-left: 18px; }
-.connection-usage li { margin: 2px 0; }
-.connection-details .sub { margin: 4px 0; }
 .service-account-status { display: grid; gap: 2px; justify-items: start; }
 .service-account-status .cell-sub { display: block; }
 .service-account-status .cell-sub.expiring { color: var(--dk-warning-text); }
@@ -851,10 +846,41 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 .grant-operations legend { margin-bottom: 6px; font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
 .grant-operations label { display: inline-flex; align-items: center; gap: 6px; }
 .grant-operations input { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
-#edit-connection-dialog { width: min(680px, calc(100vw - 32px)); }
-#edit-connection-dialog .dialog-actions { flex-wrap: wrap; }
-#edit-connection-access { margin-right: auto; }
-#edit-connection-revoke { color: var(--dk-danger-text); border-color: var(--dk-danger-border); }
+/* Manage connection: head (who + status), summary, everyday actions,
+   provider setup, Advanced (scopes, token, CLI), Danger zone. */
+#edit-connection-dialog { width: min(620px, calc(100vw - 32px)); }
+.manage-head { display: grid; gap: 4px; min-width: 0; }
+.manage-head h2 { overflow-wrap: anywhere; }
+.manage-meta { margin: 0; font-size: var(--dk-text-sm); }
+.manage-body { gap: 18px; }
+.manage-body > .form-error:empty { display: none; }
+.manage-summary { display: grid; gap: 8px; margin: 0; }
+.manage-summary-row { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.manage-summary dt { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.manage-summary dd { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); overflow-wrap: anywhere; }
+.manage-usage { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
+.manage-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid var(--dk-border-default); }
+.manage-test-result { margin: -8px 0 0; font-size: var(--dk-text-md); color: var(--dk-success-text, var(--dk-text-primary)); }
+.manage-test-result.form-error { color: var(--dk-danger-text); }
+.manage-section { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--dk-border-default); }
+.manage-section h3, .manage-danger h3 { margin: 0; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); }
+.manage-section p { margin: 0; font-size: var(--dk-text-md); line-height: 1.5; }
+.manage-section .field-hint { margin: 0; }
+.manage-url { display: block; padding: 8px 10px; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-inset); font-size: var(--dk-text-sm); }
+.manage-advanced { border-top: 1px solid var(--dk-border-default); padding-top: 12px; }
+.manage-advanced summary { cursor: pointer; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); }
+.manage-advanced-count { font-weight: var(--dk-weight-regular, 400); color: var(--dk-text-muted); }
+.manage-advanced-body { display: grid; gap: 14px; margin-top: 12px; }
+.manage-scopes { width: 100%; min-height: 96px; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-page); padding: 8px 12px; color: var(--dk-text-primary); line-height: 1.5; resize: vertical; }
+.manage-cli { margin: 0; font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow-wrap: anywhere; }
+.manage-danger { display: grid; gap: 0; border: 1px solid var(--dk-danger-border); border-radius: var(--dk-radius-md); padding: 12px 14px 4px; }
+.manage-danger h3 { color: var(--dk-danger-text); margin-bottom: 4px; }
+.manage-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; }
+.manage-danger-row + .manage-danger-row { border-top: 1px solid var(--dk-border-default); }
+.manage-danger-row[hidden] { display: none; }
+.manage-danger-row p { margin: 0; min-width: 0; font-size: var(--dk-text-md); }
+.manage-danger-row .field-hint { margin-top: 2px; }
+.manage-danger-row .dk-button { flex: none; }
 .sub-head { font-size: var(--dk-text-lg); }
 .section-head h2.sub-head { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
@@ -1404,8 +1430,9 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .grant-row { align-items: flex-start; flex-direction: column; }
   .grant-actions { width: 100%; }
   .grant-actions .dk-button { flex: 1; }
-  #edit-connection-dialog .dialog-actions { justify-content: flex-start; }
-  #edit-connection-access { margin-right: 0; }
+  .manage-summary-row { grid-template-columns: 1fr; gap: 2px; }
+  .manage-actions .dk-button { flex: 1 1 calc(50% - 4px); }
+  .manage-danger-row { flex-direction: column; align-items: stretch; gap: 8px; }
 
   /* tables become stacked rows: identity first, labelled slots beneath */
   .table-wrap thead { display: none; }
