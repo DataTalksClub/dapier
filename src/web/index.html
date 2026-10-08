@@ -128,7 +128,10 @@
           </div>
         </div>
         <div class="page-tools primary-tools" data-panel-tools="hooks" hidden>
+          <div class="hooks-tools">
+          <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
           <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
+          </div>
         </div>
         <div class="page-tools primary-tools" data-panel-tools="polls" hidden>
           <button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button>
@@ -149,12 +152,28 @@
         </div>
         </div>
         <div data-workflow-panel="hooks" hidden>
-        <div id="hook-empty" class="empty-state" hidden><h3>No hook triggers</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
-        <div id="hook-table-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Hook</th><th>Kind</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="hook-table"></tbody>
-          </table>
+        <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
+        <div id="hooks-layout" class="hooks-layout" hidden>
+          <section class="hooks-activity" aria-labelledby="hooks-activity-title">
+            <div class="hooks-head">
+              <h2 id="hooks-activity-title">Recent deliveries</h2>
+              <button class="help-tip" type="button" data-tip="Every request a hook accepted in the last 30 days, newest first, with what the workflow did with it. Calls rejected for a bad token or signature get a 401 and are not logged." aria-label="About deliveries">?</button>
+              <p id="hooks-summary" class="sub" role="status"></p>
+            </div>
+            <div id="hooks-filter" class="hooks-chips" role="group" aria-label="Show deliveries for"></div>
+            <div id="hook-deliveries-empty" class="empty-state" hidden><h3>No deliveries yet</h3><p id="hook-deliveries-empty-text">Nothing has called this hook in the last 30 days. Send a test request to see one arrive.</p></div>
+            <div id="hook-deliveries-wrap" class="table-wrap hook-deliveries">
+              <table>
+                <thead><tr><th>Delivery</th><th>Outcome</th><th>Response</th><th>Size</th></tr></thead>
+                <tbody id="hook-deliveries"></tbody>
+              </table>
+            </div>
+            <button id="hook-deliveries-more" class="dk-button dk-button--secondary hooks-more" type="button" hidden>Load more</button>
+          </section>
+          <aside class="hooks-endpoints" aria-labelledby="hooks-endpoints-title">
+            <div class="hooks-head"><h2 id="hooks-endpoints-title">Endpoints</h2><button class="help-tip" type="button" data-tip="Where each hook listens, how a request proves it is genuine, and the workflows a delivery starts." aria-label="About endpoints">?</button></div>
+            <ul id="hook-endpoints" class="hook-endpoint-list"></ul>
+          </aside>
         </div>
         </div>
         <div data-workflow-panel="polls" hidden>
@@ -598,6 +617,37 @@
       <div class="dialog-actions">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="hook-delivery-dialog" aria-labelledby="hook-delivery-title">
+    <div class="dialog-head">
+      <h2 id="hook-delivery-title">Delivery</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="hook-delivery-detail" class="dialog-body detail"></div>
+    <div class="dialog-actions">
+      <button id="hook-delivery-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
+      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
+    </div>
+  </dialog>
+  <dialog id="hook-test-dialog" aria-labelledby="hook-test-title">
+    <form id="hook-test-form" method="dialog" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="hook-test-title">Send test request</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <label>Hook<select name="name" required></select></label>
+        <p id="hook-test-target" class="field-hint mono break-all"></p>
+        <label>Payload (JSON)<textarea name="data" rows="7" class="mono-input" spellcheck="false"></textarea><small class="field-hint">Sent as the request body with the hook's own token or signature, marked as a test. It is a real delivery: workflows listening on the hook run.</small></label>
+        <div id="hook-test-result" class="hook-test-result" role="status" hidden></div>
+        <p id="hook-test-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
+        <button id="hook-test-view" class="dk-button dk-button--secondary" type="button" hidden>View delivery</button>
+        <button class="dk-button dk-button--primary" type="submit">Send</button>
       </div>
     </form>
   </dialog>

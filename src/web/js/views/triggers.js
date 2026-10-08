@@ -1,11 +1,12 @@
-/* Hooks and polls — the trigger kinds behind /api/admin/hook-triggers and
-   /api/admin/poll-triggers, the same operator endpoints `dapier hooks` and
-   `dapier polls` drive. They render as Workflows family tabs (start methods
-   of a flow). Email triggers live in the Emails tab; schedules in Schedules. */
+/* Polls — the trigger kind behind /api/admin/poll-triggers, the same
+   operator endpoint `dapier polls` drives. It renders as a Workflows family
+   tab (a start method of a flow). Hooks live in hooks.js, email triggers in
+   the Emails tab, schedules in Schedules. */
 import { state } from '../state.js';
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
+import { escapeHtml, statusLine } from '../format.js';
+import { renderHooks } from './hooks.js';
 
 /* Optional poll extras beyond the form fields; merged into the PUT body and
    validated server-side (headers, cursor). Provider
@@ -31,29 +32,11 @@ const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
   'google-calendar.events', 'gmail.messages',
   'zoom.recordings', 'dropbox.files', 'youtube.videos', 'slack.messages'];
 
-let hooks = [];
 let polls = [];
 let fetching = false;
 
-function findHook(name) {
-  return hooks.find((item) => item.hook_id === name);
-}
-
 function findPoll(name) {
   return polls.find((item) => item.poll_id === name);
-}
-
-function hookRow(hook) {
-  return `<tr>
-      <td class="cell-title"><span class="cell-name mono">${escapeHtml(hook.hook_id)}</span><span class="cell-sub">${escapeHtml(hook.description || '')}</span></td>
-      <td data-label="Kind">${escapeHtml(hook.kind || 'webhook')}</td>
-      <td data-label="Status">${statusLine(hook.enabled ? 'enabled' : 'disabled')}</td>
-      <td class="mono muted-cell" data-label="Updated">${formatTimestamp(hook.updated_at) || '—'}</td>
-      <td class="action-cell">
-        <button class="dk-button dk-button--secondary trigger-edit" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Edit</button>
-        <button class="dk-button dk-button--secondary trigger-delete" data-kind="hook" data-name="${escapeHtml(hook.hook_id)}" type="button">Delete</button>
-      </td>
-    </tr>`;
 }
 
 function pollWatches(poll) {
@@ -83,9 +66,6 @@ function pollRow(poll) {
 }
 
 function renderTables() {
-  $('#hook-table').innerHTML = hooks.map(hookRow).join('');
-  $('#hook-empty').hidden = hooks.length > 0;
-  $('#hook-table-wrap').hidden = hooks.length === 0;
   $('#poll-table').innerHTML = polls.map(pollRow).join('');
   $('#poll-empty').hidden = polls.length > 0;
   $('#poll-table-wrap').hidden = polls.length === 0;
@@ -95,11 +75,7 @@ async function fetchTriggers() {
   if (fetching) return;
   fetching = true;
   try {
-    const [hookData, pollData] = await Promise.all([
-      api('/api/admin/hook-triggers'),
-      api('/api/admin/poll-triggers'),
-    ]);
-    hooks = hookData.hooks || [];
+    const pollData = await api('/api/admin/poll-triggers');
     polls = pollData.polls || [];
   } catch (error) {
     notice(error.message, true);
@@ -111,48 +87,11 @@ async function fetchTriggers() {
 
 /* Called from the overview render after each refresh: fetch when the
    Workflows view (which hosts the tables) is on screen, otherwise just
-   repaint the cache. */
+   repaint the cache. The Hooks tab refreshes alongside. */
 export function renderTriggers() {
+  renderHooks();
   if (state.view === 'workflows') return void fetchTriggers();
   renderTables();
-}
-
-function openHookDialog(hook) {
-  const form = $('#hook-form');
-  form.reset();
-  $('#hook-error').textContent = '';
-  $('#hook-dialog-title').textContent = hook ? `Edit hook ${hook.hook_id}` : 'New hook';
-  form.name.value = hook ? hook.hook_id : '';
-  form.name.disabled = Boolean(hook); // the name is the hook URL's last segment
-  form.kind.value = hook ? (hook.kind || 'webhook') : 'webhook';
-  form.kind.disabled = Boolean(hook); // a kind change would orphan the URL
-  form.connection_id.value = hook ? (hook.connection_id || '') : '';
-  form.list_id.value = hook ? (hook.list_id || '') : '';
-  form.description.value = hook ? (hook.description || '') : '';
-  form.dedupe_path.value = hook ? (hook.dedupe_path || '') : '';
-  const response = hook ? (hook.response || {}) : {};
-  form.response_mode.value = response.mode || 'ack';
-  form.response_template.value = response.template !== undefined
-    ? JSON.stringify(response.template, null, 2)
-    : '';
-  $('#hook-response-field').hidden = form.kind.value === 'telegram';
-  $('#hook-response-template-field').hidden =
-    form.kind.value === 'telegram' || form.response_mode.value !== 'sync';
-  // The secret is write-only (the API never echoes it back): a signed hook
-  // shows only that the lock exists, and an edit keeps it unless the value
-  // is replaced or explicitly cleared.
-  const signed = Boolean(hook && hook.signed);
-  form.secret.value = '';
-  form.secret.placeholder = signed ? '(configured — leave empty to keep)' : 'shared secret';
-  form.signature_header.value = signed ? (hook.signature_header || '') : '';
-  form.clear_secret.checked = false;
-  $('#hook-clear-secret-field').hidden = !signed;
-  $('#hook-secret-field').hidden = form.kind.value !== 'webhook';
-  form.enabled.checked = hook ? Boolean(hook.enabled) : true;
-  $('#hook-connection-field').hidden = form.kind.value !== 'telegram';
-  $('#hook-list-field').hidden = form.kind.value !== 'mailchimp';
-  $('#hook-dialog').showModal();
-  if (!hook) form.name.focus();
 }
 
 function pollOptions(poll) {
@@ -183,68 +122,7 @@ function openPollDialog(poll) {
   if (!poll) form.name.focus();
 }
 
-$('#new-hook').addEventListener('click', () => openHookDialog(null));
 $('#new-poll').addEventListener('click', () => openPollDialog(null));
-
-$('#hook-form').elements.kind.addEventListener('change', (event) => {
-  $('#hook-connection-field').hidden = event.currentTarget.value !== 'telegram';
-  $('#hook-list-field').hidden = event.currentTarget.value !== 'mailchimp';
-  $('#hook-response-field').hidden = event.currentTarget.value === 'telegram';
-  $('#hook-secret-field').hidden = event.currentTarget.value !== 'webhook';
-});
-
-$('#hook-form').elements.response_mode.addEventListener('change', (event) => {
-  $('#hook-response-template-field').hidden = event.currentTarget.value !== 'sync';
-});
-
-$('#hook-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const submit = form.querySelector('[type="submit"]');
-  if (submit.disabled) return;
-  submit.disabled = true;
-  $('#hook-error').textContent = '';
-  const editingHook = form.name.disabled ? findHook(form.name.value) : null;
-  try {
-    const body = {
-      kind: form.kind.value,
-      name: form.name.value.trim(),
-      description: form.description.value.trim(),
-      dedupe_path: form.dedupe_path.value.trim(),
-      enabled: form.enabled.checked,
-    };
-    if (body.kind === 'telegram') {
-      body.connection_id = form.connection_id.value.trim();
-    } else {
-      if (body.kind === 'webhook') {
-        const secret = form.secret.value.trim();
-        if (form.clear_secret.checked) body.secret = '';
-        else if (secret) body.secret = secret; // omitted: keep the stored lock
-        // the header rides with the lock (blank = the x-dapier-signature
-        // default); a signed hook round-trips its stored name here
-        if (secret || form.clear_secret.checked || form.signature_header.value.trim()) {
-          body.signature_header = form.signature_header.value.trim().toLowerCase();
-        }
-      }
-      if (body.kind === 'mailchimp') body.list_id = form.list_id.value.trim();
-      const response = { mode: form.response_mode.value };
-      if (response.mode === 'sync' && form.response_template.value.trim()) {
-        try { response.template = JSON.parse(form.response_template.value); } catch (_) { throw new Error('Response template must be valid JSON'); }
-      }
-      body.response = response;
-    }
-    const saved = await api('/api/admin/hook-triggers', { method: 'PUT', body: JSON.stringify(body) });
-    $('#hook-dialog').close();
-    const warnings = saved.warnings || [];
-    notice(`Saved hook ${body.name}. It is live immediately.`
-      + (warnings.length ? ` Mailchimp warning: ${warnings.join(' ')}` : ''));
-    await fetchTriggers();
-  } catch (error) {
-    $('#hook-error').textContent = error.message;
-  } finally {
-    submit.disabled = false;
-  }
-});
 
 $('#poll-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -329,31 +207,22 @@ function confirmDelete(title, message) {
 document.addEventListener('click', async (event) => {
   const edit = event.target.closest('.trigger-edit');
   if (edit) {
-    if (edit.dataset.kind === 'hook') openHookDialog(findHook(edit.dataset.name));
-    else openPollDialog(findPoll(edit.dataset.name));
+    openPollDialog(findPoll(edit.dataset.name));
     return;
   }
   const sample = event.target.closest('.trigger-sample');
   if (sample && !sample.disabled) void pullSample(sample.dataset.name);
   const button = event.target.closest('.trigger-delete');
   if (!button || button.disabled) return;
-  const isHook = button.dataset.kind === 'hook';
-  const item = isHook ? findHook(button.dataset.name) : findPoll(button.dataset.name);
+  const item = findPoll(button.dataset.name);
   if (!item) return;
-  const name = isHook ? item.hook_id : item.poll_id;
-  const message = isHook
-    ? (item.kind === 'telegram'
-      ? 'The bot stops forwarding updates and the trigger is removed.'
-      : item.kind === 'mailchimp'
-        ? 'Its webhook subscription is removed from the Mailchimp audience and the trigger is deleted.'
-        : 'Callers using the hook URL are rejected and the token stops working.')
-    : 'Its EventBridge rule is removed and the API is no longer polled.';
-  if (!await confirmDelete(`Delete ${isHook ? `${item.kind || 'hook'} hook` : 'poll trigger'} ${name}?`, message)) return;
+  const name = item.poll_id;
+  const message = 'Its EventBridge rule is removed and the API is no longer polled.';
+  if (!await confirmDelete(`Delete poll trigger ${name}?`, message)) return;
   button.disabled = true;
   try {
-    const query = `name=${encodeURIComponent(name)}${isHook ? `&kind=${encodeURIComponent(item.kind || 'webhook')}` : ''}`;
-    await api(`/api/admin/${isHook ? 'hook' : 'poll'}-triggers?${query}`, { method: 'DELETE' });
-    notice(`Deleted ${isHook ? 'hook' : 'poll trigger'} ${name}.`);
+    await api(`/api/admin/poll-triggers?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    notice(`Deleted poll trigger ${name}.`);
     await fetchTriggers();
   } catch (error) {
     notice(error.message, true);
@@ -362,7 +231,7 @@ document.addEventListener('click', async (event) => {
 });
 
 /* Entering the Workflows family (nav, page tabs, back/forward) fetches
-   fresh hooks and polls. */
+   fresh polls. */
 document.addEventListener('click', (event) => {
   if (event.target.closest('[data-view="workflows"], [data-target="workflows"]')) void fetchTriggers();
 });
