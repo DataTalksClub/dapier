@@ -68,6 +68,25 @@ def test_plumbing_is_skipped_and_long_chains_collapse():
         "Email to invoice → Upload to Dropbox, DataOps +1 more"
 
 
+def test_registry_labels_read_verb_first_and_names_keep_capitals(monkeypatch):
+    from dataclasses import dataclass
+
+    from src.dapier.connectors import registry
+
+    @dataclass
+    class Entry:
+        label: str
+
+    monkeypatch.setitem(registry.ACTIONS, "cal_create", Entry("Google Calendar"))
+    monkeypatch.setitem(registry.ACTIONS, "cal_delete", Entry("Google Calendar (delete event)"))
+    monkeypatch.setitem(registry.ACTIONS, "box_move", Entry("Dropbox: move file"))
+    workflow = _flow({"connector": "custom", "event": "oauth.review"},
+                     [{"type": "agent"}, {"type": "cal_create"}, {"type": "cal_delete"},
+                      {"type": "box_move"}])
+    assert naming.action_summary(workflow, limit=4) == (
+        "Agent, Google Calendar, delete event in Google Calendar, move file in Dropbox")
+
+
 def test_only_plumbing_still_names_the_steps():
     workflow = _flow({"connector": "webhook", "event": "request.received"},
                      [{"type": "code"}, {"type": "code"}])

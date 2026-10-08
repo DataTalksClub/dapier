@@ -256,6 +256,21 @@ def _is_plumbing(kind):
     return kind in _PLUMBING or bool(_PLUMBING_PATTERN.search(kind))
 
 
+_REGISTRY_VERB = re.compile(r"^(?P<service>[^:()]+?)\s*(?::\s*(?P<a>.+)|\((?P<b>[^)]+)\))$")
+
+
+def _verb_first(label):
+    """Registry labels read "Dropbox: move file" / "Google Calendar (delete
+    event)"; a name reads better verb first: "Move file in Dropbox"."""
+    match = _REGISTRY_VERB.match(label.strip())
+    if not match:
+        return label
+    verb = (match.group("a") or match.group("b") or "").strip()
+    if not verb:
+        return label
+    return f"{verb[:1].upper()}{verb[1:]} in {match.group('service').strip()}"
+
+
 def action_label(kind):
     if kind in _ACTION_LABELS:
         return _ACTION_LABELS[kind]
@@ -264,7 +279,7 @@ def action_label(kind):
 
         entry = registry.ACTIONS.get(kind) or registry.LOGIC.get(kind)
         if entry is not None and entry.label:
-            return str(entry.label)
+            return _verb_first(str(entry.label))
     except Exception:  # noqa: BLE001 — naming must never fail a list
         pass
     words = re.sub(r"[_.]+", " ", kind).strip()
@@ -281,10 +296,12 @@ def _actions_of(workflow):
 
 
 def _join_case(label):
-    """A follow-on label reads mid-sentence: "delete from Dropbox", but proper
-    nouns (DataOps, S3, YouTube) keep their capitals."""
-    first = label.split(" ", 1)[0]
-    if first[1:] and first[1:] == first[1:].lower():
+    """A follow-on verb phrase reads mid-sentence ("delete from Dropbox");
+    names keep their capitals (DataOps, Agent, Google Calendar)."""
+    words = label.split(" ")
+    first = words[0]
+    verb_phrase = len(words) > 1 and words[1][:1].islower()
+    if verb_phrase and first[1:] == first[1:].lower():
         return label[:1].lower() + label[1:]
     return label
 
