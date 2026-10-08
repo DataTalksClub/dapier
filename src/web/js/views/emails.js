@@ -82,4 +82,3 @@ $('#email-from-add').addEventListener('submit', async (event) => {
   } catch (error) { notice(error.message, true); }
 });
 
-$('#new-email').addEventListener('click', () => openDesigner(null));
