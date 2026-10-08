@@ -332,6 +332,9 @@ Resources:
                 Resource:
                   - !GetAtt ConnectionsTable.Arn
                   - !GetAtt ExecutionsTable.Arn
+                  # The runs-by-run-id GSI behind every run detail read
+                  # (DynamoDBCrudPolicy granted <table>/index/* implicitly).
+                  - !Sub '${ExecutionsTable.Arn}/index/*'
                   - !GetAtt GrantsTable.Arn
                   - !GetAtt AuditTable.Arn
                   - !GetAtt EmailFromTable.Arn

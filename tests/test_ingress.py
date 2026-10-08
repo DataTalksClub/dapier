@@ -313,6 +313,14 @@ def test_console_email_page_uses_csp_allowed_assets():
     assert 'id="email-mail-list"' in body
 
 
+def test_api_role_can_query_the_run_id_index():
+    """Run detail (console dialog, `dapier runs show`, the inbox's run
+    status) queries the executions GSI; the table ARN alone denies it."""
+    template = pathlib.Path("template.yaml").read_text()
+    role_policy = template.split("\n  ApiExecutionRole:\n", 1)[1].split("\n  IngressFunction:", 1)[0]
+    assert "${ExecutionsTable.Arn}/index/*" in role_policy
+
+
 def test_ingress_role_can_read_overview_failure_counts():
     template = pathlib.Path("template.yaml").read_text()
     role_policy = template.split("\n  ApiExecutionRole:\n", 1)[1].split("\n  IngressFunction:", 1)[0]
