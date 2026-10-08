@@ -36,6 +36,7 @@ def _row(connection):
             const formatTimestamp = () => '';
             const statusLine = value => value;
             const state = {data: {}};
+            const serviceMark = value => value;
         ''')
         js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
         start = JS.index('function usageRefs(')

@@ -205,15 +205,25 @@
             <button id="oauth-dismiss" class="dk-button dk-button--secondary" type="button">Dismiss</button>
           </div>
         </div>
-        <div class="section-head page-tools">
-          <p id="connection-summary" class="register-summary mono">Loading accounts…</p><div class="connection-filters"><label class="visually-hidden" for="connection-search">Search connections</label><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"><label class="visually-hidden" for="connection-status-filter">Connection status</label><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></div>
+        <div class="dk-toolbar page-tools register-toolbar connection-toolbar">
+          <div class="dk-cluster toolbar-filters connection-filters">
+            <label class="toolbar-search"><span class="visually-hidden">Search accounts</span><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"></label>
+            <label><span class="visually-hidden">Connection status</span><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></label>
+          </div>
         </div>
-        <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
-        <div id="connection-register"></div>
-        <section id="connect-services" class="data-panel connect-services" aria-labelledby="connect-services-title" hidden>
-          <div class="section-head"><h2 id="connect-services-title">Connect another service</h2></div>
-          <ul id="connect-grid" class="connect-list"></ul>
-        </section>
+        <div class="trigger-workspace connection-workspace">
+          <section id="connection-accounts" class="data-panel trigger-activity" aria-labelledby="connection-accounts-title">
+            <div class="section-head"><h2 id="connection-accounts-title">Accounts</h2><p id="connection-summary" class="sub" role="status">Loading accounts…</p></div>
+            <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
+            <ul id="connection-register" class="connection-list"></ul>
+          </section>
+          <aside class="trigger-sources" aria-label="Services">
+            <section id="connect-services" class="data-panel connect-services" aria-labelledby="connect-services-title">
+              <div class="section-head"><h2 id="connect-services-title">Services</h2><p class="sub">Add an account from its service</p></div>
+              <ul id="connect-grid" class="source-list connect-list"></ul>
+            </section>
+          </aside>
+        </div>
       </section>
 
       <section class="view" data-page="credentials">
@@ -282,34 +292,49 @@
         </div>
       </section>
       <section class="view" data-page="agents">
-        <div class="agent-toolbar page-tools">
-          <div class="agent-filters" role="group" aria-label="Filter agent runs">
-            <button type="button" data-agent-filter="all" aria-pressed="true">All <span>0</span></button>
-            <button type="button" data-agent-filter="active" aria-pressed="false">Active <span>0</span></button>
-            <button type="button" data-agent-filter="attention" aria-pressed="false">Needs attention <span>0</span></button>
-            <button type="button" data-agent-filter="completed" aria-pressed="false">Completed <span>0</span></button>
+        <div class="dk-toolbar page-tools register-toolbar agent-toolbar">
+          <div class="dk-cluster toolbar-filters">
+            <label class="toolbar-search"><span class="visually-hidden">Search agent runs</span><input id="agent-runs-search" type="search" placeholder="Search runs…"></label>
+            <div class="dk-cluster agent-filters" role="group" aria-label="Filter agent runs">
+              <button type="button" class="dk-filter-chip" data-agent-filter="all" aria-pressed="true">All <span class="dk-filter-chip__count">0</span></button>
+              <button type="button" class="dk-filter-chip" data-agent-filter="active" aria-pressed="false">Active <span class="dk-filter-chip__count">0</span></button>
+              <button type="button" class="dk-filter-chip" data-agent-filter="attention" aria-pressed="false">Needs attention <span class="dk-filter-chip__count">0</span></button>
+              <button type="button" class="dk-filter-chip" data-agent-filter="completed" aria-pressed="false">Succeeded <span class="dk-filter-chip__count">0</span></button>
+            </div>
           </div>
+          <div class="dk-toolbar__end"><p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p><a class="dk-button dk-button--secondary view-link" href="/workers" data-view="workers">Workers</a></div>
         </div>
-        <p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p>
         <div class="agent-workspace">
-          <aside class="agent-run-sidebar" aria-label="Agent runs">
-            <label class="visually-hidden" for="agent-runs-search">Search agent runs</label>
-            <input id="agent-runs-search" type="search" placeholder="Search runs…">
-            <p id="agent-runs-note" class="sub">Loading runs…</p>
-            <div id="agent-runs-list"></div>
-          </aside>
-          <article id="agent-run-detail" aria-label="Selected agent run"><div class="agent-detail-empty"><h3>Select a run</h3><p>Read its result and check what happened.</p></div></article>
+          <section class="data-panel agent-run-sidebar" aria-labelledby="agent-runs-title">
+            <div class="section-head"><h2 id="agent-runs-title">Runs</h2><p id="agent-runs-note" class="sub" role="status">Loading runs…</p></div>
+            <div id="agent-runs-list" class="agent-run-list"></div>
+          </section>
+          <article id="agent-run-detail" class="data-panel" aria-label="Selected agent run"><div class="dialog-state"><strong>Select a run</strong><p>Read its result and check what happened.</p></div></article>
         </div>
       </section>
       <section class="view" data-page="workers">
-        <p id="workers-empty" class="sub"></p>
-        <div id="workers-wrap" class="table-wrap workers-table" hidden>
-          <table>
-            <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
-            <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
-            <tbody id="workers"></tbody>
-          </table>
-        </div>
+        <div id="workers-empty" class="empty-state" hidden></div>
+        <section class="data-panel" aria-labelledby="workers-active-title">
+          <div class="section-head"><h2 id="workers-active-title">Active now</h2><p class="sub">Checked in within the last two minutes</p></div>
+          <div id="workers-wrap" class="table-wrap workers-table" hidden>
+            <table>
+              <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
+              <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
+              <tbody id="workers"></tbody>
+            </table>
+          </div>
+          <p id="workers-none-active" class="sub panel-note workers-none" hidden>No worker is running. Agent tasks stay queued until one starts with <code>dapier worker</code>.</p>
+        </section>
+        <details id="workers-offline-section" class="data-panel runs-section" aria-labelledby="workers-offline-title" hidden>
+          <summary class="section-head"><h2 id="workers-offline-title">Offline</h2><p id="workers-offline-count" class="sub"></p><span class="section-chevron" aria-hidden="true"></span></summary>
+          <div class="table-wrap workers-table">
+            <table>
+              <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
+              <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
+              <tbody id="workers-offline"></tbody>
+            </table>
+          </div>
+        </details>
       </section>
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">

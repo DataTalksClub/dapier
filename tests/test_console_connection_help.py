@@ -1,4 +1,5 @@
-"""Every Connections register group explains itself behind a (?) tip."""
+"""Every service explains itself: the Services list beside the accounts
+shows each service's purpose under its name (no 18px (?) tips)."""
 import re
 from pathlib import Path
 
@@ -7,17 +8,19 @@ from src.dapier.connections.services import CATALOG
 JS = (Path(__file__).resolve().parents[1] / "src" / "web" / "js" / "views" / "connections.js").read_text()
 
 
-def _help_ids():
-    block = re.search(r"const SERVICE_HELP = \{(.*?)\n\};", JS, re.S)
-    assert block, "SERVICE_HELP is missing"
-    return set(re.findall(r"^\s+([a-z]+):", block.group(1), re.M))
+def _blurbs():
+    block = re.search(r"const CONNECT_SERVICES = \{(.*?)\n\};", JS, re.S)
+    assert block, "CONNECT_SERVICES is missing"
+    return dict(re.findall(r"^  ([a-z]+): \{\n    label: '[^']*',\n    blurb: '([^']+)'", block.group(1), re.M)
+                | {})
 
 
 def test_every_catalog_service_has_help_text():
-    # Zoom's two kinds carry their description from the API's services.
-    missing = {spec["id"] for spec in CATALOG if spec["id"] != "zoom"} - _help_ids()
-    assert not missing, f"register groups without (?) help: {sorted(missing)}"
+    blurbs = re.findall(r"^  ([a-z]+): \{\n    label: [^\n]*\n    blurb: ", JS, re.M)
+    missing = {spec["id"] for spec in CATALOG} - set(blurbs)
+    assert not missing, f"services without a blurb: {sorted(missing)}"
 
 
-def test_group_titles_render_the_help_tip():
-    assert "helpTip(service?.description || SERVICE_HELP[serviceId])" in JS
+def test_services_list_renders_each_blurb():
+    render = JS[JS.index('function renderConnectList('):JS.index('function bindConnectButtons(')]
+    assert '<span class="connect-blurb">${meta.blurb}' in render

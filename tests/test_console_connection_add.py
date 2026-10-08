@@ -1,7 +1,7 @@
-"""Adding a connection starts from the service group it lands in: every
-register panel carries its own + button, and services with no group yet are
-listed below the groups. No page-level Add connection button or picker that
-appends content at the bottom of the page."""
+"""Adding a connection starts from its service: the Services list beside the
+accounts carries one add button per service (no page-level Add connection
+button, no picker that appends content at the bottom of the page), and the
+Accounts list shows every connection once, with the services it covers."""
 import json
 import re
 from pathlib import Path
@@ -41,7 +41,7 @@ def _render(connections):
     with MiniRacer() as js:
         js.eval(STUBS)
         js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
-        js.eval(JS[JS.index('/* Services with no register group yet'):JS.index('function allKnownConnections() {')])
+        js.eval(JS[JS.index('/* Services with their own add buttons'):JS.index('function allKnownConnections() {')])
         js.eval(JS[JS.index('function reusableGoogleConnections('):JS.index('async function connectService(')])
         js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
         js.eval(f'renderConnections({json.dumps(connections)});')
@@ -60,7 +60,7 @@ def test_no_page_level_add_button_or_picker():
     assert 'connect-picker' not in INDEX + JS + CSS
     assert 'connect-dialog' not in INDEX + JS + CSS
     assert 'id="connection-empty"' not in INDEX
-    # The not-yet-connected list sits right below the register groups.
+    # Accounts first, the services (each with its add button) beside them.
     assert section.index('id="connection-register"') < section.index('id="connect-services"')
     assert 'id="connect-grid"' in section
 
@@ -73,11 +73,12 @@ def test_empty_register_is_just_the_service_list():
     assert nodes['#connection-register']['innerHTML'] == ''
 
 
-def test_every_group_gets_its_own_add_button():
+def test_every_service_keeps_its_own_add_button_and_accounts_show_once():
     connections = [
         {"connection_id": "g1", "provider": "google", "status": "connected",
          "account_title": "a@example.com",
-         "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly"]},
+         "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly",
+                            "https://www.googleapis.com/auth/drive.readonly"]},
         {"connection_id": "s1", "provider": "slack", "status": "connected", "account_title": "Team"},
         {"connection_id": "z1", "provider": "zoom", "status": "ready", "scopes": []},
         {"connection_id": "z2", "provider": "zoom", "status": "connected",
@@ -85,35 +86,34 @@ def test_every_group_gets_its_own_add_button():
     ]
     nodes = _render(connections)
     register = nodes['#connection-register']['innerHTML']
-    panels = dict(re.findall(r'<section class="data-panel service-panel" data-service="([a-z-]+)">(.*?)</section>',
-                             register, re.S))
-    assert set(panels) == {'gmail', 'slack', 'zoom-webhooks', 'zoom-api'}
-    assert _offered(panels['gmail']) == ['gmail']
-    assert 'aria-label="Add Gmail account"' in panels['gmail']
-    assert _offered(panels['slack']) == ['slack']
-    # The webhook group's + runs the webhook (secret token) setup.
-    assert _offered(panels['zoom-webhooks']) == ['zoom']
-    assert 'aria-label="Add Zoom webhook"' in panels['zoom-webhooks']
-    # The console has no Zoom API (OAuth) setup flow, so that group has no +.
-    assert _offered(panels['zoom-api']) == []
-    # Services with a group drop out of the list; the rest stay connectable.
-    listed = _offered(nodes['#connect-grid']['innerHTML'])
-    assert 'gmail' not in listed and 'slack' not in listed and 'zoom' not in listed
-    assert set(listed) | {'gmail', 'slack', 'zoom'} == set(_service_ids())
-    assert nodes['#connect-services-title']['textContent'] == 'Connect another service'
+    # One row per account: the Google sign-in covering Gmail and Drive is
+    # listed once, with both services on it.
+    rows = re.findall(r'data-connection-row="([^"]+)"', register)
+    assert rows.count('g1') == 1 and set(rows) == {'g1', 's1', 'z1', 'z2'}
+    g1 = register[register.index('data-connection-row="g1"'):]
+    g1 = g1[:g1.index('</li>')]
+    assert 'Gmail' in g1 and 'Drive' in g1
+    assert 'Zoom Webhooks' in register and 'Zoom API' in register
+    # Every service keeps its own add button, connected or not.
+    services = nodes['#connect-grid']['innerHTML']
+    assert _offered(services) == _service_ids()
+    assert 'aria-label="Add Gmail account"' in services
+    assert 'aria-label="Add Zoom webhook"' in services
+    gmail = services[services.index('data-service-row="gmail"'):]
+    assert '1 account' in gmail[:gmail.index('</li>')]
+    assert nodes['#connect-services-title']['textContent'] == 'Services'
 
 
 def test_add_buttons_start_the_service_flow_in_place():
     assert "await connectService(button.dataset.service);" in JS
     render = JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')]
     assert 'bindConnectButtons();' in render
-    assert 'scrollIntoView' not in JS[JS.index('/* Services with no register group yet'):
+    assert 'scrollIntoView' not in JS[JS.index('/* Services with their own add buttons'):
                                       JS.index('function allKnownConnections() {')]
 
 
 def test_phone_layout_keeps_add_buttons_tappable():
-    assert 'width: var(--dk-size-touch); height: var(--dk-size-touch);' in CSS[CSS.index('  .service-add { display: inline-grid;'):]
-    # Labelled buttons carry no icon; the + appears only icon-only on phones.
-    assert '.service-add svg { display: none; }' in CSS
-    assert 'PLUS_ICON' not in JS[JS.index('function renderConnectList('):JS.index('function bindConnectButtons(')]
-    assert '.connect-card { grid-template-columns: minmax(0, 1fr) auto;' in CSS
+    # dakit grows every .dk-button to 44px on phones and coarse pointers.
+    dakit = (ROOT / "vendor" / "dakit.css").read_text()
+    assert ".dk-button, .dk-input, .dk-select, .dk-filter-chip { min-height: var(--dk-size-touch); }" in dakit
+    assert 'dk-button dk-button--secondary dk-button--sm connect-button' in JS

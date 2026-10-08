@@ -92,6 +92,8 @@ function workerRow(worker, nowMs) {
     </tr>`;
 }
 
+/* Active workers lead; the offline ones (often many, all equal) fold into
+   a closed section below, so the one that matters is not lost among them. */
 export async function renderWorkers() {
   const empty = $('#workers-empty');
   const wrap = $('#workers-wrap');
@@ -105,14 +107,21 @@ export async function renderWorkers() {
   } catch (error) {
     if (seq !== workersSeq) return;
     empty.hidden = false;
-    empty.textContent = 'Workers are unavailable.';
+    empty.innerHTML = `<h3>Workers could not be loaded</h3><p>The worker registry did not answer (${escapeHtml(error.message)}). Use Refresh to try again.</p>`;
     wrap.hidden = true;
     return;
   }
   const workers = data.workers || [];
+  const active = workers.filter((worker) => worker.active);
+  const offline = workers.filter((worker) => !worker.active);
   empty.hidden = workers.length > 0;
-  empty.innerHTML = 'No worker has checked in. Start one with <code>dapier worker</code> — agent tasks stay queued until a worker picks them up.';
-  wrap.hidden = workers.length === 0;
+  empty.innerHTML = '<h3>No worker has checked in</h3><p>Start one with <code>dapier worker</code>; agent tasks stay queued until a worker picks them up.</p>';
+  empty.nextElementSibling.hidden = workers.length === 0;
+  wrap.hidden = active.length === 0;
+  $('#workers-none-active').hidden = active.length > 0 || workers.length === 0;
   const now = Date.now();
-  body.innerHTML = workers.map((worker) => workerRow(worker, now)).join('');
+  body.innerHTML = active.map((worker) => workerRow(worker, now)).join('');
+  $('#workers-offline-section').hidden = offline.length === 0;
+  $('#workers-offline-count').textContent = `${offline.length} worker${offline.length === 1 ? '' : 's'} not seen recently`;
+  $('#workers-offline').innerHTML = offline.map((worker) => workerRow(worker, now)).join('');
 }

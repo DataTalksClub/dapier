@@ -1,5 +1,5 @@
-/* Connections view: a register of services, each with its own add button,
-   and a list of services not connected yet. */
+/* Connections view: every account once (with the services its sign-in
+   covers), beside the services, each with its own add button. */
 import { state } from '../state.js';
 import { $, $$, notice, serviceMark } from '../ui.js';
 import { api } from '../api.js';
@@ -92,7 +92,6 @@ const SERVICE_MARKERS = {
   youtube: ['/auth/youtube', 'youtube.force-ssl', 'yt-analytics'],
 };
 
-const SERVICE_ORDER = Object.keys(CONNECT_SERVICES);
 const GOOGLE_FAMILY = new Set(['gmail', 'calendar', 'drive', 'docs', 'sheets']);
 
 function serviceLabel(serviceId) {
@@ -147,54 +146,11 @@ function servicesFor(connection) {
   return deriveServices(connection);
 }
 
-/* What each register group is for, shown behind the (?) next to its
-   title. Zoom's two kinds carry their own text from the API's services. */
-const SERVICE_HELP = {
-  gmail: 'Read messages and send mail from the connected inbox. Email triggers and Gmail send actions use it.',
-  calendar: 'List calendars and free/busy times, start workflows from events, and edit events this account owns.',
-  drive: 'Find, read, and watch files in Google Drive, within the permissions granted.',
-  docs: 'Read and edit the Google Docs this account can access.',
-  sheets: 'Read and write the spreadsheets this account can access, including row triggers.',
-  youtube: 'Start workflows when the channel publishes a video, and read channel data within the permissions granted.',
-  dropbox: "Watch folders, read files, and upload under the connection's root path.",
-  slack: 'Agent access to a Slack workspace with a bot or user token. Workflow Slack actions can also use the shared Slack Service credential.',
-  telegram: 'A Telegram bot: start workflows from the messages it receives and post messages from actions.',
-  dataops: 'Read invoices from DataOps with its invoice-reader credential. Invoice parsing and bookkeeping stay in DataOps.',
-  google: "A Google sign-in whose grant doesn't cover a specific product yet. Edit its scopes to choose what it is for.",
-};
-
-function helpTip(text) {
-  if (!text) return '';
-  const safe = escapeHtml(text);
-  return `<button type="button" class="help-tip" aria-label="${safe}" data-tip="${safe}">?</button>`;
-}
-
-/* Adding an account starts from the group it lands in: each register
-   panel carries its own + button, which runs that service's connect flow
-   (token dialog, reuse dialog, or OAuth popup) in place. A Zoom API group
-   gets none — the console's Zoom setup creates webhook connections only. */
-const GROUP_CONNECT_SERVICE = { 'zoom-webhooks': 'zoom', 'zoom-api': null };
-
-function groupConnectService(groupId) {
-  if (groupId in GROUP_CONNECT_SERVICE) return GROUP_CONNECT_SERVICE[groupId];
-  return CONNECT_SERVICES[groupId] ? groupId : null;
-}
-
 /* Zoom splits into two register groups by kind: OAuth API grants carry
    scopes, webhook connections carry none. */
 function connectionGroupId(connection, service) {
   return service.id === 'zoom'
     ? (scopesOf(connection).length ? 'zoom-api' : 'zoom-webhooks') : service.id;
-}
-
-const PLUS_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-
-function groupAddButton(groupId) {
-  const serviceId = groupConnectService(groupId);
-  if (!serviceId) return '';
-  const zoom = serviceId === 'zoom';
-  const label = zoom ? 'Add Zoom webhook' : `Add ${CONNECT_SERVICES[serviceId].label} account`;
-  return `<button class="dk-button dk-button--secondary service-add connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${PLUS_ICON}<span>${zoom ? 'Add webhook' : 'Add account'}</span></button>`;
 }
 
 function connectionHasService(connection, serviceId) {
@@ -272,10 +228,10 @@ const TOKEN_PROVIDER_META = {
    soon, or expired (needs refreshing) — say so in plain words, not raw
    DynamoDB values. */
 const CONNECTION_STATUS_LABELS = {
-  ready: 'setup incomplete',
-  expired: 'needs reconnection',
-  revoked: 'revoked',
-  expiring: 'expiring soon',
+  ready: 'Not set up',
+  expired: 'Needs reconnect',
+  revoked: 'Revoked',
+  expiring: 'Expiring soon',
 };
 
 /* Tokens inside this horizon still work, but the daily digest will email
@@ -344,11 +300,17 @@ function connectionsLoadMoreButton() {
   if (existing) return existing;
   const button = document.createElement('button');
   button.id = 'connections-load-more';
-  button.className = 'dk-button dk-button--secondary';
+  button.className = 'dk-button dk-button--secondary dk-button--sm';
   button.type = 'button';
-  button.hidden = true;
   button.textContent = 'Load more';
-  $('#connection-register')?.after(button);
+  /* Load more lives in the register's footer band. */
+  const footer = document.createElement('div');
+  footer.className = 'dk-table-footer';
+  footer.id = 'connections-footer';
+  footer.hidden = true;
+  footer.append(button);
+  $('#connection-register')?.after(footer);
+  Object.defineProperty(button, 'hidden', { get: () => footer.hidden, set: (value) => { footer.hidden = value; } });
   button.addEventListener('click', () => fetchConnectionsPage({ append: true }));
   return button;
 }
@@ -405,28 +367,41 @@ $('#oauth-retry').addEventListener('click', (event) => {
 });
 $('#oauth-dismiss').addEventListener('click', () => { $('#oauth-result').hidden = true; });
 
-/* Services with no register group yet are listed below the groups, one
-   compact row each, so connecting a new service never opens or appends
-   anything elsewhere on the page. With no connections at all this list is
-   the whole page. */
+/* Services with their own add buttons: every service the console can
+   connect, with how many accounts cover it. Adding starts from the service
+   (token dialog, reuse dialog, or OAuth popup) in place — no picker, no
+   page jump. A Zoom API grant has no row: the console sets up webhooks only. */
 function renderConnectList(connections) {
-  const grouped = new Set(connections.flatMap((connection) =>
-    servicesFor(connection).map((service) => connectionGroupId(connection, service))));
-  const missing = Object.entries(CONNECT_SERVICES)
-    .filter(([serviceId]) => !grouped.has(serviceId === 'zoom' ? 'zoom-webhooks' : serviceId));
-  $('#connect-services').hidden = missing.length === 0;
-  $('#connect-services-title').textContent = connections.length ? 'Connect another service' : 'Connect a service';
-  $('#connect-grid').innerHTML = missing.map(([serviceId, meta]) => {
+  const counts = new Map();
+  for (const connection of connections) {
+    for (const service of servicesFor(connection)) {
+      const groupId = connectionGroupId(connection, service);
+      const key = groupId === 'zoom-webhooks' ? 'zoom' : groupId;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  $('#connect-services').hidden = false;
+  $('#connect-services-title').textContent = connections.length ? 'Services' : 'Connect a service';
+  $('#connect-grid').innerHTML = Object.entries(CONNECT_SERVICES).map(([serviceId, meta]) => {
     const clientProvider = oauthClientProvider(meta);
     const oauthClient = ((state.data || {}).oauth_clients || []).find((item) => item.provider === clientProvider);
     const needsClient = !TOKEN_PROVIDERS.includes(meta.provider) && oauthClient && !oauthClient.configured;
+    const count = counts.get(serviceId) || 0;
     const reusable = reusableGoogleConnections(serviceId, connections);
-    const addLabel = meta.provider === 'zoom' ? 'Add Zoom app'
-      : reusable.length ? 'Add to an account' : 'Connect';
-    return `<li class="connect-card">
-      <span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>
-      <span class="connect-blurb">${meta.blurb}${needsClient ? ` <span class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> first.</span>` : ''}</span>
-      <button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(`${addLabel} — ${meta.label}`)}">${addLabel}</button>
+    const zoom = meta.provider === 'zoom';
+    const addLabel = zoom ? (count ? 'Add webhook' : 'Add Zoom app')
+      : count ? 'Add account' : reusable.length ? 'Add to an account' : 'Connect';
+    const aria = zoom ? 'Add Zoom webhook' : `Add ${meta.label} account`;
+    const countText = count ? `${count} ${zoom ? 'connection' : 'account'}${count === 1 ? '' : 's'}` : 'Not connected';
+    return `<li class="source-row connect-card" data-service-row="${serviceId}">
+      <div class="source-head">
+        <span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>
+        <span class="source-status">${escapeHtml(countText)}</span>
+      </div>
+      <div class="connect-body">
+        <span class="connect-blurb">${meta.blurb}${needsClient ? ` <span class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">App setup</a> first.</span>` : ''}</span>
+        <button class="dk-button dk-button--secondary dk-button--sm connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(aria)}" title="${escapeHtml(aria)}">${addLabel}</button>
+      </div>
     </li>`;
   }).join('');
 }
@@ -724,9 +699,9 @@ function renderConnections(connections) {
   const connected = connections.filter((connection) => effectiveStatus(connection) === 'connected').length;
   const attention = connections.filter(needsAttention).length;
   $('#connection-summary').textContent = connections.length
-    ? `${connected} connected · ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
+    ? `${connected} connected${attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} attention` : ''}`
     : 'No accounts connected';
-  $('#connection-register').hidden = connections.length === 0;
+  $('#connection-accounts').hidden = connections.length === 0;
   const query = ($('#connection-search')?.value || '').trim().toLowerCase();
   const statusFilter = $('#connection-status-filter')?.value || 'all';
   const filtered = connections.filter((connection) => {
@@ -739,46 +714,14 @@ function renderConnections(connections) {
       ...(connection.used_in || []).map((entry) => entry.ref)].some((value) => String(value || '').toLowerCase().includes(query));
   });
   $('#connection-filter-empty').hidden = filtered.length > 0 || connections.length === 0;
-  const withinGroup = (a, b) => {
-    const name = (connection) => accountIdentity(connection) || connection.connection_id;
-    return String(name(a)).localeCompare(String(name(b)));
-  };
-  /* One panel per service — a Google grant covering Calendar and Drive shows
-     under both, with a same-grant line so the shared credential stays
-     visible; grants that never finished consent have no verified identity
-     and count as not signed in. */
-  const groups = new Map();
-  for (const connection of filtered) {
-    for (const service of servicesFor(connection)) {
-      const groupId = connectionGroupId(connection, service);
-      groups.set(groupId, [...(groups.get(groupId) || []), connection]);
-    }
-  }
-  const ordered = [];
-  for (const id of SERVICE_ORDER) {
-    if (groups.has(id)) ordered.push([id, groups.get(id)]);
-  }
-  for (const [id, group] of groups) {
-    if (!SERVICE_ORDER.includes(id)) ordered.push([id, group]);
-  }
-  $('#connection-register').innerHTML = ordered.map(([serviceId, group]) => {
-    const zoom = serviceId === 'zoom-api' || serviceId === 'zoom-webhooks';
-    const service = zoom ? servicesFor(group[0]).find((entry) => entry.id === 'zoom') : null;
-    const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, zoom ? 'zoom' : serviceId)).join('');
-    const unfinished = group.filter((connection) => !accountIdentity(connection)
-      && verifiesIdentity(connection)).length;
-    const needs = group.filter(needsAttention).length;
-    const meta = [
-      `${group.length} ${zoom ? 'connection' : 'account'}${group.length === 1 ? '' : 's'}`,
-      unfinished ? `${unfinished} not signed in` : '',
-      needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
-    ].filter(Boolean).join(' · ');
-    return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
-      <div class="section-head"><h2 class="service-panel-title">${serviceMark(zoom ? 'zoom' : serviceId)}<span>${escapeHtml(service?.label || serviceLabel(serviceId))}</span>${helpTip(service?.description || SERVICE_HELP[serviceId])}</h2>
-      <p class="sub">${escapeHtml(meta)}</p>${groupAddButton(serviceId)}</div>
-      <ul class="service-accounts">${rows}</ul>
-    </section>`;
-  }).join('');
+  /* One row per account: a Google sign-in covering Gmail, Drive and Sheets
+     is listed once, with those services on it — never repeated under each
+     service. Accounts that need attention lead; then by name. */
+  const name = (connection) => accountIdentity(connection) || connection.connection_id;
+  const ordered = [...filtered].sort((a, b) => (Number(needsAttention(b)) - Number(needsAttention(a)))
+    || String(name(a)).localeCompare(String(name(b))));
+  $('#connection-register').innerHTML = ordered.map((connection) => accountRow(connection)).join('');
+  $('#connection-register').hidden = ordered.length === 0;
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
@@ -801,41 +744,51 @@ function usageLabel(connection) {
   return `Used in ${count} flow${count === 1 ? '' : 's'}`;
 }
 
-function accountRow(connection, serviceId) {
+/* The services one account covers, by name (Zoom says which kind). */
+function serviceChips(connection) {
+  return servicesFor(connection).map((service) => {
+    const label = service.id === 'zoom' ? (scopesOf(connection).length ? 'Zoom API' : 'Zoom Webhooks') : service.label;
+    return `<span class="connection-service">${serviceMark(service.id)}<span>${escapeHtml(label.replace(/^Google /, ''))}</span></span>`;
+  }).join('');
+}
+
+function accountRow(connection) {
     /* The API distinguishes automatic renewal from expiry needing consent. */
     const status = effectiveStatus(connection);
+    const id = escapeHtml(connection.connection_id);
     /* Finish setup goes where setup actually finishes: OAuth consent, or —
        for a Zoom webhook, which Zoom's URL validation activates — Manage,
        opened on the callback URL to paste into the Zoom app. */
     const nextAction = usesOAuthConsent(connection) && status !== 'connected'
-      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>`
+      ? `<a class="dk-button dk-button--secondary dk-button--sm connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${id}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>`
       : connection.provider === 'zoom' && status === 'ready'
-        ? `<button class="dk-button dk-button--secondary connection-finish" data-connection="${escapeHtml(connection.connection_id)}" type="button">Finish setup</button>` : '';
+        ? `<button class="dk-button dk-button--secondary dk-button--sm connection-finish" data-connection="${id}" type="button">Finish setup</button>` : '';
     const identity = accountIdentity(connection);
     const unfinished = !identity && verifiesIdentity(connection);
     const title = connection.provider === 'zoom' && !scopesOf(connection).length
       ? accountLabel(connection) : identity || (unfinished ? 'Not signed in' : accountLabel(connection));
-    /* One sign-in can back several services; say so quietly instead of
-       naming the internal connection_id, which nobody needs to read. */
-    const others = servicesFor(connection).filter((service) => service.id !== serviceId)
-      .map((service) => service.label.replace(/^Google /, ''));
-    const shareHtml = others.length ? escapeHtml(`Same sign-in also covers ${others.join(', ')}`) : '';
-    /* An abandoned setup is clutter: offer removal right on the row. */
-    const remove = unfinished
-      ? `<button class="dk-button dk-button--secondary connection-remove" data-connection="${escapeHtml(connection.connection_id)}" type="button">Remove</button>` : '';
+    /* One visible action: what the account needs next, else Manage. The
+       account's name always opens Manage; an abandoned setup offers Remove
+       in the row menu. */
+    const action = nextAction || `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
+    const menu = unfinished
+      ? `<button class="icon-button row-more" type="button" popovertarget="connection-menu-${id}" aria-label="More actions for ${escapeHtml(title)}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
+         <div id="connection-menu-${id}" class="row-menu" popover aria-label="Actions for ${escapeHtml(title)}"><button class="row-menu-item row-menu-danger connection-remove" data-connection="${id}" type="button">Remove</button></div>`
+      : '';
     const expires = formatTimestamp(connection.token_expires_at);
-    return `<li class="service-account">
-    <div class="service-account-main">
-      <span class="cell-name">${escapeHtml(title)}</span>
+    const meta = [
+      identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished',
+      !connection.auto_refresh && expires && status !== 'expired' ? `expires ${expires}` : '',
+    ].filter(Boolean).join(' · ');
+    return `<li class="connection-account${needsAttention(connection) ? ' needs-attention' : ''}" data-connection-row="${id}">
+    <div class="connection-account-main">
+      <button class="connection-name connection-edit" data-connection="${id}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
       ${actsAsLabel(connection) ? `<span class="account-acts-as">${escapeHtml(actsAsLabel(connection))}</span>` : ''}
-      ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
-      <span class="cell-sub">${escapeHtml(identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished')}</span>
+      <div class="connection-services">${serviceChips(connection)}</div>
+      <span class="connection-meta${status === 'expiring' ? ' expiring' : ''}">${escapeHtml(meta)}</span>
     </div>
-    <div class="service-account-status">
-      ${statusLine(status, CONNECTION_STATUS_LABELS)}
-      ${!connection.auto_refresh && expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}
-    </div>
-    <div class="service-account-actions">${nextAction}${remove}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
+    <div class="connection-account-status">${statusLine(status, CONNECTION_STATUS_LABELS)}</div>
+    <div class="row-actions connection-account-actions">${action}${menu}</div>
   </li>`;
 }
 

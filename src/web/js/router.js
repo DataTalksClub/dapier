@@ -146,7 +146,7 @@ export async function setView(view, push = true, options = {}) {
     overview: ['Home', 'Automations and their latest results at a glance.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
     agents: ['Agents', 'Agent tasks and the runs behind them.'],
-    workers: ['Workers', 'Machines that run agent tasks. Active means a check-in within two minutes; tasks stay queued until a worker is running.'],
+    workers: ['Workers', 'Machines that run agent tasks.'],
     tokens: ['Access', 'Machine tokens for API access.'],
     storage: ['Data', 'Key-value data shared with workflows.'],
     audit: ['Audit', 'Who changed what — newest first.'],

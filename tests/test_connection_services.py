@@ -111,18 +111,14 @@ def test_console_renders_zoom_types_in_separate_described_panels():
             js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
             js.eval(f'renderConnections({json.dumps(connections)});')
             markup = js.eval("nodes['#connection-register'].innerHTML")
-        assert markup.count('<section ') == 2
-        assert 'data-service="zoom-api"' in markup
-        assert 'data-service="zoom-webhooks"' in markup
+        # One row per connection; Zoom says which kind each one is.
+        assert markup.count('data-connection-row=') == 2
         assert 'Zoom API' in markup and 'Zoom Webhooks' in markup
-        assert 'permissions granted' in markup and 'event notifications' in markup
         # A webhook without a verified account is named by its type; a
         # leftover stored display_name never labels it.
         assert 'Zoom webhook' in markup and 'opaque-id' not in markup
         assert 'AISL recordings' not in markup
         assert '2 accounts' not in markup
-        assert '1 connection' in markup
-        assert 'Same sign-in' not in markup
 
 
 def test_google_without_product_scopes_falls_back_to_google():
@@ -159,19 +155,21 @@ def test_console_catalog_matches_python():
 
 def test_console_groups_rows_by_service():
     assert "connection-register" in HTML
-    assert "Connect another service" in HTML
-    assert "One panel per service" in JS
-    assert 'data-service="${escapeHtml(serviceId)}"' in JS
+    assert 'id="connect-services"' in HTML
+    # One row per account (the services it covers on the row); the
+    # per-service add buttons live in the Services list.
+    assert "One row per account" in JS
+    assert 'data-service-row="${serviceId}"' in JS
     assert "Google accounts" not in JS
     assert 'data-service="google-accounts"' not in JS
     assert "Not signed in" in JS
     assert "accountIdentity" in JS
     assert "verifiesIdentity" in JS
-    assert "Same sign-in also covers" in JS
+    assert "serviceChips(connection)" in JS
     assert "connection-remove" in JS
     assert "provider-group-row" not in JS
     assert "CONNECT_PROVIDERS" not in JS
-    assert "dk-button--secondary connection-oauth" in JS
+    assert "dk-button--secondary dk-button--sm connection-oauth" in JS
     assert "dk-button--primary connection-oauth" not in JS
     assert "Get token" not in JS
     assert "provider-token-button" not in JS
@@ -188,7 +186,7 @@ def test_zoom_oauth_rows_offer_reconnect():
 
 def test_console_puts_expiry_on_the_row_not_a_banner():
     """Expiring tokens are a row status + Reconnect; the daily digest emails."""
-    assert "expiring soon" in JS
+    assert "Expiring soon" in JS
     assert "EXPIRY_HORIZON_HOURS = 48" in JS
     assert "tokenExpiringSoon" in JS
     assert "connection-expiry-banner" not in JS
@@ -230,7 +228,7 @@ def test_console_rows_say_who_each_slack_token_acts_as():
         js.eval(f'renderConnections({json.dumps(connections)});')
         markup = js.eval("nodes['#connection-register'].innerHTML")
         label = js.eval(f'accountLabel({json.dumps(connections[0])})')
-    assert markup.count('DataTalks.Club') == 2
+    assert markup.count('>DataTalks.Club</button>') == 2
     assert '<span class="account-acts-as">Au-Tomator (App)</span>' in markup
     assert '<span class="account-acts-as">User token</span>' in markup
     assert label == 'DataTalks.Club · Au-Tomator (App)'

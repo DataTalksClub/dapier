@@ -77,7 +77,7 @@ def test_save_waits_for_an_edit():
 
 def test_phone_width_stacks_danger_rows_and_wraps_actions():
     assert ".manage-danger-row { flex-direction: column;" in CSS
-    assert ".manage-actions .dk-button { flex: 1 1 calc(50% - 4px); }" in CSS
+    assert ".manage-actions .dk-button { flex: 1 1 calc(50% - var(--dk-gap-control)); }" in CSS
 
 
 def test_google_scopes_are_shown_short_and_saved_in_full():
