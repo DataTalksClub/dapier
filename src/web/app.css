@@ -31,6 +31,12 @@
 /* Buttons are dakit's own .dk-button vocabulary (vendor/dakit.css): one
    primary per view, quiet secondaries, danger separated and labelled.
    App CSS only positions them; it never re-speaks their look. */
+/* Exception: dakit's bare `a:hover` (link blue) outranks the button
+   colors, so a link styled as a button lost its label on hover (blue on
+   the primary's blue). Re-assert each variant's text color for anchors. */
+a.dk-button--primary:hover { color: var(--dk-text-on-accent); }
+a.dk-button--secondary:hover { color: var(--dk-text-primary); }
+a.dk-button--danger:hover { color: var(--dk-danger-text); }
 
 /* Zapier-style organization tags on the workflow list. */
 .tag-chip { display: inline-block; padding: 1px 8px; margin-right: 4px; border: 1px solid var(--dk-border-strong); border-radius: 999px; background: var(--dk-bg-muted); color: var(--dk-text-primary); font-size: var(--dk-text-xs); line-height: 1.6; white-space: nowrap; }
