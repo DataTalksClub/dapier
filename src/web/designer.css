@@ -522,6 +522,30 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
   .dk-dialog__foot { padding: var(--dk-space-3) var(--dk-space-4) calc(var(--dk-space-3) + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* --- filter chips -----------------------------------------------------------------
+   Pill buttons that narrow a list (All / Handled / Failed …). They sit in a
+   .dk-cluster, so neighbours keep the control gap; the pressed chip is the
+   selection fill. Use aria-pressed. A count rides in .dk-filter-chip__count. */
+.dk-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dk-space-2);
+  height: var(--dk-size-control-sm);
+  padding: 0 var(--dk-space-3);
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-full);
+  background: var(--dk-bg-surface);
+  color: var(--dk-text-primary);
+  font-size: var(--dk-text-sm);
+  font-weight: var(--dk-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dk-filter-chip:hover { border-color: var(--dk-border-control-hover); background: var(--dk-bg-hover); }
+.dk-filter-chip[aria-pressed="true"] { border-color: var(--dk-accent-border); background: var(--dk-accent-soft); color: var(--dk-accent-default); }
+.dk-filter-chip__count { color: var(--dk-text-muted); font-variant-numeric: tabular-nums; }
+.dk-filter-chip[aria-pressed="true"] .dk-filter-chip__count { color: inherit; }
+
 /* --- touch sizing ------------------------------------------------------------------
    Phone widths and coarse pointers get 44px controls. A checkbox stays 16px
    to the eye; its .dk-check label carries the 44px hit area. */
@@ -529,7 +553,7 @@ code, kbd, samp { font-family: var(--dk-font-mono); font-size: 0.92em; backgroun
 .dk-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--dk-accent-default); cursor: pointer; }
 
 @media (max-width: 820px), (pointer: coarse) {
-  .dk-button, .dk-input, .dk-select { min-height: var(--dk-size-touch); }
+  .dk-button, .dk-input, .dk-select, .dk-filter-chip { min-height: var(--dk-size-touch); }
   .dk-textarea { min-height: max(76px, var(--dk-size-touch)); }
   .dk-check { min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); justify-content: center; }
 }
