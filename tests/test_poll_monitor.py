@@ -511,3 +511,10 @@ def test_cli_parser_routes_poll_subcommands(monkeypatch):
     assert seen == [("reset", "orders", None), ("reset", "orders", "2026-10-01"),
                     ("enabled", "orders", False), ("enabled", "orders", True),
                     ("check", "orders"), ("activity", None, 25)]
+
+
+def test_cli_watches_names_every_provider_target():
+    from dapier_cli.commands import polls as poll_commands
+
+    assert poll_commands._poll_target({"source": "dropbox.files", "path": "/Invoices"}) == "dropbox.files /Invoices"
+    assert poll_commands._poll_target({"source": "rss", "url": "https://x.test/feed"}) == "rss https://x.test/feed"
