@@ -80,7 +80,7 @@ def transport_for(monkeypatch, *, token_response=None, verify_payload=None):
         calls.append({"method": method, "url": url, "headers": headers, "body": body})
         if "oauth2.googleapis.com/token" in url or "api.dropboxapi.com/oauth2/token" in url:
             return 200, json.dumps(token_response or {}).encode()
-        if "googleapis.com/youtube" in url:
+        if "googleapis.com/youtube" in url or "api.dropboxapi.com/2/users/get_current_account" in url:
             return 200, json.dumps(verify_payload or {}).encode()
         raise AssertionError(f"unexpected url {url}")
 
@@ -311,3 +311,18 @@ def test_refresh_repairs_missing_scope_from_recorded_consent(monkeypatch):
     _, info = get_access_token(connection(granted_scopes=["scope-a", "scope-b"]))
     assert info["refreshed"] is True
     assert info["scope"] == "scope-a scope-b"
+
+
+def test_dropbox_expired_token_renews_without_consent_and_retains_refresh(monkeypatch):
+    writes = []
+    configure_client(monkeypatch)
+    configure_store(monkeypatch, stored_token(expires_at=100), writes=writes)
+    calls = transport_for(monkeypatch,
+        token_response={"access_token": "new-dropbox-access", "expires_in": 14400},
+        verify_payload={"account_id": "dbid:1", "name": {"display_name": "Alexey"}})
+    token, info = get_access_token(connection(provider="dropbox", expected_account_id="dbid:1"))
+    assert token == "new-dropbox-access"
+    assert info["refreshed"] is True
+    assert writes[0]["refresh_token"] == "refresh-1"
+    assert sent_fields(calls[0])["grant_type"] == ["refresh_token"]
+    assert calls[0]["url"] == "https://api.dropboxapi.com/oauth2/token"

@@ -218,21 +218,22 @@ def token_expires_at(stored):
     return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
 
 
-def health(item, stored=None, *, now=None):
-    """Computed connection health for listings: ``ok`` or ``expired``.
+def auto_refresh(item, stored=None):
+    """Whether the connected grant has a credential for automatic renewal."""
+    return item.get("status") == "connected" and bool((stored or {}).get("refresh_token"))
 
-    ``expired`` means "needs reconnection": the stored access token is past
-    its expiry (same skew the token refresh uses, so the two never
-    disagree), or the connection was revoked and must be reconnected
-    outright whatever the stored tokens say. Connections without expiring
-    tokens (pasted bot tokens, awaiting consent) stay ``ok``. Callers that
-    did not read the credential store pass ``stored=None`` and get the
-    status-derived verdict only.
+
+def health(item, stored=None, *, now=None):
+    """Offline health: expiry needs consent only without automatic renewal.
+
+    A stored refresh credential allows get_access_token to renew on demand.
+    This is capability metadata, not a live provider check; revoked grants
+    still need reconnection, and provider rejection surfaces when used/tested.
     """
     if item.get("status") == STATUS_REVOKED:
         return "expired"
     stored = stored or {}
-    if "expires_at" not in stored:
+    if auto_refresh(item, stored) or "expires_at" not in stored:
         return "ok"
     return "expired" if oauth_providers.is_expired(stored, now=now) else "ok"
 
@@ -243,7 +244,7 @@ def public_view(item, stored=None):
     ``stored`` is the connection's credential value when the caller has it
     (listing/show handlers read the store); the view then also carries
     ``token_expires_at`` (ISO, None without a stored expiry) and the
-    computed ``health`` so surfaces can flag connections needing
+    ``auto_refresh`` capability and computed ``health`` so surfaces can flag connections needing
     reconnection.
     """
     return {
@@ -259,6 +260,7 @@ def public_view(item, stored=None):
         "status": item.get("status"),
         "health": health(item, stored),
         "token_expires_at": token_expires_at(stored),
+        "auto_refresh": auto_refresh(item, stored),
         "version": item.get("version"),
         "updated_at": item.get("updated_at"),
         "connected_at": item.get("connected_at"),

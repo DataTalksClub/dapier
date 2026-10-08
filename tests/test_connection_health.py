@@ -1,7 +1,7 @@
 """Connection listing health: offline ``health`` + ``token_expires_at``.
 
 The stored OAuth token lives in the credentials store; listings must flag
-connections whose token is past its expiry ("needs reconnection") without
+connections whose token is past its expiry and cannot auto-renew without
 ever leaking the secret itself. Covers the domain view, both API surfaces
 (`/api/agent/connections`, `/api/admin/overview`), and the CLI output.
 """
@@ -44,8 +44,8 @@ def test_future_expiry_is_ok_and_exposed():
     assert view["status"] == "connected"
 
 
-def test_past_expiry_is_expired():
-    stored = {"access_token": "at", "refresh_token": "rt", "expires_at": 1_000}
+def test_past_expiry_without_refresh_is_expired():
+    stored = {"access_token": "at", "expires_at": 1_000}
     view = public_view(_item(), stored)
     assert view["health"] == "expired"
     assert view["token_expires_at"]
@@ -176,7 +176,8 @@ def test_agent_list_and_show_carry_health(monkeypatch):
 
     listed = json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])
     by_id = {row["connection_id"]: row for row in listed["connections"]}
-    assert by_id["youtube-personal"]["health"] == "expired"
+    assert by_id["youtube-personal"]["health"] == "ok"
+    assert by_id["youtube-personal"]["auto_refresh"] is True
     assert by_id["youtube-personal"]["token_expires_at"]
     # No expiring token (pasted bot token, nothing stored yet) stays ok.
     assert by_id["slack-team"]["health"] == "ok"
@@ -185,10 +186,11 @@ def test_agent_list_and_show_carry_health(monkeypatch):
     shown = json.loads(
         agent_api.route(event(query={"agent": "uploader"}),
                         "GET", "/api/agent/connections/youtube-personal")["body"])
-    assert shown["health"] == "expired"
+    assert shown["health"] == "ok"
+    assert shown["auto_refresh"] is True
     assert shown["token_expires_at"]
 
-    # A provider-side refresh (new stored expiry) flips the listing back to ok.
+    # Renewal keeps the listing healthy before and after access-token rotation.
     tables["credentials"].put_item(Item={
         "credential_id": "oauth#youtube-personal", "provider": "google", "version": 2,
         "value": {"access_token": "at2", "refresh_token": "rt",
@@ -263,7 +265,8 @@ def test_overview_connections_carry_health_and_expiry(monkeypatch):
     stored = {item["credential_id"]: item for item in (expired_stored, fresh_stored)}
     rows = {row["connection_id"]: row
             for row in _overview(monkeypatch, connections, stored)}
-    assert rows["youtube-personal"]["health"] == "expired"
+    assert rows["youtube-personal"]["health"] == "ok"
+    assert rows["youtube-personal"]["auto_refresh"] is True
     assert rows["youtube-personal"]["token_expires_at"]
     assert rows["dropbox-work"]["health"] == "ok"
     assert rows["dropbox-work"]["token_expires_at"]
@@ -310,3 +313,48 @@ def test_cli_connections_show_prints_health(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "health: expired" in out
     assert "token_expires_at: 2026-06-15" in out
+
+
+@pytest.mark.parametrize("provider", ["dropbox", "google", "youtube", "zoom"])
+@pytest.mark.parametrize("expiry", [1000, int(time.time()) + 60, int(time.time()) + 3600])
+def test_renewable_access_expiry_does_not_require_consent(provider, expiry):
+    view = public_view(_item(provider=provider),
+                       {"access_token": "at", "refresh_token": "rt", "expires_at": expiry})
+    assert view["health"] == "ok"
+    assert view["auto_refresh"] is True
+    assert view["token_expires_at"]
+
+
+def test_revoked_refresh_credential_does_not_enable_renewal():
+    view = public_view(_item(status="revoked"),
+                       {"refresh_token": "rt", "expires_at": 1000})
+    assert view["health"] == "expired"
+    assert view["auto_refresh"] is False
+
+
+def test_cli_shows_automatic_renewal(capsys):
+    from dapier_cli.commands.connections import print_connection, print_connections
+    view = public_view(_item(provider="dropbox"),
+                       {"refresh_token": "rt", "expires_at": 1000})
+    print_connections([view])
+    print_connection(view)
+    out = capsys.readouterr().out
+    assert "auto-renews" in out
+    assert "auto_refresh: True" in out
+
+
+def test_console_expiry_status_excludes_automatic_renewal():
+    from pathlib import Path
+    from py_mini_racer import MiniRacer
+    source = (Path(__file__).resolve().parents[1] / "src/web/js/views/connections.js").read_text()
+    start = source.index("const EXPIRY_HORIZON_HOURS")
+    end = source.index("/* A stored token", start)
+    with MiniRacer() as js:
+        js.eval(source[start:end])
+        js.eval("function expiringIds(rows) { return rows.filter(tokenExpiringSoon).map(row => row.connection_id); }")
+        rows = [
+            {"connection_id": "renewable", "auto_refresh": True, "health": "ok", "token_expires_at": "2000-01-01T00:00:00Z"},
+            {"connection_id": "manual", "auto_refresh": False, "health": "ok", "token_expires_at": "2000-01-01T00:00:00Z"},
+            {"connection_id": "revoked", "auto_refresh": False, "health": "expired", "token_expires_at": "2000-01-01T00:00:00Z"},
+        ]
+        assert js.call("expiringIds", rows) == ["manual"]

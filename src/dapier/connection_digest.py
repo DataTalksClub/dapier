@@ -79,7 +79,8 @@ def expiring(window_hours=None, *, now=None, table=None):
 
     Each row carries ``expires_state``: ``"expired"`` — past its expiry or
     revoked, reconnection needed now — or ``"expiring"`` (inside the
-    horizon). Connections without an expiring token (pasted bot tokens,
+    horizon). Automatically renewable connections are excluded.
+    Connections without an expiring token (pasted bot tokens,
     awaiting consent) never appear. Rows sort by expiry, soonest first.
     """
     now = now or datetime.now(timezone.utc)
@@ -89,6 +90,8 @@ def expiring(window_hours=None, *, now=None, table=None):
     for view in views(table):
         if view.get("health") == "expired":
             rows.append({**view, "expires_state": "expired"})
+            continue
+        if view.get("auto_refresh"):
             continue
         expires = view.get("token_expires_at")
         if not expires:

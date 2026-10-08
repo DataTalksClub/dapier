@@ -211,7 +211,7 @@ const CONNECTION_STATUS_LABELS = {
 const EXPIRY_HORIZON_HOURS = 48;
 
 const tokenExpiringSoon = (connection) => {
-  if (connection.health === 'expired' || !connection.token_expires_at) return false;
+  if (connection.auto_refresh || connection.health === 'expired' || !connection.token_expires_at) return false;
   const when = Date.parse(connection.token_expires_at);
   return !Number.isNaN(when) && when <= Date.now() + EXPIRY_HORIZON_HOURS * 3600 * 1000;
 };
@@ -687,10 +687,7 @@ function usageLabel(connection) {
 }
 
 function accountRow(connection, serviceId) {
-    /* health is computed by the API from the stored token expiry; an expired
-       token turns a connected row into "needs reconnection", and a token
-       inside the digest horizon into "expiring soon", without rewriting
-       the stored record. Reconnect is the row action either way. */
+    /* The API distinguishes automatic renewal from expiry needing consent. */
     const status = effectiveStatus(connection);
     const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
@@ -710,7 +707,7 @@ function accountRow(connection, serviceId) {
     </div>
     <div class="service-account-status">
       ${statusLine(status, CONNECTION_STATUS_LABELS)}
-      ${expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}
+      ${connection.auto_refresh ? '<span class="cell-sub">renews automatically</span>' : (expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : '')}
     </div>
     <div class="service-account-actions">${nextAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
   </li>`;

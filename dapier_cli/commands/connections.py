@@ -45,7 +45,7 @@ def print_connections(items):
     for item in items:
         account = item.get("account_title") or item.get("verified_account_id") or "-"
         print(f"{item.get('connection_id', ''):24} {_services_label(item):36} "
-              f"{item.get('status', ''):10} {item.get('health') or '-':8} {_local_expiry(item):17} "
+              f"{item.get('status', ''):10} {item.get('health') or '-':8} {('auto-renews' if item.get('auto_refresh') else _local_expiry(item)):17} "
               f"{_used_in_label(item):24} {account}")
 
 
@@ -67,7 +67,7 @@ def print_connection(item):
     for key in ("connection_id", "provider", "display_name", "status", "health",
                 "verified_account_id", "account_title", "expected_account_id",
                 "services", "granted_scopes", "scopes", "version", "updated_at",
-                "connected_at"):
+                "connected_at", "auto_refresh"):
         if item.get(key) not in (None, "", []):
             value = item[key]
             if key == "services" and isinstance(value, list):

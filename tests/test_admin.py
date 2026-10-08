@@ -1211,7 +1211,8 @@ def test_overview_connections_carry_token_health(monkeypatch):
     payload = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
     row = payload["connections"][0]
     assert row["status"] == "connected"
-    assert row["health"] == "expired"
+    assert row["health"] == "ok"
+    assert row["auto_refresh"] is True
     assert row["token_expires_at"]
 
 

@@ -271,7 +271,7 @@ def test_list_and_show_require_grants(monkeypatch):
     assert agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["statusCode"] == 404
 
 
-def test_connection_health_flags_expired_tokens(monkeypatch):
+def test_connection_health_keeps_renewable_tokens_healthy(monkeypatch):
     tables = configure(monkeypatch, claims={"sub": "subject-1"},
                        connections={"youtube-personal": CONNECTION},
                        grants={("youtube-personal", "subject-1#buildcamp-uploader"): GRANT})
@@ -282,11 +282,13 @@ def test_connection_health_flags_expired_tokens(monkeypatch):
     })
 
     listed = json.loads(agent_api.route(event(), "GET", "/api/agent/connections")["body"])["connections"]
-    assert listed[0]["health"] == "expired"
+    assert listed[0]["health"] == "ok"
+    assert listed[0]["auto_refresh"] is True
     assert listed[0]["token_expires_at"]
 
     shown = json.loads(agent_api.route(event(), "GET", "/api/agent/connections/youtube-personal")["body"])
-    assert shown["health"] == "expired"
+    assert shown["health"] == "ok"
+    assert shown["auto_refresh"] is True
 
     tables["credentials"].put_item(Item={
         "credential_id": "oauth#youtube-personal", "provider": "google", "version": 2,

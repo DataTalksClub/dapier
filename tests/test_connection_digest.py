@@ -344,3 +344,16 @@ def test_template_schedules_the_connection_digest_daily():
     digest_block = digest_block.split("ConnectionDigestErrorAlarm:", 1)[0]
     assert "OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback" \
         in digest_block
+
+
+@pytest.mark.parametrize("expiry", [REAL_NOW - timedelta(hours=2), REAL_NOW + timedelta(hours=4)])
+def test_digest_excludes_renewable_tokens_but_keeps_revoked(monkeypatch, expiry):
+    _expiring_store(monkeypatch, {
+        "dropbox": {"access_token": "at", "refresh_token": "rt", "expires_at": int(expiry.timestamp())},
+        "revoked": {"refresh_token": "rt", "expires_at": int(expiry.timestamp())},
+    })
+    rows = connection_digest.expiring(48, now=REAL_NOW, table=FakeTable([
+        _connection("dropbox", provider="dropbox"),
+        _connection("revoked", provider="dropbox", status="revoked"),
+    ]))
+    assert [(row["connection_id"], row["expires_state"]) for row in rows] == [("revoked", "expired")]

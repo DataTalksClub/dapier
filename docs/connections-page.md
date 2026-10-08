@@ -54,11 +54,15 @@ email is "Not signed in", never a fake Drive account.
 - **Same-grant line** on rows whose grant covers other products:
   `Same grant as Calendar, Drive · google-calendar`. Sentence case,
   muted, not a chip.
-- **Status** is a stacked dot+word; expiry is a second line. Never inline
-  with the word "connected". A token still valid but inside the 48h digest
-  horizon reads **expiring soon** (warning) with `expires …` underneath;
-  a lapsed token reads **needs reconnection**. Both count as needing
-  attention, including the Connected / Needs attention filter.
+- **Status** is a stacked dot+word; renewable OAuth grants show
+  "renews automatically" on the second line. Only tokens without a refresh
+  credential show expiry warnings or appear in the re-auth digest.
+  The API exposes `auto_refresh` as a boolean, without revealing credentials;
+  CLI list shows `auto-renews` and show includes that capability.
+  Access-token expiry alone does not require consent for a renewable grant. Never inline
+  with the word "connected".
+  Tokens without renewal inside the 48h horizon read **expiring soon**;
+  lapsed tokens read **needs reconnection**. Both count as needing attention.
 - **Actions:** Manage on every row. Finish setup and Reconnect are
   secondary. One primary on the page (Add connection). Reconnect is on
   every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
