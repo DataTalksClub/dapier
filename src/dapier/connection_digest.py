@@ -10,12 +10,19 @@ so it can be re-authenticated (``dapier connections connect <id>``) before
 a workflow fails on it. A register with nothing expiring sends nothing:
 the digest exists to surface upcoming lapses, not to confirm quiet days.
 
+Each listed connection carries a one-click re-auth link — the same GET the
+console Connect button issues, wrapped in ``/auth/login`` so a cold phone
+browser signs in before provider consent — because an email is read where a
+shell command is not. The base comes from ``OAUTH_CALLBACK_URL``; without it
+the email falls back to the CLI instruction alone.
+
 Send-now parity (UI/CLI rule): POST
 /api/{admin,agent}/connections/expiry-digest and
 ``dapier connections send-expiry-digest`` call ``send()`` directly and
 return what was sent (or ``{"skipped": true}``).
 """
 import os
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 
@@ -97,11 +104,31 @@ def expiring(window_hours=None, *, now=None, table=None):
     return rows
 
 
+def reauth_url(connection_id):
+    """One-click re-auth link for one connection, or "" when unconfigured.
+
+    ``/auth/login?next=...`` lands on the OAuth start endpoint after the
+    operator sign-in (a session already present skips straight through),
+    and the start endpoint is exactly the GET the console Connect button
+    issues — so the link works from a cold phone browser. The base is the
+    registered callback's origin; never derived from request headers, the
+    digest runs on a schedule with none.
+    """
+    callback = os.environ.get("OAUTH_CALLBACK_URL", "").strip()
+    if not callback:
+        return ""
+    suffix = "/oauth/callback"
+    base = callback[: -len(suffix)] if callback.endswith(suffix) else callback.rstrip("/")
+    start = f"/api/admin/oauth/{connection_id}/start"
+    return f"{base}/auth/login?next={urllib.parse.quote(start, safe='/')}"
+
+
 def render(rows, window_hours=None):
     """Subject and plain-text body for one ``expiring()`` payload.
 
-    One line per connection with its expiry and the re-auth command, so
-    the email is actionable on its own.
+    One line per connection with its expiry, a click-to-reconnect link,
+    and the re-auth command, so the email is actionable on its own —
+    phone or desktop.
     """
     hours = window_hours if window_hours is not None else _window_hours()
     count = len(rows)
@@ -114,13 +141,19 @@ def render(rows, window_hours=None):
         + ". Reconnect before a workflow fails on them:", "",
     ]
     for row in rows:
-        name = row.get("display_name") or row.get("connection_id")
+        connection_id = row.get("connection_id")
+        name = row.get("display_name") or connection_id
         state = "EXPIRED" if row.get("expires_state") == "expired" else "expiring"
-        lines.append(f"- {name} [{row.get('connection_id')}] "
+        lines.append(f"- {name} [{connection_id}] "
                      f"({row.get('provider')}): {state} at "
                      f"{row.get('token_expires_at')}")
-        lines.append(f"  re-authenticate: dapier connections connect "
-                     f"{row.get('connection_id')}")
+        url = reauth_url(connection_id)
+        if url:
+            lines.append(f"  reconnect now (one click): {url}")
+            lines.append(f"  (or: dapier connections connect {connection_id})")
+        else:
+            lines.append(f"  re-authenticate: dapier connections connect "
+                         f"{connection_id}")
     lines.append("")
     lines.append("The console Connections page reconnects the same accounts.")
     return subject, "\n".join(lines) + "\n"

@@ -1499,6 +1499,9 @@ Resources:
           DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           CREDENTIALS_TABLE: !Ref CredentialsTable
+          # The one-click re-auth links in the digest email point at the
+          # same origin the OAuth callback is registered on.
+          OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback
           DAPIER_CONNECTION_DIGEST_HOURS: '48'
       Policies:
         - Statement:

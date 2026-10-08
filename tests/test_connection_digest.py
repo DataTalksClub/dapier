@@ -147,6 +147,30 @@ def test_render_singular_case_has_no_expired_caveat():
     assert "already expired" not in body
 
 
+def test_render_links_one_click_reauth_per_connection(monkeypatch):
+    monkeypatch.setenv("OAUTH_CALLBACK_URL",
+                       "https://dapier.example.test/oauth/callback")
+
+    _, body = connection_digest.render(_expiring_rows(), 48)
+
+    assert ("https://dapier.example.test/auth/login"
+            "?next=/api/admin/oauth/google-sheets/start") in body
+    assert ("https://dapier.example.test/auth/login"
+            "?next=/api/admin/oauth/dropbox/start") in body
+    # The CLI route stays for desktop readers.
+    assert "dapier connections connect google-sheets" in body
+
+
+def test_render_without_callback_url_falls_back_to_the_cli_instruction(monkeypatch):
+    monkeypatch.delenv("OAUTH_CALLBACK_URL", raising=False)
+
+    _, body = connection_digest.render(_expiring_rows(), 48)
+
+    assert "one click" not in body
+    assert "https://" not in body
+    assert "dapier connections connect google-sheets" in body
+
+
 # --- send / handler: the daily schedule's render-and-send ---
 
 def test_handler_emails_the_expiring_connections(monkeypatch, ses):
@@ -361,3 +385,9 @@ def test_template_schedules_the_connection_digest_daily():
     assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in text
     assert "Schedule: cron(30 7 * * ? *)" in text
     assert "ConnectionDigestErrorAlarm:" in text
+    # The digest emails one-click re-auth links, so the function needs the
+    # OAuth origin — scoped to the digest block, the API function has its own.
+    digest_block = text.split("ConnectionDigestFunction:", 1)[1]
+    digest_block = digest_block.split("ConnectionDigestErrorAlarm:", 1)[0]
+    assert "OAUTH_CALLBACK_URL: !Sub https://${DomainName}/oauth/callback" \
+        in digest_block
