@@ -56,6 +56,6 @@ In Connections, search the exact ID, choose the matching row's **Manage**, and c
 
 Alternatively, from the repository use `uv run dapier connections show <id>` and `uv run dapier connections test <id>`. Read the repository's dapier-cli skill if authentication or command discovery needs help. The CLI lists only connections granted to its current identity; missing rows there do not mean the operator console lacks those connections. Never extract browser cookies or tokens to bypass CLI grants.
 
-Short-lived access tokens can still appear in the console's 48-hour **Tokens expiring soon** banner immediately after refresh. Use fresh expiry, correct identity, and a successful provider test to confirm this task; do not repeatedly reconnect just to clear the banner. Do not promise a refresh will last 48 hours.
+Short-lived access tokens can still read **expiring soon** on the row immediately after refresh if the new token is inside the 48-hour digest window. Use fresh expiry, correct identity, and a successful provider test to confirm this task; do not repeatedly reconnect just to clear that warning. Do not promise a refresh will last 48 hours. The daily digest emails upcoming lapses; there is no send-now email button on the Connections page.
 
 Report the six results and concrete account mapping, and keep the final Connections page open if useful. Document unresolved failures honestly. Unrelated setup-incomplete connections (`google-drive` and `zoom` in the observed session) are outside these six and should not be provisioned as part of a refresh.
