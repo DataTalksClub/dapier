@@ -1184,7 +1184,7 @@ def test_inbox_list_hits_agent_endpoint(prefix, isolated_home, monkeypatch, caps
     assert rc == 0
     assert calls == [("GET", "/api/agent/triggers/inbox?limit=25&connector=webhook")]
     out = capsys.readouterr().out
-    assert "evt-1" in out and "unmatched" in out
+    assert "evt-1" in out and "no workflow" in out
 
 
 @pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])

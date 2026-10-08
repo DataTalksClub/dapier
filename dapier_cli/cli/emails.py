@@ -1,6 +1,7 @@
 """The `dapier emails` noun: inbound addresses and the sender allow-list."""
 
 from .. import commands
+from .runs import OUTCOME_HELP
 
 GROUPS = ("emails",)
 
@@ -11,6 +12,12 @@ def register(sub):
     emails_sub.add_parser("list", help="List email addresses")
     emails_show = emails_sub.add_parser("show", help="Show one email address")
     emails_show.add_argument("name")
+    emails_received = emails_sub.add_parser(
+        "received", help="Recent received emails and what happened to each (the Emails page list)")
+    emails_received.add_argument("--outcome", help=OUTCOME_HELP)
+    emails_received.add_argument("--limit", type=int, default=25)
+    emails_received.add_argument("--next", dest="next_token",
+                                 help="Page token from the previous call's `next page:` footer")
     emails_from = emails_sub.add_parser("from", help="The shared sender allow-list for every inbound email")
     emails_from_sub = emails_from.add_subparsers(dest="from_command", required=True)
     emails_from_sub.add_parser("list", help="List allowed senders")
@@ -25,6 +32,10 @@ def run(args, api_url, debug, child=None):
         return commands.triggers_list(api_url, debug)
     if args.command == "show":
         return commands.triggers_show(api_url, args.name, debug)
+    if args.command == "received":
+        return commands.inbox_list(api_url, connector="email", limit=args.limit,
+                                   next_token=args.next_token, outcome=args.outcome,
+                                   debug=debug)
     if args.command == "from":
         if args.from_command == "list":
             return commands.emails_from_list(api_url, debug)

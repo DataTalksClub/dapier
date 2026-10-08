@@ -24,8 +24,10 @@ import base64
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
+from email.utils import parseaddr
 
 from ..auth import visibility
 
@@ -54,6 +56,24 @@ IGNORED = "ignored"
 # Terminal step statuses, mirrored from engine.worker — a redelivery may
 # skip a step that already finished, never one still being processed.
 _DONE_STATUSES = ("completed", "filtered")
+
+
+# What happened to an event, in the words the console and CLI show. Derived
+# from the stored status: ``handled`` ran at least one workflow, ``failed``
+# raised in a run, ``refused`` was dropped by the sender allow-list,
+# ``unmatched`` reached no workflow, ``pending`` is still in flight.
+OUTCOMES = {
+    MATCHED: "handled",
+    FAILED: "failed",
+    IGNORED: "refused",
+    UNMATCHED: "unmatched",
+    RECEIVED: "pending",
+}
+
+# Envelope summary caps: enough for a mailbox row and the detail dialog,
+# never the body.
+_SUMMARY_TEXT = 300
+_SUMMARY_ATTACHMENTS = 25
 
 
 class InboxError(Exception):
@@ -87,6 +107,120 @@ def _trim_event_data(data, limit=DATA_LIMIT):
             if data.get(key) is not None:
                 trimmed[key] = data[key]
     return trimmed
+
+
+def _text(value, limit=_SUMMARY_TEXT):
+    if value in (None, ""):
+        return None
+    return str(value)[:limit]
+
+
+def _address_list(value):
+    if isinstance(value, (list, tuple)):
+        return [str(item)[:_SUMMARY_TEXT] for item in value if item][:20]
+    if isinstance(value, str) and value.strip():
+        return [part.strip()[:_SUMMARY_TEXT] for part in value.split(",") if part.strip()][:20]
+    return []
+
+
+def _preview_fields(preview):
+    """Best-effort header fields from a truncated row's JSON preview.
+
+    Rows stored before the envelope summary existed keep only a clipped
+    JSON string of their data. The header fields sit at its start (the
+    intake writes them before the body), so a key-level match recovers
+    them; anything not found stays unknown."""
+    text = str(preview or "")
+
+    def grab(pattern):
+        match = re.search(pattern, text)
+        if not match:
+            return None
+        try:
+            return json.loads(f'"{match.group(1)}"')
+        except ValueError:
+            return None
+
+    string = r'"((?:[^"\\]|\\.)*)"'
+    fields = {}
+    for key in ("route", "message_id", "subject", "date", "from", "to"):
+        value = grab(rf'"{key}":\s*{string}')
+        if value is not None:
+            fields[key] = value
+    header = grab(r'"sender":\s*\{[^{}]*?"header":\s*' + string)
+    if header is not None:
+        fields["sender"] = {"header": header}
+    to = grab(r'"recipients":\s*\{[^{}]*?"to":\s*' + string)
+    if to is not None:
+        fields["recipients"] = {"to": to}
+    return fields
+
+
+def email_summary(data):
+    """Envelope metadata for an email event: sender, recipients, subject,
+    date, message id, and attachment names and sizes — never the body.
+
+    Dapier routes mail; this is what a mailbox row needs to say which
+    message it is. SES bounce/complaint feedback events summarize the
+    feedback kind and the affected recipients instead. Returns None for
+    data with nothing recognizable."""
+    if not isinstance(data, dict):
+        return None
+    if data.get("truncated"):
+        data = {**_preview_fields(data.get("preview")),
+                **{key: data[key] for key in ("message_id",) if data.get(key)}}
+    if data.get("feedback_type"):
+        recipients = (data.get("bounced_recipients")
+                      or data.get("complained_recipients") or [])
+        summary = {
+            "feedback": _text(data.get("feedback_type")),
+            "bounce_type": _text(data.get("bounce_type")),
+            "recipients": _address_list(recipients),
+            "from": _text(data.get("source")),
+            "to": _address_list(data.get("destination")),
+            "message_id": _text(data.get("message_id")),
+            "date": _text(data.get("timestamp")),
+        }
+        return {key: value for key, value in summary.items() if value not in (None, [])}
+    sender = data.get("sender")
+    if isinstance(sender, dict):
+        addresses = _address_list(sender.get("addresses"))
+        from_header = _text(sender.get("header")) or (addresses[0] if addresses else None)
+        from_address = addresses[0] if addresses else None
+    else:
+        from_header = _text(sender) or _text(data.get("from"))
+        from_address = None
+    recipients = data.get("recipients")
+    if isinstance(recipients, dict):
+        to = _address_list(recipients.get("addresses")) or _address_list(recipients.get("to"))
+        cc = _text(recipients.get("cc"))
+    else:
+        to = _address_list(data.get("to"))
+        cc = _text(data.get("cc"))
+    attachments = []
+    for attachment in (data.get("attachments") or [])[:_SUMMARY_ATTACHMENTS]:
+        if not isinstance(attachment, dict):
+            continue
+        size = attachment.get("size")
+        attachments.append({key: value for key, value in {
+            "name": _text(attachment.get("filename") or attachment.get("name")),
+            "size": int(size) if isinstance(size, (int, float)) or str(size).isdigit() else None,
+            "content_type": _text(attachment.get("content_type"), 100),
+            "inline": True if attachment.get("disposition") == "inline" else None,
+        }.items() if value is not None})
+    summary = {
+        "from": from_header,
+        "from_address": from_address or _text(parseaddr(from_header or "")[1]),
+        "to": to,
+        "cc": cc,
+        "subject": _text(data.get("subject")),
+        "date": _text(data.get("date"), 100),
+        "message_id": _text(data.get("message_id")),
+        "route": _text(data.get("route"), 100),
+        "attachments": attachments,
+    }
+    summary = {key: value for key, value in summary.items() if value not in (None, [])}
+    return summary or None
 
 
 def _table():
@@ -136,6 +270,12 @@ def record(event, *, table_ref=None):
         "matched": [],
         "expires_at": now + RETENTION_DAYS * 86400,
     }
+    if event.get("connector") == "email":
+        # Summarized from the full data before the storage cap clips it,
+        # so an oversized message still lists with its sender and subject.
+        summary = email_summary(event.get("data") or {})
+        if summary:
+            item["email"] = summary
     try:
         table = table_ref if table_ref is not None else _table()
         table.put_item(
@@ -221,7 +361,16 @@ def note_replay_bounced(inbox_id, error, *, table_ref=None):
 def _view(item):
     keys = ("inbox_id", "connector", "event", "source", "occurred_at",
             "received_at", "processed_at", "status", "data", "matched", "error")
-    return {key: _decode_numbers(item.get(key)) for key in keys}
+    view = {key: _decode_numbers(item.get(key)) for key in keys}
+    view["outcome"] = OUTCOMES.get(view.get("status"), view.get("status"))
+    # One run per matched workflow, keyed like engine.worker._run_id, so a
+    # client links straight to the run without searching history.
+    view["runs"] = [{"workflow": str(workflow), "run_id": f"{workflow}:{view['inbox_id']}"}
+                    for workflow in (view.get("matched") or [])]
+    if view.get("connector") == "email":
+        stored_summary = _decode_numbers(item.get("email"))
+        view["email"] = stored_summary or email_summary(view.get("data")) or {}
+    return view
 
 
 def _sort_key(event):
@@ -248,8 +397,16 @@ def _decode_token(token):
     return key if key != ("", "") else None
 
 
+def _outcomes(value):
+    """The requested outcome filter as a set (comma-separated), or None."""
+    if not value:
+        return None
+    wanted = {part.strip() for part in str(value).split(",") if part.strip()}
+    return wanted or None
+
+
 def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None,
-             visible=None):
+             visible=None, outcome=None):
     """Recent inbox events, newest first; ``connector`` filters when given.
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
@@ -262,6 +419,9 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     read-filters the list, G17 Phase 2: a non-operator keeps the events that
     matched at least one workflow it owns. An event nothing matched is
     nobody's row — visible to everyone, like every no-owner item.
+
+    ``outcome`` (comma-separated :data:`OUTCOMES` values) keeps the events
+    with that outcome, composing with the connector filter and paging.
     """
     try:
         limit = max(1, min(int(limit), MAX_LIMIT))
@@ -270,12 +430,19 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
+    outcomes = _outcomes(outcome)
+    unknown = sorted((outcomes or set()) - set(OUTCOMES.values()))
+    if unknown:
+        return 400, {"error": f"Unknown outcome {', '.join(unknown)}; use "
+                              f"{', '.join(sorted(set(OUTCOMES.values())))}"}
     owners = visibility.owners_for(visible)
     items = (table_ref if table_ref is not None else _table()).scan(
         Limit=max(limit * 6, 150)).get("Items", [])
     events = [_view(item) for item in items]
     if connector:
         events = [event for event in events if event.get("connector") == connector]
+    if outcomes:
+        events = [event for event in events if event.get("outcome") in outcomes]
     if visible is not None:
         events = [event for event in events if _visible_event(event, visible, owners)]
     events.sort(key=_sort_key, reverse=True)
@@ -289,7 +456,7 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
         "paging": {
             "next": _encode_token(page[-1]) if more and page else None,
             "limit": limit,
-            "filtered": bool(connector or next_token),
+            "filtered": bool(connector or outcomes or next_token),
         },
     }
 
@@ -304,7 +471,32 @@ def _visible_event(event, visible, owners):
     return any(visible.workflow_visible(m, owners) for m in matched)
 
 
-def api_get(inbox_id, *, table_ref=None, visible=None):
+def _run_status(run_id):
+    """The rolled-up status of one run from run history, or None.
+
+    Lazy import: run history lives in the API layer, which already reads
+    this module for replay; the detail read is the only caller."""
+    if not os.environ.get("EXECUTIONS_TABLE"):
+        return None
+    from ..api import runs
+
+    items = runs._run_items(run_id)
+    return runs.run_summary(run_id, items).get("status") if items else None
+
+
+def _with_run_status(view, run_status):
+    """Each matched run gets its status from run history (best-effort: a
+    history read failure leaves the status unknown, never fails the read)."""
+    for run in view.get("runs") or []:
+        try:
+            run["status"] = run_status(run["run_id"])
+        except Exception:
+            logger.warning("inbox run status lookup failed", extra={"run_id": run["run_id"]})
+            run["status"] = None
+    return view
+
+
+def api_get(inbox_id, *, table_ref=None, visible=None, run_status=None):
     inbox_id = str(inbox_id or "").strip()
     if not inbox_id:
         return 400, {"error": "inbox_id is required"}
@@ -317,7 +509,7 @@ def api_get(inbox_id, *, table_ref=None, visible=None):
         # Same answer as a missing row: the list dropped it, the single
         # read must not reveal it either.
         return 404, {"error": "Inbox event not found"}
-    return 200, {"event": _view(item)}
+    return 200, {"event": _with_run_status(_view(item), run_status or _run_status)}
 
 
 def stored(inbox_id, *, table_ref=None):

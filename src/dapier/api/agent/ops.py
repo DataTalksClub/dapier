@@ -427,6 +427,7 @@ def inbox_api(event, inbox_id=None):
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
+        outcome=query.get("outcome") or None,
         visible=_visibility(event, subject),
     )
     return _no_store(_json_response(status, payload))

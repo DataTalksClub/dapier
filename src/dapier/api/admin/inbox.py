@@ -14,6 +14,7 @@ def list_inbox(event, visible=None):
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
+        outcome=query.get("outcome") or None,
         visible=visible,
     )
     return http._json_response(status, payload)

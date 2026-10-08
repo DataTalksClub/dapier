@@ -4,6 +4,9 @@ from .. import commands
 
 GROUPS = ("runs", "inbox")
 
+OUTCOME_HELP = ("Only events with this outcome: handled, failed, refused, unmatched, "
+                "pending (comma-separate several)")
+
 
 def register(sub):
     runs_p = sub.add_parser("runs", help="Workflow executions and incoming trigger events")
@@ -80,6 +83,7 @@ def register(sub):
     inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
     inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
     inbox_list_p.add_argument("--limit", type=int, default=25)
+    inbox_list_p.add_argument("--outcome", help=OUTCOME_HELP)
     inbox_list_p.add_argument("--next", dest="next_token",
                               help="Page token from the previous call's `next page:` footer")
     inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
@@ -92,6 +96,7 @@ def register(sub):
     inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
     inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
     inbox_list_p.add_argument("--limit", type=int, default=25)
+    inbox_list_p.add_argument("--outcome", help=OUTCOME_HELP)
     inbox_list_p.add_argument("--next", dest="next_token",
                               help="Page token from the previous call's `next page:` footer")
     inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
@@ -135,7 +140,7 @@ def _inbox(args, api_url, debug):
     if args.command == "list":
         return commands.inbox_list(api_url, connector=args.connector,
                                    limit=args.limit, next_token=args.next_token,
-                                   debug=debug)
+                                   outcome=args.outcome, debug=debug)
     if args.command == "show":
         return commands.inbox_show(api_url, args.inbox_id, debug)
     if args.command == "replay":
