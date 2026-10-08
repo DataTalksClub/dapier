@@ -531,7 +531,7 @@ def test_the_console_dialog_carries_the_new_source():
     select = re.search(r'name="source">(.*?)</select>', html, re.S).group(1)
     assert 'value="google-calendar.events"' in select
 
-    js = (WEB / "js" / "views" / "triggers.js").read_text()
+    js = (WEB / "js" / "views" / "polls.js").read_text()
     assert "'google-calendar.events'" in js  # connection-required list
     assert "'calendar_id'" in js  # an Options key, shown as the Watches target
 

@@ -177,13 +177,28 @@
         </div>
         </div>
         <div data-workflow-panel="polls" hidden>
-        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API for new items, for example an orders feed or a YouTube channel.</p></div>
-        <div id="poll-table-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Poll</th><th>Watches</th><th>Schedule</th><th>Status</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="poll-table"></tbody>
-          </table>
-        </div>
+        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API, feed, or folder for new items, for example an orders feed or a YouTube channel.</p></div>
+        <section id="poll-monitor" class="data-panel poll-panel" aria-labelledby="poll-monitor-title" hidden>
+          <div class="section-head"><h2 id="poll-monitor-title">Polls</h2><button class="help-tip" type="button" aria-label="What a poll does" data-tip="A poll checks a source on a schedule and starts its workflow once for each new item. Open a poll to check it now, pause it, or change where it reads from.">?</button><p id="poll-summary" class="sub" role="status"></p></div>
+          <div id="poll-table-wrap" class="table-wrap">
+            <table>
+              <colgroup><col class="poll-col-name"><col class="poll-col-health"><col class="poll-col-check"><col class="poll-col-new"><col class="poll-col-starts"></colgroup>
+              <thead><tr><th>Poll</th><th>Health</th><th>Last check</th><th>Last new item</th><th>Starts</th></tr></thead>
+              <tbody id="poll-table"></tbody>
+            </table>
+          </div>
+        </section>
+        <section id="poll-activity" class="data-panel poll-panel" aria-labelledby="poll-activity-title" hidden>
+          <div class="section-head"><h2 id="poll-activity-title">Recently picked up</h2><div class="poll-chips" role="group" aria-label="Show items"><button class="poll-chip" type="button" data-filter="all" aria-pressed="true">All</button><button class="poll-chip" type="button" data-filter="matched" aria-pressed="false">Handled</button><button class="poll-chip" type="button" data-filter="unmatched" aria-pressed="false">Unmatched</button><button class="poll-chip" type="button" data-filter="failed" aria-pressed="false">Failed</button></div></div>
+          <div id="poll-activity-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
+          <div id="poll-activity-wrap" class="table-wrap">
+            <table>
+              <colgroup><col class="poll-col-item"><col class="poll-col-when"><col class="poll-col-outcome"></colgroup>
+              <thead><tr><th>Item</th><th>Picked up</th><th>Outcome</th></tr></thead>
+              <tbody id="poll-activity-table"></tbody>
+            </table>
+          </div>
+        </section>
         </div>
       </section>
 
@@ -686,6 +701,54 @@
       <p class="field-hint">The newest event the poll would publish — pulled live from the provider when it can, else the newest recorded run, else a documented example. This is the shape <code>{trigger.*}</code> templates read.</p>
     </div>
     <div class="dialog-actions"><button class="dk-button dk-button--primary dialog-close" type="button">Close</button></div>
+  </dialog>
+  <dialog id="poll-detail-dialog" aria-labelledby="poll-detail-title">
+    <div class="dialog-head">
+      <div class="poll-detail-heading"><h2 id="poll-detail-title" class="mono">Poll</h2><span id="poll-detail-health"></span></div>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="poll-detail-body" class="dialog-body detail"></div>
+    <div class="dialog-actions poll-detail-actions">
+      <div class="poll-detail-manage">
+        <button class="dk-button dk-button--secondary" type="button" data-poll-action="edit">Edit</button>
+        <button class="dk-button dk-button--secondary" type="button" data-poll-action="sample">Sample</button>
+        <button class="dk-button dk-button--danger" type="button" data-poll-action="delete">Delete</button>
+      </div>
+      <div class="poll-detail-run">
+        <button class="dk-button dk-button--secondary" type="button" data-poll-action="reset">Reset position</button>
+        <button id="poll-detail-toggle" class="dk-button dk-button--secondary" type="button" data-poll-action="toggle">Pause</button>
+        <button id="poll-detail-check" class="dk-button dk-button--primary" type="button" data-poll-action="check">Poll now</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="poll-item-dialog" aria-labelledby="poll-item-title">
+    <div class="dialog-head">
+      <h2 id="poll-item-title">Picked-up item</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="poll-item-body" class="dialog-body detail"></div>
+    <div class="dialog-actions">
+      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
+      <button id="poll-item-replay" class="dk-button dk-button--primary" type="button">Replay</button>
+    </div>
+  </dialog>
+  <dialog id="poll-reset-dialog" aria-labelledby="poll-reset-title">
+    <form id="poll-reset-form" method="dialog" autocomplete="off">
+      <div class="dialog-head"><h2 id="poll-reset-title">Reset position</h2><button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="dialog-body">
+        <p class="sub">Choose where the next check starts reading. Nothing runs until then.</p>
+        <label class="poll-reset-option"><span><input type="radio" name="to" value="now" checked> From now</span><small class="field-hint">Skip everything waiting right now. Only items that arrive after this run their workflows.</small></label>
+        <label class="poll-reset-option"><span><input type="radio" name="to" value="date"> From a date</span><input name="date" type="date" disabled><small id="poll-reset-date-hint" class="field-hint"></small></label>
+        <p id="poll-reset-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
+        <button class="dk-button dk-button--primary" type="submit">Reset position</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="poll-replay-confirm-dialog" aria-labelledby="poll-replay-confirm-title">
+    <form method="dialog"><div class="dialog-head"><h2 id="poll-replay-confirm-title">Replay this item?</h2></div><div class="dialog-body"><p>The item goes through its workflows again as a new run. Actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--primary" value="confirm">Replay</button></div></form>
   </dialog>
   <dialog id="trigger-confirm-dialog" aria-label="Delete trigger">
     <form method="dialog" autocomplete="off">

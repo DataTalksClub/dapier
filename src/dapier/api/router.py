@@ -87,6 +87,7 @@ def _static(path):
         "/assets/js/views/audit.js": ("js/views/audit.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/triggers.js": ("js/views/triggers.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/hooks.js": ("js/views/hooks.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/polls.js": ("js/views/polls.js", "text/javascript; charset=utf-8"),
         "/assets/js/theme.js": ("js/theme.js", "text/javascript; charset=utf-8"),
         "/assets/js/account.js": ("js/account.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),

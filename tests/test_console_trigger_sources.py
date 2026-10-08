@@ -1,7 +1,7 @@
 """The console's hardcoded poll-source lists vs the registered sources.
 
 The Triggers view hardcodes two lists — the Source select's options
-(index.html) and CONNECTION_POLL_SOURCES (triggers.js, the sources that
+(index.html) and CONNECTION_POLL_SOURCES (polls.js, the sources that
 must carry a connection_id). This gate pins both to
 triggers.poll_sources, so a newly registered source cannot land without
 its console surface (the gap this closed: google-drive.updates,
@@ -32,7 +32,7 @@ def _select_sources():
 
 
 def _connection_sources():
-    js = (WEB / "js" / "views" / "triggers.js").read_text()
+    js = (WEB / "js" / "views" / "polls.js").read_text()
     match = re.search(r"CONNECTION_POLL_SOURCES = \[(.*?)\]", js, re.S)
     assert match, "CONNECTION_POLL_SOURCES is missing"
     return set(re.findall(r"'([^']+)'", match.group(1)))
