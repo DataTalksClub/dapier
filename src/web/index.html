@@ -215,43 +215,50 @@
       </section>
 
       <section class="view" data-page="emails">
-        <p class="sub">Email addresses are triggers in workflows: add an email trigger with an address filter in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a> to create one.</p>
-        <p class="sub">Receiving domain: <span id="email-domain-hint" class="mono"></span>. Status shows workflow configuration, not delivery health.</p>
         <p id="email-load-error" class="form-error" role="alert"></p>
-        <div id="email-empty" class="empty-state" hidden><h3>No email addresses</h3><p>Create a workflow with an email trigger and an address filter.</p></div>
-        <div id="email-addresses" class="table-wrap">
-          <table>
-            <thead><tr><th>Address</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Manage</span></th></tr></thead>
-            <tbody id="email-table"></tbody>
-          </table>
+        <div class="email-layout">
+          <section class="data-panel email-mail" aria-labelledby="email-mail-title">
+            <div class="section-head">
+              <h2 id="email-mail-title">Received</h2>
+              <div class="email-filters" role="group" aria-label="Filter received email">
+                <button type="button" data-email-filter="all" aria-pressed="true">All</button>
+                <button type="button" data-email-filter="handled" aria-pressed="false">Handled</button>
+                <button type="button" data-email-filter="refused" aria-pressed="false">Refused</button>
+                <button type="button" data-email-filter="unmatched" aria-pressed="false">Unmatched</button>
+              </div>
+            </div>
+            <p id="email-mail-note" class="sub email-mail-note">Loading received email…</p>
+            <div id="email-mail-empty" class="empty-state" hidden></div>
+            <ul id="email-mail-list" class="email-mail-list" aria-label="Received email"></ul>
+            <button id="email-mail-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
+          </section>
+          <aside class="email-side" aria-label="Addresses and senders">
+            <section class="data-panel" aria-labelledby="email-addresses-title">
+              <div class="section-head">
+                <h2 id="email-addresses-title">Addresses</h2>
+                <button class="help-tip" type="button" aria-label="About addresses" data-tip="An address exists when a workflow has an email trigger with an address filter. Create or change one in Workflows.">?</button>
+                <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>
+              </div>
+              <p class="sub email-domain">Mail to <span id="email-domain-hint" class="mono"></span> reaches Dapier.</p>
+              <div id="email-empty" class="empty-state" hidden><p>No receiving addresses yet. Add an email trigger with an address filter to a workflow.</p></div>
+              <ul id="email-addresses" class="email-address-list"></ul>
+            </section>
+            <section class="data-panel" aria-labelledby="email-from-title">
+              <div class="section-head">
+                <h2 id="email-from-title">Allowed senders</h2>
+                <button class="help-tip" type="button" aria-label="About allowed senders" data-tip="Mail from anyone else is refused before any workflow runs. The list applies to every address.">?</button>
+              </div>
+              <div class="email-from-body">
+                <ul id="email-from-list" class="sender-list"></ul>
+                <form id="email-from-add" class="sender-add" autocomplete="off">
+                  <label class="visually-hidden" for="email-from-address">Sender address</label>
+                  <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
+                  <button class="dk-button dk-button--secondary" type="submit">Add</button>
+                </form>
+              </div>
+            </section>
+          </aside>
         </div>
-        <div id="email-subscriptions" hidden>
-          <h2>Broad email subscriptions</h2>
-          <p class="sub">These workflows match address patterns or all incoming addresses.</p>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Address rule</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th>Manage</th></tr></thead>
-            <tbody id="email-subscription-table"></tbody>
-          </table></div>
-        </div>
-        <div id="email-watchers" hidden>
-          <h2>Delivery feedback watchers</h2>
-          <p class="sub">Bounce and complaint events are workflow triggers, without a receiving address.</p>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Event</th><th>Workflow / Actions</th><th>Status</th><th>Updated</th><th>Manage</th></tr></thead>
-            <tbody id="email-watcher-table"></tbody>
-          </table></div>
-        </div>
-
-        <div class="section-head">
-          <h2>Allowed senders</h2>
-        </div>
-        <form id="email-from-add" class="sender-add" autocomplete="off">
-          <label class="visually-hidden" for="email-from-address">Sender address</label>
-          <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
-          <button class="dk-button dk-button--secondary" type="submit">Add sender</button>
-        </form>
-        <ul id="email-from-list" class="sender-list"></ul>
-
       </section>
       <section class="view" data-page="agents">
         <div class="agent-toolbar page-tools">
@@ -784,6 +791,18 @@
   </dialog>
 <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message">
     <form method="dialog"><div class="dialog-head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Replay event</button></div></form>
+  </dialog>
+  <dialog id="email-dialog" class="email-dialog" aria-labelledby="email-dialog-title">
+    <div class="dialog-head">
+      <h2 id="email-dialog-title">Email</h2>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="email-dialog-body" class="dialog-body"></div>
+    <div class="dialog-actions">
+      <button id="email-allow-sender" class="dk-button dk-button--primary" type="button" hidden>Allow this sender</button>
+      <button id="email-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
+      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
+    </div>
   </dialog>
   <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title">
     <div class="dialog-head">

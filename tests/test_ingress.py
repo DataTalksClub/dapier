@@ -310,7 +310,7 @@ def test_console_email_page_uses_csp_allowed_assets():
     assert "<script>" not in body
     assert 'style="' not in body
     assert 'id="email-flow-dialog"' not in body
-    assert 'id="email-watcher-table"' in body
+    assert 'id="email-mail-list"' in body
 
 
 def test_ingress_role_can_read_overview_failure_counts():

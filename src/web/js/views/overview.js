@@ -10,7 +10,7 @@ import { renderConnections, accountLabel } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
-import { renderEmails, renderEmailFrom } from './emails.js';
+import { renderEmails, renderEmailFrom, renderReceivedEmail } from './emails.js';
 import { renderAgentTasks } from './agents.js';
 import { renderWorkers } from './workers.js';
 import { renderRuns, openRun } from './runs.js';
@@ -512,6 +512,7 @@ export async function refresh() {
   renderAgentTasks();
   renderWorkers();
   renderInbox();
+  renderReceivedEmail();
   renderSchedules();
   renderTriggers();
   // Error history is independent of both startup and the other reads.

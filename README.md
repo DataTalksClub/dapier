@@ -324,12 +324,18 @@ never prints it. `token write` creates a `0600` file and refuses to overwrite
 without `--force`. Both commands verify the returned provider account ID
 against the connection's bound account before handing anything out.
 
-Email flows are defined only in **Workflows**. The Emails console page and
-`dapier emails` show the receiving addresses, their workflow handlers, actions,
-state, and last update. Exact `route.equals` and `route.in` rules appear as
-addresses; broad rules and delivery feedback watchers are listed separately.
+Email flows are defined only in **Workflows**. The Emails console page is a
+mailbox of what Dapier received and what happened to each message: handled by
+a workflow (with a link to the run), failed, refused because the sender is not
+allowed, or matched by no workflow. Filter by outcome; open a message for its
+headers, attachment names, runs, **Replay**, and — for a refused sender —
+**Allow this sender**. Beside it, the receiving addresses (patterns and
+bounce/complaint watchers in the same list) and the allowed senders.
+`dapier emails received [--outcome handled,failed|refused|unmatched]` prints
+the same list from the same inbox API; `dapier inbox show <id>` the detail.
 
 ```bash
+dapier emails received --outcome refused
 dapier emails list
 dapier emails show invoice                 # also accepts invoice@dtcdev.click
 dapier workflows export invoice-intake     # edit the workflow YAML
@@ -339,8 +345,8 @@ dapier emails from list
 dapier emails from add alexey@datatalks.club
 ```
 
-In the console, **New email** opens the workflow designer with an email trigger
-and an address filter. **Edit workflow** opens the same editor used by Workflows.
+In the console, each address links its workflow into the designer used by
+Workflows; new addresses come from an email trigger with an address filter.
 There is no separate email action editor and no separate email-trigger store:
 `dapier emails list|show` reads the same inventory the console does, and every
 edit goes through the ordinary workflow draft and publish lifecycle.

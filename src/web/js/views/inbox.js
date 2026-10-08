@@ -100,25 +100,27 @@ document.addEventListener('click', async (event) => {
   if (row && row.dataset.inbox) openEvent(row.dataset.inbox);
 });
 
-function openReplayConfirm(inboxId) {
+/* Shared with the Emails page: `after` runs once the replay is queued so
+   the caller repaints its own list. */
+export function openReplayConfirm(inboxId, after = null) {
   const dialog = $('#inbox-replay-confirm-dialog');
   $('#inbox-replay-confirm-message').textContent =
     `Replay this recorded event? It is re-injected with a fresh id; workflow actions may send messages or change external data a second time.`;
   dialog.returnValue = '';
   dialog.showModal();
   dialog.addEventListener('close', () => {
-    if (dialog.returnValue === 'confirm') void replayEvent(inboxId);
+    if (dialog.returnValue === 'confirm') void replayEvent(inboxId, after);
   }, { once: true });
 }
 
-async function replayEvent(inboxId) {
+async function replayEvent(inboxId, after = null) {
   try {
     const data = await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}/replay`, {
       method: 'POST',
       body: '{}',
     });
     notice(data.run_id ? `Replay queued (event ${data.run_id}).` : 'Replay queued.');
-    await fetchInbox();
+    await (after ? after() : fetchInbox());
   } catch (error) {
     notice(error.message, true);
   }
