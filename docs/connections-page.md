@@ -79,9 +79,12 @@ email is "Not signed in", never a fake Drive account.
   lapsed tokens read **needs reconnection**. Both count as needing attention.
 - **Actions:** Manage on every row. Finish setup and Reconnect are
   secondary. An unfinished setup also gets **Remove** on the row (the
-  same delete as Manage → Delete). One primary on the Accounts toolbar
-  (Add connection), below the family tabs — App setup does not steal the
-  page title or that button. Reconnect is on
+  same delete as Manage → Delete). Adding starts from the group it lands
+  in: each service panel's header has its own **Add account** (Zoom
+  Webhooks: **Add webhook**; icon-only + at phone width, named by its
+  aria-label) that runs that service's connect flow in place. Zoom API
+  has none — the console creates Zoom webhook connections only. There is
+  no page-level Add connection button. Reconnect is on
   every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
   already lapsed, or still connected but expiring soon. Slack and
   Telegram paste a new token in Manage. Provider access tokens are
@@ -89,8 +92,11 @@ email is "Not signed in", never a fake Drive account.
   Trigger samples are CLI-only (`dapier triggers sample`); this page has
   no Pull sample toolbar button. Expiry reminder email is the daily
   ConnectionDigestFunction schedule, not a send-now button on this page.
-- **Add picker** lists services, not OAuth providers. Google products are
-  first-class cards with their own default scopes.
+- **Connect another service** lists, below the groups, every service with
+  no panel yet — services, not OAuth providers; Google products are
+  first-class rows with their own default scopes. With no connections it
+  is the whole page (titled "Connect a service"). Nothing is appended or
+  revealed elsewhere on click.
 - **Empty / filter empty** stay the family empty-state, no illustration.
 - **Panels** reuse `.data-panel`. No new card grid, no pastel chips, no
   eyebrow labels, no icons inside labelled buttons.

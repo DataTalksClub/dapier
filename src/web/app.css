@@ -811,20 +811,31 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 .reuse-account:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
 .reuse-account .cell-sub { display: block; }
 
-/* Provider chooser reads as a register of services, below existing accounts. */
-.connect-grid { display: block; border-top: 1px solid var(--dk-border-default); margin: 4px 0 30px; }
-.connect-card { display: grid; grid-template-columns: minmax(170px, 23%) minmax(180px, 1fr) minmax(210px, auto); align-items: center; gap: 8px 20px; padding: 15px 0; border-bottom: 1px solid var(--dk-border-default); }
-.connect-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* Adding an account: each register panel's header carries a + button;
+   services without a panel yet sit in a compact list below the groups. */
+.service-panel > .section-head .service-add { margin-left: auto; flex: none; }
+.service-add, .connect-card .dk-button { white-space: nowrap; }
+/* Labelled buttons carry no icon (connections-page.md); the + shows only
+   when the group button collapses to icon-only at phone width. */
+.service-add svg { display: none; }
+.connect-services { margin-top: 16px; }
+.connect-list { margin: 0; padding: 0 var(--dk-space-4); list-style: none; }
+.connect-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 22%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--dk-border-default);
+}
+.connect-card:last-child { border-bottom: 0; }
 .connect-title { display: inline-flex; align-items: center; gap: 9px; }
 .connect-name { font-weight: var(--dk-weight-semibold); letter-spacing: -0.01em; }
-.connect-count { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
 .brand-mark { flex: none; }
 .provider-cell { display: inline-flex; align-items: center; gap: 8px; }
-.connect-blurb { margin: 0; color: var(--dk-text-primary); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); line-height: 1.45; }
-.connect-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; grid-column: 3; grid-row: 1 / span 2; }
-.connect-pending { color: var(--dk-info-text); font-size: var(--dk-text-sm); grid-column: 2; }
-#connect-picker { margin-top: 28px; border-top: 1px solid var(--dk-border-strong); }
-#connect-picker .section-head { margin-top: 20px; }
+.connect-blurb { color: var(--dk-text-muted); font-size: var(--dk-text-md); line-height: 1.4; }
+.connect-pending { color: var(--dk-info-text); }
+.connect-pending a { color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
 .grant-list { border-top: 1px solid var(--dk-border-default); }
 .grant-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--dk-border-default); }
 .grant-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
@@ -1267,9 +1278,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .account-button { min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); }
   .connection-filters { width: 100%; order: 3; margin-left: 0; }
   .connection-filters input { width: min(240px, 55vw); }
-  .connect-card { grid-template-columns: minmax(155px, 28%) minmax(0, 1fr); }
-  .connect-card-actions { grid-column: 2; grid-row: auto; justify-content: flex-start; }
-  .connect-pending { grid-column: 2; }
 }
 
 /* Family account trigger: avatar only in the 64px top bar at ≤820px. */
@@ -1376,9 +1384,16 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .oauth-result { align-items: flex-start; flex-direction: column; }
   .oauth-result-actions { width: 100%; }
   .oauth-result-actions .dk-button { flex: 1; }
-  .connect-card { grid-template-columns: 1fr; gap: 9px; padding: 16px 0; }
-  .connect-pending, .connect-card-actions { grid-column: 1; }
-  .connect-card-actions { justify-content: flex-start; }
+  .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .connect-blurb { grid-column: 1 / -1; grid-row: 2; }
+  .connect-card .dk-button { min-height: var(--dk-size-touch); }
+  /* The group's + collapses to a square touch target; its aria-label names it. */
+  .service-add { display: inline-grid; place-items: center; width: var(--dk-size-touch); height: var(--dk-size-touch); padding: 0; }
+  .service-add svg { display: block; }
+  .service-add span { display: none; }
+  .service-panel > .section-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; }
+  .service-panel > .section-head .sub { grid-column: 1; grid-row: 2; }
+  .service-panel > .section-head .service-add { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
   .grant-row { align-items: flex-start; flex-direction: column; }
   .grant-actions { width: 100%; }
   .grant-actions .dk-button { flex: 1; }

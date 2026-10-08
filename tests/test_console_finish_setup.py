@@ -37,7 +37,7 @@ def _row(connection):
             const statusLine = value => value;
             const state = {data: {}};
         ''')
-        js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('let addPickerOpen')])
+        js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
         start = JS.index('function usageRefs(')
         js.eval(JS[start:JS.index("$('#connection-search')", start)])
         return js.eval(f'accountRow({json.dumps(connection)}, "x")')

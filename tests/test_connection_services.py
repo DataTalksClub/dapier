@@ -102,11 +102,12 @@ def test_console_renders_zoom_types_in_separate_described_panels():
                 const serviceMark = value => value;
                 const document = {body: {dataset: {}}};
                 const connectionsLoadMoreButton = () => ({});
-                const renderConnectCards = () => {};
+                const renderConnectList = () => {};
+                const bindConnectButtons = () => {};
                 const bindOAuthLinks = () => {};
             ''')
-            js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('let addPickerOpen')])
-            js.eval('let addPickerOpen = false; const connectionsPage = {connections: null};')
+            js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
+            js.eval('const connectionsPage = {connections: null};')
             js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
             js.eval(f'renderConnections({json.dumps(connections)});')
             markup = js.eval("nodes['#connection-register'].innerHTML")
@@ -155,7 +156,7 @@ def test_console_catalog_matches_python():
 
 def test_console_groups_rows_by_service():
     assert "connection-register" in HTML
-    assert "Add a service" in HTML
+    assert "Connect another service" in HTML
     assert "One panel per service" in JS
     assert 'data-service="${escapeHtml(serviceId)}"' in JS
     assert "Google accounts" not in JS

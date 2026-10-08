@@ -1,4 +1,5 @@
-/* Connections view: a register of services, and the add-service picker. */
+/* Connections view: a register of services, each with its own add button,
+   and a list of services not connected yet. */
 import { state } from '../state.js';
 import { $, $$, notice, serviceMark } from '../ui.js';
 import { api } from '../api.js';
@@ -168,6 +169,34 @@ function helpTip(text) {
   return `<button type="button" class="help-tip" aria-label="${safe}" data-tip="${safe}">?</button>`;
 }
 
+/* Adding an account starts from the group it lands in: each register
+   panel carries its own + button, which runs that service's connect flow
+   (token dialog, reuse dialog, or OAuth popup) in place. A Zoom API group
+   gets none — the console's Zoom setup creates webhook connections only. */
+const GROUP_CONNECT_SERVICE = { 'zoom-webhooks': 'zoom', 'zoom-api': null };
+
+function groupConnectService(groupId) {
+  if (groupId in GROUP_CONNECT_SERVICE) return GROUP_CONNECT_SERVICE[groupId];
+  return CONNECT_SERVICES[groupId] ? groupId : null;
+}
+
+/* Zoom splits into two register groups by kind: OAuth API grants carry
+   scopes, webhook connections carry none. */
+function connectionGroupId(connection, service) {
+  return service.id === 'zoom'
+    ? (scopesOf(connection).length ? 'zoom-api' : 'zoom-webhooks') : service.id;
+}
+
+const PLUS_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+
+function groupAddButton(groupId) {
+  const serviceId = groupConnectService(groupId);
+  if (!serviceId) return '';
+  const zoom = serviceId === 'zoom';
+  const label = zoom ? 'Add Zoom webhook' : `Add ${CONNECT_SERVICES[serviceId].label} account`;
+  return `<button class="dk-button dk-button--secondary service-add connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${PLUS_ICON}<span>${zoom ? 'Add webhook' : 'Add account'}</span></button>`;
+}
+
 function connectionHasService(connection, serviceId) {
   return servicesFor(connection).some((service) => service.id === serviceId);
 }
@@ -265,8 +294,6 @@ const effectiveStatus = (connection) => {
 };
 const needsAttention = (connection) =>
   ['ready', 'expired', 'revoked', 'expiring'].includes(effectiveStatus(connection));
-
-let addPickerOpen = false;
 
 /* Server-paged accounts register: the overview snapshot clips at its scan
    limit, so once this page is open the view fetches /api/admin/connections
@@ -371,38 +398,38 @@ $('#oauth-retry').addEventListener('click', (event) => {
 });
 $('#oauth-dismiss').addEventListener('click', () => { $('#oauth-result').hidden = true; });
 
-function renderConnectCards(connections) {
-  $('#connect-grid').innerHTML = Object.entries(CONNECT_SERVICES).map(([serviceId, meta]) => {
+/* Services with no register group yet are listed below the groups, one
+   compact row each, so connecting a new service never opens or appends
+   anything elsewhere on the page. With no connections at all this list is
+   the whole page. */
+function renderConnectList(connections) {
+  const grouped = new Set(connections.flatMap((connection) =>
+    servicesFor(connection).map((service) => connectionGroupId(connection, service))));
+  const missing = Object.entries(CONNECT_SERVICES)
+    .filter(([serviceId]) => !grouped.has(serviceId === 'zoom' ? 'zoom-webhooks' : serviceId));
+  $('#connect-services').hidden = missing.length === 0;
+  $('#connect-services-title').textContent = connections.length ? 'Connect another service' : 'Connect a service';
+  $('#connect-grid').innerHTML = missing.map(([serviceId, meta]) => {
     const clientProvider = oauthClientProvider(meta);
     const oauthClient = ((state.data || {}).oauth_clients || []).find((item) => item.provider === clientProvider);
     const needsClient = !TOKEN_PROVIDERS.includes(meta.provider) && oauthClient && !oauthClient.configured;
-    const pending = !TOKEN_PROVIDERS.includes(meta.provider)
-      ? connections.find((connection) => connection.status === 'ready' && connectionHasService(connection, serviceId)) : null;
-    const accounts = connections.filter((connection) => connectionHasService(connection, serviceId)
-      && (serviceId !== 'zoom' || !scopesOf(connection).length));
     const reusable = reusableGoogleConnections(serviceId, connections);
     const addLabel = meta.provider === 'zoom' ? 'Add Zoom app'
       : reusable.length ? 'Add to an account' : 'Connect';
-    const action = pending
-      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(pending.connection_id)}/start" data-connection="${escapeHtml(pending.connection_id)}" target="_blank" rel="noopener">Finish setup</a>
-         <button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button">Add another account</button>`
-      : `<button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button">${addLabel}</button>`;
-    return `
-    <div class="connect-card">
-      <div class="connect-card-head"><span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>${accounts.length ? `<span class="connect-count">${accounts.length} ${serviceId === 'zoom' ? 'connection' : 'account'}${accounts.length === 1 ? '' : 's'}</span>` : ''}</div>
-      <p class="connect-blurb">${meta.blurb}</p>
-      ${needsClient ? `<p class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> before consent.</p>` : ''}
-      ${pending ? `<p class="connect-pending">${escapeHtml(pending.account_title || pending.display_name || pending.connection_id)} is waiting for setup.</p>` : ''}
-      <div class="connect-card-actions">${action}</div>
-    </div>`;
+    return `<li class="connect-card">
+      <span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>
+      <span class="connect-blurb">${meta.blurb}${needsClient ? ` <span class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">Credentials</a> first.</span>` : ''}</span>
+      <button class="dk-button dk-button--secondary connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(`${addLabel} — ${meta.label}`)}">${addLabel}</button>
+    </li>`;
   }).join('');
+}
+
+function bindConnectButtons() {
   $$('.connect-button').forEach((button) => button.addEventListener('click', async () => {
     if (button.disabled) return;
     button.disabled = true;
-    const label = button.textContent;
-    button.textContent = 'Starting…';
     try { await connectService(button.dataset.service); }
-    finally { button.disabled = false; button.textContent = label; }
+    finally { button.disabled = false; }
   }));
 }
 
@@ -651,15 +678,12 @@ function renderConnections(connections) {
   connections = connections || [];
   if (!serverPaged && document.body.dataset.view === 'connections') fetchConnectionsPage();
   connectionsLoadMoreButton().hidden = !(serverPaged && connectionsPage.nextToken);
-  renderConnectCards(connections);
+  renderConnectList(connections);
   const connected = connections.filter((connection) => effectiveStatus(connection) === 'connected').length;
   const attention = connections.filter(needsAttention).length;
   $('#connection-summary').textContent = connections.length
     ? `${connected} connected · ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
     : 'No accounts connected';
-  $('#connect-picker').hidden = !addPickerOpen && connections.length > 0;
-  $('#add-connection').setAttribute('aria-expanded', String(!$('#connect-picker').hidden));
-  $('#connection-empty').hidden = connections.length > 0;
   $('#connection-register').hidden = connections.length === 0;
   const query = ($('#connection-search')?.value || '').trim().toLowerCase();
   const statusFilter = $('#connection-status-filter')?.value || 'all';
@@ -684,8 +708,7 @@ function renderConnections(connections) {
   const groups = new Map();
   for (const connection of filtered) {
     for (const service of servicesFor(connection)) {
-      const groupId = service.id === 'zoom'
-        ? (scopesOf(connection).length ? 'zoom-api' : 'zoom-webhooks') : service.id;
+      const groupId = connectionGroupId(connection, service);
       groups.set(groupId, [...(groups.get(groupId) || []), connection]);
     }
   }
@@ -710,13 +733,14 @@ function renderConnections(connections) {
     ].filter(Boolean).join(' · ');
     return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
       <div class="section-head"><h2 class="service-panel-title">${serviceMark(zoom ? 'zoom' : serviceId)}<span>${escapeHtml(service?.label || serviceLabel(serviceId))}</span>${helpTip(service?.description || SERVICE_HELP[serviceId])}</h2>
-      <p class="sub">${escapeHtml(meta)}</p></div>
+      <p class="sub">${escapeHtml(meta)}</p>${groupAddButton(serviceId)}</div>
       <ul class="service-accounts">${rows}</ul>
     </section>`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
+  bindConnectButtons();
   bindOAuthLinks();
 }
 
@@ -806,18 +830,6 @@ function confirmRevoke(title, message, confirmLabel = 'Revoke') {
     dialog.showModal();
   });
 }
-
-$('#add-connection').addEventListener('click', () => {
-  addPickerOpen = $('#connect-picker').hidden;
-  $('#connect-picker').hidden = !addPickerOpen;
-  $('#add-connection').setAttribute('aria-expanded', String(addPickerOpen));
-  if (addPickerOpen) {
-    const heading = $('#connect-picker h2');
-    heading.setAttribute('tabindex', '-1');
-    heading.scrollIntoView({ behavior: 'instant', block: 'start' });
-    heading.focus({ preventScroll: true });
-  }
-});
 
 $('#edit-connection-reconnect').addEventListener('click', (event) => {
   $('#edit-connection-dialog').close();

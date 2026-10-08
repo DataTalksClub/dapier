@@ -185,15 +185,13 @@
         </div>
         <div class="section-head page-tools">
           <p id="connection-summary" class="register-summary mono">Loading accounts…</p><div class="connection-filters"><label class="visually-hidden" for="connection-search">Search connections</label><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"><label class="visually-hidden" for="connection-status-filter">Connection status</label><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></div>
-          <button id="add-connection" class="dk-button dk-button--primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>
         </div>
-        <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a service to connect your first account.</p></div>
         <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
         <div id="connection-register"></div>
-        <div id="connect-picker" hidden>
-          <div class="section-head"><h2>Add a service</h2></div>
-          <div class="connect-grid" id="connect-grid"></div>
-        </div>
+        <section id="connect-services" class="data-panel connect-services" aria-labelledby="connect-services-title" hidden>
+          <div class="section-head"><h2 id="connect-services-title">Connect another service</h2></div>
+          <ul id="connect-grid" class="connect-list"></ul>
+        </section>
       </section>
 
       <section class="view" data-page="credentials">
