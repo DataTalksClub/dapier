@@ -29,22 +29,73 @@ class RefError(LookupError):
 
 
 def account_of(connection):
-    """The signed-in account label, or None before first consent."""
-    return (connection.get("verified_account_id")
-            or connection.get("account_title")
+    """The signed-in account as people know it (email, workspace, channel
+    name — the provider's title before its opaque id), or None before
+    first consent."""
+    return (connection.get("account_title")
+            or connection.get("verified_account_id")
             or connection.get("expected_account_id")
             or None)
 
 
-def refs_for(connection):
-    """Every ``<service> <account>`` reference that addresses this
-    connection, one per service it grants. Empty before sign-in: an
-    unverified stub has no account to name."""
+def _nickname(connection):
+    """The operator-given display name, when it says more than the id or
+    the account (``Au-Tomator`` for a second bot in the same workspace)."""
+    name = str(connection.get("display_name") or "").strip()
+    plain = {str(connection.get(key) or "") for key in
+             ("connection_id", "account_title", "verified_account_id")}
+    return name if name and name not in plain else None
+
+
+def _service_ids_of(connection):
+    return [service["id"] for service in connection_services.services_for(connection)]
+
+
+def _account_label(connection, peers):
+    """The account part of a reference. When another connection signs in to
+    the same account for an overlapping service (two Slack bots in one
+    workspace), the display name is appended so each reference stays unique:
+    ``DataTalks.Club / Au-Tomator``."""
     account = account_of(connection)
-    if not account:
+    nickname = _nickname(connection)
+    if not peers or not nickname:
+        return account
+    services = set(_service_ids_of(connection))
+    for other in peers:
+        if other.get("connection_id") == connection.get("connection_id"):
+            continue
+        if account_of(other) == account and services & set(_service_ids_of(other)):
+            return f"{account} / {nickname}"
+    return account
+
+
+def refs_for(connection, peers=None):
+    """Every ``<service> <account>`` reference that addresses this
+    connection, one per service it grants. ``peers`` (the other
+    connections) lets duplicates on one account disambiguate. Empty before
+    sign-in: an unverified stub has no account to name."""
+    if not account_of(connection):
         return []
-    return [f"{service['id']} {account}"
-            for service in connection_services.services_for(connection)]
+    label = _account_label(connection, peers)
+    return [f"{service_id} {label}" for service_id in _service_ids_of(connection)]
+
+
+def with_refs(views):
+    """Re-stamp each view's ``refs`` knowing every other connection, so
+    lists hand out references that resolve to exactly one connection."""
+    for view in views:
+        view["refs"] = refs_for(view, views)
+    return views
+
+
+def _names(connection):
+    """Every spelling of the account a reference fragment may match."""
+    account = account_of(connection) or ""
+    nickname = _nickname(connection) or ""
+    names = [account, nickname, f"{account} / {nickname}" if nickname else ""]
+    names += [str(connection.get(key) or "") for key in
+              ("account_title", "verified_account_id", "expected_account_id")]
+    return [name.lower() for name in names if name]
 
 
 def _service_ids(word):
@@ -83,10 +134,12 @@ def _split(ref):
     return service_ids, rest or None
 
 
-def _describe(connection):
-    account = account_of(connection) or "not signed in"
-    labels = ", ".join(s["id"] for s in connection_services.services_for(connection))
-    return f"{labels} {account} ({connection.get('status')})"
+def _describe(connection, peers):
+    refs = refs_for(connection, peers)
+    if refs:
+        return f"{refs[0]} ({connection.get('status')})"
+    labels = ", ".join(_service_ids_of(connection))
+    return f"{labels} not signed in ({connection.get('status')})"
 
 
 def resolve(connections, ref):
@@ -116,18 +169,15 @@ def resolve(connections, ref):
             granted.add("google")
         if not granted & service_ids:
             continue
-        if fragment:
-            account = (account_of(connection) or "").lower()
-            if fragment.lower() not in account:
-                continue
+        if fragment and not any(fragment.lower() in name for name in _names(connection)):
+            continue
         matches.append(connection)
     if not matches:
         raise RefError(f"No connection matches '{text}'")
     if len(matches) > 1:
         # An exact account beats a fragment that also hits a longer one.
         if fragment:
-            exact = [c for c in matches
-                     if (account_of(c) or "").lower() == fragment.lower()]
+            exact = [c for c in matches if fragment.lower() in _names(c)]
             if exact:
                 matches = exact
         live = [c for c in matches if c.get("status") == records.STATUS_CONNECTED]
@@ -136,5 +186,5 @@ def resolve(connections, ref):
         if len(matches) > 1:
             raise RefError(
                 f"'{text}' matches {len(matches)} connections; add more of the account",
-                candidates=[_describe(c) for c in matches])
+                candidates=[_describe(c, connections) for c in matches])
     return matches[0]

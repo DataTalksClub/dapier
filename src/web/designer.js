@@ -21516,10 +21516,12 @@
     }
     return connection.account_title || connection.connection_id;
   }
-  function connectionRef(connection, nodeType) {
+  function connectionRef(connection, nodeType, others = []) {
     const refs = connection.refs ?? [];
     const service = (nodeType ?? "").split("_")[0];
-    return refs.find((ref) => ref.split(" ")[0] === service) ?? refs[0] ?? connection.connection_id;
+    const ref = refs.find((candidate) => candidate.split(" ")[0] === service) ?? refs[0];
+    const shared = ref && others.some((other) => other.connection_id !== connection.connection_id && (other.refs ?? []).includes(ref));
+    return ref && !shared ? ref : connection.connection_id;
   }
   function connectionMatches(connection, value) {
     const wanted = value.trim().toLowerCase();
@@ -21692,11 +21694,11 @@
             className: "mono-input",
             list: `connections-${field.key}`,
             value,
-            placeholder: matches.length === 1 && !value ? connectionRef(matches[0], nodeType) : field.placeholder,
+            placeholder: matches.length === 1 && !value ? connectionRef(matches[0], nodeType, matches) : field.placeholder,
             onChange: (event) => onChange(event.target.value)
           }
         ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connectionRef(connection, nodeType), children: connectionHint(connection) }, connection.connection_id)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `connections-${field.key}`, children: matches.map((connection) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: connectionRef(connection, nodeType, matches), children: connectionHint(connection) }, connection.connection_id)) }),
         value !== "" && current && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-hint", children: connectionHint(current) }),
         value !== "" && !current && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint warn", children: [
           "Not one of your ",

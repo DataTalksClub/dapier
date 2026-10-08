@@ -124,7 +124,8 @@ def _connection_views(items):
         except Exception:  # noqa: BLE001 — health is best-effort, never block the console
             stored = {}
         views.append(connection_records.public_view(item, stored))
-    return views
+    from ..connections import refs as connection_refs
+    return connection_refs.with_refs(views)
 
 def _oauth_client_status(provider):
     return oauth_clients.status(provider)

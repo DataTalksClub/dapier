@@ -264,6 +264,7 @@ def _with_usage(view, connections_table):
         match = next((row for row in rows
                       if row.get("connection_id") == view.get("connection_id")), {})
         view["used_in"] = match.get("used_in", [])
+        view["refs"] = connection_refs.refs_for(view, rows)
     except Exception:  # noqa: BLE001 — usage is best-effort metadata
         view.setdefault("used_in", [])
     return view

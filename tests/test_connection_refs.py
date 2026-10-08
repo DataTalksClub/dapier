@@ -192,3 +192,23 @@ def test_delete_guard_sees_reference_usage():
         ScanTable([dict(r) for r in ROWS]), "google-sheets",
         usage={"drive alexey@datatalks.club": [entry]})
     assert status == 409 and "todo-intake" in payload["error"]
+
+
+def test_refs_use_the_human_account_and_disambiguate_duplicates():
+    from src.dapier.connections import refs as r
+
+    bot = {"connection_id": "slack", "provider": "slack", "status": "connected",
+           "display_name": "DTC Slack workspace", "account_title": "DataTalks.Club",
+           "verified_account_id": "T01ATQK62F8"}
+    other = {**bot, "connection_id": "slack-automator", "display_name": "Au-Tomator"}
+    # Alone, the reference is the readable workspace, not the team id.
+    assert r.refs_for(bot) == ["slack DataTalks.Club"]
+    rows = r.with_refs([dict(bot), dict(other)])
+    assert rows[0]["refs"] == ["slack DataTalks.Club / DTC Slack workspace"]
+    assert rows[1]["refs"] == ["slack DataTalks.Club / Au-Tomator"]
+    # Each resolves to exactly its own connection; the bare account is ambiguous.
+    assert r.resolve([bot, other], rows[1]["refs"][0])["connection_id"] == "slack-automator"
+    assert r.resolve([bot, other], "slack au-tomator")["connection_id"] == "slack-automator"
+    with pytest.raises(r.RefError) as exc:
+        r.resolve([bot, other], "slack DataTalks.Club")
+    assert "slack DataTalks.Club / Au-Tomator (connected)" in exc.value.candidates

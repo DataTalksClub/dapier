@@ -76,10 +76,15 @@ function connectionTitle(connection: ConnectionOption): string {
     reference whose service matches the step (drive_find_file → drive), else
     its first. Never the internal connection_id unless nothing else exists
     (a connection that never finished sign-in has no account to name). */
-function connectionRef(connection: ConnectionOption, nodeType?: string): string {
+function connectionRef(connection: ConnectionOption, nodeType?: string, others: ConnectionOption[] = []): string {
   const refs = connection.refs ?? [];
   const service = (nodeType ?? "").split("_")[0];
-  return refs.find((ref) => ref.split(" ")[0] === service) ?? refs[0] ?? connection.connection_id;
+  const ref = refs.find((candidate) => candidate.split(" ")[0] === service) ?? refs[0];
+  // A reference another connection also answers to would be ambiguous at
+  // run time; the internal id is the only safe value then.
+  const shared = ref && others.some((other) => other.connection_id !== connection.connection_id
+    && (other.refs ?? []).includes(ref));
+  return ref && !shared ? ref : connection.connection_id;
 }
 
 /** Whether a field value names this connection: its id or any reference. */
@@ -244,12 +249,12 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
           className="mono-input"
           list={`connections-${field.key}`}
           value={value}
-          placeholder={matches.length === 1 && !value ? connectionRef(matches[0], nodeType) : field.placeholder}
+          placeholder={matches.length === 1 && !value ? connectionRef(matches[0], nodeType, matches) : field.placeholder}
           onChange={(event) => onChange(event.target.value)}
         />
         <datalist id={`connections-${field.key}`}>
           {matches.map((connection) => (
-            <option key={connection.connection_id} value={connectionRef(connection, nodeType)}>
+            <option key={connection.connection_id} value={connectionRef(connection, nodeType, matches)}>
               {connectionHint(connection)}
             </option>
           ))}
