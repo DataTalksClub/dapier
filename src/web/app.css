@@ -1470,6 +1470,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .register-toolbar .toolbar-filters > label { min-width: 0; }
   .register-toolbar .toolbar-filters > label.toolbar-search { grid-column: 1 / -1; max-width: none; }
   .register-toolbar .dk-toolbar__end > .dk-button { width: 100%; }
+  /* Data browses one workflow: a single clean stack, the action sized to
+     its label. */
+  #storage-browse.register-toolbar { grid-template-columns: 1fr; }
+  #storage-browse .dk-toolbar__end > .dk-button { width: auto; justify-self: start; }
   .storage-fields { grid-template-columns: 1fr; }
 }
 
@@ -1847,20 +1851,22 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
 .usage-table button.cell-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
 .usage-table th:not(:first-child), .usage-table td:not(:first-child) { width: 10rem; }
 
-/* Error is the flexible column (and leaves when no row has one); the
-   machine columns get room for a whole id before they clip. */
-.audit-table .col-action { width: 11%; }
-.audit-table .col-resource { width: 11%; }
-.audit-table .col-actor { width: 16%; }
-.audit-table .col-agent { width: 12%; }
-.audit-table .col-outcome { width: 11rem; }
-.audit-table .col-error { width: auto; }
-.audit-table.no-errors .col-resource { width: auto; }
+/* Identity columns first: fixed widths sized to whole values (a 16-char
+   timestamp, an 18-char action or agent, a 24-char token subject), the
+   Resource column takes the rest; an error is a second line under its
+   Outcome, so no column is held open for "—". */
+.audit-table .col-when { width: 10rem; }
+.audit-table .col-action { width: 10.5rem; }
+.audit-table .col-resource { width: auto; }
+.audit-table .col-actor { width: 14rem; }
+.audit-table .col-agent { width: 10.5rem; }
+.audit-table .col-outcome { width: 12rem; }
+.audit-table td.audit-error { display: none; }
+.audit-outcome .audit-outcome-error { display: block; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .audit-outcome .status { display: flex; max-width: 100%; min-width: 0; }
 .audit-outcome .status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .runs-table th, .audit-table th, .token-table th, .setup-table th, .inbox-table th { overflow: hidden; text-overflow: ellipsis; }
 /* No errors in view: the Error column gives its width back. */
-.audit-table.no-errors .col-error { display: none; width: 0; }
 
 .token-table .col-token { width: auto; }
 .token-table .col-prefix { width: 8rem; }
@@ -1908,6 +1914,7 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
   #audit-log-table .audit-actor { grid-column: 1; grid-row: 3; }
   #audit-log-table .audit-agent { grid-column: 2; grid-row: 3; }
   /* Error: its own full-width line, at most two lines. */
+  #audit-log-table .audit-outcome-error { display: none; }
   #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome) { grid-column: 1 / -1; grid-row: 4; display: block; color: var(--dk-danger-text); }
   #audit-log-table td.audit-error[data-empty]:not(.audit-action):not(.audit-outcome) { display: none; }
   #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome)::before { display: none; }
@@ -1920,8 +1927,8 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
   #token-table .cell-title { grid-column: 1; grid-row: 1; }
   #token-table td[data-label="Status"] { grid-column: 2; grid-row: 1; }
   #token-table td[data-label="Agent"] { grid-column: 1 / -1; grid-row: 2; }
-  #token-table td[data-label="Last used"] { grid-column: 1; grid-row: 3; }
-  #token-table .action-cell { grid-column: 2; grid-row: 3; display: flex; justify-content: flex-end; padding: 0; }
+  #token-table td[data-label="Last used"] { grid-column: 1 / -1; grid-row: 3; }
+  #token-table .action-cell { grid-column: 1 / -1; grid-row: 4; display: flex; justify-content: flex-end; padding: var(--dk-space-2) 0 0; }
   #token-table td[data-label="Agent"], #token-table td[data-label="Last used"] { display: flex; gap: var(--dk-space-2); min-width: 0; font-size: var(--dk-text-sm); }
   #token-table td[data-label="Agent"]::before, #token-table td[data-label="Last used"]::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); color: var(--dk-text-muted); }
   #token-table td[data-label="Agent"] .clip { flex: 1 1 0; }

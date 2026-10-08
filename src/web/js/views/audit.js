@@ -82,10 +82,13 @@ function eventRow(item) {
     ['Resource', clipCell(resource), 'audit-resource'],
     ['Actor', clipCell(item.actor_subject), 'audit-actor'],
     ['Agent', clipCell(item.agent), 'audit-agent'],
-    ['Outcome', { html: outcomeCell(item.outcome), empty: !item.outcome }, 'audit-outcome'],
+    /* A problem row's error rides under its outcome as a muted second
+       line (the phone card shows it as its own full-width line below). */
+    ['Outcome', { html: outcomeCell(item.outcome) + (item.error
+      ? `<span class="cell-note audit-outcome-error" title="${escapeHtml(item.error)}">${escapeHtml(item.error)}</span>` : ''), empty: !item.outcome }, 'audit-outcome'],
     ['Error', item.error
       ? { html: `<span class="clamp-2" title="${escapeHtml(item.error)}">${escapeHtml(item.error)}</span>`, empty: false }
-      : { html: '<span class="muted-cell">—</span>', empty: true }, 'col-error audit-error'],
+      : { html: '<span class="muted-cell">—</span>', empty: true }, 'audit-error'],
   ];
   return `<tr>${cells.map(([label, cell, cls]) =>
     `<td class="${cls}" data-label="${label}"${cell.empty ? ' data-empty' : ''}>${cell.html}</td>`).join('')}</tr>`;
@@ -112,10 +115,8 @@ export function renderAudit() {
     note.textContent = `Showing ${events.length} event${events.length === 1 ? '' : 's'}${auditPage.nextToken ? ', more to load' : ''}`;
   }
   note.title = 'Records are kept for 90 days.';
-  /* An Error column with nothing in it gives its width back. */
-  $('.audit-table').classList.toggle('no-errors', !events.some((item) => item.error));
   $('#audit-log-table').innerHTML = events.map(eventRow).join('') ||
-    '<tr class="register-empty"><td colspan="7"><strong>No audit events match these filters</strong></td></tr>';
+    '<tr class="register-empty"><td colspan="6"><strong>No audit events match these filters</strong></td></tr>';
   $('#audit-log-load-more').hidden = !auditPage.nextToken;
 }
 
