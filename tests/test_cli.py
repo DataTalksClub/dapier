@@ -365,6 +365,8 @@ def test_main_auth_status_exit_codes(isolated_home, capsys):
 
 def test_main_token_exec_parsing(monkeypatch):
     seen = {}
+    monkeypatch.setattr(commands, "resolve_connection_id",
+                        lambda api_url, words, agent=None, debug=False: " ".join(words))
 
     def fake_exec(api_url, connection_id, agent, argv, debug=False):
         seen.update(connection_id=connection_id, agent=agent, argv=argv)
@@ -630,6 +632,8 @@ def test_overview_prints_operator_summary(monkeypatch, capsys):
 
 def test_main_operator_command_parsing(monkeypatch):
     seen = {}
+    monkeypatch.setattr(commands, "resolve_connection_id",
+                        lambda api_url, words, agent=None, debug=False: " ".join(words))
 
     monkeypatch.setattr(commands, "grants_delete",
                         lambda api_url, connection_id, grantee, debug=False:

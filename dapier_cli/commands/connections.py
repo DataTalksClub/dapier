@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "token_exec", "token_write"]
+__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "resolve_connection_id", "token_exec", "token_write"]
 
 
 # Documented child-process variables. The provider-specific alias exists so
@@ -41,42 +41,76 @@ def _services_label(item):
 
 
 def print_connections(items):
-    print(f"{'CONNECTION':24} {'SERVICES':36} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} {'USED IN':24} ACCOUNT")
+    # No internal connection_id column: people address a connection as
+    # "<service> <account>" (`dapier connections show drive <account>`).
+    print(f"{'ACCOUNT':32} {'SERVICES':36} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} USED IN")
     for item in items:
-        account = item.get("account_title") or item.get("verified_account_id") or "-"
-        print(f"{item.get('connection_id', ''):24} {_services_label(item):36} "
-              f"{item.get('status', ''):10} {item.get('health') or '-':8} {('auto-renews' if item.get('auto_refresh') else _local_expiry(item)):17} "
-              f"{_used_in_label(item):24} {account}")
+        account = item.get("account_title") or item.get("verified_account_id") or "not signed in"
+        print(f"{account:32} {_services_label(item):36} "
+              f"{item.get('status', ''):10} {item.get('health') or '-':8} "
+              f"{('auto-renews' if item.get('auto_refresh') else _local_expiry(item)):17} "
+              f"{_used_in_label(item)}")
+
+
+def _used_in_refs(item):
+    return sorted({str(entry.get("ref")) for entry in item.get("used_in") or []})
 
 
 def _used_in_label(item):
-    """The USED IN column: up to two referencing workflows/hooks, then +N."""
-    refs = sorted({str(entry.get("ref")) for entry in item.get("used_in") or []})
-    if not refs:
+    """The USED IN column: a count; `connections show` lists the names."""
+    count = len(_used_in_refs(item))
+    if not count:
         return "-"
-    shown = ", ".join(refs[:2])
-    if len(refs) > 2:
-        shown += f" +{len(refs) - 2}"
-    return shown
+    return f"{count} flow{'s' if count != 1 else ''}"
 
 
 def print_connection(item):
     account = item.get("account_title") or item.get("verified_account_id")
-    if account:
-        print(f"account: {account}")
-    for key in ("connection_id", "provider", "display_name", "status", "health",
-                "verified_account_id", "account_title", "expected_account_id",
-                "services", "granted_scopes", "scopes", "version", "updated_at",
+    print(f"account: {account or 'not signed in'}")
+    if item.get("services"):
+        print(f"services: {_services_label(item)}")
+    refs = item.get("refs") or []
+    if refs:
+        print(f"address as: {refs[0]}" + (f"  (also: {', '.join(refs[1:])})" if refs[1:] else ""))
+    for key in ("status", "health", "provider", "display_name",
+                "verified_account_id", "expected_account_id",
+                "granted_scopes", "scopes", "version", "updated_at",
                 "connected_at", "auto_refresh"):
         if item.get(key) not in (None, "", []):
             value = item[key]
-            if key == "services" and isinstance(value, list):
-                value = _services_label(item)
-            elif isinstance(value, list):
+            if isinstance(value, list):
                 value = " ".join(value)
             print(f"{key}: {value}")
     if item.get("token_expires_at"):
         print(f"token_expires_at: {_local_expiry(item)}")
+    used = _used_in_refs(item)
+    print(f"used in: {', '.join(used)}" if used else "used in: no flows")
+    if item.get("connection_id"):
+        print(f"internal id: {item['connection_id']}")
+
+
+def resolve_connection_id(api_url, words, agent=None, debug=False):
+    """The internal connection id a human reference names, via the API's
+    resolver (``drive datatalks`` → ``google-sheets``). Ambiguous references
+    print the candidates and fail rather than guess."""
+    ref = " ".join(str(word) for word in words if str(word).strip())
+    params = {"ref": ref}
+    if agent:
+        params["agent"] = agent
+    try:
+        view = api.call(api_url, "GET",
+                        f"/api/agent/connections/resolve?{urlencode(params)}", debug=debug)
+    except api.ApiError as exc:
+        candidates = (getattr(exc, "payload", None) or {}).get("candidates")
+        if candidates:
+            raise api.ApiError(f"{exc}:\n  " + "\n  ".join(candidates), status=exc.status)
+        # A lone word the resolver cannot place may still be a literal id
+        # with no connection record behind it (credential-backed discovery
+        # such as `aws`): let the command itself answer for it.
+        if exc.status == 404 and len(ref.split()) == 1:
+            return ref
+        raise
+    return view["connection_id"]
 
 
 def connections_list(api_url, debug=False, limit=None, next_token=None, list_all=False):

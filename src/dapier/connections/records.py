@@ -16,12 +16,15 @@ DynamoDB metadata item only:
 import base64
 import json
 import re
+import secrets
 from datetime import datetime, timezone
 
 from . import services as connection_services
 from .providers import oauth_providers
 
 CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
+# Path segments under /api/*/connections/ that name a route, not a record.
+RESERVED_CONNECTION_IDS = {"resolve", "import"}
 
 STATUS_READY = "ready"
 STATUS_CONNECTED = "connected"
@@ -54,7 +57,15 @@ def validate_connection_id(connection_id):
         raise ConnectionError(
             "Connection ID must use lowercase letters, numbers, dashes, or underscores"
         )
+    if connection_id in RESERVED_CONNECTION_IDS:
+        raise ConnectionError(f"'{connection_id}' is reserved; pick another connection ID")
     return connection_id
+
+
+def new_connection_id(provider):
+    """An opaque internal key for a new connection (``google-3f9a1c``)."""
+    prefix = re.sub(r"[^a-z0-9]", "", str(provider or "").lower())[:20] or "conn"
+    return f"{prefix}-{secrets.token_hex(3)}"
 
 
 def validate_new_connection(body):
@@ -66,8 +77,12 @@ def validate_new_connection(body):
     CLI import path uses them for refresh tokens issued by another client.
     """
     body = body or {}
-    connection_id = validate_connection_id(body.get("connection_id"))
     provider = str(body.get("provider", "")).strip().lower()
+    raw_id = str(body.get("connection_id") or "").strip()
+    # New connections need no hand-picked name: people address them as
+    # "<service> <account>" (see refs), so the key is an opaque internal id.
+    connection_id = (validate_connection_id(raw_id) if raw_id
+                     else new_connection_id(provider))
     if provider not in oauth_providers.PROVIDERS and provider not in TOKEN_PROVIDERS:
         raise ConnectionError(
             f"Provider must be one of: "
@@ -265,7 +280,13 @@ def public_view(item, stored=None):
         "updated_at": item.get("updated_at"),
         "connected_at": item.get("connected_at"),
         "services": connection_services.services_for(item),
+        "refs": _refs_for(item),
     }
+
+
+def _refs_for(item):
+    from . import refs
+    return refs.refs_for(item)
 
 
 def get_connection(table, connection_id):

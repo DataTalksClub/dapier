@@ -11,6 +11,7 @@ from .. import discovery as discovery_api
 from ...auth import authz, session
 from ...connections import importing
 from ...connections import records as connections
+from ...connections import refs as connection_refs
 from ...connections import tokens
 from ...connections.providers import oauth_clients, oauth_providers
 from ...connections.providers.oauth_providers import connection_grant_scopes
@@ -35,7 +36,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "expiry_digest_api", "import_connection", "issue_token", "list_for_caller", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
+__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "expiry_digest_api", "import_connection", "issue_token", "list_for_caller", "resolve_connection", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
 
 
 
@@ -203,6 +204,52 @@ def _grant_expired(item):
         return True
 
 
+def resolve_connection(event):
+    """``GET /api/agent/connections/resolve?ref=drive datatalks[&agent=A]``:
+    turn a human ``<service> <account>`` reference into the connection it
+    names (the same public view ``show`` returns).
+
+    Operators resolve against every connection. Anyone else resolves only
+    among connections they hold a live grant on (for ``agent`` when given),
+    so a reference never reveals a connection the caller could not show.
+    """
+    subject, error = authenticate(event)
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    ref = str(query.get("ref") or "").strip()
+    agent = str(query.get("agent", "") or "").strip().lower() or None
+    if agent:
+        try:
+            authz.validate_agent(agent)
+        except ValueError as exc:
+            return _json_response(400, {"error": str(exc)})
+    connections_table, grants_table = _tables()
+    if _is_operator(event, subject):
+        candidates = connections._scan_all(connections_table)
+    else:
+        try:
+            grants = authz.list_grants(grants_table)
+        except Exception:
+            grants = []
+        ids = sorted({
+            item["connection_id"] for item in grants
+            if item.get("subject") == subject and not _grant_expired(item)
+            and (agent is None or item.get("agent") == agent)
+        })
+        candidates = [c for c in (connections.get_connection(connections_table, cid)
+                                  for cid in ids) if c]
+    try:
+        connection = connection_refs.resolve(candidates, ref)
+    except connection_refs.RefError as exc:
+        payload = {"error": str(exc)}
+        if exc.candidates:
+            payload["candidates"] = exc.candidates
+        return _json_response(404 if not exc.candidates else 409, payload)
+    stored = tokens.stored_value(connection["connection_id"])
+    return _json_response(200, connections.public_view(connection, stored))
+
+
 def show_connection(event, connection_id):
     subject, error = authenticate(event)
     if error:
@@ -253,8 +300,8 @@ def create_connection(event):
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
     allowed = {"connection_id", "provider", "display_name", "scopes", "root_path"}
-    if not isinstance(body, dict) or not {"connection_id", "provider"} <= set(body) or set(body) - allowed:
-        return _json_response(400, {"error": "Provide connection_id, provider, and supported connection fields"})
+    if not isinstance(body, dict) or "provider" not in body or set(body) - allowed:
+        return _json_response(400, {"error": "Provide provider and supported connection fields"})
     try:
         fields = connections.validate_new_connection(body)
     except connections.ConnectionError as exc:

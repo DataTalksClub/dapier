@@ -286,6 +286,8 @@ def test_cli_routes_mailchimp_discover_and_test_through_the_agent_api(monkeypatc
     from dapier_cli import commands, main
 
     calls = []
+    monkeypatch.setattr(commands, "resolve_connection_id",
+                        lambda api_url, words, agent=None, debug=False: " ".join(words))
     monkeypatch.setattr(commands, "connections_discover",
                         lambda api_url, connection_id, resource=None, params=(), debug=False:
                         calls.append(("discover", connection_id, resource)) or 0)

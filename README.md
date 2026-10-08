@@ -293,11 +293,19 @@ shared-auth stack registers `http://localhost:8471/callback` for its
 pip install .
 dapier auth login
 dapier connections list
-dapier connections show youtube-personal
-dapier connections connect youtube-personal --agent buildcamp-uploader
-dapier token exec youtube-personal --agent buildcamp-uploader -- <command>
-dapier token write youtube-personal --agent buildcamp-uploader --output <private-file>
+dapier connections show youtube datatalks
+dapier connections connect youtube datatalks --agent buildcamp-uploader
+dapier token exec drive alexey@datatalks.club --agent buildcamp-uploader -- <command>
+dapier token write youtube datatalks --agent buildcamp-uploader --output <private-file>
 ```
+
+Connections are named by **service + account**: `drive alexey@datatalks.club`,
+or any unique part of the account (`drive datatalks`). A bare service
+(`zoom`) works when only one account has it; an ambiguous reference lists the
+candidates instead of guessing. The API resolves the reference
+(`GET /api/agent/connections/resolve?ref=…`), so every command that takes a
+connection accepts it. Internal connection ids still resolve but are never
+needed.
 
 `token exec` puts a fresh access token only in the child's environment (as
 `DAPIER_ACCESS_TOKEN` plus `YOUTUBE_ACCESS_TOKEN`/`DROPBOX_ACCESS_TOKEN`) and

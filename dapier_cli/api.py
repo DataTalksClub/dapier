@@ -12,9 +12,10 @@ from . import auth, config
 
 
 class ApiError(Exception):
-    def __init__(self, message, status=None):
+    def __init__(self, message, status=None, payload=None):
         super().__init__(message)
         self.status = status
+        self.payload = payload or {}
 
 
 def _request(api_url, method, path, session, body=None, timeout=20, debug=False):
@@ -63,9 +64,10 @@ def call(api_url, method, path, body=None, timeout=20, debug=False):
     if status == 403:
         raise ApiError(data.get("error") or "Denied", status=403)
     if status == 404:
-        raise ApiError(data.get("error") or "Not found", status=404)
+        raise ApiError(data.get("error") or "Not found", status=404, payload=data)
     if status == 429:
         raise ApiError(data.get("error") or "Rate-limited; retry shortly", status=429)
     if status >= 300:
-        raise ApiError(data.get("error") or f"Request failed (HTTP {status})", status=status)
+        raise ApiError(data.get("error") or f"Request failed (HTTP {status})", status=status,
+                       payload=data)
     return data

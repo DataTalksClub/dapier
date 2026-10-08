@@ -4,6 +4,14 @@ from dapier_cli import commands, main
 from dapier_cli.api import ApiError
 
 
+@pytest.fixture(autouse=True)
+def literal_connection_refs(monkeypatch):
+    """These tests pin discover/test routing; the reference resolver has
+    its own tests (test_connection_refs)."""
+    monkeypatch.setattr(commands, "resolve_connection_id",
+                        lambda api_url, words, agent=None, debug=False: " ".join(words))
+
+
 @pytest.fixture
 def isolated_home(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))

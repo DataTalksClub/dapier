@@ -91,6 +91,8 @@ def _route(event, method, path):
         return list_for_caller(event)
     if method == "PUT" and path == "/api/agent/connections":
         return create_connection(event)
+    if method == "GET" and path == "/api/agent/connections/resolve":
+        return resolve_connection(event)
     match = re.fullmatch(r"/api/agent/connections/([a-z0-9_-]+)", path)
     if match and method == "GET":
         return show_connection(event, match.group(1))

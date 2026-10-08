@@ -468,8 +468,8 @@ def test_cli_list_prints_usage_column(monkeypatch, capsys):
     assert commands.connections_list("https://api.example.test", list_all=True) == 0
     out, _ = capsys.readouterr()
     assert "USED IN" in out
-    assert "template-email-to-sheets, third +1" in out
-    assert "-" in out  # the unused stub
+    assert "3 flows" in out  # the count; `connections show` names them
+    assert "not signed in" in out  # the unused, never-consented stub
 
 
 def test_cli_delete_parser_wires_force():
@@ -478,7 +478,7 @@ def test_cli_delete_parser_wires_force():
     args = cli_main.build_parser().parse_args(
         ["connections", "delete", "google-drive", "--force"])
     assert args.command == "delete"
-    assert args.connection_id == "google-drive"
+    assert args.connection == ["google-drive"]
     assert args.force is True
 
 
