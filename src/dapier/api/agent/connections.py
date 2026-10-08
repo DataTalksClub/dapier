@@ -259,8 +259,7 @@ def _with_usage(view, connections_table):
     land on a provider's single connection and never on one of several."""
     from ...triggers import connection_usage
     try:
-        rows = [{"connection_id": item.get("connection_id"), "provider": item.get("provider")}
-                for item in connections._scan_all(connections_table)]
+        rows = [dict(item) for item in connections._scan_all(connections_table)]
         connection_usage.attach(rows)
         match = next((row for row in rows
                       if row.get("connection_id") == view.get("connection_id")), {})

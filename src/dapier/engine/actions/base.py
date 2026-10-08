@@ -43,9 +43,10 @@ def _connected_connection(connection_id):
     import boto3
 
     table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
-    connection = connections.get_connection(table, connection_id)
-    if not connection:
-        raise ValueError(f"connection {connection_id} is not configured")
+    try:
+        connection = connections.find_connection(table, connection_id)
+    except LookupError as exc:
+        raise ValueError(f"connection {connection_id} is not configured: {exc}") from None
     if connection.get("status") != connections.STATUS_CONNECTED:
         raise ValueError(f"connection {connection_id} is not connected")
     return connection

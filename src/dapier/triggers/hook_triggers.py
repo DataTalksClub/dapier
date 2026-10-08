@@ -590,7 +590,11 @@ def _connected_connection(connection_id, connections_table, provider):
         import boto3
 
         table = boto3.resource("dynamodb").Table(name)
-    connection = table.get_item(Key={"connection_id": connection_id}).get("Item")
+    from ..connections import records as connection_records
+    try:
+        connection = connection_records.find_connection(table, connection_id)
+    except LookupError:
+        connection = None
     if not connection or connection.get("provider") != provider:
         raise TriggerError(f"connection '{connection_id}' is not a {provider.capitalize()} connection")
     if connection.get("status") != "connected":

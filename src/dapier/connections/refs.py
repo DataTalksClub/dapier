@@ -20,7 +20,7 @@ from . import records
 from . import services as connection_services
 
 
-class RefError(ValueError):
+class RefError(LookupError):
     """The reference matches no connection, or more than one."""
 
     def __init__(self, message, candidates=()):

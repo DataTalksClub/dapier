@@ -76,15 +76,22 @@ trigger:                      # exactly one of trigger / triggers
 actions:                      # non-empty, run in order
   - id: save-pdf              # unique within the workflow
     type: dropbox_upload
-    connection_id: dropbox
+    connection_id: dropbox Alexey Grigorev   # "<service> <account>"
     folder: /invoices
   - id: notify
     type: slack
-    connection_id: slack
+    connection_id: slack           # a bare service when only one account has it
     channel: "#billing"
     text: "Filed {subject} → {steps.save-pdf.output.path}"
 ```
 
+- `connection_id` names a connection as `<service> <account>`
+  (`drive alexey@datatalks.club`, or any unique part of the account:
+  `drive datatalks`), the same reference the CLI takes. A bare service works
+  when only one account has it. The engine resolves it at run time; an
+  ambiguous or unknown reference fails the step with the candidates. Legacy
+  internal ids (`google-sheets`) still work, but write references in new
+  flows — `dapier connections list` shows the accounts.
 - `triggers:` is a list of trigger mappings that share the same actions
   (multi-trigger flow). Every trigger needs `connector` and `event`.
 - Email triggers and their actions live only in workflow definitions.

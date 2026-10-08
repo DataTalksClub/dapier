@@ -138,3 +138,57 @@ def test_show_and_resolve_carry_used_in_for_operators(monkeypatch):
     assert body["used_in"] == [entry]
     shown = json.loads(agent_connections.show_connection({}, "google-sheets")["body"])
     assert shown["used_in"] == [entry]
+
+
+class ScanTable:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def get_item(self, Key):
+        item = next((r for r in self.rows if r["connection_id"] == Key["connection_id"]), None)
+        return {"Item": item} if item else {}
+
+    def scan(self, **kwargs):
+        return {"Items": self.rows}
+
+
+def test_find_connection_accepts_ids_and_references():
+    table = ScanTable(ROWS)
+    assert records.find_connection(table, "google-sheets")["connection_id"] == "google-sheets"
+    assert records.find_connection(table, "drive datatalks")["connection_id"] == "google-sheets"
+    with pytest.raises(LookupError, match="matches 2"):
+        records.find_connection(table, "docs alexey")
+    # Management lookups stay exact: a reference never lands on a record.
+    assert records.get_connection(table, "drive datatalks") is None
+
+
+def test_actions_resolve_a_flow_reference(monkeypatch):
+    from src.dapier.engine.actions import base
+
+    table = ScanTable(ROWS)
+    monkeypatch.setenv("CONNECTIONS_TABLE", "t")
+    monkeypatch.setattr("boto3.resource", lambda *a, **k: type(
+        "R", (), {"Table": lambda self, name: table})())
+    assert base._connected_connection("drive alexey@datatalks.club")["connection_id"] == "google-sheets"
+    with pytest.raises(ValueError, match="not configured"):
+        base._connected_connection("drive nobody")
+
+
+def test_usage_folds_references_onto_ids():
+    from src.dapier.triggers import connection_usage
+
+    entry = {"ref": "todo-intake", "kind": "workflow", "enabled": True, "where": "step"}
+    other = {"ref": "backup", "kind": "workflow", "enabled": True, "where": "step"}
+    usage = {"drive datatalks": [entry], "google-sheets": [other]}
+    rows = [dict(row) for row in ROWS]
+    connection_usage.attach(rows, usage)
+    sheets = next(r for r in rows if r["connection_id"] == "google-sheets")
+    assert sheets["used_in"] == [other, entry]
+
+
+def test_delete_guard_sees_reference_usage():
+    entry = {"ref": "todo-intake", "kind": "workflow", "enabled": True, "where": "step"}
+    status, payload = records.api_delete_connection(
+        ScanTable([dict(r) for r in ROWS]), "google-sheets",
+        usage={"drive alexey@datatalks.club": [entry]})
+    assert status == 409 and "todo-intake" in payload["error"]

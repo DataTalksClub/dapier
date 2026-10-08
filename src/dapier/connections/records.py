@@ -290,7 +290,30 @@ def _refs_for(item):
 
 
 def get_connection(table, connection_id):
+    """The record keyed exactly ``connection_id`` (management paths: create,
+    edit, delete must never land on a different record by resolution)."""
     return table.get_item(Key={"connection_id": connection_id}).get("Item")
+
+
+def find_connection(table, connection_id):
+    """The connection a flow names: the record keyed ``connection_id``, else
+    the one a human reference (``drive alexey@datatalks.club``) resolves to.
+    Runtime lookups (actions, triggers) use this so flows may write either.
+    Raises LookupError (refs.RefError for an unknown or ambiguous
+    reference) with a message worth surfacing."""
+    key = str(connection_id or "").strip()
+    if not key:
+        raise LookupError("No connection named")
+    if CONNECTION_ID_RE.fullmatch(key):
+        item = table.get_item(Key={"connection_id": key}).get("Item")
+        if item:
+            return item
+    from . import refs
+    try:
+        candidates = _scan_all(table)
+    except Exception:  # noqa: BLE001 — an unscannable table only loses resolution
+        raise refs.RefError(f"Connection '{key}' not found") from None
+    return refs.resolve(candidates, key)
 
 
 def put_connection(table, item):
@@ -402,9 +425,12 @@ def api_delete_connection(table, connection_id, *, grants_table_ref=None,
     connection = get_connection(table, connection_id)
     if not connection:
         return 404, {"error": "Connection not found"}
+    from ..triggers import connection_usage
     if usage is None:
-        from ..triggers import connection_usage
         usage = connection_usage.collect()
+    # Flows may name the connection as "<service> <account>"; those
+    # references guard the delete exactly like a literal connection_id.
+    usage = connection_usage.fold_refs(usage, _scan_all(table))
     refs = list(usage.get(connection_id) or [])
     # Provider-level trigger references (a workflow triggered on
     # ``youtube.video.published`` with no explicit connection_id) guard the

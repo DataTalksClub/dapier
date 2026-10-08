@@ -128,6 +128,30 @@ def found_connection_id(value):
     return bool(found)
 
 
+def fold_refs(usage, connections):
+    """Fold usage keyed by human references (``drive alexey@…``, which flows
+    may write instead of an internal connection_id) onto the ids those
+    references resolve to among ``connections``. Unresolvable keys stay as
+    they are; ``provider:`` keys are untouched. Returns a new map."""
+    ids = {str(row.get("connection_id")) for row in connections}
+    if all(key in ids or key.startswith("provider:") for key in usage):
+        return usage
+    from ..connections import refs
+    folded = {key: list(entries) for key, entries in usage.items()}
+    for key, entries in usage.items():
+        if key in ids or key.startswith("provider:"):
+            continue
+        try:
+            target = refs.resolve(connections, key)["connection_id"]
+        except refs.RefError:
+            continue
+        bucket = folded.setdefault(target, [])
+        for entry in entries:
+            if entry not in bucket:
+                bucket.append(entry)
+    return folded
+
+
 def attach(rows, usage=None):
     """Stamp connection rows with ``used_in`` in place and return them.
 
@@ -141,6 +165,7 @@ def attach(rows, usage=None):
     """
     if usage is None:
         usage = collect()
+    usage = fold_refs(usage, rows)
     provider_counts = {}
     for row in rows:
         provider_counts[row.get("provider")] = provider_counts.get(row.get("provider"), 0) + 1
