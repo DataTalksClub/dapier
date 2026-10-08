@@ -141,7 +141,7 @@ function renderStatsStrip(workflows) {
   const strip = (dot, label, value) =>
     `<div class="status-item"><span class="status-item-label">${dot}<span>${label}</span></span><span class="status-item-value">${value}</span></div>`;
   const dot = (kind) => `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span></span>`;
-  const none = '<span class="status off"></span>';
+  const none = '';
   /* A zero never wears a status color: the danger dot only shows when
      something is actually auto-paused. */
   const on = count((w) => w.enabled && !w.auto_paused);
@@ -398,9 +398,9 @@ function renderUsage() {
   }
   const shown = [...byWorkflow.entries()].sort((a, b) => b[1].total - a[1].total);
   $('#overview-usage').innerHTML = shown.map(([workflowId, entry]) =>
-    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}" title="${escapeHtml(workflowId)}">${escapeHtml(workflowName(workflowId))}</button></td>`
-    + `<td class="mono" data-label="This month">${entry.current}</td>`
-    + `<td class="mono muted-cell" data-label="3-month total">${entry.total}</td></tr>`).join('');
+    `<tr><td class="cell-title"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}" title="Runs of ${escapeHtml(workflowId)}">${escapeHtml(workflowName(workflowId))}</button></td>`
+    + `<td class="num mono" data-label="This month">${entry.current}</td>`
+    + `<td class="num mono muted-cell" data-label="3-month total">${entry.total}</td></tr>`).join('');
   $('#overview-usage-empty').hidden = shown.length > 0;
   $('#overview-usage-table').hidden = shown.length === 0;
   renderQuota();
@@ -423,7 +423,9 @@ function renderQuota() {
   const form = $('#quota-form');
   const summary = $('#overview-quota-summary');
   if (!line || !form) return;
-  line.hidden = !quota;
+  /* The section's band already states usage; the line stays hidden so it
+     is said once. */
+  line.hidden = true;
   form.hidden = !quota;
   if (summary) summary.textContent = '';
   if (!quota) return;

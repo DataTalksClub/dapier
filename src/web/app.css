@@ -93,6 +93,7 @@ svg.icon { width: 20px; height: 20px; flex: none; }
 
 .text-link {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   height: var(--dk-size-control-md);
   padding: 0;
@@ -887,7 +888,7 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .grant-meta { display: block; margin-top: 3px; font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); overflow-wrap: anywhere; }
 .grant-actions { display: flex; gap: 6px; flex: none; }
 .grant-actions .dk-button { height: var(--dk-size-control-sm); padding: 0 10px; font-size: var(--dk-text-sm); }
-#connection-access-dialog { width: min(620px, calc(100vw - 32px)); }
+#connection-access-dialog { --dk-dialog-width: 620px; }
 #connection-grant-form { display: grid; gap: 14px; border-top: 1px solid var(--dk-border-default); padding-top: 18px; }
 #connection-grant-form h3 { font-size: var(--dk-text-md); }
 .grant-operations { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; border: 0; padding: 0; }
@@ -896,7 +897,7 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .grant-operations input { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
 /* Manage connection: head (who + status), summary, everyday actions,
    provider setup, Advanced (scopes, token, CLI), Danger zone. */
-#edit-connection-dialog { width: min(620px, calc(100vw - 32px)); }
+#edit-connection-dialog { --dk-dialog-width: 620px; }
 .manage-head { display: grid; gap: 4px; min-width: 0; }
 .manage-head h2 { overflow-wrap: anywhere; }
 .manage-meta { margin: 0; font-size: var(--dk-text-sm); }
@@ -1199,7 +1200,7 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-from-body .sender-list { margin: 0; }
 .email-from-body .sender-add { max-width: none; }
 /* Detail dialog: outcome first, then headers, then attachments. */
-#email-dialog { width: min(640px, calc(100vw - 32px)); }
+#email-dialog { --dk-dialog-width: 640px; }
 #email-dialog .dialog-body { display: grid; gap: 18px; }
 #email-dialog .dialog-actions { flex-wrap: wrap; }
 #email-dialog-title { overflow-wrap: anywhere; }
@@ -1404,7 +1405,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .page-tabs a { min-height: var(--dk-size-touch); }
   /* A tab strip wider than the screen scrolls; its trailing edge fades so
      the clipped tab reads as "more this way". */
-  .page-tabs { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--dk-space-6)), transparent); mask-image: linear-gradient(to right, #000 calc(100% - var(--dk-space-6)), transparent); }
+  .page-tabs, .page-tab-set { gap: 0; }
+  .page-tabs a { padding: 0 var(--dk-space-2); font-size: var(--dk-text-md); }
+  .page-tabs a:first-child { padding-left: 0; }
+  .page-tabs.is-clipped { -webkit-mask-image: linear-gradient(to right, black calc(100% - var(--dk-space-8)), transparent); mask-image: linear-gradient(to right, black calc(100% - var(--dk-space-8)), transparent); }
   /* Empty header rows collapse so the designer's frame keeps no dead band. */
   #view-description:empty { display: none; }
   /* Every phone control meets the 44px touch scale: buttons, text inputs,
@@ -1603,10 +1607,13 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .table-wrap td.num { text-align: left; }
   .table-wrap td:first-child, .table-wrap td.action-cell { grid-template-columns: none; }
   .table-wrap td.action-cell[data-label] { grid-template-columns: 6rem minmax(0, 1fr); align-items: center; }
-  .table-wrap td.action-cell { padding-top: var(--dk-space-2); text-align: left; }
-  .table-wrap td.action-cell .dk-button { width: 100%; }
-  .table-wrap td.action-cell .row-actions { display: flex; width: 100%; }
-  .table-wrap td.action-cell .row-actions .dk-button { flex: 1; width: auto; }
+  /* One phone row-action pattern: the card's last line, actions at its
+     right end, sized to their labels, a control gap apart; a destructive
+     action is never full width. */
+  .table-wrap td.action-cell { display: flex; justify-content: flex-end; align-items: center; gap: var(--dk-gap-control); padding-top: var(--dk-space-2); text-align: right; }
+  .table-wrap td.action-cell .dk-button { width: auto; }
+  .table-wrap td.action-cell .row-actions { display: flex; gap: var(--dk-gap-control); }
+  .table-wrap td.action-cell .row-more-slot { display: none; }
   .table-wrap td.workflow-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 10px; }
   .table-wrap td.workflow-actions::before { display: none; }
   .table-wrap td.workflow-actions .dk-button { width: auto; }
@@ -1732,7 +1739,8 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
 .home-errors-table .col-wf { width: 28%; }
 .home-errors-table .col-count { width: 6rem; }
 .home-errors-table .col-when { width: 10.5rem; }
-.home-errors-table button.cell-name { max-width: 100%; text-align: left; color: var(--dk-text-link); }
+.home-errors-table button.cell-name { max-width: 100%; text-align: left; color: var(--dk-text-primary); }
+.home-errors-table button.cell-name:hover { color: var(--dk-accent-default); }
 .home-errors-table button.cell-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Workflow and result rows: the whole row is the button (one target, the
@@ -1805,10 +1813,13 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
 @media (max-width: 560px) {
   .home-problem { flex-direction: column; align-items: stretch; }
   .status-strip { grid-template-columns: 1fr 1fr; }
+  /* The strip states the counts; the band keeps just its title and link. */
+  #home-workflow-count { display: none; }
   .status-item:nth-child(3) { border-left: 0; }
   .status-item:nth-child(n+3) { border-top: 1px solid var(--dk-border-default); }
   .home-workflow { grid-template-columns: minmax(0, 1fr); }
-  .home-row-meta { display: flex; flex-wrap: wrap; gap: var(--dk-space-1) var(--dk-space-4); }
+  .home-row-meta { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--dk-space-1) var(--dk-space-4); }
+  .home-latest { min-width: 0; }
   .home-result { grid-template-columns: 6.5rem minmax(0, 1fr); }
   .home-result-when { grid-column: 2; grid-row: 2; text-align: left; }
 }
@@ -1830,14 +1841,23 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
 .inbox-table .col-source { width: 18%; }
 .inbox-table .col-action { width: 7rem; }
 .usage-table td:first-child { overflow: hidden; }
-.usage-table button.cell-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--dk-text-link); }
+/* Workflow names read like the run history's: sans, primary text; the
+   whole name opens that workflow's runs. */
+.usage-table button.cell-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--dk-text-primary); }
+.usage-table button.cell-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
 .usage-table th:not(:first-child), .usage-table td:not(:first-child) { width: 10rem; }
 
-.audit-table .col-action { width: 13%; }
-.audit-table .col-actor { width: 12%; }
-.audit-table .col-agent { width: 11%; }
+/* Error is the flexible column (and leaves when no row has one); the
+   machine columns get room for a whole id before they clip. */
+.audit-table .col-action { width: 11%; }
+.audit-table .col-resource { width: 11%; }
+.audit-table .col-actor { width: 16%; }
+.audit-table .col-agent { width: 12%; }
 .audit-table .col-outcome { width: 11rem; }
-.audit-table .col-error { width: 18%; }
+.audit-table .col-error { width: auto; }
+.audit-table.no-errors .col-resource { width: auto; }
+.audit-outcome .status { display: flex; max-width: 100%; min-width: 0; }
+.audit-outcome .status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .runs-table th, .audit-table th, .token-table th, .setup-table th, .inbox-table th { overflow: hidden; text-overflow: ellipsis; }
 /* No errors in view: the Error column gives its width back. */
 .audit-table.no-errors .col-error { display: none; width: 0; }
@@ -1882,22 +1902,29 @@ body[data-view="workflows"] #workflow-count { position: static; margin: 0; font-
      empty fields drop out. */
   #audit-log-table tr:not(.register-empty) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #audit-log-table .audit-action { grid-column: 1; grid-row: 1; }
-  #audit-log-table .audit-outcome { grid-column: 2; grid-row: 1; justify-self: end; max-width: 100%; overflow: hidden; }
+  #audit-log-table .audit-outcome { grid-column: 2; grid-row: 1; justify-self: end; max-width: 100%; min-width: 0; overflow: hidden; }
   #audit-log-table .audit-when { grid-column: 1; grid-row: 2; }
   #audit-log-table .audit-resource { grid-column: 2; grid-row: 2; }
   #audit-log-table .audit-actor { grid-column: 1; grid-row: 3; }
   #audit-log-table .audit-agent { grid-column: 2; grid-row: 3; }
-  #audit-log-table .audit-error { grid-column: 1 / -1; grid-row: 4; }
+  /* Error: its own full-width line, at most two lines. */
+  #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome) { grid-column: 1 / -1; grid-row: 4; display: block; color: var(--dk-danger-text); }
+  #audit-log-table td.audit-error[data-empty]:not(.audit-action):not(.audit-outcome) { display: none; }
+  #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome)::before { display: none; }
   #audit-log-table td:not(.audit-action):not(.audit-outcome) { display: flex; gap: var(--dk-space-1); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-  #audit-log-table td:not(.audit-action):not(.audit-outcome):not(.audit-when)::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); }
+  #audit-log-table td:not(.audit-action):not(.audit-outcome):not(.audit-when):not(.audit-error)::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); }
   #audit-log-table td[data-empty]:not(.audit-action):not(.audit-outcome) { display: none; }
 
-  #token-table .cell-title { grid-column: 1; }
-  #token-table .action-cell { grid-column: 2; grid-row: 1 / span 2; padding: 0; }
-  #token-table .action-cell .dk-button { width: auto; }
-  #token-table td[data-label="Status"] { grid-column: 1; grid-row: 2; }
-  #token-table td:not(.cell-title):not(.action-cell):not([data-label="Status"]) { grid-column: 1; display: flex; gap: var(--dk-space-2); font-size: var(--dk-text-sm); }
-  #token-table td:not(.cell-title):not(.action-cell):not([data-label="Status"])::before { display: inline; content: attr(data-label); flex: none; width: 4.5rem; font-family: var(--dk-font-sans); color: var(--dk-text-muted); }
+  /* Token card: name and status, the agent on its own line, then last
+     used with the action at the card's bottom right (the shared pattern). */
+  #token-table .cell-title { grid-column: 1; grid-row: 1; }
+  #token-table td[data-label="Status"] { grid-column: 2; grid-row: 1; }
+  #token-table td[data-label="Agent"] { grid-column: 1 / -1; grid-row: 2; }
+  #token-table td[data-label="Last used"] { grid-column: 1; grid-row: 3; }
+  #token-table .action-cell { grid-column: 2; grid-row: 3; display: flex; justify-content: flex-end; padding: 0; }
+  #token-table td[data-label="Agent"], #token-table td[data-label="Last used"] { display: flex; gap: var(--dk-space-2); min-width: 0; font-size: var(--dk-text-sm); }
+  #token-table td[data-label="Agent"]::before, #token-table td[data-label="Last used"]::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); color: var(--dk-text-muted); }
+  #token-table td[data-label="Agent"] .clip { flex: 1 1 0; }
   #token-table td[data-label="Prefix"], #token-table td[data-label="Created"] { display: none; }
 }
 
@@ -2151,7 +2178,7 @@ tr.hook-delivery-open:focus-visible { outline: 3px solid var(--dk-focus-ring); o
 .hook-facts dd { margin: 0; min-width: 0; font-size: var(--dk-text-sm); overflow-wrap: anywhere; }
 .hook-facts .status { font-size: var(--dk-text-sm); white-space: normal; align-items: baseline; }
 .hook-endpoint-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
-#hook-delivery-dialog, #hook-test-dialog { width: min(720px, calc(100vw - 32px)); }
+#hook-delivery-dialog, #hook-test-dialog { --dk-dialog-width: 720px; }
 .hook-delivery-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: var(--dk-text-body); }
 .hook-section-title { margin: 0 0 8px; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); }
 .hook-runs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -2219,7 +2246,7 @@ tr.poll-open:focus-visible, tr.poll-item-open:focus-visible { outline: 3px solid
 .poll-chip[aria-pressed="true"] { color: var(--dk-accent-default); border-bottom-color: var(--dk-accent-default); }
 .poll-chip:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 1px; }
 
-#poll-detail-dialog, #poll-item-dialog { width: min(680px, calc(100vw - 32px)); }
+#poll-detail-dialog, #poll-item-dialog { --dk-dialog-width: 680px; }
 .poll-detail-heading { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
 .poll-detail-heading h2 { font-weight: var(--dk-weight-medium); overflow-wrap: anywhere; }
 .poll-facts dd { font-size: var(--dk-text-md); line-height: 1.5; overflow-wrap: anywhere; }

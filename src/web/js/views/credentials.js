@@ -32,7 +32,9 @@ function renderCredentials(credentials) {
     const status = credential.configured ? 'configured' : 'missing';
     const provider = escapeHtml(credential.provider);
     const edit = `<button class="dk-button dk-button--secondary dk-button--sm credential-edit" data-provider="${provider}" type="button">${credential.configured ? 'Replace' : 'Add'}</button>`;
-    const test = TESTABLE.has(credential.provider) && credential.configured
+    /* Test stays reachable whether or not a value is stored (it reports
+       what is missing); it sits behind More beside the one visible action. */
+    const test = TESTABLE.has(credential.provider)
       ? `<button class="row-menu-item credential-test" data-provider="${provider}" type="button">Test connection</button>`
       : '';
     return `<tr>

@@ -66,7 +66,7 @@ function outcomeCell(outcome) {
   const [head, ...rest] = value.split('-');
   const text = value === 'ok' ? 'OK'
     : rest.length ? `${sentenceCase(head)}: ${rest.join(' ')}` : sentenceCase(value);
-  return `<span class="status ${problem ? 'err' : 'ok'}" title="${escapeHtml(value)}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+  return `<span class="status ${problem ? 'err' : 'ok'}" title="${escapeHtml(value)}"><span class="status-dot" aria-hidden="true"></span><span class="status-text">${escapeHtml(text)}</span></span>`;
 }
 
 function clipCell(value, { mono = true } = {}) {
@@ -83,7 +83,9 @@ function eventRow(item) {
     ['Actor', clipCell(item.actor_subject), 'audit-actor'],
     ['Agent', clipCell(item.agent), 'audit-agent'],
     ['Outcome', { html: outcomeCell(item.outcome), empty: !item.outcome }, 'audit-outcome'],
-    ['Error', clipCell(item.error, { mono: false }), 'col-error audit-error'],
+    ['Error', item.error
+      ? { html: `<span class="clamp-2" title="${escapeHtml(item.error)}">${escapeHtml(item.error)}</span>`, empty: false }
+      : { html: '<span class="muted-cell">—</span>', empty: true }, 'col-error audit-error'],
   ];
   return `<tr>${cells.map(([label, cell, cls]) =>
     `<td class="${cls}" data-label="${label}"${cell.empty ? ' data-empty' : ''}>${cell.html}</td>`).join('')}</tr>`;

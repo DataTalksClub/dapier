@@ -84,6 +84,19 @@ function applyWorkflowTab(tab) {
   });
 }
 
+/* A tab strip wider than the screen scrolls; it carries .is-clipped (a
+   trailing fade) while tabs remain hidden past its right edge. */
+function syncTabOverflow() {
+  const tabs = $('#page-tabs');
+  if (!tabs || tabs.hidden) return;
+  const hiddenRight = tabs.scrollWidth - tabs.clientWidth - tabs.scrollLeft > 1;
+  tabs.classList.toggle('is-clipped', hiddenRight);
+}
+window.addEventListener('resize', syncTabOverflow);
+document.addEventListener('scroll', (event) => {
+  if (event.target && event.target.id === 'page-tabs') syncTabOverflow();
+}, true);
+
 function syncPageTabs(view, workflowTab) {
   const tabs = $('#page-tabs');
   if (!tabs) return;
@@ -98,6 +111,9 @@ function syncPageTabs(view, workflowTab) {
     if (sameView && sameTab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  const current = $('.page-tabs a[aria-current="page"]');
+  if (current && !tabs.hidden) current.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  syncTabOverflow();
 }
 
 export async function setView(view, push = true, options = {}) {
