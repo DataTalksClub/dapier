@@ -18,36 +18,20 @@ import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
 import { renderStorage } from './storage.js';
-import { workflowName, workflowIdLine, workflowLabelHtml, helpTip } from '../workflow-names.js';
+import { workflowName, workflowIdLine, workflowLabelHtml } from '../workflow-names.js';
+import { loadCatalog, eventLabel, actionLabel } from '../catalog-labels.js';
 
-const TRIGGER_TEXT = {
-  'email.message.received': 'An email arrives',
-  'dropbox.file.created': 'A Dropbox file is created',
-  'renderer.job.completed': 'A render job finishes',
-  'youtube.video.published': 'A YouTube video is published',
-  'custom.received': 'A custom event arrives',
-};
-const ACTION_TEXT = {
-  webhook: 'Send webhook',
-  dataops: 'Run DataOps',
-  dropbox_upload: 'Upload to Dropbox',
-  dropbox_delete: 'Delete from Dropbox',
-  render_html_to_pdf: 'Render PDF',
-  sheets_append_row: 'Add row to Sheets',
-  slack: 'Post to Slack',
-};
-
+/* Triggers and actions in operator words, from the connector catalog
+   (catalog-labels.js): "Telegram message received", "Code (Python)". */
 function workflowTriggerText(workflow) {
   if (!workflow.trigger || !workflow.trigger.connector) return 'No trigger yet';
-  const trigger = workflow.trigger;
-  const key = `${trigger.connector}.${trigger.event}`;
-  const text = TRIGGER_TEXT[key] || `${trigger.connector || 'Unknown'}: ${String(trigger.event || 'event').replace(/[._]/g, ' ')}`;
+  const text = eventLabel(workflow.trigger.connector, workflow.trigger.event);
   const extra = (workflow.triggerCount || 1) - 1;
   return extra > 0 ? `${text} +${extra} more` : text;
 }
 
 function workflowActionText(action) {
-  return ACTION_TEXT[action.type] || String(action.type || 'Action').replace(/[_\.]/g, ' ');
+  return actionLabel(action.type);
 }
 
 /* The State cell: auto-paused outranks the on/off toggle — the workflow is
@@ -179,6 +163,8 @@ function render(section) {
   renderAttention(data);
   if (section === 'usage') renderUsage();
   if (['workflows', 'activity'].includes(section) && data.workflows) renderWorkflows();
+  /* Activity views name workflows from this list; let them repaint. */
+  if (section === 'workflows') document.dispatchEvent(new CustomEvent('dapier:workflows-loaded'));
   if (section === 'connections') renderConnections(data.connections);
   if (section === 'credentials') {
     renderCredentials(data.credentials);
@@ -197,6 +183,7 @@ function render(section) {
 }
 
 export function renderWorkflows() {
+  void loadCatalog();
   const all = state.data?.workflows || [];
   const query = $('#workflow-search').value.trim().toLowerCase();
   const status = $('#workflow-filter').value;
@@ -246,9 +233,12 @@ export function renderWorkflows() {
     const id = escapeHtml(workflow.id);
     const name = escapeHtml(workflowName(workflow));
     const opensDesigner = workflow.source;
+    /* The name opens the workflow; its description rides in the title (the
+       Flow column already says what it does), the id beneath. */
+    const about = escapeHtml(workflow.description || '');
     const detail = `<div class="workflow-name-line">${opensDesigner
-      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">${name}</a>`
-      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}">${name}</button>`}${helpTip(workflow.description)}</div>${workflowIdLine(workflow)}`;
+      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}" title="${about}">${name}</a>`
+      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}" title="${about}">${name}</button>`}</div>${workflowIdLine(workflow)}`;
     const edit = opensDesigner
       ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
@@ -258,7 +248,7 @@ export function renderWorkflows() {
     const sourceButtons = workflow.source ? '' : 'disabled title="No source file available"';
     const selected = selectedWorkflows.has(workflow.source);
     return `<tr class="workflow-list-row">
-      <td class="select-col" data-label="Select"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></td>
+      <td class="select-col" data-label="Select"><label class="dk-check workflow-check"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></label></td>
       <td class="cell-title">${detail}${(folderChip || tags) ? `<div class="cell-tags">${folderChip} ${tags}</div>` : ''}</td>
       <td class="workflow-flow" data-label="Flow"><div class="workflow-flow-line"><span class="workflow-flow-label">When</span><span>${escapeHtml(workflowTriggerText(workflow))}</span></div><div class="workflow-flow-line"><span class="workflow-flow-label">Then</span><span class="workflow-action-chain" title="${escapeHtml((workflow.actions || []).map(workflowActionText).join(' → '))}">${actions || '—'}</span></div></td>
       <td data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run for ${id}" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading recent runs…'}</span>`}</td>
@@ -997,4 +987,12 @@ document.addEventListener('toggle', (event) => {
 $('#workflow-table').addEventListener('click', (event) => {
   const action = event.target.closest('.workflow-menu button, .workflow-menu a');
   if (action && !action.disabled) action.closest('.workflow-menu').hidePopover();
+});
+
+/* Catalog labels arrive after the first paint: repaint the rows that use them. */
+document.addEventListener('dapier:catalog-loaded', () => {
+  if (state.data?.workflows) {
+    renderWorkflows();
+    render('workflows');
+  }
 });

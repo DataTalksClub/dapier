@@ -13,6 +13,8 @@ import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, jsonBlock } from '../format.js';
 import { openRun } from './runs.js';
+import { workflowName } from '../workflow-names.js';
+import { OUTCOME_FILTERS, filterChips, whenHtml, ago, runLinks, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
 const PAGE = 50;
 const TEST_SAMPLE = { event: 'test', message: 'Hello from Dapier', sent_by: 'Send test request' };
@@ -22,6 +24,7 @@ let deliveries = [];
 let healthRows = []; // the latest unfiltered page: endpoint health ignores the chip filter
 let nextToken = null;
 let filter = ''; // hook name, '' = every hook
+let outcomeFilter = 'all'; // the family's outcome chips
 let fetchingHooks = false;
 let fetchingDeliveries = false;
 let loaded = false;
@@ -35,21 +38,33 @@ function onHooksTab() {
 
 /* --- plain-language bits ---------------------------------------------------- */
 
-const OUTCOME_TONE = {
-  ran: 'ok', run_failed: 'err', failed: 'err', running: 'run', processing: 'run',
-  no_workflow: 'warn', filtered: 'off', ignored: 'off',
+/* A delivery's outcome in the family vocabulary (activity.js). */
+const OUTCOME_KEY = {
+  ran: 'handled', run_failed: 'failed', failed: 'failed', running: 'processing', processing: 'processing',
+  no_workflow: 'none', filtered: 'filtered', ignored: 'ignored',
 };
 
-function outcomeLine(row) {
-  const tone = OUTCOME_TONE[row.outcome] || 'off';
-  let text = escapeHtml(row.outcome_text || row.outcome || '—');
-  // Workflow names in the sentence link to the workflow.
-  (row.matched || []).forEach((id) => {
-    const safe = escapeHtml(id);
-    text = text.replace(safe, `<a class="hook-flow-link" href="/workflows/${encodeURIComponent(id)}">${safe}</a>`);
-  });
-  return `<span class="status ${tone} hook-outcome"><span class="status-dot" aria-hidden="true"></span><span>${text}</span></span>`;
+function outcomeKey(row) {
+  return OUTCOME_KEY[row.outcome] || 'ignored';
 }
+
+function deliveryError(row) {
+  return row.error || ((row.runs || []).find((run) => run.error) || {}).error || '';
+}
+
+function outcomeLine(row) {
+  const key = outcomeKey(row);
+  const runs = (row.runs || []).length
+    ? row.runs
+    : (row.matched || []).map((id) => ({ workflow_id: id }));
+  if (key === 'handled' || (key === 'failed' && runs.length)) {
+    return outcomeCell(key, { by: runLinks(runs), error: key === 'failed' ? deliveryError(row) : '' });
+  }
+  if (key === 'none') return outcomeCell(key, { note: 'Logged; nothing ran' });
+  return outcomeCell(key, { error: deliveryError(row), note: key === 'filtered' ? 'Did not pass the workflow filters' : '' });
+}
+
+const KIND_LABEL = { webhook: 'Webhook', telegram: 'Telegram', mailchimp: 'Mailchimp', youtube: 'YouTube' };
 
 function verification(hook) {
   if (hook.kind === 'telegram') return 'Telegram secret token, managed for you';
@@ -71,99 +86,104 @@ function responseLabel(row) {
   return '<span class="muted-cell">—</span>';
 }
 
-/* --- endpoints --------------------------------------------------------------- */
+/* --- endpoints (the tab's sources) ----------------------------------------------- */
 
-function healthFor(hookId) {
-  const rows = healthRows.filter((row) => row.hook === hookId);
-  if (!rows.length) return { text: 'No recent deliveries', tone: 'off' };
-  const failed = rows.filter((row) => row.outcome === 'run_failed' || row.outcome === 'failed').length;
-  const last = formatTimestamp(rows[0].received_at) || '—';
-  const count = `${rows.length} recent`;
+function healthFor(hook) {
+  if (!hook.enabled) return { text: 'Off', tone: 'off', last: '' };
+  const rows = healthRows.filter((row) => row.hook === hook.hook_id);
+  if (!rows.length) return { text: 'No calls', tone: 'off', last: '' };
+  const failed = rows.filter((row) => outcomeKey(row) === 'failed').length;
   return failed
-    ? { text: `Last ${last} · ${failed} of ${count} failed`, tone: 'err' }
-    : { text: `Last ${last} · ${count}, all fine`, tone: 'ok' };
+    ? { text: `${failed} of ${rows.length} failed`, tone: 'err', last: rows[0].received_at }
+    : { text: 'Healthy', tone: 'ok', last: rows[0].received_at };
 }
 
-function workflowsLine(hook) {
-  if (!('workflows' in hook)) return '<span class="muted-cell">—</span>';
+function startsLine(hook) {
+  if (!('workflows' in hook)) return '';
   const flows = hook.workflows || [];
-  if (!flows.length) return '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>No workflow — deliveries are logged, nothing runs</span>';
-  return flows.map((flow) => {
-    const notes = [!flow.enabled && 'off', flow.conditional && 'when its filters pass', flow.any_hook && 'any hook'].filter(Boolean);
-    return `<a class="hook-flow-link mono" href="/workflows/${encodeURIComponent(flow.id)}">${escapeHtml(flow.id)}</a>${notes.length ? ` <span class="muted-cell">(${escapeHtml(notes.join(', '))})</span>` : ''}`;
-  }).join('<br>');
+  if (!flows.length) return '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>';
+  const notes = flows.length === 1
+    ? [!flows[0].enabled && 'off', flows[0].conditional && 'when its filters pass', flows[0].any_hook && 'any hook'].filter(Boolean) : [];
+  return `Starts ${workflowNames(flows.map((flow) => flow.id))}${notes.length ? ` (${escapeHtml(notes.join(', '))})` : ''}`;
 }
 
-function endpointCard(hook) {
-  const health = healthFor(hook.hook_id);
+function endpointRow(hook) {
+  const health = healthFor(hook);
   const name = escapeHtml(hook.hook_id);
-  const selected = filter === hook.hook_id;
-  return `<li class="hook-endpoint${selected ? ' is-selected' : ''}" data-hook="${name}">
-    <div class="hook-endpoint-head">
-      <button class="hook-endpoint-name mono" type="button" data-hook-filter="${name}" aria-pressed="${selected}" title="Show only ${name}'s deliveries">${name}</button>
-      <span class="hook-kind">${escapeHtml(hook.kind || 'webhook')}</span>
-      ${hook.enabled ? '' : statusLine('disabled')}
-    </div>
-    ${hook.description ? `<p class="hook-endpoint-desc">${escapeHtml(hook.description)}</p>` : ''}
-    <div class="hook-url"><code>${escapeHtml(hook.url || '')}</code><button class="icon-button hook-copy" type="button" data-copy="${escapeHtml(hook.url || '')}" aria-label="Copy ${name} URL" title="Copy URL"><i data-lucide="copy"></i></button></div>
-    <dl class="hook-facts">
-      <div><dt>Verified by</dt><dd>${escapeHtml(verification(hook))}</dd></div>
-      <div><dt>Starts</dt><dd>${workflowsLine(hook)}</dd></div>
-      <div><dt>Health</dt><dd><span class="status ${health.tone}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(health.text)}</span></dd></div>
-    </dl>
-    <div class="hook-endpoint-actions">
-      ${(hook.kind || 'webhook') === 'webhook' && hook.enabled ? `<button class="dk-button dk-button--sm dk-button--secondary hook-test" type="button" data-hook="${name}">Send test</button>` : ''}
-      <button class="dk-button dk-button--sm dk-button--secondary hook-edit" type="button" data-hook="${name}">Edit</button>
-      <button class="dk-button dk-button--sm dk-button--secondary hook-delete" type="button" data-hook="${name}">Delete</button>
-    </div>
-  </li>`;
+  const kind = hook.kind || 'webhook';
+  const menuId = `hook-menu-${name}`;
+  const menu = `<button class="icon-button row-more" type="button" popovertarget="${menuId}" aria-label="More actions for ${name}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
+    <div id="${menuId}" class="row-menu" popover aria-label="Actions for ${name}">
+      ${kind === 'webhook' && hook.enabled ? `<button class="row-menu-item hook-test" type="button" data-hook="${name}">Send test request</button>` : ''}
+      <button class="row-menu-item hook-edit" type="button" data-hook="${name}">Edit</button>
+      <button class="row-menu-item row-menu-danger hook-delete" type="button" data-hook="${name}">Delete</button>
+    </div>`;
+  return sourceRow({
+    attrs: `data-hook="${name}"`,
+    name,
+    nameAttrs: `data-hook-filter="${name}" aria-pressed="${filter === hook.hook_id}"`,
+    nameTitle: `Show only ${hook.hook_id}'s deliveries`,
+    status: `<span class="status ${health.tone}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(health.text)}</span>`,
+    tools: menu,
+    selected: filter === hook.hook_id,
+    lines: [
+      `<span class="source-url"><code class="clip" title="${escapeHtml(hook.url || '')}">${escapeHtml(hook.url || '')}</code><button class="icon-button hook-copy" type="button" data-copy="${escapeHtml(hook.url || '')}" aria-label="Copy ${name} URL" title="Copy URL"><i data-lucide="copy"></i></button></span>`,
+      { html: `${escapeHtml(KIND_LABEL[kind] || kind)}${hook.description ? ` · ${escapeHtml(hook.description)}` : ''}`, title: [verification(hook), hook.description].filter(Boolean).join(' — ') },
+      startsLine(hook),
+      health.last ? `Last call ${escapeHtml(ago(health.last))}` : '',
+    ],
+  });
 }
 
-/* --- deliveries -------------------------------------------------------------- */
+/* --- deliveries (the tab's activity) ---------------------------------------------- */
 
 function deliveryRow(row) {
   const id = escapeHtml(row.delivery_id);
-  const badges = [row.test && '<span class="hook-badge">test</span>', row.replay && '<span class="hook-badge">replay</span>'].filter(Boolean).join('');
-  return `<tr class="hook-delivery-open" data-delivery="${id}" role="button" tabindex="0" aria-label="Open delivery to ${escapeHtml(row.hook || '')}">
-    <td class="cell-title"><span class="cell-name mono">${escapeHtml(row.hook || '—')}${badges}</span><span class="cell-sub mono">${escapeHtml(formatTimestamp(row.received_at) || '—')}</span></td>
-    <td data-label="Outcome">${outcomeLine(row)}</td>
-    <td data-label="Response">${responseLabel(row)}</td>
-    <td class="mono muted-cell" data-label="Size">${escapeHtml(formatSize(row.size_bytes))}</td>
-  </tr>`;
+  const badges = [row.test && '<span class="dk-chip">test</span>', row.replay && '<span class="dk-chip">replay</span>'].filter(Boolean).join('');
+  const facts = [KIND_LABEL[row.kind] ? `${KIND_LABEL[row.kind]} ${row.kind === 'webhook' ? 'request' : 'update'}` : 'Request', formatSize(row.size_bytes),
+    row.response_status ? `answered ${row.response_status}` : ''].filter((part) => part && part !== '—');
+  return activityRow({
+    attrs: `data-delivery="${id}"`,
+    label: `Open delivery to ${row.hook || 'hook'}`,
+    when: whenHtml(row.received_at),
+    primary: `<span class="mono">${escapeHtml(row.hook || '—')}</span>${badges}`,
+    secondary: escapeHtml(facts.join(' · ')),
+    outcome: outcomeLine(row),
+  });
 }
 
-function renderFilter() {
-  const names = hooks.filter((hook) => hook.kind !== 'youtube').map((hook) => hook.hook_id);
-  const chip = (value, label) => `<button class="hook-chip${filter === value ? ' is-active' : ''}" type="button" data-hook-filter="${escapeHtml(value)}" aria-pressed="${filter === value}">${escapeHtml(label)}</button>`;
-  $('#hooks-filter').innerHTML = chip('', 'All hooks') + names.map((name) => chip(name, name)).join('');
+function shownDeliveries() {
+  return outcomeFilter === 'all' ? deliveries : deliveries.filter((row) => outcomeKey(row) === outcomeFilter);
 }
 
 function renderSummary() {
-  const shown = deliveries.length;
-  const failed = deliveries.filter((row) => row.outcome === 'run_failed' || row.outcome === 'failed').length;
-  const unmatched = deliveries.filter((row) => row.outcome === 'no_workflow').length;
-  const parts = [`${shown}${nextToken ? '+' : ''} ${shown === 1 ? 'delivery' : 'deliveries'}`];
-  if (failed) parts.push(`${failed} failed`);
-  if (unmatched) parts.push(`${unmatched} started nothing`);
+  const shown = shownDeliveries().length;
+  const failed = deliveries.filter((row) => outcomeKey(row) === 'failed').length;
+  const parts = [`${shown}${nextToken ? '+' : ''} ${shown === 1 ? 'delivery' : 'deliveries'}${filter ? ` to ${filter}` : ''}`];
+  if (failed && outcomeFilter === 'all') parts.push(`${failed} failed`);
   $('#hooks-summary').textContent = loaded ? parts.join(' · ') : 'Loading…';
+  $('#hooks-clear-filter').hidden = !filter;
 }
 
 function render() {
   const any = hooks.length > 0;
   $('#hook-empty').hidden = any || !loaded;
   $('#hooks-layout').hidden = !any;
+  $('#hooks-outcome-chips').innerHTML = filterChips(OUTCOME_FILTERS, outcomeFilter, 'hook-outcome');
   if (!any) return;
-  renderFilter();
   renderSummary();
-  $('#hook-endpoints').innerHTML = hooks.map(endpointCard).join('');
-  $('#hook-deliveries').innerHTML = deliveries.map(deliveryRow).join('');
-  const empty = loaded && !deliveries.length;
+  $('#hook-endpoints').innerHTML = hooks.map(endpointRow).join('');
+  const shown = shownDeliveries();
+  $('#hook-deliveries').innerHTML = shown.map(deliveryRow).join('');
+  const empty = loaded && !shown.length;
   $('#hook-deliveries-empty').hidden = !empty;
-  $('#hook-deliveries-wrap').hidden = empty;
-  $('#hook-deliveries-empty-text').textContent = filter
-    ? `Nothing has called ${filter} in the last 30 days. Send a test request to see one arrive.`
-    : 'No hook has been called in the last 30 days. Send a test request to see one arrive.';
-  $('#hook-deliveries-more').hidden = !nextToken;
+  $('#hook-deliveries').hidden = empty;
+  $('#hook-deliveries-empty-text').textContent = deliveries.length
+    ? 'No delivery matches this filter.'
+    : filter
+      ? `Nothing has called ${filter} in the last 30 days. Send a test request to see one arrive.`
+      : 'No hook has been called in the last 30 days. Send a test request to see one arrive.';
+  $('#hook-deliveries-footer').hidden = !nextToken;
   icons();
 }
 
@@ -238,7 +258,7 @@ function runsBlock(row) {
       : '<p class="detail-muted">No workflow ran for this delivery.</p>';
   }
   return `<ul class="hook-runs">${runs.map((run) => `<li>
-      <a class="hook-flow-link mono" href="/workflows/${encodeURIComponent(run.workflow_id)}">${escapeHtml(run.workflow_id)}</a>
+      <a class="text-link workflow-edit" href="/workflows/${encodeURIComponent(run.workflow_id)}" data-workflow="${escapeHtml(run.workflow_id)}" title="${escapeHtml(run.workflow_id)}">${escapeHtml(workflowName(run.workflow_id))}</a>
       ${statusLine(run.status)}
       <button class="dk-button dk-button--sm dk-button--secondary hook-open-run" type="button" data-run="${escapeHtml(run.run_id)}">Open run</button>
       ${run.error ? `<span class="hook-run-error">${escapeHtml(run.error)}</span>` : ''}
@@ -259,8 +279,7 @@ export async function openDelivery(deliveryId) {
       ['Delivery id', row.delivery_id],
     ].filter(([, value]) => value !== null && value !== undefined && value !== '');
     $('#hook-delivery-detail').innerHTML = `
-      <div class="hook-delivery-summary">${outcomeLine(row)}${row.test ? '<span class="hook-badge">test request</span>' : ''}</div>
-      ${row.error ? `<p class="dialog-feedback error">${escapeHtml(row.error)}</p>` : ''}
+      <div class="hook-delivery-summary activity-outcome">${outcomeLine(row)}${row.test ? '<span class="dk-chip">test request</span>' : ''}</div>
       <dl class="detail-list">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>
       <section><h3 class="hook-section-title">Workflow runs</h3>${runsBlock(row)}</section>
       <section><h3 class="hook-section-title">Request headers</h3>${headersBlock(row.headers)}</section>
@@ -544,8 +563,18 @@ function setFilter(value) {
   void fetchDeliveries().then(render);
 }
 
+$('[data-panel-tools="hooks"]').addEventListener('click', (event) => {
+  const chip = event.target.closest('[data-hook-outcome]');
+  if (!chip) return;
+  outcomeFilter = chip.dataset.hookOutcome;
+  render();
+});
+
 $('[data-workflow-panel="hooks"]').addEventListener('click', (event) => {
   const target = event.target;
+  if (target.closest('#hooks-clear-filter')) return void setFilter('');
+  const runLink = target.closest('.activity-run');
+  if (runLink) return void openRun(runLink.dataset.run);
   const filterButton = target.closest('[data-hook-filter]');
   if (filterButton) return void setFilter(filterButton.dataset.hookFilter);
   const copy = target.closest('.hook-copy');
@@ -556,14 +585,14 @@ $('[data-workflow-panel="hooks"]').addEventListener('click', (event) => {
   if (edit) return void openHookDialog(findHook(edit.dataset.hook));
   const del = target.closest('.hook-delete');
   if (del && !del.disabled) return void deleteHook(del);
-  if (target.closest('a')) return undefined; // workflow links navigate
-  const row = target.closest('.hook-delivery-open');
+  if (target.closest('a, .row-menu, .row-more')) return undefined; // links and menus act on their own
+  const row = target.closest('.activity-row[data-delivery]');
   if (row) void openDelivery(row.dataset.delivery);
   return undefined;
 });
 
 $('#hook-deliveries').addEventListener('keydown', (event) => {
-  const row = event.target.closest('.hook-delivery-open');
+  const row = event.target.closest('.activity-row[data-delivery]');
   if (row && (event.key === 'Enter' || event.key === ' ')) {
     event.preventDefault();
     void openDelivery(row.dataset.delivery);
@@ -601,3 +630,4 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => {
   setTimeout(() => { if (onHooksTab()) void refreshHooks(); }, 0);
 });
+document.addEventListener('dapier:workflows-loaded', () => { if (loaded) render(); });

@@ -13,31 +13,23 @@ import { openDesigner } from './designer.js';
 import { openRun } from './runs.js';
 import { openReplayConfirm } from './inbox.js';
 import { workflowName } from '../workflow-names.js';
+import { filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
 /* Server-side outcome filters; Handled includes the runs that failed —
    a workflow took the message, and its failure is what needs attention. */
 const FILTERS = {
   all: '',
-  handled: 'handled,failed,pending',
+  handled: 'handled,pending',
+  failed: 'failed',
   refused: 'refused',
-  unmatched: 'unmatched',
+  none: 'unmatched',
 };
+const CHIPS = [['all', 'All'], ['handled', 'Handled'], ['failed', 'Failed'], ['refused', 'Refused'], ['none', 'No workflow']];
 const mail = { events: null, next: null, filter: 'all', loading: false, error: '' };
 let config = {};
 let allowed = [];
 
 /* ---- formatting ------------------------------------------------------- */
-
-function relativeTime(value) {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return '—';
-  const seconds = (Date.now() - date.getTime()) / 1000;
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
-  if (seconds < 7 * 86400) return `${Math.floor(seconds / 86400)} d ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
 
 function senderName(email) {
   const header = email.from || '';
@@ -66,32 +58,17 @@ function handlersFor(event) {
     .flatMap((address) => (address.handlers || []).map((handler) => handler.workflow));
 }
 
-function runButtons(runs) {
-  return runs.map((run) => `<button type="button" class="text-link email-run" data-run="${escapeHtml(run.run_id)}" title="Open this run (${escapeHtml(run.workflow)})">${escapeHtml(workflowName(run.workflow))}</button>`).join(', ');
-}
-
-/* The outcome in plain words, as the CLI prints it. */
-function outcome(event) {
-  const runs = event.runs || [];
-  switch (event.outcome) {
-    case 'handled':
-      return { kind: 'ok', html: runs.length ? `Handled by ${runButtons(runs)}` : 'Handled' };
-    case 'failed':
-      return { kind: 'err', html: 'Failed', detail: event.error || '' };
-    case 'refused':
-      return { kind: 'warn', html: 'Refused — sender not allowed' };
-    case 'unmatched':
-      return { kind: 'off', html: isFeedback(event) ? 'No workflow watches this feedback' : 'No workflow for this address' };
-    case 'pending':
-      return { kind: 'run', html: 'Processing' };
-    default:
-      return { kind: 'off', html: escapeHtml(event.status || 'Unknown') };
-  }
-}
+/* The outcome in the family vocabulary (activity.js). */
+const OUTCOME_KEY = { handled: 'handled', failed: 'failed', refused: 'refused', unmatched: 'none', pending: 'processing' };
 
 function outcomeHtml(event) {
-  const { kind, html, detail } = outcome(event);
-  return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span><span>${html}</span></span>${detail ? `<span class="email-outcome-detail" title="${escapeHtml(detail)}">${escapeHtml(detail)}</span>` : ''}`;
+  const key = OUTCOME_KEY[event.outcome] || 'ignored';
+  const runs = (event.runs || []).map((run) => run.workflow);
+  if (key === 'handled' && runs.length) return outcomeCell(key, { by: workflowNames(runs) });
+  if (key === 'failed') return outcomeCell(key, { by: runs.length ? workflowNames(runs) : '', error: event.error || '' });
+  if (key === 'refused') return outcomeCell(key, { note: 'Sender not allowed' });
+  if (key === 'none') return outcomeCell(key, { note: isFeedback(event) ? 'No workflow watches feedback' : 'No workflow for this address' });
+  return outcomeCell(key);
 }
 
 /* ---- received list ---------------------------------------------------- */
@@ -105,20 +82,21 @@ function mailRow(event) {
     : (email.subject || '(no subject)');
   const to = (email.to || []).join(', ');
   const attachments = (email.attachments || []).filter((item) => !item.inline).length;
-  return `<li class="email-row" data-inbox="${escapeHtml(event.inbox_id)}" data-outcome="${escapeHtml(event.outcome || '')}">
-    <time class="email-when" datetime="${escapeHtml(event.received_at || '')}" title="${escapeHtml(formatTimestamp(event.received_at) || '')}">${escapeHtml(relativeTime(event.received_at))}</time>
-    <button type="button" class="email-open" data-inbox="${escapeHtml(event.inbox_id)}">
-      <span class="email-line"><span class="email-from" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>${to ? `<span class="email-to">to <span class="mono">${escapeHtml(to)}</span></span>` : ''}</span>
-      <span class="email-subject">${escapeHtml(subject)}${attachments ? `<span class="email-attach">· ${attachments} attachment${attachments === 1 ? '' : 's'}</span>` : ''}</span>
-    </button>
-    <div class="email-outcome">${outcomeHtml(event)}</div>
-  </li>`;
+  return activityRow({
+    attrs: `data-inbox="${escapeHtml(event.inbox_id)}" data-outcome="${escapeHtml(event.outcome || '')}"`,
+    label: `Open ${subject}`,
+    when: whenHtml(event.received_at),
+    primary: `<span title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>${to ? `<span class="activity-to mono" title="${escapeHtml(to)}">to ${escapeHtml(to)}</span>` : ''}`,
+    secondary: `${escapeHtml(subject)}${attachments ? ` · ${attachments} attachment${attachments === 1 ? '' : 's'}` : ''}`,
+    outcome: outcomeHtml(event),
+  });
 }
 
 function emptyMessage() {
   const first = (config.addresses || [])[0];
   if (mail.filter === 'refused') return '<h3>Nothing refused</h3><p>Mail from senders outside the allowed list shows up here.</p>';
-  if (mail.filter === 'unmatched') return '<h3>Nothing unmatched</h3><p>Every message reached a workflow.</p>';
+  if (mail.filter === 'none') return '<h3>Nothing unmatched</h3><p>Every message reached a workflow.</p>';
+  if (mail.filter === 'failed') return '<h3>Nothing failed</h3><p>Messages whose workflow run failed show up here.</p>';
   if (mail.filter === 'handled') return '<h3>Nothing handled yet</h3><p>Messages a workflow ran for show up here.</p>';
   if (first) {
     return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>`;
@@ -137,9 +115,10 @@ function renderMail() {
   note.textContent = mail.error || (loaded ? '' : 'Loading received email…');
   note.classList.toggle('form-error', Boolean(mail.error));
   note.hidden = !note.textContent;
-  $('#email-mail-more').hidden = !mail.next;
-  $$('[data-email-filter]').forEach((button) =>
-    button.setAttribute('aria-pressed', String(button.dataset.emailFilter === mail.filter)));
+  $('#email-mail-footer').hidden = !mail.next;
+  $('#email-filter-chips').innerHTML = filterChips(CHIPS, mail.filter, 'email-filter');
+  $('#email-mail-summary').textContent = loaded
+    ? `${events.length}${mail.next ? '+' : ''} message${events.length === 1 ? '' : 's'}` : '';
 }
 
 export async function fetchMail({ append = false } = {}) {
@@ -216,7 +195,7 @@ function detailHtml(event) {
   }
   return `<section class="email-detail-block">
       <h3>Outcome</h3>
-      <div class="email-outcome">${outcomeHtml(event)}</div>
+      <div class="activity-outcome">${outcomeHtml(event)}</div>
       ${result}
     </section>
     ${header}
@@ -269,23 +248,21 @@ function routeRule(route) {
   return JSON.stringify(route);
 }
 
-function workflowLinks(handlers) {
-  return handlers.map((handler) => {
-    const off = handler.status && handler.status !== 'enabled'
-      ? ` ${statusLine(handler.status)}` : '';
-    return `<button type="button" class="text-link email-workflow" data-workflow="${escapeHtml(handler.workflow)}" title="${escapeHtml(handler.workflow)}${handler.description ? ` — ${escapeHtml(handler.description)}` : ''}">${escapeHtml(workflowName(handler.workflow))}</button>${off}`;
-  }).join(', ');
-}
-
 function addressItem({ label, kind = '', copy = '', handlers }) {
-  return `<li class="email-address">
-    <div class="email-address-line">
-      ${kind ? `<span class="email-kind">${escapeHtml(kind)}</span>` : ''}
-      <span class="mono email-address-name" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-      ${copy ? `<button type="button" class="icon-button email-copy" data-copy="${escapeHtml(copy)}" aria-label="Copy ${escapeHtml(copy)}" title="Copy address"><i data-lucide="copy"></i></button>` : ''}
-    </div>
-    <div class="email-address-flow"><i data-lucide="arrow-right" aria-hidden="true"></i>${workflowLinks(handlers)}</div>
-  </li>`;
+  const off = handlers.filter((handler) => handler.status && handler.status !== 'enabled').length;
+  return sourceRow({
+    /* The address itself is the copy button: one target, the icon says so. */
+    name: `<span class="source-name-text">${escapeHtml(label)}</span>${copy ? '<i data-lucide="copy" aria-hidden="true"></i>' : ''}`,
+    nameClass: copy ? 'email-copy' : '',
+    nameAttrs: copy ? `data-copy="${escapeHtml(copy)}" aria-label="Copy ${escapeHtml(copy)}"` : 'disabled',
+    nameTitle: copy ? `Copy ${copy}` : label,
+    status: kind ? `<span class="dk-chip">${escapeHtml(kind)}</span>` : '',
+    lines: [
+      handlers.length
+        ? `Starts ${workflowNames(handlers.map((handler) => handler.workflow))}${off ? ` <span class="muted-cell">(${off} off)</span>` : ''}`
+        : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
+    ],
+  });
 }
 
 export function renderEmails(data) {
@@ -319,10 +296,13 @@ export function renderEmailFrom(addresses) {
   allowed = (addresses || []).map((address) => String(address).toLowerCase());
   const list = $('#email-from-list');
   const items = addresses || [];
-  list.innerHTML = items.map((address) => `<li class="sender-chip">
-    <span class="mono">${escapeHtml(address)}</span>
-    <button class="sender-remove" type="button" data-address="${escapeHtml(address)}" aria-label="Remove ${escapeHtml(address)}">&times;</button>
-  </li>`).join('') || '<li class="sender-empty">No senders yet — every incoming message is refused until one is added.</li>';
+  list.innerHTML = items.map((address) => `<li class="source-row sender-row">
+    <div class="source-head">
+      <span class="mono sender-address" title="${escapeHtml(address)}">${escapeHtml(address)}</span>
+      <button class="icon-button sender-remove" type="button" data-address="${escapeHtml(address)}" aria-label="Remove ${escapeHtml(address)}" title="Remove sender"><i data-lucide="x"></i></button>
+    </div>
+  </li>`).join('') || '<li class="source-row sender-empty">No senders yet. Every incoming message is refused until one is added.</li>';
+  icons();
   $$('.sender-remove').forEach((button) => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -347,14 +327,16 @@ $('#email-from-add').addEventListener('submit', async (event) => {
   } catch (error) { notice(error.message, true); }
 });
 
-$$('[data-email-filter]').forEach((button) => button.addEventListener('click', () => {
+$('#email-filter-chips').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-email-filter]');
+  if (!button) return;
   if (mail.filter === button.dataset.emailFilter && mail.events) return;
   mail.filter = button.dataset.emailFilter;
   mail.events = null;
   mail.next = null;
   renderMail();
   void fetchMail();
-}));
+});
 
 $('#email-mail-more').addEventListener('click', () => fetchMail({ append: true }));
 
@@ -371,7 +353,7 @@ $('.view[data-page="emails"]').addEventListener('click', async (event) => {
     } catch (_) { notice('Copy is not available here; select the address instead.', true); }
     return;
   }
-  const row = event.target.closest('.email-row');
+  const row = event.target.closest('.activity-row[data-inbox]');
   if (row) void openEmail(row.dataset.inbox);
 });
 
@@ -412,3 +394,12 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => {
   if (state.view === 'emails') void fetchMail();
 });
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('#email-mail-list .activity-row');
+  if (!row || event.target !== row) return;
+  event.preventDefault();
+  void openEmail(row.dataset.inbox);
+});
+document.addEventListener('dapier:workflows-loaded', () => { if (mail.events) renderMail(); renderEmails(config); });

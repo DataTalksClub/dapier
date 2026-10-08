@@ -16,6 +16,8 @@ import { state } from '../state.js';
 import { $, $$, icons, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
+import { workflowName } from '../workflow-names.js';
+import { OUTCOME_FILTERS, filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
 /* Optional poll extras beyond the form fields; merged into the PUT body and
    validated server-side (headers, cursor). Provider
@@ -60,14 +62,9 @@ const HEALTH = {
   waiting: ['off', 'Not checked yet'],
 };
 
-/* The same plain-words outcomes the Emails mailbox uses. */
-const OUTCOMES = {
-  matched: ['ok', 'Handled'],
-  unmatched: ['off', 'No workflow for this poll'],
-  failed: ['err', 'Failed'],
-  received: ['run', 'Processing'],
-  ignored: ['off', 'Ignored'],
-};
+/* A picked-up item's status in the family vocabulary (activity.js). */
+const OUTCOME_KEY = { matched: 'handled', unmatched: 'none', failed: 'failed', received: 'processing', ignored: 'ignored' };
+const outcomeKey = (item) => OUTCOME_KEY[item.status] || 'ignored';
 
 let polls = [];
 let items = [];
@@ -127,70 +124,56 @@ function watches(poll) {
 
 function workflowLinks(flows, empty = 'No workflow') {
   if (!flows || !flows.length) return `<span class="poll-muted">${escapeHtml(empty)}</span>`;
-  return flows.map((flow) => `<a class="text-link workflow-edit poll-workflow" href="/workflows/${encodeURIComponent(flow.id)}" data-workflow="${escapeHtml(flow.id)}">${escapeHtml(flow.id)}</a>${flow.enabled ? '' : ' <span class="poll-muted">(off)</span>'}`).join('<br>');
+  return flows.map((flow) => `<a class="text-link workflow-edit poll-workflow" href="/workflows/${encodeURIComponent(flow.id)}" data-workflow="${escapeHtml(flow.id)}" title="${escapeHtml(flow.id)}">${escapeHtml(workflowName(flow.id))}</a>${flow.enabled ? '' : ' <span class="poll-muted">(off)</span>'}`).join('<br>');
 }
 
-function healthCell(poll) {
-  const [kind, text] = HEALTH[poll.health] || ['off', poll.health || 'Unknown'];
-  const status = poll.status || {};
-  let sub = '';
-  if (poll.health === 'failing') {
-    const count = status.failures || 1;
-    sub = `${count} failed check${count === 1 ? '' : 's'} in a row`;
-    if (status.last_error) {
-      return `${statusWord(kind, text)}<span class="cell-sub poll-health-sub">${escapeHtml(sub)}</span><span class="cell-sub poll-error-line poll-error-clip" title="${escapeHtml(status.last_error)}">${escapeHtml(status.last_error)}</span>`;
-    }
-  } else if (poll.health === 'late') {
-    sub = 'Missed its last checks';
-  } else if (poll.health === 'paused') {
-    sub = 'Not checking';
-  }
-  return `${statusWord(kind, text)}${sub ? `<span class="cell-sub poll-health-sub">${escapeHtml(sub)}</span>` : ''}`;
-}
-
+/* A poll as a source row: name and health, what it watches, then its
+   rhythm and what it starts. The name opens the poll's detail. */
 function pollRow(poll) {
   const status = poll.status || {};
-  const found = status.last_new_count ? ` · ${status.last_new_count} item${status.last_new_count === 1 ? '' : 's'}` : '';
-  return `<tr class="poll-open" data-poll="${escapeHtml(poll.poll_id)}" role="button" tabindex="0" aria-label="Open poll ${escapeHtml(poll.poll_id)}">
-      <td class="cell-title"><span class="cell-name mono">${escapeHtml(poll.poll_id)}</span><span class="poll-watches"><span class="poll-source">${escapeHtml(SOURCE_LABELS[poll.source || 'http'] || poll.source)}</span> <span class="mono">${escapeHtml(pollTarget(poll))}</span></span></td>
-      <td data-label="Health"><div>${healthCell(poll)}</div></td>
-      <td data-label="Last check"><div>${when(status.last_checked_at)}<span class="cell-sub">${escapeHtml(every(poll))}</span></div></td>
-      <td data-label="Last new item"><div>${status.last_new_at ? `${when(status.last_new_at)}${escapeHtml(found)}` : '<span class="poll-muted">Nothing yet</span>'}</div></td>
-      <td data-label="Starts"><div>${workflowLinks(poll.workflows, 'No workflow yet')}</div></td>
-    </tr>`;
+  const [kind, text] = HEALTH[poll.health] || ['off', poll.health || 'Unknown'];
+  const checked = status.last_checked_at ? `checked ${escapeHtml(ago(status.last_checked_at))}` : 'not checked yet';
+  const failing = poll.health === 'failing' && status.last_error
+    ? { html: `<span class="activity-error">${escapeHtml(status.last_error)}</span>`, title: status.last_error } : '';
+  return sourceRow({
+    attrs: `data-poll="${escapeHtml(poll.poll_id)}"`,
+    name: escapeHtml(poll.poll_id),
+    nameClass: 'poll-open',
+    nameAttrs: `data-poll="${escapeHtml(poll.poll_id)}"`,
+    nameTitle: `Open ${poll.poll_id}`,
+    status: statusWord(kind, text),
+    lines: [
+      { html: `${escapeHtml(SOURCE_LABELS[poll.source || 'http'] || poll.source)} <span class="mono">${escapeHtml(pollTarget(poll))}</span>`, title: watches(poll) },
+      `${escapeHtml(every(poll))} · ${checked}`,
+      (poll.workflows || []).length ? `Starts ${workflowNames(poll.workflows.map((flow) => flow.id))}` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
+      failing,
+    ],
+  });
 }
 
-function outcome(item) {
-  const [kind, text] = OUTCOMES[item.status] || ['off', item.status || 'Unknown'];
-  return statusWord(kind, text);
-}
-
-function runButtons(runs) {
-  return runs.map((run) => `<button type="button" class="text-link workflow-run-link poll-run" data-run="${escapeHtml(run)}" title="Open this run">${escapeHtml(run.split(':')[0])}</button>`).join(', ');
-}
-
-/* "Handled by <run>" like the Emails mailbox: the workflow name opens the run. */
 function outcomeLine(item) {
-  const runs = item.runs || [];
-  if (item.status === 'matched' && runs.length) {
-    return `<span class="status ok"><span class="status-dot" aria-hidden="true"></span><span>Handled by ${runButtons(runs)}</span></span>`;
+  const key = outcomeKey(item);
+  const runs = (item.runs || []).map((run) => String(run).split(':')[0]);
+  if (key === 'handled' || (key === 'failed' && runs.length)) {
+    return outcomeCell(key, { by: workflowNames(runs.length ? runs : item.matched), error: item.error || '' });
   }
-  return outcome(item);
+  return outcomeCell(key, { error: item.error || '', note: key === 'none' ? 'Recorded; nothing ran' : '' });
 }
 
 function itemRow(item) {
-  return `<tr class="poll-item-open" data-inbox="${escapeHtml(item.inbox_id)}" data-status="${escapeHtml(item.status || '')}" role="button" tabindex="0">
-      <td class="cell-title"><span class="cell-name poll-item-title">${escapeHtml(item.title || item.item_id || item.inbox_id)}</span><span class="cell-sub">${escapeHtml(item.poll || '')}</span></td>
-      <td data-label="Picked up"><div>${when(item.received_at)}</div></td>
-      <td data-label="Outcome"><div>${outcomeLine(item)}${item.error ? `<span class="cell-sub poll-error-line">${escapeHtml(item.error)}</span>` : ''}</div></td>
-    </tr>`;
+  return activityRow({
+    attrs: `data-inbox="${escapeHtml(item.inbox_id)}" data-status="${escapeHtml(item.status || '')}"`,
+    label: `Open ${item.title || item.item_id || 'item'}`,
+    when: whenHtml(item.received_at),
+    primary: `<span>${escapeHtml(item.title || item.item_id || item.inbox_id)}</span>`,
+    secondary: `<span class="mono">${escapeHtml(item.poll || '')}</span>`,
+    outcome: outcomeLine(item),
+  });
 }
 
 function filtered() {
   if (filter === 'all') return items;
-  return items.filter((item) => (filter === 'failed' ? item.status === 'failed'
-    : filter === 'matched' ? item.status === 'matched'
-      : item.status === 'unmatched'));
+  return items.filter((item) => outcomeKey(item) === filter);
 }
 
 function renderSummary() {
@@ -201,22 +184,23 @@ function renderSummary() {
   if (counts.late) parts.push(`${counts.late} late`);
   if (counts.paused) parts.push(`${counts.paused} paused`);
   $('#poll-summary').textContent = parts.join(' · ');
+  const shown = filtered().length;
+  $('#poll-activity-summary').textContent = `${shown} item${shown === 1 ? '' : 's'} in the last 30 days`;
 }
 
 function render() {
+  $('#poll-outcome-chips').innerHTML = filterChips(OUTCOME_FILTERS, filter, 'poll-outcome');
   $('#poll-table').innerHTML = polls.map(pollRow).join('');
   $('#poll-empty').hidden = polls.length > 0;
-  $('#poll-monitor').hidden = polls.length === 0;
-  $('#poll-activity').hidden = polls.length === 0;
+  $('#poll-workspace').hidden = polls.length === 0;
   renderSummary();
   const shown = filtered();
   $('#poll-activity-table').innerHTML = shown.map(itemRow).join('');
-  $('#poll-activity-wrap').hidden = shown.length === 0;
+  $('#poll-activity-table').hidden = shown.length === 0;
   $('#poll-activity-empty').hidden = shown.length > 0;
   $('#poll-activity-empty').querySelector('p').textContent = items.length
     ? 'No picked-up items match this filter.'
     : 'Nothing picked up in the last 30 days. Items appear here as polls find them, whether or not a workflow ran.';
-  $$('.poll-chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.filter === filter)));
   icons();
 }
 
@@ -296,7 +280,7 @@ function renderPollDetail(poll, recent) {
     <section class="poll-recent" aria-labelledby="poll-recent-title">
       <h3 id="poll-recent-title" class="poll-subhead">Recently picked up</h3>
       ${recent.length
-    ? `<ul class="poll-recent-list">${recent.map((item) => `<li><button class="poll-recent-item poll-item-open" type="button" data-inbox="${escapeHtml(item.inbox_id)}"><span class="poll-recent-name">${escapeHtml(item.title || item.item_id || item.inbox_id)}</span>${outcome(item)}<span class="poll-muted">${escapeHtml(ago(item.received_at))}</span></button></li>`).join('')}</ul>`
+    ? `<ul class="activity-list poll-recent-list">${recent.map(itemRow).join('')}</ul>`
     : '<p class="detail-muted">Nothing picked up in the last 30 days.</p>'}
     </section>`;
   const toggle = $('#poll-detail-toggle');
@@ -422,18 +406,13 @@ async function openItem(inboxId) {
   const data = event.data && typeof event.data === 'object' ? event.data : {};
   const runs = cached.runs || (event.matched || []).map((flow) => `${flow}:${inboxId}`);
   $('#poll-item-title').textContent = cached.title || data.title || data.name || data.item_id || 'Picked-up item';
-  const result = event.status === 'matched'
-    ? 'Handled — its workflow ran'
-    : event.status === 'unmatched' ? 'No workflow for this poll — nothing ran'
-      : event.status === 'failed' ? 'Failed'
-        : event.status === 'received' ? 'Processing' : (event.status || '');
   $('#poll-item-body').innerHTML = `
     ${event.error ? `<div class="detail-error" role="status"><p class="mono">${escapeHtml(event.error)}</p></div>` : ''}
     ${factRows([
       ['Poll', data.poll ? `<button class="text-link poll-open-link" type="button" data-poll="${escapeHtml(data.poll)}">${escapeHtml(data.poll)}</button>` : ''],
       ['Picked up', event.received_at ? `${escapeHtml(formatTimestamp(event.received_at))} <span class="poll-muted">· ${escapeHtml(ago(event.received_at))}</span>` : ''],
-      ['Outcome', statusWord((OUTCOMES[event.status] || ['off'])[0], result)],
-      ['Runs', runs.length ? runs.map((run) => `<button class="text-link workflow-run-link" type="button" data-run="${escapeHtml(run)}">${escapeHtml(run.split(':')[0])} run</button>`).join('<br>') : ''],
+      ['Outcome', `<span class="activity-outcome">${outcomeCell(outcomeKey(event), { note: outcomeKey(event) === 'none' ? 'Recorded; nothing ran' : '' })}</span>`],
+      ['Runs', runs.length ? runs.map((run) => `<button class="text-link workflow-run-link" type="button" data-run="${escapeHtml(run)}" title="${escapeHtml(run)}">Open the ${escapeHtml(workflowName(run.split(':')[0]))} run</button>`).join('<br>') : ''],
       ['Item id', data.item_id ? `<span class="mono break-all">${escapeHtml(data.item_id)}</span>` : ''],
     ])}
     <h3 class="poll-subhead">What the poll found</h3>
@@ -616,9 +595,9 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('a, .workflow-run-link')) return;
-  const chip = event.target.closest('.poll-chip');
+  const chip = event.target.closest('[data-poll-outcome]');
   if (chip) {
-    filter = chip.dataset.filter;
+    filter = chip.dataset.pollOutcome;
     return void render();
   }
   const pollLink = event.target.closest('.poll-open-link');
@@ -626,19 +605,18 @@ document.addEventListener('click', (event) => {
     $('#poll-item-dialog').close();
     return void openPollDetail(pollLink.dataset.poll);
   }
-  const itemRowEl = event.target.closest('.poll-item-open');
-  if (itemRowEl) return void openItem(itemRowEl.dataset.inbox);
+  const itemRowEl = event.target.closest('.poll-item-open, .activity-row[data-inbox]');
+  if (itemRowEl && itemRowEl.closest('[data-workflow-panel="polls"], #poll-detail-dialog')) return void openItem(itemRowEl.dataset.inbox);
   const pollRowEl = event.target.closest('.poll-open');
   if (pollRowEl) return void openPollDetail(pollRowEl.dataset.poll);
 });
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
-  const row = event.target.closest('tr.poll-open, tr.poll-item-open');
-  if (!row || event.target !== row) return;
+  const row = event.target.closest('.activity-row[data-inbox]');
+  if (!row || event.target !== row || !row.closest('[data-workflow-panel="polls"], #poll-detail-dialog')) return;
   event.preventDefault();
-  if (row.classList.contains('poll-open')) void openPollDetail(row.dataset.poll);
-  else void openItem(row.dataset.inbox);
+  void openItem(row.dataset.inbox);
 });
 
 /* Entering the Polls tab (tab link, back/forward) fetches fresh state. */

@@ -19,10 +19,15 @@ def test_emails_page_is_a_mailbox_of_received_mail():
     filters, then the addresses and allowed senders as compact lists."""
     html = (WEB / "index.html").read_text()
     page = html[html.index('data-page="emails"'):html.index('data-page="agents"')]
-    for marker in ('id="email-mail-list"', 'data-email-filter="all"', 'data-email-filter="handled"',
-                   'data-email-filter="refused"', 'data-email-filter="unmatched"',
+    for marker in ('id="email-mail-list"', 'id="email-filter-chips"',
                    'id="email-mail-more"', 'id="email-addresses"', 'id="email-from-list"'):
         assert marker in page
+    # The outcome chips are the trigger family's (views/activity.js), rendered
+    # by emails.js: All, Handled, Failed, Refused, No workflow.
+    js = (WEB / "js" / "views" / "emails.js").read_text()
+    for chip in ("['all', 'All']", "['handled', 'Handled']", "['failed', 'Failed']",
+                 "['refused', 'Refused']", "['none', 'No workflow']"):
+        assert chip in js
     assert page.index('id="email-mail-list"') < page.index('id="email-addresses"') \
         < page.index('id="email-from-list"')
     # The old three tables (addresses, broad subscriptions, watchers) are one list now.

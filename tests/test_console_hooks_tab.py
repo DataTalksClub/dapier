@@ -12,7 +12,7 @@ CLI = (ROOT / "dapier_cli" / "commands" / "hooks.py").read_text()
 
 
 def test_hooks_panel_has_deliveries_endpoints_and_dialogs():
-    for marker in ('id="hook-deliveries"', 'id="hook-endpoints"', 'id="hooks-filter"',
+    for marker in ('id="hook-deliveries"', 'id="hook-endpoints"', 'id="hooks-outcome-chips"',
                    'id="hook-delivery-dialog"', 'id="hook-delivery-replay"',
                    'id="hook-test-dialog"', 'id="hook-send-test"', 'id="new-hook"',
                    'id="hook-dialog"'):

@@ -118,86 +118,75 @@
       </section>
 
       <section class="view" data-page="workflows">
-        <div class="page-tools primary-tools" data-panel-tools="list">
-          <div class="workflow-page-actions">
-          <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
-          <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
-          <button id="export-all-yaml" class="dk-button dk-button--secondary" type="button">Export all</button>
-          <a id="new-workflow" class="dk-button dk-button--primary" href="/workflows/new">New workflow</a>
+        <div class="page-tools primary-tools dk-toolbar register-toolbar workflow-toolbar" data-panel-tools="list">
+          <div class="dk-cluster toolbar-filters workflow-filters"><label class="toolbar-search"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label></div>
+          <div class="dk-toolbar__end">
+            <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
+            <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
+            <button id="export-all-yaml" class="dk-button dk-button--secondary" type="button">Export all</button>
+            <a id="new-workflow" class="dk-button dk-button--primary" href="/workflows/new">New workflow</a>
           </div>
         </div>
-        <div class="page-tools primary-tools" data-panel-tools="hooks" hidden>
-          <div class="hooks-tools">
-          <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
-          <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
+        <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
+          <div id="hooks-outcome-chips" class="dk-cluster" role="group" aria-label="Show deliveries"></div>
+          <div class="dk-toolbar__end">
+            <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
+            <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
           </div>
         </div>
-        <div class="page-tools primary-tools" data-panel-tools="polls" hidden>
-          <button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button>
+        <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
+          <div id="poll-outcome-chips" class="dk-cluster" role="group" aria-label="Show picked-up items"></div>
+          <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>
         </div>
         <div data-workflow-panel="list">
-        <div class="page-tools">
-          <div class="list-tools workflow-filters"><label class="workflow-search-field"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label><span id="workflow-count" class="field-hint" role="status"></span></div>
-          </div>
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="dk-button dk-button--sm dk-button--secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="dk-button dk-button--sm dk-button--secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
             <colgroup><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-flow"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
-            <thead><tr><th class="select-col"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></th><th>Workflow</th><th>Flow</th><th>Latest run</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th class="select-col"><label class="dk-check workflow-check"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></label></th><th>Workflow</th><th>Flow</th><th>Latest run</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
+          <div class="dk-table-footer"><span id="workflow-count" role="status"></span></div>
         </div>
         </div>
         <div data-workflow-panel="hooks" hidden>
         <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
-        <div id="hooks-layout" class="hooks-layout" hidden>
-          <section class="hooks-activity" aria-labelledby="hooks-activity-title">
-            <div class="hooks-head">
-              <h2 id="hooks-activity-title">Recent deliveries</h2>
-              <button class="help-tip" type="button" data-tip="Every request a hook accepted in the last 30 days, newest first, with what the workflow did with it. Calls rejected for a bad token or signature get a 401 and are not logged." aria-label="About deliveries">?</button>
+        <div id="hooks-layout" class="trigger-workspace" hidden>
+          <section class="data-panel trigger-activity" aria-labelledby="hooks-activity-title">
+            <div class="section-head">
+              <h2 id="hooks-activity-title">Deliveries</h2>
               <p id="hooks-summary" class="sub" role="status"></p>
+              <button id="hooks-clear-filter" class="text-link" type="button" hidden>Show every hook</button>
             </div>
-            <div id="hooks-filter" class="hooks-chips" role="group" aria-label="Show deliveries for"></div>
-            <div id="hook-deliveries-empty" class="empty-state" hidden><h3>No deliveries yet</h3><p id="hook-deliveries-empty-text">Nothing has called this hook in the last 30 days. Send a test request to see one arrive.</p></div>
-            <div id="hook-deliveries-wrap" class="table-wrap hook-deliveries">
-              <table>
-                <thead><tr><th>Delivery</th><th>Outcome</th><th>Response</th><th>Size</th></tr></thead>
-                <tbody id="hook-deliveries"></tbody>
-              </table>
-            </div>
-            <button id="hook-deliveries-more" class="dk-button dk-button--secondary hooks-more" type="button" hidden>Load more</button>
+            <div id="hook-deliveries-empty" class="empty-state" hidden><h3>No deliveries</h3><p id="hook-deliveries-empty-text">Nothing has called this hook in the last 30 days. Send a test request to see one arrive.</p></div>
+            <ul id="hook-deliveries" class="activity-list" aria-label="Deliveries"></ul>
+            <div id="hook-deliveries-footer" class="dk-table-footer" hidden><span>Requests rejected for a bad token or signature get a 401 and are not logged.</span><button id="hook-deliveries-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
           </section>
-          <aside class="hooks-endpoints" aria-labelledby="hooks-endpoints-title">
-            <div class="hooks-head"><h2 id="hooks-endpoints-title">Endpoints</h2><button class="help-tip" type="button" data-tip="Where each hook listens, how a request proves it is genuine, and the workflows a delivery starts." aria-label="About endpoints">?</button></div>
-            <ul id="hook-endpoints" class="hook-endpoint-list"></ul>
+          <aside class="trigger-sources" aria-label="Endpoints">
+            <section class="data-panel" aria-labelledby="hooks-endpoints-title">
+              <div class="section-head"><h2 id="hooks-endpoints-title">Endpoints</h2><p class="sub">Select one to see only its deliveries</p></div>
+              <ul id="hook-endpoints" class="source-list"></ul>
+            </section>
           </aside>
         </div>
         </div>
         <div data-workflow-panel="polls" hidden>
         <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API, feed, or folder for new items, for example an orders feed or a YouTube channel.</p></div>
-        <section id="poll-monitor" class="data-panel poll-panel" aria-labelledby="poll-monitor-title" hidden>
-          <div class="section-head"><h2 id="poll-monitor-title">Polls</h2><button class="help-tip" type="button" aria-label="What a poll does" data-tip="A poll checks a source on a schedule and starts its workflow once for each new item. Open a poll to check it now, pause it, or change where it reads from.">?</button><p id="poll-summary" class="sub" role="status"></p></div>
-          <div id="poll-table-wrap" class="table-wrap">
-            <table>
-              <colgroup><col class="poll-col-name"><col class="poll-col-health"><col class="poll-col-check"><col class="poll-col-new"><col class="poll-col-starts"></colgroup>
-              <thead><tr><th>Poll</th><th>Health</th><th>Last check</th><th>Last new item</th><th>Starts</th></tr></thead>
-              <tbody id="poll-table"></tbody>
-            </table>
-          </div>
-        </section>
-        <section id="poll-activity" class="data-panel poll-panel" aria-labelledby="poll-activity-title" hidden>
-          <div class="section-head"><h2 id="poll-activity-title">Recently picked up</h2><div class="poll-chips" role="group" aria-label="Show items"><button class="poll-chip" type="button" data-filter="all" aria-pressed="true">All</button><button class="poll-chip" type="button" data-filter="matched" aria-pressed="false">Handled</button><button class="poll-chip" type="button" data-filter="unmatched" aria-pressed="false">Unmatched</button><button class="poll-chip" type="button" data-filter="failed" aria-pressed="false">Failed</button></div></div>
-          <div id="poll-activity-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
-          <div id="poll-activity-wrap" class="table-wrap">
-            <table>
-              <colgroup><col class="poll-col-item"><col class="poll-col-when"><col class="poll-col-outcome"></colgroup>
-              <thead><tr><th>Item</th><th>Picked up</th><th>Outcome</th></tr></thead>
-              <tbody id="poll-activity-table"></tbody>
-            </table>
-          </div>
-        </section>
+        <div id="poll-workspace" class="trigger-workspace" hidden>
+          <section id="poll-activity" class="data-panel trigger-activity" aria-labelledby="poll-activity-title">
+            <div class="section-head"><h2 id="poll-activity-title">Picked up</h2><p id="poll-activity-summary" class="sub" role="status"></p></div>
+            <div id="poll-activity-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
+            <ul id="poll-activity-table" class="activity-list" aria-label="Picked-up items"></ul>
+          </section>
+          <aside class="trigger-sources" aria-label="Polls">
+            <section id="poll-monitor" class="data-panel" aria-labelledby="poll-monitor-title">
+              <div class="section-head"><h2 id="poll-monitor-title">Polls</h2><p id="poll-summary" class="sub" role="status"></p></div>
+              <ul id="poll-table" class="source-list"></ul>
+            </section>
+          </aside>
+        </div>
         </div>
       </section>
 
@@ -252,47 +241,42 @@
       </section>
 
       <section class="view" data-page="emails">
+        <div class="page-tools dk-toolbar trigger-toolbar">
+          <div id="email-filter-chips" class="dk-cluster" role="group" aria-label="Filter received email"></div>
+        </div>
         <p id="email-load-error" class="form-error" role="alert"></p>
-        <div class="email-layout">
-          <section class="data-panel email-mail" aria-labelledby="email-mail-title">
+        <div class="trigger-workspace">
+          <section class="data-panel trigger-activity" aria-labelledby="email-mail-title">
             <div class="section-head">
               <h2 id="email-mail-title">Received</h2>
-              <div class="email-filters" role="group" aria-label="Filter received email">
-                <button type="button" data-email-filter="all" aria-pressed="true">All</button>
-                <button type="button" data-email-filter="handled" aria-pressed="false">Handled</button>
-                <button type="button" data-email-filter="refused" aria-pressed="false">Refused</button>
-                <button type="button" data-email-filter="unmatched" aria-pressed="false">Unmatched</button>
-              </div>
+              <p id="email-mail-summary" class="sub" role="status"></p>
             </div>
-            <p id="email-mail-note" class="sub email-mail-note">Loading received email…</p>
+            <p id="email-mail-note" class="sub panel-note">Loading received email…</p>
             <div id="email-mail-empty" class="empty-state" hidden></div>
-            <ul id="email-mail-list" class="email-mail-list" aria-label="Received email"></ul>
-            <button id="email-mail-more" class="dk-button dk-button--secondary" type="button" hidden>Load more</button>
+            <ul id="email-mail-list" class="activity-list" aria-label="Received email"></ul>
+            <div id="email-mail-footer" class="dk-table-footer" hidden><span>Mail from the last 30 days</span><button id="email-mail-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
           </section>
-          <aside class="email-side" aria-label="Addresses and senders">
+          <aside class="trigger-sources" aria-label="Addresses and senders">
             <section class="data-panel" aria-labelledby="email-addresses-title">
               <div class="section-head">
                 <h2 id="email-addresses-title">Addresses</h2>
-                <button class="help-tip" type="button" aria-label="About addresses" data-tip="An address exists when a workflow has an email trigger with an address filter. Create or change one in Workflows.">?</button>
-                <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>
+                <p class="sub">Mail to <span id="email-domain-hint" class="mono"></span></p>
               </div>
-              <p class="sub email-domain">Mail to <span id="email-domain-hint" class="mono"></span> reaches Dapier.</p>
-              <div id="email-empty" class="empty-state" hidden><p>No receiving addresses yet. Add an email trigger with an address filter to a workflow.</p></div>
-              <ul id="email-addresses" class="email-address-list"></ul>
+              <p class="sub panel-note">An address exists when a workflow has an email trigger with an address filter. Change one in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>.</p>
+              <div id="email-empty" class="empty-state" hidden><p>No receiving addresses yet.</p></div>
+              <ul id="email-addresses" class="source-list"></ul>
             </section>
             <section class="data-panel" aria-labelledby="email-from-title">
               <div class="section-head">
                 <h2 id="email-from-title">Allowed senders</h2>
-                <button class="help-tip" type="button" aria-label="About allowed senders" data-tip="Mail from anyone else is refused before any workflow runs. The list applies to every address.">?</button>
               </div>
-              <div class="email-from-body">
-                <ul id="email-from-list" class="sender-list"></ul>
-                <form id="email-from-add" class="sender-add" autocomplete="off">
-                  <label class="visually-hidden" for="email-from-address">Sender address</label>
-                  <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
-                  <button class="dk-button dk-button--secondary" type="submit">Add</button>
-                </form>
-              </div>
+              <p class="sub panel-note">Mail from anyone else is refused before any workflow runs, for every address.</p>
+              <ul id="email-from-list" class="source-list"></ul>
+              <form id="email-from-add" class="dk-table-footer sender-add" autocomplete="off">
+                <label class="visually-hidden" for="email-from-address">Sender address</label>
+                <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
+                <button class="dk-button dk-button--secondary dk-button--sm" type="submit">Add sender</button>
+              </form>
             </section>
           </aside>
         </div>
@@ -328,34 +312,28 @@
         </div>
       </section>
       <section class="view" data-page="schedules">
-        <div class="sched-toolbar page-tools">
-          <div class="sched-filters" role="group" aria-label="Filter schedules">
-            <button type="button" data-sched-filter="all" aria-pressed="true">All <span>0</span></button>
-            <button type="button" data-sched-filter="attention" aria-pressed="false">Needs attention <span>0</span></button>
-            <button type="button" data-sched-filter="paused" aria-pressed="false">Paused <span>0</span></button>
-          </div>
-          <button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button>
+        <div class="page-tools dk-toolbar trigger-toolbar">
+          <div id="sched-outcome-chips" class="dk-cluster" role="group" aria-label="Show fires"></div>
+          <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
-        <div id="sched-workspace" class="sched-workspace" hidden>
-          <div class="sched-main">
-            <section class="sched-upcoming" aria-labelledby="sched-upcoming-title">
-              <div class="sched-section-head">
-                <h2 id="sched-upcoming-title">Coming up</h2>
-                <div class="sched-window" role="group" aria-label="Upcoming window">
-                  <button type="button" data-sched-window="24" aria-pressed="true">24 hours</button>
-                  <button type="button" data-sched-window="168" aria-pressed="false">7 days</button>
-                </div>
-              </div>
-              <p id="sched-upcoming-zone" class="sched-caption"></p>
-              <div id="sched-upcoming"></div>
+        <div id="sched-workspace" class="trigger-workspace" hidden>
+          <section class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
+            <div class="section-head"><h2 id="sched-fires-title">Fires</h2><p id="sched-fires-summary" class="sub" role="status"></p></div>
+            <div id="sched-fires-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
+            <ul id="sched-fires" class="activity-list" aria-label="Fires"></ul>
+          </section>
+          <aside class="trigger-sources" aria-label="Schedules">
+            <section class="data-panel" aria-labelledby="sched-register-title">
+              <div class="section-head"><h2 id="sched-register-title">Schedules</h2><p id="sched-summary" class="sub" role="status"></p></div>
+              <ul id="sched-list" class="source-list"></ul>
             </section>
-            <section class="sched-register" aria-labelledby="sched-register-title">
-              <div class="sched-section-head"><h2 id="sched-register-title">Schedules</h2></div>
-              <ul id="sched-list" class="sched-list"></ul>
+            <section class="data-panel" aria-labelledby="sched-upcoming-title">
+              <div class="section-head"><h2 id="sched-upcoming-title">Coming up</h2><div id="sched-window-chips" class="dk-cluster" role="group" aria-label="Upcoming window"></div></div>
+              <p id="sched-upcoming-zone" class="sub panel-note"></p>
+              <ul id="sched-upcoming" class="source-list"></ul>
             </section>
-          </div>
-          <article id="sched-detail" class="sched-detail" aria-label="Selected schedule" tabindex="-1"></article>
+          </aside>
         </div>
       </section>
       <section class="view" data-page="tokens">
@@ -609,6 +587,19 @@
         <button class="dk-button dk-button--primary" type="submit">Save</button>
       </div>
     </form>
+  </dialog>
+  <dialog id="schedule-detail-dialog" class="dk-dialog" aria-labelledby="schedule-detail-title">
+    <div class="dialog-head dk-dialog__head">
+      <div class="poll-detail-heading"><h2 id="schedule-detail-title" class="mono">Schedule</h2><span id="schedule-detail-health"></span></div>
+      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div id="schedule-detail-body" class="dialog-body dk-dialog__body detail"></div>
+    <div class="dialog-actions dk-dialog__foot">
+      <button class="dk-button dk-button--danger dk-dialog__start" type="button" data-sched-action="delete">Delete</button>
+      <button class="dk-button dk-button--secondary" type="button" data-sched-action="edit">Edit</button>
+      <button id="schedule-detail-toggle" class="dk-button dk-button--secondary" type="button" data-sched-action="pause">Pause</button>
+      <button class="dk-button dk-button--primary" type="button" data-sched-action="run">Run now</button>
+    </div>
   </dialog>
   <dialog id="schedule-confirm-dialog" aria-label="Delete schedule" class="dk-dialog">
     <form method="dialog" autocomplete="off">

@@ -21,9 +21,9 @@ def test_workflow_list_and_home_lead_with_the_name():
     js = (WEB / "js/views/overview.js").read_text()
     assert "from '../workflow-names.js'" in js
     assert "escapeHtml(workflowName(workflow))" in js
-    # The list keeps the description behind (?); Home rows are whole-row
-    # buttons and show it inline as their muted second line instead.
-    assert js.count("helpTip(workflow.description)") >= 1
+    # The description rides in the name's title on the list (no 18px (?)
+    # tip on phones); Home rows show it inline as their muted second line.
+    assert "title=\"${about}\"" in js
     assert "workflow.description || workflowTriggerText(workflow)" in js
     assert "workflowIdLine(workflow)" in js
     assert "$('#workflow-title').textContent = workflowName(workflow)" in js
