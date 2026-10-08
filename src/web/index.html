@@ -291,15 +291,34 @@
         </div>
       </section>
       <section class="view" data-page="schedules">
-        <div class="page-tools primary-tools">
+        <div class="sched-toolbar page-tools">
+          <div class="sched-filters" role="group" aria-label="Filter schedules">
+            <button type="button" data-sched-filter="all" aria-pressed="true">All <span>0</span></button>
+            <button type="button" data-sched-filter="attention" aria-pressed="false">Needs attention <span>0</span></button>
+            <button type="button" data-sched-filter="paused" aria-pressed="false">Paused <span>0</span></button>
+          </div>
           <button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
-        <div id="schedule-table-wrap" class="table-wrap" hidden>
-          <table>
-            <thead><tr><th>Schedule</th><th>Expression</th><th>Status</th><th>Updated</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="schedule-table"></tbody>
-          </table>
+        <div id="sched-workspace" class="sched-workspace" hidden>
+          <div class="sched-main">
+            <section class="sched-upcoming" aria-labelledby="sched-upcoming-title">
+              <div class="sched-section-head">
+                <h2 id="sched-upcoming-title">Coming up</h2>
+                <div class="sched-window" role="group" aria-label="Upcoming window">
+                  <button type="button" data-sched-window="24" aria-pressed="true">24 hours</button>
+                  <button type="button" data-sched-window="168" aria-pressed="false">7 days</button>
+                </div>
+              </div>
+              <p id="sched-upcoming-zone" class="sched-caption"></p>
+              <div id="sched-upcoming"></div>
+            </section>
+            <section class="sched-register" aria-labelledby="sched-register-title">
+              <div class="sched-section-head"><h2 id="sched-register-title">Schedules</h2></div>
+              <ul id="sched-list" class="sched-list"></ul>
+            </section>
+          </div>
+          <article id="sched-detail" class="sched-detail" aria-label="Selected schedule" tabindex="-1"></article>
         </div>
       </section>
       <section class="view" data-page="tokens">

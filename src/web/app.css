@@ -1839,3 +1839,91 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .workflow-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .workflow-id { display: block; margin-top: 2px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); overflow-wrap: anywhere; }
 .workflow-label .workflow-id { font-weight: var(--dk-weight-regular, 400); }
+
+/* --- Schedules: when things run, and whether they did ------------------------
+   Filter tabs over a two-column workspace: "Coming up" and the schedule
+   register on the left, the selected schedule's detail on the right (the
+   agents page's list + detail shape). Stacks below 900px. */
+.sched-toolbar { justify-content: space-between; margin-bottom: 0; }
+.sched-filters, .sched-window { display: flex; gap: 4px; flex-wrap: wrap; }
+.sched-filters button, .sched-window button { background: transparent; border: 0; border-bottom: 2px solid transparent; min-height: var(--dk-size-control-md); padding: 0 12px; display: inline-flex; align-items: center; color: var(--dk-text-muted); font: 500 var(--dk-text-body) var(--dk-font-sans); cursor: pointer; }
+.sched-filters button[aria-pressed="true"], .sched-window button[aria-pressed="true"] { color: var(--dk-accent-default); border-bottom-color: var(--dk-accent-default); }
+.sched-filters span { margin-left: 5px; font: var(--dk-text-sm) var(--dk-font-mono); color: var(--dk-text-muted); }
+.sched-window button { font-size: var(--dk-text-md); padding: 0 10px; }
+.sched-workspace { display: grid; grid-template-columns: minmax(320px, 42%) minmax(0, 1fr); border-top: 1px solid var(--dk-border-strong); margin-top: var(--dk-space-2); align-items: start; }
+.sched-main { min-width: 0; border-right: 1px solid var(--dk-border-default); padding: 20px 24px 32px 0; display: grid; gap: 28px; }
+.sched-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.sched-section-head h2 { margin: 0; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
+.sched-caption { margin: 2px 0 10px; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.sched-quiet { margin: 6px 0; font-size: var(--dk-text-md); color: var(--dk-text-muted); list-style: none; }
+.sched-day + .sched-day { margin-top: 12px; }
+.sched-day h3 { margin: 0 0 4px; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sched-up-list { list-style: none; margin: 0; padding: 0; }
+.sched-up-row { display: grid; grid-template-columns: 3.6em minmax(0, 1fr); align-items: baseline; gap: 4px 12px; padding: 6px 0; border-top: 1px solid var(--dk-border-default); font-size: var(--dk-text-md); }
+.sched-up-row time { font-family: var(--dk-font-mono); color: var(--dk-text-primary); }
+.sched-up-name { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; color: var(--dk-accent-default); font: 500 var(--dk-text-md) var(--dk-font-mono); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.sched-up-name:hover { text-decoration: underline; }
+.sched-up-what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; }
+.sched-up-reach { color: var(--dk-text-muted); overflow-wrap: anywhere; }
+.sched-up-reach.is-empty { color: var(--dk-warning-text); }
+.sched-frequent { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 0 10px; padding: 8px 10px; background: var(--dk-bg-muted); border-radius: var(--dk-radius-md); font-size: var(--dk-text-md); color: var(--dk-text-muted); }
+.sched-more { margin-top: 8px; padding: 0; border: 0; background: none; color: var(--dk-accent-default); font: var(--dk-text-md) var(--dk-font-sans); cursor: pointer; min-height: 32px; }
+.sched-more:hover { text-decoration: underline; }
+.sched-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.sched-row { width: 100%; display: grid; gap: 4px; text-align: left; padding: 14px 16px; border: 0; border-top: 1px solid var(--dk-border-default); background: transparent; color: var(--dk-text-primary); font-family: var(--dk-font-sans); cursor: pointer; }
+.sched-list li:last-child .sched-row { border-bottom: 1px solid var(--dk-border-default); }
+.sched-row:hover { background: var(--dk-bg-hover); }
+.sched-row.is-selected { background: var(--dk-accent-soft); }
+.sched-row:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
+.sched-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.sched-row-name { font: var(--dk-weight-semibold) var(--dk-text-body) var(--dk-font-mono); overflow-wrap: anywhere; min-width: 0; }
+.sched-row-head .status { font-size: var(--dk-text-sm); flex: none; }
+.sched-row-when { font-size: var(--dk-text-md); }
+.sched-row-reason { font-size: var(--dk-text-sm); color: var(--dk-warning-text); }
+.sched-row-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.sched-detail { min-width: 0; padding: 24px 0 40px 32px; outline: none; }
+.sched-detail-empty { color: var(--dk-text-muted); }
+.sched-detail-empty h3 { margin: 0 0 4px; font-size: var(--dk-text-body); color: var(--dk-text-primary); }
+.sched-detail-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.sched-detail-title h2 { margin: 0; font: var(--dk-weight-semibold) var(--dk-text-xl) var(--dk-font-mono); overflow-wrap: anywhere; min-width: 0; }
+.sched-detail-head .sub { margin: 6px 0 0; }
+.sched-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 16px; }
+.sched-actions .dk-button--danger { margin-left: auto; }
+.sched-health { margin: 18px 0 0; padding: 10px 12px; border: 1px solid var(--dk-warning-border); border-radius: var(--dk-radius-md); background: var(--dk-warning-bg); color: var(--dk-warning-text); font-size: var(--dk-text-md); }
+.sched-health--paused, .sched-health--waiting { border-color: var(--dk-border-default); background: var(--dk-bg-muted); color: var(--dk-text-muted); }
+.sched-facts { margin: 22px 0 0; display: grid; gap: 14px; }
+.sched-facts > div { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 4px 16px; align-items: baseline; }
+.sched-facts dt { font-size: var(--dk-text-sm); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); }
+.sched-facts dd { margin: 0; min-width: 0; font-size: var(--dk-text-md); overflow-wrap: anywhere; }
+.sched-plain { font-size: var(--dk-text-body); margin-right: 6px; }
+.sched-flows, .sched-next { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.sched-flows li { display: inline-flex; gap: 8px; align-items: baseline; }
+.sched-next li { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); }
+.sched-warning { margin: 0; color: var(--dk-warning-text); }
+.sched-history { margin-top: 28px; border-top: 1px solid var(--dk-border-default); padding-top: 18px; }
+.sched-history h3 { margin: 0 0 8px; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
+.sched-fires { list-style: none; margin: 0; padding: 0; }
+.sched-fire { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--dk-border-default); align-items: baseline; }
+.sched-fire time { font: var(--dk-text-sm) var(--dk-font-mono); color: var(--dk-text-muted); }
+.sched-fire-body { display: grid; gap: 4px; min-width: 0; }
+.sched-fire-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.sched-fire-line .status { white-space: normal; }
+.sched-fire-flows { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--dk-text-md); color: var(--dk-text-muted); }
+.sched-run-link { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; color: var(--dk-accent-default); font: var(--dk-text-md) var(--dk-font-mono); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.sched-run-link:hover { text-decoration: underline; }
+.sched-fire-error { font-size: var(--dk-text-sm); color: var(--dk-danger-text); overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .sched-workspace { grid-template-columns: minmax(0, 1fr); }
+  .sched-main { border-right: 0; padding-right: 0; }
+  .sched-detail { padding: 24px 0 32px; border-top: 1px solid var(--dk-border-strong); scroll-margin-top: 12px; }
+}
+@media (max-width: 560px) {
+  .sched-toolbar { align-items: stretch; }
+  .sched-toolbar #new-schedule { width: 100%; }
+  .sched-up-name, .sched-run-link, .sched-more { min-height: 44px; }
+  .sched-filters button, .sched-window button { min-height: 44px; }
+  .sched-fire { grid-template-columns: minmax(0, 1fr); }
+  .sched-facts > div { grid-template-columns: minmax(0, 1fr); }
+  .sched-actions .dk-button { flex: 1 1 40%; min-height: 44px; }
+  .sched-actions .dk-button--danger { margin-left: 0; }
+}
