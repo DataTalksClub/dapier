@@ -711,7 +711,51 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
   font-weight: var(--dk-weight-semibold);
 }
 .service-panel-title .brand-mark { flex: none; }
-.service-panel .section-head .service-purpose { flex-basis: 100%; line-height: 1.5; }
+/* (?) beside a register group title: its purpose on hover, focus, or tap. */
+.help-tip {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--dk-border-strong);
+  border-radius: var(--dk-radius-full);
+  background: transparent;
+  color: var(--dk-text-muted);
+  font: inherit;
+  font-size: var(--dk-text-sm);
+  font-weight: var(--dk-weight-semibold);
+  line-height: 1;
+  cursor: help;
+}
+.help-tip:hover, .help-tip:focus-visible { color: var(--dk-text-primary); border-color: var(--dk-text-muted); }
+.help-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: min(340px, calc(100vw - 32px));
+  padding: 8px 10px;
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-md);
+  background: var(--dk-bg-raised);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  color: var(--dk-text-primary);
+  font-size: var(--dk-text-md);
+  font-weight: normal;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  transform: translateX(-30%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.help-tip:hover::after, .help-tip:focus::after { opacity: 1; visibility: visible; }
 .service-accounts { list-style: none; margin: 0; padding: 0; }
 .service-account {
   display: grid;

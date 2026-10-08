@@ -146,6 +146,28 @@ function servicesFor(connection) {
   return deriveServices(connection);
 }
 
+/* What each register group is for, shown behind the (?) next to its
+   title. Zoom's two kinds carry their own text from the API's services. */
+const SERVICE_HELP = {
+  gmail: 'Read messages and send mail from the connected inbox. Email triggers and Gmail send actions use it.',
+  calendar: 'List calendars and free/busy times, start workflows from events, and edit events this account owns.',
+  drive: 'Find, read, and watch files in Google Drive, within the permissions granted.',
+  docs: 'Read and edit the Google Docs this account can access.',
+  sheets: 'Read and write the spreadsheets this account can access, including row triggers.',
+  youtube: 'Start workflows when the channel publishes a video, and read channel data within the permissions granted.',
+  dropbox: "Watch folders, read files, and upload under the connection's root path.",
+  slack: 'Agent access to a Slack workspace with a bot or user token. Workflow Slack actions can also use the shared Slack Service credential.',
+  telegram: 'A Telegram bot: start workflows from the messages it receives and post messages from actions.',
+  dataops: 'Read invoices from DataOps with its invoice-reader credential. Invoice parsing and bookkeeping stay in DataOps.',
+  google: "A Google sign-in whose grant doesn't cover a specific product yet. Edit its scopes to choose what it is for.",
+};
+
+function helpTip(text) {
+  if (!text) return '';
+  const safe = escapeHtml(text);
+  return `<button type="button" class="help-tip" aria-label="${safe}" data-tip="${safe}">?</button>`;
+}
+
 function connectionHasService(connection, serviceId) {
   return servicesFor(connection).some((service) => service.id === serviceId);
 }
@@ -682,9 +704,8 @@ function renderConnections(connections) {
       needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
     ].filter(Boolean).join(' · ');
     return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
-      <div class="section-head"><h2 class="service-panel-title">${serviceMark(zoom ? 'zoom' : serviceId)}<span>${escapeHtml(service?.label || serviceLabel(serviceId))}</span></h2>
-      <p class="sub">${escapeHtml(meta)}</p>
-      ${service?.description ? `<p class="sub service-purpose">${escapeHtml(service.description)}</p>` : ''}</div>
+      <div class="section-head"><h2 class="service-panel-title">${serviceMark(zoom ? 'zoom' : serviceId)}<span>${escapeHtml(service?.label || serviceLabel(serviceId))}</span>${helpTip(service?.description || SERVICE_HELP[serviceId])}</h2>
+      <p class="sub">${escapeHtml(meta)}</p></div>
       <ul class="service-accounts">${rows}</ul>
     </section>`;
   }).join('');
