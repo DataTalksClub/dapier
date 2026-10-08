@@ -59,8 +59,8 @@ email is "Not signed in", never a fake Drive account.
   a chip.
 - **Usage** is a count on the row (`Used in 3 flows` / `Not used by any
   flow`); Manage lists the flows by name, workflows linked.
-- **Status** is a stacked dot+word; renewable OAuth grants show
-  "renews automatically" on the second line. Only tokens without a refresh
+- **Status** is a stacked dot+word; renewable OAuth grants show no expiry
+  or renewal line. Only tokens without a refresh
   credential show expiry warnings or appear in the re-auth digest.
   The API exposes `auto_refresh` as a boolean, without revealing credentials;
   CLI list shows `auto-renews` and show includes that capability.

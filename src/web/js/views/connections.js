@@ -720,7 +720,7 @@ function accountRow(connection, serviceId) {
     </div>
     <div class="service-account-status">
       ${statusLine(status, CONNECTION_STATUS_LABELS)}
-      ${connection.auto_refresh ? '<span class="cell-sub">renews automatically</span>' : (expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : '')}
+      ${!connection.auto_refresh && expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}
     </div>
     <div class="service-account-actions">${nextAction}${remove}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
   </li>`;
