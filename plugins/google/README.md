@@ -98,7 +98,7 @@ consent screen.
 
 ### Gmail: `google-calendar`
 
-Display name: **Google Calendar + Drive (Gmail)**. This connection keeps the
+This connection keeps the
 Calendar scopes and requests Drive, Docs, and Sheets scopes as well:
 
 ```powershell
@@ -118,7 +118,7 @@ above. The connection is granted to `personal-scheduler` for `connect` and
 
 ### DataTalks.club: `google-sheets`
 
-Display name: **Google Drive, Docs & Sheets (DataTalks)**. This connection
+This connection
 requests only Workspace scopes and account identity:
 
 ```text

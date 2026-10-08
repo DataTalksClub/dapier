@@ -9,9 +9,11 @@ Network access goes through an injectable ``transport`` callable, matching
 """
 
 import json
+from urllib.parse import urlencode
 
 
-SLACK_AUTH_TEST_URL = "https://slack.com/api/auth.test"
+SLACK_API_URL = "https://slack.com/api"
+SLACK_AUTH_TEST_URL = f"{SLACK_API_URL}/auth.test"
 TOKEN_PREFIXES = ("xoxb-", "xoxp-", "xapp-")
 
 
@@ -62,3 +64,69 @@ def verify_account(token, *, transport=None):
     if not account_id:
         raise SlackTokenError("Slack identity check returned no account")
     return account_id, data.get("team") or data.get("user") or account_id
+
+
+def token_kind(token):
+    """Who a token acts as, from its prefix alone: ``app`` (bot or app-level
+    token) or ``user`` (a person's token). None when the shape is unknown."""
+    token = str(token or "")
+    if token.startswith(("xoxb-", "xapp-")):
+        return "app"
+    if token.startswith("xoxp-"):
+        return "user"
+    return None
+
+
+def _call(token, method, params, transport):
+    """One Slack Web API call; the parsed body, or None on any failure."""
+    try:
+        status, raw = transport(
+            "POST", f"{SLACK_API_URL}/{method}",
+            headers={"authorization": f"Bearer {token}",
+                     "content-type": "application/x-www-form-urlencoded"},
+            body=urlencode(params or {}).encode(), timeout=10,
+        )
+        data = json.loads(raw.decode() or "{}")
+    except Exception:
+        return None
+    if status >= 300 or not isinstance(data, dict) or not data.get("ok"):
+        return None
+    return data
+
+
+def describe_token(token, *, transport=None):
+    """Best effort: ``{"kind": "app"|"user", "name": ...}`` — who the token
+    acts as inside its workspace: the app's name for a bot token
+    (``bots.info``), the person's real name for a user token (``users.info``).
+
+    A bot and a user token for one workspace share the workspace title; this
+    is what tells the two connections apart. Never raises: when Slack cannot
+    be asked, the kind still comes from the token prefix and the name falls
+    back to the ``auth.test`` handle, else None.
+    """
+    transport = transport or _default_transport
+    kind = token_kind(token)
+    auth = _call(token, "auth.test", {}, transport) or {}
+    name = None
+    if auth.get("bot_id"):
+        kind = "app"
+        bot = (_call(token, "bots.info", {"bot": auth["bot_id"]}, transport) or {}).get("bot") or {}
+        name = bot.get("name")
+    elif auth.get("user_id") and kind != "app":
+        kind = "user"
+        user = (_call(token, "users.info", {"user": auth["user_id"]}, transport) or {}).get("user") or {}
+        profile = user.get("profile") or {}
+        name = user.get("real_name") or profile.get("real_name") or profile.get("display_name")
+    name = name or auth.get("user") or None
+    if not kind:
+        return None
+    return {"kind": kind, "name": name}
+
+
+def identity_label(identity):
+    """``Au-Tomator (App)`` / ``Alexey Grigorev (User)``; ``App token`` when
+    only the kind is known; empty without an identity."""
+    if not isinstance(identity, dict) or identity.get("kind") not in ("app", "user"):
+        return ""
+    kind = identity["kind"].capitalize()
+    return f"{identity['name']} ({kind})" if identity.get("name") else f"{kind} token"

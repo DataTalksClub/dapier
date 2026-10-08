@@ -240,7 +240,10 @@ def overview(event=None, visible=None):
         # list — that map is also what flags a connection as safe to delete.
         connections = connection_usage.attach(
             _connection_views(_scan(os.environ["CONNECTIONS_TABLE"])))
-        payload["connections"] = sorted(connections, key=lambda item: item.get("display_name", ""))
+        payload["connections"] = sorted(connections, key=lambda item: (
+            str(item.get("provider") or ""),
+            str(item.get("account_title") or item.get("verified_account_id") or ""),
+            str(item.get("connection_id") or "")))
     if "credentials" in selected:
         payload.update(
             credentials=[_credential_status(provider) for provider in CREDENTIAL_SPECS],

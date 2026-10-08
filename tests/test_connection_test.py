@@ -136,6 +136,41 @@ def test_agent_connection_test_reports_the_slack_workspace(monkeypatch):
     assert body["identity"] == {"id": "T024P01", "name": "DataTalks"}
 
 
+def test_connection_test_backfills_who_an_older_slack_token_acts_as(monkeypatch):
+    """Connections verified before the identity was recorded get it on the
+    next passing Test, and the list then shows it on every surface."""
+    credentials = seed_slack_credential(monkeypatch)
+    monkeypatch.setattr(slack_tokens, "describe_token", lambda token, *, transport=None:
+                        {"kind": "app", "name": "Au-Tomator"})
+    tables = configure_agent(monkeypatch, claims={"sub": "subject-1"},
+                             connections={"slack-main": dict(SLACK_CONNECTION)},
+                             credentials=credentials)
+    response = agent_api.route(
+        agent_event(body={}), "POST", "/api/agent/connections/slack-main/test")
+    body = json.loads(response["body"])
+    assert body["ok"] is True
+    assert body["account_identity"] == {"kind": "app", "name": "Au-Tomator"}
+    assert "Au-Tomator (App)" in body["detail"]
+    stored = tables["connections"].items["slack-main"]
+    assert stored["account_identity"] == {"kind": "app", "name": "Au-Tomator"}
+
+    listed = json.loads(agent_api.route(
+        agent_event(query={"all": "true"}), "GET", "/api/agent/connections")["body"])
+    assert listed["connections"][0]["account_identity"] == {
+        "kind": "app", "name": "Au-Tomator", "label": "Au-Tomator (App)"}
+
+
+def test_connection_test_never_erases_a_known_name(monkeypatch):
+    credentials = seed_slack_credential(monkeypatch)
+    monkeypatch.setattr(slack_tokens, "describe_token", lambda token, *, transport=None:
+                        {"kind": "app", "name": None})
+    known = {**SLACK_CONNECTION, "account_identity": {"kind": "app", "name": "Au-Tomator"}}
+    tables = configure_agent(monkeypatch, claims={"sub": "subject-1"},
+                             connections={"slack-main": known}, credentials=credentials)
+    agent_api.route(agent_event(body={}), "POST", "/api/agent/connections/slack-main/test")
+    assert tables["connections"].items["slack-main"]["account_identity"]["name"] == "Au-Tomator"
+
+
 def test_agent_connection_test_unknown_connection_is_404(monkeypatch):
     configure_agent(monkeypatch, claims={"sub": "subject-1"})
     response = agent_api.route(

@@ -320,6 +320,8 @@ def create_connection(event):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
+    # display_name is retired: connections are named by account + service.
+    # Older clients may still send it; it is accepted and ignored.
     allowed = {"connection_id", "provider", "display_name", "scopes", "root_path"}
     if not isinstance(body, dict) or "provider" not in body or set(body) - allowed:
         return _json_response(400, {"error": "Provide provider and supported connection fields"})
@@ -340,7 +342,7 @@ def create_connection(event):
 
 
 def update_connection_metadata(event, connection_id):
-    """Operator-only edit of a connection's display name, scopes, or Dropbox path."""
+    """Operator-only edit of a connection's scopes or Dropbox path."""
     subject, error = require_operator(event, audit.CONNECT)
     if error:
         return error
@@ -349,6 +351,8 @@ def update_connection_metadata(event, connection_id):
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
     allowed = {"display_name", "scopes", "root_path"}
+    if isinstance(body, dict):
+        body.pop("display_name", None)  # retired; accepted from older clients and ignored
     if not isinstance(body, dict) or not body or set(body) - allowed:
         return _json_response(400, {"error": "Provide supported connection fields"})
     if "scopes" in body and (
@@ -367,7 +371,6 @@ def update_connection_metadata(event, connection_id):
         fields = connections.validate_new_connection({
             "connection_id": connection_id,
             "provider": previous.get("provider"),
-            "display_name": body.get("display_name", previous.get("display_name") or connection_id),
             "scopes": body.get("scopes", previous.get("scopes") or []),
             "expected_account_id": previous.get("expected_account_id"),
             "root_path": body.get("root_path", previous.get("root_path") or ""),

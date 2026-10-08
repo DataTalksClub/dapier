@@ -6,7 +6,7 @@ import { $, icons, showApp, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { openDesigner, postConnectionsToDesigner } from './designer.js';
-import { renderConnections } from './connections.js';
+import { renderConnections, accountLabel } from './connections.js';
 import { renderCredentials } from './credentials.js';
 import { renderOAuthClients } from './oauth-clients.js';
 import { renderTokens } from './tokens.js';
@@ -336,7 +336,7 @@ function renderAttention(data) {
     <div class="home-create-actions">${run ? `<button class="dk-button dk-button--secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
   </article>`);
   for (const connection of model.connections) items.push(`<article class="home-problem">
-    <div><p class="home-problem-title">${alarm('warn')}<strong>${escapeHtml(connection.display_name || connection.connection_id)} needs attention</strong></p><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
+    <div><p class="home-problem-title">${alarm('warn')}<strong>${escapeHtml(accountLabel(connection))} needs attention</strong></p><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
     <button class="dk-button dk-button--secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
   </article>`);
   if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><p class="home-problem-title"><span class="status warn" aria-hidden="true"><span class="status-dot"></span></span><strong>Monthly task limit reached</strong></p><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');

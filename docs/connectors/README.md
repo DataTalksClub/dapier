@@ -128,7 +128,8 @@ uv run dapier connections connect youtube-team --agent <agent-name>
 For Slack or Telegram, or to set up a Zoom recording webhook, import a token
 with
 `uv run dapier connections import <connection-id> --provider <provider>
---token-file <private-file>`; use `--display-name` to set its label.
+--token-file <private-file>`. The connection is named by the verified
+account (workspace, bot @username) — there is no separate display name.
 
 Check provider guides for the approved accounts and scopes. Provider consent
 is separate from configuring a shared OAuth client: each Google or Dropbox

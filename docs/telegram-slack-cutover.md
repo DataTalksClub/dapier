@@ -31,7 +31,7 @@ mapping is the flow's condition chain.
    ```
    cp /home/alexey/bots/au-tomator-telegram-bot/.env /tmp/tgenv   # not committed
    dapier connections import automator-telegram --provider telegram \
-       --token-file /tmp/tgenv-only-the-token --display-name "automator-telegram"
+       --token-file /tmp/tgenv-only-the-token
    ```
 
 4. **Save the trigger** (this registers the Telegram webhook with the

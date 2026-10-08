@@ -877,11 +877,17 @@ def test_connection(connection, *, transport=None):
             return {"ok": True, "provider": provider, "detail": f"{title} verified",
                     "identity": {"id": account_id, "name": title}}
         if provider == "slack":
-            account_id, title = slack_tokens.verify_account(
-                access_token(connection), transport=transport)
+            token = access_token(connection)
+            account_id, title = slack_tokens.verify_account(token, transport=transport)
+            # Who the token acts as (app or person) rides along so the API
+            # can backfill connections verified before it was recorded.
+            acts_as = slack_tokens.describe_token(token, transport=transport)
+            label = slack_tokens.identity_label(acts_as)
+            suffix = f" — {label}" if label else ""
             return {"ok": True, "provider": provider,
-                    "detail": f"Slack token verified as {title}",
-                    "identity": {"id": account_id, "name": title}}
+                    "detail": f"Slack token verified as {title}{suffix}",
+                    "identity": {"id": account_id, "name": title},
+                    "account_identity": acts_as}
         if provider == "telegram":
             bot_id, title = telegram_api.get_me(access_token(connection), transport=transport)
             return {"ok": True, "provider": provider,

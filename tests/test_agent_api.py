@@ -316,9 +316,21 @@ def test_operator_can_create_and_edit_oauth_connection_metadata(monkeypatch):
     )
     assert edited["statusCode"] == 200
     view = json.loads(edited["body"])
-    assert view["display_name"] == "DTC YouTube"
+    # display_name is retired: older clients may still send it; it is ignored.
+    assert "display_name" not in view
+    assert "display_name" not in tables["connections"].items["youtube-team"]
     assert view["scopes"] == scopes
     assert tables["connections"].items["youtube-team"]["status"] == "ready"
+
+
+def test_edit_with_only_the_retired_display_name_changes_nothing(monkeypatch):
+    configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
+    agent_api.route(event({"connection_id": "youtube-team", "provider": "youtube",
+                           "scopes": scopes}), "PUT", "/api/agent/connections")
+    edited = agent_api.route(event({"display_name": "Renamed"}),
+                             "PUT", "/api/agent/connections/youtube-team")
+    assert edited["statusCode"] == 400
 
 
 def test_operator_can_show_connection_without_agent_grant(monkeypatch):

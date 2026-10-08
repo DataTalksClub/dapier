@@ -33,12 +33,10 @@ def register(sub):
                           help="optional internal id; generated when omitted")
     create_p.add_argument("--provider", required=True,
                           choices=("google", "youtube", "dropbox", "zoom"))
-    create_p.add_argument("--display-name", default=None)
     create_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
     create_p.add_argument("--root-path", default=None, help="Dropbox only: listing root")
-    edit_p = conn_sub.add_parser("edit", help="Edit connection display name, scopes, or Dropbox path")
+    edit_p = conn_sub.add_parser("edit", help="Edit connection scopes or Dropbox path")
     edit_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
-    edit_p.add_argument("--display-name", default=None)
     edit_p.add_argument("--scopes", nargs="+", default=None, metavar="SCOPE")
     root_group = edit_p.add_mutually_exclusive_group()
     root_group.add_argument("--root-path", default=None, help="Dropbox only: listing root")
@@ -56,7 +54,6 @@ def register(sub):
                           help="Provider token or Zoom webhook Secret Token (read from file)")
     import_p.add_argument("--signing-secret-file", default=None,
                           help="Slack only: Events API signing secret (read from file)")
-    import_p.add_argument("--display-name", default=None)
     import_p.add_argument("--expected-account", default=None)
     import_p.add_argument("--scopes", nargs="*", default=[])
     import_p.add_argument("--root-path", default=None,
@@ -117,7 +114,7 @@ def run(args, api_url, debug, child=None):
     if args.command == "create":
         return commands.connections_create(
             api_url, args.connection_id, args.provider, args.scopes,
-            display_name=args.display_name, root_path=args.root_path, debug=debug,
+            root_path=args.root_path, debug=debug,
         )
     if args.command == "import":
         return commands.connections_import(
@@ -125,7 +122,6 @@ def run(args, api_url, debug, child=None):
             args.client_secret_file, args.authorized_user_file,
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
             token_path=args.token_file, root_path=args.root_path,
-            display_name=args.display_name,
             signing_secret_path=args.signing_secret_file,
         )
     if args.command == "send-expiry-digest":
@@ -139,7 +135,7 @@ def run(args, api_url, debug, child=None):
     if args.command == "edit":
         root_path = "" if args.clear_root_path else args.root_path
         return commands.connections_edit(
-            api_url, connection_id, display_name=args.display_name,
+            api_url, connection_id,
             scopes=args.scopes, root_path=root_path, debug=debug,
         )
     if args.command == "revoke":

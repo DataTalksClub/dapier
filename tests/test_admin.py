@@ -208,6 +208,11 @@ def test_save_slack_connection_verifies_and_stores_token(monkeypatch):
     assert records[0]["status"] == "connected"
     assert records[0]["verified_account_id"] == "T012345"
     assert records[0]["account_title"] == "DataTalks"
+    # display_name is retired: sent by an older client, it is ignored.
+    assert "display_name" not in records[0]
+    # Slack is unreachable from tests, so who the token acts as comes from
+    # its prefix: an xoxb- bot token acts as the app.
+    assert records[0]["account_identity"] == {"kind": "app", "name": None}
     assert credentials == [("oauth#slack", {"token": token}, {"provider": "slack"})]
     assert token not in response["body"]
 
@@ -279,7 +284,7 @@ def test_save_slack_connection_edit_without_new_token_reuses_the_stored_one(monk
     assert credentials == [("oauth#slack", {"token": "xoxb-" + "a" * 30}, {"provider": "slack"})]
     assert records[0]["status"] == "connected"
     assert records[0]["verified_account_id"] == "T012345"
-    assert records[0]["display_name"] == "DataTalks Slack (renamed)"
+    assert "display_name" not in records[0]
     assert records[0]["version"] == 3  # build_item + mark_connected each bump
     assert "xoxb-" not in response["body"]
 
@@ -347,13 +352,13 @@ def test_save_telegram_connection_names_itself_after_the_verified_bot(monkeypatc
     }))
 
     assert response["statusCode"] == 200
-    # No display name was supplied, so the verified bot identity becomes it —
-    # that is what tells several bots of one provider apart in the console.
+    # The verified bot identity names the connection — that is what tells
+    # several bots of one provider apart in the console.
     assert records[0]["account_title"] == "@dtc_alerts_bot"
-    assert records[0]["display_name"] == "@dtc_alerts_bot"
+    assert "display_name" not in records[0]
 
 
-def test_save_telegram_connection_keeps_operator_rename(monkeypatch):
+def test_save_telegram_connection_ignores_retired_display_name(monkeypatch):
     records = []
     _fake_connections_table(monkeypatch, records)
     monkeypatch.setattr(telegram_api, "get_me", lambda token: ("987654321", "@dtc_alerts_bot"))
@@ -367,7 +372,8 @@ def test_save_telegram_connection_keeps_operator_rename(monkeypatch):
     }))
 
     assert response["statusCode"] == 200
-    assert records[0]["display_name"] == "Announcements bot"
+    assert "display_name" not in records[0]
+    assert records[0]["account_title"] == "@dtc_alerts_bot"
 
 
 def test_oauth_start_rejects_token_provider(monkeypatch):

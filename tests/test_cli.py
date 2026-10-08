@@ -769,11 +769,11 @@ def test_connections_import_token_provider_uses_token_file(monkeypatch, tmp_path
 
     code = commands.connections_import(
         "https://api.example.test", "tg-bot", "telegram", None, None, None,
-        debug=False, token_path=str(token_file), display_name="Dapier test bot")
+        debug=False, token_path=str(token_file))
     assert code == 0
     assert seen["path"] == "/api/agent/connections/import"
     assert seen["body"]["token"] == "123456:AAAtokentokentokentokentoken"
-    assert seen["body"]["display_name"] == "Dapier test bot"
+    assert "display_name" not in seen["body"]
     assert "authorized_user" not in seen["body"]
     out, _ = capsys.readouterr()
     assert "@dapier_bot" in out and "123456" not in out
@@ -813,19 +813,19 @@ def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):
     scopes = ["account_info.read", "files.metadata.read"]
     assert commands.connections_create(
         "https://api.example.test", "dropbox", "dropbox", scopes,
-        display_name="Invoices", root_path="/_dtc_paperwork/income-invoices",
+        root_path="/_dtc_paperwork/income-invoices",
     ) == 0
     assert commands.connections_edit(
-        "https://api.example.test", "dropbox", display_name="Incoming invoices",
+        "https://api.example.test", "dropbox",
         root_path="/incoming",
     ) == 0
     assert calls == [
         ("PUT", "/api/agent/connections", {
             "connection_id": "dropbox", "provider": "dropbox", "scopes": scopes,
-            "display_name": "Invoices", "root_path": "/_dtc_paperwork/income-invoices",
+            "root_path": "/_dtc_paperwork/income-invoices",
         }),
         ("PUT", "/api/agent/connections/dropbox", {
-            "display_name": "Incoming invoices", "root_path": "/incoming",
+            "root_path": "/incoming",
         }),
     ]
     out, _ = capsys.readouterr()
@@ -1648,7 +1648,7 @@ def test_connections_show_prints_health(capsys, monkeypatch):
     assert "token_expires_at: 2026-01-02" in out
 
 
-def test_connections_show_prints_account_before_display_name(capsys, monkeypatch):
+def test_connections_show_names_the_account_not_a_display_name(capsys, monkeypatch):
     def fake_call(url, method, path, body=None, debug=False):
         return {
             "connection_id": "google-sheets",
@@ -1668,7 +1668,38 @@ def test_connections_show_prints_account_before_display_name(capsys, monkeypatch
     assert commands.connections_show("https://api.example.test", "google-sheets") == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "account: alexey@datatalks.club"
-    assert "display_name: Google Drive, Docs & Sheets (DataTalks)" in lines
+    # A leftover stored display_name is never printed: account + service name it.
+    assert not any("Google Drive, Docs & Sheets (DataTalks)" in line for line in lines)
+
+
+def test_cli_has_no_display_name_flag():
+    for argv in (["connections", "create", "--provider", "dropbox", "--scopes", "a",
+                  "--display-name", "X"],
+                 ["connections", "edit", "dropbox", "--display-name", "X"],
+                 ["connections", "import", "tg", "--provider", "telegram",
+                  "--display-name", "X"]):
+        with pytest.raises(SystemExit):
+            main.build_parser().parse_args(argv)
+
+
+def test_connections_list_and_show_say_who_a_slack_token_acts_as(capsys, monkeypatch):
+    rows = [
+        {"connection_id": "slack", "provider": "slack", "status": "connected",
+         "account_title": "DataTalks.Club", "verified_account_id": "T1",
+         "account_identity": {"kind": "app", "name": "Au-Tomator", "label": "Au-Tomator (App)"}},
+        {"connection_id": "slack-2", "provider": "slack", "status": "connected",
+         "account_title": "DataTalks.Club", "verified_account_id": "T1",
+         "account_identity": {"kind": "user", "name": "Alexey Grigorev",
+                              "label": "Alexey Grigorev (User)"}},
+        {"connection_id": "zoom", "provider": "zoom", "status": "ready", "scopes": []},
+    ]
+    commands.print_connections(rows)
+    out = capsys.readouterr().out
+    assert "DataTalks.Club · Au-Tomator (App)" in out
+    assert "DataTalks.Club · Alexey Grigorev (User)" in out
+    assert "Zoom webhook" in out
+    commands.print_connection(rows[1])
+    assert capsys.readouterr().out.splitlines()[0] == "account: DataTalks.Club · Alexey Grigorev (User)"
 
 
 def test_templates_command_is_removed():

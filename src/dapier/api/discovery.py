@@ -200,4 +200,24 @@ def test_connection(connection_id, *, connections_table=None):
     identity = verdict.get("identity")
     if isinstance(identity, dict):
         payload["identity"] = identity
+    acts_as = verdict.get("account_identity")
+    if payload["ok"] and isinstance(acts_as, dict):
+        payload["account_identity"] = acts_as
+        _backfill_identity(connection, acts_as, connections_table)
     return 200, payload
+
+
+def _backfill_identity(connection, acts_as, connections_table):
+    """A passing Test records who the credential acts as on connections
+    verified before that was stored (older Slack tokens). Best effort: the
+    verdict stands even when the write fails."""
+    known = connection.get("account_identity")
+    if not connection.get("credential_id") or known == acts_as:
+        return
+    if isinstance(known, dict) and known.get("name") and not acts_as.get("name"):
+        return  # a lookup that came back nameless never erases a known name
+    try:
+        table = connections_table or _connections_table()
+        connections.put_connection(table, {**connection, "account_identity": acts_as})
+    except Exception:
+        pass

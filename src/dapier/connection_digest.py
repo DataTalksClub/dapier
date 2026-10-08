@@ -147,7 +147,8 @@ def render(rows, window_hours=None):
     ]
     for row in rows:
         connection_id = row.get("connection_id")
-        name = row.get("display_name") or connection_id
+        name = (row.get("account_title") or row.get("verified_account_id")
+                or connection_id)
         state = "EXPIRED" if row.get("expires_state") == "expired" else "expiring"
         lines.append(f"- {name} [{connection_id}] "
                      f"({row.get('provider')}): {state} at "

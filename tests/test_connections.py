@@ -95,7 +95,8 @@ def test_build_item_edit_preserves_binding_and_bumps_version():
         validate_new_connection(body(display_name="Renamed")),
         owner_subject="subject-1", previous=connected,
     )
-    assert edited["display_name"] == "Renamed"
+    # display_name is retired: a supplied one is ignored, never stored.
+    assert "display_name" not in edited
     assert edited["verified_account_id"] == "UC1"
     assert edited["version"] == connected["version"] + 1
 
@@ -294,3 +295,20 @@ def test_table_roundtrip():
     connections.put_connection(table, item)
     assert connections.get_connection(table, "youtube-personal")["version"] == 1
     assert len(connections.list_connections(table)) == 1
+
+
+def test_public_view_says_who_a_slack_token_acts_as():
+    stored_identity = {"connection_id": "slack", "provider": "slack",
+                       "account_identity": {"kind": "user", "name": "Alexey Grigorev"}}
+    assert connections.public_view(stored_identity)["account_identity"] == {
+        "kind": "user", "name": "Alexey Grigorev", "label": "Alexey Grigorev (User)"}
+    # Verified before the identity was recorded: the stored token's prefix
+    # still tells an app from a person right away.
+    older = {"connection_id": "slack-2", "provider": "slack"}
+    assert connections.public_view(older, {"token": "xoxb-abc"})["account_identity"] == {
+        "kind": "app", "name": None, "label": "App token"}
+    assert connections.public_view(older)["account_identity"] is None
+    assert connections.public_view({"connection_id": "g", "provider": "google"},
+                                   {"token": "xoxb-abc"})["account_identity"] is None
+    assert "display_name" not in connections.public_view(
+        {"connection_id": "g", "provider": "google", "display_name": "Old label"})

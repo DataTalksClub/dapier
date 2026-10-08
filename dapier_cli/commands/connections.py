@@ -40,12 +40,27 @@ def _services_label(item):
     return ", ".join(names) if names else (item.get("provider") or "-")
 
 
+def _account_label(item):
+    """Who a connection is: the verified account, plus who the credential
+    acts as when one account holds several (a Slack app and a person's
+    token in one workspace). A Zoom webhook has no account until Zoom
+    signs its first delivery."""
+    account = item.get("account_title") or item.get("verified_account_id")
+    if not account:
+        if item.get("provider") == "zoom" and not item.get("scopes"):
+            account = "Zoom webhook"
+        else:
+            return "not signed in"
+    acts_as = (item.get("account_identity") or {}).get("label")
+    return f"{account} · {acts_as}" if acts_as else account
+
+
 def print_connections(items):
     # No internal connection_id column: people address a connection as
     # "<service> <account>" (`dapier connections show drive <account>`).
     print(f"{'ACCOUNT':32} {'SERVICES':36} {'STATUS':10} {'HEALTH':8} {'EXPIRES':17} USED IN")
     for item in items:
-        account = item.get("account_title") or item.get("verified_account_id") or "not signed in"
+        account = _account_label(item)
         print(f"{account:32} {_services_label(item):36} "
               f"{item.get('status', ''):10} {item.get('health') or '-':8} "
               f"{('auto-renews' if item.get('auto_refresh') else _local_expiry(item)):17} "
@@ -65,8 +80,7 @@ def _used_in_label(item):
 
 
 def print_connection(item):
-    account = item.get("account_title") or item.get("verified_account_id")
-    print(f"account: {account or 'not signed in'}")
+    print(f"account: {_account_label(item)}")
     if item.get("services"):
         print(f"services: {_services_label(item)}")
         for service in item["services"]:
@@ -75,7 +89,7 @@ def print_connection(item):
     refs = item.get("refs") or []
     if refs:
         print(f"address as: {refs[0]}" + (f"  (also: {', '.join(refs[1:])})" if refs[1:] else ""))
-    for key in ("status", "health", "provider", "display_name",
+    for key in ("status", "health", "provider",
                 "verified_account_id", "expected_account_id",
                 "granted_scopes", "scopes", "version", "updated_at",
                 "connected_at", "auto_refresh"):
@@ -203,15 +217,13 @@ def print_hook_setup(provider, api_url):
               f"hold the current App Console secret.")
 
 
-def connections_create(api_url, connection_id, provider, scopes, *, display_name=None,
+def connections_create(api_url, connection_id, provider, scopes, *,
                        root_path=None, debug=False):
     body = {
         "connection_id": connection_id,
         "provider": provider,
         "scopes": list(scopes),
     }
-    if display_name:
-        body["display_name"] = display_name
     if root_path is not None:
         body["root_path"] = root_path
     data = api.call(api_url, "PUT", "/api/agent/connections", body, debug=debug)
@@ -223,17 +235,15 @@ def connections_create(api_url, connection_id, provider, scopes, *, display_name
     return 0
 
 
-def connections_edit(api_url, connection_id, *, display_name=None, scopes=None,
+def connections_edit(api_url, connection_id, *, scopes=None,
                      root_path=None, debug=False):
     body = {}
-    if display_name is not None:
-        body["display_name"] = display_name
     if scopes is not None:
         body["scopes"] = list(scopes)
     if root_path is not None:
         body["root_path"] = root_path
     if not body:
-        print("Provide --display-name, --scopes, --root-path, or --clear-root-path.")
+        print("Provide --scopes, --root-path, or --clear-root-path.")
         return 2
     api.call(api_url, "PUT", f"/api/agent/connections/{connection_id}", body, debug=debug)
     print(f"Updated {connection_id}.")
@@ -306,15 +316,13 @@ TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops")
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
                        authorized_user_path, expected_account_id=None, scopes=(), debug=False,
-                       token_path=None, root_path=None, display_name=None,
+                       token_path=None, root_path=None,
                        signing_secret_path=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
     body = {
         "connection_id": connection_id,
         "provider": provider,
     }
-    if display_name:
-        body["display_name"] = display_name
     if provider in TOKEN_PROVIDERS:
         # Token providers paste their credential directly; a refresh-token
         # file makes no sense for them.

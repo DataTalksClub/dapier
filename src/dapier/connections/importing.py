@@ -117,6 +117,10 @@ def save_token_connection(body, *, operator_subject, connections_table, audit_ev
     except connections.ConnectionError as exc:
         audit_event(fields["connection_id"], action, actor, outcome="error", error=str(exc))
         return 400, {"error": str(exc)}
+    if fields["provider"] == "slack":
+        # The workspace title is shared by every token for that workspace;
+        # who this token acts as (an app or a person) tells them apart.
+        item["account_identity"] = slack_tokens.describe_token(token)
     try:
         secret_value = token_secret_value(fields["provider"], token, body, item["credential_id"])
     except ValueError as exc:

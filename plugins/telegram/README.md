@@ -19,7 +19,8 @@ webhook with Telegram.
        --token-file /path/to/telegram-token
    ```
 
-   Use `--display-name` to set its label. The token is stored write-only.
+   The connection is named by the bot's verified @username. The token is
+   stored write-only.
 3. Verify it: `uv run dapier connections test telegram-bot` calls the Bot
    API's `getMe` and answers with the bot's identity. The console's
    connection test button runs the same check.

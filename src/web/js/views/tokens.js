@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { escapeHtml, statusLine, wrapTokens, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
 import { state } from '../state.js';
-import { openAccessGrants } from './connections.js';
+import { openAccessGrants, accountLabel } from './connections.js';
 
 let revealedToken = null;
 
@@ -33,7 +33,7 @@ function confirmTokenRemove(token) {
 function renderGrantConnections() {
   const select = $('#token-grant-connection');
   const connections = ((state.data || {}).connections || []).filter((connection) => connection.provider !== 'zoom');
-  select.innerHTML = connections.map((connection) => `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(connection.display_name || connection.connection_id)}</option>`).join('');
+  select.innerHTML = connections.map((connection) => `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(accountLabel(connection))}</option>`).join('');
   select.closest('label').hidden = connections.length === 0;
   $('#token-grant').hidden = connections.length === 0;
   $('#token-reveal-dialog .dialog-body .sub').textContent = connections.length

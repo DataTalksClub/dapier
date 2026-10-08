@@ -3,7 +3,21 @@ from contextlib import contextmanager
 from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from src.dapier.connections.providers import slack_tokens
 from src.dapier.connectors import registry as connector_registry
+
+
+@pytest.fixture(autouse=True)
+def _no_live_slack(monkeypatch):
+    """Slack lookups never reach slack.com from tests: the default transport
+    fails, so best-effort identity lookups fall back to the token prefix.
+    Tests that exercise Slack calls inject their own ``transport``."""
+    def offline(*_args, **_kwargs):
+        raise OSError("network disabled in tests")
+
+    monkeypatch.setattr(slack_tokens, "_default_transport", offline)
 
 
 @contextmanager

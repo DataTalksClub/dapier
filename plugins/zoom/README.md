@@ -125,7 +125,8 @@ The CLI can provision the webhook connection too:
 uv run dapier connections import zoom --provider zoom --token-file /path/to/zoom-webhook-secret
 ```
 
-Use `--display-name` to name another Zoom recording app. The CLI prints the
+Use another connection id to add a second Zoom recording app; it is listed
+as a Zoom webhook until Zoom signs its first delivery. The CLI prints the
 endpoint URL. Replacing the webhook secret returns the connection to setup
 incomplete until Zoom validates it again. Dapier verifies every webhook
 signature and rejects requests more than five minutes from their signed

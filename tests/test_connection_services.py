@@ -116,7 +116,10 @@ def test_console_renders_zoom_types_in_separate_described_panels():
         assert 'data-service="zoom-webhooks"' in markup
         assert 'Zoom API' in markup and 'Zoom Webhooks' in markup
         assert 'permissions granted' in markup and 'event notifications' in markup
-        assert 'AISL recordings' in markup and 'opaque-id' not in markup
+        # A webhook without a verified account is named by its type; a
+        # leftover stored display_name never labels it.
+        assert 'Zoom webhook' in markup and 'opaque-id' not in markup
+        assert 'AISL recordings' not in markup
         assert '2 accounts' not in markup
         assert '1 connection' in markup
         assert 'Same sign-in' not in markup
@@ -191,3 +194,43 @@ def test_console_puts_expiry_on_the_row_not_a_banner():
     assert "connection-expiry-banner" not in JS
     assert "Email re-auth reminder" not in JS
     assert "/api/admin/connections/expiry-digest" not in JS
+
+
+def test_console_rows_say_who_each_slack_token_acts_as():
+    """Two tokens for one workspace share its title; the row says which is
+    the app and which is a person, from the API's account_identity."""
+    connections = [
+        public_view({"connection_id": "slack", "provider": "slack", "status": "connected",
+                     "account_title": "DataTalks.Club", "verified_account_id": "T1",
+                     "account_identity": {"kind": "app", "name": "Au-Tomator"}}),
+        public_view({"connection_id": "slack-2", "provider": "slack", "status": "connected",
+                     "account_title": "DataTalks.Club", "verified_account_id": "T1"},
+                    {"token": "xoxp-older"}),
+    ]
+    with MiniRacer() as js:
+        js.eval('''
+            const nodes = {};
+            const $ = id => nodes[id] ||= {value: '', dataset: {},
+                setAttribute() {}, addEventListener() {}};
+            const $$ = () => [];
+            const state = {data: {}};
+            const escapeHtml = value => String(value);
+            const formatTimestamp = () => '';
+            const statusLine = value => value;
+            const serviceMark = value => value;
+            const document = {body: {dataset: {}}};
+            const connectionsLoadMoreButton = () => ({});
+            const renderConnectList = () => {};
+            const bindConnectButtons = () => {};
+            const bindOAuthLinks = () => {};
+        ''')
+        js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
+        js.eval('const connectionsPage = {connections: null};')
+        js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
+        js.eval(f'renderConnections({json.dumps(connections)});')
+        markup = js.eval("nodes['#connection-register'].innerHTML")
+        label = js.eval(f'accountLabel({json.dumps(connections[0])})')
+    assert markup.count('DataTalks.Club') == 2
+    assert '<span class="account-acts-as">Au-Tomator (App)</span>' in markup
+    assert '<span class="account-acts-as">User token</span>' in markup
+    assert label == 'DataTalks.Club · Au-Tomator (App)'

@@ -201,8 +201,9 @@ function connectionHasService(connection, serviceId) {
   return servicesFor(connection).some((service) => service.id === serviceId);
 }
 
-/* Verified identity (email, channel) — never the mashed display_name leftover
-   like "Google Calendar + Drive (Gmail)". Unverified grants have no identity. */
+/* Verified identity (email, channel, workspace). Connections have no
+   separate display name: account + service is the name. Unverified grants
+   have no identity. */
 function accountIdentity(connection) {
   return connection.account_title || connection.verified_account_id || '';
 }
@@ -213,9 +214,18 @@ function accountIdentity(connection) {
    yet, so it is named by what it was meant to cover. */
 function accountLabel(connection) {
   if (connection.provider === 'zoom' && !scopesOf(connection).length) {
-    return connection.display_name || 'Zoom webhook';
+    return 'Zoom webhook';
   }
-  return accountIdentity(connection) || `Unfinished ${productList(connection) || connection.provider} setup`;
+  const account = accountIdentity(connection);
+  if (!account) return `Unfinished ${productList(connection) || connection.provider} setup`;
+  return actsAsLabel(connection) ? `${account} · ${actsAsLabel(connection)}` : account;
+}
+
+/* Who the credential acts as inside the account, when one account holds
+   several connections — a Slack app and a person's token in one workspace
+   ("Au-Tomator (App)", "Alexey Grigorev (User)"). The API computes it. */
+function actsAsLabel(connection) {
+  return connection.account_identity?.label || '';
 }
 
 function productList(connection) {
@@ -242,21 +252,18 @@ const TOKEN_PROVIDER_META = {
     blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials. To listen for messages, open Manage afterwards and wire up event subscriptions.',
     label: 'Slack token',
     placeholder: 'xoxb-… or xoxp-…',
-    displayName: 'DataTalks Slack',
   },
   telegram: {
     heading: 'New Telegram connection',
     blurb: 'Paste a bot token from @BotFather (the digits:secret string). It is verified against Telegram and stored as the connection\'s secret; bots drive Telegram triggers and sendMessage actions.',
     label: 'Bot token',
     placeholder: '123456:ABC-DEF…',
-    displayName: 'Telegram bot',
   },
   zoom: {
     heading: 'New Zoom recording connection',
     blurb: 'Create a Zoom Webhook Only app, then paste its Secret Token. After creating this connection, copy its callback URL into the Zoom event subscription and select recording.completed.',
     label: 'Webhook Secret Token',
     placeholder: 'Secret Token from Zoom Marketplace',
-    displayName: 'Zoom recordings',
     connectionId: 'zoom',
   },
 };
@@ -439,7 +446,7 @@ function allKnownConnections() {
 }
 
 /* New connections must not clobber existing records, so derive the first
-   free "<base>", "<base>-2", … ID and number the display name to match. */
+   free "<base>", "<base>-2", … ID. */
 function nextConnectionId(base) {
   const taken = new Set(allKnownConnections().map((connection) => connection.connection_id));
   if (!taken.has(base)) return { id: base, suffix: 0 };
@@ -508,7 +515,6 @@ async function addServiceToConnection(serviceId, connection) {
     const body = {
       connection_id: connection.connection_id,
       provider: connection.provider,
-      display_name: connection.display_name || connection.connection_id,
       scopes,
     };
     if (connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
@@ -537,10 +543,10 @@ async function startNewOAuthConnection(meta) {
   let stopWatching = () => {};
   try {
     // Provision the new record with the service's standard scopes, then
-    // bounce straight to the consent screen. No display name: once consent
-    // verifies the account, the record takes the verified identity (the
-    // account email) as its name — that is what tells same-provider
-    // accounts apart, not a "Google Calendar 2" counter. No connection_id
+    // bounce straight to the consent screen. Once consent verifies the
+    // account, the verified identity (the account email) names it — that is
+    // what tells same-provider accounts apart, not a "Google Calendar 2"
+    // counter. No connection_id
     // either: the API mints an opaque internal key, and people address the
     // connection as "<service> <account>" from then on.
     const created = await api('/api/admin/connections', {
@@ -620,7 +626,6 @@ export function openEditConnection(connectionId) {
   $('#edit-connection-meta').textContent = [productList(connection), connection.status === 'ready' ? 'not signed in' : '']
     .filter(Boolean).join(' · ');
   renderManageDetails(connection, refs);
-  form.display_name.value = connection.display_name || accountLabel(connection);
   form.scopes.value = (connection.scopes || []).join(' ');
   $('#edit-scopes-field').hidden = TOKEN_PROVIDERS.includes(connection.provider);
   form.root_path.value = connection.root_path || '';
@@ -667,7 +672,6 @@ export function openEditConnection(connectionId) {
   $('#edit-connection-error').textContent = '';
   $('#edit-connection-test-result').hidden = true;
   $('#edit-connection-dialog').showModal();
-  form.display_name.focus();
 }
 
 function renderConnections(connections) {
@@ -691,8 +695,8 @@ function renderConnections(connections) {
     if (statusFilter === 'connected' && effectiveStatus(connection) !== 'connected') return false;
     if (statusFilter === 'attention' && !needsAttention(connection)) return false;
     if (!query) return true;
-    return [connection.display_name, connection.connection_id, connection.provider,
-      connection.account_title, connection.verified_account_id,
+    return [connection.connection_id, connection.provider,
+      connection.account_title, connection.verified_account_id, actsAsLabel(connection),
       ...servicesFor(connection).flatMap((service) => [service.id, service.label]),
       ...(connection.used_in || []).map((entry) => entry.ref)].some((value) => String(value || '').toLowerCase().includes(query));
   });
@@ -785,6 +789,7 @@ function accountRow(connection, serviceId) {
     return `<li class="service-account">
     <div class="service-account-main">
       <span class="cell-name">${escapeHtml(title)}</span>
+      ${actsAsLabel(connection) ? `<span class="account-acts-as">${escapeHtml(actsAsLabel(connection))}</span>` : ''}
       ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
       <span class="cell-sub">${escapeHtml(identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished')}</span>
     </div>
@@ -1228,7 +1233,7 @@ $('#connection-grant-form').addEventListener('submit', async (event) => {
   finally { submit.disabled = false; submit.textContent = 'Save grant'; }
 });
 
-export { TOKEN_PROVIDERS, TOKEN_PROVIDER_META, renderConnections, nextConnectionId, notice };
+export { TOKEN_PROVIDERS, TOKEN_PROVIDER_META, accountLabel, renderConnections, nextConnectionId, notice };
 
 $('#connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -1240,21 +1245,19 @@ $('#connection-form').addEventListener('submit', async (event) => {
   const provider = form.dataset.provider || 'slack';
   const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   $('#connection-error').textContent = '';
-  const { id, suffix } = nextConnectionId(meta.connectionId || (provider === 'slack' ? 'slack' : 'telegram-bot'));
+  const { id } = nextConnectionId(meta.connectionId || (provider === 'slack' ? 'slack' : 'telegram-bot'));
   const body = {
     connection_id: id,
     provider,
     token: form.token.value,
   };
-  // Zoom verifies via its webhook callback, not at save time, so it keeps a
-  // plain label; Slack and Telegram are verified here and take their
-  // workspace / bot identity as the display name (see mark_connected).
-  if (provider === 'zoom') body.display_name = suffix ? `${meta.displayName} ${suffix}` : meta.displayName;
+  // Slack and Telegram are verified here and named by their workspace /
+  // bot identity; Zoom verifies via its webhook callback later.
   try {
-    await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
+    const saved = await api('/api/admin/connections', { method: 'PUT', body: JSON.stringify(body) });
     form.token.value = '';
     $('#connection-dialog').close();
-    notice(provider === 'zoom' ? 'Zoom connection created. Add its callback URL in Zoom.' : `${meta.displayName} connected`);
+    notice(provider === 'zoom' ? 'Zoom connection created. Add its callback URL in Zoom.' : `${accountLabel(saved || { provider })} connected`);
     await refreshConnections();
     if (provider === 'zoom') openEditConnection(id);
   } catch (error) { $('#connection-error').textContent = error.message; }
@@ -1274,7 +1277,6 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
   const body = {
     connection_id: connectionId,
     provider,
-    display_name: form.display_name.value.trim() || connectionId,
   };
   if (!TOKEN_PROVIDERS.includes(provider)) {
     body.scopes = form.scopes.value.split(/\s+/).filter(Boolean);

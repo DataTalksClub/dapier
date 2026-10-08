@@ -4,7 +4,7 @@ A connection binds one provider account to one ``connection_id``. Bearer
 credentials always live in the credentials store; this module owns the
 DynamoDB metadata item only:
 
-- ``connection_id`` (HASH key), ``provider``, ``display_name``
+- ``connection_id`` (HASH key), ``provider``
 - ``scopes`` (requested), ``granted_scopes``
 - ``expected_account_id`` / ``verified_account_id`` / ``account_title``
 - ``owner_subject`` (stable DTC subject that connected it)
@@ -20,7 +20,7 @@ import secrets
 from datetime import datetime, timezone
 
 from . import services as connection_services
-from .providers import oauth_providers
+from .providers import oauth_providers, slack_tokens
 
 CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
 # Path segments under /api/*/connections/ that name a route, not a record.
@@ -132,7 +132,6 @@ def validate_new_connection(body):
     return {
         "connection_id": connection_id,
         "provider": provider,
-        "display_name": str(body.get("display_name") or connection_id).strip()[:100],
         "client_id": client_id,
         "client_secret": client_secret,
         "scopes": scopes,
@@ -167,7 +166,6 @@ def build_item(fields, *, owner_subject, previous=None):
     return {
         "connection_id": fields["connection_id"],
         "provider": fields["provider"],
-        "display_name": fields["display_name"],
         "scopes": fields["scopes"],
         "granted_scopes": list(previous.get("granted_scopes") or []),
         "expected_account_id": fields.get("expected_account_id"),
@@ -185,6 +183,8 @@ def build_item(fields, *, owner_subject, previous=None):
         "updated_at": now,
         **({"connected_at": previous["connected_at"]} if previous.get("connected_at") else {}),
         **({"connected_by": previous["connected_by"]} if previous.get("connected_by") else {}),
+        **({"account_identity": previous["account_identity"]}
+           if previous.get("account_identity") else {}),
     }
 
 
@@ -225,13 +225,6 @@ def mark_connected(item, *, verified_account_id, account_title, granted_scopes, 
         "updated_at": now,
         "version": int(item.get("version", 0)) + 1,
     })
-    # A connection created without a name (the API default is the
-    # connection_id) takes the verified account identity — bot handle,
-    # workspace, account email — as its display name. That is what tells
-    # several accounts of one provider apart; an operator's explicit rename
-    # (anything other than the default) always wins.
-    if account_title and updated.get("display_name") in (None, "", updated["connection_id"]):
-        updated["display_name"] = account_title
     return updated
 
 
@@ -272,6 +265,26 @@ def health(item, stored=None, *, now=None):
     return "expired" if oauth_providers.is_expired(stored, now=now) else "ok"
 
 
+def account_identity(item, stored=None):
+    """Who the credential acts as inside its account — ``{kind, name, label}``
+    with kind ``app`` or ``user`` — or None where the account says it all.
+
+    Slack records it at verification (several tokens for one workspace share
+    the workspace title). Connections verified before that carry none; their
+    kind still follows from the stored token's prefix until the next Test or
+    save fills in the name.
+    """
+    identity = item.get("account_identity")
+    if not isinstance(identity, dict) and item.get("provider") == "slack":
+        kind = slack_tokens.token_kind((stored or {}).get("token"))
+        identity = {"kind": kind, "name": None} if kind else None
+    if not isinstance(identity, dict) or not identity.get("kind"):
+        return None
+    view = {"kind": identity["kind"], "name": identity.get("name") or None}
+    view["label"] = slack_tokens.identity_label(view)
+    return view
+
+
 def public_view(item, stored=None):
     """Metadata safe for list/status responses (never secrets).
 
@@ -284,13 +297,13 @@ def public_view(item, stored=None):
     return {
         "connection_id": item.get("connection_id"),
         "provider": item.get("provider"),
-        "display_name": item.get("display_name"),
         "scopes": item.get("scopes", []),
         "granted_scopes": item.get("granted_scopes", []),
         "expected_account_id": item.get("expected_account_id"),
         "root_path": item.get("root_path") or "",
         "verified_account_id": item.get("verified_account_id"),
         "account_title": item.get("account_title"),
+        "account_identity": account_identity(item, stored),
         "status": item.get("status"),
         "oauth_consent": uses_oauth_consent(item),
         "health": health(item, stored),

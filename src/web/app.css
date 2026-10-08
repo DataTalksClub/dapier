@@ -785,6 +785,8 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
   color: var(--dk-text-muted);
 }
 .service-share .mono { font-size: inherit; }
+/* Who the credential acts as when one account holds several (Slack app vs. person). */
+.account-acts-as { display: block; margin-top: 2px; font-size: var(--dk-text-sm); color: var(--dk-text); }
 .service-account-main .cell-sub { display: block; margin-top: 3px; }
 .connection-details { margin: 4px 0 14px; }
 .connection-details-label { margin: 0 0 4px; font-weight: 600; }
