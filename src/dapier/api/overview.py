@@ -42,11 +42,14 @@ def _workflow_view(workflow, source, *, published, failures=0):
     auto-pause fields are engine-stamped runtime state (designer_store.
     api_auto_pause sets them; re-enabling clears them) and ``failures`` is
     the live consecutive-failure count behind them."""
-    from ..engine import matching
+    from ..engine import matching, naming
 
     triggers = matching.workflow_triggers(workflow)
     view = {
         "id": workflow["id"],
+        # The human name (engine.naming) the console titles rows with; the
+        # id stays the stable key every link and run carries.
+        **naming.name_fields(workflow),
         "enabled": workflow.get("enabled", True),
         "description": str(workflow.get("description") or ""),
         "trigger": triggers[0] if triggers else {},
@@ -78,10 +81,11 @@ def _workflow_view(workflow, source, *, published, failures=0):
 
 
 def _workflow_matches(view, query):
-    """Case-insensitive ?q= match: workflow id, description, the trigger's
+    """Case-insensitive ?q= match: workflow id, name, description, the trigger's
     connector and event, the action step types, the tags, and the folder."""
     text = " ".join(
-        [str(view.get("id") or ""), str(view.get("description") or ""),
+        [str(view.get("id") or ""), str(view.get("name") or ""),
+         str(view.get("description") or ""),
          str((view.get("trigger") or {}).get("connector") or ""),
          str((view.get("trigger") or {}).get("event") or "")]
         + [str(action.get("type") or "") for action in view.get("actions") or []]

@@ -468,4 +468,4 @@ def test_cli_workflows_list_forwards_the_tag_filter(isolated_home, monkeypatch, 
     assert rc == 0
     assert calls == ["/api/agent/designer/workflows?tag=ops"]
     out = capsys.readouterr().out
-    assert "ops-flow.yaml" in out and "[ops]" in out
+    assert "ops-flow" in out and "[ops]" in out

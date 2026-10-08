@@ -645,8 +645,7 @@ def test_cli_workflows_list_and_show(monkeypatch, capsys):
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
     assert cli_commands.workflows_list("https://api.example.test") == 0
     out, _ = capsys.readouterr()
-    assert "test-flow.yaml" in out
-    assert "email.message.received" in out
+    assert "test-flow" in out and "NAME" in out and "ID" in out
     assert "DataTalksClub/dapier (main branch)" in out
 
     def fake_show(api_url, method, path, body=None, **kwargs):

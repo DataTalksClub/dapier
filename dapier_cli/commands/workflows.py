@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_code", "workflows_test_step", "workflows_versions"]
+__all__ = ["WorkflowRefError", "resolve_workflow_ref", "workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_code", "workflows_test_step", "workflows_versions"]
 
 
 def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
@@ -22,6 +22,7 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
     if not items:
         print("No workflows match this search." if search or tag or folder else
               "No workflows yet. Create one in the console or run `dapier workflows save`.")
+    rows = []
     for item in items:
         state = "On" if item.get("enabled", True) else "Off"
         if not item.get("published", True):
@@ -34,16 +35,20 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
             # The engine paused it after consecutive failed runs; `workflows on`
             # is the resume verb (the enable toggle clears the pause).
             state += " (auto-paused)"
-        trigger = f"{item.get('connector', '?')}.{item.get('event', '?')}"
-        extra = (item.get("triggerCount") or 1) - 1
-        if extra > 0:
-            trigger = f"{trigger} +{extra}"
         tags = item.get("tags") or []
         item_folder = item.get("folder") or ""
-        print(f"{item.get('source') or item['id']:36} {trigger:34} "
-              f"{item.get('actionCount', 0)} action(s) {state}"
-              + (f" [folder: {item_folder}]" if item_folder else "")
-              + (f" [{' '.join(tags)}]" if tags else ""))
+        state += ((f" [folder: {item_folder}]" if item_folder else "")
+                  + (f" [{' '.join(tags)}]" if tags else ""))
+        # The human name leads (the API's ``name``: the override, else the
+        # generated "<trigger> → <actions>"); the id is the stable key every
+        # other command takes — the exact name works there too.
+        rows.append((_clip(item.get("name") or item["id"], 60), str(item["id"]), state))
+    if rows:
+        name_width = max(len("NAME"), *(len(row[0]) for row in rows))
+        id_width = max(len("ID"), *(len(row[1]) for row in rows))
+        print(f"{'NAME':{name_width}}  {'ID':{id_width}}  STATE")
+        for name, workflow_id, state in rows:
+            print(f"{name:{name_width}}  {workflow_id:{id_width}}  {state}")
     sync = data.get("git_sync") or {}
     target = f"{sync.get('repo', '?')} ({sync.get('branch', '?')} branch)"
     if sync.get("configured"):
@@ -53,9 +58,55 @@ def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
     return 0
 
 
+def _clip(text, width):
+    text = str(text)
+    return text if len(text) <= width else text[:width - 1] + "…"
+
+
+class WorkflowRefError(Exception):
+    """A workflow reference that names no workflow, or several."""
+
+
+def resolve_workflow_ref(api_url, ref, debug=False):
+    """The workflow file a command argument names.
+
+    ``my-flow.yaml`` passes through untouched (no extra call). Anything else
+    resolves against the workflow list: an exact id first, then the exact
+    human name (case-insensitive) the list shows. Several workflows sharing
+    that name is an error naming their ids — pass one of those instead."""
+    ref = str(ref or "").strip()
+    if ref.lower().endswith(".yaml"):
+        return ref
+    data = api.call(api_url, "GET", "/api/agent/designer/workflows", debug=debug)
+    items = data.get("workflows") or []
+
+    def file_of(item):
+        return item.get("source") or f"{item['id']}.yaml"
+
+    for item in items:
+        if item.get("id") == ref:
+            return file_of(item)
+    wanted = ref.casefold()
+    named = [item for item in items if str(item.get("name") or "").casefold() == wanted]
+    if len(named) == 1:
+        return file_of(named[0])
+    if named:
+        ids = ", ".join(sorted(str(item["id"]) for item in named))
+        raise WorkflowRefError(f"{len(named)} workflows are named {ref!r} ({ids}); "
+                               "pass the id instead.")
+    raise WorkflowRefError(f"No workflow has the id or name {ref!r}; "
+                           "see `dapier workflows list`.")
+
+
 def workflows_show(api_url, file, debug=False):
     data = api.call(api_url, "GET", f"/api/agent/designer/workflows/{file}", debug=debug)
-    print(json.dumps(data.get("workflow", {}), indent=2))
+    workflow = data.get("workflow", {})
+    if data.get("name"):
+        how = ("custom — set by name: in the YAML" if data.get("name_source") == "custom"
+               else "auto — generated from the trigger and actions")
+        print(f"Name: {data['name']} ({how})")
+        print(f"ID:   {workflow.get('id') or str(file).removesuffix('.yaml')}")
+    print(json.dumps(workflow, indent=2))
     return 0
 
 
@@ -176,6 +227,8 @@ def _save_workflow_yaml(api_url, yaml_text, rename_from, debug=False):
         stale = " behind the live revision" if draft.get("stale") else ""
         print(f"Saved {data.get('file')} as a draft{stale} — "
               f"publish it with `dapier workflows publish {data.get('file')}`.")
+    if data.get("name"):
+        print(f"Name: {data['name']} ({data.get('name_source') or 'auto'})")
     if data.get("git_sync_error"):
         print(f"Warning: Git sync failed ({data['git_sync_error']}).")
     for warning in data.get("warnings") or []:

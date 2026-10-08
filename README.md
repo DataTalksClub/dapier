@@ -55,6 +55,17 @@ trigger:
       suffix: .pdf
 ```
 
+**Names and ids.** The `id` is the workflow's stable internal key — the file
+name, API paths, run records, and hook triggers all use it, and it never
+changes on its own. People see a *name*: an optional top-level `name:`
+(at most 80 characters) when set, else one generated from what the flow does,
+`"<trigger> → <main actions>"` — the example above reads "Dropbox file
+created in incoming → Send webhook". The API returns both as `name` and
+`name_source: auto|custom` on the workflow list and get. A new workflow may
+leave `id:` out: the save assigns the slug of its name (`-2`, `-3`, ... when
+taken). CLI commands that take a workflow accept the file, the id, or the
+exact name (case-insensitive; an ambiguous name is refused).
+
 The webhook receives the normalized event as JSON. When `secret_id` is present,
 the worker reads a Secrets Manager secret containing either a plain signing secret
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256

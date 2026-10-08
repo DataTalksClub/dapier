@@ -10,18 +10,18 @@ def register(sub):
     wf_sub = wf_p.add_subparsers(dest="command", required=True)
     wf_list_p = wf_sub.add_parser("list", help="List workflows and their On/Off state")
     wf_list_p.add_argument("--search", default=None,
-                           help="Only workflows whose id, description, trigger, "
+                           help="Only workflows whose id, name, description, trigger, "
                                 "or action types contain this text")
     wf_list_p.add_argument("--tag", default=None,
                            help="Only workflows carrying this tag (case-insensitive)")
     wf_list_p.add_argument("--folder", default=None,
                            help="Only workflows in this folder (case-insensitive)")
     wf_show_p = wf_sub.add_parser("show", help="Show one workflow (JSON)")
-    wf_show_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_show_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_export_p = wf_sub.add_parser(
         "export", help="Print (or write) a workflow's canonical YAML; --all bundles every workflow")
     wf_export_p.add_argument("file", nargs="?", default=None,
-                             help="Workflow file name, e.g. my-flow.yaml (omit with --all)")
+                             help="Workflow id, file, or exact name (omit with --all)")
     wf_export_p.add_argument("--all", action="store_true",
                              help="Export every workflow's YAML as one zip")
     wf_export_p.add_argument("-o", "--output", default=None,
@@ -39,7 +39,7 @@ def register(sub):
                            help="Previous file name when the workflow was renamed")
     def add_bulk_toggle_flags(parser):
         parser.add_argument("file", nargs="*", default=None,
-                            help="Workflow file name(s), e.g. my-flow.yaml")
+                            help="Workflow id(s), file(s), or exact name(s)")
         parser.add_argument("--tag", default=None,
                             help="Bulk: every workflow carrying this tag")
         parser.add_argument("--all", action="store_true",
@@ -54,7 +54,7 @@ def register(sub):
     wf_disable_p = wf_sub.add_parser("disable", help="Alias for workflows off")
     add_bulk_toggle_flags(wf_disable_p)
     wf_dup_p = wf_sub.add_parser("duplicate", help="Copy a workflow under a new id and publish the copy live")
-    wf_dup_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_dup_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_dup_p.add_argument("--name", default=None,
                           help="New workflow name (defaults to <id>-copy)")
     wf_test_p = wf_sub.add_parser("test", help="Test-run a workflow YAML against a sample event (dry-run)")
@@ -86,31 +86,31 @@ def register(sub):
                                 help="The code step's action id (e.g. triage)")
     wf_versions_p = wf_sub.add_parser("versions",
                                       help="List a workflow's published versions (newest first)")
-    wf_versions_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_versions_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_diff_p = wf_sub.add_parser("diff",
                                   help="Unified diff between two published versions")
-    wf_diff_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_diff_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_diff_p.add_argument("--from", dest="from_revision", type=int, required=True,
                            help="Version to diff from, as shown by workflows versions")
     wf_diff_p.add_argument("--to", dest="to_revision", type=int, required=True,
                            help="Version to diff to, as shown by workflows versions")
     wf_rollback_p = wf_sub.add_parser("rollback",
                                       help="Restore an old version of a workflow (live immediately)")
-    wf_rollback_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_rollback_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_rollback_p.add_argument("revision",
                                help="Version number to restore, as shown by workflows versions")
     wf_publish_p = wf_sub.add_parser("publish",
                                      help="Promote a workflow's saved draft live "
                                           "(v1 for a draft-only workflow; 409 when stale)")
-    wf_publish_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_publish_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_discard_p = wf_sub.add_parser("discard",
                                      help="Throw a workflow's saved draft away (live untouched)")
-    wf_discard_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_discard_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_discard_p.add_argument("--yes", action="store_true",
                               help="Discard without a confirmation prompt")
     wf_draft_diff_p = wf_sub.add_parser("draft-diff",
                                         help="Unified diff of a workflow's draft against live")
-    wf_draft_diff_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_draft_diff_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_sample_p = wf_sub.add_parser(
         "sample", help="Pull a sample of what a flow receives when it starts")
     wf_sample_p.add_argument("connector", nargs="?", default=None,
@@ -130,12 +130,12 @@ def register(sub):
                              help="Options listing instead of a sample (e.g. slack.channels)")
     wf_delete_p = wf_sub.add_parser("delete",
                                     help="Delete a workflow: unpublish it live and remove its YAML from the repo")
-    wf_delete_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_delete_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_delete_p.add_argument("--yes", action="store_true",
                              help="Skip the confirmation prompt")
     wf_tags_p = wf_sub.add_parser("tags",
                                   help="Edit a workflow's tags (Zapier-style organization labels)")
-    wf_tags_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_tags_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_tags_p.add_argument("--tags", default=None,
                            help="Comma-separated tags, e.g. billing,ops — replaces the whole set")
     wf_tags_p.add_argument("--add", default=None,
@@ -146,14 +146,41 @@ def register(sub):
                            help="Remove all tags")
     wf_folder_p = wf_sub.add_parser("folder",
                                     help="Put a workflow in a folder (Zapier-style, flat)")
-    wf_folder_p.add_argument("file", help="Workflow file name, e.g. my-flow.yaml")
+    wf_folder_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_folder_p.add_argument("--set", dest="set_value", default=None,
                              help="Folder name — sets or moves the workflow (at most one folder)")
     wf_folder_p.add_argument("--clear", action="store_true",
                              help="Remove the workflow from its folder")
 
 
+# Commands whose `file` argument names a stored workflow (not a local YAML
+# path): each also accepts the bare id or the exact workflow name.
+_WORKFLOW_REF_COMMANDS = ("show", "export", "on", "off", "enable", "disable", "duplicate",
+                          "versions", "diff", "rollback", "publish", "discard",
+                          "draft-diff", "delete", "tags", "folder")
+
+
+def _resolve_refs(args, api_url, debug):
+    """Rewrites args.file from an id or name to the workflow file; returns an
+    error message, or None."""
+    if args.command not in _WORKFLOW_REF_COMMANDS or not getattr(args, "file", None):
+        return None
+    try:
+        if isinstance(args.file, list):
+            args.file = [commands.resolve_workflow_ref(api_url, ref, debug=debug)
+                         for ref in args.file]
+        else:
+            args.file = commands.resolve_workflow_ref(api_url, args.file, debug=debug)
+    except commands.WorkflowRefError as exc:
+        return str(exc)
+    return None
+
+
 def run(args, api_url, debug, child=None):
+    error = _resolve_refs(args, api_url, debug)
+    if error:
+        print(f"Error: {error}")
+        return 4
     if args.command == "list":
         return commands.workflows_list(api_url, debug, search=args.search, tag=args.tag,
                                        folder=args.folder)

@@ -37,11 +37,11 @@ def test_cli_list_marks_auto_paused_workflows(monkeypatch, capsys):
     monkeypatch.setattr(commands.api, "call", fake_call)
     assert commands.workflows_list("https://api.example.test") == 0
     out, _ = capsys.readouterr()
-    assert "flaky.yaml" in out and "(auto-paused)" in out
+    assert "flaky" in out and "(auto-paused)" in out
     # The healthy row stays a plain On — the marker rides the state column.
-    healthy_row = next(line for line in out.splitlines() if "healthy.yaml" in line)
+    healthy_row = next(line for line in out.splitlines() if "healthy" in line)
     assert "auto-paused" not in healthy_row
-    assert "(auto-paused)" not in out.split("healthy.yaml")[1]
+    assert "(auto-paused)" not in out.split("healthy")[1]
 
 
 def test_cli_overview_marks_auto_paused_workflows(capsys):

@@ -1587,7 +1587,7 @@ def test_workflows_list_forwards_the_search(isolated_home, monkeypatch, capsys):
 
     assert rc == 0
     assert calls == [("GET", "/api/agent/designer/workflows?q=invoice")]
-    assert "invoice-alert.yaml" in capsys.readouterr().out
+    assert "invoice-alert" in capsys.readouterr().out
 
 
 def test_connections_list_prints_health_and_expiry(capsys, monkeypatch):

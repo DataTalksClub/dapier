@@ -509,4 +509,4 @@ def test_cli_workflows_list_forwards_the_folder_filter(isolated_home, monkeypatc
     assert rc == 0
     assert calls == ["/api/agent/designer/workflows?folder=Billing"]
     out = capsys.readouterr().out
-    assert "filed.yaml" in out and "[folder: Billing]" in out and "[ops]" in out
+    assert "filed" in out and "[folder: Billing]" in out and "[ops]" in out

@@ -126,7 +126,7 @@ def filename_for(workflow_id):
 # Top-level key order for workflow YAML the server writes; the designer
 # client emits the same order. Stored dicts keep whatever order they were
 # parsed in — this only applies at dump time.
-WORKFLOW_KEY_ORDER = ("id", "enabled", "trigger", "triggers", "actions", "flows", "flow")
+WORKFLOW_KEY_ORDER = ("id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow")
 
 
 def ordered_workflow(workflow):
@@ -160,6 +160,21 @@ def parse_workflow(yaml_text):
     if not isinstance(workflow_id, str) or not ID_PATTERN.fullmatch(workflow_id.strip()):
         raise WorkflowError("workflow needs an id: letters, digits, hyphens or underscores (max 63 chars)")
     workflow_id = workflow_id.strip()
+
+    # The optional human name override (engine.naming): a short single-line
+    # label that wins over the generated name; empty means "auto", so the
+    # key is dropped rather than stored as "".
+    if "name" in workflow:
+        from ...engine import naming
+
+        try:
+            name = naming.validate_name(workflow.get("name"))
+        except ValueError as exc:
+            raise WorkflowError(str(exc)) from exc
+        if name:
+            workflow["name"] = name
+        else:
+            workflow.pop("name", None)
 
     if "allow_email_overlap" in workflow and not isinstance(workflow["allow_email_overlap"], bool):
         raise WorkflowError("allow_email_overlap must be true or false")

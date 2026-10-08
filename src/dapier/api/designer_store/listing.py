@@ -38,13 +38,16 @@ def _folder_of(workflow):
 
 def _summary(workflow, source):
     """One list row: primary trigger, how many there are, and the actions."""
-    from ...engine import matching
+    from ...engine import matching, naming
 
     triggers = matching.workflow_triggers(workflow)
     primary = triggers[0] if triggers else {}
     actions = workflow.get("actions")
     return {
         "id": str(workflow["id"]),
+        # The human name (engine.naming): the ``name:`` override, else the
+        # generated "<trigger> → <actions>" name; name_source says which.
+        **naming.name_fields(workflow),
         "enabled": workflow.get("enabled", True),
         "description": str(workflow.get("description") or ""),
         "source": source,
@@ -77,7 +80,7 @@ def api_list(q=None, tag=None, folder=None, visible=None):
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
     here too — its published state is what actually runs. ``q`` filters
-    case-insensitively over each row's id, description, trigger connector
+    case-insensitively over each row's id, name, description, trigger connector
     and event, action step types, tags, and folder. ``tag`` narrows to
     workflows carrying exactly that tag (case-insensitive) — Zapier's tag
     view. ``folder`` narrows to workflows sitting in exactly that folder
@@ -140,7 +143,8 @@ def api_list(q=None, tag=None, folder=None, visible=None):
         ordered = [
             summary for summary in ordered
             if search in " ".join(
-                [summary["id"], summary.get("description") or "",
+                [summary["id"], summary.get("name") or "",
+                 summary.get("description") or "",
                  summary.get("connector") or "", summary.get("event") or "",
                  *(summary.get("actionTypes") or []),
                  *(summary.get("tags") or []),
@@ -211,7 +215,10 @@ def api_get(source, visible=None):
             visibility.owner_of_item(item)):
         item = None
     if item and isinstance(item.get("workflow"), dict):
+        from ...engine import naming
+
         return 200, {"workflow": item["workflow"], "published": True,
+                     **naming.name_fields(item["workflow"]),
                      "yaml": workflow_yaml_text(item["workflow"])}
     return 404, {"error": f"no such workflow: {source}"}
 

@@ -41,6 +41,45 @@ def save_gate_ids(body):
     return ids
 
 
+def _id_taken(workflow_id):
+    """True when a live workflow or a draft already holds ``workflow_id``."""
+    return bool(published_workflows.get_item(workflow_id)
+                or published_workflows.get_draft(workflow_id))
+
+
+def assign_new_id(yaml_text):
+    """A new workflow may leave ``id:`` out: the id becomes the slug of its
+    name — the ``name:`` override, else the generated name (engine.naming)
+    — made unique with -2, -3, ... against live workflows and drafts.
+    Returns (yaml_text, assigned_id): the text re-rendered with the id when
+    one was assigned, else unchanged with None. Anything that is not a
+    mapping, or already carries an id, passes through for parse_workflow to
+    judge."""
+    if not isinstance(yaml_text, str):
+        return yaml_text, None
+    try:
+        workflow = yaml.safe_load(yaml_text)
+    except yaml.YAMLError:
+        return yaml_text, None
+    if not isinstance(workflow, dict):
+        return yaml_text, None
+    current = workflow.get("id")
+    if current is not None and not (isinstance(current, str) and not current.strip()):
+        return yaml_text, None
+    from ...engine import naming
+    from .validation import slugify_id
+
+    name, _ = naming.display_name(workflow)
+    base = slugify_id(name)[:56].rstrip("-") or "workflow"
+    candidate, counter = base, 1
+    while _id_taken(candidate):
+        counter += 1
+        candidate = f"{base}-{counter}"
+    workflow = {"id": candidate, **{key: value for key, value in workflow.items()
+                                    if key != "id"}}
+    return workflow_yaml_text(workflow), candidate
+
+
 def api_save(body, operator=None, cause="save", message=None, live=False, only_if_absent=False):
     """Validate a workflow and store it; a save drafts, a publish goes live.
 
@@ -64,6 +103,11 @@ def api_save(body, operator=None, cause="save", message=None, live=False, only_i
         return 400, {"error": f"invalid workflow file name: {rename_from!r}"}
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
+    # A new workflow without an id gets one from its name; an explicit id
+    # always wins and existing ids never change.
+    yaml_text, assigned_id = assign_new_id(yaml_text)
+    if assigned_id and rename_from:
+        return 400, {"error": "a renamed workflow needs its new id in the YAML"}
     try:
         workflow = parse_workflow(yaml_text)
     except WorkflowError as exc:
@@ -78,8 +122,12 @@ def api_save(body, operator=None, cause="save", message=None, live=False, only_i
         except Exception as exc:
             return 502, {"error": f"draft save failed: {exc}"}
         base_revision = int(previous.get("revision") or 0)
+        from ...engine import naming
+
         return 200, {
             "file": f"{workflow['id']}.yaml",
+            "id": workflow["id"],
+            **naming.name_fields(workflow),
             "published": False,
             "draft": {
                 "base_revision": base_revision,
@@ -100,7 +148,10 @@ def api_save(body, operator=None, cause="save", message=None, live=False, only_i
             published_workflows.unpublish(rename_from.removesuffix(".yaml"))
     except Exception as exc:
         return 502, {"error": f"publish failed: {exc}"}
-    result = {"file": f"{workflow['id']}.yaml", "published": True,
+    from ...engine import naming
+
+    result = {"file": f"{workflow['id']}.yaml", "id": workflow["id"],
+              **naming.name_fields(workflow), "published": True,
               "revision": item["revision"]}
     warnings = _sync_youtube(previous=(previous or {}).get("workflow"), workflow=workflow)
     if warnings:
@@ -215,9 +266,12 @@ def api_draft(source, visible=None):
     workflow = draft["workflow"]
     live_revision = int((published_workflows.get_item(workflow_id) or {})
                         .get("revision") or 0)
+    from ...engine import naming
+
     return 200, {
         "workflow": workflow,
         "published": False,
+        **naming.name_fields(workflow),
         "yaml": workflow_yaml_text(workflow),
         "draft": _draft_view(draft, live_revision),
     }
