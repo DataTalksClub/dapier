@@ -74,7 +74,7 @@ def env(monkeypatch):
     unless the intake really publishes."""
     state = {"stub": {}, "published": []}
 
-    def publish(connector, event_type, data, source=None, event_id=None):
+    def publish(connector, event_type, data, source=None, event_id=None, request=None):
         state["published"].append({"connector": connector, "event": event_type,
                                    "data": data, "source": source, "id": event_id})
 

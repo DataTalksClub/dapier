@@ -1,11 +1,13 @@
 """Implementations of the `dapier hooks` and `dapier webhooks` commands."""
 
 import json
+from urllib.parse import quote, urlencode
 
 from .. import api
 from .shared import read_json_file
 
-__all__ = ["hooks_delete", "hooks_list", "hooks_save", "hooks_show", "print_hook"]
+__all__ = ["hooks_deliveries", "hooks_delete", "hooks_delivery", "hooks_list", "hooks_save",
+           "hooks_show", "hooks_test", "print_delivery", "print_hook"]
 
 
 def print_hook(item):
@@ -22,8 +24,22 @@ def print_hook(item):
         print("secret header: x-telegram-bot-api-secret-token (managed by Telegram)")
     elif item.get("kind") == "mailchimp":
         print("auth: none — Mailchimp calls the unguessable URL directly")
+    elif item.get("signed"):
+        print(f"verification: signed — {item.get('signature_header') or 'x-dapier-signature'}: "
+              "sha256=<hex HMAC-SHA256(secret, raw body)>")
     else:
+        print("verification: bearer token")
         print(f"auth header: {item.get('header', 'authorization')}: Bearer {item.get('token', '')}")
+    if "workflows" in item:
+        flows = item["workflows"] or []
+        if not flows:
+            print("starts: no workflow yet — deliveries are logged but nothing runs")
+        for flow in flows:
+            notes = [note for note, on in (("disabled", not flow.get("enabled", True)),
+                                           ("when its filters pass", flow.get("conditional")),
+                                           ("listens to every webhook", flow.get("any_hook")))
+                     if on]
+            print(f"starts: {flow.get('id')}" + (f" ({', '.join(notes)})" if notes else ""))
 
 
 def hooks_list(api_url, kind=None, debug=False):
@@ -102,3 +118,92 @@ def hooks_delete(api_url, name, kind=None, debug=False):
     return 0
 
 
+
+
+def _size(value):
+    if value is None:
+        return "-"
+    return f"{value} B" if value < 1024 else f"{value / 1024:.1f} KB"
+
+
+def hooks_deliveries(api_url, name=None, limit=25, next_token=None, debug=False):
+    """Recent webhook deliveries with their outcome, newest first."""
+    params = {"limit": int(limit)}
+    if name:
+        params["hook"] = name
+    if next_token:
+        params["next"] = next_token
+    data = api.call(api_url, "GET",
+                    f"/api/agent/hook-triggers/deliveries?{urlencode(params)}", debug=debug)
+    rows = data.get("deliveries") or []
+    if not rows:
+        print("No deliveries yet" + (f" for '{name}'" if name else "") +
+              ". Send one with `dapier hooks test <name>`.")
+        return 0
+    print(f"{'RECEIVED':19} {'HOOK':18} {'SIZE':8} {'OUTCOME':40} DELIVERY ID")
+    for row in rows:
+        received = (row.get("received_at") or "-")[:19].replace("T", " ")
+        outcome = row.get("outcome_text") or row.get("outcome") or ""
+        if row.get("test"):
+            outcome = "[test] " + outcome
+        print(f"{received:19} {str(row.get('hook') or '-'):18} {_size(row.get('size_bytes')):8} "
+              f"{outcome[:40]:40} {row.get('delivery_id', '')}")
+    next_page = (data.get("paging") or {}).get("next")
+    if next_page:
+        print(f"\nnext page: {next_page}  (pass it to --next)")
+    return 0
+
+
+def print_delivery(row):
+    print(f"delivery: {row.get('delivery_id')}" + ("  [test request]" if row.get("test") else ""))
+    for key in ("hook", "received_at", "processed_at", "response_status", "content_type"):
+        if row.get(key) not in (None, ""):
+            print(f"  {key}: {row[key]}")
+    print(f"  size: {_size(row.get('size_bytes'))}")
+    print(f"  outcome: {row.get('outcome_text') or row.get('outcome')}")
+    for run in row.get("runs") or []:
+        line = f"  run: {run.get('run_id')} {run.get('status')}"
+        if run.get("error"):
+            line += f" — {run['error']}"
+        print(line)
+    if row.get("headers"):
+        print("  headers:")
+        for key, value in sorted(row["headers"].items()):
+            print(f"    {key}: {value}")
+    if row.get("query"):
+        print(f"  query: {json.dumps(row['query'], sort_keys=True)}")
+    if "body" in row:
+        print("  body:")
+        for line in json.dumps(row.get("body"), indent=2, sort_keys=True, default=str).splitlines():
+            print(f"    {line}")
+
+
+def hooks_delivery(api_url, delivery_id, debug=False):
+    """One delivery: request headers, payload, run outcome."""
+    data = api.call(api_url, "GET",
+                    f"/api/agent/hook-triggers/deliveries/{quote(delivery_id, safe='')}",
+                    debug=debug)
+    print_delivery(data.get("delivery") or {})
+    print(f"Replay it with `dapier runs events replay {delivery_id}`.")
+    return 0
+
+
+def hooks_test(api_url, name, data_path=None, debug=False):
+    """Send test request: POST a sample (or --data) payload at the hook
+    through its real intake, then show what it answered."""
+    body = {"name": name}
+    if data_path:
+        payload, error = read_json_file(data_path)
+        if error:
+            print(error)
+            return 2
+        body["data"] = payload
+    data = api.call(api_url, "POST", "/api/agent/hook-triggers/test", body, debug=debug)
+    response = data.get("response") or {}
+    print(f"Sent a test request to {data.get('url')}")
+    print(f"  response: {response.get('status')} {json.dumps(response.get('body'), sort_keys=True, default=str)}")
+    if data.get("delivery_id"):
+        print(f"  delivery: {data['delivery_id']}")
+        print(f"  Follow it with `dapier hooks delivery {data['delivery_id']}`.")
+    status = response.get("status") or 0
+    return 0 if 200 <= int(status) < 300 else 1

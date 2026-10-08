@@ -224,6 +224,14 @@ def _route_triggers(event, method, path, operator_payload, operator_subject):
         return routes.list_hook_triggers(event)
     if method == "PUT" and path == "/api/admin/hook-triggers":
         return routes.save_hook_trigger(event, operator_subject)
+    if method == "GET" and path == "/api/admin/hook-triggers/deliveries":
+        return routes.list_hook_deliveries(event, visible=_read_scope(operator_payload))
+    delivery_match = re.fullmatch(r"/api/admin/hook-triggers/deliveries/([^/]+)", path)
+    if method == "GET" and delivery_match:
+        return routes.get_hook_delivery(unquote(delivery_match.group(1)),
+                                        visible=_read_scope(operator_payload))
+    if method == "POST" and path == "/api/admin/hook-triggers/test":
+        return routes.test_hook_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/hook-triggers":
         return routes.delete_hook_trigger(event, operator_subject)
     if method == "GET" and path == "/api/admin/schedule-triggers":

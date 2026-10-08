@@ -74,7 +74,7 @@ def env(monkeypatch):
              "workflows": None,
              "sync": lambda event, **kwargs: _own_workflow_run(event, **kwargs)}
 
-    def publish(connector, event_type, data, source=None, event_id=None):
+    def publish(connector, event_type, data, source=None, event_id=None, request=None):
         state["published"].append({"connector": connector, "data": data,
                                    "source": source, "id": event_id})
 
@@ -346,7 +346,7 @@ def real_engine(monkeypatch, tmp_path):
         monkeypatch.delenv(unused, raising=False)
     state = {"published": [], "sent": [], "table": _Table(), "runs": []}
 
-    def publish(connector, event_type, data, source=None, event_id=None):
+    def publish(connector, event_type, data, source=None, event_id=None, request=None):
         state["published"].append({"connector": connector, "data": data, "id": event_id})
 
     def send_message(**kwargs):

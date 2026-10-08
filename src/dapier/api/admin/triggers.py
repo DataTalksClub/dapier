@@ -6,6 +6,7 @@ import json
 from ...triggers import poll_triggers
 from ...triggers import schedule_triggers
 from ...auth import session
+from .. import hook_activity
 
 
 def _hook_kind(event, body=None):
@@ -24,6 +25,36 @@ def list_hook_triggers(event):
     except email_triggers.TriggerError as exc:
         return http._json_response(400, {"error": str(exc)})
     status, payload = hook_triggers.api_list(kind=kind)
+    hook_activity.attach_workflows(payload.get("hooks"))
+    return http._json_response(status, payload)
+
+
+def list_hook_deliveries(event, visible=None):
+    """Recent webhook deliveries (the trigger inbox's webhook rows) with
+    their run outcomes; ``hook`` narrows to one endpoint."""
+    query = event.get("queryStringParameters") or {}
+    status, payload = hook_activity.api_deliveries(
+        query.get("hook"), query.get("limit", 25),
+        next_token=query.get("next") or None, visible=visible)
+    return http._json_response(status, payload)
+
+
+def get_hook_delivery(delivery_id, visible=None):
+    """One webhook delivery: request headers, payload, run outcomes."""
+    status, payload = hook_activity.api_delivery(delivery_id, visible=visible)
+    return http._json_response(status, payload)
+
+
+def test_hook_trigger(event, operator):
+    """Send test request: a sample (or the caller's) payload through the
+    hook's real intake, signed with its own credential."""
+    try:
+        body = http._request_json(event)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return http._json_response(400, {"error": str(exc) or "Invalid request"})
+    status, payload = hook_activity.api_send_test(body.get("name"), body.get("data"))
+    session._audit_event(str(body.get("name") or "unknown"), "hook-trigger.test", operator,
+                         outcome="ok" if status == 200 else "error")
     return http._json_response(status, payload)
 
 def save_hook_trigger(event, operator):

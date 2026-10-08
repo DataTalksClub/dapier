@@ -150,7 +150,13 @@ def _header(event, name):
     )
 
 
-def _publish(connector, event_type, data, source=None, event_id=None):
+def _publish(connector, event_type, data, source=None, event_id=None, request=None):
+    """Put one trigger envelope on the event queue; returns its event id.
+
+    ``request`` (webhook deliveries) is the delivery log's record of the
+    HTTP request — redacted headers, size, test flag. It rides the envelope
+    beside ``data``, so the trigger inbox keeps it while workflows see the
+    payload unchanged."""
     event_id = event_id or str(uuid.uuid4())
     envelope = {
         "schema_version": "1.0",
@@ -162,7 +168,10 @@ def _publish(connector, event_type, data, source=None, event_id=None):
         "occurred_at": datetime.now(timezone.utc).isoformat(),
         "data": data,
     }
+    if request:
+        envelope["request"] = request
     queue.send_message(QueueUrl=os.environ["EVENT_QUEUE_URL"], MessageBody=json.dumps(envelope))
+    return event_id
 
 
 def _youtube(body):
@@ -401,20 +410,25 @@ def _webhook_hook(event, name, body, query):
         if not fresh:
             return _response(202, {"accepted": True, "duplicate": True, "event_id": event_id})
         try:
-            _publish("webhook", hook_triggers.WEBHOOK_EVENT, {
+            published = _publish("webhook", hook_triggers.WEBHOOK_EVENT, {
                 "hook": item["hook_id"],
                 "body": payload,
                 "query": query,
                 "content_type": content_type,
-            }, source=item["hook_id"], event_id=event_id)
+            }, source=item["hook_id"], event_id=event_id,
+                request=hook_triggers.delivery_record(
+                    event.get("headers"), body, response_status=202))
         except Exception:
             _release_delivery(item, event_id)
             raise
-        return _response(202, {"accepted": True})
-    return _sync_webhook_run(item, payload, query, content_type)
+        # The event id is the delivery's handle in the delivery log (the
+        # trigger inbox): a caller — or Send test request — can look it up.
+        return _response(202, {"accepted": True, **({"event_id": published} if published else {})})
+    return _sync_webhook_run(item, payload, query, content_type,
+                             request=hook_triggers.delivery_record(event.get("headers"), body))
 
 
-def _sync_webhook_run(item, payload, query, content_type):
+def _sync_webhook_run(item, payload, query, content_type, request=None):
     """Run the matched workflow inline and answer with the outcome (the
     trigger's ``response.mode: sync``). The production path — step leases,
     run history, task usage, failure notify, workflow-level retry — without
@@ -458,6 +472,8 @@ def _sync_webhook_run(item, payload, query, content_type):
         "source": item["hook_id"],
         "data": data,
     }
+    if request:
+        event["request"] = request
 
     def fallback(reason):
         """Hand the delivery to the queue path: publish under the same event
@@ -466,7 +482,8 @@ def _sync_webhook_run(item, payload, query, content_type):
         exactly like the ack path."""
         try:
             _publish("webhook", hook_triggers.WEBHOOK_EVENT, data,
-                     source=item["hook_id"], event_id=delivery_id)
+                     source=item["hook_id"], event_id=delivery_id,
+                     **({"request": {**request, "response_status": 202}} if request else {}))
         except Exception:
             _release_delivery(item, delivery_id)
             raise
@@ -510,6 +527,13 @@ def _sync_webhook_run(item, payload, query, content_type):
         steps.setdefault(str(action_id), {}).update(
             {"error": str(exc) or exc.__class__.__name__})
 
+    # The inline run never touches the queue, so the delivery log (trigger
+    # inbox) gets its row here, closed out like the worker would; a fallback
+    # publish reuses the id, so the worker's record is a no-op and its
+    # close-out rewrites this one.
+    from ..triggers import inbox
+
+    inbox_id = inbox.record(event)
     try:
         matched = worker.execute(event, before_action=before_action,
                                  after_action=after_action,
@@ -518,6 +542,7 @@ def _sync_webhook_run(item, payload, query, content_type):
         # A delay past the inline cap: park the continuation exactly as the
         # worker handler would and tell the caller the outcome is async.
         worker._park_suspension(susp)
+        inbox.complete(inbox_id, [susp.workflow_id])
         return _response(202, {"ok": True, "suspended": True,
                                "resume_at": (susp.output or {}).get("resume_at"),
                                "event_id": delivery_id})
@@ -525,11 +550,13 @@ def _sync_webhook_run(item, payload, query, content_type):
         # A failed inline run releases the delivery so a provider retry
         # re-executes it, and notifies like the worker path would.
         _release_delivery(item, delivery_id)
+        inbox.complete(inbox_id, None, error=exc)
         worker.notify_failure(exc, event)
         return _response(500, {"ok": False, "error": str(exc) or exc.__class__.__name__,
                                "event_id": delivery_id})
     if over_budget["flag"]:
         return fallback("budget")
+    inbox.complete(inbox_id, matched)
     workflow_id = matched[0] if matched else f"webhook-trigger-{item['hook_id']}"
     response = {"ok": True, "workflow": workflow_id, "steps": steps, "event_id": delivery_id}
     template = (item.get("response") or {}).get("template")

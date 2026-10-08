@@ -50,7 +50,7 @@ def env(monkeypatch):
              "execute_calls": [], "hooks": None,
              "sync": lambda event, **kwargs: ["webhook-trigger-orders"]}
 
-    def publish(connector, event_type, data, source=None, event_id=None):
+    def publish(connector, event_type, data, source=None, event_id=None, request=None):
         state["published"].append({"connector": connector, "data": data, "id": event_id})
 
     def execute(event, **kwargs):

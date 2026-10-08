@@ -4,7 +4,7 @@ allow-list, and email/hook/schedule/poll trigger management."""
 import json
 
 from ...connectors import trigger_discovery
-from .. import runs
+from .. import hook_activity, runs
 from ...triggers import email_from, email_triggers, hook_triggers, poll_triggers, schedule_triggers
 
 from .common import _json_response, _no_store, _visibility
@@ -21,7 +21,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_triggers_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
+__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_delivery_api", "hook_test_api", "hook_triggers_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
 
 
 
@@ -110,6 +110,7 @@ def hook_triggers_api(event, method):
             if kind and kind not in hook_triggers.KINDS:
                 raise ValueError(f"hook kind must be one of: {', '.join(hook_triggers.KINDS)}")
             status, payload = hook_triggers.api_list(table_ref, kind=kind)
+            hook_activity.attach_workflows(payload.get("hooks"))
         elif method == "PUT":
             body = json.loads(event.get("body") or "{}")
             kind = str((body or {}).get("kind") or "webhook").strip().lower()
@@ -208,3 +209,39 @@ def poll_triggers_api(event, method):
     audit.emit(payload.get("poll_id", "unknown"), "poll-trigger", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
+
+
+def hook_delivery_api(event, delivery_id=None):
+    """Operator-only webhook delivery log: recent deliveries (``hook``
+    narrows to one endpoint) or, with an id, one delivery's request
+    headers, payload and run outcomes — the console Hooks tab's data."""
+    subject, error = require_operator(event, "hook-trigger.deliveries")
+    if error:
+        return error
+    visible = _visibility(event, subject)
+    if delivery_id:
+        status, payload = hook_activity.api_delivery(delivery_id, visible=visible)
+        return _no_store(_json_response(status, payload))
+    query = event.get("queryStringParameters") or {}
+    status, payload = hook_activity.api_deliveries(
+        query.get("hook"), query.get("limit", 25),
+        next_token=query.get("next") or None, visible=visible)
+    return _no_store(_json_response(status, payload))
+
+
+def hook_test_api(event):
+    """Operator-only Send test request: a sample (or the caller's) payload
+    through the hook's real intake, signed with its own credential."""
+    subject, error = require_operator(event, "hook-trigger.test")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+        if not isinstance(body, dict):
+            raise ValueError("request body must be an object")
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _json_response(400, {"error": str(exc) or "Invalid request"})
+    status, payload = hook_activity.api_send_test(body.get("name"), body.get("data"))
+    audit.emit(str(body.get("name") or "unknown"), "hook-trigger.test", subject,
+               outcome="ok" if status == 200 else "error")
+    return _no_store(_json_response(status, payload))

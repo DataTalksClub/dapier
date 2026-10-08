@@ -265,6 +265,39 @@ def signature_for(secret, body):
     return hmac.new(str(secret).encode(), body, hashlib.sha256).hexdigest()
 
 
+# Header values a delivery record never keeps: the credentials a caller
+# presents. The signature header stays — an HMAC of the body is not a
+# secret, and seeing it is how an operator debugs a signing mismatch.
+REDACTED_HEADERS = frozenset((
+    "authorization", "proxy-authorization", "cookie", "x-api-key",
+    "x-telegram-bot-api-secret-token",
+))
+REDACTED = "[redacted]"
+TEST_HEADER = "x-dapier-test"
+MAX_RECORDED_HEADERS = 60
+
+
+def delivery_record(headers, body, *, response_status=None):
+    """What the delivery log keeps about one request: its headers with the
+    credential values redacted, the body size, and whether it was the
+    console's/CLI's Send test request. Rides the event envelope's
+    ``request`` key (never ``data``: workflows see exactly the payload they
+    always did) into the trigger inbox."""
+    recorded = {}
+    for key, value in list((headers or {}).items())[:MAX_RECORDED_HEADERS]:
+        name = str(key).strip().lower()
+        recorded[name] = REDACTED if name in REDACTED_HEADERS else str(value)[:500]
+    record = {
+        "method": "POST",
+        "headers": recorded,
+        "size_bytes": len(body or b""),
+        "test": recorded.get(TEST_HEADER) == "1",
+    }
+    if response_status is not None:
+        record["response_status"] = int(response_status)
+    return record
+
+
 def verify_signature(secret, body, header):
     """Constant-time check of the signature header value on a raw delivery
     body (the header name is the caller's — ``signature_header_for``).

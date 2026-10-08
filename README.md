@@ -434,6 +434,16 @@ one connection drives at most one trigger). Both are created and listed with
 `dapier webhooks save|list|show|delete`, fire the same action catalog as email
 triggers, and are live immediately — no deploy.
 
+Every accepted delivery lands in a delivery log (the trigger inbox, 30 days)
+with its request headers — credentials redacted — size, response, and what
+the workflows did with it. The console's Workflows › Hooks tab shows it
+beside each endpoint's URL, verification, and the workflows it starts;
+`dapier webhooks deliveries [name]` and `dapier webhooks delivery <id>` read
+the same log, `dapier webhooks replay <id>` re-sends one, and
+`dapier webhooks test <name> [--data payload.json]` POSTs a sample through
+the hook's real intake with its own token or signature (a real delivery:
+matched workflows run).
+
 A webhook trigger created or updated with an optional `secret` (a plain JSON
 field, so `dapier webhooks save webhook.json` passes it straight through;
 `"secret": ""` clears it, an edit that omits it keeps it) locks the URL
@@ -520,6 +530,8 @@ dapier tokens create --name personal-scheduler --agent personal-scheduler
 dapier tokens revoke personal-scheduler
 dapier tokens delete personal-scheduler      # permanently remove a revoked token (and its grants)
 dapier webhooks save webhook.json            # webhook and Telegram callbacks (see below)
+dapier webhooks test orders --data body.json # send a test request, then follow it:
+dapier webhooks deliveries orders            # recent deliveries and their outcome
 dapier schedules save schedule.json          # {"name", "expression": "cron(0 8 * * ? *)", "actions"}
 ```
 

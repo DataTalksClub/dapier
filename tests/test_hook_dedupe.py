@@ -44,7 +44,7 @@ def hooks(monkeypatch):
     def forget(scope, key, **kwargs):
         state["forget_calls"].append((scope, key))
 
-    def publish(connector, event_type, data, source=None, event_id=None):
+    def publish(connector, event_type, data, source=None, event_id=None, request=None):
         if state.get("fail_publish"):
             raise RuntimeError("queue down")
         state["published"].append({"connector": connector, "event": event_type,

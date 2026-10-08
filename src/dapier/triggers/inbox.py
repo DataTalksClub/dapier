@@ -276,6 +276,10 @@ def record(event, *, table_ref=None):
         summary = email_summary(event.get("data") or {})
         if summary:
             item["email"] = summary
+    if isinstance(event.get("request"), dict):
+        # A webhook delivery's request record (redacted headers, size, test
+        # flag — hook_triggers.delivery_record): the delivery log reads it.
+        item["request"] = _trim(event["request"])
     try:
         table = table_ref if table_ref is not None else _table()
         table.put_item(
@@ -370,6 +374,8 @@ def _view(item):
     if view.get("connector") == "email":
         stored_summary = _decode_numbers(item.get("email"))
         view["email"] = stored_summary or email_summary(view.get("data")) or {}
+    if item.get("request") is not None:
+        view["request"] = _decode_numbers(item["request"])
     return view
 
 
@@ -406,7 +412,7 @@ def _outcomes(value):
 
 
 def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None,
-             visible=None, outcome=None):
+             visible=None, outcome=None, hook=None):
     """Recent inbox events, newest first; ``connector`` filters when given.
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
@@ -440,7 +446,14 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
         Limit=max(limit * 6, 150)).get("Items", [])
     events = [_view(item) for item in items]
     if connector:
-        events = [event for event in events if event.get("connector") == connector]
+        # One connector, or a family of them (the hook delivery log reads
+        # webhook, telegram and mailchimp rows together).
+        wanted = (connector,) if isinstance(connector, str) else tuple(connector)
+        events = [event for event in events if event.get("connector") in wanted]
+    if hook:
+        # Hook intakes stamp the hook trigger's name on the event data.
+        events = [event for event in events
+                  if isinstance(event.get("data"), dict) and event["data"].get("hook") == hook]
     if outcomes:
         events = [event for event in events if event.get("outcome") in outcomes]
     if visible is not None:
@@ -456,7 +469,7 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
         "paging": {
             "next": _encode_token(page[-1]) if more and page else None,
             "limit": limit,
-            "filtered": bool(connector or outcomes or next_token),
+            "filtered": bool(connector or outcomes or hook or next_token),
         },
     }
 
