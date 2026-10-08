@@ -178,8 +178,8 @@ def test_console_groups_rows_by_service():
 def test_zoom_oauth_rows_offer_reconnect():
     """Zoom meetings use OAuth start, same as YouTube; Slack/Telegram paste a token."""
     assert "usesOAuthConsent" in JS
-    assert "provider !== 'slack' && provider !== 'telegram'" in JS
-    assert "usesOAuthConsent(connection.provider) && status !== 'connected'" in JS
+    assert "connection.provider !== 'slack' && connection.provider !== 'telegram'" in JS
+    assert "usesOAuthConsent(connection) && status !== 'connected'" in JS
 
 
 def test_console_puts_expiry_on_the_row_not_a_banner():

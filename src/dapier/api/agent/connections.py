@@ -520,6 +520,8 @@ def start_connect(event, connection_id):
             {"error": "This provider connects with a directly provided token; "
                       "an operator can paste a new one in the operator console"},
         )
+    if connections.is_zoom_webhook(connection):
+        return _json_response(400, {"error": connections.ZOOM_WEBHOOK_SETUP_HINT})
     if not redirect_uri:
         return _json_response(503, {"error": "OAuth callback URL is not configured"})
     try:

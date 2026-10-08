@@ -39,6 +39,25 @@ STATUS_REVOKED = "revoked"
 TOKEN_PROVIDERS = {"slack", "telegram"}
 
 
+def is_zoom_webhook(item):
+    """A Zoom connection without API scopes is a webhook-only connection:
+    it holds an event signing secret, and Zoom's endpoint validation (not
+    OAuth consent) moves it from ready to connected."""
+    return item.get("provider") == "zoom" and not item.get("scopes")
+
+
+def uses_oauth_consent(item):
+    """Whether finishing or renewing this connection goes through OAuth
+    consent — not for pasted-token providers or Zoom webhook connections."""
+    return item.get("provider") not in TOKEN_PROVIDERS and not is_zoom_webhook(item)
+
+
+ZOOM_WEBHOOK_SETUP_HINT = (
+    "Zoom webhook connections have no OAuth consent; setup finishes when Zoom "
+    "validates the connection's callback URL in the app's event subscription"
+)
+
+
 class ConnectionError(ValueError):
     """The connection request or transition is invalid."""
 
@@ -273,6 +292,7 @@ def public_view(item, stored=None):
         "verified_account_id": item.get("verified_account_id"),
         "account_title": item.get("account_title"),
         "status": item.get("status"),
+        "oauth_consent": uses_oauth_consent(item),
         "health": health(item, stored),
         "token_expires_at": token_expires_at(stored),
         "auto_refresh": auto_refresh(item, stored),

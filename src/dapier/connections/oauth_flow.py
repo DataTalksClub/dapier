@@ -70,6 +70,8 @@ def oauth_start(event, connection_id):
             {"error": "This provider connects with a directly provided token; "
                       "paste a new token in the connection form instead"},
         )
+    if connection_model.is_zoom_webhook(connection):
+        return http._json_response(400, {"error": connection_model.ZOOM_WEBHOOK_SETUP_HINT})
     redirect_uri = oauth_callback_url()
     if not redirect_uri:
         return http._json_response(503, {"error": "OAuth callback URL is not configured"})

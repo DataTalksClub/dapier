@@ -196,7 +196,12 @@ function productList(connection) {
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
-const usesOAuthConsent = (provider) => provider !== 'slack' && provider !== 'telegram';
+/* The API says whether a connection finishes/renews through OAuth consent
+   (oauth_consent): pasted-token providers — plugins add their own — and
+   Zoom webhook connections never do. The fallback covers older payloads. */
+const usesOAuthConsent = (connection) => connection.oauth_consent ?? (
+  connection.provider !== 'slack' && connection.provider !== 'telegram'
+  && !(connection.provider === 'zoom' && !(connection.scopes || []).length));
 /* Google and YouTube grants verify an account (email, channel) during
    consent; one without a verified identity never finished signing in.
    Token and no-auth providers have no identity to verify. */
@@ -626,7 +631,7 @@ export function openEditConnection(connectionId) {
   dropboxSetup.hidden = connection.provider !== 'dropbox';
   if (connection.provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
   const reconnect = $('#edit-connection-reconnect');
-  reconnect.hidden = !usesOAuthConsent(connection.provider) || connection.status === 'ready';
+  reconnect.hidden = !usesOAuthConsent(connection) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
   $('#edit-connection-revoke').hidden = !(['connected', 'expired'].includes(connection.status) ||
     (connection.provider === 'zoom' && connection.status === 'ready'));
@@ -711,6 +716,7 @@ function renderConnections(connections) {
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
+  $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
   bindOAuthLinks();
 }
 
@@ -732,8 +738,13 @@ function usageLabel(connection) {
 function accountRow(connection, serviceId) {
     /* The API distinguishes automatic renewal from expiry needing consent. */
     const status = effectiveStatus(connection);
-    const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
-      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
+    /* Finish setup goes where setup actually finishes: OAuth consent, or —
+       for a Zoom webhook, which Zoom's URL validation activates — Manage,
+       opened on the callback URL to paste into the Zoom app. */
+    const nextAction = usesOAuthConsent(connection) && status !== 'connected'
+      ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>`
+      : connection.provider === 'zoom' && status === 'ready'
+        ? `<button class="dk-button dk-button--secondary connection-finish" data-connection="${escapeHtml(connection.connection_id)}" type="button">Finish setup</button>` : '';
     const identity = accountIdentity(connection);
     const unfinished = !identity && verifiesIdentity(connection);
     const title = connection.provider === 'zoom' && !scopesOf(connection).length
@@ -763,6 +774,19 @@ function accountRow(connection, serviceId) {
 
 $('#connection-search')?.addEventListener('input', () => renderConnections((state.data || {}).connections || []));
 $('#connection-status-filter')?.addEventListener('change', () => renderConnections((state.data || {}).connections || []));
+
+/* A Zoom webhook stays 'ready' until Zoom validates its callback URL:
+   open Manage on the event-subscription block holding that URL. */
+function openZoomWebhookSetup(connectionId) {
+  openEditConnection(connectionId);
+  const setup = $('#edit-zoom-setup');
+  if (!setup || setup.hidden) return;
+  setup.scrollIntoView({ block: 'center' });
+  const url = $('#edit-zoom-url');
+  url.tabIndex = -1;
+  url.focus();
+  window.getSelection?.()?.selectAllChildren(url);
+}
 
 function bindOAuthLinks() {
   $$('.connection-oauth').forEach((link) => link.addEventListener('click', (event) => {
