@@ -171,6 +171,8 @@ def test_console_groups_rows_by_service():
     assert "dk-button--primary connection-oauth" not in JS
     assert "Get token" not in JS
     assert "provider-token-button" not in JS
+    assert "pull-trigger-sample" not in JS
+    assert "openSamplePuller" not in JS
 
 
 def test_zoom_oauth_rows_offer_reconnect():

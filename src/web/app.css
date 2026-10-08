@@ -893,8 +893,6 @@ dialog::backdrop { background: var(--dk-bg-backdrop); }
 dialog form { display: contents; }
 #run-dialog { width: min(640px, calc(100vw - 32px)); }
 #workflow-dialog { width: min(680px, calc(100vw - 32px)); }
-/* Trigger-sample puller (Connections): the pulled envelope's data object. */
-#trigger-sample-dialog { width: min(620px, calc(100vw - 32px)); }
 .sample-json { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--dk-border-default); padding: 10px 12px; max-height: 260px; overflow-y: auto; }
 .dialog-head {
   display: flex;

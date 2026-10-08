@@ -86,8 +86,9 @@ email is "Not signed in", never a fake Drive account.
   already lapsed, or still connected but expiring soon. Slack and
   Telegram paste a new token in Manage. Provider access tokens are
   CLI-only (`dapier token exec|write`); the console does not reveal them.
-  Expiry reminder email is the daily ConnectionDigestFunction schedule,
-  not a send-now button on this page.
+  Trigger samples are CLI-only (`dapier triggers sample`); this page has
+  no Pull sample toolbar button. Expiry reminder email is the daily
+  ConnectionDigestFunction schedule, not a send-now button on this page.
 - **Add picker** lists services, not OAuth providers. Google products are
   first-class cards with their own default scopes.
 - **Empty / filter empty** stay the family empty-state, no illustration.
@@ -101,7 +102,8 @@ provider-grouped "GOOGLE" headers; mashed multi-product titles as the
 row name; an unfinished `google-drive` row pretending to be a Drive
 account (it reads "Not signed in"); inline status+expiry; a "Tokens
 expiring soon" banner that repeats mashed display names above the
-register; a send-now "Email re-auth reminder" button; a connect catalog
+register; a send-now "Email re-auth reminder" button; a toolbar "Pull sample"
+button; a connect catalog
 that only offers "Google Calendar" and "YouTube" for the whole Google
 family; pastel service pills; an icon on every account row.
 

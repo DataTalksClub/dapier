@@ -106,6 +106,8 @@ def test_family_tabs_keep_the_parent_header():
     assert "if (TAB_FAMILY[view?.dataset.page]) return;" in ROUTER
     html = INDEX
     assert 'id="add-connection"' in html
+    assert 'id="pull-trigger-sample"' not in html
+    assert 'id="trigger-sample-dialog"' not in html
     assert 'class="page-tools primary-tools"' not in html.split('data-page="connections"')[1].split('data-page="credentials"')[0]
 
 

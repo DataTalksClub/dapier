@@ -188,7 +188,6 @@
         </div>
         <div class="section-head page-tools">
           <p id="connection-summary" class="register-summary mono">Loading accounts…</p><div class="connection-filters"><label class="visually-hidden" for="connection-search">Search connections</label><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"><label class="visually-hidden" for="connection-status-filter">Connection status</label><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></div>
-          <button id="pull-trigger-sample" class="dk-button dk-button--secondary" type="button">Pull sample</button>
           <button id="add-connection" class="dk-button dk-button--primary" type="button" aria-expanded="false" aria-controls="connect-picker">Add connection</button>
         </div>
         <div id="connection-empty" class="empty-state" hidden><h3>No connections yet</h3><p>Choose a service to connect your first account.</p></div>
@@ -730,28 +729,6 @@
     </div>
     <div class="dialog-actions">
       <button id="discover-run" class="dk-button dk-button--primary" type="button">Fetch items</button>
-      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
-    </div>
-  </dialog>
-
-  <dialog id="trigger-sample-dialog" aria-labelledby="trigger-sample-title">
-    <div class="dialog-head">
-      <h2 id="trigger-sample-title">Pull a trigger sample</h2>
-      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-    </div>
-    <div class="dialog-body">
-      <p class="sub">A realistic event one trigger would deliver — live from the connected account where possible, else the newest recorded run, else a documented example. Nothing is stored or run. <code>dapier triggers sample</code> pulls the same.</p>
-      <label>Connector<select id="sample-connector"></select></label>
-      <label id="sample-connection-field" hidden>Connection<select id="sample-connection"></select><small class="field-hint">Optional — an account lets the sample come live from it.</small></label>
-      <label id="sample-event-field" hidden>Event<select id="sample-event"></select><small class="field-hint">Optional; leave on the default unless the connector has several.</small></label>
-      <label id="sample-resource-field" hidden>Field options<select id="sample-resource"></select><small class="field-hint">Pick a field to list its options (channels, folders…) instead of pulling an event sample.</small></label>
-      <div id="sample-params" hidden></div>
-      <label id="sample-limit-field">Limit<input id="sample-limit" class="mono-input" type="number" min="1" max="25" placeholder="5"><small class="field-hint">Option lists are capped at 25.</small></label>
-      <p id="sample-error" class="form-error" role="alert"></p>
-      <div id="sample-result" hidden></div>
-    </div>
-    <div class="dialog-actions">
-      <button id="sample-run" class="dk-button dk-button--primary" type="button">Pull sample</button>
       <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
     </div>
   </dialog>
