@@ -152,8 +152,12 @@ function accountIdentity(connection) {
   return connection.account_title || connection.verified_account_id || '';
 }
 
+/* People name a connection by its account, never by the internal
+   connection_id (which is an opaque key since one Google sign-in backs
+   several services). A grant that never finished consent has no account
+   yet, so it is named by what it was meant to cover. */
 function accountLabel(connection) {
-  return accountIdentity(connection) || connection.connection_id;
+  return accountIdentity(connection) || `Unfinished ${productList(connection) || connection.provider} setup`;
 }
 
 function productList(connection) {
@@ -463,27 +467,29 @@ async function addServiceToConnection(serviceId, connection) {
 }
 
 async function startNewOAuthConnection(meta) {
-  const { id } = nextConnectionId(meta.connectionId);
   // Open during the click: browsers block windows opened after the PUT awaits.
   const popup = window.open('', '_blank', 'width=680,height=760');
   if (!popup) return notice('Allow pop-ups to add this connection, then try again.', true);
   popup.document.title = `Connect ${meta.label}`;
   if (popup.document.body) popup.document.body.textContent = 'Preparing connection…';
-  const stopWatching = watchOAuthPopup(popup, id);
+  let stopWatching = () => {};
   try {
     // Provision the new record with the service's standard scopes, then
     // bounce straight to the consent screen. No display name: once consent
     // verifies the account, the record takes the verified identity (the
     // account email) as its name — that is what tells same-provider
-    // accounts apart, not a "Google Calendar 2" counter.
-    await api('/api/admin/connections', {
+    // accounts apart, not a "Google Calendar 2" counter. No connection_id
+    // either: the API mints an opaque internal key, and people address the
+    // connection as "<service> <account>" from then on.
+    const created = await api('/api/admin/connections', {
       method: 'PUT',
       body: JSON.stringify({
-        connection_id: id,
         provider: meta.provider,
         scopes: meta.scopes,
       }),
     });
+    const id = created.connection_id;
+    stopWatching = watchOAuthPopup(popup, id);
     const startUrl = `/api/admin/oauth/${encodeURIComponent(id)}/start`;
     if (!popup.closed) {
       popup.location.assign(startUrl);
@@ -549,8 +555,10 @@ export function openEditConnection(connectionId) {
   form.dataset.provider = connection.provider;
   const refs = usageRefs(connection);
   $('#edit-connection-title').textContent = `Manage ${accountLabel(connection)}`;
-  $('#edit-connection-meta').textContent = `${connection.provider} · ${connection.connection_id}${refs.length ? ` · used by ${refs.length === 1 ? '1 flow/trigger' : `${refs.length} flows/triggers`}` : ' · unused'}`;
-  form.display_name.value = connection.display_name || connection.connection_id;
+  $('#edit-connection-meta').textContent = [productList(connection), connection.status === 'ready' ? 'not signed in' : '']
+    .filter(Boolean).join(' · ');
+  renderManageDetails(connection, refs);
+  form.display_name.value = connection.display_name || accountLabel(connection);
   form.scopes.value = (connection.scopes || []).join(' ');
   $('#edit-scopes-field').hidden = TOKEN_PROVIDERS.includes(connection.provider);
   form.root_path.value = connection.root_path || '';
@@ -668,6 +676,7 @@ function renderConnections(connections) {
     </section>`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   bindOAuthLinks();
 }
 
@@ -679,11 +688,11 @@ function usageRefs(connection) {
   return [...new Set((connection.used_in || []).map((entry) => String(entry.ref)))];
 }
 
+/* Rows carry only the count; Manage lists the flows by name. */
 function usageLabel(connection) {
-  const refs = usageRefs(connection);
-  if (!refs.length) return 'Not used by any flow';
-  const shown = refs.slice(0, 3).join(', ');
-  return `Used in: ${shown}${refs.length > 3 ? ` +${refs.length - 3}` : ''}`;
+  const count = usageRefs(connection).length;
+  if (!count) return 'Not used by any flow';
+  return `Used in ${count} flow${count === 1 ? '' : 's'}`;
 }
 
 function accountRow(connection, serviceId) {
@@ -692,24 +701,28 @@ function accountRow(connection, serviceId) {
     const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     const identity = accountIdentity(connection);
-    const title = identity || (verifiesIdentity(connection) ? 'Not signed in' : connection.connection_id);
-    const others = servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label);
-    const shareHtml = [
-      others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '',
-      `<span class="mono">${escapeHtml(connection.connection_id)}</span>`,
-    ].filter(Boolean).join(' · ');
+    const unfinished = !identity && verifiesIdentity(connection);
+    const title = identity || (unfinished ? 'Not signed in' : accountLabel(connection));
+    /* One sign-in can back several services; say so quietly instead of
+       naming the internal connection_id, which nobody needs to read. */
+    const others = servicesFor(connection).filter((service) => service.id !== serviceId)
+      .map((service) => service.label.replace(/^Google /, ''));
+    const shareHtml = others.length ? escapeHtml(`Same sign-in also covers ${others.join(', ')}`) : '';
+    /* An abandoned setup is clutter: offer removal right on the row. */
+    const remove = unfinished
+      ? `<button class="dk-button dk-button--secondary connection-remove" data-connection="${escapeHtml(connection.connection_id)}" type="button">Remove</button>` : '';
     const expires = formatTimestamp(connection.token_expires_at);
     return `<li class="service-account">
     <div class="service-account-main">
       <span class="cell-name">${escapeHtml(title)}</span>
       ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
-      <span class="cell-sub">${escapeHtml(identity ? usageLabel(connection) : 'No account verified yet')}</span>
+      <span class="cell-sub">${escapeHtml(identity ? usageLabel(connection) : 'Sign-in was never finished')}</span>
     </div>
     <div class="service-account-status">
       ${statusLine(status, CONNECTION_STATUS_LABELS)}
       ${connection.auto_refresh ? '<span class="cell-sub">renews automatically</span>' : (expires && status !== 'expired' ? `<span class="cell-sub${status === 'expiring' ? ' expiring' : ''}">expires ${escapeHtml(expires)}</span>` : '')}
     </div>
-    <div class="service-account-actions">${nextAction}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
+    <div class="service-account-actions">${nextAction}${remove}<button class="dk-button dk-button--secondary connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button">Manage</button></div>
   </li>`;
 }
 
@@ -770,24 +783,32 @@ const editDeleteButton = document.getElementById('edit-connection-delete')
     return button;
   })();
 
-editDeleteButton.addEventListener('click', async () => {
-  const form = $('#edit-connection-form');
-  const connectionId = form.dataset.connectionId;
+/* Manage's Delete and an unfinished row's Remove share one path: confirm
+   (naming the flows that would lose access), then DELETE through the API,
+   which re-checks usage server-side and answers 409 for a stale view. */
+async function deleteConnection(connectionId) {
   if (!connectionId) return;
-  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
-  const refs = usageRefs(connection || {});
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId) || {};
+  const name = accountLabel(connection);
+  const refs = usageRefs(connection);
   const message = refs.length
-    ? `${connectionId} is still used by: ${refs.join(', ')}. Delete it anyway? Those flows and triggers lose access.`
-    : `Delete ${connectionId}? Its stored credential and access grants go with it. This cannot be undone.`;
-  if (!await confirmRevoke('Delete connection', message, 'Delete')) return;
+    ? `${name} is still used by: ${refs.join(', ')}. Delete it anyway? Those flows and triggers lose access.`
+    : `Delete ${name}? Its stored credential and access grants go with it. This cannot be undone.`;
+  if (!await confirmRevoke('Delete connection', message, 'Delete')) return false;
+  await api(`/api/admin/connections/${encodeURIComponent(connectionId)}${refs.length ? '?force=1' : ''}`, { method: 'DELETE' });
+  notice(`Deleted ${name}`);
+  await refreshConnections();
+  return true;
+}
+
+editDeleteButton.addEventListener('click', async () => {
   editDeleteButton.disabled = true;
   editDeleteButton.textContent = 'Deleting…';
   $('#edit-connection-error').textContent = '';
   try {
-    await api(`/api/admin/connections/${encodeURIComponent(connectionId)}${refs.length ? '?force=1' : ''}`, { method: 'DELETE' });
-    $('#edit-connection-dialog').close();
-    notice(`Deleted ${connectionId}`);
-    await refreshConnections();
+    if (await deleteConnection($('#edit-connection-form').dataset.connectionId)) {
+      $('#edit-connection-dialog').close();
+    }
   } catch (error) {
     $('#edit-connection-error').textContent = error.message;
   } finally {
@@ -795,6 +816,31 @@ editDeleteButton.addEventListener('click', async () => {
     editDeleteButton.textContent = 'Delete';
   }
 });
+
+/* Manage's details block: where the connection is used and how to address
+   it from the CLI. The internal connection_id is never shown. */
+function renderManageDetails(connection, refs) {
+  const meta = $('#edit-connection-meta');
+  let details = document.getElementById('edit-connection-details');
+  if (!details) {
+    details = document.createElement('div');
+    details.id = 'edit-connection-details';
+    details.className = 'connection-details';
+    meta.after(details);
+  }
+  const usage = refs.length
+    ? `<p class="connection-details-label">Used in ${refs.length} flow${refs.length === 1 ? '' : 's'}</p>
+       <ul class="connection-usage">${refs.map((ref) => {
+         const entry = (connection.used_in || []).find((item) => String(item.ref) === ref) || {};
+         return entry.kind === 'workflow'
+           ? `<li><a href="/workflows/${encodeURIComponent(ref)}">${escapeHtml(ref)}</a></li>`
+           : `<li>${escapeHtml(ref)} <span class="sub">(${escapeHtml(entry.kind || 'trigger')})</span></li>`;
+       }).join('')}</ul>`
+    : '<p class="connection-details-label">Not used by any flow</p>';
+  const cliRef = (connection.refs || [])[0];
+  details.innerHTML = `${usage}
+    ${cliRef ? `<p class="sub">CLI: <code>dapier token exec ${escapeHtml(cliRef)} --agent …</code></p>` : ''}`;
+}
 
 $('#edit-connection-revoke').addEventListener('click', async (event) => {
   const button = event.currentTarget;

@@ -33,8 +33,8 @@ Verified against the live `/connections` register (2026-10-05):
 A vertical **register of services**. Every service — Gmail, Calendar,
 Drive, Docs, Sheets, YouTube, Dropbox, Slack, Telegram, Zoom — gets one
 panel; a Google grant covering several products appears under each of
-them, with a "Same grant as …" line so the shared credential stays
-visible. Rows within a panel sort by verified account.
+them, with a "Same sign-in also covers …" line so the shared credential
+stays visible. Rows within a panel sort by verified account.
 
 Under the hood the Google products on one email still share one connection
 record and one refresh token. Adding Gmail to an account that already has
@@ -49,11 +49,16 @@ email is "Not signed in", never a fake Drive account.
   panel header — not on every row.
 - **Row identity** is the verified account (email, channel, workspace).
   Never the mashed display name ("Google Calendar + Drive (Gmail)").
-  Unverified Google grants title **Not signed in**. The connection id is
-  mono, secondary. Display names stay in Manage as a nickname.
-- **Same-grant line** on rows whose grant covers other products:
-  `Same grant as Calendar, Drive · google-calendar`. Sentence case,
-  muted, not a chip.
+  Unverified Google grants title **Not signed in**. The internal
+  connection id is never shown — not on rows, not in Manage. People
+  address a connection as `<service> <account>` (`drive alexey@…`, or any
+  unique part of the account), and Manage shows that CLI reference.
+  Display names stay in Manage as a nickname.
+- **Same-sign-in line** on rows whose grant covers other products:
+  `Same sign-in also covers Calendar, Drive`. Sentence case, muted, not
+  a chip.
+- **Usage** is a count on the row (`Used in 3 flows` / `Not used by any
+  flow`); Manage lists the flows by name, workflows linked.
 - **Status** is a stacked dot+word; renewable OAuth grants show
   "renews automatically" on the second line. Only tokens without a refresh
   credential show expiry warnings or appear in the re-auth digest.
@@ -64,7 +69,8 @@ email is "Not signed in", never a fake Drive account.
   Tokens without renewal inside the 48h horizon read **expiring soon**;
   lapsed tokens read **needs reconnection**. Both count as needing attention.
 - **Actions:** Manage on every row. Finish setup and Reconnect are
-  secondary. One primary on the page (Add connection). Reconnect is on
+  secondary. An unfinished setup also gets **Remove** on the row (the
+  same delete as Manage → Delete). One primary on the page (Add connection). Reconnect is on
   every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
   already lapsed, or still connected but expiring soon. Slack and
   Telegram paste a new token in Manage. Provider access tokens are
@@ -79,7 +85,8 @@ email is "Not signed in", never a fake Drive account.
 
 ## Banned on this page
 
-Provider-grouped "GOOGLE" headers; mashed multi-product titles as the
+Internal connection ids (`google-sheets`) anywhere on the page;
+provider-grouped "GOOGLE" headers; mashed multi-product titles as the
 row name; an unfinished `google-drive` row pretending to be a Drive
 account (it reads "Not signed in"); inline status+expiry; a "Tokens
 expiring soon" banner that repeats mashed display names above the

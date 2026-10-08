@@ -733,6 +733,11 @@ th:last-child, td:last-child { padding-right: var(--dk-space-4); }
 }
 .service-share .mono { font-size: inherit; }
 .service-account-main .cell-sub { display: block; margin-top: 3px; }
+.connection-details { margin: 4px 0 14px; }
+.connection-details-label { margin: 0 0 4px; font-weight: 600; }
+.connection-usage { margin: 0 0 10px; padding-left: 18px; }
+.connection-usage li { margin: 2px 0; }
+.connection-details .sub { margin: 4px 0; }
 .service-account-status { display: grid; gap: 2px; justify-items: start; }
 .service-account-status .cell-sub { display: block; }
 .service-account-status .cell-sub.expiring { color: var(--dk-warning-text); }

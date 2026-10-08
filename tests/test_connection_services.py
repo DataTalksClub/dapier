@@ -104,7 +104,8 @@ def test_console_groups_rows_by_service():
     assert "Not signed in" in JS
     assert "accountIdentity" in JS
     assert "verifiesIdentity" in JS
-    assert "Same grant as" in JS
+    assert "Same sign-in also covers" in JS
+    assert "connection-remove" in JS
     assert "provider-group-row" not in JS
     assert "CONNECT_PROVIDERS" not in JS
     assert "dk-button--secondary connection-oauth" in JS
