@@ -164,6 +164,10 @@ function productList(connection) {
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
 const usesOAuthConsent = (provider) => provider !== 'slack' && provider !== 'telegram';
+/* Google and YouTube grants verify an account (email, channel) during
+   consent; one without a verified identity never finished signing in.
+   Token and no-auth providers have no identity to verify. */
+const verifiesIdentity = (connection) => ['google', 'youtube'].includes(connection.provider);
 
 const TOKEN_PROVIDER_META = {
   slack: {
@@ -673,49 +677,31 @@ function renderConnections(connections) {
     const name = (connection) => accountIdentity(connection) || connection.connection_id;
     return String(name(a)).localeCompare(String(name(b)));
   };
-  /* Google is one panel of accounts (email → products). Splitting the same
-     two emails under Calendar, Drive, Docs, and Sheets made it impossible
-     to see what each account actually has. Other providers stay one panel
-     per service. */
-  const google = filtered.filter((connection) => connection.provider === 'google');
-  const rest = filtered.filter((connection) => connection.provider !== 'google');
+  /* One panel per service — a Google grant covering Calendar and Drive shows
+     under both, with a same-grant line so the shared credential stays
+     visible; grants that never finished consent have no verified identity
+     and count as not signed in. */
   const groups = new Map();
-  for (const connection of rest) {
+  for (const connection of filtered) {
     for (const service of servicesFor(connection)) {
-      if (GOOGLE_FAMILY.has(service.id) || service.id === 'google') continue;
       groups.set(service.id, [...(groups.get(service.id) || []), connection]);
     }
   }
   const ordered = [];
   for (const id of SERVICE_ORDER) {
-    if (GOOGLE_FAMILY.has(id)) continue;
     if (groups.has(id)) ordered.push([id, groups.get(id)]);
   }
   for (const [id, group] of groups) {
-    if (!SERVICE_ORDER.includes(id) && id !== 'google') ordered.push([id, group]);
+    if (!SERVICE_ORDER.includes(id)) ordered.push([id, group]);
   }
-  const googlePanel = google.length ? (() => {
-    const signedIn = google.filter(accountIdentity).sort(withinGroup);
-    const unfinished = google.filter((connection) => !accountIdentity(connection));
-    const group = [...signedIn, ...unfinished];
-    const needs = group.filter(needsAttention).length;
-    const meta = [
-      `${signedIn.length} account${signedIn.length === 1 ? '' : 's'}`,
-      unfinished.length ? `${unfinished.length} not signed in` : '',
-      needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
-    ].filter(Boolean).join(' · ');
-    const rows = group.map((connection) => accountRow(connection, null)).join('');
-    return `<section class="data-panel service-panel" data-service="google-accounts">
-      <div class="section-head"><h2 class="service-panel-title">${serviceMark('google')}<span>Google accounts</span></h2>
-      <p class="sub">${escapeHtml(meta)}</p></div>
-      <ul class="service-accounts">${rows}</ul>
-    </section>`;
-  })() : '';
-  const restPanels = ordered.map(([serviceId, group]) => {
+  $('#connection-register').innerHTML = ordered.map(([serviceId, group]) => {
     const rows = [...group].sort(withinGroup).map((connection) => accountRow(connection, serviceId)).join('');
+    const unfinished = group.filter((connection) => !accountIdentity(connection)
+      && verifiesIdentity(connection)).length;
     const needs = group.filter(needsAttention).length;
     const meta = [
       `${group.length} account${group.length === 1 ? '' : 's'}`,
+      unfinished ? `${unfinished} not signed in` : '',
       needs ? `${needs} ${needs === 1 ? 'needs' : 'need'} attention` : '',
     ].filter(Boolean).join(' · ');
     return `<section class="data-panel service-panel" data-service="${escapeHtml(serviceId)}">
@@ -724,7 +710,6 @@ function renderConnections(connections) {
       <ul class="service-accounts">${rows}</ul>
     </section>`;
   }).join('');
-  $('#connection-register').innerHTML = googlePanel + restPanels;
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
   bindOAuthLinks();
 }
@@ -752,15 +737,10 @@ function accountRow(connection, serviceId) {
     const nextAction = usesOAuthConsent(connection.provider) && status !== 'connected'
       ? `<a class="dk-button dk-button--secondary connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${escapeHtml(connection.connection_id)}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>` : '';
     const identity = accountIdentity(connection);
-    const title = identity || (serviceId ? connection.connection_id : 'Not signed in');
-    const products = productList(connection);
-    const others = serviceId
-      ? servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label)
-      : [];
+    const title = identity || (verifiesIdentity(connection) ? 'Not signed in' : connection.connection_id);
+    const others = servicesFor(connection).filter((service) => service.id !== serviceId).map((service) => service.label);
     const shareHtml = [
-      serviceId
-        ? (others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '')
-        : (products ? escapeHtml(products) : ''),
+      others.length ? escapeHtml(`Same grant as ${others.join(', ')}`) : '',
       `<span class="mono">${escapeHtml(connection.connection_id)}</span>`,
     ].filter(Boolean).join(' · ');
     const expires = formatTimestamp(connection.token_expires_at);

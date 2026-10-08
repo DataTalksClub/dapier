@@ -1,4 +1,4 @@
-"""Google connections group by verified account; products are listed on the row."""
+"""Console register groups rows one panel per service; identity on the row."""
 
 from pathlib import Path
 
@@ -94,13 +94,17 @@ def test_console_catalog_matches_python():
             assert scope in JS
 
 
-def test_console_groups_google_by_account():
+def test_console_groups_rows_by_service():
     assert "connection-register" in HTML
     assert "Add a service" in HTML
-    assert "Google accounts" in JS
+    assert "One panel per service" in JS
+    assert 'data-service="${escapeHtml(serviceId)}"' in JS
+    assert "Google accounts" not in JS
+    assert 'data-service="google-accounts"' not in JS
     assert "Not signed in" in JS
-    assert "data-service=\"google-accounts\"" in JS
     assert "accountIdentity" in JS
+    assert "verifiesIdentity" in JS
+    assert "Same grant as" in JS
     assert "provider-group-row" not in JS
     assert "CONNECT_PROVIDERS" not in JS
     assert "dk-button--secondary connection-oauth" in JS
