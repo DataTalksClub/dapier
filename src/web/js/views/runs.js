@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, resolvedLine, wrapTokens, formatTimestamp, formatDuration, dataBlock } from '../format.js';
+import { escapeHtml, statusLine, resolvedLine, formatTimestamp, formatDuration, dataBlock, triggerEventLabel, sentenceCase } from '../format.js';
 import { workflowName, workflowLabelHtml } from '../workflow-names.js';
 
 const STEP_ICONS = {
@@ -19,6 +19,10 @@ const STEP_ICONS = {
 };
 
 function triggerLabel(run) {
+  return triggerEventLabel(run.connector, run.event_type);
+}
+
+function machineTrigger(run) {
   return `${run.connector || '?'} · ${run.event_type || '?'}`;
 }
 
@@ -27,20 +31,23 @@ function triggerLabel(run) {
    verdict, and a retired failure reads as the latter. */
 function statusCell(run) {
   if (run.resolved) return resolvedLine(run);
-  const failed = run.failed_step ? ` <span class="muted-cell mono">(${escapeHtml(run.failed_step)})</span>` : '';
+  const failed = run.failed_step
+    ? `<span class="cell-note" title="${escapeHtml(run.failed_step)}">at <span class="mono">${escapeHtml(run.failed_step)}</span></span>` : '';
   const delayedUntil = run.status === 'delayed' && run.delayed_until
-    ? ` <span class="muted-cell mono">(until ${escapeHtml(formatTimestamp(run.delayed_until))})</span>` : '';
+    ? `<span class="cell-note">until <span class="mono">${escapeHtml(formatTimestamp(run.delayed_until))}</span></span>` : '';
   return `${statusLine(run.status)}${failed}${delayedUntil}`;
 }
 
 function runRow(run) {
+  const name = run.workflow_id ? workflowName(run.workflow_id) : 'Run';
+  const started = formatTimestamp(run.started_at) || '—';
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
-    <td class="cell-title"><span class="cell-name workflow-label">${workflowLabelHtml(run.workflow_id)}</span></td>
-    <td class="mono muted-cell" data-label="Trigger"><div>${escapeHtml(triggerLabel(run))}</div>${run.event_summary
-      ? `<div class="run-event-summary">${escapeHtml(run.event_summary)}</div>` : ''}</td>
-    <td data-label="Status">${statusCell(run)}</td>
-    <td class="mono muted-cell" data-label="Steps">${run.steps ?? '—'}</td>
-    <td class="mono muted-cell" data-label="Started">${escapeHtml(formatTimestamp(run.started_at) || '—')}</td>
+    <td class="cell-title run-name"><span class="cell-name workflow-label clip" title="${escapeHtml(run.workflow_id || name)}">${workflowLabelHtml(run.workflow_id)}</span></td>
+    <td class="run-trigger" data-label="Trigger"><span class="clip" title="${escapeHtml(machineTrigger(run))}">${escapeHtml(triggerLabel(run))}</span>${run.event_summary
+      ? `<span class="cell-note clip run-event-summary" title="${escapeHtml(run.event_summary)}">${escapeHtml(run.event_summary)}</span>` : ''}</td>
+    <td class="run-status" data-label="Status">${statusCell(run)}</td>
+    <td class="num mono run-steps" data-label="Steps">${run.steps ?? '—'}</td>
+    <td class="mono muted-cell nowrap run-when" data-label="Started">${escapeHtml(started)}</td>
   </tr>`;
 }
 
@@ -137,7 +144,7 @@ export function renderRuns() {
       ? '<option value="problems">Failures</option>' : '') +
     ((selectedStatus === 'resolved' || hasResolved)
       ? '<option value="resolved">Fixed</option>' : '') +
-    statuses.sort().map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`).join('');
+    statuses.sort().map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(sentenceCase(status === 'completed' ? 'succeeded' : status))}</option>`).join('');
   workflowFilter.value = selectedWorkflow;
   statusFilter.value = selectedStatus;
   let shown = runs.filter((run) =>
@@ -166,15 +173,16 @@ export function renderRuns() {
     : runs.length || statusFilter.value ? 'No runs match these filters' : 'No runs yet')
     + clippedNote;
   $('#run-table').innerHTML = shown.map(runRow).join('') ||
-    `<tr><td colspan="5" class="muted-cell">${emptyText}</td></tr>`;
+    `<tr class="register-empty"><td colspan="5"><strong>${escapeHtml(emptyText)}</strong></td></tr>`;
   /* The API flags a window its scan budget clipped: with a filter applied,
      the rows shown are the ones that matched inside the window, not proof
      there are no others. Say so — an empty failures list that was only
      empty where we looked is the worst possible thing to imply. */
   const clipped = serverPaged && runsPage.bounded;
+  const noun = (count) => `${count} run${count === 1 ? '' : 's'}`;
   $('#runs-sample-note').textContent = serverPaged
-    ? `${shown.length} of ${runs.length}${runsPage.nextToken ? ' · more' : ''}${clipped ? ' · window clipped' : ''}`
-    : `${shown.length} of ${runs.length} · sample of 25`;
+    ? `Showing ${noun(shown.length)}${runsPage.nextToken ? ', more to load' : ''}${clipped ? ' (search window clipped)' : ''}`
+    : `Showing the latest ${noun(shown.length)}`;
   $('#runs-sample-note').title = clipped
     ? 'Records are kept for 90 days. The search window was clipped, so older rows may exist that these filters did not reach.'
     : 'Records are kept for 90 days.';
@@ -228,28 +236,33 @@ $('#runs-export').addEventListener('click', async (event) => {
   }
 });
 
-/* One flow card: head row plus optional data sections. A top-level step
-   card carries "Replay from here" when a run id is in scope. */
-function stepCard({ icon, title, badge, status, duration, at, data, error, replayFrom, stepId }) {
+/* One flow step: a divided row in the flow list (no card inside a card) —
+   head line, then the data it carried. A top-level step carries "Replay
+   from here" when a run id is in scope. */
+function stepCard({ icon, title, titleMono = false, badge, status, duration, at, data, error, replayFrom, stepId }) {
   const sections = Object.entries(data || {})
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${dataBlock(value, { openRaw: Boolean(error) }) || '<p class="detail-muted">Empty</p>'}</div>`)
     .join('');
   const replayFromHere = replayFrom && stepId
-    ? `<button class="dk-button dk-button--secondary run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
+    ? `<button class="dk-button dk-button--secondary dk-button--sm run-replay-from-step" type="button" data-run="${escapeHtml(replayFrom)}" data-step="${escapeHtml(stepId)}"
         title="Re-run from this step: earlier steps do not run again, their recorded outputs seed the rerun">Replay from here</button>`
     : '';
-  return `<div class="flow-step ${error ? 'failed' : ''}">
+  const meta = [
+    status ? statusLine(status) : '',
+    duration ? `<span class="mono">${escapeHtml(duration)}</span>` : '',
+    at ? `<span class="mono">${escapeHtml(at)}</span>` : '',
+  ].filter(Boolean).join('');
+  return `<li class="flow-step ${error ? 'failed' : ''}">
     <div class="flow-head">
       <span class="flow-icon"><i data-lucide="${icon}"></i></span>
-      <span class="flow-title">${escapeHtml(title)}</span>
-      ${badge ? `<span class="action-type">${escapeHtml(badge)}</span>` : ''}
-      <span class="flow-meta">${[status ? statusLine(status) : '', duration ? escapeHtml(duration) : '', at ? escapeHtml(at) : ''].filter(Boolean).join(' ')}</span>
+      <span class="flow-name"><span class="flow-title${titleMono ? ' mono' : ''}">${escapeHtml(title)}</span>${badge ? `<span class="flow-type">${escapeHtml(badge)}</span>` : ''}</span>
+      <span class="flow-meta">${meta}</span>
       ${replayFromHere}
     </div>
     ${error ? `<div class="detail-error"><i data-lucide="triangle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${sections ? `<div class="flow-data">${sections}</div>` : ''}
-  </div>`;
+  </li>`;
 }
 
 function flow(data) {
@@ -261,12 +274,11 @@ function flow(data) {
   cards.push(stepCard({
     icon: 'zap',
     title: 'Trigger',
-    badge: `${run.connector || '?'} · ${run.event_type || '?'}`,
+    badge: triggerLabel(run),
     at: formatTimestamp(run.started_at),
     data: firstInput ? { 'Event data': firstInput.input } : null,
   }));
   steps.forEach((step, index) => {
-    cards.push(`<div class="flow-link" aria-hidden="true"></div>`);
     /* The API replays from top-level steps only (a nested id like
        `branch.post` cannot start a chain), and the action targets a failed
        step — offer it exactly there. */
@@ -277,7 +289,8 @@ function flow(data) {
     cards.push(stepCard({
       icon: STEP_ICONS[step.action_type] || 'arrow-right',
       title: step.action_id || `Step ${index + 1}`,
-      badge: step.action_type,
+      titleMono: Boolean(step.action_id),
+      badge: sentenceCase(String(step.action_type || '').replace(/[._]+/g, ' ')),
       status: step.status,
       duration: formatDuration(step.duration_ms),
       at: formatTimestamp(step.finished_at),
@@ -287,7 +300,7 @@ function flow(data) {
       stepId: step.action_id,
     }));
   });
-  return `<div class="flow">${cards.join('')}</div>`;
+  return `<ol class="flow">${cards.join('')}</ol>`;
 }
 
 export async function openRun(runId) {
@@ -295,47 +308,52 @@ export async function openRun(runId) {
   $('#run-replay-result').hidden = true;
   $('#run-replay-result').textContent = '';
   $('#run-replay-result').classList.remove('error');
-  $('#run-detail').innerHTML = '<p class="detail-muted">Loading flow…</p>';
+  $('#run-actions').innerHTML = '';
+  $('#run-actions-start').innerHTML = '';
+  $('#run-detail').innerHTML = '<div class="dialog-state"><p>Loading the run…</p></div>';
   $('#run-dialog').showModal();
   let data;
   try {
     data = await api(`/api/admin/runs/${encodeURIComponent(runId)}`);
   } catch (error) {
-    $('#run-detail').innerHTML = `<p class="detail-muted">${escapeHtml(error.message)}</p>`;
+    $('#run-detail').innerHTML = `<div class="dialog-state"><strong>This run could not be loaded</strong><p>The run service answered: ${escapeHtml(error.message)}</p><button class="dk-button dk-button--secondary run-retry" type="button" data-run="${escapeHtml(runId)}">Try again</button></div>`;
     return;
   }
   const run = data.run || {};
+  const id = run.run_id || runId;
   $('#run-title').textContent = run.workflow_id ? workflowName(run.workflow_id) : 'Run';
-  const cancel = run.status === 'delayed'
-    ? `<button class="dk-button dk-button--secondary run-cancel" type="button" data-run="${escapeHtml(run.run_id || runId)}"
-        title="Drop the parked continuation: the remaining actions will never fire">Cancel</button>`
+  /* Cancel drops a parked continuation, so it sits apart at the start of
+     the foot; Mark fixed and Replay sit with Close at the end. */
+  $('#run-actions-start').innerHTML = run.status === 'delayed'
+    ? `<button class="dk-button dk-button--danger run-cancel" type="button" data-run="${escapeHtml(id)}"
+        title="Drop the parked continuation: the remaining actions will never fire">Cancel run</button>`
     : '';
   /* Mark fixed is for the failures no rerun can settle: a dead workflow's
      last run, a negative test meant to fail. A failure a completed replay
      already recovered arrives here resolved (the API derives it) and shows
      the verdict instead of the button — nothing left to press. */
   const fixable = ['failed', 'error'].includes(run.status) && !run.resolved;
-  const markFixed = fixable
-    ? `<button class="dk-button dk-button--secondary run-mark-fixed" type="button" data-run="${escapeHtml(run.run_id || runId)}"
+  $('#run-actions').innerHTML = `${fixable
+    ? `<button class="dk-button dk-button--secondary run-mark-fixed" type="button" data-run="${escapeHtml(id)}"
         title="Stop treating this failure as a problem: it keeps its status and error in history, but leaves the failure views">Mark fixed</button>`
-    : '';
-  const verdict = run.resolved
-    ? `<span class="detail-muted">${resolvedLine(run)}</span>`
-    : '';
+    : ''}<button class="dk-button dk-button--secondary run-replay" type="button" data-run="${escapeHtml(id)}"
+        title="Re-inject this run's original trigger event">Replay</button>`;
+  const summary = [
+    ['Status', `${statusLine(run.status)}${run.resolved ? resolvedLine(run) : ''}`],
+    ['Run', `<span class="mono clip" title="${escapeHtml(id)}">${escapeHtml(id)}</span>`],
+    ['Started', run.started_at ? `<span class="mono">${escapeHtml(formatTimestamp(run.started_at))}</span>` : ''],
+    ['Duration', run.duration_ms != null ? `<span class="mono">${escapeHtml(formatDuration(run.duration_ms))}</span>` : ''],
+  ].filter(([, value]) => value);
   $('#run-detail').innerHTML = `
-    <div class="detail-summary">
-      ${statusLine(run.status)}
-      <code>${wrapTokens(run.run_id || runId)}</code>
-      ${run.duration_ms != null ? `<span class="flow-total mono">${escapeHtml(formatDuration(run.duration_ms))} total</span>` : ''}
-      ${verdict}
-      ${cancel}
-      ${markFixed}
-      <button class="dk-button dk-button--secondary run-replay" type="button" data-run="${escapeHtml(run.run_id || runId)}"
-        title="Re-inject this run's original trigger event">Replay</button>
-    </div>
-    ${flow(data)}`;
+    <dl class="run-summary">${summary.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
+    <section class="run-flow" aria-label="Steps">${flow(data)}</section>`;
   icons();
 }
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.run-retry');
+  if (button && button.dataset.run) void openRun(button.dataset.run);
+});
 
 /* Mark fixed retires a failure nothing will re-derive away: it stamps the
    run's steps server-side (the same route `dapier runs resolve` calls), so

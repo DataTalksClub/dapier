@@ -61,15 +61,20 @@ function workflowState(workflow) {
   return statusLine(workflow.enabled ? 'enabled' : 'disabled', { enabled: 'On', disabled: 'Off' });
 }
 
+/* One row per workflow, the whole row opens it: name and what it does on
+   the left, its on/off state and latest run on the right. */
 function workflowRow(workflow) {
   const latest = homeModel(state.data).latest.get(workflow.id);
-  return `<article class="home-workflow">
-    <div><div class="workflow-name-line"><button type="button" class="cell-name workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${escapeHtml(workflowName(workflow))}</button>${helpTip(workflow.description)}</div>
-      ${workflowIdLine(workflow)}
-      <div class="home-workflow-state">${workflowState(workflow)}${latest ? `<span class="sub">Latest run: ${statusLine(latest.status)}</span>` : `<span class="sub">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading recent runs…'}</span>`}</div>
-    </div>
-    <button type="button" class="dk-button dk-button--secondary workflow-detail" data-workflow="${escapeHtml(workflow.id)}">${workflow.source ? 'Open' : 'Details'}</button>
-  </article>`;
+  const about = workflow.description || workflowTriggerText(workflow);
+  const name = workflowName(workflow);
+  const idText = name !== workflow.id ? workflow.id : '';
+  const run = latest
+    ? `<span class="home-latest"><span class="home-latest-label">Latest run</span>${statusLine(latest.status)}</span>`
+    : `<span class="home-latest muted-cell">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading runs…'}</span>`;
+  return `<button type="button" class="home-workflow workflow-detail" data-workflow="${escapeHtml(workflow.id)}" aria-label="Open ${escapeHtml(name)}">
+    <span class="home-row-main"><span class="cell-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span><span class="home-row-sub" title="${escapeHtml([idText, about].filter(Boolean).join(' — '))}">${idText ? `<span class="mono">${escapeHtml(idText)}</span> · ` : ''}${escapeHtml(about)}</span></span>
+    <span class="home-row-meta">${workflowState(workflow)}${run}</span>
+  </button>`;
 }
 
 function triggerBlocks(workflow) {
@@ -137,11 +142,16 @@ function renderStatsStrip(workflows) {
     `<div class="status-item"><span class="status-item-label">${dot}<span>${label}</span></span><span class="status-item-value">${value}</span></div>`;
   const dot = (kind) => `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span></span>`;
   const none = '<span class="status off"></span>';
+  /* A zero never wears a status color: the danger dot only shows when
+     something is actually auto-paused. */
+  const on = count((w) => w.enabled && !w.auto_paused);
+  const paused = count((w) => w.auto_paused);
+  const off = count((w) => !w.enabled && !w.auto_paused);
   const items = [
     strip(none, 'Workflows', workflows.length),
-    strip(dot('ok'), 'On', count((w) => w.enabled && !w.auto_paused)),
-    strip(dot('err'), 'Auto-paused', count((w) => w.auto_paused)),
-    strip(dot('off'), 'Off', count((w) => !w.enabled && !w.auto_paused)),
+    strip(on ? dot('ok') : dot('off'), 'On', on),
+    strip(paused ? dot('err') : dot('off'), 'Auto-paused', paused),
+    strip(dot('off'), 'Off', off),
   ];
   $('#overview-stats').innerHTML = items.join('');
   $('#overview-stats').hidden = workflows.length === 0;
@@ -159,9 +169,10 @@ function render(section) {
   }
   if (section === 'activity') {
     $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
-      `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}">
-        <span class="home-result-title"><span class="workflow-label">${workflowLabelHtml(run.workflow_id)}</span>${statusLine(run.status)}</span>
-        <span class="sub">${escapeHtml(formatTimestamp(run.started_at) || '—')}${run.failed_step ? ` · Failed at ${escapeHtml(run.failed_step)}` : ''}</span>
+      `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}" aria-label="Open run of ${escapeHtml(workflowName(run.workflow_id || 'workflow'))}">
+        <span class="home-row-main"><span class="cell-name workflow-label" title="${escapeHtml(run.workflow_id || '')}">${workflowLabelHtml(run.workflow_id)}</span>${run.failed_step ? `<span class="home-row-sub" title="Failed at ${escapeHtml(run.failed_step)}">Failed at ${escapeHtml(run.failed_step)}</span>` : ''}</span>
+        <span class="home-result-status">${statusLine(run.status)}</span>
+        <span class="home-result-when mono">${escapeHtml(formatTimestamp(run.started_at) || '—')}</span>
       </button>`).join('');
     $('#overview-runs-empty').hidden = model.runs.length > 0;
   }
@@ -331,15 +342,15 @@ function renderAttention(data) {
      quota. */
   const alarm = (kind) => `<span class="status ${kind}" aria-hidden="true"><span class="status-dot"></span></span>`;
   const items = model.problems.map(({ workflow, run }) => `<article class="home-problem">
-    <div><p class="home-problem-title">${alarm('err')}<strong>${escapeHtml(workflow.id)} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong></p>
+    <div><p class="home-problem-title">${alarm('err')}<strong>${escapeHtml(workflowName(workflow))} ${workflow.auto_paused ? 'is auto-paused' : 'failed its latest run'}</strong></p>
       <p class="sub">${escapeHtml(workflow.auto_paused_reason || (run?.failed_step ? `Failed at ${run.failed_step}` : 'Open the run to see what went wrong.'))}</p></div>
-    <div class="home-create-actions">${run ? `<button class="dk-button dk-button--secondary workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
+    <div class="home-create-actions dk-cluster">${run ? `<button class="dk-button dk-button--secondary dk-button--sm workflow-run-link" type="button" data-run="${escapeHtml(run.run_id)}">Inspect failure</button>` : ''}<button class="dk-button dk-button--secondary dk-button--sm workflow-detail" type="button" data-workflow="${escapeHtml(workflow.id)}">Open workflow</button></div>
   </article>`);
   for (const connection of model.connections) items.push(`<article class="home-problem">
     <div><p class="home-problem-title">${alarm('warn')}<strong>${escapeHtml(accountLabel(connection))} needs attention</strong></p><p class="sub">${connection.status === 'ready' ? 'Finish setup to use this account.' : 'Check this account’s access before its next run.'}</p></div>
-    <button class="dk-button dk-button--secondary home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button>
+    <div class="home-create-actions dk-cluster"><button class="dk-button dk-button--secondary dk-button--sm home-connection" type="button" data-connection="${escapeHtml(connection.connection_id)}">Manage connection</button></div>
   </article>`);
-  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><p class="home-problem-title"><span class="status warn" aria-hidden="true"><span class="status-dot"></span></span><strong>Monthly task limit reached</strong></p><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><a class="dk-button dk-button--secondary view-link" href="/runs" data-target="runs">Review limit</a></article>');
+  if (model.quotaBlocked) items.unshift('<article class="home-problem"><div><p class="home-problem-title"><span class="status warn" aria-hidden="true"><span class="status-dot"></span></span><strong>Monthly task limit reached</strong></p><p class="sub">Workflow actions are blocked until the limit is raised or the month resets.</p></div><div class="home-create-actions dk-cluster"><a class="dk-button dk-button--secondary dk-button--sm view-link" href="/runs" data-target="runs">Review limit</a></div></article>');
   $('#overview-attention').classList.toggle('home-needs-attention', items.length > 0);
   $('#overview-attention').hidden = items.length === 0;
   $('#overview-attention').innerHTML = items.length ? `<h3>Needs attention</h3>${items.join('')}` : '';
@@ -348,10 +359,18 @@ function renderAttention(data) {
 function renderErrors() {
   const rows = (state.errors && state.errors.workflows) || [];
   const total = Number(state.errors && state.errors.total_failed_runs) || 0;
-  $('#overview-errors').innerHTML = rows.slice(0, 8).map((row) =>
-    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(row.workflow_id)}" data-status="problems">${escapeHtml(row.workflow_id)}</button></td><td data-label="Failed">${escapeHtml(row.failed_runs)}</td><td class="mono muted-cell" data-label="Last failure">${escapeHtml(formatTimestamp(row.last_failed_at) || '—')}</td><td class="muted-cell" data-label="Error">${escapeHtml(String(row.last_error || '—').slice(0, 160))}</td></tr>`).join('');
+  $('#overview-errors').innerHTML = rows.slice(0, 8).map((row) => {
+    const error = String(row.last_error || '');
+    return `<tr><td class="cell-title"><button type="button" class="cell-name workflow-runs clip" data-workflow="${escapeHtml(row.workflow_id)}" data-status="problems" title="${escapeHtml(row.workflow_id)}">${escapeHtml(workflowName(row.workflow_id))}</button></td>`
+      + `<td class="num mono" data-label="Failed">${escapeHtml(row.failed_runs)}</td>`
+      + `<td class="mono muted-cell nowrap" data-label="Last failure">${escapeHtml(formatTimestamp(row.last_failed_at) || '—')}</td>`
+      + `<td class="muted-cell" data-label="Error"${error ? '' : ' data-empty'}><span class="clamp-2" title="${escapeHtml(error)}">${escapeHtml(error || '—')}</span></td></tr>`;
+  }).join('');
   $('#overview-errors-empty').hidden = rows.length > 0;
   $('#overview-errors-table').hidden = rows.length === 0;
+  /* With nothing to fix the panel collapses to its one-line band and
+     drops below the status strip (see app.css: Home order). */
+  $('#overview-errors-panel').classList.toggle('is-empty', rows.length === 0);
   const badge = $('#nav-runs-count');
   if (badge) {
     badge.hidden = total <= 0;
@@ -379,7 +398,7 @@ function renderUsage() {
   }
   const shown = [...byWorkflow.entries()].sort((a, b) => b[1].total - a[1].total);
   $('#overview-usage').innerHTML = shown.map(([workflowId, entry]) =>
-    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}">${escapeHtml(workflowId)}</button></td>`
+    `<tr><td class="cell-title mono"><button type="button" class="cell-name workflow-runs" data-workflow="${escapeHtml(workflowId)}" title="${escapeHtml(workflowId)}">${escapeHtml(workflowName(workflowId))}</button></td>`
     + `<td class="mono" data-label="This month">${entry.current}</td>`
     + `<td class="mono muted-cell" data-label="3-month total">${entry.total}</td></tr>`).join('');
   $('#overview-usage-empty').hidden = shown.length > 0;
@@ -402,9 +421,11 @@ function renderQuota() {
   const quota = (state.data && state.data.quota) || null;
   const line = $('#overview-quota-line');
   const form = $('#quota-form');
+  const summary = $('#overview-quota-summary');
   if (!line || !form) return;
   line.hidden = !quota;
   form.hidden = !quota;
+  if (summary) summary.textContent = '';
   if (!quota) return;
   const used = Number(quota.used) || 0;
   const period = humanMonth(quota.month);
@@ -414,6 +435,11 @@ function renderQuota() {
       + (left != null ? `, ${left} left for ${period}.` : ` for ${period}.`);
   } else {
     line.textContent = `No monthly limit — ${used} tasks used in ${period}.`;
+  }
+  if (summary) {
+    summary.textContent = quota.enabled
+      ? `${used} of ${quota.limit} tasks used in ${period}`
+      : `${used} tasks used in ${period}, no limit`;
   }
   $('#quota-limit').value = quota.enabled ? quota.limit : '';
 }

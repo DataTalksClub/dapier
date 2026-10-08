@@ -1,7 +1,7 @@
 /* OAuth clients view: shared per-provider client configuration. */
-import { $, $$, notice } from '../ui.js';
+import { $, $$, notice, rowActions } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, wrapTokens } from '../format.js';
+import { escapeHtml, statusLine } from '../format.js';
 import { refresh } from './overview.js';
 
 function renderOAuthClients(clients) {
@@ -11,13 +11,19 @@ function renderOAuthClients(clients) {
   const wrap = $('#oauth-client-wrap');
   if (empty) empty.hidden = list.length > 0;
   if (wrap) wrap.hidden = list.length === 0;
-  $('#oauth-client-list').innerHTML = list.map((client) => `<tr>
-      <td class="cell-title"><span class="cell-name">${names[client.provider] || escapeHtml(client.provider)}</span><span class="cell-sub">oauth client: ${escapeHtml(client.provider)}</span></td>
-      <td class="mono muted-cell" data-label="Client ID">${client.client_id ? wrapTokens(client.client_id) : '—'}</td>
-      <td class="mono muted-cell" data-label="Source">${escapeHtml(client.source)}</td>
+  const sources = { config: 'Saved in Dapier', deploy: 'Deployment setting', none: '' };
+  $('#oauth-client-list').innerHTML = list.map((client) => {
+    const name = names[client.provider] || escapeHtml(client.provider.charAt(0).toUpperCase() + client.provider.slice(1));
+    const source = String(client.source || '');
+    return `<tr>
+      <td class="cell-title"><span class="cell-name">${name}</span></td>
+      <td class="muted-cell" data-label="Client ID"${client.client_id ? '' : ' data-empty'}>${client.client_id
+        ? `<span class="mono clip" title="${escapeHtml(client.client_id)}">${escapeHtml(client.client_id)}</span>` : '—'}</td>
+      <td class="muted-cell" data-label="Source"${sources[source] === '' || !source ? ' data-empty' : ''} title="${escapeHtml(source)}">${escapeHtml((source in sources ? sources[source] : source) || '—')}</td>
       <td data-label="Status">${statusLine(client.configured ? 'configured' : 'missing')}</td>
-      <td class="action-cell"><button class="dk-button dk-button--secondary oauth-client-edit" data-provider="${escapeHtml(client.provider)}" type="button">${client.configured ? 'Replace' : 'Set up'}</button></td>
-    </tr>`).join('');
+      <td class="action-cell">${rowActions(`<button class="dk-button dk-button--secondary dk-button--sm oauth-client-edit" data-provider="${escapeHtml(client.provider)}" type="button">${client.configured ? 'Replace' : 'Set up'}</button>`, [], { id: '', label: name })}</td>
+    </tr>`;
+  }).join('');
   $$('.oauth-client-edit').forEach((button) => button.addEventListener('click', () => openOAuthClient(button.dataset.provider)));
 }
 

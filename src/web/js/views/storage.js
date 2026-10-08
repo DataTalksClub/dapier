@@ -40,12 +40,12 @@ function renderItems(data) {
   $('#storage-table-wrap').hidden = items.length === 0;
   $('#storage-empty-title').textContent = `No stored keys for ${workflow}`;
   $('#storage-table').innerHTML = items.map((item) => `<tr>
-      <td class="cell-title"><span class="cell-name mono">${escapeHtml(item.key)}</span></td>
+      <td class="cell-title"><span class="cell-name mono clip" title="${escapeHtml(item.key)}">${escapeHtml(item.key)}</span></td>
       <td class="mono muted-cell storage-value-cell" data-label="Value"><span class="storage-value-text">${escapeHtml(item.value)}</span></td>
-      <td class="mono muted-cell" data-label="Updated">${formatTimestamp(item.updated_at) || '—'}</td>
-      <td class="mono muted-cell" data-label="Expires">${item.expires
-        ? formatTimestamp(new Date(item.expires * 1000).toISOString()) || item.expires : '—'}</td>
-      <td class="action-cell"><button class="dk-button dk-button--secondary storage-delete" data-key="${escapeHtml(item.key)}" type="button">Delete</button></td>
+      <td class="mono muted-cell nowrap" data-label="Updated">${formatTimestamp(item.updated_at) || '—'}</td>
+      <td class="mono muted-cell nowrap" data-label="Expires"${item.expires ? '' : ' data-empty'}>${item.expires
+        ? formatTimestamp(new Date(item.expires * 1000).toISOString()) || item.expires : 'Never'}</td>
+      <td class="action-cell"><button class="dk-button dk-button--danger dk-button--sm storage-delete" data-key="${escapeHtml(item.key)}" type="button">Delete</button></td>
     </tr>`).join('');
   /* Only overflowing values get the expand affordance; short ones stay quiet. */
   $$('#storage-table .storage-value-text').forEach((el) => {

@@ -1,7 +1,7 @@
 /* API tokens view: operator-issued bearer tokens for agents. */
 import { $, $$, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, wrapTokens, formatTimestamp } from '../format.js';
+import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
 import { state } from '../state.js';
 import { openAccessGrants, accountLabel } from './connections.js';
@@ -44,18 +44,23 @@ function renderGrantConnections() {
 function renderTokens(tokens) {
   $('#token-empty').hidden = tokens.length > 0;
   $('.table-wrap', $('[data-page=tokens]')).hidden = tokens.length === 0;
-  $('#token-table').innerHTML = tokens.map((token) => `<tr>
-      <td class="cell-title"><span class="cell-name mono">${escapeHtml(token.token_id)}</span><span class="cell-sub">${wrapTokens(token.token_prefix || '')}…</span></td>
-      <td class="mono muted-cell" data-label="Agent">${escapeHtml(token.agent)}</td>
-      <td class="mono muted-cell" data-label="Created">${formatTimestamp(token.created_at) || '—'}</td>
-      <td class="mono muted-cell" data-label="Last used">${formatTimestamp(token.last_used_at) || 'never'}</td>
-      <td data-label="Status">${token.revoked_at
-        ? `<span class="status off"><span class="status-dot" aria-hidden="true"></span>revoked ${formatTimestamp(token.revoked_at) || ''}</span>`
-        : statusLine('active')}</td>
-      <td class="action-cell">${token.revoked_at
-        ? `<button class="dk-button dk-button--secondary token-remove" data-token="${escapeHtml(token.token_id)}" type="button">Remove</button>`
-        : `<button class="dk-button dk-button--secondary token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
-    </tr>`).join('');
+  $('#token-table').innerHTML = tokens.map((token) => {
+    const revoked = Boolean(token.revoked_at);
+    const status = revoked
+      ? `<span class="status off" title="Revoked ${escapeHtml(formatTimestamp(token.revoked_at) || '')}"><span class="status-dot" aria-hidden="true"></span>Revoked</span>`
+      : statusLine('active');
+    return `<tr class="${revoked ? 'is-revoked' : ''}">
+      <td class="cell-title"><span class="cell-name clip" title="${escapeHtml(token.token_id)}">${escapeHtml(token.token_id)}</span></td>
+      <td class="mono muted-cell nowrap" data-label="Prefix">${escapeHtml(token.token_prefix || '—')}</td>
+      <td class="muted-cell" data-label="Agent"><span class="mono clip" title="${escapeHtml(token.agent)}">${escapeHtml(token.agent)}</span></td>
+      <td class="mono muted-cell nowrap" data-label="Created">${formatTimestamp(token.created_at) || '—'}</td>
+      <td class="mono muted-cell nowrap" data-label="Last used">${formatTimestamp(token.last_used_at) || 'Never'}</td>
+      <td data-label="Status">${status}</td>
+      <td class="action-cell">${revoked
+        ? `<button class="dk-button dk-button--danger dk-button--sm token-remove" data-token="${escapeHtml(token.token_id)}" type="button">Remove</button>`
+        : `<button class="dk-button dk-button--danger dk-button--sm token-revoke" data-token="${escapeHtml(token.token_id)}" type="button">Revoke</button>`}</td>
+    </tr>`;
+  }).join('');
   $$('.token-revoke').forEach((button) => button.addEventListener('click', async () => {
     const token = tokens.find((item) => item.token_id === button.dataset.token);
     if (!token || !await confirmTokenRevoke(token)) return;

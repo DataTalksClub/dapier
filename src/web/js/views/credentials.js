@@ -1,5 +1,5 @@
 /* Credentials view: provider secrets used by workflow actions. */
-import { $, $$, notice } from '../ui.js';
+import { $, $$, notice, rowActions } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
@@ -17,18 +17,30 @@ const PROVIDERS = {
 /* Credential-backed providers with a health check (pseudo connections). */
 const TESTABLE = new Set(['mailchimp', 'aws']);
 
+function providerName(provider) {
+  if (PROVIDERS[provider]) return PROVIDERS[provider].name;
+  const known = { zoom: 'Zoom', telegram: 'Telegram bot', github: 'GitHub', openai: 'OpenAI' };
+  const value = String(provider || '');
+  return known[value] || value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function renderCredentials(credentials) {
   $('#credential-list').innerHTML = credentials.map((credential) => {
-    const item = PROVIDERS[credential.provider] || { name: credential.provider };
+    const name = providerName(credential.provider);
+    /* Service credentials are optional: an unset one is neutral "Not set
+       up", never a danger state. */
     const status = credential.configured ? 'configured' : 'missing';
-    const test = TESTABLE.has(credential.provider)
-      ? `<button class="dk-button dk-button--secondary credential-test" data-provider="${escapeHtml(credential.provider)}">Test</button>`
+    const provider = escapeHtml(credential.provider);
+    const edit = `<button class="dk-button dk-button--secondary dk-button--sm credential-edit" data-provider="${provider}" type="button">${credential.configured ? 'Replace' : 'Add'}</button>`;
+    const test = TESTABLE.has(credential.provider) && credential.configured
+      ? `<button class="row-menu-item credential-test" data-provider="${provider}" type="button">Test connection</button>`
       : '';
     return `<tr>
-      <td class="cell-title"><span class="cell-name">${escapeHtml(item.name)}</span><span class="cell-sub">credential: ${escapeHtml(credential.provider)}</span></td>
-      <td class="mono muted-cell" data-label="Updated">${credential.updated_at ? formatTimestamp(credential.updated_at) : '—'}</td>
+      <td class="cell-title"><span class="cell-name">${escapeHtml(name)}</span></td>
+      <td class="mono muted-cell nowrap" data-label="Updated"${credential.updated_at ? '' : ' data-empty'}>${credential.updated_at ? formatTimestamp(credential.updated_at) : '—'}</td>
+      <td data-empty></td>
       <td data-label="Status">${statusLine(status)}</td>
-      <td class="action-cell">${test}<button class="dk-button dk-button--secondary credential-edit" data-provider="${escapeHtml(credential.provider)}">${credential.configured ? 'Replace' : 'Add'}</button></td>
+      <td class="action-cell">${rowActions(edit, [test], { id: `credential-menu-${provider}`, label: escapeHtml(name) })}</td>
     </tr>`;
   }).join('');
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));

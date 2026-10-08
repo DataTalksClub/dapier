@@ -4,29 +4,30 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
+import { escapeHtml, formatTimestamp, dataBlock, triggerEventLabel } from '../format.js';
 
 let events = null;
 let fetching = false;
 
 function triggerLabel(event) {
-  return `${event.connector || '?'} · ${event.event || '?'}`;
+  return triggerEventLabel(event.connector, event.event);
 }
 
 function matchedLabel(event) {
   const matched = event.matched || [];
-  if (!matched.length) return '<span class="muted-cell">no workflow</span>';
-  return matched.map((id) => `<span class="mono">${escapeHtml(id)}</span>`).join(', ');
+  if (!matched.length) return '<span class="muted-cell">No workflow</span>';
+  const all = matched.join(', ');
+  return `<span class="clip" title="${escapeHtml(all)}">${escapeHtml(all)}</span>`;
 }
 
 function eventRow(event) {
   const matched = (event.matched || []).length ? 'matched' : 'unmatched';
   return `<tr class="inbox-open" data-inbox="${escapeHtml(event.inbox_id)}" role="button" tabindex="0" data-matched="${matched}">
-    <td class="mono muted-cell" data-label="Received">${escapeHtml(formatTimestamp(event.received_at) || '—')}</td>
-    <td class="mono" data-label="Trigger">${escapeHtml(triggerLabel(event))}</td>
+    <td class="mono muted-cell nowrap" data-label="Received">${escapeHtml(formatTimestamp(event.received_at) || '—')}</td>
+    <td class="cell-title" data-label="Trigger"><span class="clip" title="${escapeHtml(`${event.connector || '?'} · ${event.event || '?'}`)}">${escapeHtml(triggerLabel(event))}</span></td>
     <td data-label="Matched">${matchedLabel(event)}</td>
-    <td class="mono muted-cell" data-label="Source">${escapeHtml(event.source || '—')}</td>
-    <td class="action-col"><button class="dk-button dk-button--secondary inbox-replay" data-inbox="${escapeHtml(event.inbox_id)}" type="button">Replay</button></td>
+    <td class="muted-cell" data-label="Source"${event.source ? '' : ' data-empty'}><span class="mono clip" title="${escapeHtml(event.source || '')}">${escapeHtml(event.source || '—')}</span></td>
+    <td class="action-cell"><button class="dk-button dk-button--secondary dk-button--sm inbox-replay" data-inbox="${escapeHtml(event.inbox_id)}" type="button">Replay</button></td>
   </tr>`;
 }
 
@@ -36,6 +37,7 @@ function renderRows() {
   $('#inbox-empty').hidden = list.length > 0;
   $('#inbox-table-wrap').hidden = list.length === 0;
   $('#inbox-load-more').hidden = !paging.nextToken;
+  $('#inbox-footer').hidden = !paging.nextToken;
   icons();
 }
 
@@ -77,10 +79,13 @@ async function openEvent(inboxId) {
     const detail = $('#inbox-event-detail');
     const matched = event.matched || [];
     detail.innerHTML = `
-      <p class="sub">Received ${escapeHtml(formatTimestamp(event.received_at) || '—')} · source ${escapeHtml(event.source || '—')}</p>
-      <p>Matched workflows: ${matched.length ? matched.map((id) => `<span class="mono">${escapeHtml(id)}</span>`).join(', ') : '<em>none — no workflow picked this up</em>'}</p>
-      ${event.error ? `<p class="dialog-feedback error">${escapeHtml(event.error)}</p>` : ''}
-      <h3 class="sub-head">Envelope</h3>
+      <dl class="run-summary">
+        <div><dt>Received</dt><dd class="mono">${escapeHtml(formatTimestamp(event.received_at) || '—')}</dd></div>
+        <div><dt>Source</dt><dd><span class="mono clip" title="${escapeHtml(event.source || '')}">${escapeHtml(event.source || '—')}</span></dd></div>
+        <div><dt>Matched</dt><dd>${matched.length ? escapeHtml(matched.join(', ')) : 'No workflow picked this up'}</dd></div>
+      </dl>
+      ${event.error ? `<div class="detail-error"><span>${escapeHtml(event.error)}</span></div>` : ''}
+      <h3 class="detail-heading">Event data</h3>
       ${dataBlock(event.data ?? event)}`;
     $('#inbox-replay-button').dataset.inbox = inboxId;
     $('#inbox-event-dialog').showModal();

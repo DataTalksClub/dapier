@@ -2,7 +2,7 @@
    filters, paging, and CSV export. */
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, formatTimestamp } from '../format.js';
+import { escapeHtml, formatTimestamp, sentenceCase } from '../format.js';
 
 const auditPage = { events: null, nextToken: null, filters: '' };
 let fetchSeq = 0;
@@ -51,17 +51,42 @@ async function fetchAuditPage({ append = false } = {}) {
   renderAudit();
 }
 
+/* "connections.test" / "hook-trigger" read as words; the machine value
+   stays in the title for copying and in the filter. */
+function actionLabel(action) {
+  return sentenceCase(String(action || '?').replace(/[.\-_]+/g, ' '));
+}
+
+/* One status language: ok is a quiet success dot; anything denied or
+   failed is the danger dot with its reason in words. */
+function outcomeCell(outcome) {
+  const value = String(outcome || '');
+  if (!value) return '<span class="muted-cell">—</span>';
+  const problem = /error|denied|fail/.test(value);
+  const [head, ...rest] = value.split('-');
+  const text = value === 'ok' ? 'OK'
+    : rest.length ? `${sentenceCase(head)}: ${rest.join(' ')}` : sentenceCase(value);
+  return `<span class="status ${problem ? 'err' : 'ok'}" title="${escapeHtml(value)}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+}
+
+function clipCell(value, { mono = true } = {}) {
+  if (!value) return { html: '<span class="muted-cell">—</span>', empty: true };
+  return { html: `<span class="clip${mono ? ' mono' : ''}" title="${escapeHtml(value)}">${escapeHtml(value)}</span>`, empty: false };
+}
+
 function eventRow(item) {
-  const isProblem = /error|denied|fail/.test(item.outcome || '');
-  return `<tr>
-    <td class="mono muted-cell" data-label="When">${escapeHtml(formatTimestamp(item.timestamp) || '—')}</td>
-    <td class="mono" data-label="Action"><span class="cell-name">${escapeHtml(item.action || '?')}</span></td>
-    <td class="mono muted-cell" data-label="Resource">${escapeHtml(item.connection_id || '—')}</td>
-    <td class="mono muted-cell" data-label="Actor">${escapeHtml(item.actor_subject || '—')}</td>
-    <td class="mono muted-cell" data-label="Agent">${escapeHtml(item.agent || '—')}</td>
-    <td class="mono ${isProblem ? 'audit-problem' : 'muted-cell'}" data-label="Outcome">${escapeHtml(item.outcome || '—')}</td>
-    <td class="muted-cell" data-label="Error" title="${escapeHtml(item.error || '')}">${escapeHtml(item.error || '—')}</td>
-  </tr>`;
+  const resource = item.connection_id && item.connection_id !== 'unknown' ? item.connection_id : '';
+  const cells = [
+    ['When', { html: `<span class="mono nowrap">${escapeHtml(formatTimestamp(item.timestamp) || '—')}</span>`, empty: false }, 'audit-when'],
+    ['Action', { html: `<span class="cell-name clip" title="${escapeHtml(item.action || '')}">${escapeHtml(actionLabel(item.action))}</span>`, empty: false }, 'cell-title audit-action'],
+    ['Resource', clipCell(resource), 'audit-resource'],
+    ['Actor', clipCell(item.actor_subject), 'audit-actor'],
+    ['Agent', clipCell(item.agent), 'audit-agent'],
+    ['Outcome', { html: outcomeCell(item.outcome), empty: !item.outcome }, 'audit-outcome'],
+    ['Error', clipCell(item.error, { mono: false }), 'col-error audit-error'],
+  ];
+  return `<tr>${cells.map(([label, cell, cls]) =>
+    `<td class="${cls}" data-label="${label}"${cell.empty ? ' data-empty' : ''}>${cell.html}</td>`).join('')}</tr>`;
 }
 
 /* Keep the chosen option visible across paged fetches, like the runs view. */
@@ -80,13 +105,15 @@ export function renderAudit() {
   fillSelect($('#audit-log-outcome-filter'), events.map((item) => item.outcome));
   const note = $('#audit-log-note');
   if (auditPage.events === null) {
-    note.textContent = 'Up to 25 events';
+    note.textContent = 'Loading events…';
   } else {
-    note.textContent = `${events.length} events${auditPage.nextToken ? ' · more' : ''}`;
+    note.textContent = `Showing ${events.length} event${events.length === 1 ? '' : 's'}${auditPage.nextToken ? ', more to load' : ''}`;
   }
   note.title = 'Records are kept for 90 days.';
+  /* An Error column with nothing in it gives its width back. */
+  $('.audit-table').classList.toggle('no-errors', !events.some((item) => item.error));
   $('#audit-log-table').innerHTML = events.map(eventRow).join('') ||
-    '<tr><td colspan="7" class="muted-cell">No audit events match these filters</td></tr>';
+    '<tr class="register-empty"><td colspan="7"><strong>No audit events match these filters</strong></td></tr>';
   $('#audit-log-load-more').hidden = !auditPage.nextToken;
 }
 
