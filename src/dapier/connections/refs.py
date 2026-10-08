@@ -39,12 +39,22 @@ def account_of(connection):
 
 
 def _nickname(connection):
-    """The operator-given display name, when it says more than the id or
-    the account (``Au-Tomator`` for a second bot in the same workspace)."""
-    name = str(connection.get("display_name") or "").strip()
+    """Who the credential acts as inside its account (``Au-Tomator`` for a
+    Slack app, ``Alexey Grigorev`` for a person's token), when it says more
+    than the id or the account. Recorded at verification; see
+    ``records.account_identity``."""
+    identity = connection.get("account_identity")
+    name = str((identity or {}).get("name") or "").strip() if isinstance(identity, dict) else ""
     plain = {str(connection.get(key) or "") for key in
              ("connection_id", "account_title", "verified_account_id")}
     return name if name and name not in plain else None
+
+
+def _legacy_name(connection):
+    """A retired display name still stored on older records. It never
+    labels anything; it only keeps references written with it resolving."""
+    name = str(connection.get("display_name") or "").strip()
+    return name or None
 
 
 def _service_ids_of(connection):
@@ -54,7 +64,7 @@ def _service_ids_of(connection):
 def _account_label(connection, peers):
     """The account part of a reference. When another connection signs in to
     the same account for an overlapping service (two Slack bots in one
-    workspace), the display name is appended so each reference stays unique:
+    workspace), who the token acts as is appended so each reference stays unique:
     ``DataTalks.Club / Au-Tomator``."""
     account = account_of(connection)
     nickname = _nickname(connection)
@@ -91,8 +101,10 @@ def with_refs(views):
 def _names(connection):
     """Every spelling of the account a reference fragment may match."""
     account = account_of(connection) or ""
-    nickname = _nickname(connection) or ""
-    names = [account, nickname, f"{account} / {nickname}" if nickname else ""]
+    names = [account]
+    for nickname in (_nickname(connection), _legacy_name(connection)):
+        if nickname:
+            names += [nickname, f"{account} / {nickname}"]
     names += [str(connection.get(key) or "") for key in
               ("account_title", "verified_account_id", "expected_account_id")]
     return [name.lower() for name in names if name]

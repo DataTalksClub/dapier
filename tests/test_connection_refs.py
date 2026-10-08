@@ -198,9 +198,10 @@ def test_refs_use_the_human_account_and_disambiguate_duplicates():
     from src.dapier.connections import refs as r
 
     bot = {"connection_id": "slack", "provider": "slack", "status": "connected",
-           "display_name": "DTC Slack workspace", "account_title": "DataTalks.Club",
-           "verified_account_id": "T01ATQK62F8"}
-    other = {**bot, "connection_id": "slack-automator", "display_name": "Au-Tomator"}
+           "account_identity": {"kind": "user", "name": "DTC Slack workspace"},
+           "account_title": "DataTalks.Club", "verified_account_id": "T01ATQK62F8"}
+    other = {**bot, "connection_id": "slack-automator",
+             "account_identity": {"kind": "app", "name": "Au-Tomator"}}
     # Alone, the reference is the readable workspace, not the team id.
     assert r.refs_for(bot) == ["slack DataTalks.Club"]
     rows = r.with_refs([dict(bot), dict(other)])
@@ -211,4 +212,26 @@ def test_refs_use_the_human_account_and_disambiguate_duplicates():
     assert r.resolve([bot, other], "slack au-tomator")["connection_id"] == "slack-automator"
     with pytest.raises(r.RefError) as exc:
         r.resolve([bot, other], "slack DataTalks.Club")
+    assert "slack DataTalks.Club / Au-Tomator (connected)" in exc.value.candidates
+
+
+def test_slack_tokens_in_one_workspace_are_told_apart_by_who_they_act_as():
+    app = {"connection_id": "slack-automator", "provider": "slack", "status": "connected",
+           "verified_account_id": "T01ATQK62F8", "account_title": "DataTalks.Club",
+           "account_identity": {"kind": "app", "name": "Au-Tomator"}}
+    person = {"connection_id": "slack", "provider": "slack", "status": "connected",
+              "verified_account_id": "T01ATQK62F8", "account_title": "DataTalks.Club",
+              "account_identity": {"kind": "user", "name": "Alexey Grigorev"},
+              # A retired display name left on an old record never labels it.
+              "display_name": "DTC Slack workspace"}
+    rows = refs.with_refs([dict(app), dict(person)])
+    assert rows[0]["refs"] == ["slack DataTalks.Club / Au-Tomator"]
+    assert rows[1]["refs"] == ["slack DataTalks.Club / Alexey Grigorev"]
+    assert refs.resolve([app, person], "slack au-tomator")["connection_id"] == "slack-automator"
+    assert refs.resolve([app, person], "slack Alexey Grigorev")["connection_id"] == "slack"
+    # References written with the retired display name keep resolving.
+    assert refs.resolve([app, person],
+                        "slack DataTalks.Club / DTC Slack workspace")["connection_id"] == "slack"
+    with pytest.raises(refs.RefError) as exc:
+        refs.resolve([app, person], "slack DataTalks.Club")
     assert "slack DataTalks.Club / Au-Tomator (connected)" in exc.value.candidates
