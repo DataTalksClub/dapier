@@ -206,10 +206,13 @@ Home is the glance page: paused workflows, latest-run failures, and recent
 results. Create and edit automations in Workflows (emails, schedules, hooks,
 and polls are start methods on that page). Inspect failures in Runs, agent
 tasks in Agents, and connected accounts in Connections (OAuth clients and
-provider keys sit under App setup). Access, Data, and Audit live under
-Settings. The CLI reaches the same actions with `dapier workflows`,
-`dapier runs`, `dapier connections`, `dapier quota`, `dapier errors send-digest`,
-and `dapier audit`.
+provider keys sit under App setup). Access and Audit live under Settings.
+A workflow with storage steps (`storage_get`/`set`/`find`/`delete`) shows a
+**Stored data** panel in its designer (the topbar's "Stored data" action, under
+More on a phone) to list, filter, set and delete its keys; the old `/storage`
+page link redirects to Workflows. The CLI reaches the same actions with
+`dapier workflows`, `dapier runs`, `dapier connections`, `dapier storage`,
+`dapier quota`, `dapier errors send-digest`, and `dapier audit`.
 
 Open `https://dapier.dtcdev.click` and sign in as `admin`. Retrieve the generated
 password from Secrets Manager without putting it in source control:

@@ -1645,3 +1645,115 @@ input[type="checkbox"], input[type="radio"] {
   .board-toolbar { flex-wrap: wrap; gap: 6px; }
   .inspector-head::before { left: -16px; }
 }
+
+/* ---- Stored data (StoredData.tsx) ----
+   The saved workflow's key-value state, floating over the canvas like the
+   Test run panel; on a phone it becomes a full-screen sheet. Spacing comes
+   from the dakit scale only. */
+.stored-panel {
+  background: var(--dk-bg-surface);
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-md);
+  box-shadow: var(--dk-shadow-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: var(--dk-space-4);
+  /* Clear of the 360px inspector column and below the canvas toolbar, so
+     undo/redo and the step list stay reachable while it is open. */
+  max-height: calc(100vh - 128px);
+  overflow-y: auto;
+  padding: var(--dk-space-4);
+  position: fixed;
+  right: calc(360px + var(--dk-space-4));
+  top: 112px;
+  width: min(520px, calc(100vw - 360px - 2 * var(--dk-space-6)));
+  z-index: 60;
+}
+.stored-panel-head { align-items: center; display: flex; gap: var(--dk-space-3); justify-content: space-between; }
+.stored-panel-head h2 { font-size: var(--dk-text-lg); font-weight: 600; margin: 0; }
+.stored-hint { color: var(--dk-text-muted); font-size: var(--dk-text-sm); line-height: 1.5; margin: 0; }
+.stored-panel .mono-field { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
+.stored-panel .dk-input { height: var(--dk-size-control-md); min-height: var(--dk-size-control-md); }
+.stored-filter { display: flex; gap: var(--dk-space-3); }
+.stored-filter .dk-input { flex: 1; min-width: 0; }
+.stored-filter .dk-button { flex: none; white-space: nowrap; }
+.stored-status { color: var(--dk-success-text); font-size: var(--dk-text-sm); margin: 0; overflow-wrap: anywhere; }
+.stored-status.error { color: var(--dk-danger-text); }
+
+/* One bordered register: hairline rows, empty state inside it. */
+.stored-register { border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
+.stored-list { list-style: none; margin: 0; padding: 0; }
+.stored-item {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--dk-space-3);
+  padding: var(--dk-space-3);
+}
+.stored-item + .stored-item { border-top: 1px solid var(--dk-border-default); }
+.stored-item-main { display: flex; flex: 1; flex-direction: column; gap: var(--dk-space-1); min-width: 0; }
+.stored-key {
+  color: var(--dk-text-primary);
+  font-family: var(--dk-font-mono);
+  font-size: var(--dk-text-md);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The value clamps to two lines; a click shows all of it. */
+.stored-value {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  background: none;
+  border: 0;
+  border-radius: var(--dk-radius-sm);
+  color: var(--dk-text-muted);
+  cursor: zoom-in;
+  display: -webkit-box;
+  font-family: var(--dk-font-mono);
+  font-size: var(--dk-text-sm);
+  line-height: 1.5;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  padding: 0;
+  text-align: left;
+  white-space: pre-wrap;
+}
+.stored-value.open { -webkit-line-clamp: unset; cursor: zoom-out; display: block; }
+.stored-value em { color: var(--dk-text-faint); font-family: var(--dk-font-sans); }
+.stored-value:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
+.stored-meta { color: var(--dk-text-faint); font-size: var(--dk-text-xs); }
+.stored-delete { flex: none; }
+.stored-empty { padding: var(--dk-space-4); }
+.stored-empty h3 { font-size: var(--dk-text-lg); font-weight: 600; margin: 0 0 var(--dk-space-1); }
+.stored-empty p, .stored-empty-line { color: var(--dk-text-muted); font-size: var(--dk-text-sm); margin: 0; }
+.stored-empty-line { padding: var(--dk-space-4); }
+
+.stored-form { border-top: 1px solid var(--dk-border-default); display: flex; flex-direction: column; gap: var(--dk-space-3); padding-top: var(--dk-space-4); }
+.stored-form h3 { font-size: var(--dk-text-body); font-weight: 600; margin: 0; }
+.stored-fields { display: grid; gap: var(--dk-space-3); grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.stored-field { display: flex; flex-direction: column; min-width: 0; }
+.stored-field .dk-label { font-weight: 500; }
+.stored-value-field { grid-column: 1 / -1; }
+.stored-value-field .dk-textarea { max-height: 14rem; min-height: 64px; overflow-y: auto; }
+.stored-actions { justify-content: flex-end; margin-top: 0; }
+
+@media (max-width: 720px) {
+  /* Full-screen sheet with the family 16px gutter and 44px targets. */
+  .stored-panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    inset: 0;
+    max-height: none;
+    padding: var(--dk-space-4);
+    width: auto;
+  }
+  .stored-panel .icon-button,
+  .stored-panel .dk-button { min-height: var(--dk-size-touch); }
+  .stored-panel .icon-button { width: var(--dk-size-touch); }
+  .stored-panel .dk-input { height: var(--dk-size-touch); min-height: var(--dk-size-touch); }
+  .stored-value { min-height: var(--dk-size-touch); }
+  .stored-fields { grid-template-columns: 1fr; }
+  .stored-actions .dk-button { width: 100%; }
+}

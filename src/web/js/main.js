@@ -8,7 +8,6 @@ import { refresh, openRowFor, openWorkflow, openVersions, restoreVersion } from 
 import { renderRuns, openRun } from './views/runs.js';
 import { openDesigner, designerFromLocation } from './views/designer.js';
 import { showOAuthResult, openEditConnection } from './views/connections.js';
-import './views/storage.js';
 import { refreshAudit } from './views/audit.js';
 import { applyAccountIdentity, bindAccountChrome } from './account.js';
 

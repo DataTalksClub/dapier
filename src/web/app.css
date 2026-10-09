@@ -525,23 +525,6 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
 .inline-status { color: var(--dk-accent-default); font-size: var(--dk-text-md); min-height: 1em; }
 .token-grant-choice { margin-right: auto; min-width: 170px; }
 
-/* --- Data (storage) -------------------------------------------------------
-   Browse toolbar above the register; the write form is a panel with its
-   fields on one grid and the Store action in the panel's footer band. */
-.storage-form { margin-top: var(--dk-gap-section); }
-.storage-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--dk-gap-block); padding: var(--dk-pad-panel); }
-.storage-fields .storage-value-field { grid-column: 1 / -1; }
-.storage-fields label { min-width: 0; }
-.storage-form textarea { max-height: 14rem; resize: vertical; overflow-y: auto; }
-.storage-form .dk-form-actions { margin-top: 0; }
-.storage-table { table-layout: fixed; }
-.storage-table .col-key { width: 26%; }
-.storage-table .col-when { width: 10.5rem; }
-.storage-table .col-action { width: 6.5rem; }
-.storage-value-cell { min-width: 0; }
-.storage-value-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; cursor: zoom-in; }
-.storage-value-cell.expanded .storage-value-text { display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; cursor: zoom-out; }
-
 /* --- Home: a status strip and three banded panels -------------------------- */
 /* The attention panel only renders when something needs action; its rows'
    own dots carry the severity, the frame stays neutral. */
@@ -573,7 +556,7 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
 }
 /* Panels that hold only bands and rows clip them to the rounded frame
    (Connections' panels keep overflow visible for their help tips). */
-.home-panel, details.data-panel, [data-page="credentials"] .data-panel, .storage-form { overflow: hidden; }
+.home-panel, details.data-panel, [data-page="credentials"] .data-panel { overflow: hidden; }
 .data-panel + .data-panel { margin-top: var(--dk-gap-section); }
 .home-panel > .section-head,
 .data-panel > .section-head {
@@ -1289,15 +1272,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .register-toolbar .toolbar-filters > label { min-width: 0; }
   .register-toolbar .toolbar-filters > label.toolbar-search { grid-column: 1 / -1; max-width: none; }
   .register-toolbar .dk-toolbar__end > .dk-button { width: 100%; }
-  /* Data browses one workflow: a single clean stack, the action sized to
-     its label. */
-  #storage-browse.register-toolbar { grid-template-columns: 1fr; }
-  #storage-browse .dk-toolbar__end > .dk-button { width: auto; justify-self: start; }
   /* A lone filter beside search takes the row rather than half of it. */
   .connection-toolbar .toolbar-filters > label:not(.toolbar-search) { grid-column: 1 / -1; }
   .agent-toolbar .agent-filters { grid-column: 1 / -1; }
   .agent-toolbar .agent-workers-strip { align-self: center; }
-  .storage-fields { grid-template-columns: 1fr; }
 }
 
 /* Family account trigger: avatar only in the 64px top bar at ≤820px. */

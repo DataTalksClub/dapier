@@ -84,7 +84,6 @@ def _static(path):
         "/assets/js/views/workers.js": ("js/views/workers.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/schedules.js": ("js/views/schedules.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/tokens.js": ("js/views/tokens.js", "text/javascript; charset=utf-8"),
-        "/assets/js/views/storage.js": ("js/views/storage.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/audit.js": ("js/views/audit.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/triggers.js": ("js/views/triggers.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/hooks.js": ("js/views/hooks.js", "text/javascript; charset=utf-8"),

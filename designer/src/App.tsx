@@ -8,6 +8,7 @@ import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, def
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
+import { StoredDataPanel, workflowUsesStorage } from "./StoredData";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
@@ -619,6 +620,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       draft, Publish/Discard promote or throw it. Null = no draft known. */
   const [draftInfo, setDraftInfo] = useState<DraftInfo | null>(null);
   const [testOpen, setTestOpen] = useState(false);
+  /** The Stored data panel (StoredData.tsx): the saved workflow's
+      key-value state, offered only when a step reads or writes it. */
+  const [storedOpen, setStoredOpen] = useState(false);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);
   const [testStrict, setTestStrict] = useState(false);
@@ -663,6 +667,22 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       ? yamlText !== savedYaml
       : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
     [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
+  );
+
+  /** Stored data is per saved workflow id: offered in console mode once the
+      workflow is saved and one of its steps (canvas, flows, nested chains)
+      is a storage_* action. */
+  const storedDataAvailable = useMemo(
+    () => config.mode === "console" && !!sourceName && workflowUsesStorage(
+      shapes.map((shape) => (shape.type === "node" ? shape.data?.actionType : undefined)), base),
+    [config.mode, sourceName, shapes, base]
+  );
+  useEffect(() => {
+    if (!storedDataAvailable) setStoredOpen(false);
+  }, [storedDataAvailable]);
+  const storageRequest = useCallback(
+    <T,>(path: string, init?: RequestInit) => api<T>(config, path, init, "/api/admin"),
+    [config]
   );
 
   /** Whole-editor undo history (designer/src/history.ts): canvas ops,
@@ -1173,6 +1193,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       const shapes = shapesFromWorkflow(workflow);
       const yaml = workflowYaml(workflow);
       setSourceName(summary.source);
+      setStoredOpen(false);
       setWorkflowId(workflow.id);
       setEnabled(workflow.enabled !== false);
       setShapes(shapes);
@@ -1212,6 +1233,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
     };
     setSourceName(null);
+    setStoredOpen(false);
     setInvalidRawDrafts({});
     setWorkflowId("new-workflow");
     setEnabled(true);
@@ -1281,6 +1303,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       setSelectedId(null);
     }
     setTestOpen(false);
+    setStoredOpen(false);
     setStepTest({ nodeId: null, busy: false, result: null });
     setView(next);
   }
@@ -1598,11 +1621,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     try {
       sample = JSON.parse(testEvent);
     } catch {
+      setStoredOpen(false);
       setTestOpen(true);
       setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event is not valid JSON — fix it in the Test run panel." } });
       return;
     }
     if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+      setStoredOpen(false);
       setTestOpen(true);
       setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event must be a JSON object — fix it in the Test run panel." } });
       return;
@@ -2322,11 +2347,23 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <button
                 className={testOpen ? "button secondary active" : "dk-button dk-button--secondary"}
                 type="button"
-                onClick={() => setTestOpen(!testOpen)}
+                onClick={() => { setStoredOpen(false); setTestOpen(!testOpen); }}
                 disabled={status.kind === "busy" || view === "yaml"}
                 title={view === "yaml" ? "Switch to Canvas to test this workflow" : undefined}
               >
                 <span>Test run</span>
+              </button>
+            )}
+            {storedDataAvailable && (
+              <button
+                className={storedOpen ? "dk-button dk-button--secondary active" : "dk-button dk-button--secondary"}
+                type="button"
+                aria-pressed={storedOpen}
+                onClick={() => { setTestOpen(false); setStoredOpen(!storedOpen); }}
+                disabled={view === "yaml"}
+                title={view === "yaml" ? "Switch to Canvas to see stored data" : "The keys this workflow's storage steps read and write"}
+              >
+                <span>Stored data</span>
               </button>
             )}
             {config.mode === "console" && (
@@ -2503,6 +2540,9 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 </div>
               )}
             </section>
+          )}
+          {storedOpen && storedDataAvailable && (
+            <StoredDataPanel workflowId={savedId} request={storageRequest} onClose={() => setStoredOpen(false)} />
           )}
           {/* "empty" lets the narrow-frame layout drop the panel until a node
              is selected — on a phone the hints would cost half the canvas. */}

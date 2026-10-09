@@ -55,7 +55,6 @@
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <p class="nav-group-label">Settings</p>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>Access</span></a>
-        <a class="nav-item" href="/storage" data-view="storage"><i data-lucide="database"></i><span>Data</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit</span></a>
       </nav>
       <div class="sidebar-foot">
@@ -372,31 +371,6 @@
           </table>
         </div>
       </section>
-      <section class="view" data-page="storage">
-        <form id="storage-browse" class="dk-toolbar page-tools register-toolbar">
-          <div class="dk-cluster toolbar-filters"><label><span class="visually-hidden">Workflow</span><select name="workflow" required><option value="">Choose a workflow…</option></select></label><label class="toolbar-search"><span class="visually-hidden">Key prefix</span><input name="prefix" placeholder="Key prefix"></label></div>
-          <div class="dk-toolbar__end"><button class="dk-button dk-button--secondary" type="submit">List keys</button></div>
-        </form>
-        <div id="storage-idle" class="empty-state"><h3>Pick a workflow to inspect its keys</h3><p>The keys its storage steps wrote appear here, with values and expiry.</p></div>
-        <div id="storage-empty" class="empty-state" hidden><h3 id="storage-empty-title">No stored keys</h3><p>Keys appear as this workflow's storage steps run. Store one below to try it, then read it back with a storage_get step.</p></div>
-        <div id="storage-table-wrap" class="table-wrap register" hidden>
-          <table class="storage-table">
-            <colgroup><col class="col-key"><col><col class="col-when"><col class="col-when"><col class="col-action"></colgroup>
-            <thead><tr><th>Key</th><th>Value</th><th>Updated</th><th>Expires</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="storage-table"></tbody>
-          </table>
-        </div>
-        <form id="storage-put" class="data-panel storage-form">
-          <div class="section-head"><h2>Store a value</h2><p class="sub" id="storage-put-target" hidden>For <span id="storage-put-workflow" class="mono"></span></p></div>
-          <div class="storage-fields">
-            <label>Key<input name="key" class="mono-input" required placeholder="dedupe:message-123"></label>
-            <label>Expires after (seconds)<input name="ttl_seconds" type="number" min="1" placeholder="Optional"></label>
-            <label class="storage-value-field">Value<textarea name="value" rows="2" class="mono-input" required placeholder="true"></textarea></label>
-          </div>
-          <div class="dk-form-actions"><button class="dk-button dk-button--primary" type="submit">Store</button></div>
-        </form>
-      </section>
-
       <section class="view" data-page="runs">
         <div class="dk-toolbar page-tools register-toolbar">
           <div class="dk-cluster toolbar-filters"><label class="toolbar-search"><span class="visually-hidden">Search</span><input id="runs-search-filter" type="search" placeholder="Search runs" title="Text in a run's data, or its id"></label><label><span class="visually-hidden">Workflow</span><select id="runs-workflow-filter" aria-label="Workflow"><option value="">All workflows</option></select></label><label><span class="visually-hidden">Status</span><select id="runs-status-filter" aria-label="Status"><option value="">All statuses</option></select></label><label><span class="visually-hidden">Date</span><select id="runs-date-filter" aria-label="Date"><option value="">All dates</option><option value="day">Last 24 hours</option><option value="week">Last 7 days</option></select></label></div>

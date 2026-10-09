@@ -50,7 +50,7 @@ def test_hooks_endpoints_render_through_the_guard_and_keep_edit_in_the_menu():
 def test_tab_reentry_refetch_only_fires_for_navigation_links():
     # `[data-view=…]` also matches the view <section>, so any click inside
     # the page (opening a row menu) used to refetch and re-render the list.
-    for name in ("hooks.js", "emails.js", "polls.js", "schedules.js", "storage.js"):
+    for name in ("hooks.js", "emails.js", "polls.js", "schedules.js"):
         source = (VIEWS / name).read_text()
         for selector in re.findall(r"closest\('([^']*data-view[^']*)'\)", source):
             for part in selector.split(","):

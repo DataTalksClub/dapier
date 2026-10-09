@@ -151,3 +151,14 @@ def test_admin_routes_drive_the_same_domain(operator, storage_table):
 
     removed = admin_routes.storage_delete({"queryStringParameters": {"key": "k"}}, "wf-1")
     assert json.loads(removed["body"])["deleted"] is True
+
+
+def test_listing_carries_each_keys_expiry(operator, storage_table):
+    # The designer's Stored data panel shows when each key expires; the
+    # list (not just the single-key read) has to carry it.
+    storage.kv_set("wf-1", "temp", "x", 60)
+    storage.kv_set("wf-1", "kept", "y")
+    listed = admin_routes.storage_read({"queryStringParameters": {}}, "wf-1")
+    items = {item["key"]: item for item in json.loads(listed["body"])["items"]}
+    assert isinstance(items["temp"]["expires"], int) and items["temp"]["expires"] > 0
+    assert items["kept"]["expires"] is None

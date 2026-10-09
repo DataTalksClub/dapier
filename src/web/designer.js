@@ -21580,6 +21580,192 @@
     ] });
   }
   const localConfig = { apiBase: "/api", mode: "local" };
+  const STORAGE_TYPE = /^storage_(get|set|find|delete)$/;
+  function workflowUsesStorage(actionTypes, base) {
+    if (actionTypes.some((type2) => type2 !== void 0 && STORAGE_TYPE.test(type2))) return true;
+    return !!base && /"type":"storage_(get|set|find|delete)"/.test(JSON.stringify(base));
+  }
+  function shortTime(value) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  }
+  function timeFromIso(iso) {
+    if (!iso) return { text: "—" };
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? { text: iso } : { text: shortTime(date), title: date.toISOString() };
+  }
+  function expiryLabel(expires) {
+    if (!expires) return { text: "Never expires" };
+    const date = new Date(expires * 1e3);
+    return Number.isNaN(date.getTime()) ? { text: `Expires ${expires}` } : { text: `Expires ${shortTime(date)}`, title: date.toISOString() };
+  }
+  function StoredDataPanel({ workflowId, request, onClose }) {
+    const ids = reactExports.useId();
+    const base = `/storage/${encodeURIComponent(workflowId)}`;
+    const [prefix, setPrefix] = reactExports.useState("");
+    const [items, setItems] = reactExports.useState(null);
+    const [listing, setListing] = reactExports.useState(false);
+    const [error, setError] = reactExports.useState("");
+    const [notice, setNotice] = reactExports.useState("");
+    const [expanded, setExpanded] = reactExports.useState({});
+    const [deleting, setDeleting] = reactExports.useState(null);
+    const [key, setKey] = reactExports.useState("");
+    const [value, setValue] = reactExports.useState("");
+    const [ttl, setTtl] = reactExports.useState("");
+    const [storing, setStoring] = reactExports.useState(false);
+    const listedPrefix = reactExports.useRef("");
+    const list = reactExports.useCallback(async (nextPrefix) => {
+      setListing(true);
+      setError("");
+      try {
+        const query = nextPrefix ? `?prefix=${encodeURIComponent(nextPrefix)}` : "";
+        const data = await request(`${base}${query}`);
+        listedPrefix.current = nextPrefix;
+        setItems(data.items ?? []);
+      } catch (problem) {
+        setError(problem instanceof Error ? problem.message : String(problem));
+      } finally {
+        setListing(false);
+      }
+    }, [base, request]);
+    reactExports.useEffect(() => {
+      setItems(null);
+      setExpanded({});
+      setNotice("");
+      void list("");
+    }, [list]);
+    async function store(event) {
+      event.preventDefault();
+      if (storing) return;
+      const body = { key: key.trim(), value };
+      if (ttl.trim()) body.ttl_seconds = Number(ttl);
+      setStoring(true);
+      setError("");
+      try {
+        await request(base, { method: "POST", body: JSON.stringify(body) });
+        setNotice(`Stored ${body.key}.`);
+        setKey("");
+        setValue("");
+        setTtl("");
+        await list(listedPrefix.current);
+      } catch (problem) {
+        setError(problem instanceof Error ? problem.message : String(problem));
+      } finally {
+        setStoring(false);
+      }
+    }
+    async function remove(itemKey) {
+      setDeleting(itemKey);
+      setError("");
+      try {
+        await request(`${base}?key=${encodeURIComponent(itemKey)}`, { method: "DELETE" });
+        setNotice(`Deleted ${itemKey}.`);
+        await list(listedPrefix.current);
+      } catch (problem) {
+        setError(problem instanceof Error ? problem.message : String(problem));
+      } finally {
+        setDeleting(null);
+      }
+    }
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "stored-panel", "aria-labelledby": `${ids}-title`, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "stored-panel-head", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: `${ids}-title`, children: "Stored data" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", type: "button", "aria-label": "Close stored data", title: "Close", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "stored-hint", children: "Keys this workflow’s storage steps read and write. Changes here apply right away, outside of saving." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "form",
+        {
+          className: "stored-filter",
+          role: "search",
+          onSubmit: (event) => {
+            event.preventDefault();
+            void list(prefix.trim());
+          },
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "dk-visually-hidden", htmlFor: `${ids}-prefix`, children: "Key prefix" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                id: `${ids}-prefix`,
+                className: "dk-input mono-field",
+                value: prefix,
+                placeholder: "Key prefix",
+                spellCheck: false,
+                onChange: (event) => setPrefix(event.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "submit", disabled: listing, children: [
+              listing && /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 16, strokeWidth: 1.8, className: "spin" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "List keys" })
+            ] })
+          ]
+        }
+      ),
+      (error || notice) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: error ? "stored-status error" : "stored-status", role: error ? "alert" : "status", children: error || notice }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stored-register", children: items === null ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "stored-empty-line", children: listing ? "Loading keys…" : "Keys could not be listed." }) : items.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stored-empty", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: listedPrefix.current ? `No keys under ${listedPrefix.current}` : "No stored keys" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Keys appear as this workflow’s storage steps run. Store one below to try it." })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "stored-list", "aria-label": "Stored keys", children: items.map((item) => {
+        const open = !!expanded[item.key];
+        const updated = timeFromIso(item.updated_at);
+        const expiry = expiryLabel(item.expires);
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "stored-item", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stored-item-main", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stored-key", title: item.key, children: item.key }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: open ? "stored-value open" : "stored-value",
+                "aria-expanded": open,
+                title: open ? "Collapse the value" : "Show the whole value",
+                onClick: () => setExpanded((current) => ({ ...current, [item.key]: !open })),
+                children: item.value === "" ? /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: "empty" }) : item.value
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "stored-meta", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { title: updated.title, children: [
+                "Updated ",
+                updated.text
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { "aria-hidden": "true", children: " · " }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { title: expiry.title, children: expiry.text })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "dk-button dk-button--danger dk-button--sm stored-delete",
+              type: "button",
+              disabled: deleting === item.key,
+              "aria-label": `Delete ${item.key}`,
+              onClick: () => void remove(item.key),
+              children: "Delete"
+            }
+          )
+        ] }, item.key);
+      }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { className: "stored-form", onSubmit: store, "aria-labelledby": `${ids}-store`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { id: `${ids}-store`, children: "Store a value" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stored-fields", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "stored-field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-label", children: "Key" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "dk-input mono-field", required: true, value: key, spellCheck: false, placeholder: "dedupe:message-123", onChange: (event) => setKey(event.target.value) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "stored-field stored-ttl", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-label", children: "Expires after (seconds)" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "dk-input", type: "number", min: 1, value: ttl, placeholder: "Optional", onChange: (event) => setTtl(event.target.value) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "stored-field stored-value-field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-label", children: "Value" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("textarea", { className: "dk-textarea mono-field", required: true, rows: 2, value, spellCheck: false, placeholder: "true", onChange: (event) => setValue(event.target.value) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-form-actions stored-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "submit", disabled: storing, children: storing ? "Storing…" : "Store" }) })
+      ] })
+    ] });
+  }
   const COALESCE_MS = 500;
   function initHistory() {
     return { past: [], future: [] };
@@ -22143,6 +22329,7 @@
     const customName = typeof base?.name === "string" ? base.name.trim() : "";
     const [draftInfo, setDraftInfo] = reactExports.useState(null);
     const [testOpen, setTestOpen] = reactExports.useState(false);
+    const [storedOpen, setStoredOpen] = reactExports.useState(false);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
     const [testStrict, setTestStrict] = reactExports.useState(false);
@@ -22171,6 +22358,20 @@
     const dirty = reactExports.useMemo(
       () => view === "yaml" ? yamlText !== savedYaml : Object.keys(invalidRawDrafts).length > 0 || canvasExtraDirty || workflowId !== savedId || enabled !== savedEnabled || JSON.stringify(shapes) !== savedSnapshot,
       [view, yamlText, savedYaml, invalidRawDrafts, canvasExtraDirty, workflowId, savedId, enabled, savedEnabled, shapes, savedSnapshot]
+    );
+    const storedDataAvailable = reactExports.useMemo(
+      () => config.mode === "console" && !!sourceName && workflowUsesStorage(
+        shapes.map((shape) => shape.type === "node" ? shape.data?.actionType : void 0),
+        base
+      ),
+      [config.mode, sourceName, shapes, base]
+    );
+    reactExports.useEffect(() => {
+      if (!storedDataAvailable) setStoredOpen(false);
+    }, [storedDataAvailable]);
+    const storageRequest = reactExports.useCallback(
+      (path, init) => api(config, path, init, "/api/admin"),
+      [config]
     );
     const [editHistory, setEditHistory] = reactExports.useState(initHistory);
     const canUndo = editHistory.past.length > 0;
@@ -22587,6 +22788,7 @@
         const shapes2 = shapesFromWorkflow(workflow);
         const yaml2 = workflowYaml(workflow);
         setSourceName(summary.source);
+        setStoredOpen(false);
         setWorkflowId(workflow.id);
         setEnabled(workflow.enabled !== false);
         setShapes(shapes2);
@@ -22625,6 +22827,7 @@
         data: { nodeKind: "trigger", connector: "email", event: "message.received", filters: [{ field: "route", operator: "equals", value: "" }] }
       };
       setSourceName(null);
+      setStoredOpen(false);
       setInvalidRawDrafts({});
       setWorkflowId("new-workflow");
       setEnabled(true);
@@ -22690,6 +22893,7 @@
         setSelectedId(null);
       }
       setTestOpen(false);
+      setStoredOpen(false);
       setStepTest({ nodeId: null, busy: false, result: null });
       setView(next);
     }
@@ -22965,11 +23169,13 @@
       try {
         sample = JSON.parse(testEvent);
       } catch {
+        setStoredOpen(false);
         setTestOpen(true);
         setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event is not valid JSON — fix it in the Test run panel." } });
         return;
       }
       if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+        setStoredOpen(false);
         setTestOpen(true);
         setStepTest({ nodeId, busy: false, result: { mode: "test-step", matched: false, steps: [], error: "The sample event must be a JSON object — fix it in the Test run panel." } });
         return;
@@ -23696,10 +23902,28 @@
                 {
                   className: testOpen ? "button secondary active" : "dk-button dk-button--secondary",
                   type: "button",
-                  onClick: () => setTestOpen(!testOpen),
+                  onClick: () => {
+                    setStoredOpen(false);
+                    setTestOpen(!testOpen);
+                  },
                   disabled: status.kind === "busy" || view === "yaml",
                   title: view === "yaml" ? "Switch to Canvas to test this workflow" : void 0,
                   children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
+                }
+              ),
+              storedDataAvailable && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: storedOpen ? "dk-button dk-button--secondary active" : "dk-button dk-button--secondary",
+                  type: "button",
+                  "aria-pressed": storedOpen,
+                  onClick: () => {
+                    setTestOpen(false);
+                    setStoredOpen(!storedOpen);
+                  },
+                  disabled: view === "yaml",
+                  title: view === "yaml" ? "Switch to Canvas to see stored data" : "The keys this workflow's storage steps read and write",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Stored data" })
                 }
               ),
               config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23878,6 +24102,7 @@
               ] }, `${step.action_id}-${index}`))
             ] })
           ] }),
+          storedOpen && storedDataAvailable && /* @__PURE__ */ jsxRuntimeExports.jsx(StoredDataPanel, { workflowId: savedId, request: storageRequest, onClose: () => setStoredOpen(false) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: selected?.type === "node" ? "inspector" : "inspector empty", children: [
             selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [

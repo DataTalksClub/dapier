@@ -53,6 +53,11 @@ def get(workflow_id, key, visible=None):
     }
 
 
+def _epoch(value):
+    """DynamoDB hands numbers back as Decimal; JSON wants an int (or None)."""
+    return int(value) if value is not None else None
+
+
 def find(workflow_id, prefix, limit, visible=None):
     if _hidden(workflow_id, visible):
         return 200, {
@@ -77,6 +82,7 @@ def find(workflow_id, prefix, limit, visible=None):
                 "key": str(item.get("key") or ""),
                 "value": str(item.get("value") or ""),
                 "updated_at": item.get("updated_at"),
+                "expires": _epoch(item.get("expires")),
             }
             for item in items
         ],

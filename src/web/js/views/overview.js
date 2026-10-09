@@ -18,7 +18,6 @@ import { renderRuns, openRun } from './runs.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
-import { renderStorage } from './storage.js';
 import { workflowName, workflowLabelHtml, workflowFlowText, appStripHtml, triggerKindIcon } from '../workflow-names.js';
 import { loadCatalog, eventLabel, actionLabel } from '../catalog-labels.js';
 
@@ -178,7 +177,6 @@ function render(section) {
     renderEmailFrom(data.email_from);
   }
   if (data.runs && ['workflows', 'activity'].includes(section)) renderRuns();
-  if (section === 'workflows') renderStorage();
   const now = new Date();
   $('#last-updated').textContent = `Updated ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   icons();

@@ -34,7 +34,6 @@ def test_sidebar_lists_daily_pages_then_settings():
         "Workers",
         "Connections",
         "Access",
-        "Data",
         "Audit",
     ]
     assert "Settings" in sidebar
@@ -134,6 +133,20 @@ def test_old_triggers_path_opens_hooks_tab():
     assert "'/triggers'" in ROUTER
     assert "/workflows?tab=hooks" in ROUTER
     assert "/triggers" in ingress.CONSOLE_VIEWS
+
+
+def test_old_data_page_redirects_to_workflows():
+    """The Data page left the console: a workflow's stored keys live in its
+    designer's Stored data panel. Saved /storage links still land."""
+    assert 'href="/storage"' not in INDEX
+    assert 'data-page="storage"' not in INDEX
+    assert not pathlib.Path("src/web/js/views/storage.js").exists()
+    assert "'storage'" not in ROUTER.split("const VIEWS = ", 1)[1].split("\n", 1)[0]
+    assert "if (name === 'storage') return 'workflows'" in ROUTER
+    assert "window.location.pathname === '/storage') history.replaceState(null, '', '/workflows')" in ROUTER
+    assert "/storage" in ingress.CONSOLE_VIEWS
+    assert "Path: /storage" in TEMPLATE
+    assert "/assets/js/views/storage.js" not in pathlib.Path("src/dapier/api/router.py").read_text()
 
 
 def test_sidebar_and_page_tab_hrefs_have_gateway_routes():
