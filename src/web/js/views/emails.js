@@ -5,7 +5,7 @@
    (GET /api/admin/triggers/inbox?connector=email), the same API behind
    `dapier emails received`; flows are still edited only in the designer. */
 import { state } from '../state.js';
-import { $, $$, icons, notice } from '../ui.js';
+import { $, $$, icons, notice, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
@@ -272,6 +272,10 @@ function addressItem({ label, kind = '', copy = '', handlers }) {
 }
 
 export function renderEmails(data) {
+  whenMenusClosed($('.view[data-page="emails"]'), () => renderEmailsNow(data));
+}
+
+function renderEmailsNow(data) {
   config = data || {};
   $('#email-domain-hint').textContent = config.domain ? `*@${config.domain}` : 'the receiving domain';
   $('#email-load-error').textContent = config.error || '';
@@ -395,7 +399,7 @@ $('#email-allow-sender').addEventListener('click', async (event) => {
 
 /* Entering the page (tab click, back/forward) loads fresh mail. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('[data-view="emails"]')) void fetchMail();
+  if (event.target.closest('a[data-view="emails"]')) void fetchMail();
 });
 window.addEventListener('popstate', () => {
   if (state.view === 'emails') void fetchMail();

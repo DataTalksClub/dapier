@@ -116,3 +116,12 @@ export function rowActions(primary, menuItems = [], { id, label }) {
     : '<span class="row-more-slot" aria-hidden="true"></span>';
   return `<div class="row-actions">${primary}${more}</div>`;
 }
+
+/* A list re-render replaces its rows — and with them any open row menu.
+   Background refreshes wait until the open menu in `root` closes. */
+export function whenMenusClosed(root, paint) {
+  const open = root && root.querySelector('.row-menu:popover-open');
+  if (!open) return paint();
+  open.addEventListener('toggle', (event) => { if (event.newState === 'closed') paint(); }, { once: true });
+  return undefined;
+}

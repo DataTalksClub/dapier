@@ -621,7 +621,7 @@ document.addEventListener('keydown', (event) => {
 
 /* Entering the Polls tab (tab link, back/forward) fetches fresh state. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('[data-view="workflows"][data-tab="polls"]')) window.setTimeout(() => void fetchPolls(), 0);
+  if (event.target.closest('a[data-view="workflows"][data-tab="polls"]')) window.setTimeout(() => void fetchPolls(), 0);
 });
 window.addEventListener('popstate', () => {
   if (pollsPanelShown()) void fetchPolls();

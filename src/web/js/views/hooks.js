@@ -9,7 +9,7 @@
    Recent deliveries are the main content; each endpoint (URL, how requests
    are verified, which workflows run) sits beside them as compact cards. */
 import { state } from '../state.js';
-import { $, icons, notice } from '../ui.js';
+import { $, icons, notice, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, jsonBlock } from '../format.js';
 import { openRun } from './runs.js';
@@ -167,6 +167,10 @@ function renderSummary() {
 }
 
 function render() {
+  whenMenusClosed($('[data-workflow-panel="hooks"]'), renderNow);
+}
+
+function renderNow() {
   const any = hooks.length > 0;
   $('#hook-empty').hidden = any || !loaded;
   $('#hooks-layout').hidden = !any;
@@ -624,7 +628,7 @@ $('#hook-delivery-replay').addEventListener('click', () => {
 
 /* Entering the tab (page tabs, nav, back/forward) fetches fresh data. */
 document.addEventListener('click', (event) => {
-  if (event.target.closest('[data-view="workflows"], [data-target="workflows"]')) {
+  if (event.target.closest('a[data-view="workflows"], a[data-target="workflows"]')) {
     setTimeout(() => { if (onHooksTab()) void refreshHooks(); }, 0);
   }
 });
