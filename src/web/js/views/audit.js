@@ -59,14 +59,24 @@ function actionLabel(action) {
 
 /* One status language: ok is a quiet success dot; anything denied or
    failed is the danger dot with its reason in words. */
+/* One word for the outcome (OK / Denied / Failed); the reason and the
+   error ride together on the muted line under it, two lines at most, so a
+   failure reads without hover and the row stays three lines. */
+function outcomeParts(outcome) {
+  const value = String(outcome || '');
+  const [head, ...rest] = value.split('-');
+  return {
+    problem: /error|denied|fail/.test(value),
+    word: value === 'ok' ? 'OK' : sentenceCase(head === 'error' ? 'failed' : head),
+    reason: rest.length ? sentenceCase(rest.join(' ')) : '',
+  };
+}
+
 function outcomeCell(outcome) {
   const value = String(outcome || '');
   if (!value) return '<span class="muted-cell">—</span>';
-  const problem = /error|denied|fail/.test(value);
-  const [head, ...rest] = value.split('-');
-  const text = value === 'ok' ? 'OK'
-    : rest.length ? `${sentenceCase(head)}: ${rest.join(' ')}` : sentenceCase(value);
-  return `<span class="status ${problem ? 'err' : 'ok'}" title="${escapeHtml(value)}"><span class="status-dot" aria-hidden="true"></span><span class="status-text">${escapeHtml(text)}</span></span>`;
+  const { problem, word } = outcomeParts(value);
+  return `<span class="status ${problem ? 'err' : 'ok'}" title="${escapeHtml(value)}"><span class="status-dot" aria-hidden="true"></span><span class="status-text">${escapeHtml(word)}</span></span>`;
 }
 
 function clipCell(value, { mono = true } = {}) {
@@ -84,11 +94,16 @@ function eventRow(item) {
     ['Agent', clipCell(item.agent), 'audit-agent'],
     /* A problem row's error rides under its outcome as a muted second
        line (the phone card shows it as its own full-width line below). */
-    ['Outcome', { html: outcomeCell(item.outcome) + (item.error
-      ? `<span class="cell-note audit-outcome-error" title="${escapeHtml(item.error)}">${escapeHtml(item.error)}</span>` : ''), empty: !item.outcome }, 'audit-outcome'],
-    ['Error', item.error
-      ? { html: `<span class="clamp-2" title="${escapeHtml(item.error)}">${escapeHtml(item.error)}</span>`, empty: false }
-      : { html: '<span class="muted-cell">—</span>', empty: true }, 'audit-error'],
+    ['Outcome', { html: outcomeCell(item.outcome) + (() => {
+      const note = [outcomeParts(item.outcome).reason, item.error].filter(Boolean).join('. ');
+      return note ? `<span class="cell-note audit-outcome-error" title="${escapeHtml(note)}">${escapeHtml(note)}</span>` : '';
+    })(), empty: !item.outcome }, 'audit-outcome'],
+    ['Error', (() => {
+      const note = [outcomeParts(item.outcome).reason, item.error].filter(Boolean).join('. ');
+      return note
+        ? { html: `<span class="clamp-2" title="${escapeHtml(note)}">${escapeHtml(note)}</span>`, empty: false }
+        : { html: '<span class="muted-cell">—</span>', empty: true };
+    })(), 'audit-error'],
   ];
   return `<tr>${cells.map(([label, cell, cls]) =>
     `<td class="${cls}" data-label="${label}"${cell.empty ? ' data-empty' : ''}>${cell.html}</td>`).join('')}</tr>`;

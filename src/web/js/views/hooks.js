@@ -115,6 +115,7 @@ function endpointRow(hook) {
   const menu = `<button class="icon-button row-more" type="button" popovertarget="${menuId}" aria-label="More actions for ${name}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
     <div id="${menuId}" class="row-menu" popover aria-label="Actions for ${name}">
       ${kind === 'webhook' && hook.enabled ? `<button class="row-menu-item hook-test" type="button" data-hook="${name}">Send test request</button>` : ''}
+      ${(hook.workflows || []).map((flow) => `<a class="row-menu-item workflow-edit" href="/workflows/${encodeURIComponent(flow.id)}" data-workflow="${escapeHtml(flow.id)}" title="${escapeHtml(flow.id)}">Open ${escapeHtml(workflowName(flow.id))}</a>`).join('')}
       <button class="row-menu-item hook-edit" type="button" data-hook="${name}">Edit</button>
       <button class="row-menu-item row-menu-danger hook-delete" type="button" data-hook="${name}">Delete</button>
     </div>`;

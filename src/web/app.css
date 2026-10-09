@@ -844,6 +844,10 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .manage-danger-row p { margin: 0; min-width: 0; font-size: var(--dk-text-md); }
 .manage-danger-row .field-hint { margin-top: var(--dk-space-1); }
 .manage-danger-row .dk-button { flex: none; }
+@media (max-width: 860px) {
+  .manage-advanced summary { min-height: var(--dk-size-touch); }
+  .help-tip { flex: none; min-width: var(--dk-size-touch); }
+}
 .sub-head { font-size: var(--dk-text-lg); }
 .section-head h2.sub-head { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
@@ -946,10 +950,10 @@ dialog form { display: contents; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-gap-block); }
 
 /* OAuth callout */
-.callout { border: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); border-radius: var(--dk-radius-md); padding: 13px 14px; display: grid; gap: 9px; }
+.callout { border: 1px solid var(--dk-accent-border); background: var(--dk-accent-soft); border-radius: var(--dk-radius-md); padding: var(--dk-space-3) var(--dk-space-4); display: grid; gap: var(--dk-space-2); }
 .callout-step { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); }
 .callout-step a { color: var(--dk-accent-default); font-weight: var(--dk-weight-medium); text-underline-offset: 2px; }
-.copy-field { display: flex; align-items: center; gap: 8px; background: var(--dk-bg-surface); border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); padding: 4px 4px 4px 11px; }
+.copy-field { display: flex; align-items: center; gap: var(--dk-space-2); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); padding: var(--dk-space-1) var(--dk-space-1) var(--dk-space-1) var(--dk-space-3); }
 .copy-field code { flex: 1; min-width: 0; background: none; padding: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); overflow-wrap: anywhere; }
 .copy-field .icon-button { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
 .copy-field .icon-button:hover { border-color: var(--dk-border-strong); }
@@ -1216,18 +1220,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .json-raw summary { display: flex; align-items: center; min-height: var(--dk-size-touch); }
   .row-actions .row-more, .row-more-slot { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .row-menu-item { min-height: var(--dk-size-touch); }
-  /* Row state controls keep their labels readable at touch scale. */
-  .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 12px; }
-  .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  .workflow-switch { min-height: var(--dk-size-touch); }
-  /* 44px hit area, 18px visual: padding paints outside the content box. */
-  .workflow-list-row .select-col input[type="checkbox"] { width: var(--dk-size-touch); height: var(--dk-size-touch); padding: 13px; background-clip: content-box; }
   .dk-input, .dk-select, .dk-textarea { min-height: var(--dk-size-touch); }
   .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   /* the drawer's own controls outrank the generic bump — re-assert here */
   .sidebar .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  .workflow-state-control .dk-button, .workflow-menu .dk-button,
-  .workflow-actions .dk-button, .workflow-actions .workflow-more { height: var(--dk-size-touch); }
   .sidebar-backdrop:not([hidden]) { position: fixed; display: block; inset: 0; z-index: 19; width: 100%; height: 100dvh; border: 0; background: var(--dk-bg-backdrop); cursor: pointer; }
   .sidebar {
     position: fixed;
@@ -1264,6 +1260,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
      its label. */
   #storage-browse.register-toolbar { grid-template-columns: 1fr; }
   #storage-browse .dk-toolbar__end > .dk-button { width: auto; justify-self: start; }
+  /* A lone filter beside search takes the row rather than half of it. */
+  .connection-toolbar .toolbar-filters > label:not(.toolbar-search) { grid-column: 1 / -1; }
+  .agent-toolbar .agent-filters { grid-column: 1 / -1; }
+  .agent-toolbar .agent-workers-strip { align-self: center; }
   .storage-fields { grid-template-columns: 1fr; }
 }
 
@@ -1348,9 +1348,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .table-wrap table, .table-wrap tbody { display: block; width: 100%; }
   .table-wrap tr { display: block; padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
   .table-wrap tbody tr:last-child { border-bottom: 0; }
-  .service-account { grid-template-columns: 1fr; gap: 8px; }
-  .service-account-actions { justify-content: flex-start; }
-  .service-account-actions .dk-button { flex: 1; }
   .table-wrap td { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-gap-control); height: auto; padding: var(--dk-space-1) 0; border: 0; }
   .table-wrap td:first-child, .table-wrap td:last-child { padding-left: 0; padding-right: 0; }
   .table-wrap td[data-label]::before { content: attr(data-label); font-family: var(--dk-font-sans); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
@@ -1365,9 +1362,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .table-wrap td.action-cell .dk-button { width: auto; }
   .table-wrap td.action-cell .row-actions { display: flex; gap: var(--dk-gap-control); }
   .table-wrap td.action-cell .row-more-slot { display: none; }
-  .table-wrap td.workflow-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 10px; }
   .table-wrap td.workflow-actions::before { display: none; }
-  .table-wrap td.workflow-actions .dk-button { width: auto; }
   /* Status suffixes (failed step, delayed-until) keep the status read's wide
      column — auto-placement would drop them into the label column and
      wrap mono tokens mid-word. */
@@ -1591,9 +1586,12 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .audit-table .col-agent { width: 10.5rem; }
 .audit-table .col-outcome { width: 12rem; }
 .audit-table td.audit-error { display: none; }
-.audit-outcome .audit-outcome-error { display: block; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.audit-outcome .status { display: flex; max-width: 100%; min-width: 0; }
-.audit-outcome .status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-outcome .audit-outcome-error { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: var(--dk-space-1); overflow: hidden; overflow-wrap: anywhere; }
+/* A failure row reads without hover: the outcome may take two lines, and
+   its error two more under it. */
+.audit-outcome .status { display: flex; align-items: baseline; max-width: 100%; min-width: 0; white-space: normal; }
+.audit-outcome .status-dot { flex: none; }
+.audit-outcome .status-text { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .runs-table th, .audit-table th, .token-table th, .setup-table th, .inbox-table th { overflow: hidden; text-overflow: ellipsis; }
 /* No errors in view: the Error column gives its width back. */
 
@@ -1750,11 +1748,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loading) { visibility: hidden; }
 .section-loading { padding: var(--dk-space-3) 0; }
 
-/* Workflow names: the API's human name leads; the stable id rides beneath
-   as small mono text, the description behind the (?) tip. */
-.workflow-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.workflow-id { display: block; margin-top: 2px; font-size: var(--dk-text-xs); color: var(--dk-text-muted); overflow-wrap: anywhere; }
-.workflow-label .workflow-id { font-weight: var(--dk-weight-regular, 400); }
 
 /* --- Schedules: the tab is the trigger family; these are its extras ----------- */
 .sched-day { padding: var(--dk-space-2) var(--dk-space-4) 0; color: var(--dk-text-muted); font-size: var(--dk-text-xs); font-weight: var(--dk-weight-semibold); }
@@ -1815,7 +1808,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .source-row { display: grid; gap: var(--dk-space-2); min-width: 0; padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
 .source-row:last-child { border-bottom: 0; }
 .source-row.is-selected { background: var(--dk-accent-soft); }
-.source-head { display: flex; align-items: center; gap: var(--dk-space-2); min-width: 0; }
+.source-head { display: flex; align-items: center; gap: var(--dk-gap-control); min-width: 0; }
 .source-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
 .source-name.mono { font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); }
 .source-name:has(svg) { display: inline-flex; align-items: center; gap: var(--dk-space-2); }

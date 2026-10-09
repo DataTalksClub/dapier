@@ -248,6 +248,8 @@ function routeRule(route) {
   return JSON.stringify(route);
 }
 
+const menuId = (text) => String(text).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+
 function addressItem({ label, kind = '', copy = '', handlers }) {
   const off = handlers.filter((handler) => handler.status && handler.status !== 'enabled').length;
   return sourceRow({
@@ -257,6 +259,10 @@ function addressItem({ label, kind = '', copy = '', handlers }) {
     nameAttrs: copy ? `data-copy="${escapeHtml(copy)}" aria-label="Copy ${escapeHtml(copy)}"` : 'disabled',
     nameTitle: copy ? `Copy ${copy}` : label,
     status: kind ? `<span class="dk-chip">${escapeHtml(kind)}</span>` : '',
+    /* Each workflow the address starts opens from the row menu. */
+    tools: handlers.length ? `<button class="icon-button row-more" type="button" popovertarget="email-menu-${escapeHtml(menuId(label))}" aria-label="Workflows for ${escapeHtml(label)}" title="Open a workflow"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
+      <div id="email-menu-${escapeHtml(menuId(label))}" class="row-menu" popover aria-label="Workflows for ${escapeHtml(label)}">${handlers.map((handler) =>
+        `<button type="button" class="row-menu-item email-workflow" data-workflow="${escapeHtml(handler.workflow)}" title="${escapeHtml(handler.workflow)}">Open ${escapeHtml(workflowName(handler.workflow))}</button>`).join('')}</div>` : '',
     lines: [
       handlers.length
         ? `Starts ${workflowNames(handlers.map((handler) => handler.workflow))}${off ? ` <span class="muted-cell">(${off} off)</span>` : ''}`
