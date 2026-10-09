@@ -33,10 +33,10 @@ def _row(connection):
     with MiniRacer() as js:
         js.eval('''
             const escapeHtml = value => String(value);
+    const whenMenusClosed = (root, paint) => paint();
             const formatTimestamp = () => '';
             const statusLine = value => value;
             const state = {data: {}};
-            const serviceMark = value => value;
         ''')
         js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
         start = JS.index('function usageRefs(')

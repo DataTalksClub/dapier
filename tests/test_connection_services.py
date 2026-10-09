@@ -97,6 +97,7 @@ def test_console_renders_zoom_types_in_separate_described_panels():
                 const $$ = () => [];
                 const state = {data: {}};
                 const escapeHtml = value => String(value);
+    const whenMenusClosed = (root, paint) => paint();
                 const formatTimestamp = () => '';
                 const statusLine = value => value;
                 const serviceMark = value => value;
@@ -111,14 +112,18 @@ def test_console_renders_zoom_types_in_separate_described_panels():
             js.eval(JS[JS.index('function renderConnections('):JS.index('function bindOAuthLinks(')])
             js.eval(f'renderConnections({json.dumps(connections)});')
             markup = js.eval("nodes['#connection-register'].innerHTML")
-        # One row per connection; Zoom says which kind each one is.
-        assert markup.count('data-connection-row=') == 2
+        assert markup.count('<section ') == 2
+        assert 'data-service="zoom-api"' in markup
+        assert 'data-service="zoom-webhooks"' in markup
         assert 'Zoom API' in markup and 'Zoom Webhooks' in markup
+        assert 'permissions granted' in markup and 'event notifications' in markup
         # A webhook without a verified account is named by its type; a
         # leftover stored display_name never labels it.
         assert 'Zoom webhook' in markup and 'opaque-id' not in markup
         assert 'AISL recordings' not in markup
         assert '2 accounts' not in markup
+        assert '1 connection' in markup
+        assert 'Same sign-in' not in markup
 
 
 def test_google_without_product_scopes_falls_back_to_google():
@@ -155,17 +160,15 @@ def test_console_catalog_matches_python():
 
 def test_console_groups_rows_by_service():
     assert "connection-register" in HTML
-    assert 'id="connect-services"' in HTML
-    # One row per account (the services it covers on the row); the
-    # per-service add buttons live in the Services list.
-    assert "One row per account" in JS
-    assert 'data-service-row="${serviceId}"' in JS
+    assert "Connect another service" in HTML
+    assert "One panel per service" in JS
+    assert 'data-service="${escapeHtml(serviceId)}"' in JS
     assert "Google accounts" not in JS
     assert 'data-service="google-accounts"' not in JS
     assert "Not signed in" in JS
     assert "accountIdentity" in JS
     assert "verifiesIdentity" in JS
-    assert "serviceChips(connection)" in JS
+    assert "Same sign-in also covers" in JS
     assert "connection-remove" in JS
     assert "provider-group-row" not in JS
     assert "CONNECT_PROVIDERS" not in JS
@@ -213,6 +216,7 @@ def test_console_rows_say_who_each_slack_token_acts_as():
             const $$ = () => [];
             const state = {data: {}};
             const escapeHtml = value => String(value);
+    const whenMenusClosed = (root, paint) => paint();
             const formatTimestamp = () => '';
             const statusLine = value => value;
             const serviceMark = value => value;

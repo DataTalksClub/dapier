@@ -209,21 +209,15 @@
           <div class="dk-cluster toolbar-filters connection-filters">
             <label class="toolbar-search"><span class="visually-hidden">Search accounts</span><input id="connection-search" type="search" placeholder="Search accounts" aria-label="Search connections"></label>
             <label><span class="visually-hidden">Connection status</span><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></label>
+            <span id="connection-summary" class="field-hint connection-summary" role="status">Loading accounts…</span>
           </div>
         </div>
-        <div class="trigger-workspace connection-workspace">
-          <section id="connection-accounts" class="data-panel trigger-activity" aria-labelledby="connection-accounts-title">
-            <div class="section-head"><h2 id="connection-accounts-title">Accounts</h2><p id="connection-summary" class="sub" role="status">Loading accounts…</p></div>
-            <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
-            <ul id="connection-register" class="connection-list"></ul>
-          </section>
-          <aside class="trigger-sources" aria-label="Services">
-            <section id="connect-services" class="data-panel connect-services" aria-labelledby="connect-services-title">
-              <div class="section-head"><h2 id="connect-services-title">Services</h2><p class="sub">Add an account from its service</p></div>
-              <ul id="connect-grid" class="source-list connect-list"></ul>
-            </section>
-          </aside>
-        </div>
+        <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
+        <div id="connection-register" class="connection-register"></div>
+        <section id="connect-services" class="data-panel connect-services" aria-labelledby="connect-services-title" hidden>
+          <div class="section-head"><h2 id="connect-services-title">Connect another service</h2></div>
+          <ul id="connect-grid" class="connect-list"></ul>
+        </section>
       </section>
 
       <section class="view" data-page="credentials">

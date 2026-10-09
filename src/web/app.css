@@ -699,52 +699,76 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .row-menu-item:hover { background: var(--dk-bg-hover); }
 .row-menu-item:focus-visible { outline-offset: -3px; }
 /* --- Connections ----------------------------------------------------------------
-   Accounts (each connection once, with the services its sign-in covers)
-   beside Services (every service with its own add button). Same workspace
-   as the trigger family. */
-.connection-list { list-style: none; margin: 0; padding: 0; }
-.connection-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem auto; align-items: start; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
-.connection-account:last-child { border-bottom: 0; }
-.connection-account:hover { background: var(--dk-bg-hover); }
-.connection-account-main { display: grid; gap: var(--dk-space-1); min-width: 0; }
+   One panel per service, each with its own add button in its band. An
+   account's full row sits under its first service; the other services list
+   it as a one-line reference. Services with no account yet are listed in
+   "Connect another service" below the groups. */
+.connection-register { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--dk-gap-block); }
+.connection-register:empty { display: none; }
+.connection-register > .data-panel { margin: 0; }
+.connection-summary { white-space: nowrap; }
+.service-panel-title { display: inline-flex; align-items: center; gap: var(--dk-space-2); margin: 0; white-space: nowrap; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
+.service-panel > .section-head { flex-wrap: nowrap; }
+.service-panel > .section-head .sub { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.service-panel > .section-head .service-add { margin-left: auto; flex: none; }
+.service-add svg { display: none; }
+.service-accounts { list-style: none; margin: 0; padding: 0; }
+.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem auto; align-items: start; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
+.service-account:last-child, .service-ref:last-child { border-bottom: 0; }
+.service-account-main { display: grid; gap: var(--dk-space-1); min-width: 0; }
 .connection-name { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
 .connection-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
 /* Who the credential acts as when one account holds several (Slack app vs. person). */
 .account-acts-as { display: block; font-size: var(--dk-text-sm); color: var(--dk-text-primary); }
-.connection-services { display: flex; flex-wrap: wrap; gap: var(--dk-space-1) var(--dk-space-3); }
-.connection-service { display: inline-flex; align-items: center; gap: var(--dk-space-1); font-size: var(--dk-text-sm); color: var(--dk-text-primary); }
-.connection-service .brand-mark { width: 14px; height: 14px; }
-.connection-meta { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.connection-meta.expiring { color: var(--dk-warning-text); }
-.connection-account-status { padding-top: var(--dk-space-1); }
-.connection-account-status .status { font-size: var(--dk-text-sm); }
-.connection-account-actions { justify-content: flex-end; }
-.connection-account-actions .row-more { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
-.connect-card { gap: var(--dk-space-2); }
+.service-share { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.service-account-main .cell-note { margin-top: 0; }
+.service-account-main .expiring { color: var(--dk-warning-text); }
+.service-account-status { padding-top: var(--dk-space-1); }
+.service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
+.service-account-actions { justify-content: flex-end; }
+.service-account-actions .row-more { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
+/* A shared sign-in seen from its other services: one quiet line. */
+.service-ref { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; align-items: center; gap: var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
+.service-ref .connection-name { font-weight: var(--dk-weight-medium); }
+.service-ref-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.service-ref-status { justify-self: end; }
+.connect-services { margin-top: var(--dk-gap-section); }
+.connect-list { list-style: none; margin: 0; padding: 0; }
+.connect-card { display: grid; grid-template-columns: minmax(10rem, 22%) minmax(0, 1fr) auto; align-items: center; gap: var(--dk-space-1) var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
+.connect-card:last-child { border-bottom: 0; }
 .connect-title { display: inline-flex; align-items: center; gap: var(--dk-space-2); min-width: 0; }
 .connect-name { font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); }
-.connect-body { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--dk-gap-control); }
 .connect-blurb { min-width: 0; color: var(--dk-text-muted); font-size: var(--dk-text-sm); line-height: var(--dk-leading-normal); }
-.connect-body .dk-button { flex: none; }
 .connect-pending { color: var(--dk-info-text); }
 .connect-pending a { color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
-.brand-mark { flex: none; }
+.brand-mark { flex: none; color: var(--dk-text-muted); }
 .provider-cell { display: inline-flex; align-items: center; gap: var(--dk-space-2); }
+.connections-footer { margin-top: var(--dk-gap-block); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
 .reuse-list { display: grid; gap: var(--dk-space-2); margin-top: var(--dk-space-3); }
 .reuse-account { display: grid; gap: var(--dk-space-1); width: 100%; padding: var(--dk-space-3) var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); text-align: left; cursor: pointer; }
 .reuse-account:hover { background: var(--dk-bg-hover); }
 .reuse-account:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; }
 .reuse-account .cell-sub { display: block; }
-@media (max-width: 560px) {
-  .connection-account { grid-template-columns: minmax(0, 1fr) auto; }
-  .connection-account-status { grid-column: 2; grid-row: 1; }
-  .connection-account-main { grid-column: 1; grid-row: 1; }
-  .connection-account-actions { grid-column: 1 / -1; }
-}
 @media (max-width: 860px) {
   .connection-name { min-height: var(--dk-size-touch); }
-  .connection-account-actions .row-more { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  .manage-advanced summary { min-height: var(--dk-size-touch); }
+  .service-account-actions .row-more { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+}
+@media (max-width: 560px) {
+  .service-account { grid-template-columns: minmax(0, 1fr) auto; }
+  .service-account-main { grid-column: 1; grid-row: 1; }
+  .service-account-status { grid-column: 2; grid-row: 1; }
+  .service-account-main { grid-row: 1 / span 2; }
+  .service-account-actions { grid-column: 2; grid-row: 2; align-self: end; }
+  .service-account-actions .row-more-slot { display: none; }
+  .service-ref { grid-template-columns: minmax(0, 1fr) auto; }
+  .service-ref-note { grid-column: 1; grid-row: 2; }
+  .service-ref-status { grid-column: 2; grid-row: 1; }
+  .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: var(--dk-space-1) var(--dk-gap-control); }
+  .connect-blurb { grid-column: 1 / -1; grid-row: 2; }
+  /* The group's + collapses to a square touch target; its aria-label names it. */
+  .service-add { display: inline-grid; place-items: center; width: var(--dk-size-touch); height: var(--dk-size-touch); padding: 0; }
+  .service-add svg { display: block; }
+  .service-add span { display: none; }
 }
 
 /* (?) beside a title: its purpose on hover, focus, or tap (the designer
