@@ -615,6 +615,18 @@ def handler(event, _context):
     if method == "GET" and path == "/health":
         return _response(200, {"ok": True, "service": "dapier"})
 
+    if method == "GET" and path == "/internal/ops/status":
+        # The cross-project console's machine endpoint. Deliberately outside
+        # the /api/admin gate: an operator session says nothing about it, and
+        # its bearer token is the entire credential (taskdeck_status.py holds
+        # the check and answers 404 rather than 401, so the route does not
+        # announce itself). CORS — including the preflight — is the gateway's
+        # stage configuration, not this code's.
+        from ..triggers import taskdeck_status
+
+        status, payload = taskdeck_status.api_status(event)
+        return _response(status, payload)
+
     if method == "GET" and path == "/api/catalog":
         # Public, read-only manifests: the action/trigger/logic catalog the
         # designer and CLI render from (src/dapier/connectors/registry.py).

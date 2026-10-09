@@ -122,6 +122,14 @@ Parameters:
     Type: String
     Default: gpt-4o-mini
     Description: Default model name the ai_complete action requests
+  TaskdeckStatusToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: >
+      Bearer token the cross-project console sends to GET /internal/ops/status
+      (the taskdeck status contract). Empty leaves the endpoint answering 404
+      for every caller, which is how it reads when no console is configured.
   DatamailerUrl:
     Type: String
     Default: https://datamailer.dtcdev.click
@@ -213,7 +221,9 @@ Resources:
     Properties:
       CorsConfiguration:
         AllowOrigins: ['*']
-        AllowHeaders: [content-type, x-dropbox-signature]
+        # Bearer token: GET /internal/ops/status is read by a browser-hosted
+        # console, so its Authorization header has to survive the preflight.
+        AllowHeaders: [content-type, x-dropbox-signature, authorization]
         AllowMethods: [GET, POST]
       Domain:
         DomainName: !Ref DomainName
@@ -462,6 +472,9 @@ Resources:
           LLM_BASE_URL: !Ref LlmBaseUrl
           LLM_API_KEY: !Ref LlmApiKey
           LLM_MODEL: !Ref LlmModel
+          # Bearer token for GET /internal/ops/status; empty leaves the route
+          # answering 404 rather than opening it up.
+          TASKDECK_STATUS_TOKEN: !Ref TaskdeckStatusToken
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
           GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
@@ -580,6 +593,11 @@ Resources:
         Catalog:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /api/catalog, Method: GET}
+        # The taskdeck status contract the cross-project console polls.
+        # Bearer-gated, and answered by the router before any admin gate.
+        OpsStatus:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: '/internal/ops/status', Method: GET}
         CustomHook:
           Type: HttpApi
           Properties:

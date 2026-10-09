@@ -200,6 +200,21 @@ curl -X POST "$API_URL/hooks/custom/demo" \
 
 The sandbox deployment is available at `https://dapier.dtcdev.click`.
 
+## Status contract endpoint
+
+The stack takes an optional `TaskdeckStatusToken`. With it set,
+`GET /internal/ops/status` answers with the read-only status contract the
+cross-project console polls: every schedule's next fire, last fire, last
+success, and Dapier's own health verdict. The bearer token is the whole
+credential — there is no operator gate on the route, and it answers `404`
+rather than `401` to a caller that cannot present it, so the endpoint does
+not announce itself. With the token unset it answers 404 to everyone rather
+than publishing an open status. Fields Dapier cannot honestly fill in (worker
+liveness, queue depth, run history) come back null instead of a number that
+would read as "fine". The console reads it from a browser: the API's stage
+CORS configuration already allows the `Authorization` header across origins
+and answers the preflight, so no route-level CORS code is needed.
+
 ## Administration console
 
 Home is the glance page: paused workflows, latest-run failures, and recent
