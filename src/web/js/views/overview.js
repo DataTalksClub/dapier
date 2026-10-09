@@ -151,7 +151,9 @@ function render(section) {
     $('#overview-workflows-empty').hidden = data.workflows.length > 0;
     renderStatsStrip(data.workflows);
   }
-  if (section === 'activity') {
+  /* Results name their workflows: wait for the workflow list so a row never
+     flashes its raw id before the name arrives. */
+  if (['workflows', 'activity'].includes(section) && data.workflows && data.runs) {
     $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
       `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}" aria-label="Open run of ${escapeHtml(workflowName(run.workflow_id || 'workflow'))}">
         <span class="home-row-main"><span class="cell-name workflow-label" title="${escapeHtml(run.workflow_id || '')}">${workflowLabelHtml(run.workflow_id)}</span>${run.failed_step ? `<span class="home-row-sub" title="Failed at ${escapeHtml(run.failed_step)}">Failed at ${escapeHtml(run.failed_step)}</span>` : ''}</span>

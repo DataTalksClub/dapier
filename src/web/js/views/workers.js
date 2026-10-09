@@ -86,7 +86,7 @@ function workerRow(worker, nowMs) {
       <td class="cell-title">${clip(who.name, worker.worker_id, 'cell-name')}${who.sub ? clip(who.sub, '', 'cell-sub') : ''}</td>
       <td data-label="Status"><span class="worker-status">${statusLine(worker.active ? 'active' : 'offline')}${seen ? `<span class="cell-sub" title="${escapeHtml(formatTimestamp(worker.last_seen) || '')}">seen ${escapeHtml(seen)}</span>` : ''}</span></td>
       <td data-label="Task"><span class="worker-stack">${task.name ? clip(task.name, task.id, 'worker-task') : ''}${clip(task.sub, '', 'cell-sub')}</span></td>
-      <td data-label="Engine"><span class="worker-stack"><span class="dk-badge worker-engine">${escapeHtml(worker.engine || 'claude')}</span><span class="worker-capabilities"${capabilities === '—' ? ' title="No extra capabilities"' : ''}>${escapeHtml(capabilities)}</span></span></td>
+      <td data-label="Engine"><span class="worker-stack"><span class="dk-badge worker-engine">${escapeHtml(worker.engine || 'claude')}</span>${capabilities === '—' ? '' : `<span class="worker-capabilities">${escapeHtml(capabilities)}</span>`}</span></td>
       <td data-label="Workspace">${clip(workspaceText(worker.workspace_root), worker.workspace_root || '', 'mono worker-path')}</td>
       <td data-label="Started"><span class="worker-started" title="${escapeHtml(formatTimestamp(worker.started_at) || '')}">${escapeHtml(started || '—')}</span></td>
     </tr>`;
