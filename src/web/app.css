@@ -1414,7 +1414,8 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .workflow-col-manage { width: 3.5rem; }
 .workflow-list-row td { vertical-align: top; }
 .workflow-name-line { display: flex; align-items: flex-start; gap: var(--dk-space-2); min-width: 0; }
-.workflow-list-row .cell-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--dk-text-primary); font-family: var(--dk-font-sans); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; text-decoration: none; overflow-wrap: anywhere; }
+.workflow-list-row .cell-name-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.workflow-list-row .cell-name { display: block; color: var(--dk-text-primary); font-family: var(--dk-font-sans); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; text-decoration: none; overflow-wrap: anywhere; }
 .workflow-list-row button.cell-name { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
 .workflow-list-row .cell-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
 .workflow-id { display: block; margin-top: var(--dk-space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
@@ -1473,7 +1474,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .workflow-toolbar .toolbar-filters > label.toolbar-search { max-width: none; }
   /* The name's 44px hit area overhangs its line instead of padding the row,
      so the name→id spacing is set by the text, not the checkbox or menu. */
-  .workflow-list-row .cell-name { min-width: var(--dk-size-touch); padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); margin-block: calc((var(--dk-size-touch) - 1.4em) / -2); }
+  .workflow-list-row .cell-name { box-sizing: border-box; min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); margin-block: calc((var(--dk-size-touch) - 1.4em) / -2); }
   .workflow-list-row button.cell-name { padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); }
   .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-touch); height: var(--dk-size-touch); border-color: transparent; }
   .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 var(--dk-space-3); }
@@ -1887,7 +1888,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .trigger-workspace { grid-template-columns: minmax(0, 1fr); }
   /* The switch leads the toolbar as one full-width pair; the activity
      filters only show with the activity pane. */
-  .pane-switch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-space-2); flex: 1 0 100%; }
+  .pane-switch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-gap-control); flex: 1 0 100%; }
   .pane-switch .dk-filter-chip { justify-content: center; }
   .trigger-toolbar[data-pane="sources"] > [id$="-chips"] { display: none; }
   .trigger-workspace[data-pane="activity"] > .trigger-sources,

@@ -239,8 +239,8 @@ export function renderWorkflows() {
        Flow column already says what it does), the id beneath. */
     const about = escapeHtml(workflow.description || '');
     const detail = `<div class="workflow-name-line">${opensDesigner
-      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}" title="${about}">${name}</a>`
-      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}" title="${about}">${name}</button>`}</div>${workflowIdLine(workflow)}`;
+      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}" title="${about}"><span class="cell-name-text">${name}</span></a>`
+      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}" title="${about}"><span class="cell-name-text">${name}</span></button>`}</div>${workflowIdLine(workflow)}`;
     const edit = opensDesigner
       ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
