@@ -4,7 +4,8 @@ import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
 import { $, icons, showApp, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
+import { escapeHtml, statusLine, statusDot, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
+import { icon } from '../icons.js';
 import { openDesigner, postConnectionsToDesigner } from './designer.js';
 import { renderConnections, accountLabel } from './connections.js';
 import { renderCredentials } from './credentials.js';
@@ -18,7 +19,7 @@ import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
 import { renderStorage } from './storage.js';
-import { workflowName, workflowIdLine, workflowLabelHtml } from '../workflow-names.js';
+import { workflowName, workflowLabelHtml, workflowFlowText, appStripHtml, triggerKindIcon } from '../workflow-names.js';
 import { loadCatalog, eventLabel, actionLabel } from '../catalog-labels.js';
 
 /* Triggers and actions in operator words, from the connector catalog
@@ -51,12 +52,11 @@ function workflowRow(workflow) {
   const latest = homeModel(state.data).latest.get(workflow.id);
   const about = workflow.description || workflowTriggerText(workflow);
   const name = workflowName(workflow);
-  const idText = name !== workflow.id ? workflow.id : '';
   const run = latest
     ? `<span class="home-latest"><span class="home-latest-label">Latest run</span>${statusLine(latest.status)}</span>`
     : `<span class="home-latest muted-cell">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading runs…'}</span>`;
   return `<button type="button" class="home-workflow workflow-detail" data-workflow="${escapeHtml(workflow.id)}" aria-label="Open ${escapeHtml(name)}">
-    <span class="home-row-main"><span class="cell-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span><span class="home-row-sub" title="${escapeHtml([idText, about].filter(Boolean).join(' — '))}">${idText ? `<span class="mono">${escapeHtml(idText)}</span> · ` : ''}${escapeHtml(about)}</span></span>
+    <span class="home-row-main"><span class="cell-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span><span class="home-row-sub" title="${escapeHtml(about)}">${escapeHtml(about)}</span></span>
     <span class="home-row-meta">${workflowState(workflow)}${run}</span>
   </button>`;
 }
@@ -229,44 +229,60 @@ export function renderWorkflows() {
     (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
   $('#workflow-count').textContent = `${shown.length} of ${all.length} shown`;
   const runs = state.data?.runs || [];
+  /* Location only when the account uses folders (Zapier's column). */
+  const hasFolders = all.some((workflow) => String(workflow.folder || '').trim());
+  $('#workflow-location-head').hidden = !hasFolders;
+  const locationCol = $('#workflow-cols .workflow-col-location');
+  if (hasFolders && !locationCol) {
+    $('#workflow-cols .workflow-col-apps').insertAdjacentHTML('afterend', '<col class="workflow-col-location">');
+  } else if (!hasFolders && locationCol) {
+    locationCol.remove();
+  }
   $('#workflow-table').innerHTML = shown.map((workflow, index) => {
     const recent = runs.find((run) => run.workflow_id === workflow.id);
-    const actions = (workflow.actions || []).map((action) => escapeHtml(workflowActionText(action))).join(' <span class="workflow-separator" aria-hidden="true">→</span> ');
     const id = escapeHtml(workflow.id);
     const name = escapeHtml(workflowName(workflow));
     const opensDesigner = workflow.source;
-    /* The name opens the workflow; its description rides in the title (the
-       Flow column already says what it does), the id beneath. */
-    const about = escapeHtml(workflow.description || '');
-    const detail = `<div class="workflow-name-line">${opensDesigner
-      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}" title="${about}"><span class="cell-name-text">${name}</span></a>`
-      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}" title="${about}"><span class="cell-name-text">${name}</span></button>`}</div>${workflowIdLine(workflow)}`;
+    /* One line: trigger-kind icon and the name; the full flow (and the
+       description) is one hover away, the designer has the rest. */
+    const flow = workflowFlowText(workflow);
+    const hover = escapeHtml([flow, workflow.description || ''].filter(Boolean).join('\n\n'));
+    const nameLink = opensDesigner
+      ? `<a class="cell-name workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}" title="${hover}">${triggerKindIcon(workflow)}<span class="cell-name-text">${name}</span></a>`
+      : `<button class="cell-name workflow-detail" type="button" data-workflow="${id}" title="${hover}">${triggerKindIcon(workflow)}<span class="cell-name-text">${name}</span></button>`;
+    const tagList = workflow.tags || [];
+    const tags = tagList.length
+      ? `<span class="workflow-tags-inline" title="Tags: ${escapeHtml(tagList.join(', '))}">${tagList.slice(0, 1).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}${tagList.length > 1 ? `<span class="tag-chip tag-chip--more">+${tagList.length - 1}</span>` : ''}</span>` : '';
+    const detail = `<div class="workflow-name-line">${nameLink}${tags}</div>`;
     const edit = opensDesigner
       ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
       : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
-    const tags = (workflow.tags || []).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join(' ');
-    const folderChip = String(workflow.folder || '').trim()
-      ? `<span class="tag-chip folder-chip" title="Folder">${escapeHtml(String(workflow.folder).trim())}</span>` : '';
+    const folder = String(workflow.folder || '').trim();
+    const location = hasFolders
+      ? `<td class="workflow-location" data-label="Location"${folder ? '' : ' data-empty'}>${folder ? `<span class="workflow-folder-name" title="Folder: ${escapeHtml(folder)}">${icon('folder', 'folder-icon')}<span>${escapeHtml(folder)}</span></span>` : ''}</td>` : '';
     const sourceButtons = workflow.source ? '' : 'disabled title="No source file available"';
     const selected = selectedWorkflows.has(workflow.source);
+    const when = recent ? escapeHtml(formatTimestamp(recent.started_at) || '') : '';
     return `<tr class="workflow-list-row">
-      <td class="select-col" data-label="Select"><label class="dk-check workflow-check"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${id}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></label></td>
-      <td class="cell-title">${detail}${(folderChip || tags) ? `<div class="cell-tags">${folderChip} ${tags}</div>` : ''}</td>
-      <td class="workflow-flow" data-label="Flow"><div class="workflow-flow-line"><span class="workflow-flow-label">When</span><span>${escapeHtml(workflowTriggerText(workflow))}</span></div><div class="workflow-flow-line"><span class="workflow-flow-label">Then</span><span class="workflow-action-chain" title="${escapeHtml((workflow.actions || []).map(workflowActionText).join(' → '))}">${actions || '—'}</span></div></td>
-      <td data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run for ${id}" data-run="${escapeHtml(recent.run_id)}">${statusLine(recent.status)} <span>${escapeHtml(formatTimestamp(recent.started_at) || '')}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading recent runs…'}</span>`}</td>
+      <td class="select-col" data-label="Select"><label class="dk-check workflow-check"><input type="checkbox" class="workflow-select" data-workflow="${id}" data-file="${escapeHtml(workflow.source || '')}" aria-label="Select ${name}" ${selected ? 'checked' : ''} ${workflow.source ? '' : 'disabled title="No source file available"'}></label></td>
+      <td class="cell-title">${detail}</td>
+      <td class="workflow-apps" data-label="Apps">${appStripHtml(workflow, flow)}</td>
+      ${location}
+      <td class="workflow-latest" data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run of ${name}" title="${escapeHtml(statusLabel(recent.status))} · ${when}" data-run="${escapeHtml(recent.run_id)}">${statusDot(recent.status)}<span>${when}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading…'}</span>`}</td>
       <td data-label="State"><div class="workflow-state-control">${workflow.auto_paused
           ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="dk-button dk-button--secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
-          : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${id}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
+          : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${name}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
       </div></td>
       <td class="action-cell workflow-actions" data-label="Manage">
-        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${id}"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
-        <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${id}">
+        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${name}"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
+        <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${name}">
         ${edit}
         <button type="button" class="dk-button dk-button--secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
         <button type="button" class="dk-button dk-button--secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
         <button type="button" class="dk-button dk-button--secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
         <button type="button" class="dk-button dk-button--secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
         <button type="button" class="dk-button dk-button--secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
+        <button type="button" class="dk-button dk-button--secondary workflow-copy-id" data-workflow="${id}" title="Copy the id the CLI and API use (${id})">Copy ID</button>
         <button type="button" class="dk-button dk-button--danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
         </div>
       </td>
@@ -667,7 +683,7 @@ document.addEventListener('click', (event) => {
 });
 
 export function openRowFor(event) {
-  if (event.target.closest('.workflow-toggle, .workflow-resume, .workflow-tags, .workflow-folder, .workflow-delete, .workflow-duplicate')) return; // the button handles itself
+  if (event.target.closest('.workflow-toggle, .workflow-resume, .workflow-tags, .workflow-folder, .workflow-delete, .workflow-duplicate, .workflow-copy-id')) return; // the button handles itself
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');
@@ -889,6 +905,19 @@ $('#workflow-folder-form').addEventListener('submit', async (event) => {
     error.hidden = false;
   } finally {
     save.disabled = false;
+  }
+});
+
+/* ---- Copy ID: the key `dapier workflows …` and the API take, kept off
+   the row itself. ---- */
+$('#workflow-table').addEventListener('click', async (event) => {
+  const button = event.target.closest('.workflow-copy-id');
+  if (!button) return;
+  try {
+    await navigator.clipboard.writeText(button.dataset.workflow);
+    notice(`Copied workflow id ${button.dataset.workflow}.`);
+  } catch (_) {
+    notice(`Copy failed — the id is ${button.dataset.workflow}.`, true);
   }
 });
 

@@ -42,3 +42,10 @@ export function actionLabel(type) {
   const action = catalog && catalog.actions.get(type);
   return (action && action.label) || sentenceCase(String(type || 'Action').replace(/[._]+/g, ' '));
 }
+
+/* A connector's product name ("Google Sheets", "Dropbox"); null until the
+   catalog arrives or for an unknown connector. */
+export function connectorLabel(name) {
+  const source = catalog && catalog.connectors.get(name);
+  return (source && source.label) ? String(source.label) : null;
+}

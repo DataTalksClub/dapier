@@ -146,8 +146,8 @@
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="dk-button dk-button--sm dk-button--secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="dk-button dk-button--sm dk-button--secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>
-            <colgroup><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-flow"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
-            <thead><tr><th class="select-col"><label class="dk-check workflow-check"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></label></th><th>Workflow</th><th>Flow</th><th>Latest run</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <colgroup id="workflow-cols"><col class="workflow-col-select"><col class="workflow-col-name"><col class="workflow-col-apps"><col class="workflow-col-run"><col class="workflow-col-state"><col class="workflow-col-manage"></colgroup>
+            <thead><tr><th class="select-col"><label class="dk-check workflow-check"><input type="checkbox" id="workflow-select-all" aria-label="Select all shown workflows"></label></th><th>Workflow</th><th>Apps</th><th id="workflow-location-head" hidden>Location</th><th>Latest run</th><th>State</th><th class="action-col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="workflow-table"></tbody>
           </table>
           <div class="dk-table-footer"><span id="workflow-count" role="status"></span></div>

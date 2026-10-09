@@ -1416,30 +1416,41 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 #workflow-table-wrap tbody tr:has(.workflow-select:checked) td { background: var(--dk-accent-soft); }
 .workflow-check { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); }
 .workflow-col-select { width: 44px; }
-.workflow-col-name { width: 28%; }
-.workflow-col-flow { width: auto; }
-.workflow-col-run { width: 17%; }
-.workflow-col-state { width: 7.5rem; }
+.workflow-col-name { width: auto; }
+.workflow-col-apps { width: 8.5rem; }
+.workflow-col-location { width: 11rem; }
+.workflow-col-run { width: 11rem; }
+.workflow-col-state { width: 7rem; }
 .workflow-col-manage { width: 3.5rem; }
-.workflow-list-row td { vertical-align: top; }
-.workflow-name-line { display: flex; align-items: flex-start; gap: var(--dk-space-2); min-width: 0; }
-.workflow-list-row .cell-name-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.workflow-list-row .cell-name { display: block; color: var(--dk-text-primary); font-family: var(--dk-font-sans); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; text-decoration: none; overflow-wrap: anywhere; }
+/* Zapier-style one-line rows: trigger-kind icon + name, the apps the flow
+   touches, where it lives, its latest run, its state. The id and the
+   When/Then detail are off the row (hover, row menu, designer). */
+.workflow-list-row td { vertical-align: middle; }
+.workflow-name-line { display: flex; align-items: center; gap: var(--dk-space-2); min-width: 0; }
+.workflow-list-row .cell-name { display: inline-flex; align-items: center; gap: var(--dk-space-2); flex: 0 1 auto; min-width: 0; color: var(--dk-text-primary); font-family: var(--dk-font-sans); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; text-decoration: none; }
+.workflow-list-row .cell-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-list-row button.cell-name { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
-.workflow-list-row .cell-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
+.workflow-list-row .cell-name:hover .cell-name-text { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
+.workflow-list-row .trigger-kind { flex: none; width: 16px; height: 16px; color: var(--dk-text-muted); }
+.workflow-tags-inline { display: inline-flex; flex: none; max-width: 45%; overflow: hidden; gap: var(--dk-space-1); }
+.workflow-tags-inline .tag-chip { max-width: 7rem; }
+.tag-chip--more { color: var(--dk-text-muted); }
 .workflow-id { display: block; margin-top: var(--dk-space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
 .workflow-label .workflow-id { font-weight: var(--dk-weight-regular); }
 .cell-tags { display: flex; flex-wrap: nowrap; gap: var(--dk-space-1); margin-top: var(--dk-space-1); overflow: hidden; }
 .tag-chip { display: inline-block; flex: none; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--dk-space-2); border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-full); background: var(--dk-bg-muted); color: var(--dk-text-primary); font-size: var(--dk-text-xs); line-height: 1.6; white-space: nowrap; }
 /* The folder chip: dashed, so the flat folder reads as a container. */
 .folder-chip { border-style: dashed; font-weight: var(--dk-weight-semibold); }
-.workflow-flow-line { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); gap: var(--dk-space-2); font-size: var(--dk-text-sm); line-height: var(--dk-leading-normal); }
-.workflow-flow-line + .workflow-flow-line { margin-top: var(--dk-space-1); }
-.workflow-flow-label { color: var(--dk-text-muted); }
-.workflow-flow-line > span:last-child, .workflow-action-chain { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); }
-.workflow-separator { color: var(--dk-text-muted); padding: 0 var(--dk-space-1); }
-.workflow-run-link { display: grid; gap: var(--dk-space-1); border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
-.workflow-run-link:hover .status { text-decoration: underline; }
+/* Apps: brand marks in small bordered tiles, the middle collapsed to +N. */
+.app-strip { display: inline-flex; align-items: center; gap: var(--dk-space-1); vertical-align: middle; }
+.app-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); }
+.app-tile .brand-mark { width: 16px; height: 16px; }
+.app-tile--more { font-size: var(--dk-text-xs); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); }
+.workflow-folder-name { display: inline-flex; align-items: center; gap: var(--dk-space-2); max-width: 100%; min-width: 0; font-size: var(--dk-text-sm); color: var(--dk-text-primary); }
+.workflow-folder-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-folder-name .folder-icon { flex: none; width: 16px; height: 16px; color: var(--dk-text-muted); }
+.workflow-run-link { display: inline-flex; align-items: center; gap: var(--dk-space-2); border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+.workflow-run-link:hover > span:last-child { text-decoration: underline; }
 .workflow-run-link > span:last-child { color: var(--dk-text-muted); font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); white-space: nowrap; }
 .workflow-list-row .status { font-size: var(--dk-text-sm); }
 .workflow-list-row .muted-cell { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
@@ -1473,11 +1484,17 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   #workflow-table-wrap .workflow-list-row { display: grid; grid-template-columns: var(--dk-size-touch) minmax(0, 1fr) auto; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4) var(--dk-space-3) var(--dk-space-2); }
   #workflow-table-wrap td { grid-column: 2; height: auto; padding: 0; border: 0; }
   #workflow-table-wrap td.select-col { display: block; grid-column: 1; grid-row: 1 / span 2; padding: 0; }
-  #workflow-table-wrap td.select-col::before, #workflow-table-wrap td.workflow-flow::before { display: none; }
+  #workflow-table-wrap td.select-col::before, #workflow-table-wrap td.workflow-apps::before { display: none; }
   #workflow-table-wrap td.cell-title { display: block; grid-row: 1; }
-  #workflow-table-wrap td.workflow-flow { display: block; }
+  /* The app strip sits under the name; Location, Latest run and State
+     follow as labelled lines. */
+  #workflow-table-wrap td.workflow-apps { display: block; grid-row: 2; }
   #workflow-table-wrap td.workflow-actions { grid-column: 3; grid-row: 1; align-self: start; }
-  /* State is its own labelled line, like When / Then / Latest run. */
+  #workflow-table-wrap td.workflow-location, #workflow-table-wrap td.workflow-latest { align-items: center; }
+  .workflow-list-row .cell-name-text { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .workflow-name-line { flex-wrap: wrap; row-gap: var(--dk-space-1); }
+  .workflow-tags-inline { max-width: 100%; }
+  /* State is its own labelled line, like Latest run. */
   #workflow-table-wrap td[data-label="State"] { align-items: center; }
   #workflow-table-wrap .workflow-menu .dk-button { width: 100%; height: var(--dk-size-touch); }
   .workflow-check { width: var(--dk-size-touch); height: var(--dk-size-touch); }

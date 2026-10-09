@@ -50,15 +50,25 @@ export function statusLabel(status) {
   return STATUS_LABELS[value] || sentenceCase(value);
 }
 
-export function statusLine(status, labels) {
-  const value = String(status || 'unknown');
-  const kind = ['completed', 'succeeded', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
+function statusKind(value) {
+  return ['completed', 'succeeded', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'running', 'ready', 'queued', 'delayed'].includes(value) ? 'run'
     : ['failed', 'timed_out', 'interrupted', 'error', 'expired', 'auto-paused'].includes(value) ? 'err'
     : ['expiring'].includes(value) ? 'warn'
     : 'off';
+}
+
+export function statusLine(status, labels) {
+  const value = String(status || 'unknown');
   const text = (labels || {})[value] || statusLabel(value);
-  return `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+  return `<span class="status ${statusKind(value)}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+}
+
+/* The dot alone, its word kept for screen readers (dense one-line cells
+   that pair the dot with a date). */
+export function statusDot(status) {
+  const value = String(status || 'unknown');
+  return `<span class="status ${statusKind(value)}"><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">${escapeHtml(statusLabel(value))}</span></span>`;
 }
 
 /* A failure that no longer needs action. The run keeps its status pill

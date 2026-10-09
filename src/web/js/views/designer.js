@@ -34,11 +34,11 @@ function frameSrc(source) {
   return `/designer/app?${params}`;
 }
 
-/* The h1: the human name plus the description's (?) tip; the id goes on
-   the line under it as secondary mono text. */
-function paintTitle(name, description, id) {
+/* The h1: the human name plus the description's (?) tip. The id stays
+   off the header (the YAML tab and the list's row menu carry it). */
+function paintTitle(name, description) {
   $('#view-title').innerHTML = `<span class="view-title-text">${escapeHtml(name)}</span>${helpTip(description)}`;
-  $('#view-description').innerHTML = id ? `<span class="workflow-id mono">${escapeHtml(id)}</span>` : '';
+  $('#view-description').textContent = '';
 }
 
 function savedId() {
@@ -52,7 +52,7 @@ function applyMeta() {
   const title = $('#view-title');
   title.classList.toggle('renamable', !!meta && meta.editable && !editing);
   if (meta) {
-    if (!editing) paintTitle(meta.name || (meta.saved ? meta.id : 'New workflow'), meta.description, savedId());
+    if (!editing) paintTitle(meta.name || (meta.saved ? meta.id : 'New workflow'), meta.description);
     title.title = meta.editable
       ? (meta.nameSource === 'custom'
         ? 'Click to rename — clear the name to use the generated one'
@@ -81,7 +81,7 @@ function syncHead(ref) {
     ? (state.data?.workflows || []).find((item) => item.id === ref || item.source === ref)
     : null;
   const id = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : '';
-  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow', workflow?.description, id);
+  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow', workflow?.description);
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
 }
