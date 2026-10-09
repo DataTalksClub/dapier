@@ -156,8 +156,10 @@ To add or change a scope:
    uv run dapier connections edit <connection-id> --scopes <scope> [<scope> ...]
    ```
 
-   Zoom OAuth connections currently use the CLI for scope changes; the
-   console's Zoom connection editor manages the recording webhook token.
+   Zoom API connections edit their scopes in Manage → Advanced like any
+   OAuth connection; a Zoom webhook connection's Manage dialog holds its
+   Secret Token instead. New Zoom API connections start from the default
+   read scopes in `src/dapier/connections/zoom.py` (`API_DEFAULT_SCOPES`).
 
    `uv run dapier connections edit <connection-id>` can also change the
    display name, scopes, or Dropbox root path (`--clear-root-path` selects the

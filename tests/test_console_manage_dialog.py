@@ -95,3 +95,63 @@ def test_google_scopes_are_shown_short_and_saved_in_full():
                          "https://www.googleapis.com/auth/spreadsheets"]
         dropbox = json.loads(js.eval("JSON.stringify(scopesFromEditing('files.metadata.read', 'dropbox'))"))
         assert dropbox == ["files.metadata.read"]
+
+
+def _manage(connection):
+    """Open Manage on one connection with stubbed DOM nodes; return them."""
+    with MiniRacer() as js:
+        js.eval(f'''
+            const nodes = {{}};
+            const node = () => ({{hidden: false, textContent: '', innerHTML: '', href: '',
+                open: false, disabled: false, value: '', placeholder: '', dataset: {{}},
+                firstChild: {{textContent: ''}}, reset() {{}}, showModal() {{}},
+                addEventListener() {{}}}});
+            const $ = id => nodes[id] ||= node();
+            const $$ = () => [];
+            const form = $('#edit-connection-form');
+            for (const field of ['scopes', 'token', 'root_path', 'signing_secret']) form[field] = node();
+            const state = {{data: {{connections: [{json.dumps(connection)}]}}}};
+            const escapeHtml = value => String(value);
+            const statusLine = value => value;
+            const formatTimestamp = () => '';
+            const serviceMark = value => value;
+            const whenMenusClosed = (root, paint) => paint();
+            const window = {{location: {{origin: 'https://dapier.test'}}}};
+            function renderManageDetails() {{}}
+            function usageRefs() {{ return []; }}
+            function scopesForEditing(c) {{ return (c.scopes || []).join(' '); }}
+        ''')
+        js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
+        js.eval(JS[JS.index('export function openEditConnection('):JS.index('/* Save wakes up')]
+                .replace('export function', 'function'))
+        js.eval(f'openEditConnection({json.dumps(connection["connection_id"])})')
+        return json.loads(js.eval('JSON.stringify(nodes)'))
+
+
+def test_zoom_api_manage_edits_scopes_like_any_oauth_connection():
+    nodes = _manage({"connection_id": "zoom-api", "provider": "zoom", "status": "connected",
+                     "scopes": ["user:read:user"], "oauth_consent": True})
+    form = nodes['#edit-connection-form']
+    assert form['dataset'] == {'connectionId': 'zoom-api', 'provider': 'zoom',
+                               'kind': 'api', 'pastesToken': ''}
+    assert nodes['#edit-scopes-field']['hidden'] is False
+    assert nodes['#edit-token-field']['hidden'] is True
+    assert nodes['#edit-zoom-setup']['hidden'] is True
+    assert nodes['#edit-connection-access']['hidden'] is False
+    assert nodes['#edit-connection-revoke']['textContent'] == 'Revoke tokens'
+
+
+def test_zoom_webhook_manage_keeps_its_secret_token():
+    nodes = _manage({"connection_id": "zoom", "provider": "zoom", "status": "ready", "scopes": []})
+    form = nodes['#edit-connection-form']
+    assert form['dataset']['kind'] == 'webhook' and form['dataset']['pastesToken'] == '1'
+    assert nodes['#edit-scopes-field']['hidden'] is True
+    assert nodes['#edit-token-field']['hidden'] is False
+    assert nodes['#edit-zoom-setup']['hidden'] is False
+    assert nodes['#edit-connection-revoke']['textContent'] == 'Disable webhook'
+
+
+def test_manage_save_sends_the_zoom_kind():
+    save = JS[JS.index("$('#edit-connection-form').addEventListener('submit'"):]
+    assert "if (form.dataset.kind) body.kind = form.dataset.kind;" in save
+    assert "if (!form.dataset.pastesToken) {" in save

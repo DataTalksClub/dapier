@@ -61,21 +61,32 @@ and [using Zoom APIs](https://developers.zoom.us/docs/api/using-zoom-apis/).
 
 ### Create and connect the OAuth account
 
-Use the authenticated `dapier` CLI to create the OAuth connection and open
-Zoom consent:
+In the console, use **Add account** on the Connections page's Zoom API group
+(or **Connect** next to Zoom API under "Connect a service"): it creates the
+connection and opens Zoom consent in a pop-up. From the authenticated
+`dapier` CLI, the same API path:
 
 ```sh
-uv run dapier connections create zoom-api --provider zoom --scopes user:read:user
+uv run dapier connections create zoom-api --provider zoom
 uv run dapier connections connect zoom-api --agent <agent-name>
 ```
+
+A Zoom create names its kind explicitly (`kind: api`; the CLI's `--kind`
+defaults to `api`), so it never lands on the webhook setup below. Without
+`--scopes` the connection requests Dapier's default read scopes —
+`user:read:user` (account verification), `meeting:read:list_meetings`,
+`meeting:read:meeting`, and `cloud_recording:read:recording` (find/list
+meetings and recordings, the pickers, and the recordings poll). Every
+requested scope must be enabled on the Zoom app, or consent fails with
+"Permissions were not granted". Add write or webinar scopes later in
+Manage → Advanced or with `dapier connections edit --scopes`.
 
 Check the Zoom account on the consent screen before approving. Dapier verifies
 the Zoom user ID and display name, then stores the OAuth access and refresh
 tokens write-only. Inspect `uv run dapier connections show zoom-api` to check
 the verified account and granted scopes.
 
-The console's Zoom connection card currently configures recording webhooks;
-use the CLI flow above for a Zoom API OAuth connection. This OAuth token
+This OAuth token
 supports authorized API access and drives the workflow actions
 (`zoom_find_meeting`, `zoom_find_recording`, `zoom_create_meeting`,
 `zoom_update_meeting`, `zoom_delete_meeting`, `zoom_add_registrant`,
@@ -97,8 +108,8 @@ define defaults, see [the connector scope guide](README.md#changing-requested-sc
 
 ## Cloud recording webhook
 
-This is the Zoom integration currently exposed by the Dapier console's Zoom
-card and the `zoom` workflow trigger. It does not use the Zoom OAuth client.
+The console sets this up with **Add webhook** on the Zoom Webhooks group (the
+`zoom` workflow trigger uses it). It does not use the Zoom OAuth client.
 
 1. Enable cloud recording for the Zoom host. In the Zoom App Marketplace,
    create a **Webhook Only** app with an event subscription for

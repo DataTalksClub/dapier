@@ -74,6 +74,16 @@ const CONNECT_SERVICES = {
     connectionId: 'telegram-bot',
     scopes: [],
   },
+  'zoom-api': {
+    label: 'Zoom API',
+    blurb: 'Find and manage meetings and recordings through Zoom\'s API.',
+    provider: 'zoom',
+    // An explicit kind: the API fills the default read scopes
+    // (src/dapier/connections/zoom.py API_DEFAULT_SCOPES), so none ride here.
+    kind: 'api',
+    connectionId: 'zoom-api',
+    scopes: [],
+  },
   zoom: {
     label: 'Zoom Webhooks',
     blurb: 'Start workflows when a Zoom cloud recording video finishes processing.',
@@ -92,7 +102,9 @@ const SERVICE_MARKERS = {
   youtube: ['/auth/youtube', 'youtube.force-ssl', 'yt-analytics'],
 };
 
-const SERVICE_ORDER = Object.keys(CONNECT_SERVICES);
+/* Register groups follow the catalog; the Zoom webhook service's group is
+   zoom-webhooks, so it sits right after Zoom API. */
+const SERVICE_ORDER = Object.keys(CONNECT_SERVICES).map((id) => (id === 'zoom' ? 'zoom-webhooks' : id));
 const GOOGLE_FAMILY = new Set(['gmail', 'calendar', 'drive', 'docs', 'sheets']);
 
 /* Plugin services (DataOps) name themselves through the API's services
@@ -176,9 +188,9 @@ function helpTip(text) {
 
 /* Adding an account starts from the group it lands in: each register
    panel carries its own + button, which runs that service's connect flow
-   (token dialog, reuse dialog, or OAuth popup) in place. A Zoom API group
-   gets none — the console's Zoom setup creates webhook connections only. */
-const GROUP_CONNECT_SERVICE = { 'zoom-webhooks': 'zoom', 'zoom-api': null };
+   (token dialog, reuse dialog, or OAuth popup) in place. Zoom API adds an
+   OAuth account; Zoom Webhooks runs the Secret Token setup. */
+const GROUP_CONNECT_SERVICE = { 'zoom-webhooks': 'zoom' };
 
 function groupConnectService(groupId) {
   if (groupId in GROUP_CONNECT_SERVICE) return GROUP_CONNECT_SERVICE[groupId];
@@ -240,16 +252,24 @@ function productList(connection) {
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
+/* A Zoom API service or connection is OAuth; only the webhook kind pastes
+   its secret like the token providers. */
+const metaPastesToken = (meta) => TOKEN_PROVIDERS.includes(meta.provider) && meta.kind !== 'api';
+const isZoomWebhook = (connection) => connection.provider === 'zoom' && !(connection.scopes || []).length;
+const pastesToken = (connection) => TOKEN_PROVIDERS.includes(connection.provider)
+  && (connection.provider !== 'zoom' || isZoomWebhook(connection));
 /* The API says whether a connection finishes/renews through OAuth consent
    (oauth_consent): pasted-token providers — plugins add their own — and
    Zoom webhook connections never do. The fallback covers older payloads. */
 const usesOAuthConsent = (connection) => connection.oauth_consent ?? (
   connection.provider !== 'slack' && connection.provider !== 'telegram'
-  && !(connection.provider === 'zoom' && !(connection.scopes || []).length));
-/* Google and YouTube grants verify an account (email, channel) during
-   consent; one without a verified identity never finished signing in.
-   Token and no-auth providers have no identity to verify. */
-const verifiesIdentity = (connection) => ['google', 'youtube'].includes(connection.provider);
+  && !isZoomWebhook(connection));
+/* Google, YouTube, and Zoom API grants verify an account (email, channel,
+   Zoom user) during consent; one without a verified identity never
+   finished signing in. Token and no-auth providers have no identity to
+   verify. */
+const verifiesIdentity = (connection) => ['google', 'youtube'].includes(connection.provider)
+  || (connection.provider === 'zoom' && !isZoomWebhook(connection));
 
 const TOKEN_PROVIDER_META = {
   slack: {
@@ -430,12 +450,12 @@ function renderConnectList(connections) {
   $('#connect-grid').innerHTML = missing.map(([serviceId, meta]) => {
     const clientProvider = oauthClientProvider(meta);
     const oauthClient = ((state.data || {}).oauth_clients || []).find((item) => item.provider === clientProvider);
-    const needsClient = !TOKEN_PROVIDERS.includes(meta.provider) && oauthClient && !oauthClient.configured;
+    const needsClient = !metaPastesToken(meta) && oauthClient && !oauthClient.configured;
     const reusable = reusableGoogleConnections(serviceId, connections);
-    const addLabel = meta.provider === 'zoom' ? 'Add Zoom app'
+    const addLabel = serviceId === 'zoom' ? 'Add Zoom app'
       : reusable.length ? 'Add to an account' : 'Connect';
     return `<li class="connect-card">
-      <span class="connect-title">${serviceMark(serviceId)}<span class="connect-name">${meta.label}</span></span>
+      <span class="connect-title">${serviceMark(meta.provider === 'zoom' ? 'zoom' : serviceId)}<span class="connect-name">${meta.label}</span></span>
       <span class="connect-blurb">${meta.blurb}${needsClient ? ` <span class="connect-pending">Set up the ${escapeHtml(clientProvider)} OAuth client in <a href="/credentials">App setup</a> first.</span>` : ''}</span>
       <button class="dk-button dk-button--secondary dk-button--sm connect-button" data-service="${serviceId}" type="button" aria-label="${escapeHtml(`${addLabel} — ${meta.label}`)}">${addLabel}</button>
     </li>`;
@@ -478,7 +498,7 @@ function reusableGoogleConnections(serviceId, connections) {
 async function connectService(serviceId) {
   const meta = CONNECT_SERVICES[serviceId];
   if (!meta) return;
-  if (TOKEN_PROVIDERS.includes(meta.provider)) return openTokenDialog(meta.provider);
+  if (metaPastesToken(meta)) return openTokenDialog(meta.provider);
   const reuse = reusableGoogleConnections(serviceId);
   if (reuse.length) return openReuseDialog(serviceId, reuse);
   return startNewOAuthConnection(meta);
@@ -564,7 +584,8 @@ async function startNewOAuthConnection(meta) {
       method: 'PUT',
       body: JSON.stringify({
         provider: meta.provider,
-        scopes: meta.scopes,
+        ...(meta.kind ? { kind: meta.kind } : {}),
+        ...(meta.scopes.length ? { scopes: meta.scopes } : {}),
       }),
     });
     const id = created.connection_id;
@@ -649,11 +670,14 @@ export function openEditConnection(connectionId) {
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (!connection) return;
   const provider = connection.provider;
-  const tokenProvider = TOKEN_PROVIDERS.includes(provider);
+  const tokenProvider = pastesToken(connection);
+  const zoomWebhook = isZoomWebhook(connection);
   const form = $('#edit-connection-form');
   form.reset();
   form.dataset.connectionId = connection.connection_id;
   form.dataset.provider = provider;
+  form.dataset.kind = provider === 'zoom' ? (zoomWebhook ? 'webhook' : 'api') : '';
+  form.dataset.pastesToken = tokenProvider ? '1' : '';
   $('#edit-connection-title').textContent = accountLabel(connection);
   $('#edit-connection-meta').innerHTML = statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS);
   renderManageDetails(connection, usageRefs(connection));
@@ -665,9 +689,9 @@ export function openEditConnection(connectionId) {
     : `· ${scopeCount} scope${scopeCount === 1 ? '' : 's'}`;
   form.token.value = '';
   $('#edit-token-field').hidden = !tokenProvider;
-  $('#edit-token-field').firstChild.textContent = provider === 'zoom' ? 'Replace webhook Secret Token' : 'Replace token';
-  form.token.placeholder = provider === 'zoom' ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
-  $('#edit-token-field .field-hint').textContent = provider === 'zoom'
+  $('#edit-token-field').firstChild.textContent = zoomWebhook ? 'Replace webhook Secret Token' : 'Replace token';
+  form.token.placeholder = zoomWebhook ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
+  $('#edit-token-field .field-hint').textContent = zoomWebhook
     ? 'Leave blank to keep the stored secret. Replacing it requires Zoom to validate the callback again.'
     : 'Leave blank to keep the stored token — it is re-verified on save.';
   const cliRef = (connection.refs || [])[0];
@@ -676,8 +700,8 @@ export function openEditConnection(connectionId) {
     ? `From the CLI: <code>dapier token exec ${escapeHtml(cliRef)} --agent …</code>` : '';
   $('#edit-advanced').open = false;
 
-  $('#edit-zoom-setup').hidden = provider !== 'zoom';
-  if (provider === 'zoom') $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
+  $('#edit-zoom-setup').hidden = !zoomWebhook;
+  if (zoomWebhook) $('#edit-zoom-url').textContent = `${window.location.origin}/hooks/zoom/${encodeURIComponent(connectionId)}`;
   $('#edit-slack-setup').hidden = provider !== 'slack';
   if (provider === 'slack') {
     $('#edit-slack-url').textContent = `${window.location.origin}/hooks/slack/${encodeURIComponent(connectionId)}`;
@@ -703,13 +727,13 @@ export function openEditConnection(connectionId) {
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = !usesOAuthConsent(connection) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
-  $('#edit-connection-access').hidden = provider === 'zoom';
+  $('#edit-connection-access').hidden = zoomWebhook;
   const revocable = ['connected', 'expired'].includes(connection.status)
-    || (provider === 'zoom' && connection.status === 'ready');
+    || (zoomWebhook && connection.status === 'ready');
   $('#edit-revoke-row').hidden = !revocable;
-  $('#edit-revoke-label').textContent = revokeLabel(provider);
-  $('#edit-connection-revoke').textContent = revokeLabel(provider);
-  $('#edit-revoke-hint').textContent = provider === 'zoom'
+  $('#edit-revoke-label').textContent = revokeLabel(zoomWebhook);
+  $('#edit-connection-revoke').textContent = revokeLabel(zoomWebhook);
+  $('#edit-revoke-hint').textContent = zoomWebhook
     ? 'Clears the stored secret, so Zoom deliveries are rejected until you set it again.'
     : 'Clears the stored tokens. Flows using it stop working until you reconnect.';
   $('#edit-connection-save').disabled = true;
@@ -718,7 +742,7 @@ export function openEditConnection(connectionId) {
   $('#edit-connection-dialog').showModal();
 }
 
-const revokeLabel = (provider) => (provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens');
+const revokeLabel = (zoomWebhook) => (zoomWebhook ? 'Disable webhook' : 'Revoke tokens');
 
 /* Save wakes up once an editable field changes. */
 $('#edit-connection-form').addEventListener('input', () => { $('#edit-connection-save').disabled = false; });
@@ -1015,7 +1039,7 @@ $('#edit-connection-revoke').addEventListener('click', async (event) => {
     notice(`Access for ${connectionId} revoked in Dapier. Reconnect it to use the connection again.`);
     await refreshConnections();
   } catch (error) { $('#edit-connection-error').textContent = error.message; }
-  finally { button.disabled = false; button.textContent = $('#edit-connection-form').dataset.provider === 'zoom' ? 'Disable webhook' : 'Revoke tokens'; }
+  finally { button.disabled = false; button.textContent = revokeLabel($('#edit-connection-form').dataset.kind === 'webhook'); }
 });
 
 $('#edit-connection-test').addEventListener('click', async (event) => {
@@ -1362,7 +1386,8 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     connection_id: connectionId,
     provider,
   };
-  if (!TOKEN_PROVIDERS.includes(provider)) {
+  if (form.dataset.kind) body.kind = form.dataset.kind;
+  if (!form.dataset.pastesToken) {
     body.scopes = scopesFromEditing(form.scopes.value, provider);
   } else {
     const token = form.token.value.trim();

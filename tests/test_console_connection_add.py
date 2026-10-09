@@ -35,7 +35,7 @@ STUBS = '''
 def _service_ids():
     block = re.search(r"const CONNECT_SERVICES = \{(.*?)\n\};", JS, re.S)
     assert block
-    return re.findall(r"^  ([a-z]+): \{", block.group(1), re.M)
+    return re.findall(r"^  '?([a-z-]+)'?: \{", block.group(1), re.M)
 
 
 def _render(connections):
@@ -52,7 +52,7 @@ def _render(connections):
 
 
 def _offered(markup):
-    return re.findall(r'connect-button" data-service="([a-z]+)"', markup)
+    return re.findall(r'connect-button" data-service="([a-z-]+)"', markup)
 
 
 def test_no_page_level_add_button_or_picker():
@@ -95,12 +95,14 @@ def test_every_group_gets_its_own_add_button():
     # The webhook group's + runs the webhook (secret token) setup.
     assert _offered(panels['zoom-webhooks']) == ['zoom']
     assert 'aria-label="Add Zoom webhook"' in panels['zoom-webhooks']
-    # The console has no Zoom API (OAuth) setup flow, so that group has no +.
-    assert _offered(panels['zoom-api']) == []
+    # The Zoom API group's + adds an OAuth account (consent popup).
+    assert _offered(panels['zoom-api']) == ['zoom-api']
+    assert 'aria-label="Add Zoom API account"' in panels['zoom-api']
+    assert '<span>Add account</span>' in panels['zoom-api']
     # Services with a group drop out of the list; the rest stay connectable.
     listed = _offered(nodes['#connect-grid']['innerHTML'])
-    assert 'gmail' not in listed and 'slack' not in listed and 'zoom' not in listed
-    assert set(listed) | {'gmail', 'slack', 'zoom'} == set(_service_ids())
+    assert not {'gmail', 'slack', 'zoom', 'zoom-api'} & set(listed)
+    assert set(listed) | {'gmail', 'slack', 'zoom', 'zoom-api'} == set(_service_ids())
     assert nodes['#connect-services-title']['textContent'] == 'Connect another service'
 
 
@@ -156,3 +158,32 @@ def test_unfinished_sign_in_offers_remove_beside_finish_setup():
     actions = register[register.index('service-account-actions'):]
     assert 'connection-remove' in actions
     assert actions.index('connection-remove') < actions.index('Finish setup')
+
+
+def test_zoom_api_is_listed_until_one_exists_and_starts_oauth():
+    """With only a Zoom webhook, Zoom API stays under Connect another
+    service; its button runs the OAuth popup flow, not the token dialog."""
+    nodes = _render([{"connection_id": "z1", "provider": "zoom", "status": "ready", "scopes": []}])
+    grid = nodes['#connect-grid']['innerHTML']
+    assert 'zoom-api' in _offered(grid) and 'zoom' not in _offered(grid)
+    card = grid[grid.index('Zoom API'):]
+    assert '>Connect</button>' in card[:card.index('</li>')]
+    with MiniRacer() as js:
+        js.eval(STUBS)
+        js.eval(JS[JS.index('const CONNECT_SERVICES'):JS.index('/* Server-paged accounts register')])
+        js.eval('''
+            const calls = [];
+            function openTokenDialog(provider) { calls.push('token:' + provider); }
+            function openReuseDialog() { calls.push('reuse'); }
+            function startNewOAuthConnection(meta) { calls.push('oauth:' + meta.kind); }
+        ''')
+        js.eval(JS[JS.index('function reusableGoogleConnections('):JS.index('function openReuseDialog(')])
+        js.eval('connectService("zoom-api"); connectService("zoom");')
+        assert json.loads(js.eval('JSON.stringify(calls)')) == ['oauth:api', 'token:zoom']
+
+
+def test_new_zoom_api_connection_names_its_kind_and_leaves_scopes_to_the_api():
+    start = JS[JS.index('async function startNewOAuthConnection('):JS.index('function watchOAuthPopup(')]
+    assert "...(meta.kind ? { kind: meta.kind } : {})" in start
+    assert "...(meta.scopes.length ? { scopes: meta.scopes } : {})" in start
+    assert "/api/admin/oauth/${encodeURIComponent(id)}/start" in start
