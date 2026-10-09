@@ -713,7 +713,9 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .service-panel > .section-head .service-add { margin-left: auto; flex: none; }
 .service-add svg { display: none; }
 .service-accounts { list-style: none; margin: 0; padding: 0; }
-.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem auto; align-items: start; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
+/* Full rows and one-line references share one grid: statuses start on one
+   edge, actions end on the band's right edge under Add account. */
+.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 7rem; align-items: start; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
 .service-account:last-child, .service-ref:last-child { border-bottom: 0; }
 .service-account-main { display: grid; gap: var(--dk-space-1); min-width: 0; }
 .connection-name { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
@@ -726,12 +728,12 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .service-account-status { padding-top: var(--dk-space-1); }
 .service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
 .service-account-actions { justify-content: flex-end; }
-.service-account-actions .row-more { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
 /* A shared sign-in seen from its other services: one quiet line. */
-.service-ref { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; align-items: center; gap: var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
-.service-ref .connection-name { font-weight: var(--dk-weight-medium); }
-.service-ref-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.service-ref-status { justify-self: end; }
+.service-ref { align-items: center; padding-block: var(--dk-space-3); }
+.service-ref-main { display: flex; align-items: baseline; gap: var(--dk-gap-control); }
+.service-ref .connection-name { flex: 0 1 auto; font-weight: var(--dk-weight-medium); }
+.service-ref .service-account-status { padding-top: 0; }
+.service-ref-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .connect-services { margin-top: var(--dk-gap-section); }
 .connect-list { list-style: none; margin: 0; padding: 0; }
 .connect-card { display: grid; grid-template-columns: minmax(10rem, 22%) minmax(0, 1fr) auto; align-items: center; gap: var(--dk-space-1) var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
@@ -751,18 +753,16 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .reuse-account .cell-sub { display: block; }
 @media (max-width: 860px) {
   .connection-name { min-height: var(--dk-size-touch); }
-  .service-account-actions .row-more { width: var(--dk-size-touch); height: var(--dk-size-touch); }
 }
 @media (max-width: 560px) {
-  .service-account { grid-template-columns: minmax(0, 1fr) auto; }
+  /* A fixed status column keeps statuses on one left edge on phone too. */
+  .service-account { grid-template-columns: minmax(0, 1fr) 7.5rem; }
   .service-account-main { grid-column: 1; grid-row: 1; }
   .service-account-status { grid-column: 2; grid-row: 1; }
   .service-account-main { grid-row: 1 / span 2; }
   .service-account-actions { grid-column: 2; grid-row: 2; align-self: end; }
-  .service-account-actions .row-more-slot { display: none; }
-  .service-ref { grid-template-columns: minmax(0, 1fr) auto; }
-  .service-ref-note { grid-column: 1; grid-row: 2; }
-  .service-ref-status { grid-column: 2; grid-row: 1; }
+  .service-ref-main { display: grid; gap: 0; }
+  .service-ref .service-account-actions:empty { display: none; }
   .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: var(--dk-space-1) var(--dk-gap-control); }
   .connect-blurb { grid-column: 1 / -1; grid-row: 2; }
   /* The group's + collapses to a square touch target; its aria-label names it. */
@@ -1469,6 +1469,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   #workflow-table-wrap td.workflow-flow { display: block; }
   #workflow-table-wrap td.workflow-actions { grid-column: 3; grid-row: 1; align-self: start; }
   /* State is its own labelled line, like When / Then / Latest run. */
+  #workflow-table-wrap td[data-label="State"] { align-items: center; }
   #workflow-table-wrap .workflow-menu .dk-button { width: 100%; height: var(--dk-size-touch); }
   .workflow-check { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .workflow-toolbar .toolbar-filters > label.toolbar-search { max-width: none; }

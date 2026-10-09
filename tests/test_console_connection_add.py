@@ -121,9 +121,20 @@ def test_shared_sign_in_shows_once_with_compact_references():
                                        "https://www.googleapis.com/auth/drive.readonly"]}]
     register = _render(connections)['#connection-register']['innerHTML']
     assert register.count('class="service-account"') == 1
-    assert register.count('class="service-ref"') == 1
+    assert register.count('class="service-account service-ref"') == 1
     assert 'Same sign-in as Gmail' in register
     assert 'Same sign-in also covers Drive' in register
+
+
+def test_compact_reference_carries_the_next_action():
+    """A shared sign-in needing reconnection shows Reconnect in every panel
+    it appears in, not only on its full row under another service."""
+    connections = [{"connection_id": "g1", "provider": "google", "status": "expired",
+                    "account_title": "a@example.com", "oauth_consent": True,
+                    "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly",
+                                       "https://www.googleapis.com/auth/drive.readonly"]}]
+    register = _render(connections)['#connection-register']['innerHTML']
+    assert register.count('connection-oauth') == 2
 
 
 def test_phone_layout_keeps_add_buttons_tappable():

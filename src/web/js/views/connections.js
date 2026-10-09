@@ -836,24 +836,38 @@ function rowTitle(connection) {
    and where its full row lives; the name still opens Manage. */
 function accountRef(connection, primaryGroup) {
   const title = rowTitle(connection);
-  return `<li class="service-ref">
-    <button class="connection-name connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
-    <span class="service-ref-note">Same sign-in as ${escapeHtml(serviceLabel(primaryGroup).replace(/^Google /, ''))}</span>
-    <span class="service-ref-status">${statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS)}</span>
+  /* A shared sign-in that needs attention carries its next step here too,
+     not only on its full row under another service. */
+  return `<li class="service-account service-ref">
+    <div class="service-account-main service-ref-main">
+      <button class="connection-name connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
+      <span class="service-ref-note">Same sign-in as ${escapeHtml(serviceLabel(primaryGroup).replace(/^Google /, ''))}</span>
+    </div>
+    <div class="service-account-status">${statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS)}</div>
+    <div class="row-actions service-account-actions">${nextActionHtml(connection)}</div>
   </li>`;
+}
+
+/* What the account needs next: OAuth consent, or — for a Zoom webhook,
+   which Zoom's URL validation activates — Manage, opened on the callback
+   URL to paste into the Zoom app. Empty when nothing is pending. */
+function nextActionHtml(connection) {
+  const status = effectiveStatus(connection);
+  const id = escapeHtml(connection.connection_id);
+  if (usesOAuthConsent(connection) && status !== 'connected') {
+    return `<a class="dk-button dk-button--secondary dk-button--sm connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${id}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>`;
+  }
+  if (connection.provider === 'zoom' && status === 'ready') {
+    return `<button class="dk-button dk-button--secondary dk-button--sm connection-finish" data-connection="${id}" type="button">Finish setup</button>`;
+  }
+  return '';
 }
 
 function accountRow(connection, serviceId, { twin = false } = {}) {
     /* The API distinguishes automatic renewal from expiry needing consent. */
     const status = effectiveStatus(connection);
     const id = escapeHtml(connection.connection_id);
-    /* Finish setup goes where setup actually finishes: OAuth consent, or —
-       for a Zoom webhook, which Zoom's URL validation activates — Manage,
-       opened on the callback URL to paste into the Zoom app. */
-    const nextAction = usesOAuthConsent(connection) && status !== 'connected'
-      ? `<a class="dk-button dk-button--secondary dk-button--sm connection-oauth" href="/api/admin/oauth/${encodeURIComponent(connection.connection_id)}/start" data-connection="${id}" target="_blank" rel="noopener">${status === 'ready' ? 'Finish setup' : 'Reconnect'}</a>`
-      : connection.provider === 'zoom' && status === 'ready'
-        ? `<button class="dk-button dk-button--secondary dk-button--sm connection-finish" data-connection="${id}" type="button">Finish setup</button>` : '';
+    const nextAction = nextActionHtml(connection);
     const identity = accountIdentity(connection);
     const unfinished = !identity && verifiesIdentity(connection);
     const title = rowTitle(connection);
@@ -862,13 +876,9 @@ function accountRow(connection, serviceId, { twin = false } = {}) {
     const others = servicesFor(connection).filter((service) => service.id !== serviceId)
       .map((service) => service.label.replace(/^Google /, ''));
     const shareHtml = others.length ? escapeHtml(`Same sign-in also covers ${others.join(', ')}`) : '';
-    /* One visible action: what the account needs next, else Manage. The
-       name always opens Manage; an abandoned setup offers Remove in the menu. */
+    /* One action column: what the account needs next, else Manage. The
+       name always opens Manage, whose Delete removes an abandoned setup. */
     const action = nextAction || `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
-    const menu = unfinished
-      ? `<button class="icon-button row-more" type="button" popovertarget="connection-menu-${id}" aria-label="More actions for ${escapeHtml(title)}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
-         <div id="connection-menu-${id}" class="row-menu" popover aria-label="Actions for ${escapeHtml(title)}"><button class="row-menu-item row-menu-danger connection-remove" data-connection="${id}" type="button">Remove</button></div>`
-      : '<span class="row-more-slot" aria-hidden="true"></span>';
     const expires = formatTimestamp(connection.token_expires_at);
     /* Two connections that read alike (two Slack tokens of one app) say
        which is which: their key and when they were added. */
@@ -883,7 +893,7 @@ function accountRow(connection, serviceId, { twin = false } = {}) {
       <span class="cell-note">${escapeHtml(identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished')}${!connection.auto_refresh && expires && status !== 'expired' ? ` · <span class="${status === 'expiring' ? 'expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}</span>
     </div>
     <div class="service-account-status">${statusLine(status, CONNECTION_STATUS_LABELS)}</div>
-    <div class="row-actions service-account-actions">${action}${menu}</div>
+    <div class="row-actions service-account-actions">${action}</div>
   </li>`;
 }
 
