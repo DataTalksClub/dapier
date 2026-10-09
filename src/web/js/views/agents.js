@@ -5,6 +5,7 @@ import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { renderMarkdown } from '../md.js';
 import { state } from '../state.js';
 import { workflowName } from '../workflow-names.js';
+import { ago } from './activity.js';
 
 const ACTIVE = new Set(['queued', 'running', 'claimed', 'starting', 'started']);
 const FAILED = new Set(['failed', 'timed_out', 'interrupted']);
@@ -20,7 +21,13 @@ function title(task) {
   return task.email_subject?.trim() || (task.workflow || 'Agent run').replace(/^email-trigger-/, '').replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase());
 }
 function badge(task) { return statusLine(task.status, LABELS); }
-function date(task) { return formatTimestamp(task.created_at) || '—'; }
+/* Emails' reading: "3 h ago" to scan, the exact minute in the title. Task
+   times are epoch seconds. */
+function when(value) {
+  if (!value) return '<span class="muted-cell">—</span>';
+  const ms = /^\d+$/.test(String(value)) ? Number(value) * 1000 : value;
+  return `<time title="${escapeHtml(formatTimestamp(value) || '')}">${escapeHtml(ago(ms))}</time>`;
+}
 function duration(task) {
   if (!task.started_at) return 'Waiting to start';
   const seconds = Math.max(0, Math.round((Number(task.finished_at) || Date.now() / 1000) - Number(task.started_at)));
@@ -41,8 +48,8 @@ function renderList() {
   });
   $('#agent-runs-note').textContent = fetched ? `${rows.length} shown${tasks.length === 200 ? ' · newest 200 loaded' : ''}` : 'Loading runs…';
   $('#agent-runs-list').innerHTML = rows.length ? rows.map(task => `<button type="button" class="agent-run-item ${task.task_id === selected ? 'selected' : ''}" data-agent-task="${escapeHtml(task.task_id).replace(/"/g, '&quot;')}" aria-current="${task.task_id === selected ? 'true' : 'false'}">
-    <span class="agent-run-line"><strong>${escapeHtml(title(task))}</strong>${badge(task)}</span>
-    <span class="agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span><time class="mono">${escapeHtml(date(task))}</time></span>
+    <span class="agent-run-line"><strong title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</strong>${badge(task)}</span>
+    <span class="agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span>${when(task.created_at)}</span>
   </button>`).join('') : `<div class="dialog-state"><strong>${tasks.length ? 'No matching runs' : 'No agent runs yet'}</strong><p>${tasks.length ? 'Try another status or search.' : 'Runs appear here when a workflow starts an agent.'}</p></div>`;
 }
 function setTaskUrl(id) {
@@ -70,18 +77,26 @@ function renderDetail() {
   if (!task) { panel.innerHTML = '<div class="dialog-state" role="status"><p>Loading the run…</p></div>'; return; }
   const active = ACTIVE.has(task.status), failed = FAILED.has(task.status), result = resultText(task);
   const logs = task.logs;
-  panel.innerHTML = `<div class="section-head agent-detail-band">
-      <button class="agent-back dk-button dk-button--secondary dk-button--sm" type="button">Back to runs</button>
-      <div class="agent-detail-status">${badge(task)}<span>${escapeHtml(task.engine || 'Agent')} · <span class="mono">${escapeHtml(duration(task))}</span></span></div>
-    </div>
-    <div class="agent-detail-body">
+  const startedLabel = task.started_at ? 'Started' : task.status === 'queued' ? 'Queued' : 'Created';
+  /* One compact head, like an Emails message: the title, then ONE meta line
+     (status · workflow · when · how long). Exact times, engine and ids sit
+     behind Details, so the result starts right after. */
+  panel.innerHTML = `<div class="agent-detail-body">
     <div class="agent-detail-head">
-      <h2 tabindex="-1">${escapeHtml(title(task))}</h2>
-      <dl class="run-summary">
-        <div><dt>Workflow</dt><dd><a class="text-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a></dd></div>
-        <div><dt>${task.started_at ? 'Started' : task.status === 'queued' ? 'Queued' : 'Created'}</dt><dd class="mono">${escapeHtml(formatTimestamp(task.started_at || task.created_at) || '—')}</dd></div>
-        ${task.finished_at ? `<div><dt>Finished</dt><dd class="mono">${escapeHtml(formatTimestamp(task.finished_at))}</dd></div>` : ''}
-      </dl>
+      <button class="agent-back dk-button dk-button--secondary dk-button--sm" type="button">Back to runs</button>
+      <h2 tabindex="-1" title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</h2>
+      <p class="agent-detail-meta">${badge(task)}<span class="agent-meta-item"><a class="text-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a></span><span class="agent-meta-item">${startedLabel}&nbsp;${when(task.started_at || task.created_at)}</span><span class="agent-meta-item mono">${escapeHtml(duration(task))}</span></p>
+      <details class="agent-technical"><summary>Details</summary><dl>
+        <dt>${startedLabel}</dt><dd class="mono">${escapeHtml(formatTimestamp(task.started_at || task.created_at) || '—')}</dd>
+        ${task.finished_at ? `<dt>Finished</dt><dd class="mono">${escapeHtml(formatTimestamp(task.finished_at))}</dd>` : ''}
+        <dt>Duration</dt><dd class="mono">${escapeHtml(duration(task))}</dd>
+        <dt>Engine</dt><dd>${escapeHtml(task.engine || 'Agent')}</dd>
+        <dt>Task ID</dt><dd class="mono">${escapeHtml(task.task_id)}</dd>
+        <dt>Required capabilities</dt><dd>${escapeHtml((task.requires || []).join(", ") || "None")}</dd>
+        <dt>Workspace</dt><dd>${escapeHtml(task.workspace || 'Worker default')}</dd>
+        ${task.exit_code != null ? `<dt>Exit code</dt><dd>${escapeHtml(String(task.exit_code))}</dd>` : ''}
+        ${task.notified_at ? `<dt>Completion email sent</dt><dd>${escapeHtml(formatTimestamp(task.notified_at))}</dd>` : ''}
+      </dl></details>
     </div>
     <section class="agent-result" aria-labelledby="agent-result-heading">
       <h3 id="agent-result-heading">${failed ? 'What went wrong' : active ? 'Progress' : 'Result'}</h3>
@@ -93,13 +108,6 @@ function renderDetail() {
         <pre class="agent-log-output" tabindex="0">${escapeHtml(logs.stdout || 'No output recorded.')}</pre>`
         : `<p class="sub">${active ? 'Logs will be available after this run finishes.' : 'Detailed logs were not recorded for this run. Its available result is shown above.'}</p>`}
     </details>
-    <details class="agent-technical"><summary>Run details</summary><dl>
-      <dt>Task ID</dt><dd class="mono">${escapeHtml(task.task_id)}</dd>
-      <dt>Required capabilities</dt><dd>${escapeHtml((task.requires || []).join(", ") || "None")}</dd>
-      <dt>Workspace</dt><dd>${escapeHtml(task.workspace || 'Worker default')}</dd>
-      ${task.exit_code != null ? `<dt>Exit code</dt><dd>${escapeHtml(String(task.exit_code))}</dd>` : ''}
-      ${task.notified_at ? `<dt>Completion email sent</dt><dd>${escapeHtml(formatTimestamp(task.notified_at))}</dd>` : ''}
-    </dl></details>
     </div>`;
 }
 async function selectTask(id, { updateUrl = true } = {}) {

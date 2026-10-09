@@ -1702,16 +1702,31 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 
 /* --- Agents: a run list beside the selected run's outcome ----------------------
    The page measure like every register: one toolbar (search, filter chips,
-   worker status + Workers), then the list panel and the detail panel. The
-   list scrolls inside its panel; the detail reads at page length. */
+   worker status + Workers), then the list panel and the detail panel. On
+   desktop the workspace fills the window below the toolbar and each pane
+   scrolls on its own; the page itself stays put. */
 .agent-toolbar .toolbar-filters > label.toolbar-search { flex: 0 1 260px; }
 .agent-filters { flex: 0 1 auto; }
-.page-tools .agent-workers-strip, .agent-workers-strip { flex: none; margin: 0; font-size: var(--dk-text-sm); white-space: normal; }
+.page-tools .agent-workers-strip, .agent-workers-strip { flex: 0 1 auto; min-width: 0; margin: 0; font-size: var(--dk-text-sm); white-space: normal; }
 .agent-workspace > .data-panel + .data-panel { margin-top: 0; }
 .agent-workers-strip .status { font-size: var(--dk-text-sm); }
-.agent-workspace { display: grid; grid-template-columns: 22rem minmax(0, 1fr); gap: var(--dk-gap-section); align-items: start; }
-.agent-run-sidebar { position: sticky; top: var(--dk-space-4); display: flex; flex-direction: column; max-height: calc(100dvh - 2 * var(--dk-space-4)); overflow: hidden; }
+.agent-workspace { display: grid; grid-template-columns: min(22rem, 40%) minmax(0, 1fr); gap: var(--dk-gap-section); align-items: start; }
+.agent-run-sidebar { display: flex; flex-direction: column; overflow: hidden; }
 .agent-run-sidebar > .section-head { flex: none; }
+@media (min-width: 861px) {
+  /* Two columns that can never overlap: search + chips wrap inside the
+     first, the worker status and Workers sit in the second. */
+  .agent-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .agent-toolbar .dk-toolbar__end { flex-wrap: nowrap; justify-content: flex-end; min-width: 0; max-width: 20rem; }
+  /* The viewport-tall frame (the designer's recipe): main is the window,
+     the view a column, the workspace takes what the toolbar leaves. */
+  body[data-view="agents"] main { display: flex; flex-direction: column; height: 100dvh; padding-bottom: var(--dk-space-6); }
+  body[data-view="agents"] section.view[data-page="agents"].active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .agent-toolbar { flex: none; }
+  .agent-workspace { flex: 1; min-height: 18rem; align-items: stretch; }
+  .agent-run-sidebar, #agent-run-detail { min-height: 0; }
+  #agent-run-detail { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
 .agent-run-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .agent-run-item { display: grid; gap: var(--dk-space-1); width: 100%; padding: var(--dk-space-3) var(--dk-space-4); border: 0; border-bottom: 1px solid var(--dk-border-default); background: transparent; color: var(--dk-text-primary); font: inherit; text-align: left; cursor: pointer; }
 .agent-run-item:last-child { border-bottom: 0; }
@@ -1719,23 +1734,36 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-run-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
 .agent-run-item.selected { background: var(--dk-accent-soft); }
 .agent-run-line { display: flex; justify-content: space-between; align-items: baseline; gap: var(--dk-gap-control); min-width: 0; }
-.agent-run-line strong { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; overflow-wrap: anywhere; }
+.agent-run-line strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; }
 .agent-run-item.selected strong { color: var(--dk-accent-default); }
 .agent-run-line .status { flex: none; font-size: var(--dk-text-sm); }
 .agent-run-meta { display: flex; justify-content: space-between; gap: var(--dk-gap-control); min-width: 0; color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 .agent-run-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-run-meta time { flex: none; font-size: var(--dk-text-xs); }
+.agent-run-meta time { flex: none; }
 #agent-run-detail { min-width: 0; }
 #agent-run-detail > .dialog-state { padding: var(--dk-space-7) var(--dk-pad-panel); }
-.agent-detail-band { justify-content: flex-start; }
 .agent-back { display: none; }
-.agent-detail-status { display: flex; align-items: center; gap: var(--dk-gap-control); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .agent-detail-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); }
-.agent-detail-head { display: grid; gap: var(--dk-space-3); }
-.agent-detail-head h2 { font-size: var(--dk-text-xl); line-height: 1.3; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
-.agent-detail-head .text-link { height: auto; }
-.agent-result { margin: var(--dk-space-6) 0; border-top: 1px solid var(--dk-border-default); padding-top: var(--dk-space-6); }
-.agent-result h3 { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); margin: 0 0 var(--dk-space-4); }
+/* The compact head: a heading-size title held to two lines, one meta
+   line, and a Details disclosure for everything else. */
+.agent-detail-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
+.agent-detail-head h2 { justify-self: stretch; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
+/* Each part after the status leads with a "·" in a fixed slot. The line
+   starts one slot left of the column and clips that slot, so a part that
+   wraps to a new line never starts with a stray dot. */
+.agent-detail-meta { --agent-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0 0 0 calc(-1 * var(--agent-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--agent-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.agent-detail-meta > .status { margin-left: var(--agent-sep); font-size: var(--dk-text-sm); }
+.agent-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; }
+.agent-meta-item::before { content: "·"; flex: none; width: var(--agent-sep); text-align: center; color: var(--dk-text-faint); }
+/* A long workflow name ends in an ellipsis (the id rides in its title). */
+.agent-detail-meta .text-link { display: block; min-width: 0; height: auto; overflow: hidden; text-overflow: ellipsis; font-size: inherit; }
+.agent-detail-head .agent-technical { border-top: 0; padding: 0; justify-self: stretch; }
+.agent-detail-head .agent-technical summary { display: inline-flex; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); }
+.agent-detail-head .agent-technical summary:hover { color: var(--dk-text-primary); }
+.agent-detail-head .agent-technical summary::after { margin-left: 0; }
+.agent-detail-head .agent-technical dl { margin: var(--dk-space-2) 0 0; padding: var(--dk-space-3) var(--dk-space-4); background: var(--dk-bg-muted); gap: var(--dk-space-1) var(--dk-gap-control); font-size: var(--dk-text-sm); }
+.agent-result { margin: var(--dk-space-4) 0; border-top: 1px solid var(--dk-border-default); padding-top: var(--dk-space-4); }
+.agent-result h3 { font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); margin: 0 0 var(--dk-space-3); }
 .agent-result-text { overflow-wrap: anywhere; font-size: var(--dk-text-body); line-height: 1.7; max-width: 70ch; }
 .agent-result-text > :first-child { margin-top: 0; }
 .agent-result-text > :last-child { margin-bottom: 0; }
@@ -1769,13 +1797,13 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 @media (max-width: 860px) {
   /* One pane at a time: the list, or the selected run with Back. */
   .agent-workspace { grid-template-columns: minmax(0, 1fr); }
-  .agent-run-sidebar { position: static; max-height: none; }
   #agent-run-detail { display: none; }
   .agent-workspace.has-selection #agent-run-detail { display: block; }
   .agent-workspace.has-selection .agent-run-sidebar { display: none; }
-  .agent-back { display: inline-flex; }
+  .agent-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
+  .agent-detail-meta .text-link { line-height: var(--dk-size-touch); }
   .agent-detail-body { padding: var(--dk-space-4); }
-  .agent-log-section summary, .agent-technical summary { min-height: var(--dk-size-touch); }
+  .agent-log-section summary, .agent-technical summary, .agent-detail-head .agent-technical summary { min-height: var(--dk-size-touch); }
   .agent-technical dl { grid-template-columns: minmax(0, 1fr); gap: var(--dk-space-1); }
   .agent-technical dd { margin-bottom: var(--dk-space-3); }
   .agent-toolbar .toolbar-filters > label.toolbar-search { flex-basis: 100%; }
