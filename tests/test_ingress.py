@@ -287,7 +287,7 @@ def test_every_nav_link_has_an_api_gateway_route():
     assets = set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', index["body"]))
     assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer")["body"]))
     assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer/app")["body"]))
-    assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/js/views/designer.js", "/assets/vendor/dakit.css", "/assets/fonts/inter-var.woff2"}
+    assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/js/views/designer.js", "/assets/vendor/dakit.css", "/assets/vendor/dakit-dialogs.js", "/assets/fonts/inter-var.woff2"}
     assert len(assets) >= 8, assets
     for path in assets:
         assert covered(path), f"API Gateway has no route for {path}"

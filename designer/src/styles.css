@@ -1385,33 +1385,10 @@ input[type="checkbox"], input[type="radio"] {
   word-break: break-word;
 }
 
-.leave-backdrop,
-.picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  background: var(--dk-bg-backdrop);
-  padding: 20px;
-}
+.leave-error { color: var(--dk-danger-text); margin: 0; }
 
-.leave-prompt {
-  width: min(100%, 440px);
-  background: var(--dk-bg-surface);
-  border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-lg);
-  box-shadow: var(--dk-shadow-overlay);
-  padding: 24px;
-}
-
-.leave-prompt h2 { margin: 0 0 8px; font-size: var(--dk-text-xl); }
-.leave-prompt p { margin: 0 0 22px; color: var(--dk-text-faint); }
-.leave-prompt .leave-error { color: var(--dk-danger-text); margin-bottom: 14px; }
-.leave-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-
-/* Discovery picker: the leave prompt's dialog idiom over a scrollable list of
-   live resources; Browse… sits beside the field it fills. */
+/* Discovery picker: a dk-dialog over a scrollable list of live resources;
+   Browse… sits beside the field it fills. */
 .discover-field {
   display: flex;
   gap: 6px;
@@ -1427,23 +1404,8 @@ input[type="checkbox"], input[type="radio"] {
   flex-shrink: 0;
 }
 
-.picker-panel {
-  width: min(100%, 480px);
-  background: var(--dk-bg-surface);
-  border: 1px solid var(--dk-border-default);
-  box-shadow: var(--dk-shadow-overlay);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: min(560px, 100%);
-  padding: 24px;
-}
-
-.picker-panel h2 {
-  font-size: var(--dk-text-lg);
-}
-
-.picker-panel input {
+.picker-dialog { --dk-dialog-width: 480px; }
+.picker-dialog input {
   font-family: var(--dk-font-mono);
   font-size: var(--dk-text-sm);
 }
@@ -1627,17 +1589,11 @@ input[type="checkbox"], input[type="radio"] {
 .prompt-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
 .prompt-expand { padding: 0; border: 0; background: transparent; color: var(--dk-accent-default); font: 500 var(--dk-text-sm) var(--dk-font-sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .inspector .prompt-inline { min-height: 240px; width: 100%; font: var(--dk-text-body)/1.65 var(--dk-font-sans); padding: 12px; resize: vertical; }
-.prompt-editor-dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 28px; margin: auto; color: var(--dk-text-primary); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); overflow: auto; }
-.prompt-editor-dialog::backdrop { background: var(--dk-bg-backdrop); }
-.prompt-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.prompt-editor-head h2 { font: 600 var(--dk-text-xl) var(--dk-font-sans); margin: 0; }
-.prompt-editor-head button { padding: 8px; display: inline-flex; }
-.prompt-editor-hint { color: var(--dk-text-muted); font-size: var(--dk-text-md); line-height: 1.5; margin: 12px 0 24px; }
+.prompt-editor-dialog { --dk-dialog-width: 920px; }
+.prompt-editor-hint { color: var(--dk-text-muted); font-size: var(--dk-text-md); line-height: 1.5; margin: 0; }
 .prompt-editor-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .prompt-editor-dialog .prompt-expanded { display: block; width: 100%; max-width: 72ch; height: min(56vh, 580px); min-height: 200px; margin: 0 auto; padding: 20px; color: var(--dk-text-primary); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); font: var(--dk-text-lg)/1.7 var(--dk-font-sans); resize: vertical; }
-.prompt-editor-actions { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--dk-border-default); padding-top: 20px; margin-top: 24px; }
 @media (max-width: 600px) {
-  .prompt-editor-dialog { padding: 20px 16px; width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   .prompt-editor-dialog .prompt-expanded { padding: 14px; height: 50vh; }
 }
 

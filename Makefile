@@ -51,6 +51,7 @@ sync-dakit:
 	mkdir -p src/web/vendor/fonts
 	cp ../dakit/dist/dakit.css src/web/vendor/dakit.css
 	cp ../dakit/dist/tokens.css src/web/vendor/dakit-tokens.css
+	cp ../dakit/dist/dialogs.js src/web/vendor/dakit-dialogs.js
 	cp ../dakit/fonts/*.woff2 src/web/vendor/fonts/
 
 # Rebuild the bundle vendored into the console (src/web/designer.js/.css,

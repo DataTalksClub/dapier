@@ -10,10 +10,22 @@ import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
 import { StoredDataPanel, workflowUsesStorage } from "./StoredData";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
+import "../../src/web/vendor/dakit-dialogs.js";
 
 const EMPTY_SHAPES: DiagramShape[] = [];
 /** The id a never-saved canvas carries until the API assigns one from its name. */
 const NEW_WORKFLOW_ID = "new-workflow";
+
+/** Open a native <dialog> as a modal on mount. Backdrop and Escape dismissal
+    come from the vendored dakit helper; the caller unmounts on close. */
+function useMountedModal() {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el && !el.open) el.showModal();
+  }, []);
+  return ref;
+}
 /** engine.naming.MAX_NAME_LENGTH: the longest `name:` override the API accepts. */
 const MAX_NAME_LENGTH = 80;
 
@@ -168,21 +180,23 @@ function PromptField({ field, value, onChange }: {
       </div>
       <textarea id={id} ref={inline} className="prompt-inline" rows={10} value={value}
         placeholder={field.placeholder} onChange={event => onChange(event.target.value)} />
-      <dialog ref={dialog} className="prompt-editor-dialog" aria-labelledby={`${id}-title`}
+      <dialog ref={dialog} className="dk-dialog prompt-editor-dialog" aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-hint`} onCancel={close} onClose={close}
         onKeyDown={event => event.stopPropagation()}>
-        <header className="prompt-editor-head">
+        <div className="dk-dialog__head">
           <h2 id={`${id}-title`}>Edit {field.label.toLowerCase()}</h2>
           <button type="button" className="dk-button dk-button--secondary" aria-label="Close prompt editor" onClick={close}><X size={20} strokeWidth={1.8} /></button>
-        </header>
-        <p id={`${id}-hint`} className="prompt-editor-hint">Changes apply to this step. Save the workflow when you’re ready.</p>
-        <label className="prompt-editor-label" htmlFor={`${id}-expanded`}>{field.label}</label>
-        <textarea id={`${id}-expanded`} ref={expanded} className="prompt-expanded" value={draft}
-          placeholder={field.placeholder} spellCheck onChange={event => setDraft(event.target.value)} />
-        <footer className="prompt-editor-actions">
+        </div>
+        <div className="dk-dialog__body">
+          <p id={`${id}-hint`} className="prompt-editor-hint">Changes apply to this step. Save the workflow when you’re ready.</p>
+          <label className="prompt-editor-label" htmlFor={`${id}-expanded`}>{field.label}</label>
+          <textarea id={`${id}-expanded`} ref={expanded} className="prompt-expanded" value={draft}
+            placeholder={field.placeholder} spellCheck onChange={event => setDraft(event.target.value)} />
+        </div>
+        <div className="dk-dialog__foot">
           <button className="dk-button dk-button--secondary" type="button" onClick={close}>Cancel</button>
           <button className="dk-button dk-button--primary" type="button" onClick={() => { onChange(draft); close(); }}>Apply to step</button>
-        </footer>
+        </div>
       </dialog>
     </div>
   );
@@ -404,31 +418,23 @@ function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose 
       .catch((err) => { if (!cancelled) setError(String(err)); });
     return () => { cancelled = true; };
   }, [config, url, adminBase]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+  const dialogRef = useMountedModal();
   const needle = query.trim().toLowerCase();
   const matches = (items ?? []).filter((item) =>
     !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
   const resource = discover.resource.replace(/_/g, " ");
   return (
-    <div className="picker-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="picker-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="picker-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <dialog
+      ref={dialogRef}
+      className="dk-dialog picker-dialog"
+      aria-labelledby="picker-title"
+      onClose={onClose}
+      onCancel={onClose}
+    >
+      <div className="dk-dialog__head">
         <h2 id="picker-title">Pick {article(resourceSingular(discover.resource))} {resourceSingular(discover.resource)}</h2>
+      </div>
+      <div className="dk-dialog__body">
         <input
           value={query}
           placeholder={`Filter ${resource}…`}
@@ -452,8 +458,8 @@ function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose 
             </button>
           ))}
         </div>
-      </section>
-    </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -523,26 +529,19 @@ function StepsTemplatePicker({ steps, onPick, onClose }: {
   onPick: (template: string) => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const dialogRef = useMountedModal();
   return (
-    <div className="picker-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="picker-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="steps-templates-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <dialog
+      ref={dialogRef}
+      className="dk-dialog picker-dialog"
+      aria-labelledby="steps-templates-title"
+      onClose={onClose}
+      onCancel={onClose}
+    >
+      <div className="dk-dialog__head">
         <h2 id="steps-templates-title">Insert from previous steps</h2>
+      </div>
+      <div className="dk-dialog__body">
         <p className="picker-status">
           Outputs from earlier steps&rsquo; test runs — click one to copy its template,
           then paste it into any action field.
@@ -578,8 +577,72 @@ function StepsTemplatePicker({ steps, onPick, onClose }: {
             </div>
           ))}
         </div>
-      </section>
-    </div>
+      </div>
+    </dialog>
+  );
+}
+
+function LeavePromptDialog({ error, saveDisabled, onStay, onDiscard, onSave }: {
+  error: string | null;
+  saveDisabled: boolean;
+  onStay: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  const ref = useMountedModal();
+  return (
+    <dialog
+      ref={ref}
+      className="dk-dialog"
+      role="alertdialog"
+      aria-labelledby="leave-title"
+      aria-describedby="leave-description"
+      onClose={onStay}
+      onCancel={onStay}
+    >
+      <div className="dk-dialog__head">
+        <h2 id="leave-title">Unsaved workflow changes</h2>
+      </div>
+      <div className="dk-dialog__body">
+        <p id="leave-description">Save this draft before opening another workflow?</p>
+        {error && <p className="leave-error" role="alert">{error}</p>}
+      </div>
+      <div className="dk-dialog__foot">
+        <button className="dk-button dk-button--secondary" type="button" onClick={onStay} autoFocus>Stay</button>
+        <button className="dk-button dk-button--secondary" type="button" onClick={onDiscard}>Discard changes</button>
+        <button className="dk-button dk-button--primary" type="button" disabled={saveDisabled} onClick={onSave}>Save and continue</button>
+      </div>
+    </dialog>
+  );
+}
+
+function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+  const ref = useMountedModal();
+  return (
+    <dialog
+      ref={ref}
+      className="dk-dialog picker-dialog"
+      aria-labelledby="shortcuts-title"
+      onClose={onClose}
+      onCancel={onClose}
+    >
+      <div className="dk-dialog__head">
+        <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+      </div>
+      <div className="dk-dialog__body">
+        <div className="shortcut-list">
+          {SHORTCUTS.map((shortcut) => (
+            <div className="shortcut-row" key={shortcut.description}>
+              <span className="shortcut-keys">
+                {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+              </span>
+              <span className="shortcut-desc">{shortcut.description}</span>
+            </div>
+          ))}
+        </div>
+        <p className="picker-status">Double-click a node to rename it; drag from a handle to connect steps.</p>
+      </div>
+    </dialog>
   );
 }
 
@@ -951,30 +1014,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-
-  useEffect(() => {
-    if (!leaveOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        resolveLeave(false);
-      }
-      if (event.key !== "Tab") return;
-      const buttons = [...document.querySelectorAll<HTMLButtonElement>(".leave-prompt button:not(:disabled)")];
-      if (!buttons.length) return;
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [leaveOpen]);
 
   /** The mobile drawer is a modal dialog, like the console's: while it is
       open the main pane goes inert, focus starts inside, Tab cycles inside,
@@ -2606,18 +2645,13 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         )}
       </main>
       {leaveOpen && (
-        <div className="leave-backdrop" role="presentation">
-          <section className="leave-prompt" role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-description">
-            <h2 id="leave-title">Unsaved workflow changes</h2>
-            <p id="leave-description">Save this draft before opening another workflow?</p>
-            {status.kind === "error" && <p className="leave-error" role="alert">{status.message}</p>}
-            <div className="leave-actions">
-              <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(false)} autoFocus>Stay</button>
-              <button className="dk-button dk-button--secondary" type="button" onClick={() => resolveLeave(true)}>Discard changes</button>
-              <button className="dk-button dk-button--primary" type="button" disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0} onClick={leaveAfterSave}>Save and continue</button>
-            </div>
-          </section>
-        </div>
+        <LeavePromptDialog
+          error={status.kind === "error" ? status.message : null}
+          saveDisabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}
+          onStay={() => resolveLeave(false)}
+          onDiscard={() => resolveLeave(true)}
+          onSave={leaveAfterSave}
+        />
       )}
       {stepsPickerOpen && (
         <StepsTemplatePicker
@@ -2630,28 +2664,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         />
       )}
       {shortcutsOpen && (
-        <div className="picker-backdrop" role="presentation" onClick={() => setShortcutsOpen(false)}>
-          <section
-            className="picker-panel shortcuts-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="shortcuts-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="shortcuts-title">Keyboard shortcuts</h2>
-            <div className="shortcut-list">
-              {SHORTCUTS.map((shortcut) => (
-                <div className="shortcut-row" key={shortcut.description}>
-                  <span className="shortcut-keys">
-                    {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                  </span>
-                  <span className="shortcut-desc">{shortcut.description}</span>
-                </div>
-              ))}
-            </div>
-            <p className="picker-status">Double-click a node to rename it; drag from a handle to connect steps.</p>
-          </section>
-        </div>
+        <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />
       )}
     </div>
   );

@@ -21805,8 +21805,33 @@
       snapshot: top.snapshot
     };
   }
+  if (!globalThis.__dakitDialogDismiss) {
+    globalThis.__dakitDialogDismiss = true;
+    let pressed = null;
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        pressed = event.target;
+      },
+      true
+    );
+    document.addEventListener("click", (event) => {
+      if (event.target !== pressed) return;
+      if (event.target instanceof HTMLDialogElement && event.target.open) {
+        event.target.close();
+      }
+    });
+  }
   const EMPTY_SHAPES = [];
   const NEW_WORKFLOW_ID = "new-workflow";
+  function useMountedModal() {
+    const ref = reactExports.useRef(null);
+    reactExports.useEffect(() => {
+      const el = ref.current;
+      if (el && !el.open) el.showModal();
+    }, []);
+    return ref;
+  }
   const MAX_NAME_LENGTH = 80;
   const STEP_CLIPBOARD_KEY = "dapier-designer.step-clipboard";
   function readStepClipboard() {
@@ -21932,35 +21957,37 @@
         "dialog",
         {
           ref: dialog,
-          className: "prompt-editor-dialog",
+          className: "dk-dialog prompt-editor-dialog",
           "aria-labelledby": `${id}-title`,
           "aria-describedby": `${id}-hint`,
           onCancel: close,
           onClose: close,
           onKeyDown: (event) => event.stopPropagation(),
           children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "prompt-editor-head", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__head", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: `${id}-title`, children: [
                 "Edit ",
                 field.label.toLowerCase()
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", className: "dk-button dk-button--secondary", "aria-label": "Close prompt editor", onClick: close, children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) })
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "textarea",
-              {
-                id: `${id}-expanded`,
-                ref: expanded,
-                className: "prompt-expanded",
-                value: draft,
-                placeholder: field.placeholder,
-                spellCheck: true,
-                onChange: (event) => setDraft(event.target.value)
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "prompt-editor-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__body", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: `${id}-hint`, className: "prompt-editor-hint", children: "Changes apply to this step. Save the workflow when you’re ready." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "prompt-editor-label", htmlFor: `${id}-expanded`, children: field.label }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "textarea",
+                {
+                  id: `${id}-expanded`,
+                  ref: expanded,
+                  className: "prompt-expanded",
+                  value: draft,
+                  placeholder: field.placeholder,
+                  spellCheck: true,
+                  onChange: (event) => setDraft(event.target.value)
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__foot", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: close, children: "Cancel" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", onClick: () => {
                 onChange(draft);
@@ -22143,67 +22170,60 @@
         cancelled = true;
       };
     }, [config, url, adminBase]);
-    reactExports.useEffect(() => {
-      const onKey = (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
+    const dialogRef = useMountedModal();
     const needle = query.trim().toLowerCase();
     const matches = (items ?? []).filter((item) => !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
     const resource = discover.resource.replace(/_/g, " ");
-    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "section",
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "dialog",
       {
-        className: "picker-panel",
-        role: "dialog",
-        "aria-modal": "true",
+        ref: dialogRef,
+        className: "dk-dialog picker-dialog",
         "aria-labelledby": "picker-title",
-        onClick: (event) => event.stopPropagation(),
+        onClose,
+        onCancel: onClose,
         children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: "picker-title", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-dialog__head", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { id: "picker-title", children: [
             "Pick ",
             article(resourceSingular(discover.resource)),
             " ",
             resourceSingular(discover.resource)
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              value: query,
-              placeholder: `Filter ${resource}…`,
-              "aria-label": `Filter ${resource}`,
-              autoFocus: true,
-              onChange: (event) => setQuery(event.target.value)
-            }
-          ),
-          error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
-          !error && items === null && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Loading…" }),
-          items !== null && matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
-            "No ",
-            resource,
-            " found"
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: matches.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              type: "button",
-              className: "picker-item",
-              onClick: () => onPick(applyTemplate(discover.value ?? "{id}", item)),
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: item.name }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: item.id })
-              ]
-            },
-            item.id
-          )) })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__body", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: query,
+                placeholder: `Filter ${resource}…`,
+                "aria-label": `Filter ${resource}`,
+                autoFocus: true,
+                onChange: (event) => setQuery(event.target.value)
+              }
+            ),
+            error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
+            !error && items === null && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Loading…" }),
+            items !== null && matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
+              "No ",
+              resource,
+              " found"
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: matches.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                className: "picker-item",
+                onClick: () => onPick(applyTemplate(discover.value ?? "{id}", item)),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: item.name }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: item.id })
+                ]
+              },
+              item.id
+            )) })
+          ] })
         ]
       }
-    ) });
+    );
   }
   function RawJsonInput({ value, draft, onChange, onInvalidChange }) {
     const [text, setText] = reactExports.useState(() => draft ?? JSON.stringify(value, null, 2));
@@ -22247,59 +22267,102 @@
     return paths;
   }
   function StepsTemplatePicker({ steps, onPick, onClose }) {
-    reactExports.useEffect(() => {
-      const onKey = (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
-    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "section",
+    const dialogRef = useMountedModal();
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "dialog",
       {
-        className: "picker-panel",
-        role: "dialog",
-        "aria-modal": "true",
+        ref: dialogRef,
+        className: "dk-dialog picker-dialog",
         "aria-labelledby": "steps-templates-title",
-        onClick: (event) => event.stopPropagation(),
+        onClose,
+        onCancel: onClose,
         children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "steps-templates-title", children: "Insert from previous steps" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Outputs from earlier steps’ test runs — click one to copy its template, then paste it into any action field." }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: steps.map((step) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: step.id }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: step.label })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "template-chips", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  type: "button",
-                  className: "template-chip",
-                  title: `Copy {steps.${step.id}.output}`,
-                  onClick: () => onPick(`{steps.${step.id}.output}`),
-                  children: `{steps.${step.id}.output}`
-                }
-              ),
-              outputPaths(step.output ?? {}).map((path) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  type: "button",
-                  className: "template-chip",
-                  title: `Copy {steps.${step.id}.output.${path}}`,
-                  onClick: () => onPick(`{steps.${step.id}.output.${path}}`),
-                  children: `{steps.${step.id}.output.${path}}`
-                },
-                path
-              ))
-            ] })
-          ] }, step.id)) })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-dialog__head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "steps-templates-title", children: "Insert from previous steps" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__body", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Outputs from earlier steps’ test runs — click one to copy its template, then paste it into any action field." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-list", children: steps.map((step) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "step-templates", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "step-templates-head", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-id", children: step.id }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "picker-item-name", children: step.label })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "template-chips", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    type: "button",
+                    className: "template-chip",
+                    title: `Copy {steps.${step.id}.output}`,
+                    onClick: () => onPick(`{steps.${step.id}.output}`),
+                    children: `{steps.${step.id}.output}`
+                  }
+                ),
+                outputPaths(step.output ?? {}).map((path) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    type: "button",
+                    className: "template-chip",
+                    title: `Copy {steps.${step.id}.output.${path}}`,
+                    onClick: () => onPick(`{steps.${step.id}.output.${path}}`),
+                    children: `{steps.${step.id}.output.${path}}`
+                  },
+                  path
+                ))
+              ] })
+            ] }, step.id)) })
+          ] })
         ]
       }
-    ) });
+    );
+  }
+  function LeavePromptDialog({ error, saveDisabled, onStay, onDiscard, onSave }) {
+    const ref = useMountedModal();
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "dialog",
+      {
+        ref,
+        className: "dk-dialog",
+        role: "alertdialog",
+        "aria-labelledby": "leave-title",
+        "aria-describedby": "leave-description",
+        onClose: onStay,
+        onCancel: onStay,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-dialog__head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "leave-title", children: "Unsaved workflow changes" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__body", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
+            error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: error })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__foot", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: onStay, autoFocus: true, children: "Stay" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: onDiscard, children: "Discard changes" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: saveDisabled, onClick: onSave, children: "Save and continue" })
+          ] })
+        ]
+      }
+    );
+  }
+  function ShortcutsDialog({ onClose }) {
+    const ref = useMountedModal();
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "dialog",
+      {
+        ref,
+        className: "dk-dialog picker-dialog",
+        "aria-labelledby": "shortcuts-title",
+        onClose,
+        onCancel: onClose,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-dialog__head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "shortcuts-title", children: "Keyboard shortcuts" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-dialog__body", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shortcut-list", children: SHORTCUTS.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "shortcut-row", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-keys", children: shortcut.keys.map((key) => /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: key }, key)) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-desc", children: shortcut.description })
+            ] }, shortcut.description)) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Double-click a node to rename it; drag from a handle to connect steps." })
+          ] })
+        ]
+      }
+    );
   }
   function App({ config = localConfig }) {
     const [summaries, setSummaries] = reactExports.useState([]);
@@ -22579,29 +22642,6 @@
       window.addEventListener("beforeunload", warn);
       return () => window.removeEventListener("beforeunload", warn);
     }, [dirty]);
-    reactExports.useEffect(() => {
-      if (!leaveOpen) return;
-      const onKey = (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          resolveLeave(false);
-        }
-        if (event.key !== "Tab") return;
-        const buttons = [...document.querySelectorAll(".leave-prompt button:not(:disabled)")];
-        if (!buttons.length) return;
-        const first = buttons[0];
-        const last = buttons[buttons.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [leaveOpen]);
     reactExports.useEffect(() => {
       const drawer = navDrawerRef.current;
       if (!drawer) return;
@@ -24142,16 +24182,16 @@
           ] })
         ] })
       ] }),
-      leaveOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "leave-backdrop", role: "presentation", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "leave-prompt", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "leave-title", "aria-describedby": "leave-description", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "leave-title", children: "Unsaved workflow changes" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { id: "leave-description", children: "Save this draft before opening another workflow?" }),
-        status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "leave-error", role: "alert", children: status.message }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "leave-actions", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(false), autoFocus: true, children: "Stay" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => resolveLeave(true), children: "Discard changes" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--primary", type: "button", disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0, onClick: leaveAfterSave, children: "Save and continue" })
-        ] })
-      ] }) }),
+      leaveOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        LeavePromptDialog,
+        {
+          error: status.kind === "error" ? status.message : null,
+          saveDisabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,
+          onStay: () => resolveLeave(false),
+          onDiscard: () => resolveLeave(true),
+          onSave: leaveAfterSave
+        }
+      ),
       stepsPickerOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
         StepsTemplatePicker,
         {
@@ -24163,24 +24203,7 @@
           onClose: () => setStepsPickerOpen(false)
         }
       ),
-      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "picker-backdrop", role: "presentation", onClick: () => setShortcutsOpen(false), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "section",
-        {
-          className: "picker-panel shortcuts-panel",
-          role: "dialog",
-          "aria-modal": "true",
-          "aria-labelledby": "shortcuts-title",
-          onClick: (event) => event.stopPropagation(),
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { id: "shortcuts-title", children: "Keyboard shortcuts" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shortcut-list", children: SHORTCUTS.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "shortcut-row", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-keys", children: shortcut.keys.map((key) => /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: key }, key)) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "shortcut-desc", children: shortcut.description })
-            ] }, shortcut.description)) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Double-click a node to rename it; drag from a handle to connect steps." })
-          ]
-        }
-      ) })
+      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(ShortcutsDialog, { onClose: () => setShortcutsOpen(false) })
     ] });
   }
   const THEME_KEY = "dakit-theme";

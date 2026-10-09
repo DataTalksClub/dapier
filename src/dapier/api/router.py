@@ -96,6 +96,7 @@ def _static(path):
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),
         # The dakit design system, vendored (make sync-dakit refreshes it).
         "/assets/vendor/dakit.css": ("vendor/dakit.css", "text/css; charset=utf-8"),
+        "/assets/vendor/dakit-dialogs.js": ("vendor/dakit-dialogs.js", "text/javascript; charset=utf-8"),
         # dakit.css references its fonts as url("../fonts/…"), which resolves
         # against /assets/vendor/ to /assets/fonts/… — alias the vendored
         # files there so the bundle's own @font-faces resolve.
