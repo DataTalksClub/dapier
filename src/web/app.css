@@ -1467,12 +1467,14 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   #workflow-table-wrap td.cell-title { display: block; grid-row: 1; }
   #workflow-table-wrap td.workflow-flow { display: block; }
   #workflow-table-wrap td.workflow-actions { grid-column: 3; grid-row: 1; align-self: start; }
-  #workflow-table-wrap td[data-label="State"] { grid-column: 3; grid-row: 2 / span 2; display: block; align-self: end; }
-  #workflow-table-wrap td[data-label="State"]::before { display: none; }
+  /* State is its own labelled line, like When / Then / Latest run. */
   #workflow-table-wrap .workflow-menu .dk-button { width: 100%; height: var(--dk-size-touch); }
   .workflow-check { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .workflow-toolbar .toolbar-filters > label.toolbar-search { max-width: none; }
-  .workflow-list-row .cell-name { min-height: var(--dk-size-touch); min-width: var(--dk-size-touch); }
+  /* The name's 44px hit area overhangs its line instead of padding the row,
+     so the name→id spacing is set by the text, not the checkbox or menu. */
+  .workflow-list-row .cell-name { min-width: var(--dk-size-touch); padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); margin-block: calc((var(--dk-size-touch) - 1.4em) / -2); }
+  .workflow-list-row button.cell-name { padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); }
   .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-touch); height: var(--dk-size-touch); border-color: transparent; }
   .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 var(--dk-space-3); }
   .workflow-switch { min-height: var(--dk-size-touch); }
@@ -1799,11 +1801,11 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .trigger-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: var(--dk-gap-section); align-items: start; }
 .trigger-sources { display: grid; gap: var(--dk-gap-section); min-width: 0; }
 .trigger-sources .data-panel + .data-panel { margin-top: 0; }
-.trigger-activity .dk-table-footer { justify-content: space-between; }
-
 /* Phone: activity and its sources are two panes behind a two-chip switch,
    so the sources list is one tap away instead of under the whole feed. */
 .pane-switch { display: none; }
+.trigger-activity .dk-table-footer { justify-content: space-between; }
+
 .activity-list, .source-list { list-style: none; margin: 0; padding: 0; }
 .activity-row {
   display: grid;
@@ -1883,8 +1885,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 
 @media (max-width: 860px) {
   .trigger-workspace { grid-template-columns: minmax(0, 1fr); }
-  .trigger-toolbar .dk-toolbar__end { margin-left: 0; }
-  .source-head .row-more, .source-url .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   /* The switch leads the toolbar as one full-width pair; the activity
      filters only show with the activity pane. */
   .pane-switch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-space-2); flex: 1 0 100%; }
@@ -1892,6 +1892,8 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .trigger-toolbar[data-pane="sources"] > [id$="-chips"] { display: none; }
   .trigger-workspace[data-pane="activity"] > .trigger-sources,
   .trigger-workspace[data-pane="sources"] > .trigger-activity { display: none; }
+  .trigger-toolbar .dk-toolbar__end { margin-left: 0; }
+  .source-head .row-more, .source-url .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .source-name { min-height: var(--dk-size-touch); min-width: var(--dk-size-touch); }
   .trigger-toolbar .dk-filter-chip, .agent-toolbar .dk-filter-chip { min-width: var(--dk-size-touch); justify-content: center; }
 }
