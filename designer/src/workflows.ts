@@ -1,6 +1,6 @@
 import { dump, load } from "js-yaml";
 import type { CatalogField } from "./catalog";
-import { actionCatalog, connectorCatalog, errorHandlingFields, filterOperators, logicOperators } from "./catalog";
+import { actionCatalog, connectorCatalog, errorHandlingFields, eventInfo, filterOperators, logicOperators } from "./catalog";
 import type { ActionType, DiagramShape, FilterRule, NodeData, TriggerSpec, Workflow, WorkflowSummary } from "./types";
 
 export { actionCatalog, connectorCatalog, errorHandlingFields, filterOperators, logicOperators };
@@ -22,6 +22,20 @@ export function connectorMeta(name: string) {
 /** Product name for a connector ("youtube" → "YouTube"); falls back to the raw name. */
 export function connectorLabel(name: string) {
   return connectorMeta(name)?.label ?? name;
+}
+
+/** A trigger in operator words: "Email arrives", "Dropbox file added",
+ * "Telegram channel post received" — the catalog's event label, prefixed by
+ * the connector unless the label already names it. Custom events keep
+ * "Connector · event". */
+export function triggerLabel(connector: string, event: string) {
+  const name = connectorLabel(connector);
+  const info = eventInfo(connector, event);
+  if (!info) return event ? `${name} · ${event}` : name;
+  const source = name.toLowerCase().split(" ")[0];
+  const first = info.label.toLowerCase().split(" ")[0];
+  if (info.label.toLowerCase().includes(source) || source.startsWith(first)) return info.label;
+  return `${name} ${info.label.charAt(0).toLowerCase()}${info.label.slice(1)}`;
 }
 
 /** Inspector starting values for a new node of this action type. */
@@ -414,7 +428,7 @@ export function shapesFromWorkflow(workflow: Workflow): DiagramShape[] {
       y: rowY(0),
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      label: `${connectorLabel(spec.connector)} · ${spec.event}`,
+      label: triggerLabel(spec.connector, spec.event),
       data: {
         nodeKind: "trigger",
         connector: connectorCatalog.some((entry) => entry.name === spec.connector)

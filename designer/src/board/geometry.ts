@@ -3,8 +3,9 @@ import type { DiagramShape, Point } from "../types";
 export type ConnectionHandle = { id: string; x: number; y: number };
 
 export const nodeColor = "var(--dk-accent-default)";
-export const triggerColor = "var(--dk-warning-text)";
-export const noteColor = "var(--dk-warning-text)";
+/* Triggers read by their icon, not a status hue: status colours are for status. */
+export const triggerColor = "var(--dk-accent-default)";
+export const noteColor = "var(--dk-border-strong)";
 export const handleColor = "var(--dk-accent-default)";
 export const shapeLabelSize = 16;
 export const minZoom = 0.25;

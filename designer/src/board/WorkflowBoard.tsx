@@ -785,7 +785,7 @@ export function WorkflowBoard({
           if (shape.type === "note") {
             return (
               <g key={shape.id} onDoubleClick={(event) => { event.stopPropagation(); openEditor(shape); }}>
-                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill="var(--dk-warning-bg)" stroke={noteColor} strokeWidth={strokeWidth} />
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill="var(--dk-bg-muted)" stroke={noteColor} strokeWidth={strokeWidth} />
                 <text x={shape.x + 14} y={shape.y + 30} fill="var(--dk-text-primary)" fontSize={shapeLabelSize} fontWeight="500">
                   {shape.label && <title>{shape.label}</title>}
                   {shape.label ? displayLabel(shape.label) : ""}

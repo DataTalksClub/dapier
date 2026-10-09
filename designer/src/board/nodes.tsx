@@ -1,5 +1,5 @@
 import { FileText, StickyNote, Zap } from "../icons";
-import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorLabel, connectorMeta, defaultFields } from "../workflows";
+import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorMeta, defaultFields, triggerLabel } from "../workflows";
 import type { IconComponent } from "../catalog";
 import type { ActionType, DiagramShape, NodeData } from "../types";
 
@@ -58,7 +58,7 @@ export function nodeDataForKind(kind: PaletteKind): NodeData {
 export function nodeTitle(shape: DiagramShape): string {
   if (shape.type === "note") return shape.label ?? "Note";
   if (shape.data?.nodeKind === "trigger") {
-    return `${connectorLabel(shape.data.connector ?? "custom")} · ${shape.data.event}`;
+    return triggerLabel(shape.data.connector ?? "custom", shape.data.event ?? "");
   }
   return actionNodeTitle(shape.data ?? { nodeKind: "action" });
 }

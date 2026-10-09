@@ -17433,8 +17433,8 @@
     safeDump
   } = yaml;
   const nodeColor = "var(--dk-accent-default)";
-  const triggerColor = "var(--dk-warning-text)";
-  const noteColor = "var(--dk-warning-text)";
+  const triggerColor = "var(--dk-accent-default)";
+  const noteColor = "var(--dk-border-strong)";
   const handleColor = "var(--dk-accent-default)";
   const shapeLabelSize = 16;
   const minZoom = 0.25;
@@ -20150,6 +20150,15 @@
   function connectorLabel(name) {
     return connectorMeta(name)?.label ?? name;
   }
+  function triggerLabel(connector, event) {
+    const name = connectorLabel(connector);
+    const info = eventInfo(connector, event);
+    if (!info) return event ? `${name} · ${event}` : name;
+    const source = name.toLowerCase().split(" ")[0];
+    const first = info.label.toLowerCase().split(" ")[0];
+    if (info.label.toLowerCase().includes(source) || source.startsWith(first)) return info.label;
+    return `${name} ${info.label.charAt(0).toLowerCase()}${info.label.slice(1)}`;
+  }
   function defaultFields(type2) {
     const fields = {};
     for (const field of actionMeta(type2)?.fields ?? []) {
@@ -20450,7 +20459,7 @@
         y: rowY(0),
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        label: `${connectorLabel(spec.connector)} · ${spec.event}`,
+        label: triggerLabel(spec.connector, spec.event),
         data: {
           nodeKind: "trigger",
           connector: connectorCatalog.some((entry) => entry.name === spec.connector) ? spec.connector : "custom",
@@ -20548,7 +20557,7 @@
   function nodeTitle(shape) {
     if (shape.type === "note") return shape.label ?? "Note";
     if (shape.data?.nodeKind === "trigger") {
-      return `${connectorLabel(shape.data.connector ?? "custom")} · ${shape.data.event}`;
+      return triggerLabel(shape.data.connector ?? "custom", shape.data.event ?? "");
     }
     return actionNodeTitle(shape.data ?? {});
   }
@@ -21417,7 +21426,7 @@
                   event.stopPropagation();
                   openEditor(shape);
                 }, children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--dk-warning-bg)", stroke: noteColor, strokeWidth }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--dk-bg-muted)", stroke: noteColor, strokeWidth }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--dk-text-primary)", fontSize: shapeLabelSize, fontWeight: "500", children: [
                     shape.label && /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     shape.label ? displayLabel(shape.label) : ""
@@ -22115,6 +22124,7 @@
     const [shapes, setShapes] = reactExports.useState(EMPTY_SHAPES);
     const [selectedId, setSelectedId] = reactExports.useState(null);
     const [savedSnapshot, setSavedSnapshot] = reactExports.useState("[]");
+    const [moreOpen, setMoreOpen] = reactExports.useState(false);
     const [savedId, setSavedId] = reactExports.useState("new-workflow");
     const [savedEnabled, setSavedEnabled] = reactExports.useState(true);
     const [canvasExtraDirty, setCanvasExtraDirty] = reactExports.useState(false);
@@ -23064,7 +23074,7 @@
       editShapes((current) => current.map((shape) => {
         if (shape.id !== selectedId || !shape.data) return shape;
         const data = mutate(shape.data);
-        const label = data.nodeKind === "trigger" ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}` : shape.label;
+        const label = data.nodeKind === "trigger" ? triggerLabel(data.connector ?? "custom", data.event ?? "") : shape.label;
         return { ...shape, data, label };
       }), `node:${selectedId}`);
     }
@@ -23575,7 +23585,7 @@
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "designer-main", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "designer-topbar", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: config.embedded ? "designer-topbar embedded" : "designer-topbar", children: [
           !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
@@ -23654,75 +23664,88 @@
               status.kind === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { size: 20, strokeWidth: 1.8 }),
               status.message
             ] }),
-            config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
-              "Push ",
-              git && git.ahead > 0 ? `(${git.ahead})` : ""
-            ] }) }),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: "dk-button dk-button--secondary",
-                type: "button",
-                onClick: duplicateWorkflow,
-                disabled: status.kind === "busy" || !sourceName,
-                title: !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
-              }
-            ),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: testOpen ? "button secondary active" : "dk-button dk-button--secondary",
-                type: "button",
-                onClick: () => setTestOpen(!testOpen),
-                disabled: status.kind === "busy" || view === "yaml",
-                title: view === "yaml" ? "Switch to Canvas to test this workflow" : void 0,
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
-              }
-            ),
-            config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: "dk-button dk-button--secondary",
-                type: "button",
-                onClick: publishDraft,
-                disabled: status.kind === "busy" || !sourceName || !draftInfo || dirty,
-                title: !draftInfo ? "Save the workflow first — a save writes a draft" : dirty ? "Save the draft before publishing it" : draftInfo.stale ? `The live workflow moved past this draft (based on v${draftInfo.base_revision}) — publishing will refuse it until you save again` : `Publish the draft live (based on v${draftInfo.base_revision})`,
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Publish draft" })
-              }
-            ),
-            config.mode === "console" && draftInfo && /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                className: "dk-button dk-button--secondary",
-                type: "button",
-                onClick: discardDraft,
-                disabled: status.kind === "busy",
-                title: "Throw the saved draft away — the live workflow is untouched",
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
-              }
-            ),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: "dk-button dk-button--secondary",
+                className: "dk-button dk-button--secondary topbar-more",
                 type: "button",
-                onClick: revertChanges,
-                disabled: status.kind === "busy" || !dirty,
-                title: "Throw unsaved changes away — back to the last saved state",
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Revert" })
+                "aria-expanded": moreOpen,
+                "aria-controls": "topbar-secondary",
+                onClick: () => setMoreOpen((open) => !open),
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "More" })
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { id: "topbar-secondary", className: moreOpen ? "topbar-secondary open" : "topbar-secondary", onClick: () => setMoreOpen(false), children: [
+              config.mode === "local" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button dk-button--secondary", type: "button", onClick: push, disabled: !git || git.ahead === 0, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                "Push ",
+                git && git.ahead > 0 ? `(${git.ahead})` : ""
+              ] }) }),
+              config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "dk-button dk-button--secondary",
+                  type: "button",
+                  onClick: duplicateWorkflow,
+                  disabled: status.kind === "busy" || !sourceName,
+                  title: !sourceName ? "Save the workflow first — duplicates copy the saved file" : void 0,
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
+                }
+              ),
+              config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: testOpen ? "button secondary active" : "dk-button dk-button--secondary",
+                  type: "button",
+                  onClick: () => setTestOpen(!testOpen),
+                  disabled: status.kind === "busy" || view === "yaml",
+                  title: view === "yaml" ? "Switch to Canvas to test this workflow" : void 0,
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Test run" })
+                }
+              ),
+              config.mode === "console" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "dk-button dk-button--secondary",
+                  type: "button",
+                  onClick: publishDraft,
+                  disabled: status.kind === "busy" || !sourceName || !draftInfo || dirty,
+                  title: !draftInfo ? "Save the workflow first — a save writes a draft" : dirty ? "Save the draft before publishing it" : draftInfo.stale ? `The live workflow moved past this draft (based on v${draftInfo.base_revision}) — publishing will refuse it until you save again` : `Publish the draft live (based on v${draftInfo.base_revision})`,
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Publish draft" })
+                }
+              ),
+              config.mode === "console" && draftInfo && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "dk-button dk-button--secondary",
+                  type: "button",
+                  onClick: discardDraft,
+                  disabled: status.kind === "busy",
+                  title: "Throw the saved draft away — the live workflow is untouched",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Discard draft" })
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "dk-button dk-button--secondary",
+                  type: "button",
+                  onClick: revertChanges,
+                  disabled: status.kind === "busy" || !dirty,
+                  title: "Throw unsaved changes away — back to the last saved state",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Revert" })
+                }
+              )
+            ] }),
+            dirty || Object.keys(invalidRawDrafts).length ? /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                className: dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary",
+                className: "dk-button dk-button--primary",
                 type: "button",
                 onClick: save,
                 disabled: status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0,
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? draftInfo ? "Save draft" : "Save changes" : "Saved" })
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : draftInfo ? "Save draft" : "Save changes" })
               }
-            )
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-state", role: "status", children: "Saved" })
           ] })
         ] }),
         view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
@@ -23859,10 +23882,10 @@
             selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}` : nodeListLabel(selected) })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? triggerLabel(selected.data.connector ?? "custom", selected.data.event ?? "") : nodeListLabel(selected) })
             ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
             selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Nodes" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Steps on the canvas" }),
               shapes.filter((shape) => shape.type === "node").map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "button",
                 {

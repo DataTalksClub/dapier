@@ -364,6 +364,14 @@ a.brand:hover span:last-child {
 
 .state-save-hint { color: var(--dk-text-muted); font-size: var(--dk-text-xs); white-space: nowrap; }
 
+/* Secondary workflow actions sit inline on wide frames; phones fold them
+   behind More (a dropdown under the toolbar). */
+.topbar-secondary { display: contents; }
+.topbar-more { display: none; }
+/* Saved is a state, not a button. */
+.save-state { display: inline-flex; align-items: center; gap: var(--dk-space-2); min-height: var(--dk-size-control-md); padding: 0 var(--dk-space-2); color: var(--dk-text-muted); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); }
+.save-state::before { content: ""; width: 8px; height: 8px; border-radius: var(--dk-radius-full); background: var(--dk-success-text); }
+
 /* Enabled sits with the save action: the workflow's on/off switch belongs
    next to the button that publishes it. */
 .topbar-actions .check-label {
@@ -732,9 +740,8 @@ input[type="checkbox"], input[type="radio"] {
   font-size: var(--dk-text-xs);
   font-weight: 600;
   gap: 6px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   padding: 8px 8px 4px;
-  text-transform: uppercase;
 }
 
 .step-group-head.toggle { cursor: pointer; }
@@ -962,10 +969,6 @@ input[type="checkbox"], input[type="radio"] {
 
 .sidebar-action { align-self: flex-start; }
 
-@media (max-width: 1359px) {
-  .palette-button { padding: 0 var(--dk-space-2); }
-  .palette-button span { display: none; }
-}
 
 @media (max-width: 720px) {
   .nav-toggle { display: inline-flex; }
@@ -991,6 +994,22 @@ input[type="checkbox"], input[type="radio"] {
   .id-input { grid-area: title; min-height: 44px; }
   .save-problems { grid-area: hint; justify-self: start; font-size: var(--dk-text-xs); }
   .topbar-actions { grid-area: actions; }
+  /* Embedded in the console, the console's app bar already names the
+     workflow: no empty name row, the switch and actions share one row. */
+  .designer-topbar.embedded { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "switch actions" "hint hint"; grid-template-rows: auto; padding: 8px 12px; }
+  .designer-topbar.embedded::after { content: none; }
+  .designer-topbar.embedded .topbar-actions { justify-content: flex-end; flex-wrap: nowrap; gap: 8px; min-width: 0; }
+  /* The switch keeps its accessible name; its On/Off word yields the room. */
+  .designer-topbar.embedded .enabled-toggle .switch-text { display: none; }
+  .designer-topbar.embedded .enabled-toggle { margin-right: 0; }
+  .topbar-actions { position: relative; }
+  .topbar-more { display: inline-flex; }
+  .topbar-secondary { display: none; }
+  .topbar-secondary.open { display: grid; position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 12rem; gap: 4px; padding: 4px; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); box-shadow: var(--dk-shadow-overlay); }
+  .topbar-secondary.open .dk-button { justify-content: flex-start; width: 100%; border-color: transparent; background: transparent; }
+  .topbar-secondary.open .dk-button:hover { background: var(--dk-bg-hover); }
+  /* No keyboard on a phone: the shortcuts sheet would only take room. */
+  .canvas-session-controls button[title^="Keyboard"] { display: none; }
   .designer-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -1110,8 +1129,8 @@ input[type="checkbox"], input[type="radio"] {
   width: 2px;
 }
 
-.kind-trigger::before { background: var(--dk-warning-text); }
-.kind-action::before { background: var(--dk-accent-default); }
+/* No coloured edge marks the kind: the heading says Trigger or Action. */
+.kind-trigger::before, .kind-action::before { content: none; }
 
 .inspector h2 {
   font-size: var(--dk-text-lg);
@@ -1485,11 +1504,9 @@ input[type="checkbox"], input[type="radio"] {
 }
 .node-jump p {
   margin: 0 0 4px;
-  color: var(--dk-text-faint);
-  font-family: var(--dk-font-mono);
-  font-size: var(--dk-text-xs);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  color: var(--dk-text-muted);
+  font-size: var(--dk-text-sm);
+  font-weight: var(--dk-weight-semibold);
 }
 .node-jump-item {
   background: transparent;

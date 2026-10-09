@@ -4,7 +4,7 @@ import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { nodeTitle, nodeSubtitle } from "./board/nodes";
 import { actionCatalog, connectorCatalog, errorActionsField, eventInfo, filterOperators, onErrorField, onFailField } from "./catalog";
-import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, workflowFromShapes } from "./workflows";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, triggerLabel, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -591,6 +591,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [shapes, setShapes] = useState<DiagramShape[]>(EMPTY_SHAPES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("[]");
+  /* Phones fold the secondary workflow actions behind More. */
+  const [moreOpen, setMoreOpen] = useState(false);
   const [savedId, setSavedId] = useState("new-workflow");
   const [savedEnabled, setSavedEnabled] = useState(true);
   const [canvasExtraDirty, setCanvasExtraDirty] = useState(false);
@@ -1722,7 +1724,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       if (shape.id !== selectedId || !shape.data) return shape;
       const data = mutate(shape.data);
       const label = data.nodeKind === "trigger"
-        ? `${connectorLabel(data.connector ?? "custom")} · ${data.event}`
+        ? triggerLabel(data.connector ?? "custom", data.event ?? "")
         : shape.label;
       return { ...shape, data, label };
     }), `node:${selectedId}`);
@@ -2217,7 +2219,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       )}
 
       <main className="designer-main">
-        <header className="designer-topbar">
+        <header className={config.embedded ? "designer-topbar embedded" : "designer-topbar"}>
           {!config.embedded && (
             <button
               ref={navToggleRef}
@@ -2290,6 +2292,16 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 {status.message}
               </span>
             )}
+            <button
+              className="dk-button dk-button--secondary topbar-more"
+              type="button"
+              aria-expanded={moreOpen}
+              aria-controls="topbar-secondary"
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              <span>More</span>
+            </button>
+            <div id="topbar-secondary" className={moreOpen ? "topbar-secondary open" : "topbar-secondary"} onClick={() => setMoreOpen(false)}>
             {config.mode === "local" && (
               <button className="dk-button dk-button--secondary" type="button" onClick={push} disabled={!git || git.ahead === 0}>
                 <span>Push {git && git.ahead > 0 ? `(${git.ahead})` : ""}</span>
@@ -2354,14 +2366,21 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             >
               <span>Revert</span>
             </button>
-            <button
-              className={dirty ? "dk-button dk-button--primary" : "dk-button dk-button--secondary"}
-              type="button"
-              onClick={save}
-              disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}
-            >
-              <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : dirty ? (draftInfo ? "Save draft" : "Save changes") : "Saved"}</span>
-            </button>
+            </div>
+            {/* A clean workflow says so as a state, not a button; the save
+               action appears once there is something to save. */}
+            {dirty || Object.keys(invalidRawDrafts).length ? (
+              <button
+                className="dk-button dk-button--primary"
+                type="button"
+                onClick={save}
+                disabled={status.kind === "busy" || Object.keys(invalidRawDrafts).length > 0}
+              >
+                <span>{Object.keys(invalidRawDrafts).length ? "Fix JSON to save" : draftInfo ? "Save draft" : "Save changes"}</span>
+              </button>
+            ) : (
+              <span className="save-state" role="status">Saved</span>
+            )}
           </div>
         </header>
 
@@ -2497,7 +2516,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <header className={`inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`}>
                 <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : "Action"}</h2>
                 <p className="inspector-summary">{selected.data.nodeKind === "trigger"
-                  ? `${connectorLabel(selected.data.connector ?? "custom")} · ${selected.data.event ?? ""}`
+                  ? triggerLabel(selected.data.connector ?? "custom", selected.data.event ?? "")
                   : nodeListLabel(selected)}</p>
               </header>
             ) : (
@@ -2511,7 +2530,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                repeated steps (eight Conditions) stay distinguishable. */}
             {selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && (
               <nav className="node-jump" aria-label="Select a workflow node">
-                <p>Nodes</p>
+                <p>Steps on the canvas</p>
                 {shapes.filter((shape) => shape.type === "node").map((shape) => (
                   <button
                     key={shape.id}
