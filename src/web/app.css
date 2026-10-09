@@ -1801,6 +1801,9 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .trigger-sources .data-panel + .data-panel { margin-top: 0; }
 .trigger-activity .dk-table-footer { justify-content: space-between; }
 
+/* Phone: activity and its sources are two panes behind a two-chip switch,
+   so the sources list is one tap away instead of under the whole feed. */
+.pane-switch { display: none; }
 .activity-list, .source-list { list-style: none; margin: 0; padding: 0; }
 .activity-row {
   display: grid;
@@ -1882,15 +1885,26 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .trigger-workspace { grid-template-columns: minmax(0, 1fr); }
   .trigger-toolbar .dk-toolbar__end { margin-left: 0; }
   .source-head .row-more, .source-url .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
+  /* The switch leads the toolbar as one full-width pair; the activity
+     filters only show with the activity pane. */
+  .pane-switch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-space-2); flex: 1 0 100%; }
+  .pane-switch .dk-filter-chip { justify-content: center; }
+  .trigger-toolbar[data-pane="sources"] > [id$="-chips"] { display: none; }
+  .trigger-workspace[data-pane="activity"] > .trigger-sources,
+  .trigger-workspace[data-pane="sources"] > .trigger-activity { display: none; }
   .source-name { min-height: var(--dk-size-touch); min-width: var(--dk-size-touch); }
   .trigger-toolbar .dk-filter-chip, .agent-toolbar .dk-filter-chip { min-width: var(--dk-size-touch); justify-content: center; }
 }
 @media (max-width: 560px) {
-  /* Phone rows: when and outcome on the first line, what under them. */
-  .activity-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .activity-when { grid-column: 1; grid-row: 1; }
-  .activity-outcome { grid-column: 2; grid-row: 1; justify-items: end; text-align: right; max-width: 14rem; }
-  .activity-main { grid-column: 1 / -1; grid-row: 2; }
+  /* Phone rows read like a card: what first with its status top-right,
+     then when, then the outcome's note or error — all left-aligned. */
+  .activity-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--dk-space-1); }
+  .activity-main { grid-column: 1; grid-row: 1; }
+  .activity-outcome { display: contents; }
+  .activity-outcome .status { grid-column: 2; grid-row: 1; align-self: start; }
+  .activity-when { grid-column: 1 / -1; grid-row: 2; }
+  .activity-outcome .activity-note { grid-column: 1 / -1; grid-row: 3; }
+  .activity-outcome .activity-error { grid-column: 1 / -1; grid-row: 4; }
   .hook-headers > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .hook-runs li .dk-button { margin-left: 0; }
 }

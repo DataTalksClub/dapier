@@ -143,9 +143,9 @@ function pollRow(poll) {
     nameTitle: `Open ${poll.poll_id}`,
     status: statusWord(kind, text),
     lines: [
-      { html: `${escapeHtml(SOURCE_LABELS[poll.source || 'http'] || poll.source)} <span class="mono">${escapeHtml(pollTarget(poll))}</span>`, title: watches(poll) },
-      `${escapeHtml(every(poll))} · ${checked}`,
-      (poll.workflows || []).length ? `Starts ${workflowNames(poll.workflows.map((flow) => flow.id))}` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
+      { html: `<span>${escapeHtml(SOURCE_LABELS[poll.source || 'http'] || poll.source)}</span> <span class="mono">${escapeHtml(pollTarget(poll))}</span>`, title: watches(poll) },
+      `<span>${escapeHtml(every(poll))} · ${checked}</span>`,
+      (poll.workflows || []).length ? `<span>Starts ${workflowNames(poll.workflows.map((flow) => flow.id))}</span>` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
       failing,
     ],
   });

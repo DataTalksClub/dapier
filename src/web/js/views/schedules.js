@@ -146,9 +146,9 @@ function scheduleRow(item) {
     nameTitle: `Open ${item.schedule_id}`,
     status: dot(health.kind, health.label),
     lines: [
-      { html: `${escapeHtml(item.summary || '')} <code class="mono">${escapeHtml(item.expression || '')}</code>`, title: item.expression || '' },
-      `${escapeHtml(lastLine(item))}${next ? ` · next ${escapeHtml(when(next))}` : ''}`,
-      flows.length ? `Starts ${workflowNames(flows)}` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
+      { html: `<span>${escapeHtml(item.summary || '')}</span> <code class="mono">${escapeHtml(item.expression || '')}</code>`, title: item.expression || '' },
+      `<span>${escapeHtml(lastLine(item))}${next ? ` · next ${escapeHtml(when(next))}` : ''}</span>`,
+      flows.length ? `<span>Starts ${workflowNames(flows)}</span>` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
       health.state === 'attention' ? { html: `<span class="activity-error">${escapeHtml(health.reason)}</span>`, title: health.reason } : '',
     ],
   });

@@ -104,7 +104,7 @@ function startsLine(hook) {
   if (!flows.length) return '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>';
   const notes = flows.length === 1
     ? [!flows[0].enabled && 'off', flows[0].conditional && 'when its filters pass', flows[0].any_hook && 'any hook'].filter(Boolean) : [];
-  return `Starts ${workflowNames(flows.map((flow) => flow.id))}${notes.length ? ` (${escapeHtml(notes.join(', '))})` : ''}`;
+  return `<span>Starts ${workflowNames(flows.map((flow) => flow.id))}${notes.length ? ` (${escapeHtml(notes.join(', '))})` : ''}</span>`;
 }
 
 function endpointRow(hook) {
@@ -129,9 +129,9 @@ function endpointRow(hook) {
     selected: filter === hook.hook_id,
     lines: [
       `<span class="source-url"><code class="clip" title="${escapeHtml(hook.url || '')}">${escapeHtml(hook.url || '')}</code><button class="icon-button hook-copy" type="button" data-copy="${escapeHtml(hook.url || '')}" aria-label="Copy ${name} URL" title="Copy URL"><i data-lucide="copy"></i></button></span>`,
-      { html: `${escapeHtml(KIND_LABEL[kind] || kind)}${hook.description ? ` · ${escapeHtml(hook.description)}` : ''}`, title: [verification(hook), hook.description].filter(Boolean).join(' — ') },
+      { html: `<span>${escapeHtml(KIND_LABEL[kind] || kind)}${hook.description ? ` · ${escapeHtml(hook.description)}` : ''}</span>`, title: [verification(hook), hook.description].filter(Boolean).join(' — ') },
       startsLine(hook),
-      health.last ? `Last call ${escapeHtml(ago(health.last))}` : '',
+      health.last ? `<span>Last call ${escapeHtml(ago(health.last))}</span>` : '',
     ],
   });
 }

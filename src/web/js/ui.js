@@ -129,3 +129,16 @@ export function whenMenusClosed(root, paint) {
   open.addEventListener('toggle', (event) => { if (event.newState === 'closed') paint(); }, { once: true });
   return undefined;
 }
+
+/* Phone pane switch on the trigger workspaces (activity | sources). */
+document.addEventListener('click', (event) => {
+  const chip = event.target.closest('.pane-switch [data-pane]');
+  if (!chip) return;
+  const group = chip.closest('.pane-switch');
+  const workspace = document.getElementById(group.dataset.workspace);
+  if (workspace) workspace.dataset.pane = chip.dataset.pane;
+  group.parentElement.dataset.pane = chip.dataset.pane;
+  chip.parentElement.querySelectorAll('[data-pane]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button === chip));
+  });
+});

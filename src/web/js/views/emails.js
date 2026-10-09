@@ -265,7 +265,7 @@ function addressItem({ label, kind = '', copy = '', handlers }) {
         `<button type="button" class="row-menu-item email-workflow" data-workflow="${escapeHtml(handler.workflow)}" title="${escapeHtml(handler.workflow)}">Open ${escapeHtml(workflowName(handler.workflow))}</button>`).join('')}</div>` : '',
     lines: [
       handlers.length
-        ? `Starts ${workflowNames(handlers.map((handler) => handler.workflow))}${off ? ` <span class="muted-cell">(${off} off)</span>` : ''}`
+        ? `<span>Starts ${workflowNames(handlers.map((handler) => handler.workflow))}</span>${off ? ` <span class="muted-cell">(${off} off)</span>` : ''}`
         : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
     ],
   });

@@ -128,6 +128,7 @@
           </div>
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
+          <div class="pane-switch" role="group" aria-label="Show" data-workspace="hooks-layout"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Deliveries</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Endpoints</button></div>
           <div id="hooks-outcome-chips" class="dk-cluster" role="group" aria-label="Show deliveries"></div>
           <div class="dk-toolbar__end">
             <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
@@ -135,6 +136,7 @@
           </div>
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
+          <div class="pane-switch" role="group" aria-label="Show" data-workspace="poll-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Picked up</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Polls</button></div>
           <div id="poll-outcome-chips" class="dk-cluster" role="group" aria-label="Show picked-up items"></div>
           <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>
         </div>
@@ -153,7 +155,7 @@
         </div>
         <div data-workflow-panel="hooks" hidden>
         <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
-        <div id="hooks-layout" class="trigger-workspace" hidden>
+        <div id="hooks-layout" class="trigger-workspace" data-pane="activity" hidden>
           <section class="data-panel trigger-activity" aria-labelledby="hooks-activity-title">
             <div class="section-head">
               <h2 id="hooks-activity-title">Deliveries</h2>
@@ -174,7 +176,7 @@
         </div>
         <div data-workflow-panel="polls" hidden>
         <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API, feed, or folder for new items, for example an orders feed or a YouTube channel.</p></div>
-        <div id="poll-workspace" class="trigger-workspace" hidden>
+        <div id="poll-workspace" class="trigger-workspace" data-pane="activity" hidden>
           <section id="poll-activity" class="data-panel trigger-activity" aria-labelledby="poll-activity-title">
             <div class="section-head"><h2 id="poll-activity-title">Picked up</h2><p id="poll-activity-summary" class="sub" role="status"></p></div>
             <div id="poll-activity-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
@@ -246,10 +248,11 @@
 
       <section class="view" data-page="emails">
         <div class="page-tools dk-toolbar trigger-toolbar">
+          <div class="pane-switch" role="group" aria-label="Show" data-workspace="email-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Received</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Addresses</button></div>
           <div id="email-filter-chips" class="dk-cluster" role="group" aria-label="Filter received email"></div>
         </div>
         <p id="email-load-error" class="form-error" role="alert"></p>
-        <div class="trigger-workspace">
+        <div id="email-workspace" class="trigger-workspace" data-pane="activity">
           <section class="data-panel trigger-activity" aria-labelledby="email-mail-title">
             <div class="section-head">
               <h2 id="email-mail-title">Received</h2>
@@ -332,11 +335,12 @@
       </section>
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">
+          <div class="pane-switch" role="group" aria-label="Show" data-workspace="sched-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Fires</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Schedules</button></div>
           <div id="sched-outcome-chips" class="dk-cluster" role="group" aria-label="Show fires"></div>
           <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
-        <div id="sched-workspace" class="trigger-workspace" hidden>
+        <div id="sched-workspace" class="trigger-workspace" data-pane="activity" hidden>
           <section class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
             <div class="section-head"><h2 id="sched-fires-title">Fires</h2><p id="sched-fires-summary" class="sub" role="status"></p></div>
             <div id="sched-fires-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
