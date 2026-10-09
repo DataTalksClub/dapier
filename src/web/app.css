@@ -758,11 +758,14 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
   /* A fixed status column keeps statuses on one left edge on phone too. */
   .service-account { grid-template-columns: minmax(0, 1fr) 7.5rem; }
   .service-account-main { grid-column: 1; grid-row: 1; }
-  .service-account-status { grid-column: 2; grid-row: 1; }
+  /* Status sits on the name line (the name carries a 44px hit area). */
+  .service-account-status { grid-column: 2; grid-row: 1; padding-top: calc((var(--dk-size-touch) - 1lh) / 2); }
   .service-account-main { grid-row: 1 / span 2; }
   .service-account-actions { grid-column: 2; grid-row: 2; align-self: end; }
   .service-ref-main { display: grid; gap: 0; }
   .service-ref .service-account-actions:empty { display: none; }
+  .service-ref { align-items: start; }
+  .service-ref .service-account-status { padding-top: calc((var(--dk-size-touch) - 1lh) / 2); }
   .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: var(--dk-space-1) var(--dk-gap-control); }
   .connect-blurb { grid-column: 1 / -1; grid-row: 2; }
   /* The group's + collapses to a square touch target; its aria-label names it. */
