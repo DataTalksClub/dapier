@@ -77,9 +77,12 @@ email is "Not signed in", never a fake Drive account.
   with the word "connected".
   Tokens without renewal inside the 48h horizon read **expiring soon**;
   lapsed tokens read **needs reconnection**. Both count as needing attention.
-- **Actions:** Manage on every row. Finish setup and Reconnect are
-  secondary. An unfinished setup also gets **Remove** on the row (the
-  same delete as Manage → Delete). Adding starts from the group it lands
+- **Actions:** one action column per row, ending under the panel's Add
+  account: Finish setup or Reconnect when the account needs it, otherwise
+  Manage; the account name always opens Manage. An unfinished sign-in
+  also gets **Remove** on the row (the same delete as Manage → Delete),
+  left of Finish setup. A shared sign-in's one-line reference in its
+  other services carries the same Finish setup / Reconnect. Adding starts from the group it lands
   in: each service panel's header has its own **Add account** (Zoom
   Webhooks: **Add webhook**; icon-only + at phone width, named by its
   aria-label) that runs that service's connect flow in place. Zoom API

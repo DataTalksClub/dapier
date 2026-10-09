@@ -143,3 +143,16 @@ def test_phone_layout_keeps_add_buttons_tappable():
     assert '.service-add svg { display: none; }' in CSS
     assert 'PLUS_ICON' not in JS[JS.index('function renderConnectList('):JS.index('function bindConnectButtons(')]
     assert '.connect-card { grid-template-columns: minmax(0, 1fr) auto;' in CSS
+
+
+def test_unfinished_sign_in_offers_remove_beside_finish_setup():
+    """An abandoned Google/YouTube consent keeps Remove on its row (Manage →
+    Delete's path), to the left of Finish setup in the one action column."""
+    connections = [{"connection_id": "yt1", "provider": "youtube", "status": "ready",
+                    "oauth_consent": True, "account_title": None,
+                    "services": [{"id": "youtube", "label": "YouTube"}]}]
+    register = _render(connections)['#connection-register']['innerHTML']
+    assert 'class="service-account has-remove"' in register
+    actions = register[register.index('service-account-actions'):]
+    assert 'connection-remove' in actions
+    assert actions.index('connection-remove') < actions.index('Finish setup')

@@ -876,15 +876,18 @@ function accountRow(connection, serviceId, { twin = false } = {}) {
     const others = servicesFor(connection).filter((service) => service.id !== serviceId)
       .map((service) => service.label.replace(/^Google /, ''));
     const shareHtml = others.length ? escapeHtml(`Same sign-in also covers ${others.join(', ')}`) : '';
-    /* One action column: what the account needs next, else Manage. The
-       name always opens Manage, whose Delete removes an abandoned setup. */
-    const action = nextAction || `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
+    /* One action column: what the account needs next, else Manage (the
+       name always opens Manage). An abandoned setup is clutter, so it also
+       offers Remove right on the row — Manage → Delete's path. */
+    const remove = unfinished
+      ? `<button class="dk-button dk-button--secondary dk-button--sm connection-remove" data-connection="${id}" type="button" aria-label="Remove ${escapeHtml(title)}">Remove</button>` : '';
+    const action = remove + (nextAction || `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`);
     const expires = formatTimestamp(connection.token_expires_at);
     /* Two connections that read alike (two Slack tokens of one app) say
        which is which: their key and when they were added. */
     const created = formatTimestamp(connection.created_at);
     const twinNote = twin ? `<span class="cell-note">Connection <span class="mono">${id}</span>${created ? ` · added ${escapeHtml(created)}` : ''}</span>` : '';
-    return `<li class="service-account">
+    return `<li class="service-account${remove ? ' has-remove' : ''}">
     <div class="service-account-main">
       <button class="connection-name connection-edit" data-connection="${id}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
       ${actsAsLabel(connection) ? `<span class="account-acts-as">${escapeHtml(actsAsLabel(connection))}</span>` : ''}

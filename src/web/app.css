@@ -727,7 +727,11 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .service-account-main .expiring { color: var(--dk-warning-text); }
 .service-account-status { padding-top: var(--dk-space-1); }
 .service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
-.service-account-actions { justify-content: flex-end; }
+.service-account-actions { justify-content: flex-end; gap: var(--dk-gap-control); }
+/* Remove + Finish setup need more than the action column: they take a
+   second line under status and action, still ending on the right edge. */
+.service-account.has-remove .service-account-main { grid-row: 1 / span 2; }
+.service-account.has-remove .service-account-actions { grid-column: 2 / -1; grid-row: 2; }
 /* A shared sign-in seen from its other services: one quiet line. */
 .service-ref { align-items: center; padding-block: var(--dk-space-3); }
 .service-ref-main { display: flex; align-items: baseline; gap: var(--dk-gap-control); }
@@ -764,6 +768,8 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
   .service-account-actions { grid-column: 2; grid-row: 2; align-self: end; }
   .service-ref-main { display: grid; gap: 0; }
   .service-ref .service-account-actions:empty { display: none; }
+  .service-account.has-remove .service-account-main { grid-row: 1 / span 2; }
+  .service-account.has-remove .service-account-actions { grid-column: 1 / -1; grid-row: 3; }
   .service-ref { align-items: start; }
   .service-ref .service-account-status { padding-top: calc((var(--dk-size-touch) - 1lh) / 2); }
   .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: var(--dk-space-1) var(--dk-gap-control); }
