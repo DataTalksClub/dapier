@@ -47,12 +47,13 @@ def save_credential(provider, event):
     status, payload = credentials.api_save_credential(provider, body)
     return http._json_response(status, payload)
 
-def _save_special_connection(fields, body, operator, connections_table):
-    # The provider-specific save paths: Zoom's signing-secret flow (audited
-    # here) and the token providers' reuse-stored-token import (which audits
-    # through the callback it is handed). None when the generic build-item
-    # path handles the provider.
-    if fields["provider"] == "zoom":
+def _save_special_connection(fields, body, operator, connections_table, zoom_kind=None):
+    # The provider-specific save paths: Zoom's webhook signing-secret flow
+    # (audited here) and the token providers' reuse-stored-token import
+    # (which audits through the callback it is handed). None when the
+    # generic build-item path handles the provider — including a Zoom API
+    # connection, which is a regular OAuth record finished by consent.
+    if zoom_kind == zoom.KIND_WEBHOOK:
         status, payload = zoom.save(body, operator_subject=operator,
                                     connections_table=connections_table)
         session._audit_event(fields["connection_id"], audit_log.CONNECT,
@@ -81,7 +82,14 @@ def save_connection(event):
     previous = connection_model.get_connection(connections_table, fields["connection_id"])
     operator = session._session_subject(event)
 
-    special = _save_special_connection(fields, body, operator, connections_table)
+    try:
+        zoom_kind = zoom.resolve_kind(fields, body.get("kind"), previous)
+    except zoom.KindConflict as exc:
+        return http._json_response(409, {"error": str(exc)})
+    except connection_model.ConnectionError as exc:
+        return http._json_response(400, {"error": str(exc)})
+
+    special = _save_special_connection(fields, body, operator, connections_table, zoom_kind)
     if special is not None:
         return http._json_response(*special)
 

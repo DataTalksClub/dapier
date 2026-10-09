@@ -33,7 +33,12 @@ def register(sub):
                           help="optional internal id; generated when omitted")
     create_p.add_argument("--provider", required=True,
                           choices=("google", "youtube", "dropbox", "zoom"))
-    create_p.add_argument("--scopes", nargs="+", required=True, metavar="SCOPE")
+    create_p.add_argument("--scopes", nargs="+", default=None, metavar="SCOPE",
+                          help="Requested scopes (required except for Zoom, which "
+                               "defaults to the read scopes its actions use)")
+    create_p.add_argument("--kind", choices=("api", "webhook"), default=None,
+                          help="Zoom only: connection kind (default api; a webhook "
+                               "is created with `connections import --token-file`)")
     create_p.add_argument("--root-path", default=None, help="Dropbox only: listing root")
     edit_p = conn_sub.add_parser("edit", help="Edit connection scopes or Dropbox path")
     edit_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
@@ -114,7 +119,7 @@ def run(args, api_url, debug, child=None):
     if args.command == "create":
         return commands.connections_create(
             api_url, args.connection_id, args.provider, args.scopes,
-            root_path=args.root_path, debug=debug,
+            root_path=args.root_path, kind=args.kind, debug=debug,
         )
     if args.command == "import":
         return commands.connections_import(

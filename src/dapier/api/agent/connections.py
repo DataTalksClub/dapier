@@ -18,6 +18,7 @@ from ...connections.providers.oauth_providers import connection_grant_scopes
 from ...connections.records import BindingError
 from ...connections.tokens import TokenError
 from ...connections import oauth_flow
+from ...connections import zoom
 from .. import overview
 
 from ... import connection_digest
@@ -322,15 +323,20 @@ def create_connection(event):
         return _json_response(400, {"error": "Invalid request"})
     # display_name is retired: connections are named by account + service.
     # Older clients may still send it; it is accepted and ignored.
-    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path"}
+    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path", "kind"}
     if not isinstance(body, dict) or "provider" not in body or set(body) - allowed:
         return _json_response(400, {"error": "Provide provider and supported connection fields"})
     try:
         fields = connections.validate_new_connection(body)
+        # Zoom: the same kind rule (and API default scopes) as the console save.
+        zoom_kind = zoom.resolve_kind(fields, body.get("kind"))
     except connections.ConnectionError as exc:
         return _json_response(400, {"error": str(exc)})
     if fields["provider"] in connections.TOKEN_PROVIDERS:
         return _json_response(400, {"error": "Token providers must be created with connections import and a verified token"})
+    if zoom_kind == zoom.KIND_WEBHOOK:
+        return _json_response(400, {"error": "Zoom webhook connections are created with their "
+                                             "Secret Token: connections import --provider zoom --token-file"})
 
     connections_table, _ = _tables()
     if connections.get_connection(connections_table, fields["connection_id"]):
@@ -375,8 +381,10 @@ def update_connection_metadata(event, connection_id):
             "expected_account_id": previous.get("expected_account_id"),
             "root_path": body.get("root_path", previous.get("root_path") or ""),
         })
+        # A scope edit never flips a Zoom connection between API and webhook.
+        zoom.resolve_kind(fields, previous=previous)
         item = connections.build_item(fields, owner_subject=subject, previous=previous)
-    except connections.BindingError as exc:
+    except (connections.BindingError, zoom.KindConflict) as exc:
         return _json_response(409, {"error": str(exc)})
     except connections.ConnectionError as exc:
         return _json_response(400, {"error": str(exc)})

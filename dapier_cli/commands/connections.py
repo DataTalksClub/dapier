@@ -218,12 +218,24 @@ def print_hook_setup(provider, api_url):
 
 
 def connections_create(api_url, connection_id, provider, scopes, *,
-                       root_path=None, debug=False):
+                       root_path=None, kind=None, debug=False):
+    """Provision an OAuth connection before consent. Zoom names its kind
+    explicitly (``api`` unless told otherwise); with no scopes the API
+    fills the Zoom API defaults — the same rule the console's Add account
+    goes through."""
+    if provider == "zoom":
+        kind = kind or "api"
+    elif not scopes:
+        print("Provide --scopes for this provider.")
+        return 2
     body = {
         "connection_id": connection_id,
         "provider": provider,
-        "scopes": list(scopes),
     }
+    if scopes:
+        body["scopes"] = list(scopes)
+    if kind:
+        body["kind"] = kind
     if root_path is not None:
         body["root_path"] = root_path
     data = api.call(api_url, "PUT", "/api/agent/connections", body, debug=debug)
