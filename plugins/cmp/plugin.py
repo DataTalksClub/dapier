@@ -16,7 +16,7 @@ def _transport(method, url, *, headers, body, timeout):
 
 def verify_account(token, *, transport=None):
     # CMP uses Django's Token authentication, not Bearer authentication.
-    if not re.fullmatch(r"[a-fA-F0-9]{40}", str(token or "")):
+    if not re.fullmatch(r"[!-~]{1,512}", str(token or "")):
         raise ValueError("Enter a valid CMP API token")
     try:
         status, raw = (transport or _transport)("GET", API_URL,

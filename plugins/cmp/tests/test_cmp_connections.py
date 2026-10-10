@@ -28,7 +28,8 @@ def test_verification_health_and_safe_errors(monkeypatch):
         with pytest.raises(ValueError) as error:
             verifier(TOKEN, transport=lambda *a, **kw: (status, raw))
         assert TOKEN not in str(error.value)
-    with pytest.raises(ValueError): verifier('invalid')
+    with pytest.raises(ValueError): verifier('invalid token')
+    assert verifier('legacy-custom-token', transport=transport)[0] == 'courses.datatalks.club'
 
 
 def test_console_and_agent_store_the_same_verified_scoped_connection(monkeypatch):
