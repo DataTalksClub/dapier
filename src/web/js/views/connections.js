@@ -74,6 +74,13 @@ const CONNECT_SERVICES = {
     connectionId: 'telegram-bot',
     scopes: [],
   },
+  cmp: {
+    label: 'Course Management Platform',
+    blurb: 'Store a CMP API token for production course access.',
+    provider: 'cmp',
+    connectionId: 'cmp-production',
+    scopes: [],
+  },
   'zoom-api': {
     label: 'Zoom API',
     blurb: 'Find and manage meetings and recordings through Zoom\'s API.',
@@ -136,7 +143,7 @@ function deriveServices(connection) {
   const found = [];
   const seen = new Set();
   for (const [id, meta] of Object.entries(CONNECT_SERVICES)) {
-    if (['dropbox', 'slack', 'telegram', 'zoom'].includes(id)) {
+    if (['dropbox', 'slack', 'telegram', 'cmp', 'zoom'].includes(id)) {
       if (provider === meta.provider && !seen.has(id)) { found.push({ id, label: meta.label }); seen.add(id); }
       continue;
     }
@@ -176,6 +183,7 @@ const SERVICE_HELP = {
   dropbox: "Watch folders, read files, and upload under the connection's root path.",
   slack: 'Agent access to a Slack workspace with a bot or user token. Workflow Slack actions can also use the shared Slack Service credential.',
   telegram: 'A Telegram bot: start workflows from the messages it receives and post messages from actions.',
+  cmp: 'Manage access to a production CMP API token. Course data stays in CMP.',
   dataops: 'Read invoices from DataOps with its invoice-reader credential. Invoice parsing and bookkeeping stay in DataOps.',
   google: "A Google sign-in whose grant doesn't cover a specific product yet. Edit its scopes to choose what it is for.",
 };
@@ -251,7 +259,7 @@ function productList(connection) {
 
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
-const TOKEN_PROVIDERS = ['slack', 'telegram', 'zoom'];
+const TOKEN_PROVIDERS = ['slack', 'telegram', 'cmp', 'zoom'];
 /* A Zoom API service or connection is OAuth; only the webhook kind pastes
    its secret like the token providers. */
 const metaPastesToken = (meta) => TOKEN_PROVIDERS.includes(meta.provider) && meta.kind !== 'api';
@@ -283,6 +291,13 @@ const TOKEN_PROVIDER_META = {
     blurb: 'Paste a bot token from @BotFather (the digits:secret string). It is verified against Telegram and stored as the connection\'s secret; bots drive Telegram triggers and sendMessage actions.',
     label: 'Bot token',
     placeholder: '123456:ABC-DEF…',
+  },
+  cmp: {
+    heading: 'New CMP connection',
+    blurb: 'Paste a CMP API token. Verification checks production course-list access; CMP does not expose the token owner identity.',
+    label: 'CMP API token',
+    placeholder: 'CMP API token',
+    connectionId: 'cmp-production',
   },
   zoom: {
     heading: 'New Zoom recording connection',

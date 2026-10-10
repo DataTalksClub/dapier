@@ -120,6 +120,21 @@ def get_access_token(connection, *, transport=None, _retry=True):
         raise TokenError(f"Connection {connection['connection_id']} is revoked")
     record = _record(connection["connection_id"])
     stored = _stored_tokens(record)
+    if connection.get("provider") in connections.TOKEN_PROVIDERS:
+        from .importing import verify_token_provider
+        token = stored.get("token")
+        if not token:
+            raise TokenError("Connection has no stored provider token")
+        try:
+            account_id, account_title = verify_token_provider(
+                connection["provider"], token, transport=transport)
+        except Exception:
+            raise TokenError("Provider rejected the stored token or is unavailable") from None
+        connections.check_binding(connection, account_id)
+        return token, {"expires_at": None,
+                       "scope": " ".join(connection.get("granted_scopes") or []),
+                       "provider_account_id": account_id,
+                       "account_title": account_title, "refreshed": False}
     access_token = stored.get("access_token")
     missing_scope_metadata = (not stored.get("scope") and stored.get("refresh_token")
                               and connection.get("granted_scopes"))

@@ -323,7 +323,7 @@ def token_write(api_url, connection_id, agent, output, force=False, debug=False)
     return 0
 
 
-TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops")
+TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops", "cmp")
 
 
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,

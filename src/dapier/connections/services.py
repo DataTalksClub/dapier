@@ -110,6 +110,14 @@ CATALOG = (
         "default_scopes": (),
     },
     {
+        "id": "cmp",
+        "label": "Course Management Platform",
+        "provider": "cmp",
+        "connection_id": "cmp-production",
+        "standalone": True,
+        "default_scopes": (),
+    },
+    {
         "id": "zoom",
         "label": "Zoom",
         "provider": "zoom",
