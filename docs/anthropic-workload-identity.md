@@ -7,7 +7,7 @@ existing host-based `agent` runner or OpenAI-compatible `ai_complete` action.
 
 ## Configuration inventory
 
-Recorded 2026-10-10:
+Configured and verified 2026-10-11:
 
 | Setting | Value |
 | --- | --- |
@@ -19,11 +19,16 @@ Recorded 2026-10-10:
 | Audience | `https://api.anthropic.com` |
 | STS token | RS256, at most 900 seconds |
 | Anthropic scope / token lifetime | `workspace:developer` / 600 seconds |
+| Anthropic organization | `bebaed24-6ac5-4b50-832d-c02be9706f2a` (DTC) |
+| Anthropic workspace | `wrkspc_01Nd6VYVAfdo9zSvk8VoA1Zn` (`dapier`) |
+| Federation issuer ID | `fdis_01PL2UKqx6kfWWhokFKy4r69` |
+| Federation rule ID | `fdrl_01JT2rGCPQUmBh6M7gBntwxS` (`dapier-lambda-sandbox`) |
+| Service account ID | `svac_01PPpcCtmeRMQzJwHDA3stzC` (`dapier-lambda-sandbox`) |
 
-AWS account outbound federation was enabled and verified. Anthropic resource
-creation is pending confirmation; record the issuer, rule, service account,
-organization and workspace IDs here after saving the wizard. These identifiers
-are configuration, not secrets. JWTs and exchanged access tokens are secrets.
+AWS outbound federation and the Anthropic issuer, service account and rule
+are active. The rule allows only the exact worker role and the `dapier`
+workspace. These identifiers are configuration, not secrets. JWTs and
+exchanged access tokens are secrets.
 
 ## Ownership and AWS setup
 
@@ -91,10 +96,10 @@ The current application requirements do not install the Anthropic SDK.
 Set these non-secret values on the future job Lambda through its SAM template:
 
 ```text
-ANTHROPIC_FEDERATION_RULE_ID=fdrl_...
-ANTHROPIC_ORGANIZATION_ID=<organization UUID>
-ANTHROPIC_SERVICE_ACCOUNT_ID=svac_...
-ANTHROPIC_WORKSPACE_ID=wrkspc_...
+ANTHROPIC_FEDERATION_RULE_ID=fdrl_01JT2rGCPQUmBh6M7gBntwxS
+ANTHROPIC_ORGANIZATION_ID=bebaed24-6ac5-4b50-832d-c02be9706f2a
+ANTHROPIC_SERVICE_ACCOUNT_ID=svac_01PPpcCtmeRMQzJwHDA3stzC
+ANTHROPIC_WORKSPACE_ID=wrkspc_01Nd6VYVAfdo9zSvk8VoA1Zn
 ```
 
 Use a token-provider callback so refreshes obtain fresh STS tokens from the
@@ -126,12 +131,30 @@ client = Anthropic(credentials=WorkloadIdentityCredentials(
 # The future job calls client.messages.create(...) with its chosen model.
 ```
 
-Keep credentials in memory and never log either token. Configuration alone
-does not route existing actions through Anthropic. Implement any future
-provider integration in `plugins/`, preserving Console/CLI/API parity.
+Keep credentials in memory and never log either token. This WIF setup does
+not add automatic token exchange or refresh to `ai_complete`; that action's
+existing `LLM_API_KEY` configuration is separate, including when it calls
+Anthropic's OpenAI-compatible endpoint. Do not store a short-lived WIF token
+as a permanent `LLM_API_KEY`. Implement any future provider integration in
+`plugins/`, preserving Console/CLI/API parity.
 Domain work remains in the owning service (for example, DataOps).
 
 ## Verification and troubleshooting
+
+On 2026-10-11 a temporary Lambda using the actual worker execution role:
+
+- Minted an STS token with the configured issuer, exact role subject,
+  Anthropic audience and 900-second lifetime.
+- Exchanged it successfully with Anthropic (HTTP 200, `expires_in: 600`).
+- Called `GET /v1/models` with the exchanged Bearer token (HTTP 200).
+
+Claude Console recorded successful authentication for `dapier-lambda-sandbox`.
+The temporary function was removed after verification; no model inference
+was requested and no tokens were printed or committed. AWS policy simulation
+also rejected wrong/mixed audiences, missing audience, wrong signing algorithm
+and excessive duration.
+An STS token from the unrelated sandbox operator role was rejected by the
+same Anthropic rule (HTTP 401), confirming the role binding.
 
 From the workload, mint an STS token and exchange it with
 `POST https://api.anthropic.com/v1/oauth/token`. The JSON request contains
@@ -144,6 +167,10 @@ verify API authentication without generating paid inference.
 - Disabled outbound federation: check `JwtVendingEnabled` in IAM.
 - STS access denied: check the execution role's token policy and requested
   audience, algorithm and duration.
+- `SessionDurationEscalationException`: the requested identity-token expiry
+  exceeds the caller's remaining AWS session. Refresh the AWS session or use
+  a shorter duration for an operator check. Lambda manages its own execution
+  credentials; the Lambda check above used the full 900 seconds.
 - Missing SDK method: update the packaged SDK and select regional STS.
 - Exchange denied: inspect the Console's **Authentication events**; compare
   issuer, exact subject, audience, workspace membership and resource IDs.
