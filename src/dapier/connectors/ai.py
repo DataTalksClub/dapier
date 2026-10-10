@@ -6,12 +6,13 @@ urllib: no new infrastructure, no connection record and no discovery.
 Configuration is environment-only on the Worker function: LLM_BASE_URL
 (default https://api.openai.com/v1), LLM_API_KEY (no default — unset fails
 the step with a setup message naming the env vars, loud like any other
-unconfigured action), and LLM_MODEL (default gpt-4o-mini). template.yaml
-carries no env default for the key, so enabling it is an ops step
-(docs/connectors/ai.md). Any OpenAI-compatible gateway works, including an
-OpenRouter/Bedrock/LiteLLM proxy in front of Anthropic models (for example
-anthropic/claude-haiku-4-5) — the action never talks to api.anthropic.com
-directly.
+unconfigured action), LLM_MODEL (default gpt-4o-mini), and LLM_HEADERS_JSON
+(optional JSON object of extra request headers). template.yaml carries no
+env default for the key, so enabling it is an ops step
+(docs/connectors/ai.md). Any OpenAI-compatible endpoint works — including
+Anthropic's own OpenAI-compatible API at https://api.anthropic.com/v1 with
+a Bearer Claude key (strict json_schema there is normalized automatically;
+see the Anthropic section in docs/connectors/ai.md).
 
 Content problems never raise: a ``json_mode``/``json_schema`` reply that
 will not parse — or parses but misses the schema's required fields/types —
@@ -24,6 +25,7 @@ import json
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from ..engine.actions.templating import render
@@ -32,8 +34,10 @@ from .registry import Action, Connector, connector, register
 
 connector(Connector(name="ai", label="AI", events=(), icon="sparkles"))
 
-# The OpenAI chat-completions request shape, with temperature 0 and the
-# configured model as defaults opened up as action fields.
+# The OpenAI chat-completions request shape, with the configured model as
+# the default opened up as an action field. Temperature is omitted unless
+# the step sets it: newer Claude models reject temperature outright, and
+# every provider has its own default.
 TEMPERATURE_BOUNDS = (0.0, 2.0)
 _JSON_TRUE = frozenset({"true", "1", "yes", "on"})
 # Models wrap structured replies in code fences even under response_format,
@@ -43,6 +47,7 @@ _JSON_FENCE_RE = re.compile(r"```(?:json)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.I
 BASE_URL_ENV = "LLM_BASE_URL"
 API_KEY_ENV = "LLM_API_KEY"
 MODEL_ENV = "LLM_MODEL"
+HEADERS_ENV = "LLM_HEADERS_JSON"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 LLM_TIMEOUT_SECONDS = 25
@@ -52,8 +57,70 @@ def _base_url():
     return os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL).rstrip("/")
 
 
+def _is_anthropic_endpoint():
+    """Whether the configured endpoint is Anthropic's first-party API.
+
+    api.anthropic.com speaks the OpenAI-compatible shape but enforces it
+    strictly: response_format must be json_schema with strict:true and
+    additionalProperties:false on objects (json_object is rejected,
+    temperature is deprecated). Only the exact first-party host gets the
+    normalized payload; gateways in front of Claude keep the generic one.
+    """
+    try:
+        return (urllib.parse.urlparse(_base_url()).hostname or "").lower() \
+            == "api.anthropic.com"
+    except ValueError:
+        return False
+
+
+def _normalize_schema_for_anthropic(node):
+    """A copy of a JSON Schema with additionalProperties:false injected on
+    every object node — the shape Anthropic's strict json_schema demands.
+    Nodes that already set additionalProperties keep their value."""
+    if isinstance(node, dict):
+        normalized = {
+            key: _normalize_schema_for_anthropic(value)
+            for key, value in node.items()
+        }
+        if normalized.get("type") == "object" or "properties" in normalized:
+            normalized.setdefault("additionalProperties", False)
+        return normalized
+    if isinstance(node, list):
+        return [_normalize_schema_for_anthropic(item) for item in node]
+    return node
+
+
 def _model():
     return os.environ.get(MODEL_ENV, DEFAULT_MODEL).strip() or DEFAULT_MODEL
+
+
+def _extra_headers():
+    """Static request headers from LLM_HEADERS_JSON, or {} when unset.
+
+    A JSON object of string pairs, merged over the default authorization /
+    content-type / user-agent headers — the slot for provider account
+    headers such as Anthropic's anthropic-workspace-id (needed when the
+    Claude key is not scoped to a workspace). Anything else — unparsable
+    JSON, a non-object, or non-string pairs — is a configuration error and
+    raises ValueError. Kept in env (not an action field) so header values
+    never land in committed workflow YAML.
+    """
+    raw = os.environ.get(HEADERS_ENV, "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"ai_complete {HEADERS_ENV} must be a JSON object of header pairs: {exc}"
+        ) from None
+    if not isinstance(parsed, dict) or not all(
+        isinstance(name, str) and isinstance(value, str)
+        for name, value in parsed.items()
+    ):
+        raise ValueError(
+            f"ai_complete {HEADERS_ENV} must be a JSON object of header pairs")
+    return parsed
 
 
 register(Action(
@@ -83,9 +150,11 @@ register(Action(
          "help": ("A JSON Schema object (dict or JSON string) with type: object; "
                   "implies JSON mode, sends response_format json_schema named "
                   "extraction, and validates the parsed reply (required fields "
-                  "and top-level/array-item types); a mismatch sets ok: false")},
+                  "and top-level/array-item types); a mismatch sets ok: false. "
+                  "On api.anthropic.com the schema is normalized to their "
+                  "strict form (strict:true, additionalProperties:false)")},
         {"key": "temperature", "label": "Temperature", "type": "number",
-         "help": "0-2; 0 when left out"},
+         "help": "0-2; omitted when left out (the provider default applies)"},
         {"key": "model", "label": "Model",
          "help": "Overrides the configured default (LLM_MODEL)"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
@@ -102,10 +171,11 @@ def _json_mode(action):
 
 
 def _temperature(value):
-    """The action's temperature, validated against OpenAI's 0-2 range; left
-    out keeps the 0 default."""
+    """The action's temperature, validated against OpenAI's 0-2 range, or
+    None when the step left it out — None omits the field so the provider
+    default applies (newer Claude models reject temperature outright)."""
     if value is None or not str(value).strip():
-        return 0
+        return None
     if isinstance(value, bool):
         raise ValueError("ai_complete temperature must be a number between 0 and 2")
     try:
@@ -278,17 +348,27 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
     model = str(action.get("model") or "").strip() or _model()
+    anthropic = _is_anthropic_endpoint()
     if schema is not None:
+        # Anthropic enforces strict json_schema (strict:true plus
+        # additionalProperties:false on objects) and rejects json_object,
+        # so it gets the normalized payload; everyone else gets the
+        # generic one. Either way the parsed reply is validated locally.
+        normalized = _normalize_schema_for_anthropic(schema) if anthropic else schema
         response_format = {"type": "json_schema",
-                           "json_schema": {"name": "extraction", "schema": schema}}
-    elif _json_mode(action):
+                           "json_schema": {"name": "extraction", "schema": normalized,
+                                           **({"strict": True} if anthropic else {})}}
+    elif _json_mode(action) and not anthropic:
         response_format = {"type": "json_object"}
     else:
+        # Plain text — or json_mode on Anthropic, whose endpoint only
+        # speaks json_schema: the prompt must demand JSON and the local
+        # parse is the guarantee.
         response_format = None
     payload = json.dumps({
         "model": model,
         "messages": messages,
-        "temperature": temperature,
+        **({"temperature": temperature} if temperature is not None else {}),
         **({"response_format": response_format} if response_format else {}),
     }).encode()
     url = f"{_base_url()}/chat/completions"
@@ -296,6 +376,7 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
         "authorization": f"Bearer {key}",
         "content-type": "application/json",
         "user-agent": "dapier-ai-complete",
+        **_extra_headers(),
     }
     timeout = action.get("timeout_seconds", LLM_TIMEOUT_SECONDS)
     if transport is not None:

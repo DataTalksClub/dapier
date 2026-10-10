@@ -50,7 +50,8 @@ def body(action=None, event=None, steps=None):
         event or email_event(),
         steps=steps if steps is not None else extraction_steps(sponsors=[
             {"name": "Acme Cloud", "url": "https://acme.example/",
-             "blurb": "Try Acme free", "context": "mid-roll"}]))
+             "category": "tool", "blurb": "Try Acme free",
+             "context": "mid-roll"}]))
 
 
 class RoutingTests(unittest.TestCase):
@@ -89,7 +90,8 @@ class EnvelopeTests(unittest.TestCase):
                 "receivedAt": "2026-10-10T08:00:00Z",
             },
             "sponsors": [{"name": "Acme Cloud", "url": "https://acme.example",
-                          "blurb": "Try Acme free", "context": "mid-roll"}],
+                          "category": "tool", "blurb": "Try Acme free",
+                          "context": "mid-roll"}],
         }
 
     def test_dict_newsletter_reads_title_then_name(self):

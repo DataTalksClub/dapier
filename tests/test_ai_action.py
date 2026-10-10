@@ -117,7 +117,10 @@ class TextCompletionTests(unittest.TestCase):
         assert call["headers"]["authorization"] == "Bearer test-key"
         assert call["payload"]["model"] == "test-model"
         assert call["payload"]["messages"] == [{"role": "user", "content": "greet"}]
-        assert call["payload"]["temperature"] == 0
+        # Temperature is omitted unless the step sets it: newer Claude
+        # models reject the field outright, and every provider has its own
+        # default.
+        assert "temperature" not in call["payload"]
         assert "response_format" not in call["payload"]
 
     def test_prompt_and_system_render_from_the_event(self):
@@ -342,6 +345,13 @@ class ConfigTests(unittest.TestCase):
         assert payload["model"] == "gpt-x"
         assert payload["temperature"] == 0.7
 
+    def test_explicit_zero_temperature_is_sent(self):
+        transport = stub_transport()
+        with configured():
+            run({"type": "ai_complete", "prompt": "x",
+                 "temperature": 0}, transport=transport)
+        assert transport.calls[0]["payload"]["temperature"] == 0
+
     def test_temperature_out_of_range_or_non_numeric_refuses(self):
         transport = stub_transport()
         with configured():
@@ -354,6 +364,118 @@ class ConfigTests(unittest.TestCase):
                 else:
                     raise AssertionError(f"temperature {value!r} must refuse")
         assert transport.calls == []
+
+
+class HeadersTests(unittest.TestCase):
+    """LLM_HEADERS_JSON carries provider account headers (such as
+    Anthropic's anthropic-workspace-id) without putting values into
+    committed workflow YAML."""
+
+    def test_extra_headers_merge_over_the_defaults(self):
+        transport = stub_transport()
+        with configured(LLM_HEADERS_JSON='{"anthropic-workspace-id": "wrkspc_test"}'):
+            run({"type": "ai_complete", "prompt": "x"}, transport=transport)
+        headers = transport.calls[0]["headers"]
+        assert headers["anthropic-workspace-id"] == "wrkspc_test"
+        assert headers["authorization"] == "Bearer test-key"
+        assert headers["content-type"] == "application/json"
+
+    def test_unset_headers_leave_the_defaults_alone(self):
+        transport = stub_transport()
+        with configured():
+            run({"type": "ai_complete", "prompt": "x"}, transport=transport)
+        assert transport.calls[0]["headers"] == {
+            "authorization": "Bearer test-key",
+            "content-type": "application/json",
+            "user-agent": "dapier-ai-complete",
+        }
+
+    def test_malformed_headers_refuse_before_any_request(self):
+        for bad in ('{"unclosed"', '["not", "an", "object"]', '{"x": 42}'):
+            transport = stub_transport()
+            with configured(LLM_HEADERS_JSON=bad):
+                try:
+                    run({"type": "ai_complete", "prompt": "x"},
+                        transport=transport)
+                except ValueError as exc:
+                    assert "LLM_HEADERS_JSON" in str(exc)
+                else:
+                    raise AssertionError(f"{bad!r} must refuse the step")
+            assert transport.calls == []
+
+
+class AnthropicTests(unittest.TestCase):
+    """api.anthropic.com speaks the OpenAI shape but enforces it strictly:
+    json_schema needs strict:true plus additionalProperties:false (live
+    400s), json_object is rejected, and temperature is deprecated."""
+
+    ANTHROPIC_ENV = {"LLM_BASE_URL": "https://api.anthropic.com/v1"}
+
+    SCHEMA = {
+        "type": "object",
+        "required": ["newsletter", "sponsors"],
+        "properties": {
+            "newsletter": {"type": "string"},
+            "sponsors": {
+                "type": "array",
+                "items": {"type": "object",
+                          "required": ["name"],
+                          "properties": {"name": {"type": "string"}}},
+            },
+        },
+    }
+
+    def run_anthropic(self, action, **env):
+        transport = stub_transport(
+            raw=llm_reply('{"newsletter": "N", "sponsors": [{"name": "A"}]}'))
+        with configured(**{**self.ANTHROPIC_ENV, **env}):
+            output = run(action, transport=transport)
+        return transport.calls[0], output
+
+    def test_schema_is_normalized_to_the_strict_form(self):
+        call, output = self.run_anthropic(
+            {"type": "ai_complete", "prompt": "x", "json_schema": self.SCHEMA})
+        assert output["ok"] is True
+        assert output["data"] == {"newsletter": "N", "sponsors": [{"name": "A"}]}
+        response_format = call["payload"]["response_format"]
+        assert response_format["type"] == "json_schema"
+        sent = response_format["json_schema"]
+        assert sent["name"] == "extraction"
+        assert sent["strict"] is True
+        assert sent["schema"]["additionalProperties"] is False
+        items = sent["schema"]["properties"]["sponsors"]["items"]
+        assert items["additionalProperties"] is False
+        assert "temperature" not in call["payload"]
+
+    def test_normalization_leaves_the_configured_schema_untouched(self):
+        schema = {"type": "object",
+                  "properties": {"newsletter": {"type": "string"}}}
+        self.run_anthropic({"type": "ai_complete", "prompt": "x",
+                            "json_schema": schema})
+        assert schema == {"type": "object",
+                          "properties": {"newsletter": {"type": "string"}}}
+
+    def test_json_mode_sends_no_response_format(self):
+        call, output = self.run_anthropic(
+            {"type": "ai_complete", "prompt": "judge", "json_mode": True})
+        assert "response_format" not in call["payload"]
+        assert output["ok"] is True
+
+    def test_other_endpoints_keep_the_generic_payload(self):
+        transport = stub_transport(
+            raw=llm_reply('{"newsletter": "N", "sponsors": [{"name": "A"}]}'))
+        with configured():
+            run({"type": "ai_complete", "prompt": "x",
+                 "json_schema": self.SCHEMA}, transport=transport)
+        sent = transport.calls[0]["payload"]["response_format"]["json_schema"]
+        assert "strict" not in sent
+        assert "additionalProperties" not in sent["schema"]
+
+    def test_trailing_slash_base_url_still_matches(self):
+        with configured(LLM_BASE_URL="https://api.anthropic.com/v1/"):
+            assert ai_connector._is_anthropic_endpoint() is True
+        with configured():
+            assert ai_connector._is_anthropic_endpoint() is False
 
 
 class EngineErrorTests(unittest.TestCase):

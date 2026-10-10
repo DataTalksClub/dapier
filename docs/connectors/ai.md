@@ -7,13 +7,14 @@ environment-only, and nothing new is deployed to enable it.
 
 ## Configure it
 
-The endpoint, key and default model are environment-only:
+The endpoint, key, default model and extra headers are environment-only:
 
 | Env var | Meaning | Default |
 |---------|---------|---------|
 | `LLM_API_KEY` | Bearer key for the endpoint (**required** — without it `ai_complete` refuses to run) | — |
 | `LLM_BASE_URL` | OpenAI-compatible base URL | `https://api.openai.com/v1` |
 | `LLM_MODEL` | Default model for completions | `gpt-4o-mini` |
+| `LLM_HEADERS_JSON` | Extra request headers as a JSON object (rarely needed) | — |
 
 template.yaml wires these onto both the API function (designer test runs)
 and the **Worker** function (real runs) via the `LlmBaseUrl` / `LlmApiKey`
@@ -28,6 +29,39 @@ step:
 Unconfigured, the step fails with
 `ai_complete is not configured (set LLM_API_KEY …)`, naming every variable
 it needs.
+
+## Anthropic (Claude) via the official OpenAI-compatible API
+
+Anthropic serves an OpenAI-compatible `POST /v1/chat/completions` on
+`https://api.anthropic.com/v1/` taking the Claude key as a Bearer token —
+no gateway needed:
+
+| Env var | Value |
+|---------|-------|
+| `LLM_BASE_URL` | `https://api.anthropic.com/v1` |
+| `LLM_API_KEY` | the `ANTHROPIC_API_KEY` value (deploy-time parameter, never git) |
+| `LLM_MODEL` | `claude-sonnet-5-5` (or per-step `model:`) |
+
+Prefer a **workspace-scoped** key (console → API keys): it needs no extra
+headers. A personal key that is not scoped to a workspace must send
+`anthropic-workspace-id` on every request — put it in `LLM_HEADERS_JSON`
+(`{"anthropic-workspace-id": "wrkspc_…"}`), which keeps header values out
+of committed workflow YAML. A malformed `LLM_HEADERS_JSON` fails the step
+with a setup error before any request goes out.
+
+Verified compat notes (probed live against `claude-sonnet-5-5`):
+
+- `json_schema` is **enforced strictly**: the action normalizes the schema
+  (injects `additionalProperties: false` on objects, sends `strict: true`)
+  when the endpoint is `api.anthropic.com`. Other endpoints keep the
+  generic payload untouched.
+- `json_object` is **rejected** by Anthropic, so `json_mode` without a
+  schema sends no `response_format` there — the prompt must demand JSON
+  and the local parse stays the guarantee.
+- `temperature` is **deprecated** on current Claude models (HTTP 400), so
+  the action omits it unless the step sets it.
+- Auth is the standard `Authorization: Bearer` header the action already
+  sends; usage tokens come back in the normal OpenAI shape.
 
 ## The action
 
@@ -51,8 +85,8 @@ actions:
 | `prompt` | yes | Templated: `{field}`, `{trigger.*}`, `{steps.<id>.output.*}` and formatters all expand before the call |
 | `system` | no | Sent as the system message |
 | `json_mode` | no | Requests a JSON object (`response_format: json_object`) and parses it into `data` |
-| `json_schema` | no | A JSON Schema object (dict or JSON string) with `type: object`; implies JSON mode, sends `response_format: json_schema` named `extraction`, and validates the parsed reply (required fields, top-level and array-item types). Works through any OpenAI-compatible gateway, including an OpenRouter/Bedrock/LiteLLM proxy in front of Anthropic models — never direct `api.anthropic.com` |
-| `temperature` | no | 0–2; 0 when left out |
+| `json_schema` | no | A JSON Schema object (dict or JSON string) with `type: object`; implies JSON mode, sends `response_format: json_schema` named `extraction`, and validates the parsed reply (required fields, top-level and array-item types). Note: Anthropic's compatibility layer ignores `response_format`, so with Claude the prompt must demand JSON and local validation is the guarantee |
+| `temperature` | no | 0–2; omitted when left out (the provider default applies — required for Claude, which rejects the field) |
 | `model` | no | Overrides `LLM_MODEL` for this step |
 | `timeout_seconds` | no | Default 25 |
 
@@ -96,7 +130,7 @@ fallback.
 actions:
   - id: extract
     type: ai_complete
-    model: anthropic/claude-haiku-4-5
+    model: claude-sonnet-5-5
     prompt: |
       Extract the newsletter subject and sponsors as JSON matching the schema.
       Newsletter text: {body}
@@ -108,14 +142,17 @@ actions:
           type: string
         sponsors:
           type: array
-          items:
-            type: object
-            required: [name]
-            properties:
-              name:
-                type: string
-              url:
-                type: string
+        items:
+          type: object
+          required: [name, category]
+          properties:
+            name:
+              type: string
+            url:
+              type: string
+            category:
+              type: string
+              enum: [tool, product, service, event, course, book, job, community, other]
 ```
 
 The request sends

@@ -324,6 +324,12 @@ def _leads_intake_body(action, event, *, steps=None):
         sponsor = {"name": name}
         if url:
             sponsor["url"] = url
+        # Category passes through (truncated) for the intake's triage; the
+        # extraction schema already constrains it to the known taxonomy, so
+        # an unknown value rides along rather than failing the forward.
+        category = _collapse_ws(entry.get("category"))[:40]
+        if category:
+            sponsor["category"] = category
         blurb = _collapse_ws(entry.get("blurb"))[:2000]
         if blurb:
             sponsor["blurb"] = blurb

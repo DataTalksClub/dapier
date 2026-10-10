@@ -6,6 +6,10 @@ __pycache__/
 .venv/
 .tmp/
 
+# local secrets (ANTHROPIC_API_KEY etc.) — deploy keys go through
+# template parameters, never through git
+.env
+
 *.egg-info/
 uv.lock
 

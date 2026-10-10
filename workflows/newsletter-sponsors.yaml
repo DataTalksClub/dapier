@@ -9,11 +9,9 @@
 #
 # Status: example only (`enabled: false`). Before enabling, set
 # DATAOPS_LEADS_URL on the Worker (template.yaml snippet in
-# docs/newsletter-sponsors.md) and confirm the intake secret. The LLM step
-# runs through an OpenAI-compatible gateway — set the model to a Claude
-# Haiku served by your gateway (e.g. anthropic/claude-haiku-4-5 via
-# OpenRouter/Bedrock/LiteLLM proxy); ai_complete never talks to
-# api.anthropic.com directly.
+# docs/newsletter-sponsors.md), confirm the intake secret, and configure the
+# LLM_* env (docs/connectors/ai.md — Anthropic's OpenAI-compatible API with
+# model claude-sonnet-5-5; prefer a workspace-scoped key).
 id: newsletter-sponsors
 enabled: false
 description: 'Newsletter emails: extract paid sponsor mentions with one LLM call
@@ -33,13 +31,17 @@ actions:
   # {ok: false, error, text} for the chain to branch on instead of failing
   # the step (src/dapier/connectors/ai.py). Field names match the DataOps
   # intake (blurb/context), so the forward step passes them through.
-  model: anthropic/claude-haiku-4-5
+  model: claude-sonnet-5-5
   prompt: |
     Extract the newsletter identity and its paid sponsor/advertiser mentions
     from the email below. Sponsors are paid placements only — never editorial
     links, author bios, social icons, or footer/unsubscribe links. An empty
-    sponsors array is valid when the issue has no sponsors. Blurb is a short
-    description of the sponsor; context is where/how the mention appeared.
+    sponsors array is valid when the issue has no sponsors. Url is the link
+    the sponsor promotes (the sponsor's own page or offer, never the
+    newsletter homepage or an unsubscribe link). Category is the kind of
+    promotion: tool, product, service, event, course, book, job, community,
+    or other. Blurb is a short description of the sponsor; context is
+    where/how the mention appeared.
 
     Subject: {subject}
     Body:
@@ -55,17 +57,21 @@ actions:
         type: array
         items:
           type: object
-          required: [name]
+          required: [name, category]
           properties:
             name:
               type: string
             url:
               type: string
+            category:
+              type: string
+              enum: [tool, product, service, event, course, book, job, community, other]
             blurb:
               type: string
             context:
               type: string
-  temperature: 0
+  # No temperature: newer Claude models reject the field outright, and the
+  # provider default applies when it is omitted.
 - id: forward-leads
   type: dataops
   # Posts the 2026-10-10 sponsors-leads envelope built by

@@ -16,9 +16,9 @@ its own stores; it forwards to the service that owns the domain.
 
 ```
 SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workflow:
-  1. extract-sponsors — one ai_complete call (model anthropic/claude-haiku-4-5
-     via an OpenAI-compatible gateway) with a json_schema for
-     {newsletter: string, sponsors: [{name, url?, blurb?, context?}]} pulls
+  1. extract-sponsors — one ai_complete call (model claude-sonnet-5-5
+     via Anthropic's OpenAI-compatible API) with a json_schema for
+     {newsletter: string, sponsors: [{name, url?, category?, blurb?, context?}]} pulls
      the extraction from the subject and body. The schema is enforced
      provider-side (response_format json_schema) and re-validated locally;
      an unparsable reply or a schema mismatch returns {ok: false, ...} for
@@ -56,14 +56,16 @@ after a lost response is safe.
   },
   "sponsors": [
     {"name": "Acme Cloud", "url": "https://acme.example",
-     "blurb": "Try Acme free", "context": "mid-roll"}
+     "category": "tool", "blurb": "Try Acme free", "context": "mid-roll"}
   ]
 }
 ```
 
 `version` is exactly `2026-10-10`. `sponsors` carries 1–20 entries;
 `url` is optional (omit when unknown or not `https:` — the builder drops
-junk URLs rather than failing); `blurb`/`context` are optional (max 2000).
+junk URLs rather than failing); `category` is optional (one of
+tool/product/service/event/course/book/job/community/other, max 40);
+`blurb`/`context` are optional (max 2000).
 `receivedAt` is strict UTC `YYYY-MM-DDTHH:MM:SS[.mmm]Z`. No extra keys at
 any level. Tests: `tests/test_dataops_leads.py`.
 
