@@ -1,6 +1,6 @@
 """Implementations of the `dapier connections` and `dapier token` commands."""
 
-import json, os, subprocess, time, webbrowser
+import json, os, subprocess, sys, time, webbrowser
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -342,7 +342,7 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
             print(f"{provider} connections import with --token-file (the pasted provider token).")
             return 2
         try:
-            with open(token_path, encoding="utf-8") as handle:
+            with (sys.stdin if token_path == "-" else open(token_path, encoding="utf-8")) as handle:
                 token = handle.read().strip()
         except OSError as exc:
             print(f"Cannot read {token_path}: {exc}")

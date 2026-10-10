@@ -56,7 +56,7 @@ def register(sub):
     import_p.add_argument("--authorized-user-file", default=None,
                           help="Refresh-token JSON for OAuth providers")
     import_p.add_argument("--token-file", default=None,
-                          help="Provider token or Zoom webhook Secret Token (read from file)")
+                          help="Provider token or Zoom webhook Secret Token (file, or - for stdin)")
     import_p.add_argument("--signing-secret-file", default=None,
                           help="Slack only: Events API signing secret (read from file)")
     import_p.add_argument("--expected-account", default=None)

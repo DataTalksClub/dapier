@@ -92,3 +92,13 @@ def test_console_has_cmp_create_and_maintenance_parity():
     assert "provider: 'cmp'" in js
     assert "connectionId: 'cmp-production'" in js
     assert "['slack', 'telegram', 'cmp', 'zoom']" in js
+
+
+def test_cli_token_import_accepts_stdin_without_secret_file(monkeypatch, capsys):
+    import io
+    calls = []
+    monkeypatch.setattr(cli.sys, 'stdin', io.StringIO(TOKEN + '\n'))
+    monkeypatch.setattr(cli.api, 'call', lambda *args, **kw: calls.append(args) or {'connection_id': 'cmp-production'})
+    assert cli.connections_import('https://dapier.example.test', 'cmp-production', 'cmp', None, None, None, token_path='-') == 0
+    assert calls[0][3]['token'] == TOKEN
+    assert TOKEN not in capsys.readouterr().out

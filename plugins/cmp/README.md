@@ -1,8 +1,8 @@
 # Course Management Platform connection
 
 Dapier stores CMP API tokens as write-only connection secrets. Import with
-`uv run dapier connections import cmp-production --provider cmp --token-file /private/raw-token`.
-The file contains only the token; never pass a whole `.env` file or put a token in argv.
+`uv run dapier connections import cmp-production --provider cmp --token-file -`.
+Supply only the raw token through stdin; never pass a whole `.env` file or put a token in argv.
 `uv run dapier connections test cmp-production` verifies authenticated production course-list access.
 The console Connections view offers the same CMP token setup and maintenance.
 
