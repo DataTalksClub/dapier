@@ -765,6 +765,22 @@ Resources:
             Action: sts:AssumeRole
             Resource: !Ref AwsAssumableRoleArns
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
+        # Outbound identity for future Anthropic Lambda jobs. Only the worker
+        # may mint these tokens; the Anthropic rule pins this role's exact ARN.
+        - Statement:
+            Sid: WorkerAnthropicIdentityToken
+            Effect: Allow
+            Action: [sts:GetWebIdentityToken]
+            Resource: '*'
+            Condition:
+              ForAllValues:StringEquals:
+                sts:IdentityTokenAudience: [https://api.anthropic.com]
+              'Null':
+                sts:IdentityTokenAudience: 'false'
+              StringEquals:
+                sts:SigningAlgorithm: RS256
+              NumericLessThanEquals:
+                sts:DurationSeconds: 900
         - Statement:
             Effect: Allow
             Action: [ses:SendEmail, ses:SendRawEmail]
