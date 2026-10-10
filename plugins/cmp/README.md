@@ -16,3 +16,16 @@ After granting the connection to an agent, use
 The child reads `DAPIER_ACCESS_TOKEN` and sends `Authorization: Token <value>`
 to CMP. Do not log it. Course changes remain the responsibility of CMP and
 require operator authorization; connection setup makes no course changes.
+
+
+## Read-only workflow action
+
+`cmp_read_course` takes `connection_id`, `course_slug`, and an optional timeout
+of 1-30 seconds. It makes only a GET to the fixed production course endpoint,
+using the stored connection's Token header. It refuses redirects, incorrect
+providers or account bindings, unexpected payloads, and duplicate entity slugs.
+Output contains allowlisted course facts and homework/project maps indexed by
+slug, so native filter steps can stop an announcement when its expected dates
+or required state differ. A read failure halts the action chain by default.
+The API action registry, CLI catalog/test routes and console designer expose
+this same action; no secret is a workflow field or result.

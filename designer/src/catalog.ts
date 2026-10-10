@@ -161,6 +161,17 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "cmp_read_course",
+    label: "Read CMP course",
+    icon: FileText,
+    description: "Read production course dates and homework/project states. Output: {course, homeworks, projects}; maps are keyed by slug.",
+    fields: [
+      { key: "connection_id", label: "CMP connection", required: true },
+      { key: "course_slug", label: "Course slug", required: true },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number", default: "15" },
+    ]
+  },
+  {
     type: "http_request",
     label: "HTTP request",
     icon: Globe,
@@ -1924,6 +1935,7 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   storage_set: "data",
   storage_delete: "data",
   storage_find: "data",
+  cmp_read_course: "data",
   http_request: "data",
   webhook: "data",
   render_html_to_pdf: "data",

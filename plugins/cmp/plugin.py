@@ -35,3 +35,20 @@ def test_connection(connection, *, transport=None):
 
 register_token_provider("cmp", verify_account)
 register_connection_test(ConnectionTest(connector="cmp", run=test_connection))
+
+
+from plugins.cmp.read_course import run_read_course
+from src.dapier.connectors.registry import Action, register
+
+register(Action(
+    type="cmp_read_course", label="Read CMP course", icon="file-text",
+    description="Read production course dates and homework/project states. Output maps are keyed by slug; credentials never appear in output.",
+    required=frozenset({"connection_id", "course_slug"}),
+    optional=frozenset({"timeout_seconds"}),
+    run=lambda action, event, workflow_id, steps=None: run_read_course(action, event, steps=steps),
+    fields=(
+        {"key": "connection_id", "label": "CMP connection", "required": True},
+        {"key": "course_slug", "label": "Course slug", "required": True},
+        {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number", "default": 15},
+    ),
+))
