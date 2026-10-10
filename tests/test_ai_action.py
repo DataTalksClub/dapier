@@ -183,6 +183,141 @@ class JsonModeTests(unittest.TestCase):
         assert output["model"] == "test-model"
 
 
+class JsonSchemaTests(unittest.TestCase):
+    """Generic provider-agnostic structured extraction via `json_schema`."""
+
+    SCHEMA = {
+        "type": "object",
+        "required": ["newsletter", "sponsors"],
+        "properties": {
+            "newsletter": {"type": "string"},
+            "sponsors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "url": {"type": "string"},
+                    },
+                },
+            },
+        },
+    }
+
+    GOOD_REPLY = '{"newsletter": "Weekly", "sponsors": [{"name": "Acme"}]}'
+
+    def test_json_schema_sends_structured_format_and_parses(self):
+        transport = stub_transport(raw=llm_reply(self.GOOD_REPLY))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "extract",
+                          "json_schema": self.SCHEMA}, transport=transport)
+        assert output["ok"] is True
+        assert output["data"] == {"newsletter": "Weekly", "sponsors": [{"name": "Acme"}]}
+        assert "text" not in output
+        assert transport.calls[0]["payload"]["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {"name": "extraction", "schema": self.SCHEMA},
+        }
+
+    def test_json_schema_implies_json_mode(self):
+        # No json_mode key at all — the schema alone requests structured output.
+        transport = stub_transport(raw=llm_reply(self.GOOD_REPLY))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "extract",
+                          "json_schema": self.SCHEMA,
+                          "model": "anthropic/claude-haiku-4-5"},
+                         transport=transport)
+        assert output["ok"] is True
+        payload = transport.calls[0]["payload"]
+        assert payload["model"] == "anthropic/claude-haiku-4-5"
+        assert payload["response_format"]["type"] == "json_schema"
+
+    def test_json_schema_accepts_a_json_string(self):
+        transport = stub_transport(raw=llm_reply(self.GOOD_REPLY))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "extract",
+                          "json_schema": json.dumps(self.SCHEMA)},
+                         transport=transport)
+        assert output["ok"] is True
+        assert output["data"]["newsletter"] == "Weekly"
+
+    def test_json_schema_missing_required_field_is_a_verdict(self):
+        transport = stub_transport(
+            raw=llm_reply('{"newsletter": "Weekly", "sponsors": []}'))
+        schema = {"type": "object", "required": ["newsletter", "sponsors", "edition"],
+                  "properties": {"newsletter": {"type": "string"}}}
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "x",
+                          "json_schema": schema}, transport=transport)
+        assert output["ok"] is False
+        assert "edition" in output["error"]
+        assert output["text"] == '{"newsletter": "Weekly", "sponsors": []}'
+        assert output["model"] == "test-model"
+        assert "usage" in output
+
+    def test_json_schema_type_mismatch_is_a_verdict(self):
+        transport = stub_transport(
+            raw=llm_reply('{"newsletter": 42, "sponsors": []}'))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "x",
+                          "json_schema": self.SCHEMA}, transport=transport)
+        assert output["ok"] is False
+        assert "newsletter" in output["error"]
+        assert "string" in output["error"]
+
+    def test_json_schema_array_item_mismatch_is_a_verdict(self):
+        transport = stub_transport(raw=llm_reply(
+            '{"newsletter": "W", "sponsors": [{"url": "https://x.test"}]}'))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "x",
+                          "json_schema": self.SCHEMA}, transport=transport)
+        assert output["ok"] is False
+        assert "name" in output["error"]
+
+    def test_json_schema_parse_failure_is_a_verdict(self):
+        transport = stub_transport(raw=llm_reply("not json at all"))
+        with configured():
+            output = run({"type": "ai_complete", "prompt": "x",
+                          "json_schema": self.SCHEMA}, transport=transport)
+        assert output["ok"] is False
+        assert "JSON" in output["error"]
+        assert output["text"] == "not json at all"
+
+    def test_json_schema_invalid_schema_refuses(self):
+        transport = stub_transport()
+        with configured():
+            for bad in ({"type": "array"}, '{"type": "object"',
+                        ["type", "object"], "just a string",
+                        {"type": "object", "required": "newsletter"}):
+                try:
+                    run({"type": "ai_complete", "prompt": "x",
+                         "json_schema": bad}, transport=transport)
+                except ValueError as exc:
+                    assert "json_schema" in str(exc)
+                else:
+                    raise AssertionError(f"schema {bad!r} must refuse")
+        assert transport.calls == []
+
+    def test_json_schema_400_surfaces_as_http_error(self):
+        # No silent json_object fallback: a provider rejecting json_schema
+        # raises for autoretry like any other HTTP 400.
+        transport = stub_transport(status=400, raw=b'{"error": "bad schema"}')
+        with configured():
+            try:
+                run({"type": "ai_complete", "prompt": "x",
+                     "json_schema": self.SCHEMA}, transport=transport)
+            except HttpError as exc:
+                assert exc.status == 400
+            else:
+                raise AssertionError("HTTP 400 must raise HttpError")
+
+    def test_validate_action_chain_accepts_json_schema(self):
+        with configured():
+            validate_action_chain([{"type": "ai_complete", "prompt": "hi",
+                                    "json_schema": self.SCHEMA}])
+
+
 class ConfigTests(unittest.TestCase):
     def test_unconfigured_env_fails_with_the_setup_message(self):
         with unconfigured():

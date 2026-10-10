@@ -51,6 +51,7 @@ actions:
 | `prompt` | yes | Templated: `{field}`, `{trigger.*}`, `{steps.<id>.output.*}` and formatters all expand before the call |
 | `system` | no | Sent as the system message |
 | `json_mode` | no | Requests a JSON object (`response_format: json_object`) and parses it into `data` |
+| `json_schema` | no | A JSON Schema object (dict or JSON string) with `type: object`; implies JSON mode, sends `response_format: json_schema` named `extraction`, and validates the parsed reply (required fields, top-level and array-item types). Works through any OpenAI-compatible gateway, including an OpenRouter/Bedrock/LiteLLM proxy in front of Anthropic models — never direct `api.anthropic.com` |
 | `temperature` | no | 0–2; 0 when left out |
 | `model` | no | Overrides `LLM_MODEL` for this step |
 | `timeout_seconds` | no | Default 25 |
@@ -77,6 +78,51 @@ step succeeds with `{"ok": false, "error": "…", "text": "<raw reply>", …}`,
 so a chain can branch on `{steps.triage.output.ok}` or retry with a
 stricter prompt. Later steps template `{steps.triage.data.category}` when
 `ok` is true.
+
+With `json_schema` the same verdict rule covers schema mismatches: a reply
+that parses but misses a required field or has the wrong type for a
+top-level (or array-item) property returns
+`{"ok": false, "error": "ai_complete json_schema validation failed: …",
+"text": "<raw reply>", …}`. A `json_schema` value that is not a JSON Schema
+object with `type: object` fails the step with `ValueError` (a
+configuration error, not a verdict). A provider that rejects the
+`json_schema` response_format answers HTTP 400, which surfaces as the
+usual `HttpError` for `autoretry` — there is no silent `json_object`
+fallback.
+
+### Structured extraction
+
+```yaml
+actions:
+  - id: extract
+    type: ai_complete
+    model: anthropic/claude-haiku-4-5
+    prompt: |
+      Extract the newsletter subject and sponsors as JSON matching the schema.
+      Newsletter text: {body}
+    json_schema:
+      type: object
+      required: [newsletter, sponsors]
+      properties:
+        newsletter:
+          type: string
+        sponsors:
+          type: array
+          items:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+              url:
+                type: string
+```
+
+The request sends
+`response_format: {type: json_schema, json_schema: {name: extraction,
+schema: <schema>}}`; the parsed object lands in `data`
+(`{steps.extract.data.newsletter}`,
+`{steps.extract.data.sponsors}` when `ok` is true).
 
 ### Errors
 
