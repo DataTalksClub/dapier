@@ -3,6 +3,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -13,6 +14,19 @@ from .templating import render
 
 
 STAGING_PREFIX = "transfer/"
+
+# Newsletter-sponsors leads intake (DataOps contract 2026-10-10). Dapier is
+# only the pipe: one LLM extraction plus this formatter; sponsor records,
+# dedup across emails, outreach and review live in DataOps. The intake
+# accepts 1-20 sponsors per POST and dedups per lead on
+# sha256("lead:"+messageId+name+url), so this builder normalizes within one
+# email only (trim/collapse, https-only URLs, within-email dedup, caps) and
+# fails loudly on anything the intake would reject.
+LEADS_VERSION = "2026-10-10"
+LEADS_URL_ENV = "DATAOPS_LEADS_URL"
+_LEADS_RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
+_LEADS_WS_RE = re.compile(r"\s+")
+MAX_LEADS_SPONSORS = 20
 
 
 def _s3():
@@ -77,9 +91,19 @@ def run_dataops(action, event, *, steps=None):
     )
 
 def _intake_body(action, event, *, steps=None):
+    if _is_leads_action(action):
+        return _leads_intake_body(action, event, steps=steps)
     if event.get("connector") == "dropbox":
         return _dropbox_intake_body(action, event, steps=steps)
     return _email_intake_body(action, event)
+
+
+def _is_leads_action(action):
+    """Whether this step targets the sponsors-leads intake rather than the
+    document intake — via the dedicated env var or a leads-intake URL."""
+    if action.get("url_env") == LEADS_URL_ENV:
+        return True
+    return "/intake/leads" in str(action.get("url") or "")
 
 def _dropbox_intake_body(action, event, *, steps=None):
     """Build a DataOps intake for a Dropbox file event.
@@ -182,4 +206,144 @@ def _email_intake_body(action, event):
         "subject": source_data.get("subject") or "Inbound email",
         "receivedAt": _received_at(source_data.get("date") or event["occurred_at"]),
         "documents": documents,
+    }
+
+
+def _collapse_ws(text):
+    return _LEADS_WS_RE.sub(" ", str(text or "")).strip()
+
+
+def _leads_norm_name(name):
+    return _collapse_ws(name).lower()
+
+
+def _leads_norm_url(url):
+    """The intake's identity form: lowercase host, no default port, no
+    trailing slash, no fragment. Returns None when there is no usable URL."""
+    text = str(url or "").strip()
+    if not text:
+        return None
+    if not re.match(r"^https://", text, flags=re.I):
+        return None
+    if re.search(r"\s", text) or "@" in text.split("/", 3)[2]:
+        return None
+    lowered = re.sub(r"^https://", "https://", text, flags=re.I)
+    host_rest = lowered[len("https://"):]
+    host, _, rest = host_rest.partition("/")
+    host = host.lower()
+    if host.endswith(":443"):
+        host = host[:-4]
+    rest = rest.split("#", 1)[0].rstrip("/")
+    return f"https://{host}" + (f"/{rest}" if rest else "")
+
+
+def _extraction_data(action, steps):
+    """The ai_complete reply shape for the sponsors step: prefer the
+    configured ``extraction_step`` (default ``extract-sponsors``), else any
+    step whose output.data carries a sponsors list."""
+    names = []
+    configured = str(action.get("extraction_step") or "").strip()
+    if configured:
+        names.append(configured)
+    if "extract-sponsors" not in names:
+        names.append("extract-sponsors")
+    steps = steps or {}
+    for name in names:
+        node = steps.get(name)
+        output = node.get("output") if isinstance(node, dict) else None
+        data = output.get("data") if isinstance(output, dict) else None
+        if isinstance(data, dict) and isinstance(data.get("sponsors"), list):
+            if output.get("ok") is False:
+                raise ValueError(
+                    f"extraction step '{name}' did not produce structured data "
+                    f"({data.get('error') or output.get('error') or 'ok: false'})")
+            return data
+    for name, node in steps.items():
+        if name in names or not isinstance(node, dict):
+            continue
+        output = node.get("output")
+        data = output.get("data") if isinstance(output, dict) else None
+        if isinstance(data, dict) and isinstance(data.get("sponsors"), list):
+            if isinstance(output, dict) and output.get("ok") is False:
+                continue
+            return data
+    wanted = names[0] if names else "extract-sponsors"
+    raise ValueError(
+        f"leads intake needs structured sponsors from step '{wanted}' "
+        "(ai_complete with a sponsors json_schema); no step output carries one")
+
+
+def _leads_newsletter_name(data, fallback):
+    raw = data.get("newsletter")
+    if isinstance(raw, dict):
+        for key in ("name", "title"):
+            if str(raw.get(key) or "").strip():
+                return _collapse_ws(raw[key])[:200]
+    elif str(raw or "").strip():
+        return _collapse_ws(raw)[:200]
+    return _collapse_ws(fallback)[:200] or "Newsletter"
+
+
+def _leads_intake_body(action, event, *, steps=None):
+    """Build the DataOps sponsors-leads envelope (contract 2026-10-10).
+
+    Event metadata (messageId/sender/subject/date) comes from the email
+    event; the newsletter name and sponsor mentions come from the
+    extraction step. Normalization is within-email only — cross-email
+    dedup is the intake's idempotency rule. Raises ValueError (fails the
+    step) on anything the intake would reject, so problems read loudly
+    instead of posting a 4xx the autoretry would pace pointlessly."""
+    data = event.get("data", {})
+    source_data = data.get("source_event", {}).get("data", data)
+    message_id = str(data.get("message_id") or source_data.get("message_id") or "").strip()
+    if not message_id or len(message_id) > 500:
+        raise ValueError("leads intake requires an email message_id (max 500 chars)")
+    sender = source_data.get("sender", {})
+    sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
+    sender_value = _collapse_ws(sender_value)[:320] or "unknown@example.com"
+    subject = _collapse_ws(source_data.get("subject") or "Inbound email")[:500] or "Inbound email"
+    received = _received_at(source_data.get("date") or event.get("occurred_at"))
+    if not _LEADS_RECEIVED_RE.match(received or ""):
+        raise ValueError(f"leads intake needs a parseable email date, got {received!r}")
+
+    extraction = _extraction_data(action, steps)
+    raw_sponsors = extraction.get("sponsors") or []
+    sponsors = []
+    seen = set()
+    for entry in raw_sponsors:
+        if not isinstance(entry, dict):
+            continue
+        name = _collapse_ws(entry.get("name"))[:200]
+        if not name:
+            continue
+        url = _leads_norm_url(entry.get("url"))
+        key = f"{_leads_norm_name(name)}\n{url or ''}"
+        if key in seen:
+            continue
+        seen.add(key)
+        sponsor = {"name": name}
+        if url:
+            sponsor["url"] = url
+        blurb = _collapse_ws(entry.get("blurb"))[:2000]
+        if blurb:
+            sponsor["blurb"] = blurb
+        context = _collapse_ws(entry.get("context"))[:2000]
+        if context:
+            sponsor["context"] = context
+        sponsors.append(sponsor)
+    if not sponsors:
+        raise ValueError("leads intake has no sponsors to forward (extraction found none)")
+    if len(sponsors) > MAX_LEADS_SPONSORS:
+        raise ValueError(
+            f"leads intake accepts at most {MAX_LEADS_SPONSORS} sponsors, got {len(sponsors)}")
+    return {
+        "version": LEADS_VERSION,
+        "messageId": message_id,
+        "newsletter": {
+            "name": _leads_newsletter_name(extraction, subject),
+            "sender": sender_value,
+            "subject": subject,
+            "receivedAt": received,
+        },
+        "sponsors": sponsors,
     }
