@@ -18,7 +18,6 @@ mirrored here.
 | AlphaSignal | Recent deliveries | news@alphasignal.ai | [archive](https://alphasignal.ai/archive) |
 | MLOps Community | Recent deliveries | demetrios@news.mlops.community | [archive](https://gatewaze.mlops.community/newsletter) |
 | Data Science Weekly | Older deliveries | datascienceweekly@substack.com | [archive](https://datascienceweekly.substack.com/archive) |
-| Eugene’s Weekly (Eugene Yan) | Older deliveries | eugene@eugeneyan.com | [archive](https://eugeneyan.com/writing/) |
 | TheSequence | Older deliveries | thesequence@substack.com | [archive](https://thesequence.substack.com/archive) |
 | The AI Collective Newsletter | Older deliveries | aicollective@substack.com | [archive](https://newsletter.aicollective.com/archive) |
 | The Deep View | Older deliveries | newsletter@thedeepview.co | [archive](https://www.thedeepview.com/newsletter) |
