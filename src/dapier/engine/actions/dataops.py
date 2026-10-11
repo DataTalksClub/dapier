@@ -317,7 +317,9 @@ def _leads_intake_body(action, event, *, steps=None):
         if not name:
             continue
         url = _leads_norm_url(entry.get("url"))
-        key = f"{_leads_norm_name(name)}\n{url or ''}"
+        # Same link under different name readings is one sponsor: dedup on
+        # the URL when there is one, else on the normalized name.
+        key = url if url else f"name:{_leads_norm_name(name)}"
         if key in seen:
             continue
         seen.add(key)

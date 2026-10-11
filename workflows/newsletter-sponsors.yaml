@@ -34,15 +34,38 @@ actions:
   model: claude-sonnet-5-5
   prompt: |
     Extract the newsletter identity and its paid sponsor/advertiser mentions
-    from the email below. Sponsors are paid placements only — never editorial
-    links, author bios, social icons, or footer/unsubscribe links. An empty
-    sponsors array is valid when the issue has no sponsors. Url is the link
-    the sponsor promotes (the sponsor's own page or offer, never the
+    from the email below. Read the entire email top to bottom, including job
+    boards, event sections, partner shout-outs, resource blocks, and
+    end-of-email sponsor slots. Name each sponsor by its canonical
+    company, product, or event name, without suffixes like (Sponsored).
+
+    Sponsors are always third parties paying for placement: the sender's own
+    organization, products, events, job board, courses, and community
+    properties are never sponsors, no matter how prominently featured.
+
+    Include a mention as a sponsor ONLY when it is a dedicated promo unit or
+    is labeled as paid: a sponsor section or ad card, a block marked
+    sponsored / partner / paid / advertisement, a hiring block for a named
+    employer, an event promo with tickets or registration for an external
+    event, a sponsored resource with a download or register call-to-action,
+    or a partner offer or discount. Hiring posts, partnerships, and sponsored
+    resources count even when the surrounding wording sounds editorial.
+
+    Exclude everything else: mentions inside articles and essays, author
+    bios, social-media icons, footer/unsubscribe/compliance links, links back
+    to the newsletter's own homepage or archive, and the newsletter's own
+    recurring properties and channels (its meetups, forums, portals,
+    spreadsheets, and communities) even when they carry links. When still in
+    doubt, include the mention — a missed sponsor loses a lead, while the
+    review queue discards anything that is not a real promotion. An empty
+    sponsors array is valid when the issue truly has no sponsors. Url is the
+    link the sponsor promotes (the sponsor's own page or offer, never the
     newsletter homepage or an unsubscribe link). Category is the kind of
     promotion: tool, product, service, event, course, book, job, community,
     or other. Blurb is a short description of the sponsor; context is
     where/how the mention appeared.
 
+    From: {sender}
     Subject: {subject}
     Body:
     {body}

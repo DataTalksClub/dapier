@@ -125,6 +125,15 @@ class EnvelopeTests(unittest.TestCase):
             {"name": "Beta DB", "context": "sidebar"},
         ]
 
+    def test_same_link_under_different_name_readings_collapses(self):
+        steps = extraction_steps(sponsors=[
+            {"name": "Drive", "url": "https://acme.example/guide"},
+            {"name": "Drive Fund Admin Data Quality Without Scrambling",
+             "url": "https://acme.example/guide/"},
+        ])
+        assert body(steps=steps)["sponsors"] == [
+            {"name": "Drive", "url": "https://acme.example/guide"}]
+
     def test_nameless_entries_drop_out(self):
         steps = extraction_steps(sponsors=[
             {"name": "", "url": "", "blurb": "footer link"},
