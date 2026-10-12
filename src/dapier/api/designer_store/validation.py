@@ -366,7 +366,7 @@ def _validate_decision(step, label):
     ``cases``); omitted, it is inferred — a step carrying choices/cases is a
     switch, everything else an if. The prompt is required (the question the
     LLM answers). A switch needs a non-empty, unique ``choices`` list — the
-    enum the structured reply is constrained to — and every case's
+    options the typed decision answer is picked from — and every case's
     ``choice`` must be one of them, at most once per case, with optional
     ``actions``; ``default_actions`` covers an unusable or off-list reply.
     Branches recurse as step chains, like condition's then/else.

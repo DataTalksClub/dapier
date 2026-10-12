@@ -152,7 +152,8 @@ def _decision_plan(step, action_id):
 
 def _decision_branch(workflow_id, action_id, step, event, run_action, *,
                      before_action, after_action, on_action_error, scope,
-                     step_outputs, mode, choice, model, usage, note=None):
+                     step_outputs, mode, choice, model, usage, note=None,
+                     extra=None):
     """Run the branch a decision picked: ``then``/``else`` for an if, the
     matching case's ``actions`` (or ``default_actions``) for a switch. The
     branch id nests under the step like a condition's or a path's, and the
@@ -185,6 +186,7 @@ def _decision_branch(workflow_id, action_id, step, event, run_action, *,
               "choice": choice if choice is not None else "",
               "branch": branch, "steps": len(steps), "model": model,
               "usage": usage}
+    output.update(extra or {})
     if note:
         output["note"] = note
     return stop, output, "completed"
@@ -195,19 +197,21 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
                   step_outputs=None, transport=None):
     """The LLM decision step: a smart ``if`` statement or a ``switch``.
 
-    One structured completion against the same OpenAI-compatible endpoint
-    the ``ai_complete`` action reads (the LLM_* env on the Worker function —
-    point LLM_BASE_URL at OpenRouter and it is an OpenRouter decision):
-    ``mode: if`` asks the prompt's yes/no question and runs ``then``/``else``;
-    ``mode: switch`` asks the model to pick one of ``choices`` and runs the
-    matching case's ``actions``. A reply that will not parse — or picks a
-    value outside ``choices`` — runs ``default_actions`` when the step has
-    one and fails the step otherwise, so on_fail/on_error policies apply.
-    The reply is forced through a json_schema (a boolean ``answer`` or the
-    ``choice`` enum) and validated locally; temperature defaults to 0 so the
-    same input routes the same way.
+    One typed call to OpenRouter's decisions endpoint (the jev route,
+    ``~typesafe/jev-latest`` by default — step ``model:`` overrides): the
+    rendered prompt is the question's ``state`` and the model answers a
+    single choice question over the criteria, so the reply is a picked
+    option with probabilities and confidence — no free text to parse.
+    ``mode: if`` offers yes/no and runs ``then``/``else``; ``mode: switch``
+    offers ``choices`` (a case may carry a ``description:`` that becomes
+    that option's criterion) and runs the matching case's ``actions``.
+    A response with no usable choice — or one outside ``choices`` — runs
+    ``default_actions`` when the step has one and fails the step otherwise,
+    so on_fail/on_error policies apply. ``system``, when set, is the
+    question's instructions.
     """
     from ...connectors import ai
+    from ..actions.templating import render
 
     mode, choices = _decision_plan(step, action_id)
     if not os.environ.get(ai.API_KEY_ENV, "").strip():
@@ -215,30 +219,33 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
             f"decision '{action_id}' is not configured (set {ai.API_KEY_ENV} — "
             f"and optionally {ai.BASE_URL_ENV} and {ai.MODEL_ENV} — on "
             "the Worker function)")
+    prompt = render(str(step["prompt"]), event, step_outputs).strip()
     if mode == "switch":
-        schema = {"type": "object",
-                  "properties": {"choice": {"type": "string", "enum": choices,
-                                            "description": "exactly one of the allowed choices"}},
-                  "required": ["choice"]}
+        described = {}
+        for case in step.get("cases") or []:
+            if isinstance(case, dict):
+                choice = str(case.get("choice") or "").strip()
+                description = str(case.get("description") or "").strip()
+                if choice and description:
+                    described[choice] = description
+        criteria = {choice: described.get(choice, choice) for choice in choices}
+        instructions = (str(step.get("system") or "").strip()
+                        or "Pick exactly the one option that matches the state.")
     else:
-        schema = {"type": "object",
-                  "properties": {"answer": {"type": "boolean",
-                                            "description": "the answer to the prompt's question"}},
-                  "required": ["answer"]}
-    synthetic = {
-        "prompt": str(step["prompt"]),
-        "json_schema": schema,
-        "temperature": step.get("temperature", 0),
-    }
-    if str(step.get("system") or "").strip():
-        synthetic["system"] = step["system"]
-    if str(step.get("model") or "").strip():
-        synthetic["model"] = step["model"]
-    if step.get("timeout_seconds") is not None:
-        synthetic["timeout_seconds"] = step["timeout_seconds"]
-    result = ai.run_ai_complete(synthetic, event, steps=step_outputs, transport=transport)
+        criteria = {"yes": "the answer to the state's question is yes / true",
+                    "no": "the answer to the state's question is no / false"}
+        instructions = (str(step.get("system") or "").strip()
+                        or "Answer the state's yes/no question by choosing "
+                           "exactly one option.")
+    result = ai.run_decisions(
+        state=prompt, instructions=instructions, criteria=criteria,
+        model=step.get("model"),
+        timeout_seconds=step.get("timeout_seconds"), transport=transport)
     model, usage = result.get("model"), (result.get("usage") if isinstance(result.get("usage"), dict) else {})
-    if not result.get("ok"):
+    extra = {"confidence": result.get("confidence"),
+             "probabilities": result.get("probabilities")}
+
+    def _unusable(note):
         default_steps = step.get("default_actions")
         if mode == "switch" and isinstance(default_steps, list):
             return _decision_branch(
@@ -246,36 +253,27 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
                 before_action=before_action, after_action=after_action,
                 on_action_error=on_action_error, scope=scope,
                 step_outputs=step_outputs, mode=mode, choice=None,
-                model=model, usage=usage, note=str(result.get("error") or ""))
-        raise ValueError(f"decision '{action_id}': {result.get('error')}")
+                model=model, usage=usage, note=note)
+        raise ValueError(f"decision '{action_id}': {note}")
+
+    if not result.get("ok"):
+        return _unusable(str(result.get("error") or "the model returned no choice"))
+    choice = result["choice"]
     if mode == "switch":
-        choice = str((result.get("data") or {}).get("choice") or "").strip()
         if choice not in choices:
-            default_steps = step.get("default_actions")
-            if isinstance(default_steps, list):
-                return _decision_branch(
-                    workflow_id, action_id, step, event, run_action,
-                    before_action=before_action, after_action=after_action,
-                    on_action_error=on_action_error, scope=scope,
-                    step_outputs=step_outputs, mode=mode, choice=None,
-                    model=model, usage=usage,
-                    note=f"the model answered '{choice}', which is not one of "
-                         f"{', '.join(choices)}")
-            raise ValueError(
-                f"decision '{action_id}': the model answered '{choice}', "
-                f"which is not one of {', '.join(choices)}")
+            return _unusable(f"the model answered '{choice}', which is not one of "
+                             f"{', '.join(choices)}")
         picked = choice
     else:
-        answer = (result.get("data") or {}).get("answer")
-        if not isinstance(answer, bool):
-            raise ValueError(f"decision '{action_id}': the model did not answer true or false")
-        picked = answer
+        if choice not in ("yes", "no"):
+            return _unusable(f"the model answered '{choice}', which is not yes or no")
+        picked = choice == "yes"
     return _decision_branch(
         workflow_id, action_id, step, event, run_action,
         before_action=before_action, after_action=after_action,
         on_action_error=on_action_error, scope=scope,
         step_outputs=step_outputs, mode=mode, choice=picked,
-        model=model, usage=usage)
+        model=model, usage=usage, extra=extra)
 
 
 def _run_delay(step, context):

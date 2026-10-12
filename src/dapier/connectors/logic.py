@@ -40,10 +40,11 @@ logic_step(LogicStep(
     label="Decision",
     icon="sparkles",
     description="Ask the LLM and branch on the answer: a smart if (then/else) "
-                "or a switch over choices. One structured completion against "
-                "the ai_complete LLM_* env — point LLM_BASE_URL at OpenRouter "
-                "and it is an OpenRouter decision. Output: {mode, choice, "
-                "branch, steps, model, usage}.",
+                "or a switch over choices. One typed call to OpenRouter's "
+                "decisions endpoint (the jev route) over the ai_complete "
+                "LLM_* env — the reply is a picked option with confidence, "
+                "not chat text. Output: {mode, choice, branch, steps, model, "
+                "usage, confidence, probabilities}.",
     fields=(
         {"key": "mode", "label": "Mode", "type": "select",
          "options": ["if", "switch"], "default": "switch",
@@ -54,14 +55,13 @@ logic_step(LogicStep(
         {"key": "system", "label": "System message", "type": "textarea",
          "help": "Optional role and standing instructions"},
         {"key": "model", "label": "Model",
-         "help": "Overrides the configured default (LLM_MODEL)"},
-        {"key": "temperature", "label": "Temperature", "type": "number",
-         "help": "Defaults to 0 so the same input routes the same way"},
+         "help": "Overrides the default decision model (~typesafe/jev-latest)"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
         {"key": "choices", "label": "Choices (YAML, switch)", "type": "yaml",
          "placeholder": "- one-on-one\n- ai-shipping-labs"},
         {"key": "cases", "label": "Cases (YAML, switch)", "type": "yaml",
-         "placeholder": "- choice: one-on-one\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []"},
+         "placeholder": "- choice: one-on-one\n  description: a recorded call between two people\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []",
+         "help": "A case may carry a description: it becomes that choice's criterion"},
         {"key": "default_actions", "label": "Default steps (YAML, switch)", "type": "yaml",
          "help": "Runs when the reply is unusable or off-list; without it the step fails"},
         {"key": "then", "label": "Then steps (YAML, if)", "type": "yaml",

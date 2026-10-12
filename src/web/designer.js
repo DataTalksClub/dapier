@@ -19820,7 +19820,7 @@
       type: "decision",
       label: "Decision",
       icon: Sparkles,
-      description: "Ask the LLM and branch on the answer — a smart if (then/else) or a switch over choices; one structured completion via the ai_complete LLM_* env",
+      description: "Ask the LLM and branch on the answer — a smart if (then/else) or a switch over choices; one typed call to OpenRouter's decisions endpoint (jev) via the ai_complete LLM_* env",
       fields: [
         {
           key: "mode",
@@ -19838,8 +19838,7 @@
           placeholder: "Classify this Zoom recording:\nTopic: {topic}\nHost: {host_email}"
         },
         { key: "system", label: "System message", type: "textarea" },
-        { key: "model", label: "Model", placeholder: "defaults to LLM_MODEL" },
-        { key: "temperature", label: "Temperature", type: "number", placeholder: "0" },
+        { key: "model", label: "Model", placeholder: "defaults to ~typesafe/jev-latest" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
         {
           key: "choices",
@@ -19851,7 +19850,7 @@
           key: "cases",
           label: "Cases (YAML, switch)",
           type: "yaml",
-          placeholder: "- choice: one-on-one\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []"
+          placeholder: "- choice: one-on-one\n  description: a recorded call between two people\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []"
         },
         {
           key: "default_actions",

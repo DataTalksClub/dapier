@@ -435,3 +435,99 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
                 }
         return {"ok": True, "data": data, "model": answered_model, "usage": usage}
     return {"ok": True, "text": reply, "model": answered_model, "usage": usage}
+
+# --- decision: OpenRouter's typed decisions endpoint (jev) ------------------
+
+JEV_MODEL = "~typesafe/jev-latest"
+DECISIONS_PATH = "/api/alpha/decisions"
+
+
+def _decisions_base_url():
+    """The host the decisions endpoint hangs off. LLM_BASE_URL is a
+    chat-completions root for ai_complete (`.../api/v1`); the decisions
+    endpoint lives off the bare host, so a chat-style suffix is stripped.
+    Unset, it is OpenRouter."""
+    base = os.environ.get(BASE_URL_ENV, "").strip().rstrip("/")
+    for suffix in ("/api/v1", "/v1"):
+        if base.endswith(suffix):
+            return base[: -len(suffix)]
+    return base or "https://openrouter.ai"
+
+
+def run_decisions(*, state, instructions, criteria, model=None,
+                  timeout_seconds=None, transport=None):
+    """One typed decision via OpenRouter's decisions endpoint (the jev
+    route): the state plus one choice question in, a picked option with
+    probabilities and confidence out — the endpoint returns typed answers,
+    so there is no reply text to parse.
+
+    Transport is the same seam run_ai_complete uses — an injectable
+    ``(method, url, *, headers, body, timeout) -> (status, raw)`` so tests
+    record the request instead of hitting the network; the default is
+    urllib. HTTP 4xx/5xx, timeouts and an unreadable response raise
+    ``HttpError`` (Retry-After included when the server sent one), which is
+    what the engine's autoretry reads; a response whose answers do not
+    carry the question is a ``{ok: False}`` verdict, never a raise.
+    """
+    key = os.environ.get(API_KEY_ENV, "").strip()
+    if not key:
+        raise ValueError(
+            "decision is not configured (set "
+            f"{API_KEY_ENV} — and optionally {BASE_URL_ENV} and {MODEL_ENV} — "
+            "on the Worker function)")
+    payload = json.dumps({
+        "model": str(model or "").strip() or JEV_MODEL,
+        "state": state,
+        "questions": {"choice": {"type": "choice",
+                                 "instructions": instructions,
+                                 "criteria": criteria}},
+    }).encode()
+    url = f"{_decisions_base_url()}{DECISIONS_PATH}"
+    headers = {
+        "authorization": f"Bearer {key}",
+        "content-type": "application/json",
+        "user-agent": "dapier-decision",
+        **_extra_headers(),
+    }
+    timeout = timeout_seconds if timeout_seconds is not None else LLM_TIMEOUT_SECONDS
+    if transport is not None:
+        status, raw = transport("POST", url, headers=headers, body=payload,
+                                timeout=timeout)
+    else:
+        try:
+            status, raw = _default_transport(url, payload, headers, timeout)
+        except urllib.error.HTTPError as exc:
+            # urllib raises for HTTP 4xx/5xx before the status check below;
+            # type it like the ai_complete default path does.
+            raise HttpError(
+                f"decision returned HTTP {exc.code}",
+                status=exc.code,
+                retry_after=retry_after_seconds(exc.headers),
+            ) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise HttpError(f"decision request failed: {exc}") from exc
+    if status >= 300:
+        raise HttpError(f"decision returned HTTP {status}", status=status)
+    try:
+        body = json.loads(raw.decode())
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise HttpError(f"decision returned an unexpected response: {exc}") from exc
+    if not isinstance(body, dict):
+        raise HttpError("decision returned an unexpected response: "
+                        f"{json.dumps(body)[:300]}")
+    answered_model = str(body.get("model") or model or JEV_MODEL)
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else {}
+    answer = answers.get("choice")
+    usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
+    if not isinstance(answer, dict) or not str(answer.get("choice") or "").strip():
+        return {"ok": False,
+                "error": "the decision response carried no choice answer",
+                "model": answered_model, "usage": usage}
+    probabilities = answer.get("probabilities")
+    confidence = answer.get("confidence")
+    return {"ok": True,
+            "choice": str(answer["choice"]).strip(),
+            "confidence": confidence if isinstance(confidence, (int, float)) else None,
+            "probabilities": probabilities if isinstance(probabilities, dict) else {},
+            "model": answered_model,
+            "usage": usage}

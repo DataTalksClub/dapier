@@ -1,12 +1,14 @@
 """In-workflow logic step: decision — the LLM smart if/switch.
 
-One structured completion (the ai_complete machinery, so the same LLM_* env —
-LLM_BASE_URL at OpenRouter makes it an OpenRouter decision) picks a branch:
-``mode: if`` answers the prompt's yes/no question and runs then/else;
-``mode: switch`` picks one of ``choices`` and runs the matching case's
-actions, falling back to ``default_actions`` on an unusable or off-list
-reply. The save-time validator, the dry-run and the engine agree on the
-step's shape, and the step output carries the choice for later steps.
+One typed call to OpenRouter's decisions endpoint (the jev route — the same
+LLM_* env as ai_complete, LLM_API_KEY is the OpenRouter key) picks a branch:
+``mode: if`` offers the model yes/no over the prompt's question and runs
+then/else; ``mode: switch`` offers ``choices`` and runs the matching case's
+actions, falling back to ``default_actions`` when no usable choice comes
+back. The reply is a typed answer — choice, probabilities, confidence — so
+there is no reply text to parse. The save-time validator, the dry-run and
+the engine agree on the step's shape, and the step output carries the choice
+for later steps.
 """
 import json
 import os
@@ -27,22 +29,33 @@ EVENT = {
 }
 
 
-def llm_transport(content, model="test-model"):
-    """A transport seam answering one fixed assistant message."""
+def decisions_transport(choice=None, *, confidence=0.9, model="test-model",
+                        instructions=None):
+    """A transport seam answering one fixed typed choice (or no answer at
+    all when ``choice`` is None), recording the question it was asked."""
     def transport(method, url, *, headers, body, timeout):
-        assert url.endswith("/chat/completions")
+        assert url.endswith("/api/alpha/decisions")
         assert headers["authorization"] == "Bearer test-key"
+        payload = json.loads(body)
+        assert payload["questions"]["choice"]["type"] == "choice"
+        if instructions is not None:
+            assert payload["questions"]["choice"]["instructions"] == instructions
+        answers = {}
+        if choice is not None:
+            answers["choice"] = {"type": "choice", "choice": choice,
+                                 "probabilities": {choice: confidence},
+                                 "confidence": confidence}
         return 200, json.dumps({
             "model": model,
-            "choices": [{"message": {"content": content}}],
-            "usage": {"total_tokens": 7},
+            "answers": answers,
+            "usage": {"input_tokens": 6, "output_tokens": 1},
         }).encode()
     return transport
 
 
-def default_transport_for(content):
-    """ai.py's positional _default_transport seam wrapped around llm_transport."""
-    seam = llm_transport(content)
+def default_transport_for(choice):
+    """ai.py's positional _default_transport seam around decisions_transport."""
+    seam = decisions_transport(choice)
 
     def default_transport(url, payload, headers, timeout):
         return seam("POST", url, headers=headers, body=payload, timeout=timeout)
@@ -67,7 +80,8 @@ class Hooks:
         self.calls.append(("error", action_id, str(exc)))
 
 
-def run_decision(step, content, *, event=None, run_action=None, hooks=None):
+def run_decision(step, choice, *, event=None, run_action=None, hooks=None,
+                 transport=None):
     hooks = hooks or Hooks()
     ran = []
     runner = run_action or (lambda action, event, workflow_id, steps=None:
@@ -77,7 +91,7 @@ def run_decision(step, content, *, event=None, run_action=None, hooks=None):
             "wf-1", str(step["id"]), step, event or EVENT, runner,
             before_action=hooks.before, after_action=hooks.after,
             on_action_error=hooks.error, step_outputs={},
-            transport=llm_transport(content))
+            transport=transport or decisions_transport(choice))
     return stop, output, status, ran, hooks
 
 
@@ -99,26 +113,29 @@ SWITCH_STEP = {
 
 class SwitchTests(unittest.TestCase):
     def test_matching_case_runs(self):
-        stop, output, status, ran, hooks = run_decision(
-            SWITCH_STEP, json.dumps({"choice": "one-on-one"}))
+        stop, output, status, ran, hooks = run_decision(SWITCH_STEP, "one-on-one")
         assert stop is None and status == "completed"
         assert ran == ["zoom-calls-agent"]
         assert output["choice"] == "one-on-one"
         assert output["branch"] == "one-on-one"
         assert output["model"] == "test-model"
-        assert output["usage"] == {"total_tokens": 7}
+        assert output["usage"] == {"input_tokens": 6, "output_tokens": 1}
+        assert output["confidence"] == 0.9
+        assert output["probabilities"] == {"one-on-one": 0.9}
         # the branch nests under the step, like a condition's then/else
         assert ("before", "classify.one-on-one.zoom-calls-agent", "agent") in hooks.calls
 
-    def test_request_carries_enum_and_zero_temperature(self):
+    def test_request_carries_choices_as_criteria(self):
         seen = {}
 
         def transport(method, url, *, headers, body, timeout):
             seen.update(json.loads(body))
-            return 200, json.dumps({
+            return (200, json.dumps({
                 "model": "m",
-                "choices": [{"message": {"content": '{"choice": "ai-shipping-labs"}'}}],
-                "usage": {}}).encode()
+                "answers": {"choice": {"type": "choice",
+                                       "choice": "ai-shipping-labs",
+                                       "probabilities": {}, "confidence": 0.8}},
+                "usage": {}}).encode())
 
         with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
             logic._run_decision(
@@ -126,36 +143,72 @@ class SwitchTests(unittest.TestCase):
                 lambda action, event, workflow_id, steps=None: {},
                 before_action=None, after_action=None, on_action_error=None,
                 step_outputs={}, transport=transport)
-        schema = seen["response_format"]["json_schema"]["schema"]
-        assert schema["properties"]["choice"]["enum"] == ["one-on-one", "ai-shipping-labs"]
-        assert seen["temperature"] == 0.0
+        question = seen["questions"]["choice"]
+        assert list(question["criteria"]) == ["one-on-one", "ai-shipping-labs"]
+        # the rendered prompt is the state; the model defaults to the jev route
+        assert "Weekly sync with Bob" in seen["state"]
+        assert seen["model"] == "~typesafe/jev-latest"
+
+    def test_case_description_reaches_criteria(self):
+        seen = {}
+        step = {**SWITCH_STEP, "cases": [
+            {"choice": "one-on-one", "description": "a call between two people",
+             "actions": [{"id": "zoom-calls-agent", "type": "agent", "prompt": "x"}]},
+            {"choice": "ai-shipping-labs", "actions": []},
+        ]}
+
+        def transport(method, url, *, headers, body, timeout):
+            seen.update(json.loads(body))
+            return (200, json.dumps({
+                "model": "m",
+                "answers": {"choice": {"type": "choice", "choice": "one-on-one",
+                                       "probabilities": {}, "confidence": 0.8}},
+                "usage": {}}).encode())
+
+        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+            logic._run_decision(
+                "wf-1", "classify", step, EVENT,
+                lambda action, event, workflow_id, steps=None: {},
+                before_action=None, after_action=None, on_action_error=None,
+                step_outputs={}, transport=transport)
+        criteria = seen["questions"]["choice"]["criteria"]
+        assert criteria["one-on-one"] == "a call between two people"
+        assert criteria["ai-shipping-labs"] == "ai-shipping-labs"
+
+    def test_system_becomes_the_instructions(self):
+        step = {**SWITCH_STEP, "system": "You route Zoom recordings."}
+        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+            logic._run_decision(
+                "wf-1", "classify", step, EVENT,
+                lambda action, event, workflow_id, steps=None: {},
+                before_action=None, after_action=None, on_action_error=None,
+                step_outputs={}, transport=decisions_transport(
+                    "one-on-one", instructions="You route Zoom recordings."))
 
     def test_off_list_answer_runs_default(self):
-        stop, output, status, ran, _ = run_decision(
-            SWITCH_STEP, json.dumps({"choice": "webinar"}))
+        stop, output, status, ran, _ = run_decision(SWITCH_STEP, "webinar")
         assert ran == ["fallback"]
         assert output["branch"] == "default"
-        assert "not one of the allowed values" in output["note"]
+        assert "not one of" in output["note"]
 
     def test_off_list_answer_without_default_fails(self):
         step = {k: v for k, v in SWITCH_STEP.items() if k != "default_actions"}
         with pytest.raises(ValueError, match="not one of"):
-            run_decision(step, json.dumps({"choice": "webinar"}))
+            run_decision(step, "webinar")
 
-    def test_unparsable_reply_runs_default(self):
-        stop, output, status, ran, _ = run_decision(SWITCH_STEP, "not json at all")
+    def test_missing_answer_runs_default(self):
+        stop, output, status, ran, _ = run_decision(SWITCH_STEP, None)
         assert ran == ["fallback"]
         assert output["branch"] == "default"
 
-    def test_unparsable_reply_without_default_fails(self):
+    def test_missing_answer_without_default_fails(self):
         step = {k: v for k, v in SWITCH_STEP.items() if k != "default_actions"}
-        with pytest.raises(ValueError, match="could not parse"):
-            run_decision(step, "not json at all")
+        with pytest.raises(ValueError, match="carried no choice"):
+            run_decision(step, None)
 
     def test_mode_defaults_to_switch_when_choices_present(self):
         step = {k: v for k, v in SWITCH_STEP.items() if k != "mode"}
-        stop, output, status, ran, _ = run_decision(
-            step, json.dumps({"choice": "ai-shipping-labs"}))
+        stop, output, status, ran, _ = run_decision(step, "ai-shipping-labs")
         assert output["mode"] == "switch"
         assert ran == ["aisl-agent"]
 
@@ -172,29 +225,46 @@ IF_STEP = {
 
 class IfTests(unittest.TestCase):
     def test_true_runs_then(self):
-        stop, output, status, ran, hooks = run_decision(
-            IF_STEP, json.dumps({"answer": True}))
+        stop, output, status, ran, hooks = run_decision(IF_STEP, "yes")
         assert ran == ["yes"]
         assert output["branch"] == "then"
         assert output["choice"] is True
         assert ("before", "ask.then.yes", "agent") in hooks.calls
 
     def test_false_runs_else(self):
-        stop, output, status, ran, hooks = run_decision(
-            IF_STEP, json.dumps({"answer": False}))
+        stop, output, status, ran, hooks = run_decision(IF_STEP, "no")
         assert ran == ["no"]
         assert output["branch"] == "else"
         assert output["choice"] is False
         assert ("before", "ask.else.no", "agent") in hooks.calls
 
-    def test_non_boolean_answer_fails(self):
-        with pytest.raises(ValueError, match="should be boolean"):
-            run_decision(IF_STEP, json.dumps({"answer": "maybe"}))
+    def test_if_criteria_are_yes_no(self):
+        seen = {}
+
+        def transport(method, url, *, headers, body, timeout):
+            seen.update(json.loads(body))
+            return (200, json.dumps({
+                "model": "m",
+                "answers": {"choice": {"type": "choice", "choice": "yes",
+                                       "probabilities": {}, "confidence": 0.7}},
+                "usage": {}}).encode())
+
+        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+            logic._run_decision(
+                "wf-1", "ask", IF_STEP, EVENT,
+                lambda action, event, workflow_id, steps=None: {},
+                before_action=None, after_action=None, on_action_error=None,
+                step_outputs={}, transport=transport)
+        assert list(seen["questions"]["choice"]["criteria"]) == ["yes", "no"]
+        assert "one-on-one" in seen["state"]
+
+    def test_non_yes_no_answer_fails(self):
+        with pytest.raises(ValueError, match="not yes or no"):
+            run_decision(IF_STEP, "maybe")
 
     def test_mode_defaults_to_if_when_no_choices(self):
         step = {k: v for k, v in IF_STEP.items() if k != "mode"}
-        stop, output, status, ran, _ = run_decision(
-            step, json.dumps({"answer": True}))
+        stop, output, status, ran, _ = run_decision(step, "yes")
         assert output["mode"] == "if"
         assert ran == ["yes"]
 
@@ -210,17 +280,17 @@ class ConfigTests(unittest.TestCase):
                     lambda action, event, workflow_id, steps=None: {},
                     before_action=None, after_action=None,
                     on_action_error=None, step_outputs={},
-                    transport=llm_transport(json.dumps({"choice": "one-on-one"})))
+                    transport=decisions_transport("one-on-one"))
 
     def test_missing_prompt_fails_before_any_call(self):
         step = {k: v for k, v in SWITCH_STEP.items() if k != "prompt"}
         with pytest.raises(ValueError, match="needs a prompt"):
-            run_decision(step, json.dumps({"choice": "one-on-one"}))
+            run_decision(step, "one-on-one")
 
     def test_unknown_mode_fails(self):
         step = {**SWITCH_STEP, "mode": "maybe"}
         with pytest.raises(ValueError, match="mode must be one of"):
-            run_decision(step, json.dumps({"choice": "one-on-one"}))
+            run_decision(step, "one-on-one")
 
     def test_choice_reaches_downstream_steps(self):
         seen = {}
@@ -231,7 +301,7 @@ class ConfigTests(unittest.TestCase):
 
         with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}), \
                 mock.patch("src.dapier.connectors.ai._default_transport",
-                           default_transport_for(json.dumps({"choice": "one-on-one"}))):
+                           default_transport_for("one-on-one")):
             logic.run_chain(
                 "wf-1", [SWITCH_STEP,
                          {"id": "after", "type": "webhook", "url": "https://example.test"}],
@@ -245,7 +315,7 @@ class EngineChainTests(unittest.TestCase):
 
     def test_run_chain_dispatches_decision(self):
         with mock.patch("src.dapier.connectors.ai._default_transport",
-                        default_transport_for(json.dumps({"choice": "one-on-one"}))):
+                        default_transport_for("one-on-one")):
             with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
                 ran, hooks = [], Hooks()
                 stop = logic.run_chain(
@@ -324,9 +394,10 @@ class ValidationTests(unittest.TestCase):
         with pytest.raises(Exception, match="for_each needs a list field"):
             self._parse([step])
 
-    def test_templated_temperature_skips_literal_check(self):
-        workflow = self._parse([{**SWITCH_STEP, "temperature": "{settings.temp}"}])
-        assert workflow["actions"][0]["temperature"] == "{settings.temp}"
+    def test_templated_timeout_skips_literal_check(self):
+        workflow = self._parse([{**SWITCH_STEP,
+                                 "timeout_seconds": "{settings.timeout}"}])
+        assert workflow["actions"][0]["timeout_seconds"] == "{settings.timeout}"
 
 
 class DryRunTests(unittest.TestCase):
@@ -365,7 +436,7 @@ class DryRunTests(unittest.TestCase):
         ]}]}
         with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}), \
                 mock.patch("src.dapier.connectors.ai._default_transport",
-                           default_transport_for(json.dumps({"choice": "one-on-one"}))):
+                           default_transport_for("one-on-one")):
             result = dryrun.test_run(workflow, EVENT, execute=True)
         entry = next(s for s in result["steps"] if s["action_id"] == "classify")
         assert entry["ok"] is True

@@ -181,18 +181,20 @@ and `on_fail: continue` / `on_error` policies apply unchanged:
 
 ## The decision step (smart if / switch)
 
-`decision` is the branching sibling of `ai_complete`: one structured
-completion picks a branch, and the step runs that branch's steps inline —
-a smart `if` statement, or a `switch` over named choices. It reads the same
-`LLM_*` env as `ai_complete` (Worker and API functions), so configuring it
-is the same ops step; with OpenRouter as the endpoint it is an OpenRouter
-decision:
+`decision` is the branching sibling of `ai_complete`: one typed call to
+**OpenRouter's decisions endpoint** (the jev route) picks a branch, and the
+step runs that branch's steps inline — a smart `if` statement, or a
+`switch` over named choices. The decisions endpoint returns a picked option
+with probabilities and a confidence, not chat text, so there is nothing to
+parse and a reply cannot route anywhere illegal. It reads the same `LLM_*`
+env as `ai_complete` (Worker and API functions), so configuring it is the
+same ops step:
 
 | Env var | OpenRouter value |
 |---------|------------------|
-| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` |
+| `LLM_BASE_URL` | leave unset (defaults to OpenRouter); a chat-style `…/api/v1` base is stripped back to the bare host for the decisions call |
 | `LLM_API_KEY` | an OpenRouter key (deploy-time parameter, never git) |
-| `LLM_MODEL` | any router id, e.g. `openai/gpt-4o-mini` |
+| `LLM_MODEL` | not used by `decision` — the decision model defaults to `~typesafe/jev-latest`; set `model:` per step to override |
 
 ```yaml
 actions:
@@ -207,6 +209,7 @@ actions:
     choices: [one-on-one, ai-shipping-labs]
     cases:
       - choice: one-on-one
+        description: a recorded call between two people
         actions:
           - id: process-call
             type: agent
@@ -214,6 +217,7 @@ actions:
             workspace: /home/alexey/git/zoom-calls
             prompt: "Process this one-on-one recording: {topic} ..."
       - choice: ai-shipping-labs
+        description: an AI Shipping Labs session — cohort lecture, workshop, or guest talk
         actions:
           - id: process-aisl
             type: agent
@@ -231,31 +235,31 @@ actions:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `mode` | no | `if` or `switch`; omitted, it is inferred — a step carrying `choices`/`cases` is a switch, everything else an if |
-| `prompt` | yes | Templated like `ai_complete`; the question the model answers |
-| `system` | no | Sent as the system message |
-| `model` | no | Overrides `LLM_MODEL` (per-step model, e.g. a stronger router id) |
-| `temperature` | no | Defaults to **0** so the same input routes the same way |
+| `prompt` | yes | Templated like `ai_complete`; sent as the question's `state` |
+| `system` | no | The question's instructions (a mode-appropriate default when omitted) |
+| `model` | no | Overrides the default decision model (`~typesafe/jev-latest`) |
 | `timeout_seconds` | no | Default 25 |
-| `choices` | switch | Non-empty list of unique strings — the enum the reply is constrained to |
-| `cases` | switch | `[{choice, actions}]`; each `choice` must be in `choices`, at most once per case |
-| `default_actions` | switch | Runs when the reply is unusable or off-list; without it the step fails (on_fail/on_error then apply) |
+| `choices` | switch | Non-empty list of unique strings — the options the model picks from |
+| `cases` | switch | `[{choice, actions, description?}]`; each `choice` must be in `choices`, at most once per case; a `description` becomes that option's criterion |
+| `default_actions` | switch | Runs when the answer is unusable or off-list; without it the step fails (on_fail/on_error then apply) |
 | `then` / `else` | if | The steps for the yes/no sides, like a condition step's branches |
 
-The reply is forced through a `json_schema` — `{"answer": true|false}` for
-an if, `{"choice": <one of choices>}` for a switch — and validated locally,
-so a model that ignores the schema still cannot route anywhere illegal. An
-unparsable or off-list reply runs `default_actions` (switch) or fails the
-step (if, or switch without a default). Transport errors raise the usual
-`HttpError`; unlike the logic-step kind it resembles, `decision` is not in
-the worker's config-error set, so the workflow-level `retry:` redrive still
-covers a rate-limited endpoint. It cannot carry `autoretry:` (logic steps
-never do) — use a per-step `on_error: run` branch or the workflow retry.
+An `if` is the same choice question with `yes`/`no` criteria — the answer
+maps to `then`/`else` and surfaces as a boolean `choice`. An off-list or
+missing answer runs `default_actions` (switch) or fails the step (if, or
+switch without a default). Transport errors raise the usual `HttpError`;
+unlike the logic-step kind it resembles, `decision` is not in the worker's
+config-error set, so the workflow-level `retry:` redrive still covers a
+rate-limited endpoint. It cannot carry `autoretry:` (logic steps never do)
+— use a per-step `on_error: run` branch or the workflow retry.
 
 ### Output
 
 ```json
 {"mode": "switch", "choice": "one-on-one", "branch": "one-on-one",
- "steps": 1, "model": "openai/gpt-4o-mini", "usage": {…}}
+ "steps": 1, "model": "~typesafe/jev-latest", "usage": {…},
+ "confidence": 0.93, "probabilities": {"one-on-one": 0.93,
+ "ai-shipping-labs": 0.07}}
 ```
 
 `branch` is the side that ran (`then`/`else`, the matching choice, or
