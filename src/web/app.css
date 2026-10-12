@@ -2337,7 +2337,9 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 }
   /* Service credential rows carry a third control (the row menu): keep the
      name on whole-word wrap and shrink the row buttons, so a single-word
-     name like Mailchimp never breaks mid-word at 375. */
+     name like Mailchimp never breaks mid-word at 375. (Kept inside the
+     media block - as landed these two rules sat below it and shrank the
+     setup tables' buttons on desktop too.) */
   .setup-table td.cell-title { overflow-wrap: normal; word-break: normal; }
   .setup-table .action-cell .dk-button { height: var(--dk-size-control-sm); min-height: 0; padding: 0 var(--dk-space-2); font-size: var(--dk-text-sm); }
 
@@ -2389,4 +2391,16 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   #token-table .cell-title .cell-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
 }
 
-
+/* --- mobile: connections account actions (<=560) ----------------------------------
+   The Manage action reads as the account row's last full-width line, left
+   aligned - col 2 row 2 stranded it right with a dead half beside it on
+   every account card. Above 560px nothing changes. */
+@media (max-width: 560px) {
+  .service-account-actions { grid-column: 1 / -1; grid-row: 3; justify-content: flex-start; }
+}
+@media (max-width: 420px) {
+  /* Provider heads: below ~430 the title, its count and the add button no
+     longer share a line, so Add account wraps to a deliberate full-width
+     row instead of a lone right-floating button on a dead line. */
+  .service-panel > .section-head .service-add { flex: 1 1 100%; justify-content: center; }
+}
