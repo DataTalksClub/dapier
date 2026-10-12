@@ -26,8 +26,13 @@ from src.dapier.connections.providers.dropbox_api import (  # noqa: E402
     dropbox_download as _dropbox_download,
 )
 
-def _upload_files(action, data):
+def _upload_files(action, data, steps=None):
     """Return the ``{s3, filename}`` files the action should upload."""
+    if action.get("source") == "step":
+        document = _step_document(steps, action.get("step"))
+        name = str(document.get("filename") or "").strip() or "document.pdf"
+        return [{"s3": {"bucket": document["bucket"], "key": document["key"]},
+                 "filename": name}]
     if action.get("source") == "output":
         output = data.get("output") or {}
         if not (output.get("bucket") and output.get("key")):
@@ -45,6 +50,22 @@ def _upload_files(action, data):
     if not files:
         raise ValueError("email has no stored attachments to upload")
     return files
+
+def _step_document(steps, ref):
+    """The ``{bucket, key, filename?}`` a prior step's output references
+    (a merge_pdfs step's ``output.output``), addressed by its prefixed id."""
+    ref = str(ref or "").strip()
+    if not ref:
+        raise ValueError("dropbox_upload source step needs step (a prior step id)")
+    node = (steps or {}).get(ref)
+    output = node.get("output") if isinstance(node, dict) and isinstance(node.get("output"), dict) else {}
+    document = output.get("output") if isinstance(output.get("output"), dict) else {}
+    if not (isinstance(document, dict) and document.get("bucket") and document.get("key")):
+        raise ValueError(f"dropbox_upload source step '{ref}' does not reference a stored file")
+    if not str(document.get("filename") or "").strip():
+        document = dict(document, filename=output.get("filename"))
+    return document
+
 
 def _content_type(attachment):
     return str((attachment or {}).get("content_type") or "").split(";")[0].strip().lower()
@@ -120,7 +141,7 @@ def run_dropbox_upload(action, event, transport=None, steps=None):
     stripped = render(str(action.get("folder") or ""), event, steps).strip("/")
     folder = f"/{stripped}" if stripped else ""
     uploaded = []
-    files = _upload_files(action, event.get("data", {}))
+    files = _upload_files(action, event.get("data", {}), steps=steps)
     selection = action.get("attachment_selection", "all")
     if selection not in ("all", "single", "first"):
         raise ValueError("attachment_selection must be all, single or first")

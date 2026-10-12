@@ -2,15 +2,12 @@
 
 The canonical `workflows/invoice-intake.yaml` must satisfy the same
 save-time validation the API enforces, so the file cannot rot away from
-what a live workflow would accept — and its code steps (triage,
-subject cleanup, forwarded-header stripping) must behave as their tests
-claim.
+what a live workflow would accept — and its code steps (triage, subject
+cleanup, forwarded-header stripping) must behave as their tests claim.
 """
 from pathlib import Path
 
 import yaml
-
-from src.dapier.connectors import registry
 
 WORKFLOW_FILE = Path(__file__).resolve().parents[1] / "workflows" / "invoice-intake.yaml"
 
@@ -39,7 +36,7 @@ def test_the_shipped_invoice_intake_workflow_validates():
     assert workflow["trigger"]["filters"]["route"]["equals"] == "invoice"
 
 
-def test_triage_routes_attachment_body_and_fails_on_two():
+def test_triage_drops_non_pdfs_and_picks_or_merges():
     from src.dapier.engine.actions.code import run_code
 
     triage = find_action(shipped_workflow(), "triage")
@@ -48,74 +45,82 @@ def test_triage_routes_attachment_body_and_fails_on_two():
     def run(attachments):
         return run_code(triage, {"data": {"attachments": attachments}})["result"]
 
-    assert run([]) == {"has_attachment": False, "attachment_count": 0,
-                       "document_count": 0}
-    assert run([{"filename": "invoice.pdf"}]) == {
-        "has_attachment": True, "attachment_count": 1, "document_count": 1}
+    pdf = {"content_type": "application/pdf", "checksum": "sha256:" + "a" * 64}
+
+    body = run([])
+    assert body["has_attachment"] is False
+    assert body["mode"] == "body"
+    assert body["document_plan"] == {"mode": "body", "attachments": []}
+
+    single = run([dict(pdf, filename="invoice.pdf")])
+    assert single["mode"] == "single"
+    assert single["document_key"] == "a" * 12
+    assert single["document_plan"]["attachments"] == [dict(pdf, filename="invoice.pdf")]
+
+    # Stripe sends the invoice and the receipt; the receipt is the keeper.
+    pair = run([dict(pdf, filename="Invoice-4T7.pdf", checksum="sha256:" + "b" * 64),
+                dict(pdf, filename="Receipt-4T7.pdf", checksum="sha256:" + "c" * 64)])
+    assert pair["mode"] == "receipt"
+    assert pair["document_plan"]["attachments"] == [
+        dict(pdf, filename="Receipt-4T7.pdf", checksum="sha256:" + "c" * 64)]
+    assert pair["document_key"] == "c" * 12
+
+    # Ambiguity merges instead of picking: no receipt name, or several.
+    merged = run([dict(pdf, filename="a.pdf"),
+                  dict(pdf, filename="b.pdf", checksum="sha256:" + "b" * 64)])
+    assert merged["mode"] == "merge"
+    assert [a["filename"] for a in merged["document_plan"]["attachments"]] == ["a.pdf", "b.pdf"]
+    assert merged["document_key"] == "6173cf9d3267"
+    two_receipts = run([dict(pdf, filename="Receipt-1.pdf"),
+                        dict(pdf, filename="Receipt-2.pdf", checksum="sha256:" + "b" * 64)])
+    assert two_receipts["mode"] == "merge"
+
+    # Non-PDF attachments never make the document.
+    mixed = run([{"content_type": "text/html; charset=utf-8", "filename": "Terms_of_Service.html"},
+                 {"content_type": "image/png", "filename": "scan.png"},
+                 dict(pdf, filename="invoice.pdf")])
+    assert mixed["attachment_count"] == 3
+    assert mixed["document_count"] == 1
+    assert mixed["document_plan"]["attachments"] == [dict(pdf, filename="invoice.pdf")]
 
     import pytest
 
-    with pytest.raises(RuntimeError, match="got 2 documents"):
-        run([{}, {}])
-
-    # Vendor boilerplate (stapled Terms-of-Service HTML) never counts as a
-    # document: a Google-Play-style forward takes the body-render path, and a
-    # PDF beside the boilerplate still takes the archive path.
-    boilerplate = [{"content_type": "text/html; charset=utf-8",
-                    "filename": "Terms_of_Service_de_de.html"}] * 2
-    assert run(boilerplate) == {"has_attachment": False, "attachment_count": 2,
-                                "document_count": 0}
-    mixed = boilerplate + [{"content_type": "application/pdf",
-                            "filename": "invoice.pdf"}]
-    assert run(mixed) == {"has_attachment": True, "attachment_count": 3,
-                          "document_count": 1}
+    with pytest.raises(RuntimeError, match="checksum is required"):
+        run([{"content_type": "application/pdf", "filename": "invoice.pdf"}])
 
 
-def test_subject_cleanup_and_archive_identity():
-    from src.dapier.engine.actions.code import run_code
-    from src.dapier.engine.actions.templating import render
-
+def test_attachment_branch_builds_and_archives_one_document():
     workflow = shipped_workflow()
     branch = next(action for action in workflow["actions"]
                   if action.get("id") == "route")["then"]
     assert [action["id"] for action in branch] == [
-        "email-date", "clean-subject", "archive-attachment", "file-to-dataops",
+        "email-date", "clean-subject", "make-document", "archive-document",
+        "file-to-dataops",
     ]
-    clean_subject, archive = branch[1], branch[2]
-    # Branch steps are recorded under their prefixed run-history id; bare ids
-    # silently rendered empty and archived every PDF as "--.pdf".
+    make_document, archive, intake = branch[2], branch[3], branch[4]
+    assert make_document["type"] == "merge_pdfs"
+    assert make_document["plan_step"] == "triage"
+    # The archive names come from prefixed run-history ids (bare branch ids
+    # silently rendered empty and archived every PDF as "--.pdf") and the
+    # document key now comes from triage's decision.
     assert "steps.route.then.email-date" in archive["filename"]
     assert "steps.route.then.clean-subject" in archive["filename"]
-    assert archive.get("exclude_content_types") == ["text/html", "text/plain"]
-    subjects = [
-        "Fwd: Amazon Web Services Invoice Available [Account: 123] [Invoice ID: INV-1]",
-        "Re: Fwd: Amazon web services Invoice Available [Account: 456] [Invoice ID: INV-2]",
-        "Amazon Web Services",
-    ]
-    names = []
-    for index, subject in enumerate(subjects):
-        event = {"data": {"subject": subject, "attachments": [{"checksum": "sha256:" + str(index + 1) * 64}]}}
-        output = run_code(clean_subject, event)
-        assert output["result"]["subject"] == "Amazon Web Services"
-        assert event["data"]["subject"] == subject  # retain the original intake/audit data
-        steps = {"route.then.email-date": {"output": {"formatted": "2026-10-03"}},
-                 "route.then.clean-subject": {"output": output}}
-        names.append(render(archive["filename"], event, steps))
-        assert run_code(clean_subject, event)["result"] == output["result"]
-    assert len(set(names)) == len(names)
-    assert all(name.startswith("2026-10-03-Amazon Web Services-") for name in names)
+    assert "steps.triage.output.result.document_key" in archive["filename"]
+    assert archive["source"] == "step"
+    assert archive["step"] == "route.then.make-document"
+    assert intake["document_step"] == "route.then.make-document"
 
 
-def test_subject_cleanup_keeps_other_vendor_text_and_requires_document_identity():
-    import pytest
-
+def test_subject_cleanup_still_normalizes_vendors():
     from src.dapier.engine.actions.code import run_code
 
     clean_subject = find_action(shipped_workflow(), "clean-subject")
-    event = {"data": {"subject": "Fwd: Stripe receipt", "attachments": [{"checksum": "a" * 64}]}}
+    event = {"data": {"subject": "Fwd: Stripe receipt [Invoice ID: INV-1]"}}
     assert run_code(clean_subject, event)["result"]["subject"] == "Stripe receipt"
-    with pytest.raises(RuntimeError, match="Attachment checksum is required"):
-        run_code(clean_subject, {"data": {"subject": "Amazon Web Services"}})
+    event = {"data": {"subject": "Re: Amazon Web Services Invoice Available [Account: 123]"}}
+    assert run_code(clean_subject, event)["result"]["subject"] == "Amazon Web Services"
+    event = {"data": {"subject": ""}}
+    assert run_code(clean_subject, event)["result"]["subject"] == "Invoice"
 
 
 def test_body_only_branch_strips_and_renders():

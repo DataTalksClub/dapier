@@ -130,7 +130,7 @@ def _intake_body(action, event, *, steps=None):
         return _leads_intake_body(action, event, steps=steps)
     if event.get("connector") == "dropbox":
         return _dropbox_intake_body(action, event, steps=steps)
-    return _email_intake_body(action, event)
+    return _email_intake_body(action, event, steps=steps)
 
 
 def _is_leads_action(action):
@@ -187,50 +187,56 @@ def _email_transfer_key(route, message_id, kind, index, filename, body, content_
     return f"email/{digest}/{filename}"
 
 
-def _email_intake_body(action, event):
+def _email_intake_body(action, event, *, steps=None):
     data = event.get("data", {})
     source_data = data.get("source_event", {}).get("data", data)
     message_id = data.get("message_id") or source_data["message_id"]
     route = data.get("route") or source_data["route"]
-    documents = []
-    for index, attachment in enumerate(data.get("attachments", [])):
-        if not base.is_document_attachment(attachment):
-            continue  # ToS/legal boilerplate never belongs in the document intake
-        ref = attachment.get("s3") or {}
-        if ref.get("bucket") and ref.get("key"):
-            body = _s3_bytes(ref["bucket"], ref["key"])
-            filename = base._safe_filename(attachment.get("filename") or "attachment")
-            content_type = attachment.get("content_type") or "application/octet-stream"
+    document_step = str(action.get("document_step") or "").strip()
+    if document_step:
+        # A prior step (merge_pdfs) already decided the one document this
+        # email is about: forward exactly that, not every attachment.
+        documents = [_step_document(document_step, route, message_id, action, steps)]
+    else:
+        documents = []
+        for index, attachment in enumerate(data.get("attachments", [])):
+            if not base.is_document_attachment(attachment):
+                continue  # ToS/legal boilerplate never belongs in the document intake
+            ref = attachment.get("s3") or {}
+            if ref.get("bucket") and ref.get("key"):
+                body = _s3_bytes(ref["bucket"], ref["key"])
+                filename = base._safe_filename(attachment.get("filename") or "attachment")
+                content_type = attachment.get("content_type") or "application/octet-stream"
+                storage_uri = _stage_document(
+                    _email_transfer_key(route, message_id, "attachment", index, filename,
+                                        body, content_type, attachment["checksum"]),
+                    body, content_type, attachment["checksum"])
+                documents.append({
+                    "kind": "attachment",
+                    "storageUri": storage_uri,
+                    "filename": filename,
+                    "contentType": content_type,
+                    "sizeBytes": len(body),
+                    "checksum": attachment["checksum"],
+                })
+        output = data.get("output") or {}
+        if output.get("bucket") and output.get("key"):
+            body = _s3_bytes(output["bucket"], output["key"])
+            filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
+            content_type = data.get("content_type", "application/pdf")
+            checksum = f"sha256:{data['checksum']}"
             storage_uri = _stage_document(
-                _email_transfer_key(route, message_id, "attachment", index, filename,
-                                    body, content_type, attachment["checksum"]),
-                body, content_type, attachment["checksum"])
+                _email_transfer_key(route, message_id, "rendered-email-pdf", 0, filename,
+                                    body, content_type, checksum),
+                body, content_type, checksum)
             documents.append({
-                "kind": "attachment",
+                "kind": "rendered-email-pdf",
                 "storageUri": storage_uri,
                 "filename": filename,
                 "contentType": content_type,
                 "sizeBytes": len(body),
-                "checksum": attachment["checksum"],
+                "checksum": checksum,
             })
-    output = data.get("output") or {}
-    if output.get("bucket") and output.get("key"):
-        body = _s3_bytes(output["bucket"], output["key"])
-        filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
-        content_type = data.get("content_type", "application/pdf")
-        checksum = f"sha256:{data['checksum']}"
-        storage_uri = _stage_document(
-            _email_transfer_key(route, message_id, "rendered-email-pdf", 0, filename,
-                                body, content_type, checksum),
-            body, content_type, checksum)
-        documents.append({
-            "kind": "rendered-email-pdf",
-            "storageUri": storage_uri,
-            "filename": filename,
-            "contentType": content_type,
-            "sizeBytes": len(body),
-            "checksum": checksum,
-        })
     sender = source_data.get("sender", {})
     sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
     return {
@@ -241,6 +247,34 @@ def _email_intake_body(action, event):
         "subject": source_data.get("subject") or "Inbound email",
         "receivedAt": _received_at(source_data.get("date") or event["occurred_at"]),
         "documents": documents,
+    }
+
+
+def _step_document(ref, route, message_id, action, steps):
+    """Stage the one document a prior step produced (a merge_pdfs output:
+    ``{"filename", "output": {"bucket", "key"}}`` under the step's output)
+    and build its intake document entry. The checksum is computed over the
+    stored bytes, so passthrough documents keep the original attachment's."""
+    node = (steps or {}).get(ref)
+    output = node.get("output") if isinstance(node, dict) and isinstance(node.get("output"), dict) else {}
+    document = output.get("output") if isinstance(output.get("output"), dict) else {}
+    if not (isinstance(document, dict) and document.get("bucket") and document.get("key")):
+        raise ValueError(f"dataops document_step '{ref}' does not reference a stored file")
+    body = _s3_bytes(document["bucket"], document["key"])
+    filename = base._safe_filename(str(document.get("filename") or output.get("filename") or "").strip()
+                                   or action.get("filename") or "invoice-document.pdf")
+    checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
+    storage_uri = _stage_document(
+        _email_transfer_key(route, message_id, "attachment", 0, filename,
+                            body, "application/pdf", checksum),
+        body, "application/pdf", checksum)
+    return {
+        "kind": "attachment",
+        "storageUri": storage_uri,
+        "filename": filename,
+        "contentType": "application/pdf",
+        "sizeBytes": len(body),
+        "checksum": checksum,
     }
 
 

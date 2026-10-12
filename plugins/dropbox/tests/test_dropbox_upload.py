@@ -71,3 +71,56 @@ class SkipExistingTests(unittest.TestCase):
         self.assertIn("skip_existing", spec.optional)
         keys = [field["key"] for field in spec.fields]
         self.assertIn("skip_existing", keys)
+
+
+def run_step_source(transport, action, steps):
+    with patch("plugins.dropbox.runners.dropbox._dropbox_connection",
+               return_value=dict(CONNECTION)), \
+         patch("src.dapier.connections.tokens.get_access_token",
+               return_value=("token-123", {})), \
+         patch("src.dapier.engine.actions.base._s3_body", return_value=b"merged-pdf-bytes"):
+        return run_dropbox_upload(action, deepcopy(EVENT), transport=transport, steps=steps)
+
+
+STEP_OUTPUT = {"output": {"output": {"bucket": "artifacts",
+                                     "key": "invoice-document/ev.pdf",
+                                     "filename": "merged.pdf", "merged": True}}}
+
+
+class StepSourceTests(unittest.TestCase):
+    ACTION = {"type": "dropbox_upload", "connection_id": "dropbox", "source": "step",
+              "step": "route.then.make-document", "folder": "/Invoices"}
+
+    def test_step_source_uploads_the_referenced_document(self):
+        transport = FakeTransport()
+        output = run_step_source(transport, dict(self.ACTION, filename="archived.pdf"),
+                                 {"route.then.make-document": STEP_OUTPUT})
+        self.assertEqual(output, {"uploaded": ["/Invoices/x"], "already_exists": False})
+        self.assertEqual(transport.calls[0]["body"], b"merged-pdf-bytes")
+        api_arg = json.loads(transport.calls[0]["headers"]["dropbox-api-arg"])
+        self.assertEqual(api_arg["path"], "/Invoices/archived.pdf")
+
+    def test_step_source_falls_back_to_the_document_filename(self):
+        transport = FakeTransport()
+        output = run_step_source(transport, dict(self.ACTION),
+                                 {"route.then.make-document": STEP_OUTPUT})
+        api_arg = json.loads(transport.calls[0]["headers"]["dropbox-api-arg"])
+        self.assertEqual(api_arg["path"], "/Invoices/merged.pdf")
+
+    def test_step_source_needs_a_recorded_step(self):
+        with self.assertRaises(ValueError) as caught:
+            run_step_source(FakeTransport(), dict(self.ACTION), {})
+        self.assertIn("does not reference a stored file", str(caught.exception))
+        with self.assertRaises(ValueError) as caught:
+            run_step_source(FakeTransport(), dict(self.ACTION, step=""), {})
+        self.assertIn("needs step", str(caught.exception))
+
+    def test_registry_lists_step_source(self):
+        from src.dapier.connectors import registry
+
+        spec = registry.ACTIONS["dropbox_upload"]
+        self.assertIn("step", spec.optional)
+        keys = [field["key"] for field in spec.fields]
+        self.assertIn("step", keys)
+        source = next(field for field in spec.fields if field["key"] == "source")
+        self.assertIn("step", source["options"])

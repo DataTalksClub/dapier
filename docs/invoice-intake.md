@@ -11,20 +11,35 @@ in DataOps (`POST /api/v1/intake/email-documents`, contract
 
 ```
 SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
-  1. triage — count document attachments; email boilerplate (text/html and
-     text/plain parts, e.g. stapled Terms of Service) is ignored end to end
-     (triage, archive naming, the Dropbox upload via exclude_content_types,
-     and the DataOps intake staging). Two or more documents fail the run.
+  1. triage — decide the one document this email is about. Only PDFs count
+     (content type application/pdf, or a .pdf name on an unnamed or
+     octet-stream part); everything else — vendor HTML boilerplate, images,
+     calendar parts — is dropped end to end.
+       - no PDF left → the body path: strip the forwarded header and render
+         the body to PDF (the else branch, completed by
+         invoice-body-completion).
+       - one PDF → the archive path with it.
+       - several PDFs → a lone receipt wins over its paired invoice (Stripe
+         sends both; the receipt is the keeper). When the keeper is
+         ambiguous — no receipt-named PDF, or several — all the PDFs merge
+         into one document instead of picking arbitrarily. The document key
+         for archive naming is the chosen checksum's prefix, or for merges
+         a hash over the sorted checksums.
   2. email-date — format the email date in UTC
   3. clean-subject — a Python code step removes forwarding/reply prefixes,
      "Invoice Available" and account/invoice brackets; AWS subjects become
-     "Amazon Web Services". It returns a stable attachment checksum suffix.
-  4. archive-attachment — archive the original PDF using date, clean subject
-     and checksum suffix, so different invoices on the same day do not collide.
-  5. file-to-dataops — stage the PDF into the DataOps documents bucket
-     (transfer/ prefix, sha256 in object metadata), then post the intake
-     envelope to the DataOps connection's origin
-     (`/api/v1/intake/email-documents`) with x-dataops-intake-secret
+     "Amazon Web Services".
+  4. make-document — merge_pdfs turns triage's plan into exactly one
+     document: a single attachment passes through untouched (bytes and
+     checksum stay the original's), several merge page-wise in email order
+     into `invoice-document/{event_id}.pdf` in the artifacts bucket.
+  5. archive-document — dropbox_upload (source: step) archives that one
+     document using date, clean subject and document key, so different
+     invoices on the same day do not collide.
+  6. file-to-dataops — document_step points at make-document, so the intake
+     stages exactly the selected document (transfer/ prefix, sha256 in
+     object metadata) and posts the envelope to the DataOps connection's
+     origin (`/api/v1/intake/email-documents`) with x-dataops-intake-secret
 ```
 
 Each email is one SQS message, so concurrent invoices file concurrently.
@@ -33,9 +48,9 @@ after a lost response submits the same source manifest. Changed document
 content gets a separate source key and remains subject to the intake's
 immutable-message conflict checks.
 The intake is idempotent per (recipientRoute, messageId), checksum- and
-size-verifies every staged object, and files each attachment as a
+size-verifies every staged object, and files each document as a
 DataOps artifact — review and bookkeeping happen in the DataOps console
-from there. The code step does not change the original email subject sent to
+from there. The code steps do not change the original email subject sent to
 DataOps or parse invoice contents. DataOps handles extraction, verification and
 spreadsheet publication, and uses its own stable document ID for archive names.
 Nothing in Dapier keeps invoice state.

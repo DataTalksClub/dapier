@@ -16,6 +16,15 @@ plugin code.
 
 ## Unreleased
 
+`dropbox_upload` accepts `source: step`: the upload reads the file a prior
+step's output references (`{bucket, key, filename?}` under the step's
+`output.output`, addressed by its prefixed run-history id — e.g.
+`route.then.make-document`). This archives produced documents — a
+merge_pdfs result, a rendered PDF handed across steps — without routing
+them through the event. The rendered filename falls back to the
+referenced document's filename.
+
+
 `dropbox_upload` accepts `exclude_content_types` (list or comma-separated
 string): attachments with those MIME types (matched without parameters,
 case-insensitive) are skipped before the upload, and `attachment_selection`

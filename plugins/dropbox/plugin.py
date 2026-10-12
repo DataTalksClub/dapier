@@ -49,10 +49,12 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None, transport=None:
         run_dropbox_upload(action, event, transport=transport, steps=steps),
     required=frozenset({"connection_id", "folder"}),
-    optional=frozenset({"source", "filename", "attachment_selection", "exclude_content_types", "overwrite", "autorename", "strict_conflict", "skip_existing"}),
+    optional=frozenset({"source", "step", "filename", "attachment_selection", "exclude_content_types", "overwrite", "autorename", "strict_conflict", "skip_existing"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "dropbox", "required": True},
-        {"key": "source", "label": "Source", "type": "select", "options": ["attachment", "output"], "default": "attachment"},
+        {"key": "source", "label": "Source", "type": "select", "options": ["attachment", "output", "step"], "default": "attachment"},
+        {"key": "step", "label": "Step reference", "placeholder": "route.then.make-document",
+         "help": "With source: step — the prior step whose output.output references {bucket, key, filename?}."},
         {"key": "folder", "label": "Folder", "placeholder": "/Invoices", "required": True,
          "discover": {"resource": "dropbox.folders"}},
         {"key": "filename", "label": "Filename override"},

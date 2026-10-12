@@ -10,17 +10,56 @@ actions:
 - id: triage
   type: code
   code: |
+    import hashlib
+    import re
+
     attachments = input.get("attachments") or []
-    boilerplate = ("text/html", "text/plain")
-    documents = [a for a in attachments
-                 if str(a.get("content_type") or "").split(";")[0].strip().lower()
-                 not in boilerplate]
-    count = len(documents)
-    if count > 1:
-        raise ValueError(f"expected at most one document, got {count} documents "
-                          f"({len(attachments) - count} boilerplate attachments ignored)")
-    output = {"has_attachment": count == 1, "attachment_count": len(attachments),
-              "document_count": count}
+
+    def main_type(attachment):
+        return str((attachment or {}).get("content_type") or "").split(";")[0].strip().lower()
+
+    def is_pdf(attachment):
+        content_type = main_type(attachment)
+        name = str((attachment or {}).get("filename") or "").strip().lower()
+        return content_type == "application/pdf" or (
+            content_type in ("", "application/octet-stream") and name.endswith(".pdf"))
+
+    pdfs = [a for a in attachments if is_pdf(a)]
+
+    def checksum_of(attachment):
+        value = re.sub(r"^sha256:", "", str((attachment or {}).get("checksum") or ""), flags=re.I)
+        if not re.fullmatch(r"[a-f0-9]{64}", value, flags=re.I):
+            raise ValueError("Document checksum is required for archive naming")
+        return value.lower()
+
+    # Non-PDF attachments (vendor HTML, images, calendar parts) are dropped
+    # end to end. With several PDFs a lone receipt wins over its paired
+    # invoice (Stripe sends both; the receipt is the keeper); when the
+    # keeper is ambiguous every PDF merges into one document instead of
+    # picking arbitrarily.
+    mode = "body"
+    keep = []
+    if len(pdfs) == 1:
+        mode = "single"
+        keep = pdfs
+    elif len(pdfs) > 1:
+        receipts = [a for a in pdfs if "receipt" in str(a.get("filename") or "").lower()]
+        if len(receipts) == 1:
+            mode = "receipt"
+            keep = receipts
+        else:
+            mode = "merge"
+            keep = pdfs
+    document_key = ""
+    if keep:
+        keys = [checksum_of(a) for a in keep]
+        if mode == "merge":
+            document_key = hashlib.sha256(":".join(sorted(keys)).encode()).hexdigest()[:12]
+        else:
+            document_key = keys[0][:12]
+    output = {"has_attachment": bool(keep), "attachment_count": len(attachments),
+              "document_count": len(pdfs), "mode": mode, "document_key": document_key,
+              "document_plan": {"mode": mode, "attachments": keep}}
   tests:
   - name: body-only email renders to PDF
     input:
@@ -29,21 +68,119 @@ actions:
       has_attachment: false
       attachment_count: 0
       document_count: 0
-  - name: single attachment follows the archive path
+      mode: body
+      document_key: ''
+      document_plan: {mode: body, attachments: []}
+  - name: single PDF follows the archive path
     input:
       attachments:
       - filename: invoice.pdf
+        content_type: application/pdf
+        checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     expected:
       has_attachment: true
       attachment_count: 1
       document_count: 1
-  - name: two attachments fail
+      mode: single
+      document_key: aaaaaaaaaaaa
+      document_plan:
+        mode: single
+        attachments:
+        - filename: invoice.pdf
+          content_type: application/pdf
+          checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - name: a receipt beats its paired invoice
     input:
       attachments:
-      - {}
-      - {}
-    expected_error: got 2 documents
-  - name: stapled Terms-of-Service HTML is boilerplate, the body renders
+      - filename: Invoice-4T7L8W.pdf
+        content_type: application/pdf
+        checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      - filename: Receipt-4T7L8W.pdf
+        content_type: application/pdf
+        checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    expected:
+      has_attachment: true
+      attachment_count: 2
+      document_count: 2
+      mode: receipt
+      document_key: cccccccccccc
+      document_plan:
+        mode: receipt
+        attachments:
+        - filename: Receipt-4T7L8W.pdf
+          content_type: application/pdf
+          checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  - name: an ambiguous pair merges instead of picking
+    input:
+      attachments:
+      - filename: a.pdf
+        content_type: application/pdf
+        checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - filename: b.pdf
+        content_type: application/pdf
+        checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    expected:
+      has_attachment: true
+      attachment_count: 2
+      document_count: 2
+      mode: merge
+      document_key: 6173cf9d3267
+      document_plan:
+        mode: merge
+        attachments:
+        - filename: a.pdf
+          content_type: application/pdf
+          checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        - filename: b.pdf
+          content_type: application/pdf
+          checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - name: two receipt-named PDFs stay ambiguous
+    input:
+      attachments:
+      - filename: Receipt-1.pdf
+        content_type: application/pdf
+        checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - filename: Receipt-2.pdf
+        content_type: application/pdf
+        checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    expected:
+      has_attachment: true
+      attachment_count: 2
+      document_count: 2
+      mode: merge
+      document_key: 6173cf9d3267
+      document_plan:
+        mode: merge
+        attachments:
+        - filename: Receipt-1.pdf
+          content_type: application/pdf
+          checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        - filename: Receipt-2.pdf
+          content_type: application/pdf
+          checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - name: stapled Terms-of-Service HTML and images are dropped
+    input:
+      attachments:
+      - content_type: text/html; charset=utf-8
+        filename: Terms_of_Service_de_de.html
+      - content_type: image/png
+        filename: scan.png
+      - filename: invoice.pdf
+        content_type: application/pdf
+        checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    expected:
+      has_attachment: true
+      attachment_count: 3
+      document_count: 1
+      mode: single
+      document_key: cccccccccccc
+      document_plan:
+        mode: single
+        attachments:
+        - filename: invoice.pdf
+          content_type: application/pdf
+          checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  - name: boilerplate-only email still renders the body
     input:
       attachments:
       - content_type: text/html; charset=utf-8
@@ -54,27 +191,33 @@ actions:
       has_attachment: false
       attachment_count: 2
       document_count: 0
-  - name: a PDF beside boilerplate follows the archive path
+      mode: body
+      document_key: ''
+      document_plan: {mode: body, attachments: []}
+  - name: an unnamed octet-stream PDF still counts
     input:
       attachments:
-      - content_type: text/html
-        filename: Terms_of_Service.html
-      - content_type: application/pdf
-        filename: invoice.pdf
+      - filename: invoice.pdf
+        content_type: application/octet-stream
+        checksum: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
     expected:
       has_attachment: true
-      attachment_count: 2
+      attachment_count: 1
       document_count: 1
-  - name: two documents still fail
+      mode: single
+      document_key: dddddddddddd
+      document_plan:
+        mode: single
+        attachments:
+        - filename: invoice.pdf
+          content_type: application/octet-stream
+          checksum: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  - name: a document without a checksum fails
     input:
       attachments:
-      - content_type: application/pdf
-        filename: a.pdf
-      - content_type: application/pdf
-        filename: b.pdf
-      - content_type: text/html
-        filename: tos.html
-    expected_error: got 2 documents
+      - filename: invoice.pdf
+        content_type: application/pdf
+    expected_error: checksum is required
 - id: route
   type: condition
   when:
@@ -96,59 +239,35 @@ actions:
       subject = re.sub(r"\s+Invoice\s+Available\b.*$", "", subject, flags=re.I).strip()
       if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
           subject = "Amazon Web Services"
-      attachment = (input.get("attachments") or [{}])[0]
-      for candidate in input.get("attachments") or []:
-          if str(candidate.get("content_type") or "").split(";")[0].strip().lower() \
-                  not in ("text/html", "text/plain"):
-              attachment = candidate
-              break
-      checksum = re.sub(r"^sha256:", "", str(attachment.get("checksum") or ""), flags=re.I)
-      if not re.fullmatch(r"[a-f0-9]{64}", checksum, flags=re.I):
-          raise ValueError("Attachment checksum is required for archive naming")
-      output = {"subject": subject or "Invoice", "document_key": checksum.lower()[:12]}
+      output = {"subject": subject or "Invoice"}
     tests:
     - name: forward prefix and receipt suffix come off
       input:
         subject: 'Fwd: Your Google Play Order Receipt from Oct 2, 2026'
-        attachments:
-        - checksum: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       expected:
         subject: Your Google Play Order Receipt from Oct 2, 2026
-        document_key: aaaaaaaaaaaa
     - name: AWS subjects normalize
       input:
         subject: 'Fwd: Amazon Web Services Invoice Available [Account: 1234]'
-        attachments:
-        - checksum: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
       expected:
         subject: Amazon Web Services
-        document_key: bbbbbbbbbbbb
-    - name: the document checksum wins over boilerplate
+    - name: an empty subject falls back to Invoice
       input:
-        subject: Invoice
-        attachments:
-        - content_type: text/html
-          filename: Terms_of_Service.html
-        - checksum: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-          content_type: application/pdf
-          filename: invoice.pdf
+        subject: ''
       expected:
         subject: Invoice
-        document_key: cccccccccccc
-    - name: a missing checksum fails
-      input:
-        subject: Invoice
-        attachments:
-        - filename: invoice.pdf
-      expected_error: checksum is required
-  - id: archive-attachment
+  - id: make-document
+    type: merge_pdfs
+    plan_step: triage
+    output_key: invoice-document/{event_id}.pdf
+    output_bucket_env: RENDER_ARTIFACTS_BUCKET
+  - id: archive-document
     type: dropbox_upload
     connection_id: dropbox
+    source: step
+    step: route.then.make-document
     folder: /_dtc_paperwork/invoices
-    source: attachment
-    attachment_selection: single
-    exclude_content_types: [text/html, text/plain]
-    filename: '{steps.route.then.email-date.output.formatted}-{steps.route.then.clean-subject.output.result.subject}-{steps.route.then.clean-subject.output.result.document_key}.pdf'
+    filename: '{steps.route.then.email-date.output.formatted}-{steps.route.then.clean-subject.output.result.subject}-{steps.triage.output.result.document_key}.pdf'
     overwrite: false
     autorename: false
     strict_conflict: true
@@ -156,6 +275,7 @@ actions:
     type: dataops
     connection_id: dataops
     auth_secret_id: dapier/dataops
+    document_step: route.then.make-document
   else:
   - id: strip-forwarded
     type: code

@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
+import { Bot, Braces, Calendar, Clock, Code2, Copy, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -1575,6 +1575,18 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "merge_pdfs",
+    label: "Merge PDFs",
+    icon: Copy,
+    description: "Turn a code step's document plan into exactly one PDF: a single attachment passes through untouched (the output references the stored object), several merge page-wise in plan order under output_key. The plan is the plan_step result's document_plan: {mode, attachments: [{filename, s3}]}. Output: {merged, parts, pages, filename, output}.",
+    fields: [
+      { key: "plan_step", label: "Plan step", placeholder: "triage", required: true },
+      { key: "output_key", label: "Output key", placeholder: "merged/{event_id}.pdf" },
+      { key: "output_bucket", label: "Output bucket", discover: { resource: "buckets", account: "aws" } },
+      { key: "output_bucket_env", label: "Output bucket env", placeholder: "RENDER_ARTIFACTS_BUCKET" }
+    ]
+  },
+  {
     type: "filter",
     label: "Filter",
     icon: Filter,
@@ -1953,6 +1965,7 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   http_request: "data",
   webhook: "data",
   render_html_to_pdf: "data",
+  merge_pdfs: "data",
   dataops: "data"
 };
 

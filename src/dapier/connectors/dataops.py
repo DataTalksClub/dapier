@@ -9,7 +9,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_dataops(action, event, steps=steps),
     required=frozenset({"auth_secret_id", "connection_id"}),
     optional=frozenset({"timeout_seconds", "dropbox_connection_id", "filename", "path",
-                        "recipient_route", "extraction_step"}),
+                        "recipient_route", "extraction_step", "document_step"}),
     fields=(
         {"key": "connection_id", "label": "DataOps connection", "placeholder": "dataops",
          "required": True, "provider": "dataops",
@@ -17,6 +17,8 @@ register(Action(
         {"key": "auth_secret_id", "label": "Auth secret ID", "placeholder": "dapier/dataops", "required": True},
         {"key": "extraction_step", "label": "Extraction step", "placeholder": "extract-sponsors",
          "help": "Step id whose output.data carries {newsletter, sponsors[]}. Set this for the sponsors-leads intake; omit for documents."},
+        {"key": "document_step", "label": "Document step", "placeholder": "route.then.make-document",
+         "help": "Email intakes: forward only the one document this prior step outputs (merge_pdfs), not every attachment."},
         {"key": "dropbox_connection_id", "label": "Dropbox connection",
          "placeholder": "dropbox — for file-event intakes", "provider": "dropbox"},
         {"key": "filename", "label": "Filename override"},

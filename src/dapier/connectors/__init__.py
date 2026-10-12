@@ -21,6 +21,7 @@ from . import (  # noqa: F401  (import = registration)
     email,
     ingress,
     logic,
+    pdf,
     poll,
     render,
     schedule,
