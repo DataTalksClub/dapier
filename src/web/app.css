@@ -2404,3 +2404,17 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
      row instead of a lone right-floating button on a dead line. */
   .service-panel > .section-head .service-add { flex: 1 1 100%; justify-content: center; }
 }
+
+/* --- mobile: worker rows (<=560) --------------------------------------------------
+   From the 2026-10-13 phone verification of the settled build: the row grid's
+   second column sized to the status cell, so the task line's state fell a notch
+   below the id while the workspace path wrapped beside the Started stamp. The
+   task line and the workspace path each span the card so neither wraps at 375,
+   and the engine chip shares the last line with the Started stamp (chip left,
+   stamp right). Above 560px nothing changes. */
+@media (max-width: 560px) {
+  .workers-table td[data-label="Task"]:not([data-empty]) { grid-column: 1 / -1; grid-row: 2; gap: var(--dk-space-1); font-size: var(--dk-text-xs); }
+  .workers-table td[data-label="Workspace"]:not([data-empty]) { grid-column: 1 / -1; grid-row: 3; }
+  .workers-table td[data-label="Engine"]:not([data-empty]) { grid-column: 1; grid-row: 4; justify-self: start; align-self: center; }
+  .workers-table td[data-label="Started"]:not([data-empty]) { grid-column: 2; grid-row: 4; justify-self: end; }
+}
