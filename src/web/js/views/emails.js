@@ -157,7 +157,7 @@ function emptyMessage() {
   if (mail.filter === 'failed') return '<h3>Nothing failed</h3><p>Messages whose workflow run failed show up here.</p>';
   if (mail.filter === 'handled') return '<h3>Nothing handled yet</h3><p>Messages a workflow ran for show up here.</p>';
   if (first) {
-    return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>';
+    return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>`;
   }
   return '<h3>No email received yet</h3><p>Add an email trigger with an address filter in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>, then send a message to that address.</p>';
 }
