@@ -70,6 +70,11 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
     A chat the bot cannot see is a verdict (``found: False``), not an error
     — Telegram rejects getChat with "chat not found" — so a workflow can
     branch on the outcome; every other Telegram rejection still raises.
+
+    The output also carries the bot's own id (via getMe) and whether the
+    currently pinned message is ours (``pinned_is_ours``), so a workflow
+    can unpin only its own previous announcement and leave other people's
+    pins alone — the ods-berlin-bot port.
     """
     connection = base._connected_connection(action["connection_id"])
     secret = credentials.get_credential(connection["credential_id"])
@@ -93,8 +98,14 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
             "message_id": pinned.get("message_id"),
             "from_id": (pinned.get("from") or {}).get("id"),
         }
+    try:
+        bot_id, _ = telegram_api.get_me(token, transport=transport)
+    except telegram_api.TelegramApiError:
+        bot_id = None
+    pinned_from = (pinned_info or {}).get("from_id")
     return {
         "found": True,
+        "bot_id": bot_id,
         "chat": {
             "id": chat.get("id"),
             "title": chat.get("title"),
@@ -102,6 +113,10 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
             "type": chat.get("type"),
             "pinned_message_id": (pinned or {}).get("message_id") if isinstance(pinned, dict) else None,
             "pinned_message": pinned_info,
+            "pinned_is_ours": bool(
+                pinned_info and pinned_info.get("message_id") is not None
+                and bot_id is not None and pinned_from == bot_id
+            ),
         },
     }
 

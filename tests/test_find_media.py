@@ -585,9 +585,11 @@ def test_telegram_find_chat_returns_the_chat_profile():
 
     output = run_telegram({"chat_id": "{chat_handle}"}, transport)
 
-    assert output == {"found": True, "chat": {
+    assert output == {"found": True, "bot_id": -10022, "chat": {
         "id": -10022, "title": "DataTalksClub Announcements",
-        "username": "dtc_announce", "type": "channel"}}
+        "username": "dtc_announce", "type": "channel",
+        "pinned_message_id": None, "pinned_message": None,
+        "pinned_is_ours": False}}
     call = transport.calls[0]
     assert call["url"].endswith("/getChat")
     assert call["body"] == {"chat_id": "@dtc_announce"}

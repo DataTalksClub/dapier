@@ -538,6 +538,19 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "telegram_unpin_message",
+    label: "Telegram unpin message",
+    icon: Send,
+    description: "Unpin one message in a chat (Bot API unpinChatMessage). chat_id falls back to the triggering chat; message_id comes from the trigger or an earlier step. Output: {unpinned, chat_id, message_id}.",
+    fields: [
+      { key: "connection_id", label: "Bot connection", required: true, provider: "telegram" },
+      { key: "chat_id", label: "Chat ID", placeholder: "defaults to the triggering chat",
+        discover: { resource: "chats" } },
+      { key: "message_id", label: "Message ID", required: true, placeholder: "{message_id}" },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
+    ]
+  },
+  {
     type: "telegram_ban_member",
     label: "Telegram ban member",
     icon: Send,

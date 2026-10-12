@@ -205,9 +205,15 @@ class SendMessageActionTests(unittest.TestCase):
                 "from": {"id": 8606382261, "is_bot": True},
             },
         }
+
+        def fake_call(token, method, payload=None, **kwargs):
+            if method == "getMe":
+                return {"id": 8606382261, "username": "ods_berlin_bot"}
+            return chat_data
+
         with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
-             patch("src.dapier.connections.providers.telegram_api.call", return_value=chat_data):
+             patch("src.dapier.connections.providers.telegram_api.call", side_effect=fake_call):
             res = run_telegram_find_chat(
                 {"connection_id": "tg-bot", "chat_id": "-1001295648628"},
                 {"data": {}},
@@ -215,6 +221,34 @@ class SendMessageActionTests(unittest.TestCase):
         self.assertTrue(res["found"])
         self.assertEqual(res["chat"]["pinned_message_id"], 18766)
         self.assertEqual(res["chat"]["pinned_message"]["from_id"], 8606382261)
+        self.assertEqual(res["bot_id"], 8606382261)
+        self.assertTrue(res["chat"]["pinned_is_ours"])
+
+    def test_find_chat_marks_foreign_pin_not_ours(self):
+        chat_data = {
+            "id": -1001295648628,
+            "title": "ODS Berlin",
+            "type": "supergroup",
+            "pinned_message": {
+                "message_id": 18766,
+                "from": {"id": 12345, "is_bot": False},
+            },
+        }
+
+        def fake_call(token, method, payload=None, **kwargs):
+            if method == "getMe":
+                return {"id": 8606382261, "username": "ods_berlin_bot"}
+            return chat_data
+
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.call", side_effect=fake_call):
+            res = run_telegram_find_chat(
+                {"connection_id": "tg-bot", "chat_id": "-1001295648628"},
+                {"data": {}},
+            )
+        self.assertTrue(res["found"])
+        self.assertFalse(res["chat"]["pinned_is_ours"])
 
     def test_unpin_message_calls_api(self):
         calls = []
