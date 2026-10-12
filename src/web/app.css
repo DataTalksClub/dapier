@@ -2177,7 +2177,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .workers-table td[data-label="Status"] { grid-column: 2; grid-row: 1; }
   .workers-table td[data-label="Status"]::before,
   .workers-table td[data-label="Engine"]::before { display: none; }
-  .workers-table .worker-status, .workers-table .worker-stack { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--dk-space-1) var(--dk-space-2); }
+  .workers-table .worker-status, .workers-table .worker-stack { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: var(--dk-space-1) var(--dk-space-2); }
   .workers-table td[data-label="Status"] .worker-status { justify-content: flex-end; }
   .workers-table td[data-label="Task"]:not([data-empty]) { grid-column: 1; grid-row: 2; display: flex; align-items: baseline; gap: var(--dk-space-2); font-size: var(--dk-text-sm); }
   .workers-table td[data-label="Engine"]:not([data-empty]) { grid-column: 2; grid-row: 2; justify-self: end; }
@@ -2187,6 +2187,9 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .workers-table td[data-label="Task"]::before,
   .workers-table td[data-label="Workspace"]::before,
   .workers-table td[data-label="Started"]::before { display: inline; content: attr(data-label); flex: none; font-family: var(--dk-font-sans); font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
+  /* The workspace path says where it lives; its label is redundant at this
+     width and only pushed the mono path to wrap. */
+  .workers-table td[data-label="Workspace"]::before { display: none; }
 
   /* Schedules: the name + cron summary with the on/off switch riding the
      name line, then the Starts / Latest fire lines labelled inline. The
