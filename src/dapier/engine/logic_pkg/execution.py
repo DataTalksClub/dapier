@@ -3,8 +3,8 @@ autoretry planning and backoff, and the dispatch into the
 action runner."""
 import random
 import time
-from .controls import (_predicate_scope, _run_condition, _run_delay, _run_filter,
-                       _run_paths)
+from .controls import (_predicate_scope, _run_condition, _run_decision,
+                       _run_delay, _run_filter, _run_paths)
 from .core import (AUTORETRY_DEFAULTS, CompletedStep, ERROR_MODES, ON_FAIL_MODES,
                    QuotaExceeded, RunSuspended, _elapsed, _step_id)
 from .loops import _run_digest, _run_for_each
@@ -180,6 +180,13 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
     if step_type == "delay":
         context = {**_predicate_scope(event, scope), "steps": step_outputs}
         return _run_delay(step, context)
+    if step_type == "decision":
+        return _run_decision(
+            workflow_id, action_id, step, event, run_action,
+            before_action=before_action, after_action=after_action,
+            on_action_error=on_action_error, scope=scope,
+            step_outputs=step_outputs,
+        )
     if step_type == "paths":
         return _run_paths(
             workflow_id, action_id, step, event, run_action,

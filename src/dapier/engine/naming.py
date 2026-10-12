@@ -99,6 +99,7 @@ _ACTION_LABELS = {
     "filter": "Filter",
     "condition": "Condition",
     "paths": "Paths",
+    "decision": "Decision",
     "delay": "Delay",
     "for_each": "Loop",
     "digest": "Digest",
@@ -108,8 +109,8 @@ _ACTION_LABELS = {
 
 # Steps that move data around rather than do what the flow is for.
 _PLUMBING = {"date_time", "code", "js", "filter", "condition", "paths", "delay",
-             "for_each", "digest", "digest_add", "formatter", "storage_get",
-             "storage_find"}
+             "for_each", "digest", "decision", "digest_add", "formatter",
+             "storage_get", "storage_find"}
 _PLUMBING_PATTERN = re.compile(r"_(find|read|lookup|get|head|list|presign)(_|$)")
 
 # Filter fields that identify a trigger, most identifying first, with the

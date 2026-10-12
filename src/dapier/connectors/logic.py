@@ -1,7 +1,7 @@
 """In-workflow logic steps, as catalog metadata for the designer.
 
 These steps execute inside ``engine.logic`` (filter, condition, paths,
-delay, for_each, digest), not through the connector dispatch — the registry carries their
+_decision, delay, for_each, digest), not through the connector dispatch — the registry carries their
 inspector schema so ``GET /api/catalog`` is the complete step palette.
 """
 from .registry import LOGIC_OPERATORS, LogicStep, logic_step
@@ -32,6 +32,41 @@ logic_step(LogicStep(
         {"key": "then", "label": "Then steps (YAML)", "type": "yaml",
          "placeholder": "- id: notify\n  type: slack\n  channel: \"#alerts\"\n  text: \"{subject}\""},
         {"key": "else", "label": "Else steps (YAML)", "type": "yaml"},
+    ),
+))
+
+logic_step(LogicStep(
+    type="decision",
+    label="Decision",
+    icon="sparkles",
+    description="Ask the LLM and branch on the answer: a smart if (then/else) "
+                "or a switch over choices. One structured completion against "
+                "the ai_complete LLM_* env — point LLM_BASE_URL at OpenRouter "
+                "and it is an OpenRouter decision. Output: {mode, choice, "
+                "branch, steps, model, usage}.",
+    fields=(
+        {"key": "mode", "label": "Mode", "type": "select",
+         "options": ["if", "switch"], "default": "switch",
+         "help": "if asks the prompt's yes/no question and runs then/else; "
+                 "switch picks one of the choices and runs the matching case"},
+        {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
+         "placeholder": "Classify this Zoom recording:\nTopic: {topic}\nHost: {host_email}"},
+        {"key": "system", "label": "System message", "type": "textarea",
+         "help": "Optional role and standing instructions"},
+        {"key": "model", "label": "Model",
+         "help": "Overrides the configured default (LLM_MODEL)"},
+        {"key": "temperature", "label": "Temperature", "type": "number",
+         "help": "Defaults to 0 so the same input routes the same way"},
+        {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
+        {"key": "choices", "label": "Choices (YAML, switch)", "type": "yaml",
+         "placeholder": "- one-on-one\n- ai-shipping-labs"},
+        {"key": "cases", "label": "Cases (YAML, switch)", "type": "yaml",
+         "placeholder": "- choice: one-on-one\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []"},
+        {"key": "default_actions", "label": "Default steps (YAML, switch)", "type": "yaml",
+         "help": "Runs when the reply is unusable or off-list; without it the step fails"},
+        {"key": "then", "label": "Then steps (YAML, if)", "type": "yaml",
+         "placeholder": "- id: notify\n  type: slack\n  channel: \"#alerts\"\n  text: \"yes: {subject}\""},
+        {"key": "else", "label": "Else steps (YAML, if)", "type": "yaml"},
     ),
 ))
 

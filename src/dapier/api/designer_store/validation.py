@@ -252,7 +252,8 @@ def _validate_steps(steps, where="actions"):
     """Structural validation of a step chain, recursing into logic steps.
 
     Connector action internals stay permissive (the engine owns them); the
-    logic step kinds — filter, condition, paths, delay, for_each, digest — are checked here
+    logic step kinds — filter, condition, paths, decision, delay, for_each,
+    digest — are checked here
     so a bad delay bound or an empty loop body fails the save with a clear
     error instead of failing at run time. The generic on_error/error_actions
     keys are shape-checked on every step, and error_actions recurses as a
@@ -284,6 +285,8 @@ def _validate_steps(steps, where="actions"):
                 if not isinstance(value, list):
                     raise WorkflowError(f"step '{label}': condition {branch} must be a list of steps")
                 _validate_steps(value, where=f"{label}.{branch}")
+        if kind == "decision":
+            _validate_decision(step, label)
         if kind == "paths":
             branches = step.get("paths")
             if not isinstance(branches, list) or not branches:
@@ -354,6 +357,70 @@ def _validate_steps(steps, where="actions"):
         registry.validate_field_types(step, f"step '{label}'", WorkflowError)
         if step.get("error_actions"):
             _validate_steps(step["error_actions"], where=f"{label}.error")
+
+
+def _validate_decision(step, label):
+    """Save-time check for a decision step (mirrors engine.logic._run_decision).
+
+    ``mode`` is ``if`` (then/else branches) or ``switch`` (``choices`` plus
+    ``cases``); omitted, it is inferred — a step carrying choices/cases is a
+    switch, everything else an if. The prompt is required (the question the
+    LLM answers). A switch needs a non-empty, unique ``choices`` list — the
+    enum the structured reply is constrained to — and every case's
+    ``choice`` must be one of them, at most once per case, with optional
+    ``actions``; ``default_actions`` covers an unusable or off-list reply.
+    Branches recurse as step chains, like condition's then/else.
+    """
+    from ...engine import logic
+
+    mode = logic._decision_mode(step)
+    if mode not in logic.DECISION_MODES:
+        raise WorkflowError(
+            f"step '{label}': decision mode must be one of "
+            f"{', '.join(logic.DECISION_MODES)}")
+    if not str(step.get("prompt") or "").strip():
+        raise WorkflowError(f"step '{label}': decision needs a prompt")
+    if mode == "switch":
+        choices = logic._decision_choices(step, label)
+        cases = step.get("cases")
+        if cases is not None:
+            if not isinstance(cases, list):
+                raise WorkflowError(f"step '{label}': decision cases must be a list")
+            seen = set()
+            for position, case in enumerate(cases):
+                if not isinstance(case, dict):
+                    raise WorkflowError(
+                        f"step '{label}': decision case {position} must be a mapping")
+                choice = str(case.get("choice") or "").strip()
+                if choice not in choices:
+                    raise WorkflowError(
+                        f"step '{label}': case {position} choice '{choice}' is not "
+                        f"one of the step's choices ({', '.join(choices)})")
+                if choice in seen:
+                    raise WorkflowError(
+                        f"step '{label}': duplicate case for choice '{choice}'")
+                seen.add(choice)
+                actions = case.get("actions")
+                if actions is not None:
+                    if not isinstance(actions, list):
+                        raise WorkflowError(
+                            f"step '{label}': case '{choice}' actions must be a list of steps")
+                    _validate_steps(actions, where=f"{label}.{choice}")
+        default_steps = step.get("default_actions")
+        if default_steps is not None:
+            if not isinstance(default_steps, list):
+                raise WorkflowError(
+                    f"step '{label}': decision default_actions must be a list of steps")
+            _validate_steps(default_steps, where=f"{label}.default")
+    else:
+        for branch in ("then", "else"):
+            value = step.get(branch)
+            if value is None:
+                continue
+            if not isinstance(value, list):
+                raise WorkflowError(
+                    f"step '{label}': decision {branch} must be a list of steps")
+            _validate_steps(value, where=f"{label}.{branch}")
 
 
 def _validate_digest(step, label):

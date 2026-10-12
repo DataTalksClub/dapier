@@ -394,6 +394,43 @@ def _evaluate_logic_step(step, step_type, envelope, context,
         entry["status"] = "completed"
         entry["output"] = {"matched": matched, "steps": len(body) if isinstance(body, list) else 0,
                            "note": "branch not executed — test its steps individually"}
+    elif step_type == "decision":
+        try:
+            mode, choices = logic._decision_plan(step, step.get("id", ""))
+            if mode == "switch":
+                cases = step.get("cases")
+                if cases is not None:
+                    if not isinstance(cases, list):
+                        raise ValueError(f"decision '{step.get('id', '')}' cases must be a list")
+                    for position, case in enumerate(cases):
+                        if not isinstance(case, dict):
+                            raise ValueError(
+                                f"decision '{step.get('id', '')}': case {position} must be a mapping")
+                        choice = str(case.get("choice") or "").strip()
+                        if choice not in choices:
+                            raise ValueError(
+                                f"decision '{step.get('id', '')}': case {position} choice "
+                                f"'{choice}' is not one of {', '.join(choices)}")
+                        if not isinstance(case.get("actions") or [], list):
+                            raise ValueError(
+                                f"decision '{step.get('id', '')}': case '{choice}' "
+                                "actions must be a list of steps")
+                if not isinstance(step.get("default_actions") or [], list):
+                    raise ValueError(
+                        f"decision '{step.get('id', '')}' default_actions must be a list of steps")
+            else:
+                for branch in ("then", "else"):
+                    if step.get(branch) is not None and not isinstance(step[branch], list):
+                        raise ValueError(
+                            f"decision '{step.get('id', '')}' {branch} must be a list of steps")
+        except ValueError as exc:
+            entry["ok"] = False
+            entry["error"] = str(exc)
+            return
+        entry["ok"] = True
+        entry["status"] = "completed"
+        entry["output"] = {"mode": mode, "choice": None, "branch": None,
+                           "note": "LLM not consulted — branch not executed"}
     elif step_type == "delay":
         try:
             total, until = logic._delay_request(step, context, step.get("id", ""))
@@ -536,6 +573,18 @@ def _iter_steps(steps, prefix=""):
                         yield from _iter_steps(branch["actions"], f"{action_id}.{label}")
             if isinstance(step.get("default"), list):
                 yield from _iter_steps(step["default"], f"{action_id}.default")
+        elif kind == "decision":
+            if logic._decision_mode(step) == "switch":
+                for case in step.get("cases") or []:
+                    if isinstance(case, dict) and isinstance(case.get("actions"), list):
+                        label = str(case.get("choice") or "").strip() or "case"
+                        yield from _iter_steps(case["actions"], f"{action_id}.{label}")
+                if isinstance(step.get("default_actions"), list):
+                    yield from _iter_steps(step["default_actions"], f"{action_id}.default")
+            else:
+                for branch in ("then", "else"):
+                    if isinstance(step.get(branch), list):
+                        yield from _iter_steps(step[branch], f"{action_id}.{branch}")
         elif kind == "for_each" and isinstance(step.get("actions"), list):
             yield from _iter_steps(step["actions"], f"{action_id}[0]")
         if isinstance(step.get("error_actions"), list):

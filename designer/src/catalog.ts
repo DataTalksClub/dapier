@@ -5,8 +5,8 @@ import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, You
 /**
  * The node catalog — the single place to edit when the designer should know a
  * new engine action (see run_* dispatch in src/dapier/engine/__init__.py), an
- * in-workflow logic step (filter, condition, paths, delay, for_each, digest — executed by
- * src/dapier/engine/logic.py), or trigger connector.
+ * in-workflow logic step (filter, condition, paths, decision, delay, for_each,
+ * digest — executed by src/dapier/engine/logic.py), or trigger connector.
  *
  * Adding an action is one object in `actionCatalog`:
  *   1. type   — the exact string written to the action's `type` YAML key;
@@ -1611,6 +1611,30 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "decision",
+    label: "Decision",
+    icon: Sparkles,
+    description: "Ask the LLM and branch on the answer — a smart if (then/else) or a switch over choices; one structured completion via the ai_complete LLM_* env",
+    fields: [
+      { key: "mode", label: "Mode", type: "select", options: ["if", "switch"], default: "switch",
+        help: "if asks the prompt's yes/no question and runs then/else; switch picks one of the choices and runs the matching case" },
+      { key: "prompt", label: "Prompt", type: "textarea", required: true,
+        placeholder: "Classify this Zoom recording:\nTopic: {topic}\nHost: {host_email}" },
+      { key: "system", label: "System message", type: "textarea" },
+      { key: "model", label: "Model", placeholder: "defaults to LLM_MODEL" },
+      { key: "temperature", label: "Temperature", type: "number", placeholder: "0" },
+      { key: "timeout_seconds", label: "Timeout (s)", type: "number" },
+      { key: "choices", label: "Choices (YAML, switch)", type: "yaml",
+        placeholder: "- one-on-one\n- ai-shipping-labs" },
+      { key: "cases", label: "Cases (YAML, switch)", type: "yaml",
+        placeholder: "- choice: one-on-one\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []" },
+      { key: "default_actions", label: "Default steps (YAML, switch)", type: "yaml",
+        help: "Runs when the reply is unusable or off-list; without it the step fails" },
+      { key: "then", label: "Then steps (YAML, if)", type: "yaml" },
+      { key: "else", label: "Else steps (YAML, if)", type: "yaml" }
+    ]
+  },
+  {
     type: "paths",
     label: "Paths",
     icon: GitBranch,
@@ -1946,6 +1970,7 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   ai_complete: "ai",
   filter: "flow",
   condition: "flow",
+  decision: "flow",
   paths: "flow",
   delay: "flow",
   for_each: "flow",

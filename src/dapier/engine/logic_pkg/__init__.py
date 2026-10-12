@@ -41,6 +41,25 @@ sides parse as float — plus exists and empty):
           actions: [...]
       default: [...]            # optional; runs when no branch matched
 
+    - id: classify
+      type: decision
+      mode: switch            # if (then/else) | switch (choices/cases)
+      prompt: |
+        Classify this recording. Topic: {topic}
+      choices: [one-on-one, ai-shipping-labs]
+      cases:
+        - choice: one-on-one
+          actions: [...]      # the matching case's steps
+        - choice: ai-shipping-labs
+          actions: [...]
+      default_actions: [...]  # optional: unusable or off-list reply
+      # if mode asks a yes/no question instead and runs then/else:
+      # then: [...]
+      # else: [...]
+      # One structured completion against the ai_complete env (LLM_* on the
+      # Worker — LLM_BASE_URL at OpenRouter makes it an OpenRouter decision);
+      # output carries {choice, branch, model, usage} for later steps.
+
     - id: pause
       type: delay
       seconds: 30             # ≤ MAX_DELAY_SECONDS sleeps inside this invocation
@@ -141,7 +160,8 @@ working):
 
     - core:       constants, the error types, and the pure helpers
                   (moment parsing, template lookup/rendering, rule evaluation)
-    - controls:   filter, condition, paths, and the delay pause/resume machinery
+    - controls:   filter, condition, paths, the LLM decision, and the delay
+                  pause/resume machinery
     - loops:      for_each and digest
     - execution:  one step's run: error modes, autoretry, dispatch
     - chains:     run_chain/resume_chain, the ordered walk and its
@@ -157,8 +177,10 @@ from .core import (AUTORETRY_DEFAULTS, CompletedStep, DIGEST_MODES, ERROR_MODES,
                    ON_FAIL_MODES, QuotaExceeded, RunSuspended, _TOKEN, _elapsed,
                    _iso, _lookup, _rendered, _step_id, evaluate_rules,
                    parse_moment, predicate_rules, render_value)
-from .controls import (DURATION_KEYS, DURATION_UNITS, _delay_number,
-                       _delay_request, _predicate_scope, _run_condition,
+from .controls import (DECISION_MODES, DURATION_KEYS, DURATION_UNITS,
+                       _decision_branch, _decision_choices, _decision_mode,
+                       _decision_plan, _delay_number, _delay_request,
+                       _predicate_scope, _run_condition, _run_decision,
                        _run_delay, _run_filter, _run_paths)
 from .loops import _digest_batch, _run_digest, _run_for_each
 from .execution import (_autoretry_backoff, _autoretry_plan, _dispatch_action,
