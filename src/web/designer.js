@@ -18123,6 +18123,8 @@
           placeholder: "defaults to the triggering chat",
           discover: { resource: "chats" }
         },
+        { key: "message_thread_id", label: "Topic / Thread ID", type: "number", placeholder: "e.g. 547" },
+        { key: "parse_mode", label: "Parse mode", placeholder: "HTML or Markdown" },
         { key: "text", label: "Text template", type: "textarea", placeholder: "{text}" },
         { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
       ]
