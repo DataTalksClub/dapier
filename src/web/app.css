@@ -2335,6 +2335,11 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .setup-table tr:not(:has(td[data-label="Updated"])) .action-cell { grid-column: 3; grid-row: 1; justify-content: flex-end; }
   .setup-table tr:not(:has(td[data-label="Updated"])) td[data-label="Client ID"] { grid-row: 2; }
 }
+  /* Service credential rows carry a third control (the row menu): keep the
+     name on whole-word wrap and shrink the row buttons, so a single-word
+     name like Mailchimp never breaks mid-word at 375. */
+  .setup-table td.cell-title { overflow-wrap: normal; word-break: normal; }
+  .setup-table .action-cell .dk-button { height: var(--dk-size-control-sm); min-height: 0; padding: 0 var(--dk-space-2); font-size: var(--dk-text-sm); }
 
 /* --- mobile audit fixes (<=560) ---------------------------------------------------
    From the 2026-10-13 phone audit of every console screen at 375-430px:
