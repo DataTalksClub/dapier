@@ -182,60 +182,33 @@ function render(section) {
   icons();
 }
 
+function workflowMatchesSearch(workflow, query, serverIds) {
+  if (!query) return true;
+  if (serverIds) return serverIds.has(workflow.id);
+  return `${workflow.id} ${workflow.name || ''} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
+}
+
+/* Scheduled jobs live under the Schedules tab, not here: hide workflows
+   whose every trigger is a schedule trigger. A flow that also listens
+   elsewhere (email plus schedule, say) stays in this list. */
+function workflowIsScheduleOnly(workflow) {
+  const triggers = Array.isArray(workflow.triggers) && workflow.triggers.length
+    ? workflow.triggers : [workflow.trigger];
+  const known = triggers.filter((trigger) => trigger && trigger.connector);
+  return known.length > 0 && known.every((trigger) => trigger.connector === 'schedule');
+}
+
 export function renderWorkflows() {
   void loadCatalog();
   const all = state.data?.workflows || [];
-  /* Scheduled jobs live under the Schedules tab, not here: hide workflows
-     whose every trigger is a schedule trigger. A flow that also listens
-     elsewhere (email plus schedule, say) stays in this list. */
-  const scheduleOnly = (workflow) => {
-    const triggers = Array.isArray(workflow.triggers) && workflow.triggers.length
-      ? workflow.triggers : [workflow.trigger];
-    const known = triggers.filter((trigger) => trigger && trigger.connector);
-    return known.length > 0 && known.every((trigger) => trigger.connector === 'schedule');
-  };
-  const scheduled = all.filter(scheduleOnly);
-  const listed = all.filter((workflow) => !scheduleOnly(workflow));
+  const scheduled = all.filter(workflowIsScheduleOnly);
+  const listed = all.filter((workflow) => !workflowIsScheduleOnly(workflow));
   const query = $('#workflow-search').value.trim().toLowerCase();
-  const status = $('#workflow-filter').value;
-  // Zapier-style tag filter: the option list tracks the tags actually in
-  // use (client-side; the API exposes the same narrowing as ?tag=).
-  const tagSelect = $('#workflow-tag-filter');
-  const tagNames = [...new Set(listed.flatMap((workflow) => workflow.tags || []).map((tag) => String(tag).toLowerCase()))].sort();
-  if (tagSelect.dataset.tags !== tagNames.join(',')) {
-    const selectedTag = tagSelect.value;
-    tagSelect.dataset.tags = tagNames.join(',');
-    tagSelect.innerHTML = '<option value="all">All tags</option>'
-      + tagNames.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('');
-    tagSelect.value = tagNames.includes(selectedTag) ? selectedTag : 'all';
-  }
-  const tagFilter = tagSelect.value;
-  // Zapier-style folder filter, beside the tag one: flat folders, one per
-  // workflow (the API exposes the same narrowing as ?folder=).
-  const folderSelect = $('#workflow-folder-filter');
-  const folderNames = [...new Set(listed.flatMap((workflow) => {
-    const folder = String(workflow.folder || '').trim();
-    return folder ? [folder] : [];
-  }))].sort((a, b) => a.localeCompare(b));
-  if (folderSelect.dataset.folders !== folderNames.join(',')) {
-    const selectedFolder = folderSelect.value;
-    folderSelect.dataset.folders = folderNames.join(',');
-    folderSelect.innerHTML = '<option value="all">All folders</option>'
-      + folderNames.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`).join('');
-    folderSelect.value = folderNames.includes(selectedFolder) ? selectedFolder : 'all';
-  }
-  const folderFilter = folderSelect.value;
   // The server owns text search once its ?q= result is in
   // (state.workflowSearchIds); while that call is in flight or has failed,
   // the loaded payload filters client-side.
   const serverIds = query ? state.workflowSearchIds : null;
-  const matchesText = (workflow) =>
-    `${workflow.id} ${workflow.name || ''} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
-  const shown = listed.filter((workflow) =>
-    (serverIds ? serverIds.has(workflow.id) : matchesText(workflow)) &&
-    (status === 'all' || workflow.enabled === (status === 'enabled')) &&
-    (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
-    (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
+  const shown = listed.filter((workflow) => workflowMatchesSearch(workflow, query, serverIds));
   $('#workflow-count').textContent = `${shown.length} of ${listed.length} shown`
     + (scheduled.length ? ` · ${scheduled.length} scheduled live under Schedules` : '');
   const runs = state.data?.runs || [];
@@ -307,8 +280,7 @@ export function renderWorkflows() {
   }
   /* Nothing listed and nothing filtered: when the account only runs
      scheduled jobs, say where they went instead of "no workflows". */
-  const scheduledOnly = listed.length === 0 && scheduled.length > 0
-    && !query && status === 'all' && tagFilter === 'all' && folderFilter === 'all';
+  const scheduledOnly = listed.length === 0 && scheduled.length > 0 && !query;
   empty.hidden = listed.length > 0;
   if (emptyTitle) emptyTitle.textContent = scheduledOnly ? 'Scheduled jobs live under Schedules' : (emptyTitle.dataset.default || '');
   if (emptyText) emptyText.textContent = scheduledOnly
@@ -334,16 +306,13 @@ function renderBulkBar(shown) {
   selectedWorkflows.forEach((file) => {
     if (!files.includes(file)) selectedWorkflows.delete(file);
   });
-  /* Scope buttons: with a tag filter or search active, the whole shown set is
-     one bulk target — no checkbox picking needed. The count is exact: the
-     same rows the table shows are the ids the call sends. */
+  /* Scope buttons: with search active, the whole shown set is one bulk
+     target — no checkbox picking needed. The count is exact: the same
+     rows the table shows are the ids the call sends. */
   const query = $('#workflow-search').value.trim();
-  const tagFilter = $('#workflow-tag-filter').value;
-  const folderFilter = $('#workflow-folder-filter').value;
-  const scoped = (query !== '' || tagFilter !== 'all' || folderFilter !== 'all') && files.length > 0;
+  const scoped = query !== '' && files.length > 0;
   const scopeNote = $('#workflow-scope-note');
-  const scopeLabel = tagFilter !== 'all' ? `tag “${tagFilter}”`
-    : folderFilter !== 'all' ? `folder “${folderFilter}”` : `search “${query}”`;
+  const scopeLabel = `search “${query}”`;
   if (scopeNote) {
     scopeNote.hidden = !scoped;
     scopeNote.textContent = scoped ? `${files.length} match ${scopeLabel}` : '';
@@ -522,9 +491,6 @@ $('#workflow-search').addEventListener('input', () => {
   clearTimeout(searchWorkflows.timer);
   searchWorkflows.timer = setTimeout(searchWorkflows, 250);
 });
-$('#workflow-filter').addEventListener('change', renderWorkflows);
-$('#workflow-tag-filter').addEventListener('change', renderWorkflows);
-$('#workflow-folder-filter').addEventListener('change', renderWorkflows);
 
 const sectionTargets = {
   workflows: ['.view[data-page="workflows"]', '[aria-labelledby="home-workflows-title"]'],
@@ -751,21 +717,12 @@ $('#workflow-select-all').addEventListener('change', (event) => {
   renderWorkflows();
 });
 
-/* The exact rows the table is showing right now (search + status + tag +
-   folder). */
+/* The exact rows the table is showing right now (search). */
 function currentShownWorkflows() {
-  const all = state.data?.workflows || [];
   const query = $('#workflow-search').value.trim().toLowerCase();
-  const status = $('#workflow-filter').value;
-  const tagFilter = $('#workflow-tag-filter').value;
-  const folderFilter = $('#workflow-folder-filter').value;
   const serverIds = query ? state.workflowSearchIds : null;
-  return all.filter((workflow) =>
-    (serverIds ? serverIds.has(workflow.id)
-      : `${workflow.id} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query)) &&
-    (status === 'all' || workflow.enabled === (status === 'enabled')) &&
-    (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
-    (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
+  return (state.data?.workflows || []).filter((workflow) =>
+    !workflowIsScheduleOnly(workflow) && workflowMatchesSearch(workflow, query, serverIds));
 }
 
 async function bulkToggle(action, button) {

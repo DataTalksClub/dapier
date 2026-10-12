@@ -128,6 +128,20 @@ def test_parent_nav_highlights_folded_views():
     assert "credentials: 'connections'" in ROUTER
 
 
+def test_workflows_toolbar_keeps_search_without_status_tag_folder_filters():
+    """The list is searched; On/Off, tags, and folders are not extra
+    dropdowns on the toolbar."""
+    html = INDEX.split('data-page="workflows"', 1)[1].split('data-workflow-panel="list"', 1)[0]
+    assert 'id="workflow-search"' in html
+    assert 'id="workflow-filter"' not in html
+    assert 'id="workflow-tag-filter"' not in html
+    assert 'id="workflow-folder-filter"' not in html
+    js = pathlib.Path("src/web/js/views/overview.js").read_text()
+    assert "$('#workflow-tag-filter')" not in js
+    assert "$('#workflow-folder-filter')" not in js
+    assert "$('#workflow-filter')" not in js
+
+
 def test_old_triggers_path_opens_hooks_tab():
     assert "if (name === 'triggers') return 'workflows'" in ROUTER
     assert "'/triggers'" in ROUTER

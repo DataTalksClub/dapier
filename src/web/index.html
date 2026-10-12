@@ -119,7 +119,7 @@
 
       <section class="view" data-page="workflows">
         <div class="page-tools primary-tools dk-toolbar register-toolbar workflow-toolbar" data-panel-tools="list">
-          <div class="dk-cluster toolbar-filters workflow-filters"><label class="toolbar-search"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label><label><span class="visually-hidden">Show</span><select id="workflow-filter"><option value="all">All workflows</option><option value="enabled">On</option><option value="disabled">Off</option></select></label><label><span class="visually-hidden">Tag</span><select id="workflow-tag-filter"><option value="all">All tags</option></select></label><label><span class="visually-hidden">Folder</span><select id="workflow-folder-filter"><option value="all">All folders</option></select></label></div>
+          <div class="dk-cluster toolbar-filters workflow-filters"><label class="toolbar-search"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label></div>
           <div class="dk-toolbar__end">
             <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
             <input id="import-yaml-input" type="file" accept=".yaml,.yml,text/yaml,text/plain" hidden>
@@ -142,7 +142,7 @@
         </div>
         <div data-workflow-panel="list">
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
-        <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search or status filter to see more workflows.</p></div>
+        <div id="workflow-filter-empty" class="empty-state" hidden><h3>No matching workflows</h3><p>Change the search to see more workflows.</p></div>
         <div id="workflow-bulk-bar" class="bulk-bar" hidden><span id="workflow-bulk-count" class="field-hint" role="status"></span><button id="workflow-bulk-enable" class="dk-button dk-button--sm dk-button--secondary" type="button">Enable selected</button><button id="workflow-bulk-disable" class="dk-button dk-button--sm dk-button--secondary" type="button">Disable selected</button><span id="workflow-scope-note" class="field-hint" hidden></span><button id="workflow-scope-pause" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Pause shown</button><button id="workflow-scope-resume" class="dk-button dk-button--sm dk-button--secondary" type="button" hidden>Resume shown</button></div>
         <div id="workflow-table-wrap" class="table-wrap">
           <table>

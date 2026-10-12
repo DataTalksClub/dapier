@@ -33,7 +33,7 @@ def test_schedule_rows_toggle_through_the_shared_endpoints():
 
 
 def test_workflows_list_hides_schedule_only_flows():
-    assert "scheduleOnly" in OVERVIEW
+    assert "workflowIsScheduleOnly" in OVERVIEW
     assert "trigger.connector === 'schedule'" in OVERVIEW
     assert "Scheduled jobs live under Schedules" in OVERVIEW
     assert "live under Schedules" in OVERVIEW
