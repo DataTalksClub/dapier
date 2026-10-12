@@ -5,6 +5,8 @@ the operator address, an explicit ``notify: []`` opts out, and failures
 with no workflow behind them (a poll trigger the worker could not run)
 notify the operator too.
 """
+import re
+
 import boto3
 import pytest
 
@@ -257,5 +259,24 @@ def test_opted_out_workflow_failure_sends_nothing(monkeypatch):
     assert calls == []
 
 
+def test_worker_function_can_send_failure_mail():
+    """The worker is what calls notify_failure; it must have a verified From,
+    SES in EmailSendRegion (Globals), the operator inbox (Globals), and
+    ses:SendEmail. Sending To the From identity is silent — that was the
+    Oct 2026 miss.
+    """
+    text = open("template.yaml", encoding="utf-8").read()
+    globals_env = text.split("Globals:")[1].split("Resources:")[0]
+    assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in globals_env
+    assert "DAPIER_EMAIL_REGION: !Ref EmailSendRegion" in globals_env
+    start = text.index("\n  WorkerFunction:\n")
+    rest = text[start + 1:]
+    nxt = re.search(r"\n  [A-Z]\w+:\n", rest)
+    block = rest[:nxt.start()] if nxt else rest
+    assert "DAPIER_EMAIL_SENDER: !Ref EmailSender" in block
+    assert "ses:SendEmail" in block
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
+
