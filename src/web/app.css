@@ -2324,3 +2324,11 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
     max-width: none;
   }
 }
+
+/* --- mobile: app-setup action line (<=560) ----------------------------------------
+   OAuth client rows carry no Updated line; their Replace/Set up action reads as
+   the row's second line at the left, not a lone right-floating button with a
+   dead half. */
+@media (max-width: 560px) {
+  .setup-table tr:not(:has(td[data-label="Updated"])) .action-cell { grid-column: 1; grid-row: 2; justify-content: flex-start; }
+}
