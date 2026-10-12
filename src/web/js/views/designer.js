@@ -2,21 +2,20 @@
    This is the console's workflow view — every workflow row opens it at
    /workflows/<id>. The canvas owns the viewport under the topbar: the
    topbar's h1 shows the workflow's human name (the API's generated
-   "<trigger> → <actions>", or the `name:` override) with the description
-   behind a (?) tip, and the stable id as small mono text under it. Clicking
-   the name edits the override (empty = back to the generated name); the
-   edit lands in the iframe's draft and saves with it — the id never changes
-   here. The iframe reports what the title should show via designer:meta
+   "<trigger> → <actions>", or the `name:` override). Clicking the name
+   edits the override (empty = back to the generated name); the edit lands
+   in the iframe's draft and saves with it — the id never changes here.
+   The iframe reports what the title should show via designer:meta
    messages below, and the console answers with the connections snapshot the
    inspector's connection suggestions render from. */
 import { state } from '../state.js';
 import { $ } from '../ui.js';
 import { escapeHtml } from '../format.js';
 import { setView, rememberViewUrl, setViewGuard } from '../router.js';
-import { workflowName, helpTip } from '../workflow-names.js';
+import { workflowName } from '../workflow-names.js';
 
 /* Last designer:meta from the iframe: { id, saved, name, nameSource,
-   description, enabled, source, editable, dirty }. */
+   enabled, source, editable, dirty }. */
 let meta = null;
 let editing = false;
 let leaveSequence = 0;
@@ -34,10 +33,10 @@ function frameSrc(source) {
   return `/designer/app?${params}`;
 }
 
-/* The h1: the human name plus the description's (?) tip. The id stays
-   off the header (the YAML tab and the list's row menu carry it). */
-function paintTitle(name, description) {
-  $('#view-title').innerHTML = `<span class="view-title-text">${escapeHtml(name)}</span>${helpTip(description)}`;
+/* The h1: the human name. The id stays off the header (the YAML tab and
+   the list's row menu carry it). */
+function paintTitle(name) {
+  $('#view-title').innerHTML = `<span class="view-title-text">${escapeHtml(name)}</span>`;
   $('#view-description').textContent = '';
 }
 
@@ -52,7 +51,7 @@ function applyMeta() {
   const title = $('#view-title');
   title.classList.toggle('renamable', !!meta && meta.editable && !editing);
   if (meta) {
-    if (!editing) paintTitle(meta.name || (meta.saved ? meta.id : 'New workflow'), meta.description);
+    if (!editing) paintTitle(meta.name || (meta.saved ? meta.id : 'New workflow'));
     title.title = meta.editable
       ? (meta.nameSource === 'custom'
         ? 'Click to rename — clear the name to use the generated one'
@@ -81,7 +80,7 @@ function syncHead(ref) {
     ? (state.data?.workflows || []).find((item) => item.id === ref || item.source === ref)
     : null;
   const id = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : '';
-  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow', workflow?.description);
+  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow');
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
 }
@@ -91,9 +90,8 @@ function syncHead(ref) {
    empty name drops the override and the generated name comes back. */
 const MAX_NAME_LENGTH = 80;
 
-function startRename(event) {
+function startRename() {
   const title = $('#view-title');
-  if (event?.target?.closest?.('.help-tip')) return;
   if (editing || state.view !== 'designer' || !meta?.editable) return;
   const current = meta.name || '';
   editing = true;
@@ -109,6 +107,9 @@ function startRename(event) {
   title.appendChild(input);
   input.focus();
   input.select();
+  // select() scrolls a long value to the end; keep the start in view.
+  input.scrollLeft = 0;
+  requestAnimationFrame(() => { input.scrollLeft = 0; });
   let done = false;
   const finish = (commit) => {
     if (done) return;
@@ -180,7 +181,6 @@ window.addEventListener('message', (event) => {
     saved: data.saved === true,
     name: typeof data.name === 'string' ? data.name : '',
     nameSource: data.nameSource === 'custom' ? 'custom' : 'auto',
-    description: typeof data.description === 'string' ? data.description : '',
     enabled: data.enabled !== false,
     source: typeof data.source === 'string' && data.source ? data.source : null,
     editable: data.editable === true,

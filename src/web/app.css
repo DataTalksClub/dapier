@@ -1231,6 +1231,7 @@ body[data-view="designer"] .topbar h1 {
   align-items: center;
   gap: var(--dk-space-2);
   min-width: 0;
+  width: 100%;
 }
 body[data-view="designer"] .topbar h1 .view-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The h1 doubles as the workflow rename affordance (the human name; the id
@@ -1240,19 +1241,23 @@ body[data-view="designer"] .topbar h1.renamable:hover .view-title-text {
   text-decoration: underline dashed var(--dk-text-muted);
   text-underline-offset: 5px;
 }
-.topbar h1 .help-tip { font-weight: var(--dk-weight-regular, 400); letter-spacing: 0; }
 .topbar h1 .title-input {
   background: transparent;
   border: 0;
   border-bottom: 2px solid var(--dk-accent-default);
   border-radius: 0;
   color: inherit;
+  flex: 1 1 auto;
   font: inherit;
+  height: auto;
   letter-spacing: inherit;
-  max-width: 38vw;
+  line-height: inherit;
+  max-width: none;
+  min-height: 0;
+  min-width: 0;
   outline: none;
-  padding: 0;
-  width: 320px;
+  padding: 0 0 2px;
+  width: 100%;
 }
 #designer-back { display: none; border-color: transparent; }
 body[data-view="designer"] #designer-back { display: inline-flex; }
@@ -1296,6 +1301,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-gutter)); right: calc(-1 * var(--page-gutter)); border-bottom: 1px solid var(--dk-border-default); }
   .topbar-title { display: contents; }
   .topbar h1 { grid-area: title; font-size: var(--dk-text-xl); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body[data-view="designer"] .topbar h1:has(.title-input) { overflow: visible; }
   #menu-toggle, #designer-back { grid-area: lead; }
   .top-actions { grid-area: actions; display: flex; }
   #view-description { grid-area: desc; align-self: start; margin: var(--dk-space-4) 0 0; }

@@ -138,8 +138,14 @@ def test_designer_header_edits_the_name_not_the_id():
     js = (WEB / "js/views/designer.js").read_text()
     assert "type: 'designer:set-name', name: value" in js
     assert "designer:set-id" not in js
-    assert "helpTip(description)" in js
+    assert "helpTip" not in js
     assert "input.maxLength = MAX_NAME_LENGTH" in js
+    assert "input.scrollLeft = 0" in js
+    css = (WEB / "app.css").read_text()
+    block = css[css.index(".topbar h1 .title-input"):]
+    block = block[:block.index("#designer-back")]
+    assert "width: 100%" in block and "max-width: none" in block
+    assert "width: 320px" not in block and "max-width: 38vw" not in block
     # The header carries no id line under the name.
     assert "workflow-id" not in js
     app = (ROOT / "designer/src/App.tsx").read_text()
