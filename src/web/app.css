@@ -2327,38 +2327,27 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 }
 
 /* --- mobile: app-setup action line (<=560) ----------------------------------------
-   OAuth client rows carry no Updated line; their Replace/Set up action reads as
-   the row's second line at the left, not a lone right-floating button with a
-   dead half. */
+   OAuth client rows carry no Updated cell: their Replace/Set up action rides
+   the name/status line and the client id takes the second line, so the card
+   has no sparse band between them. */
 @media (max-width: 560px) {
-  .setup-table tr:not(:has(td[data-label="Updated"])) .action-cell { grid-column: 1; grid-row: 2; justify-content: flex-start; }
+  .setup-table tr:not(:has(td[data-label="Updated"])) .action-cell { grid-column: 3; grid-row: 1; justify-content: flex-end; }
+  .setup-table tr:not(:has(td[data-label="Updated"])) td[data-label="Client ID"] { grid-row: 2; }
 }
 
 /* --- mobile audit fixes (<=560) ---------------------------------------------------
-   From the 2026-10-13 phone audit of every console screen at 375-430px
-   (toolbar follows-up landed separately): a workflow card one line taller
-   than it needs, the OAuth client card's blank band, worker cells whose
-   half-width placement survives the refinement block above on
-   :not([data-empty]) specificity, and audit/token values squeezed into
-   half a column. Above 560px nothing changes. */
+   From the 2026-10-13 phone audit of every console screen at 375-430px:
+   an actions band that orphaned right-aligned under the toolbar filters
+   at 375-390, the audit error card printed twice (the outcome line already
+   carries the error, and the <=860 display rule outranked the hide), the
+   OAuth client card's sparse second line, and audit values squeezed into
+   half a column. The workflow card and the worker cells keep the judged
+   refinement block above as is. Above 560px nothing changes. */
 @media (max-width: 560px) {
-  /* Workflows: a two-line card. The apps strip and the folder shed their
-     cells (display: contents) and flow inline after the name and its tags,
-     so the name keeps nearly the full width; latest run and the state
-     control share the second line. */
-  #workflow-table-wrap .workflow-list-row { grid-template-columns: minmax(0, 1fr) auto; }
-  #workflow-table-wrap td.cell-title { grid-column: 1; grid-row: 1; }
-  #workflow-table-wrap td.workflow-actions { grid-column: 2; grid-row: 1; }
-  #workflow-table-wrap td.workflow-apps { display: contents; }
-  #workflow-table-wrap td.workflow-location { display: contents; }
-  #workflow-table-wrap td.workflow-latest { grid-column: 1; grid-row: 2; }
-  #workflow-table-wrap td[data-label="State"] { grid-column: 2; grid-row: 2; justify-self: end; align-self: center; }
-  /* An auto-paused workflow reads status + Resume on a line of its own,
-     right-aligned - they need the attention anyway. */
-  #workflow-table-wrap td[data-label="State"]:has(.workflow-resume) { grid-column: 1 / -1; grid-row: 3; justify-self: end; }
-  #workflow-table-wrap .workflow-state-control:has(.workflow-resume) { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--dk-space-2); }
-  .app-tile { width: 20px; height: 20px; border: 0; background: none; }
-  .app-tile .brand-mark { width: 16px; height: 16px; }
+  /* The toolbar's actions stop orphaning right-aligned under the filters
+     at 375-390: the group takes a full line and its buttons share it. */
+  .register-toolbar .dk-toolbar__end { flex: 1 1 100%; }
+  .register-toolbar .dk-toolbar__end > .dk-button { flex: 1 1 auto; }
 
   /* App setup: the action joins the name/status line, so an OAuth client
      card has no blank band between its head and its client id. */
@@ -2370,7 +2359,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   /* Audit: the error cell stays hidden - the outcome line already carries
      the error; the register's display:block rule would otherwise resurrect
      it as an unplaced card line that collides with the actor. */
-  #audit-log-table td.audit-error { display: none; }
+  #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome) { display: none; }
   /* Audit: the resource reads on its own full-width line under the
      timestamp; actor and agent pair below it. */
   #audit-log-table .audit-resource { grid-column: 1 / -1; grid-row: 3; }
@@ -2380,17 +2369,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   /* Tokens: a long token name wraps to two lines instead of ellipsizing
      away its identity. */
   #token-table .cell-title .cell-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
-
-  /* Workers: "running now" stays on the task line and the workspace path
-     ellipsizes on its own line instead of breaking mid-token. */
-  .workers-table td[data-label="Task"] .worker-stack { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; }
-  .workers-table td[data-label="Workspace"] .worker-path { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
-/* --- mobile: app-setup action line (<=560) ----------------------------------------
-   OAuth client rows carry no Updated line; their Replace/Set up action reads as
-   the row's second line at the left, not a lone right-floating button with a
-   dead half. */
-@media (max-width: 560px) {
-  .setup-table tr:not(:has(td[data-label="Updated"])) .action-cell { grid-column: 1; grid-row: 2; justify-content: flex-start; }
-}
+
