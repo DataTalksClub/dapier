@@ -39,13 +39,15 @@ class CodeStepTests(unittest.TestCase):
 
     def test_allowed_module_imports_work(self):
         output = run(
-            "import json, re, hashlib\n"
+            "import json, re, hashlib, zoneinfo\n"
             "match = re.search(r'\\d+', input['s'])\n"
-            "output = {'digits': match.group(), 'md5': hashlib.md5(b'x').hexdigest()[:4]}",
+            "tz = zoneinfo.ZoneInfo('Europe/Berlin')\n"
+            "output = {'digits': match.group(), 'md5': hashlib.md5(b'x').hexdigest()[:4], 'tz': tz.key}",
             {"s": "abc123"},
         )
         self.assertEqual(output["result"]["digits"], "123")
         self.assertEqual(len(output["result"]["md5"]), 4)
+        self.assertEqual(output["result"]["tz"], "Europe/Berlin")
 
     def test_blocked_import_fails_the_step(self):
         with self.assertRaises(RuntimeError) as ctx:

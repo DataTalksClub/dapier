@@ -55,6 +55,7 @@ _OUTPUT_PART_LIMIT = 2500
 ALLOWED_MODULES = frozenset({
     "base64", "collections", "datetime", "decimal", "hashlib", "itertools",
     "json", "math", "random", "re", "statistics", "string", "time", "uuid",
+    "zoneinfo",
 })
 
 
