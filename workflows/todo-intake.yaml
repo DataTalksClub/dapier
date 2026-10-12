@@ -65,8 +65,8 @@ actions:
   then:
   - id: create-intake
     type: dataops
+    connection_id: dataops
     auth_secret_id: dapier/dataops
-    url_env: DATAOPS_INTAKE_URL
 - id: confirm-telegram
   type: condition
   when:

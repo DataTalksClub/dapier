@@ -39,7 +39,8 @@ def test_the_shipped_newsletter_sponsors_workflow_validates():
         "extract-sponsors", "forward-leads"]
     forward = workflow["actions"][1]
     assert forward["type"] == "dataops"
-    assert forward["url"] == "https://ops.dtcdev.click/api/v1/intake/leads"
+    assert forward["connection_id"] == "dataops"
+    assert "url" not in forward
     assert "url_env" not in forward
     assert forward["auth_secret_id"] == "dapier/dataops"
     assert forward["extraction_step"] == "extract-sponsors"
@@ -90,12 +91,12 @@ def test_extract_sponsors_prompt_encodes_gold_paid_only_rules():
     assert "empty sponsors is valid" in system.lower()
 
 
-def test_template_leaves_leads_url_to_the_connector():
+def test_template_leaves_intake_url_to_the_connection():
     text = TEMPLATE_FILE.read_text(encoding="utf-8")
+    deploy = (Path(__file__).resolve().parents[1] / "scripts" / "deploy.sh").read_text(
+        encoding="utf-8")
     assert "DataOpsLeadsUrl:" not in text
+    assert "DataOpsIntakeUrl:" not in text
     assert "DATAOPS_LEADS_URL" not in text
-    assert "DATAOPS_INTAKE_URL: !Ref DataOpsIntakeUrl" in text
-    assert (
-        "https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws"
-        "/api/v1/intake/email-documents"
-    ) in text
+    assert "DATAOPS_INTAKE_URL" not in text
+    assert "DataOpsIntakeUrl" not in deploy

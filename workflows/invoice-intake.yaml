@@ -160,8 +160,8 @@ actions:
     strict_conflict: true
   - id: file-to-dataops
     type: dataops
+    connection_id: dataops
     auth_secret_id: dapier/dataops
-    url_env: DATAOPS_INTAKE_URL
   else:
   - id: strip-forwarded
     type: code

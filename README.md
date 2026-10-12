@@ -407,8 +407,8 @@ enabled: true
 actions:
   - id: forward
     type: dataops
+    connection_id: dataops
     auth_secret_id: dapier/dataops
-    url_env: DATAOPS_INTAKE_URL
 trigger:
   connector: email
   event: message.received

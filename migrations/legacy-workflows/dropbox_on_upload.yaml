@@ -3,8 +3,8 @@ enabled: true
 actions:
   - id: intake-invoice
     type: dataops
-    connection_id: dropbox
-    url_env: DATAOPS_INTAKE_URL
+    connection_id: dataops
+    dropbox_connection_id: dropbox
     auth_secret_id: dapier/dataops
   - id: delete-processed-file
     type: dropbox_delete

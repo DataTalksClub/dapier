@@ -8,7 +8,7 @@
 # Dapier: no sponsor store, no ledger, no review queue.
 #
 # Status: example only (`enabled: false`). Before enabling, confirm the
-# dataops step's `url` (DataOps leads intake), the intake secret, and
+# DataOps connection's url (API origin), the intake secret, and
 # the LLM_* env (docs/connectors/ai.md — Anthropic's OpenAI-compatible API
 # with model claude-sonnet-5-5; prefer a workspace-scoped key).
 id: newsletter-sponsors
@@ -107,7 +107,7 @@ actions:
   # Same auth as the invoice intake: the dapier/dataops secret lands in
   # x-dataops-intake-secret. on_fail: continue skips issues whose
   # extraction found no forwardable sponsors instead of failing the run.
+  connection_id: dataops
   auth_secret_id: dapier/dataops
-  url: https://ops.dtcdev.click/api/v1/intake/leads
   extraction_step: extract-sponsors
   on_fail: continue

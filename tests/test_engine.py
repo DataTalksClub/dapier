@@ -352,18 +352,22 @@ class DropboxIntakeTests(unittest.TestCase):
         }
 
     def run_dataops_action(self, event=None):
-        action = {"type": "dataops", "connection_id": "dropbox",
-                  "url_env": "DATAOPS_INTAKE_URL", "auth_secret_id": "dapier/dataops"}
+        action = {"type": "dataops", "connection_id": "dataops",
+                  "dropbox_connection_id": "dropbox", "auth_secret_id": "dapier/dataops"}
         s3 = MagicMock()
         with patch("src.dapier.engine.actions.base.secrets_value", return_value='{"token": "tok"}'), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \
+             patch("src.dapier.engine.actions.dataops.base._connected_connection",
+                   return_value={"connection_id": "dataops", "provider": "dataops",
+                                 "status": "connected", "url": "https://intake.test"}), \
              patch("src.dapier.connections.providers.dropbox_api.dropbox_connection", return_value=dict(self.connection)), \
              patch("src.dapier.connections.tokens.get_access_token", return_value=("token-123", {})), \
              patch("src.dapier.connections.providers.dropbox_api.dropbox_download", return_value=b"pdf-bytes"), \
              patch("boto3.client", return_value=s3), \
-             patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging",
-                                       "DATAOPS_INTAKE_URL": "https://intake.test"}):
+             patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}):
             run_dataops(action, event or deepcopy(self.event))
+        self.assertEqual(json_request.call_args.args[0],
+                         "https://intake.test/api/v1/intake/email-documents")
         return json_request.call_args.args[1], s3
 
     def test_intakes_a_copy_of_the_file(self):

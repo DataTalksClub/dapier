@@ -76,4 +76,5 @@ actions:
       not_equals: true
 - id: intake-rendered
   type: dataops
+  connection_id: dataops
   auth_secret_id: dapier/dataops

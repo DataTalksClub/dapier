@@ -32,8 +32,8 @@ SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workfl
      stores `data.body` as `{html: {value: ...}}` and SES intake stores
      string `html`/`text`; the prompt lists both so the model sees the
      issue either way.
-  2. forward-leads — dataops POST to the connector's `url`
-     (`https://ops.dtcdev.click/api/v1/intake/leads`) with the
+  2. forward-leads — dataops POST to the DataOps connection origin plus
+     `/api/v1/intake/leads` with the
      dapier/dataops secret as x-dataops-intake-secret, the same auth as
      the invoice intake. The envelope is built by
      engine.actions.dataops._leads_intake_body from the email event plus
@@ -50,8 +50,8 @@ after a lost response is safe.
 
 ## Leads contract (implemented in DataOps)
 
-`POST https://ops.dtcdev.click/api/v1/intake/leads`
-(set on the dataops connector step as `url`),
+`POST {connection.url}/api/v1/intake/leads`
+(the DataOps connection's https origin, e.g. `https://ops.dtcdev.click`),
 `Content-Type: application/json`, credential in `x-dataops-intake-secret`
 (the existing `dapier/dataops` secret — no new secret):
 
@@ -82,10 +82,10 @@ any level. Tests: `tests/test_dataops_leads.py`.
 
 ## Live setup (one-time)
 
-1. Deploy. The leads intake URL lives on the dataops connector step
-   (`url: https://ops.dtcdev.click/api/v1/intake/leads` in
-   `workflows/newsletter-sponsors.yaml`). Document intakes keep reading
-   `DATAOPS_INTAKE_URL` from the Worker env.
+1. Deploy. Set the DataOps API origin on the connection:
+   `dapier connections edit dataops --url https://ops.dtcdev.click`.
+   The dataops step uses `connection_id: dataops` and
+   `extraction_step` (leads) or omits it (documents).
 
 2. The `dapier/dataops` secret already holds the intake token — reuse it;
    the leads intake accepts the same credential as email-documents.

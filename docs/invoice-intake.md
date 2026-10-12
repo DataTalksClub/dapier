@@ -23,7 +23,8 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
      and checksum suffix, so different invoices on the same day do not collide.
   5. file-to-dataops — stage the PDF into the DataOps documents bucket
      (transfer/ prefix, sha256 in object metadata), then post the intake
-     envelope to DATAOPS_INTAKE_URL with x-dataops-intake-secret
+     envelope to the DataOps connection's origin
+     (`/api/v1/intake/email-documents`) with x-dataops-intake-secret
 ```
 
 Each email is one SQS message, so concurrent invoices file concurrently.
@@ -41,9 +42,11 @@ Nothing in Dapier keeps invoice state.
 
 ## Live setup (one-time)
 
-1. Deploy (the Worker env already carries `DATAOPS_INTAKE_URL` and
+1. Deploy (the Worker env already carries
    `DATAOPS_EMAIL_DOCUMENTS_BUCKET`; the stack grants write to the
-   documents bucket and read to the Datamailer inbound bucket).
+   documents bucket and read to the Datamailer inbound bucket). Set the
+   DataOps API origin on the connection:
+   `dapier connections edit dataops --url https://ops.dtcdev.click`.
 2. Store the DataOps intake token (plain string or
    `{"credential": …}` JSON) as the `dapier/dataops` secret.
 3. `dapier workflows save workflows/invoice-intake.yaml && dapier

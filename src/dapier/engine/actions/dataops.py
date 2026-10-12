@@ -23,12 +23,11 @@ STAGING_PREFIX = "transfer/"
 # email only (trim/collapse, https-only URLs, within-email dedup, caps) and
 # fails loudly on anything the intake would reject.
 LEADS_VERSION = "2026-10-10"
-# Public DataOps API (same host as plugins/dataops IDENTITY_URL). Override
-# per step with the connector's `url` field; `url_env: DATAOPS_LEADS_URL`
-# still selects this default so a live step keeps working without a
-# Worker env var.
-LEADS_INTAKE_URL = "https://ops.dtcdev.click/api/v1/intake/leads"
-LEADS_URL_ENV = "DATAOPS_LEADS_URL"
+# Paths under the DataOps connection's https origin. The origin is stored
+# on the connection (`dapier connections edit dataops --url https://…`);
+# extraction_step selects leads vs documents.
+LEADS_PATH = "/api/v1/intake/leads"
+DOCUMENTS_PATH = "/api/v1/intake/email-documents"
 _LEADS_RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 _LEADS_WS_RE = re.compile(r"\s+")
 MAX_LEADS_SPONSORS = 20
@@ -96,14 +95,27 @@ def run_dataops(action, event, *, steps=None):
     )
 
 
+def _dataops_connection(action):
+    """The connected DataOps record named by the step's ``connection_id``."""
+    connection_id = str(action.get("connection_id") or "").strip()
+    if not connection_id:
+        raise ValueError("dataops step requires connection_id (a DataOps connection)")
+    connection = base._connected_connection(connection_id)
+    if connection.get("provider") != "dataops":
+        raise ValueError(f"connection {connection_id} is not a DataOps connection")
+    return connection
+
+
 def _target_url(action):
-    """Intake URL from the connector step, then env, then the leads default."""
-    if action.get("url"):
-        return action["url"]
-    env_name = action.get("url_env") or "DATAOPS_INTAKE_URL"
-    if env_name == LEADS_URL_ENV:
-        return os.environ.get(LEADS_URL_ENV) or LEADS_INTAKE_URL
-    return os.environ[env_name]
+    """Intake URL from the DataOps connection origin plus the path this step uses."""
+    origin = str(_dataops_connection(action).get("url") or "").rstrip("/")
+    if not origin:
+        raise ValueError(
+            "DataOps connection has no url; set it with "
+            "`dapier connections edit <ref> --url https://…`"
+        )
+    path = LEADS_PATH if _is_leads_action(action) else DOCUMENTS_PATH
+    return origin + path
 
 def _intake_body(action, event, *, steps=None):
     if _is_leads_action(action):
@@ -114,11 +126,8 @@ def _intake_body(action, event, *, steps=None):
 
 
 def _is_leads_action(action):
-    """Whether this step targets the sponsors-leads intake rather than the
-    document intake — via the dedicated env var or a leads-intake URL."""
-    if action.get("url_env") == LEADS_URL_ENV:
-        return True
-    return "/intake/leads" in str(action.get("url") or "")
+    """Sponsors-leads intake when the step names an extraction_step."""
+    return bool(str(action.get("extraction_step") or "").strip())
 
 def _dropbox_intake_body(action, event, *, steps=None):
     """Build a DataOps intake for a Dropbox file event.
@@ -134,7 +143,10 @@ def _dropbox_intake_body(action, event, *, steps=None):
         raise ValueError("dropbox intake requires a file path")
     filename = base._safe_filename(path.split("/")[-1])
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    connection = dropbox_api.dropbox_connection(action["connection_id"])
+    dropbox_id = str(action.get("dropbox_connection_id") or "").strip()
+    if not dropbox_id:
+        raise ValueError("dropbox intake requires dropbox_connection_id")
+    connection = dropbox_api.dropbox_connection(dropbox_id)
     access_token, _info = tokens.get_access_token(connection)
     body = dropbox_api.dropbox_download(access_token, path)
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"

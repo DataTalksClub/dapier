@@ -22,9 +22,9 @@ actions:
   autorename: false
 - id: intake-invoice
   type: dataops
+  connection_id: dataops
   auth_secret_id: dapier/dataops
-  url_env: DATAOPS_INTAKE_URL
-  connection_id: dropbox
+  dropbox_connection_id: dropbox
   path: '{steps.move-file.output.item.path}'
 trigger:
   connector: dropbox

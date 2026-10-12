@@ -4,8 +4,8 @@ Dapier is only the pipe — one LLM extraction plus this formatter. Sponsor
 records and cross-email dedup live in DataOps (POST /api/v1/intake/leads).
 These tests pin the envelope without touching the network: run_dataops is
 exercised with a stubbed _json_request, like the ai_complete transport seam.
+The intake URL comes from the DataOps connection origin, not the job.
 """
-import os
 import unittest
 from copy import deepcopy
 from unittest.mock import patch
@@ -39,9 +39,19 @@ def extraction_steps(newsletter="Data Bites Weekly", sponsors=(), step="extract-
 
 def leads_action(**overrides):
     action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
-              "url": "https://ops.dtcdev.click/api/v1/intake/leads"}
+              "connection_id": "dataops", "extraction_step": "extract-sponsors"}
     action.update(overrides)
     return action
+
+
+def dataops_connection(url="https://ops.dtcdev.click"):
+    return {"connection_id": "dataops", "provider": "dataops",
+            "status": "connected", "url": url}
+
+
+def patch_connection(url="https://ops.dtcdev.click"):
+    return patch("src.dapier.engine.actions.dataops.base._connected_connection",
+                 return_value=dataops_connection(url))
 
 
 def body(action=None, event=None, steps=None):
@@ -55,22 +65,12 @@ def body(action=None, event=None, steps=None):
 
 
 class RoutingTests(unittest.TestCase):
-    def test_leads_url_routes_to_the_leads_body(self):
+    def test_extraction_step_routes_to_the_leads_body(self):
         assert dataops_action._is_leads_action(leads_action()) is True
 
-    def test_legacy_leads_env_still_routes_to_the_leads_body(self):
+    def test_omitting_extraction_step_routes_to_documents(self):
         action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
-                  "url_env": "DATAOPS_LEADS_URL"}
-        assert dataops_action._is_leads_action(action) is True
-
-    def test_leads_url_overrides_document_env(self):
-        action = leads_action(url_env="DATAOPS_INTAKE_URL",
-                              url="https://ops.example.test/api/v1/intake/leads")
-        assert dataops_action._is_leads_action(action) is True
-
-    def test_document_intake_still_routes_to_documents(self):
-        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
-                  "url_env": "DATAOPS_INTAKE_URL"}
+                  "connection_id": "dataops"}
         assert dataops_action._is_leads_action(action) is False
 
     def test_intake_body_dispatches_to_leads(self):
@@ -79,6 +79,35 @@ class RoutingTests(unittest.TestCase):
             steps=extraction_steps(sponsors=[{"name": "Acme"}]))
         assert envelope["version"] == "2026-10-10"
         assert envelope["sponsors"] == [{"name": "Acme"}]
+
+
+class TargetUrlTests(unittest.TestCase):
+    def test_leads_appends_the_leads_path(self):
+        with patch_connection():
+            assert dataops_action._target_url(leads_action()) == (
+                "https://ops.dtcdev.click/api/v1/intake/leads")
+
+    def test_documents_appends_the_documents_path(self):
+        action = {"type": "dataops", "connection_id": "dataops",
+                  "auth_secret_id": "dapier/dataops"}
+        with patch_connection("https://intake.test"):
+            assert dataops_action._target_url(action) == (
+                "https://intake.test/api/v1/intake/email-documents")
+
+    def test_missing_connection_url_fails_loudly(self):
+        with patch_connection(""), self.assertRaisesRegex(ValueError, "no url"):
+            dataops_action._target_url(leads_action())
+
+    def test_missing_connection_id_fails_loudly(self):
+        with self.assertRaisesRegex(ValueError, "connection_id"):
+            dataops_action._target_url({"type": "dataops"})
+
+    def test_non_dataops_connection_fails_loudly(self):
+        with patch("src.dapier.engine.actions.dataops.base._connected_connection",
+                   return_value={"connection_id": "dropbox", "provider": "dropbox",
+                                 "status": "connected"}), \
+             self.assertRaisesRegex(ValueError, "not a DataOps connection"):
+            dataops_action._target_url(leads_action(connection_id="dropbox"))
 
 
 class EnvelopeTests(unittest.TestCase):
@@ -203,7 +232,8 @@ class PostTests(unittest.TestCase):
         with patch("src.dapier.engine.actions.base.secrets_value",
                    return_value='{"token": "tok-123"}'), \
              patch("src.dapier.engine.actions.dataops.base._json_request",
-                   side_effect=fake_request):
+                   side_effect=fake_request), \
+             patch_connection():
             result = dataops_action.run_dataops(leads_action(), email_event(), steps=steps)
         assert result == {"accepted": True}
         assert seen["url"] == "https://ops.dtcdev.click/api/v1/intake/leads"
@@ -211,46 +241,22 @@ class PostTests(unittest.TestCase):
         assert seen["payload"]["version"] == "2026-10-10"
         assert seen["payload"]["messageId"] == "<abc123@example.test>"
 
-    def test_connector_url_wins_over_env(self):
+    def test_posts_to_the_connection_origin(self):
         seen = {}
 
         def fake_request(url, payload, headers=None, timeout=15):
             seen["url"] = url
             return {"accepted": True}
 
-        action = leads_action(url="https://ops.example.test/api/v1/intake/leads",
-                              url_env="DATAOPS_LEADS_URL")
         with patch("src.dapier.engine.actions.base.secrets_value",
                    return_value="tok-123"), \
              patch("src.dapier.engine.actions.dataops.base._json_request",
                    side_effect=fake_request), \
-             patch.dict(os.environ, {"DATAOPS_LEADS_URL": "https://from-env.test/leads"},
-                        clear=False):
+             patch_connection("https://ops.example.test"):
             dataops_action.run_dataops(
-                action, email_event(),
+                leads_action(), email_event(),
                 steps=extraction_steps(sponsors=[{"name": "Acme"}]))
         assert seen["url"] == "https://ops.example.test/api/v1/intake/leads"
-
-    def test_legacy_leads_env_falls_back_to_the_connector_default(self):
-        seen = {}
-
-        def fake_request(url, payload, headers=None, timeout=15):
-            seen["url"] = url
-            return {"accepted": True}
-
-        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
-                  "url_env": "DATAOPS_LEADS_URL"}
-        env = {key: value for key, value in os.environ.items()
-               if key != "DATAOPS_LEADS_URL"}
-        with patch("src.dapier.engine.actions.base.secrets_value",
-                   return_value="tok-123"), \
-             patch("src.dapier.engine.actions.dataops.base._json_request",
-                   side_effect=fake_request), \
-             patch.dict(os.environ, env, clear=True):
-            dataops_action.run_dataops(
-                action, email_event(),
-                steps=extraction_steps(sponsors=[{"name": "Acme"}]))
-        assert seen["url"] == dataops_action.LEADS_INTAKE_URL
 
     def test_deepcopy_of_event_is_untouched(self):
         event = email_event()

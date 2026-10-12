@@ -178,7 +178,6 @@ def test_real_connector_fields_carry_the_declared_types():
     assert field("http_request", "url")["type"] == "url"
     assert field("http_request", "method")["options"] == list(registry.ACTIONS[
         "http_request"].fields[1]["options"])  # select keeps its options
-    assert field("dataops", "url")["type"] == "url"
     assert field("s3_upload", "source_url")["type"] == "url"
     assert field("email_send", "to")["type"] == "email"
     assert field("email_send", "sender")["type"] == "email"
