@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import urllib.error
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -87,12 +88,19 @@ def run_dataops(action, event, *, steps=None):
         token = value
     if not token:
         raise ValueError("DataOps secret does not contain a token")
-    return base._json_request(
-        _target_url(action),
-        _intake_body(action, event, steps=steps),
-        headers={"x-dataops-intake-secret": token},
-        timeout=action.get("timeout_seconds", 15),
-    )
+    try:
+        return base._json_request(
+            _target_url(action),
+            _intake_body(action, event, steps=steps),
+            headers={"x-dataops-intake-secret": token},
+            timeout=action.get("timeout_seconds", 15),
+        )
+    except urllib.error.HTTPError as exc:
+        # Intake is idempotent per (recipientRoute, messageId). A replay of
+        # an already-filed document is 409, not a failed run.
+        if exc.code == 409:
+            return {"already_exists": True, "status": 409}
+        raise
 
 
 def _dataops_connection(action):
