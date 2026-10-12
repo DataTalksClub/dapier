@@ -80,3 +80,14 @@ def test_inbox_show_prints_envelope_runs_and_attachments(isolated_home, monkeypa
     assert "email.subject: March invoice" in out
     assert "email.cc: bob@example.com" in out
     assert "attachment: inv.pdf (1234 bytes)" in out
+
+
+def test_inbox_show_prints_the_email_body(isolated_home, monkeypatch, capsys):
+    event = dict(ROWS[0], email={**ROWS[0]["email"], "text": "Please pay the March invoice."})
+    monkeypatch.setattr(commands.api, "call", lambda *a, **k: {"event": event})
+
+    assert main.main(["inbox", "show", "mail-1"]) == 0
+    out = capsys.readouterr().out
+    assert "body:" in out
+    assert "Please pay the March invoice." in out
+    assert "data:" not in out

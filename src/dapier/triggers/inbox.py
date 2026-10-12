@@ -70,10 +70,12 @@ OUTCOMES = {
     RECEIVED: "pending",
 }
 
-# Envelope summary caps: enough for a mailbox row and the detail dialog,
-# never the body.
+# Envelope summary caps: enough for a mailbox row, never the body.
+# The reading pane (api_get) attaches text/html separately, capped like
+# the SES intake so a stored message stays well under the item limit.
 _SUMMARY_TEXT = 300
 _SUMMARY_ATTACHMENTS = 25
+_BODY_TEXT = 60_000
 
 
 class InboxError(Exception):
@@ -223,6 +225,61 @@ def email_summary(data):
     return summary or None
 
 
+def _body_part(value, limit=_BODY_TEXT):
+    """A decoded body part as a string.
+
+    Accepts the SES catch-all's top-level ``text``/``html`` strings and
+    Datamailer's inbound-email ``{"value": "..."}`` wrapper.
+    """
+    if isinstance(value, dict):
+        value = value.get("value")
+    if value in (None, ""):
+        return None
+    text = str(value)
+    return text[:limit] if len(text) > limit else text
+
+
+def email_body(data):
+    """Plain text and HTML of a stored email event.
+
+    Covers both intake shapes: the SES catch-all (``data.text`` /
+    ``data.html``) and Datamailer's inbound-email v1
+    (``data.body.text.value`` / ``data.body.html.value``). Truncated
+    rows report ``truncated`` and whatever of the clipped preview still
+    parses. Returns None when there is no body to show (feedback
+    events, empty messages).
+    """
+    if not isinstance(data, dict):
+        return None
+    truncated = bool(data.get("truncated"))
+    source = data
+    if truncated:
+        preview = data.get("preview")
+        parsed = None
+        if isinstance(preview, dict):
+            parsed = preview
+        elif isinstance(preview, str) and preview.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(preview)
+            except ValueError:
+                parsed = None
+        source = parsed if isinstance(parsed, dict) else {}
+    body = source.get("body") if isinstance(source.get("body"), dict) else {}
+    text = _body_part(source.get("text")) or _body_part(body.get("text"))
+    html = _body_part(source.get("html")) or _body_part(body.get("html"))
+    content = {}
+    if text:
+        content["text"] = text
+    if html:
+        content["html"] = html
+    if truncated:
+        content["truncated"] = True
+    return content or None
+
+
+_LIST_BODY_KEYS = ("text", "html", "body")
+
+
 def _table():
     name = os.environ.get(TABLE_ENV)
     if not name:
@@ -362,7 +419,7 @@ def note_replay_bounced(inbox_id, error, *, table_ref=None):
     return complete(inbox_id, None, error=error, table_ref=table_ref)
 
 
-def _view(item):
+def _view(item, *, body=False):
     keys = ("inbox_id", "connector", "event", "source", "occurred_at",
             "received_at", "processed_at", "status", "data", "matched", "error")
     view = {key: _decode_numbers(item.get(key)) for key in keys}
@@ -374,6 +431,17 @@ def _view(item):
     if view.get("connector") == "email":
         stored_summary = _decode_numbers(item.get("email"))
         view["email"] = stored_summary or email_summary(view.get("data")) or {}
+        if body:
+            content = email_body(view.get("data"))
+            if content:
+                view["email"] = {**view["email"], **content}
+        else:
+            # List rows stay envelope-only so a page of mail stays small;
+            # the reading pane loads text/html through api_get.
+            data = view.get("data")
+            if isinstance(data, dict) and not data.get("truncated"):
+                view["data"] = {key: value for key, value in data.items()
+                                if key not in _LIST_BODY_KEYS}
     if item.get("request") is not None:
         view["request"] = _decode_numbers(item["request"])
     return view
@@ -522,7 +590,8 @@ def api_get(inbox_id, *, table_ref=None, visible=None, run_status=None):
         # Same answer as a missing row: the list dropped it, the single
         # read must not reveal it either.
         return 404, {"error": "Inbox event not found"}
-    return 200, {"event": _with_run_status(_view(item), run_status or _run_status)}
+    return 200, {"event": _with_run_status(_view(item, body=True),
+                                           run_status or _run_status)}
 
 
 def stored(inbox_id, *, table_ref=None):

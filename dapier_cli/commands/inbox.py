@@ -99,7 +99,16 @@ def inbox_show(api_url, inbox_id, debug=False):
         size = attachment.get("size")
         size_text = f" ({size} bytes)" if size is not None else ""
         print(f"  attachment: {attachment.get('name') or '(unnamed)'}{size_text}")
-    if event.get("data") not in (None, {}, []):
+    if email.get("truncated"):
+        print("  body: (truncated)")
+    text, html = email.get("text"), email.get("html")
+    if text:
+        print("  body:")
+        print(text if str(text).endswith("\n") else f"{text}\n")
+    elif html:
+        print("  body (html):")
+        print(html if str(html).endswith("\n") else f"{html}\n")
+    elif event.get("data") not in (None, {}, []):
         print(f"  data: {json.dumps(event['data'], sort_keys=True, default=str)}")
     return 0
 

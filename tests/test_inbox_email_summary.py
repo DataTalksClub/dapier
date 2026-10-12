@@ -54,6 +54,7 @@ def test_email_rows_carry_the_envelope_summary_outcome_and_run_links(table):  # 
         "attachments": [{"name": "inv.pdf", "size": 1234, "content_type": "application/pdf"}],
     }
     assert "secret body text" not in json.dumps(row["email"])
+    assert "secret body text" not in json.dumps(row.get("data") or {})
 
 
 def test_email_summary_survives_the_storage_cap(table):  # noqa: F811
@@ -116,6 +117,49 @@ def test_api_list_filters_by_outcome(table):  # noqa: F811
     assert [event["inbox_id"] for event in payload["events"]] == ["evt-3", "evt-0"]
     status, payload = inbox.api_list(outcome="nope", table_ref=table)
     assert status == 400 and "nope" in payload["error"]
+
+
+def test_api_get_includes_the_decoded_body(table):  # noqa: F811
+    """The reading pane (and `dapier inbox show`) load text/html on the
+    single-event read; list rows stay envelope-only."""
+    inbox.record(EMAIL, table_ref=table)
+    _, payload = inbox.api_get("mail-1", table_ref=table)
+    assert payload["event"]["email"]["text"] == "secret body text"
+    assert "html" not in payload["event"]["email"]
+    _, listed = inbox.api_list("email", table_ref=table)
+    assert "text" not in listed["events"][0]["email"]
+    assert "html" not in listed["events"][0]["email"]
+
+
+def test_api_get_reads_ses_top_level_text_and_html(table):  # noqa: F811
+    """The SES catch-all stores decoded parts at data.text / data.html."""
+    inbox.record({
+        **EMAIL, "id": "ses-1",
+        "data": {**EMAIL["data"], "text": "plain invoice",
+                 "html": "<p>plain invoice</p>", "body": {}},
+    }, table_ref=table)
+    _, payload = inbox.api_get("ses-1", table_ref=table)
+    assert payload["event"]["email"]["text"] == "plain invoice"
+    assert payload["event"]["email"]["html"] == "<p>plain invoice</p>"
+
+
+def test_api_get_unwraps_datamailer_html_part(table):  # noqa: F811
+    inbox.record({
+        **EMAIL, "id": "dm-1",
+        "data": {**EMAIL["data"], "body": {"html": {"value": "<p>Do this</p>"}},
+                 "html": {"value": "<p>Do this</p>"}},
+    }, table_ref=table)
+    _, payload = inbox.api_get("dm-1", table_ref=table)
+    assert payload["event"]["email"]["html"] == "<p>Do this</p>"
+    assert "text" not in payload["event"]["email"]
+
+
+def test_truncated_detail_flags_the_clipped_body(table):  # noqa: F811
+    big = {**EMAIL["data"], "body": {"text": {"value": "x" * (inbox.DATA_LIMIT + 1)}}}
+    inbox.record({**EMAIL, "id": "big-1", "data": big}, table_ref=table)
+    _, payload = inbox.api_get("big-1", table_ref=table)
+    assert payload["event"]["email"]["truncated"] is True
+    assert payload["event"]["email"]["subject"] == "March invoice"
 
 
 def test_api_get_reports_each_matched_run_status(table):  # noqa: F811
