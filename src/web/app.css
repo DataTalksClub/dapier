@@ -2286,6 +2286,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   /* Connections: the group head flows onto further lines; its nowrap
      inline-flex title was the widest element on the page. */
   .service-panel > .section-head { flex-wrap: wrap; row-gap: var(--dk-space-1); }
+  .service-panel > .section-head .sub { overflow-wrap: normal; }
   .service-panel-title { flex-wrap: wrap; white-space: normal; min-width: 0; }
   .service-account { align-items: start; }
 
@@ -2350,16 +2351,28 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .register-toolbar .dk-toolbar__end > .dk-button { flex: 1 1 auto; }
 
   /* App setup: the action joins the name/status line, so an OAuth client
-     card has no blank band between its head and its client id. */
+     card has no blank band between its head and its client id. The status
+     badge drops - Set up / Replace / Add already say the state - so the
+     provider name keeps whole words at 375. */
   .setup-table tr { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .setup-table td[data-label="Status"] { display: none; }
   .setup-table td[data-label="Status"] { grid-column: 2; }
   .setup-table .action-cell { grid-column: 3; grid-row: 1; align-self: center; }
   .setup-table td[data-label="Updated"]:not([data-empty]) { grid-column: 1 / -1; }
 
+  /* Workflow cards: the judged three-line recipe, compacted - app marks
+     at 20px without their frames on the apps line beside the folder, and
+     an auto-paused workflow's status + Resume on a right-aligned line of
+     their own under them (they need the attention anyway). */
+  #workflow-table-wrap td[data-label="State"]:has(.workflow-resume) { justify-self: end; }
+  #workflow-table-wrap .workflow-state-control:has(.workflow-resume) { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--dk-space-2); }
+  .app-tile { width: 20px; height: 20px; border: 0; background: none; }
+  .app-tile .brand-mark { width: 16px; height: 16px; }
+
   /* Audit: the error cell stays hidden - the outcome line already carries
      the error; the register's display:block rule would otherwise resurrect
      it as an unplaced card line that collides with the actor. */
-  #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome) { display: none; }
+  #audit-log-table td.audit-error:not(.audit-action):not(.audit-outcome) { grid-row: 5; }
   /* Audit: the resource reads on its own full-width line under the
      timestamp; actor and agent pair below it. */
   #audit-log-table .audit-resource { grid-column: 1 / -1; grid-row: 3; }
