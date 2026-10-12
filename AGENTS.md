@@ -82,7 +82,7 @@ $env:AWS_ACCESS_KEY_ID = "testing"
 $env:AWS_SECRET_ACCESS_KEY = "testing"
 $env:AWS_DEFAULT_REGION = "eu-west-1"
 $env:DAPIER_SKIP_CONFIG_DB = "1"
-uv run --with boto3 --with pytest --with pyyaml --with 'pyjwt[crypto]' --with mini-racer --with moto pytest -q
+uv run --with boto3 --with pytest --with pyyaml --with 'pyjwt[crypto]' --with mini-racer --with moto --with pypdf --with playwright pytest -q
 ```
 
 ### Auditing parity

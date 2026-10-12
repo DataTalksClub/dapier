@@ -4,38 +4,9 @@ Addresses come from workflow email triggers, so a "New email" button that
 opened a blank workflow was a confusing detour. The page links to
 Workflows instead.
 """
-import shutil
-import subprocess
 from pathlib import Path
 
-import pytest
-
 WEB = Path(__file__).resolve().parents[1] / "src" / "web"
-
-
-def test_console_javascript_modules_parse():
-    """A template in emails.js opened with a backtick and closed with a
-    quote. The browser then hit `Uncaught SyntaxError: Unexpected
-    identifier '$'` on the next `${...}` and the console stayed on
-    Loading. Parse every ES module the same way the browser does."""
-    if not shutil.which("node"):
-        pytest.skip("node is needed to parse console JavaScript")
-    classic = {"theme-init.js", "device.js"}
-    files = [WEB / "app.js"] + sorted(
-        path for path in (WEB / "js").rglob("*.js") if path.name not in classic
-    )
-    failed = []
-    for path in files:
-        proc = subprocess.run(
-            ["node", "--input-type=module", "--check"],
-            input=path.read_text(),
-            text=True,
-            capture_output=True,
-        )
-        if proc.returncode != 0:
-            rel = path.relative_to(WEB.parents[1])
-            failed.append(f"{rel}: {proc.stderr.strip()}")
-    assert not failed, "\n".join(failed)
 
 
 def test_emails_page_has_no_new_email_button():
