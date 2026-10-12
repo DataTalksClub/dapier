@@ -1,8 +1,9 @@
 /* Emails is a mailbox of what Dapier received and what happened to each
    message: handled by a workflow, refused by the sender policy, or matched
-   by nothing. The receiving addresses sit beside it; selecting one binds
-   the "Who can write" panel to that address's sender policy (or the
-   default). Rows come from the trigger inbox
+   by nothing. Select a row to read the body, the same way Agents opens a
+   run. Addresses sit on the Addresses pane; selecting one binds the
+   "Who can write" panel to that address's sender policy (or the default).
+   Rows come from the trigger inbox
    (GET /api/admin/triggers/inbox?connector=email), the same API behind
    `dapier emails received`; flows are still edited only in the designer. */
 import { state } from '../state.js';
@@ -14,7 +15,7 @@ import { openDesigner } from './designer.js';
 import { openRun } from './runs.js';
 import { openReplayConfirm } from './inbox.js';
 import { workflowName } from '../workflow-names.js';
-import { filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
+import { filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow, OUTCOMES, ago } from './activity.js';
 
 /* Server-side outcome filters; Handled includes the runs that failed —
    a workflow took the message, and its failure is what needs attention. */
@@ -30,6 +31,9 @@ const mail = { events: null, next: null, filter: 'all', loading: false, error: '
 let config = {};
 let fromPolicy = { default: { mode: 'allowlist', addresses: [] }, routes: {}, addresses: [] };
 let selectedKey = null;
+let openInboxId = null;
+let detail = null;
+let detailSeq = 0;
 
 /* ---- formatting ------------------------------------------------------- */
 
@@ -48,6 +52,14 @@ function formatSize(bytes) {
 
 function isFeedback(event) {
   return Boolean((event.email || {}).feedback);
+}
+
+function mailTitle(event) {
+  const email = event.email || {};
+  if (isFeedback(event)) {
+    return `${email.feedback === 'bounce' ? 'Bounce' : 'Complaint'} report`;
+  }
+  return email.subject || '(no subject)';
 }
 
 /* The workflows bound to an address in the current configuration — used
@@ -73,15 +85,56 @@ function outcomeHtml(event) {
   return outcomeCell(key);
 }
 
+function outcomeBadge(event) {
+  const key = OUTCOME_KEY[event.outcome] || 'ignored';
+  const outcome = OUTCOMES[key] || { kind: 'off', label: key || 'Unknown' };
+  return `<span class="status ${outcome.kind}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(outcome.label)}</span>`;
+}
+
+function part(value) {
+  if (value && typeof value === 'object') value = value.value;
+  return typeof value === 'string' && value.trim() ? value : '';
+}
+
+function bodies(event) {
+  const email = event.email || {};
+  const data = event.data || {};
+  const body = data.body || {};
+  return {
+    text: part(email.text) || part(data.text) || part(body.text),
+    html: part(email.html) || part(data.html) || part(body.html),
+    truncated: Boolean(email.truncated || data.truncated),
+  };
+}
+
+function htmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, style, noscript').forEach((node) => node.remove());
+  return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function bodyHtml(event) {
+  const { text, html, truncated } = bodies(event);
+  const note = truncated ? '<p class="sub">Only the stored portion of this message is shown.</p>' : '';
+  const readable = text || (html ? htmlToText(html) : '');
+  if (!readable && !html) {
+    return `<div class="email-body-empty"><p>${truncated
+      ? 'This message was too large to store in full. Replay still uses the raw copy.'
+      : 'No body was recorded for this message.'}</p></div>`;
+  }
+  const source = html
+    ? `<details class="email-html-alt"><summary>Original HTML</summary><pre class="email-body-html">${escapeHtml(html)}</pre></details>`
+    : '';
+  return `${note}${readable ? `<pre class="email-body-text">${escapeHtml(readable)}</pre>` : ''}${source}`;
+}
+
 /* ---- received list ---------------------------------------------------- */
 
 function mailRow(event) {
   const email = event.email || {};
   const feedback = isFeedback(event);
   const from = feedback ? `${email.feedback === 'bounce' ? 'Bounce' : 'Complaint'} report` : senderName(email);
-  const subject = feedback
-    ? `${email.feedback === 'bounce' ? 'Bounced' : 'Complaint'}: ${(email.recipients || []).join(', ') || 'unknown recipient'}`
-    : (email.subject || '(no subject)');
+  const subject = mailTitle(event);
   const to = (email.to || []).join(', ');
   const attachments = (email.attachments || []).filter((item) => !item.inline).length;
   return activityRow({
@@ -89,8 +142,11 @@ function mailRow(event) {
     label: `Open ${subject}`,
     when: whenHtml(event.received_at),
     primary: `<span title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>${to ? `<span class="activity-to mono" title="${escapeHtml(to)}">to ${escapeHtml(to)}</span>` : ''}`,
-    secondary: `${escapeHtml(subject)}${attachments ? ` · ${attachments} attachment${attachments === 1 ? '' : 's'}` : ''}`,
+    secondary: `${escapeHtml(feedback
+      ? `${email.feedback === 'bounce' ? 'Bounced' : 'Complaint'}: ${(email.recipients || []).join(', ') || 'unknown recipient'}`
+      : subject)}${attachments ? ` · ${attachments} attachment${attachments === 1 ? '' : 's'}` : ''}`,
     outcome: outcomeHtml(event),
+    selected: event.inbox_id === openInboxId,
   });
 }
 
@@ -101,7 +157,7 @@ function emptyMessage() {
   if (mail.filter === 'failed') return '<h3>Nothing failed</h3><p>Messages whose workflow run failed show up here.</p>';
   if (mail.filter === 'handled') return '<h3>Nothing handled yet</h3><p>Messages a workflow ran for show up here.</p>';
   if (first) {
-    return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>`;
+    return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>';
   }
   return '<h3>No email received yet</h3><p>Add an email trigger with an address filter in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>, then send a message to that address.</p>';
 }
@@ -123,6 +179,168 @@ function renderMail() {
     ? `${events.length}${mail.next ? '+' : ''} message${events.length === 1 ? '' : 's'}` : '';
 }
 
+function setMailUrl(id) {
+  if (state.view !== 'emails') return;
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('mail', id); else url.searchParams.delete('mail');
+  history.replaceState(null, '', url);
+}
+
+function listedEvent(inboxId) {
+  return (mail.events || []).find((event) => event.inbox_id === inboxId);
+}
+
+/* ---- reading pane ----------------------------------------------------- */
+
+function runsHtml(event) {
+  const email = event.email || {};
+  const runs = event.runs || [];
+  if (runs.length) {
+    return `<ul class="email-runs">${runs.map((run) => `<li>
+        <span class="cell-name" title="${escapeHtml(run.workflow)}">${escapeHtml(workflowName(run.workflow))}</span>
+        ${run.status ? statusLine(run.status) : '<span class="email-muted">status unknown</span>'}
+        <button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(run.run_id)}">Open run</button>
+      </li>`).join('')}</ul>`;
+  }
+  if (event.outcome === 'failed') {
+    const candidates = handlersFor(event);
+    return `<p class="detail-error">${escapeHtml(event.error || 'The run failed.')}</p>${candidates.length
+      ? `<ul class="email-runs">${candidates.map((workflow) => `<li><span class="cell-name" title="${escapeHtml(workflow)}">${escapeHtml(workflowName(workflow))}</span><span class="email-muted">handles this address</span><button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(`${workflow}:${event.inbox_id}`)}">Open run</button></li>`).join('')}</ul>` : ''}`;
+  }
+  if (event.outcome === 'refused') {
+    const sender = email.from_address;
+    return `<p class="sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} allowed to write to this address, so no workflow ran. Allow the sender, then replay the message to run it now.</p>`;
+  }
+  if (event.outcome === 'unmatched') {
+    return `<p class="sub">${isFeedback(event)
+      ? 'No workflow watches bounce or complaint feedback.'
+      : 'No published workflow has an email trigger for this address.'} Add one in Workflows, then replay the message.</p>`;
+  }
+  return '';
+}
+
+function readHtml(event) {
+  const email = event.email || {};
+  const title = mailTitle(event);
+  const from = isFeedback(event) ? (email.from || '') : senderName(email);
+  const to = (email.to || []).join(', ');
+  const when = event.received_at
+    ? `<time datetime="${escapeHtml(event.received_at)}" title="${escapeHtml(formatTimestamp(event.received_at) || '')}">${escapeHtml(ago(event.received_at))}</time>`
+    : '';
+  const rows = [
+    ['From', email.from],
+    ['To', to],
+    ['Cc', email.cc],
+    ['Date', email.date],
+    ['Received', formatTimestamp(event.received_at)],
+    ['Message-ID', email.message_id],
+  ];
+  if (isFeedback(event)) {
+    rows.unshift(['Feedback', `${email.feedback}${email.bounce_type ? ` (${email.bounce_type})` : ''}`],
+      ['Recipients', (email.recipients || []).join(', ')]);
+  }
+  const headers = rows.filter(([, value]) => value)
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd class="mono">${escapeHtml(value)}</dd>`).join('');
+  const attachments = email.attachments || [];
+  const files = attachments.length ? `<section class="email-detail-block">
+      <h3>Attachments <span class="email-muted">${attachments.length}</span></h3>
+      <ul class="email-files">${attachments.map((item) => `<li><i data-lucide="file-text"></i><span class="mono">${escapeHtml(item.name || '(unnamed)')}</span><span class="email-muted">${escapeHtml([formatSize(item.size), item.inline ? 'inline' : ''].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>
+    </section>` : '';
+  const sender = (email.from_address || '').toLowerCase();
+  const route = (email.route || '').toLowerCase();
+  const canAllow = event.outcome === 'refused' && sender && !senderAllowed(sender, route);
+  return `<div class="email-read-body">
+    <div class="email-read-head">
+      <button class="email-back dk-button dk-button--secondary dk-button--sm" type="button">Back to received</button>
+      <h2 tabindex="-1" title="${escapeHtml(title)}">${escapeHtml(title)}</h2>
+      <p class="email-read-meta">${outcomeBadge(event)}${from ? `<span class="email-meta-item" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>` : ''}${to ? `<span class="email-meta-item mono" title="${escapeHtml(to)}">${escapeHtml(to)}</span>` : ''}${when ? `<span class="email-meta-item">${when}</span>` : ''}</p>
+      <details class="email-technical"><summary>Details</summary><dl>${headers}</dl></details>
+    </div>
+    <section class="email-detail-block" aria-labelledby="email-outcome-heading">
+      <h3 id="email-outcome-heading">Workflow</h3>
+      <div class="activity-outcome">${outcomeHtml(event)}</div>
+      ${runsHtml(event)}
+    </section>
+    <section class="email-body" aria-labelledby="email-body-heading">
+      <h3 id="email-body-heading">Message</h3>
+      ${bodyHtml(event)}
+    </section>
+    ${files}
+    <div class="email-read-actions">
+      ${canAllow ? `<button id="email-allow-sender" class="dk-button dk-button--primary" type="button" data-address="${escapeHtml(sender)}" data-route="${escapeHtml(route)}">Allow ${escapeHtml(sender)}</button>` : ''}
+      <button id="email-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
+    </div>
+  </div>`;
+}
+
+function renderRead() {
+  const panel = $('#email-read');
+  const workspace = $('.email-mail-workspace');
+  if (workspace) workspace.classList.toggle('has-selection', Boolean(openInboxId));
+  if (!openInboxId) {
+    panel.innerHTML = '<div class="dialog-state"><strong>Select a message</strong><p>Read the email and see which workflow ran.</p></div>';
+    return;
+  }
+  const event = (detail && detail.inbox_id === openInboxId) ? detail : listedEvent(openInboxId);
+  if (!event) {
+    panel.innerHTML = '<div class="dialog-state" role="status"><p>Loading the message…</p></div>';
+    return;
+  }
+  panel.innerHTML = readHtml(event);
+  icons();
+}
+
+async function openEmail(inboxId, { updateUrl = true } = {}) {
+  const changed = openInboxId !== inboxId;
+  openInboxId = inboxId;
+  if (changed) {
+    detail = null;
+    $('#email-read').scrollTop = 0;
+  }
+  if (updateUrl) setMailUrl(inboxId);
+  renderMail();
+  renderRead();
+  const seq = ++detailSeq;
+  try {
+    const event = (await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`)).event || {};
+    if (seq !== detailSeq || openInboxId !== inboxId) return;
+    detail = event;
+    renderRead();
+  } catch (error) {
+    if (seq !== detailSeq || openInboxId !== inboxId) return;
+    if (!listedEvent(inboxId)) {
+      $('#email-read').innerHTML = `<div class="dialog-state"><strong>This message could not be loaded</strong><p>${escapeHtml(error.message)}</p><button class="email-back dk-button dk-button--secondary" type="button">Back to received</button></div>`;
+    }
+  }
+}
+
+function clearSelection() {
+  ++detailSeq;
+  openInboxId = null;
+  detail = null;
+  setMailUrl(null);
+  renderMail();
+  renderRead();
+}
+
+function pickMail() {
+  if (state.view !== 'emails') return;
+  const ids = new Set((mail.events || []).map((event) => event.inbox_id));
+  if (openInboxId && !ids.has(openInboxId)) {
+    openInboxId = null;
+    detail = null;
+    setMailUrl(null);
+  }
+  const fromUrl = new URLSearchParams(window.location.search).get('mail');
+  const desktop = window.matchMedia('(min-width: 861px)').matches;
+  const id = (fromUrl && ids.has(fromUrl) && fromUrl)
+    || openInboxId
+    || (desktop ? (mail.events || [])[0]?.inbox_id : null);
+  if (id && id !== openInboxId) void openEmail(id);
+  else if (id && id === openInboxId && !detail) void openEmail(id, { updateUrl: false });
+  else renderRead();
+}
+
 export async function fetchMail({ append = false } = {}) {
   if (mail.loading) return;
   mail.loading = true;
@@ -142,101 +360,13 @@ export async function fetchMail({ append = false } = {}) {
     mail.loading = false;
   }
   renderMail();
+  pickMail();
 }
 
 /* Called from the overview refresh: fetch while the page is on screen. */
 export function renderReceivedEmail() {
   if (state.view === 'emails') void fetchMail();
   else renderMail();
-}
-
-/* ---- detail dialog ---------------------------------------------------- */
-
-function detailHtml(event) {
-  const email = event.email || {};
-  const runs = event.runs || [];
-  const rows = [
-    ['From', email.from],
-    ['To', (email.to || []).join(', ')],
-    ['Cc', email.cc],
-    ['Date', email.date],
-    ['Received', formatTimestamp(event.received_at)],
-    ['Message-ID', email.message_id],
-  ];
-  if (isFeedback(event)) {
-    rows.unshift(['Feedback', `${email.feedback}${email.bounce_type ? ` (${email.bounce_type})` : ''}`],
-      ['Recipients', (email.recipients || []).join(', ')]);
-  }
-  const header = `<dl class="detail-list email-headers">${rows.filter(([, value]) => value)
-    .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd class="mono">${escapeHtml(value)}</dd></div>`).join('')}</dl>`;
-  const attachments = email.attachments || [];
-  const files = attachments.length ? `<section class="email-detail-block">
-      <h3>Attachments <span class="email-muted">${attachments.length}</span></h3>
-      <ul class="email-files">${attachments.map((item) => `<li><i data-lucide="file-text"></i><span class="mono">${escapeHtml(item.name || '(unnamed)')}</span><span class="email-muted">${escapeHtml([formatSize(item.size), item.inline ? 'inline' : ''].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>
-    </section>` : '';
-  let result;
-  if (runs.length) {
-    result = `<ul class="email-runs">${runs.map((run) => `<li>
-        <span class="cell-name" title="${escapeHtml(run.workflow)}">${escapeHtml(workflowName(run.workflow))}</span>
-        ${run.status ? statusLine(run.status) : '<span class="email-muted">status unknown</span>'}
-        <button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(run.run_id)}">Open run</button>
-      </li>`).join('')}</ul>`;
-  } else if (event.outcome === 'failed') {
-    const candidates = handlersFor(event);
-    result = `<p class="detail-error">${escapeHtml(event.error || 'The run failed.')}</p>${candidates.length
-      ? `<ul class="email-runs">${candidates.map((workflow) => `<li><span class="cell-name" title="${escapeHtml(workflow)}">${escapeHtml(workflowName(workflow))}</span><span class="email-muted">handles this address</span><button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(`${workflow}:${event.inbox_id}`)}">Open run</button></li>`).join('')}</ul>` : ''}`;
-  } else if (event.outcome === 'refused') {
-    const sender = email.from_address;
-    result = `<p class="sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} allowed to write to this address, so no workflow ran. Allow the sender, then replay the message to run it now.</p>`;
-  } else if (event.outcome === 'unmatched') {
-    result = `<p class="sub">${isFeedback(event)
-      ? 'No workflow watches bounce or complaint feedback.'
-      : 'No published workflow has an email trigger for this address.'} Add one in Workflows, then replay the message.</p>`;
-  } else {
-    result = '';
-  }
-  return `<section class="email-detail-block">
-      <h3>Outcome</h3>
-      <div class="activity-outcome">${outcomeHtml(event)}</div>
-      ${result}
-    </section>
-    ${header}
-    ${files}`;
-}
-
-let openInboxId = null;
-
-async function openEmail(inboxId) {
-  openInboxId = inboxId;
-  const dialog = $('#email-dialog');
-  const row = (mail.events || []).find((event) => event.inbox_id === inboxId) || {};
-  $('#email-dialog-title').textContent = (row.email || {}).subject || 'Email';
-  $('#email-dialog-body').innerHTML = row.inbox_id ? detailHtml(row) : '<p class="detail-muted">Loading…</p>';
-  $('#email-allow-sender').hidden = true;
-  icons();
-  if (!dialog.open) dialog.showModal();
-  let event;
-  try {
-    event = (await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`)).event || {};
-  } catch (error) {
-    if (!row.inbox_id) $('#email-dialog-body').innerHTML = `<p class="detail-muted">${escapeHtml(error.message)}</p>`;
-    return;
-  }
-  if (openInboxId !== inboxId) return;
-  const email = event.email || {};
-  $('#email-dialog-title').textContent = isFeedback(event)
-    ? `${email.feedback === 'bounce' ? 'Bounce' : 'Complaint'} report`
-    : (email.subject || '(no subject)');
-  $('#email-dialog-body').innerHTML = detailHtml(event);
-  const sender = (email.from_address || '').toLowerCase();
-  const route = (email.route || '').toLowerCase();
-  const allow = $('#email-allow-sender');
-  allow.hidden = !(event.outcome === 'refused' && sender && !senderAllowed(sender, route));
-  allow.dataset.address = sender;
-  allow.dataset.route = route;
-  allow.textContent = `Allow ${sender}`;
-  allow.disabled = false;
-  icons();
 }
 
 /* ---- addresses and senders -------------------------------------------- */
@@ -475,13 +605,42 @@ $('#email-filter-chips').addEventListener('click', (event) => {
   mail.filter = button.dataset.emailFilter;
   mail.events = null;
   mail.next = null;
+  openInboxId = null;
+  detail = null;
+  setMailUrl(null);
   renderMail();
+  renderRead();
   void fetchMail();
 });
 
 $('#email-mail-more').addEventListener('click', () => fetchMail({ append: true }));
 
 $('.view[data-page="emails"]').addEventListener('click', async (event) => {
+  if (event.target.closest('.email-back')) { clearSelection(); return; }
+  const replay = event.target.closest('#email-replay');
+  if (replay) {
+    if (!openInboxId) return;
+    openReplayConfirm(openInboxId, async () => { await fetchMail(); });
+    return;
+  }
+  const allow = event.target.closest('#email-allow-sender');
+  if (allow) {
+    const address = allow.dataset.address;
+    if (!address) return;
+    const body = { address };
+    if (allow.dataset.route) body.route = allow.dataset.route;
+    allow.disabled = true;
+    try {
+      await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify(body) });
+      notice(`Allowed ${address}. Replay the message to run it now.`);
+      await refresh();
+      if (openInboxId) renderRead();
+    } catch (error) {
+      notice(error.message, true);
+      allow.disabled = false;
+    }
+    return;
+  }
   const run = event.target.closest('.email-run');
   if (run) { event.stopPropagation(); void openRun(run.dataset.run); return; }
   const workflow = event.target.closest('.email-workflow');
@@ -499,37 +658,12 @@ $('.view[data-page="emails"]').addEventListener('click', async (event) => {
     return;
   }
   const row = event.target.closest('.activity-row[data-inbox]');
-  if (row) void openEmail(row.dataset.inbox);
-});
-
-$('#email-dialog-body').addEventListener('click', (event) => {
-  const run = event.target.closest('.email-run');
-  if (run) void openRun(run.dataset.run);
-});
-
-$('#email-replay').addEventListener('click', () => {
-  if (!openInboxId) return;
-  openReplayConfirm(openInboxId, async () => {
-    $('#email-dialog').close();
-    await fetchMail();
-  });
-});
-
-$('#email-allow-sender').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  const address = button.dataset.address;
-  if (!address) return;
-  const body = { address };
-  if (button.dataset.route) body.route = button.dataset.route;
-  button.disabled = true;
-  try {
-    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify(body) });
-    button.hidden = true;
-    notice(`Allowed ${address}. Replay the message to run it now.`);
-    await refresh();
-  } catch (error) {
-    notice(error.message, true);
-    button.disabled = false;
+  if (row) {
+    void openEmail(row.dataset.inbox).then(() => {
+      if (openInboxId === row.dataset.inbox && window.matchMedia('(max-width: 860px)').matches) {
+        $('#email-read h2')?.focus();
+      }
+    });
   }
 });
 

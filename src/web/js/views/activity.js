@@ -81,8 +81,8 @@ export function outcomeCell(key, { by = '', note = '', error = '' } = {}) {
 
 /* One activity row: when | what (primary + secondary line) | outcome. The
    row opens its detail; links inside the outcome act on their own. */
-export function activityRow({ attrs = '', label = '', when, primary, secondary = '', outcome }) {
-  return `<li class="activity-row" ${attrs} tabindex="0" role="button" aria-label="${escapeHtml(label)}">
+export function activityRow({ attrs = '', label = '', when, primary, secondary = '', outcome, selected = false }) {
+  return `<li class="activity-row${selected ? ' is-selected' : ''}" ${attrs} tabindex="0" role="button" aria-label="${escapeHtml(label)}"${selected ? ' aria-current="true"' : ''}>
     <span class="activity-when">${when}</span>
     <span class="activity-main"><span class="activity-primary">${primary}</span>${secondary ? `<span class="activity-secondary">${secondary}</span>` : ''}</span>
     <span class="activity-outcome">${outcome}</span>

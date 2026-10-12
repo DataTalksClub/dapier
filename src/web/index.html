@@ -253,16 +253,19 @@
         </div>
         <p id="email-load-error" class="form-error" role="alert"></p>
         <div id="email-workspace" class="trigger-workspace" data-pane="activity">
-          <section class="data-panel trigger-activity" aria-labelledby="email-mail-title">
-            <div class="section-head">
-              <h2 id="email-mail-title">Received</h2>
-              <p id="email-mail-summary" class="sub" role="status"></p>
-            </div>
-            <p id="email-mail-note" class="sub panel-note">Loading received email…</p>
-            <div id="email-mail-empty" class="empty-state" hidden></div>
-            <ul id="email-mail-list" class="activity-list" aria-label="Received email"></ul>
-            <div id="email-mail-footer" class="dk-table-footer" hidden><span>Mail from the last 30 days</span><button id="email-mail-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
-          </section>
+          <div class="email-mail-workspace trigger-activity">
+            <section class="data-panel email-mail-sidebar" aria-labelledby="email-mail-title">
+              <div class="section-head">
+                <h2 id="email-mail-title">Received</h2>
+                <p id="email-mail-summary" class="sub" role="status"></p>
+              </div>
+              <p id="email-mail-note" class="sub panel-note">Loading received email…</p>
+              <div id="email-mail-empty" class="empty-state" hidden></div>
+              <ul id="email-mail-list" class="activity-list" aria-label="Received email"></ul>
+              <div id="email-mail-footer" class="dk-table-footer" hidden><span>Mail from the last 30 days</span><button id="email-mail-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
+            </section>
+            <article id="email-read" class="data-panel" aria-label="Selected email"><div class="dialog-state"><strong>Select a message</strong><p>Read the email and see which workflow ran.</p></div></article>
+          </div>
           <aside class="trigger-sources" aria-label="Addresses and senders">
             <section class="data-panel" aria-labelledby="email-addresses-title">
               <div class="section-head">
@@ -941,18 +944,6 @@
   </dialog>
 <dialog id="inbox-replay-confirm-dialog" aria-labelledby="inbox-replay-confirm-title" aria-describedby="inbox-replay-confirm-message" class="dk-dialog">
     <form method="dialog"><div class="dialog-head dk-dialog__head"><h2 id="inbox-replay-confirm-title">Replay inbox event</h2></div><div class="dialog-body dk-dialog__body"><p id="inbox-replay-confirm-message">This re-injects the recorded event with a fresh id. Workflow actions may send messages or change external data a second time.</p></div><div class="dialog-actions dk-dialog__foot"><button class="dk-button dk-button--secondary" value="cancel">Cancel</button><button class="dk-button dk-button--danger" value="confirm">Replay event</button></div></form>
-  </dialog>
-  <dialog id="email-dialog" class="dk-dialog email-dialog" aria-labelledby="email-dialog-title">
-    <div class="dialog-head dk-dialog__head">
-      <h2 id="email-dialog-title">Email</h2>
-      <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
-    </div>
-    <div id="email-dialog-body" class="dialog-body dk-dialog__body"></div>
-    <div class="dialog-actions dk-dialog__foot">
-      <button id="email-allow-sender" class="dk-button dk-button--primary" type="button" hidden>Allow this sender</button>
-      <button id="email-replay" class="dk-button dk-button--secondary" type="button">Replay</button>
-      <button class="dk-button dk-button--secondary dialog-close" type="button">Close</button>
-    </div>
   </dialog>
   <dialog id="inbox-event-dialog" aria-labelledby="inbox-event-title" class="dk-dialog">
     <div class="dialog-head dk-dialog__head">

@@ -1060,15 +1060,55 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 #email-addresses .source-row { cursor: pointer; }
 #email-addresses .source-row:hover { background: var(--dk-bg-hover); }
 #email-addresses .source-row.is-selected:hover { background: var(--dk-accent-soft); }
-/* Detail dialog: outcome first, then headers, then attachments. */
-#email-dialog { --dk-dialog-width: 640px; }
-#email-dialog-title { overflow-wrap: anywhere; }
+/* Reading pane: list beside the selected message, like Agents. */
+.email-mail-workspace { display: grid; grid-template-columns: min(24rem, 42%) minmax(0, 1fr); gap: var(--dk-gap-section); align-items: start; }
+.email-mail-workspace > .data-panel + .data-panel { margin-top: 0; }
+.email-mail-sidebar { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.email-mail-sidebar > .section-head, .email-mail-sidebar > .panel-note, .email-mail-sidebar > .dk-table-footer { flex: none; }
+.email-mail-sidebar .activity-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.activity-row.is-selected { background: var(--dk-accent-soft); }
+/* The list is a mailbox sidebar: sender + subject, status top-right. */
+.email-mail-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--dk-space-1); }
+.email-mail-sidebar .activity-main { grid-column: 1; grid-row: 1; }
+.email-mail-sidebar .activity-outcome { display: contents; }
+.email-mail-sidebar .activity-outcome .status { grid-column: 2; grid-row: 1; align-self: start; }
+.email-mail-sidebar .activity-when { grid-column: 1 / -1; grid-row: 2; }
+.email-mail-sidebar .activity-outcome .activity-note { grid-column: 1 / -1; grid-row: 3; }
+.email-mail-sidebar .activity-outcome .activity-error { grid-column: 1 / -1; grid-row: 4; }
+.email-mail-sidebar .activity-to { display: none; }
+.email-mail-sidebar .activity-primary > :first-child:not(:only-child) { max-width: 100%; }
+#email-read { min-width: 0; }
+#email-read > .dialog-state { padding: var(--dk-space-7) var(--dk-pad-panel); }
+.email-back { display: none; }
+.email-read-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); display: grid; gap: var(--dk-space-5); }
+.email-read-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
+.email-read-head h2 { justify-self: stretch; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
+.email-read-meta { --email-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0 0 0 calc(-1 * var(--email-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--email-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.email-read-meta > .status { margin-left: var(--email-sep); font-size: var(--dk-text-sm); }
+.email-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.email-meta-item::before { content: "·"; flex: none; width: var(--email-sep); text-align: center; color: var(--dk-text-faint); }
+.email-read-head .email-technical { border-top: 0; padding: 0; justify-self: stretch; }
+.email-read-head .email-technical summary { display: inline-flex; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); cursor: pointer; }
+.email-read-head .email-technical summary:hover { color: var(--dk-text-primary); }
+.email-read-head .email-technical summary::-webkit-details-marker { display: none; }
+.email-read-head .email-technical summary::after { content: ""; width: 10px; height: 6px; background: var(--dk-select-chevron) no-repeat center; }
+.email-read-head .email-technical[open] summary::after { transform: rotate(180deg); }
+.email-read-head .email-technical dl { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-gap-control); margin: var(--dk-space-2) 0 0; padding: var(--dk-space-3) var(--dk-space-4); background: var(--dk-bg-muted); font-size: var(--dk-text-sm); }
+.email-read-head .email-technical dt { color: var(--dk-text-muted); }
+.email-read-head .email-technical dd { margin: 0; overflow-wrap: anywhere; }
 .email-detail-block { display: grid; gap: var(--dk-space-2); }
-.email-detail-block h3 { margin: 0; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-primary); }
+.email-detail-block h3, .email-body h3 { margin: 0; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); }
 .email-detail-block h3 .email-muted { margin-left: var(--dk-space-1); }
 .email-detail-block > .sub { margin: 0; }
 .email-detail-block .detail-error { margin: 0; overflow-wrap: anywhere; font-size: var(--dk-text-sm); }
-.email-headers dd { font-size: var(--dk-text-md); overflow-wrap: anywhere; }
+.email-body { display: grid; gap: var(--dk-space-3); min-width: 0; }
+.email-body-text, .email-body-html { margin: 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
+.email-body-text { font: var(--dk-text-body)/1.7 var(--dk-font-sans); }
+.email-body-html { font: var(--dk-text-sm)/1.6 var(--dk-font-mono); max-height: 24rem; overflow: auto; }
+.email-body-empty { color: var(--dk-text-muted); font-size: var(--dk-text-md); }
+.email-body-empty p { margin: 0; }
+.email-html-alt summary { cursor: pointer; font-size: var(--dk-text-sm); color: var(--dk-text-muted); min-height: var(--dk-size-control-sm); }
+.email-html-alt[open] .email-body-html { margin-top: var(--dk-space-2); }
 .email-runs, .email-files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
 .email-runs li, .email-files li { display: flex; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); flex-wrap: wrap; padding: var(--dk-space-2) var(--dk-space-3); border-bottom: 1px solid var(--dk-border-default); }
 .email-runs li:last-child, .email-files li:last-child { border-bottom: 0; }
@@ -1076,10 +1116,33 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-files svg { width: 16px; height: 16px; flex: none; color: var(--dk-text-muted); }
 .email-files .mono { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: var(--dk-text-md); }
 .email-muted { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
+.email-read-actions { display: flex; flex-wrap: wrap; gap: var(--dk-gap-control); }
+@media (min-width: 861px) {
+  body[data-view="emails"] main { display: flex; flex-direction: column; height: 100dvh; padding-bottom: var(--dk-space-6); }
+  body[data-view="emails"] section.view[data-page="emails"].active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  body[data-view="emails"] .trigger-toolbar { flex: none; }
+  body[data-view="emails"] .trigger-workspace { flex: 1; min-height: 18rem; align-items: stretch; grid-template-columns: minmax(0, 1fr); }
+  body[data-view="emails"] .pane-switch { display: grid; grid-template-columns: auto auto; flex: none; }
+  body[data-view="emails"] .trigger-toolbar[data-pane="sources"] > #email-filter-chips { display: none; }
+  body[data-view="emails"] .trigger-workspace[data-pane="activity"] > .trigger-sources,
+  body[data-view="emails"] .trigger-workspace[data-pane="sources"] > .email-mail-workspace { display: none; }
+  .email-mail-workspace { flex: 1; min-height: 18rem; align-items: stretch; }
+  .email-mail-sidebar, #email-read { min-height: 0; }
+  #email-read { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
 @media (max-width: 860px) {
   .sender-row .sender-remove { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .sender-add input { height: var(--dk-size-touch); }
   .panel-note .text-link { min-height: var(--dk-size-touch); }
+  .email-mail-workspace { grid-template-columns: minmax(0, 1fr); }
+  #email-read { display: none; }
+  .email-mail-workspace.has-selection #email-read { display: block; }
+  .email-mail-workspace.has-selection .email-mail-sidebar { display: none; }
+  .email-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
+  .email-read-body { padding: var(--dk-space-4); }
+  .email-read-head .email-technical summary { min-height: var(--dk-size-touch); }
+  .email-read-head .email-technical dl { grid-template-columns: minmax(0, 1fr); }
+  .email-read-head .email-technical dd { margin-bottom: var(--dk-space-3); }
 }
 #poll-sample-data { max-height: 50vh; overflow: auto; }
 .flow-head { display: flex; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); flex-wrap: wrap; min-width: 0; }
@@ -1973,12 +2036,12 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   /* Phone rows read like a card: what first with its status top-right,
      then when, then the outcome's note or error — all left-aligned. */
   .activity-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--dk-space-1); }
-  .activity-main { grid-column: 1; grid-row: 1; }
-  .activity-outcome { display: contents; }
-  .activity-outcome .status { grid-column: 2; grid-row: 1; align-self: start; }
-  .activity-when { grid-column: 1 / -1; grid-row: 2; }
-  .activity-outcome .activity-note { grid-column: 1 / -1; grid-row: 3; }
-  .activity-outcome .activity-error { grid-column: 1 / -1; grid-row: 4; }
+  .activity-row .activity-main { grid-column: 1; grid-row: 1; }
+  .activity-row .activity-outcome { display: contents; }
+  .activity-row .activity-outcome .status { grid-column: 2; grid-row: 1; align-self: start; }
+  .activity-row .activity-when { grid-column: 1 / -1; grid-row: 2; }
+  .activity-row .activity-outcome .activity-note { grid-column: 1 / -1; grid-row: 3; }
+  .activity-row .activity-outcome .activity-error { grid-column: 1 / -1; grid-row: 4; }
   .hook-headers > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .hook-runs li .dk-button { margin-left: 0; }
 }
