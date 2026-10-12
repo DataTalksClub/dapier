@@ -91,3 +91,13 @@ def test_inbox_show_prints_the_email_body(isolated_home, monkeypatch, capsys):
     assert "body:" in out
     assert "Please pay the March invoice." in out
     assert "data:" not in out
+
+def test_outcome_text_refused_rows_surface_the_reason():
+    """Webhook refusals carry the endpoint's rejection reason; email sender
+    refusals keep the classic wording."""
+    from dapier_cli.commands.inbox import outcome_text
+    assert outcome_text({"outcome": "refused"}) == "refused: sender not allowed"
+    assert outcome_text({"outcome": "refused",
+                         "error": "invalid signature"}) == "refused: invalid signature"
+    assert outcome_text({"outcome": "refused", "error": "Zoom webhook is "
+                        "not configured"}) == "refused: Zoom webhook is not configured"

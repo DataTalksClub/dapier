@@ -376,3 +376,102 @@ def test_zoom_hook_route_dispatches_signed_challenge(monkeypatch):
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["plainToken"] == "challenge"
     assert table.items["zoom"]["status"] == "connected"
+
+def test_zoom_valid_delivery_heals_a_reimported_connection(monkeypatch):
+    """The Oct-2026 outage: re-saving the connection with a rotated token
+    reset a verified connection to ready; deliveries signed with the new
+    token must mark it connected again instead of staying ready forever."""
+    table, secrets = setup(monkeypatch)
+    published = []
+    publish = lambda *args, **kwargs: published.append((args, kwargs))
+    payload = {"event": "recording.completed", "event_ts": 1000,
+               "payload": {"account_id": "account-1", "object": {
+                   "id": 123, "uuid": "meeting-uuid", "topic": "Course",
+                   "recording_files": [{"id": "v", "file_type": "MP4"}]}}}
+    body, headers = signed(payload, secret="zoom-secret-123456")
+    assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                publish=publish)[0] == 200
+    assert table.items["zoom"]["status"] == "connected"
+    assert table.items["zoom"]["verified_account_id"] == "account-1"
+    # The operator re-imports with a fresh Secret Token: same account, new
+    # secret, status back to ready until Zoom proves the token again.
+    status, _ = zoom.save({"connection_id": "zoom", "provider": "zoom", "token": "rotated-secret-12345"},
+                          operator_subject="operator", connections_table=table)
+    assert status == 200
+    assert table.items["zoom"]["status"] == "ready"
+    assert table.items["zoom"]["verified_account_id"] == "account-1"
+    payload = {"event": "meeting.started", "event_ts": 1001,
+               "payload": {"account_id": "account-1", "object": {
+                   "id": 123, "uuid": "meeting-uuid", "topic": "Course"}}}
+    body, headers = signed(payload, secret="rotated-secret-12345")
+    assert zoom_webhooks.handle("zoom", headers, body, connections_table=table,
+                                publish=publish)[0] == 200
+    assert published[1][0][:2] == ("zoom", "meeting.started")
+    assert table.items["zoom"]["status"] == "connected"
+    assert table.items["zoom"]["account_title"] == "account-1"
+
+
+def test_zoom_refused_deliveries_reach_the_inbox(monkeypatch):
+    """A bad-signature delivery from a known connection records a refused
+    inbox row (hour-bucketed, so Zoom's retries collapse) instead of 401ing
+    invisibly."""
+    table, _ = setup(monkeypatch)
+    monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
+    monkeypatch.setattr(ingress.boto3, "resource", lambda _: type(
+        "Resource", (), {"Table": lambda self, name: table})())
+    from src.dapier.triggers import inbox
+    recorded, ignored = [], []
+    monkeypatch.setattr(inbox, "record", lambda event, **kwargs: recorded.append(event) or event["id"])
+    monkeypatch.setattr(inbox, "ignore", lambda inbox_id, **kwargs: ignored.append((inbox_id, kwargs)))
+
+    def call():
+        return ingress.handler({
+            "requestContext": {"http": {"method": "POST", "path": "/hooks/zoom/zoom"}},
+            "headers": {}, "body": json.dumps(
+                {"event": "recording.completed", "payload": {"account_id": "a"}}),
+        }, None)
+
+    assert call()["statusCode"] == 401
+    assert len(recorded) == 1 and len(ignored) == 1
+    row = recorded[0]
+    assert row["connector"] == "zoom" and row["source"] == "zoom"
+    assert row["event"] == "recording.completed"
+    assert row["id"] == ignored[0][0]
+    assert row["id"].startswith("zoom-refused:")
+    assert ignored[0][1]["error"] == "invalid signature"
+    # A retry within the same hour collapses onto the same row id.
+    assert call()["statusCode"] == 401
+    assert len(recorded) == 2 and recorded[1]["id"] == recorded[0]["id"]
+
+
+def test_zoom_handle_reports_unconfigured_and_binding_refusals(monkeypatch):
+    table, secrets = setup(monkeypatch)
+    refusals = []
+    refuse = lambda reason, message=None: refusals.append((reason, message))
+    secrets["oauth#zoom"] = {}
+    status, payload = zoom_webhooks.handle(
+        "zoom", {}, b"{}", connections_table=table,
+        publish=lambda *a, **k: None, refuse=refuse)
+    assert status == 503
+    assert refusals[-1] == ("Zoom webhook is not configured", None)
+    secrets["oauth#zoom"] = {"webhook_secret": "zoom-secret-123456"}
+    # Bind the connection to account-1 first, so the mismatch is real.
+    bound = {"event": "recording.completed", "event_ts": 999,
+             "payload": {"account_id": "account-1", "object": {
+                 "id": 123, "uuid": "u", "topic": "T",
+                 "recording_files": [{"id": "v", "file_type": "MP4"}]}}}
+    bound_body, bound_headers = signed(bound)
+    assert zoom_webhooks.handle(
+        "zoom", bound_headers, bound_body, connections_table=table,
+        publish=lambda *a, **k: None, refuse=refuse)[0] == 200
+    payload = {"event": "recording.completed", "event_ts": 1000,
+               "payload": {"account_id": "account-2", "object": {
+                   "id": 123, "uuid": "u", "topic": "T",
+                   "recording_files": [{"id": "v", "file_type": "MP4"}]}}}
+    body, headers = signed(payload)
+    status, payload = zoom_webhooks.handle(
+        "zoom", headers, body, connections_table=table,
+        publish=lambda *a, **k: None, refuse=refuse)
+    assert status == 403
+    assert refusals[-1][0] == "Zoom account does not match connection"
+    assert refusals[-1][1]["event"] == "recording.completed"

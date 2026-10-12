@@ -351,21 +351,30 @@ def record(event, *, table_ref=None):
     return item["inbox_id"]
 
 
-def ignore(inbox_id, *, table_ref=None):
-    """Close an event that the sender list refused. No workflow runs."""
+def ignore(inbox_id, *, error=None, table_ref=None):
+    """Close an event refused before any workflow could run — the email
+    sender list, or a webhook delivery the endpoint rejected. ``error``
+    names why; plain sender refusals carry none."""
     if not inbox_id:
         return None
     try:
         table = table_ref if table_ref is not None else _table()
+        names = {"#status": "status"}
+        values = {
+            ":status": IGNORED,
+            ":matched": [],
+            ":at": _now_iso(),
+        }
+        sets = "#status = :status, matched = :matched, processed_at = :at"
+        if error:
+            sets += ", #error = :error"
+            names["#error"] = "error"
+            values[":error"] = str(error)[:500]
         table.update_item(
             Key={"inbox_id": inbox_id},
-            UpdateExpression="SET #status = :status, matched = :matched, processed_at = :at",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": IGNORED,
-                ":matched": [],
-                ":at": _now_iso(),
-            },
+            UpdateExpression="SET " + sets,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
         )
     except InboxError:
         return None

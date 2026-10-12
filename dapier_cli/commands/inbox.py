@@ -22,7 +22,8 @@ def outcome_text(item):
         error = " ".join(str(item.get("error") or "").split())
         return f"failed: {error}" if error else "failed"
     if outcome == "refused":
-        return "refused: sender not allowed"
+        error = " ".join(str(item.get("error") or "").split())
+        return f"refused: {error}" if error else "refused: sender not allowed"
     if outcome == "unmatched":
         return "no workflow"
     if outcome == "pending":

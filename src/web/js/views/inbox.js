@@ -15,6 +15,10 @@ function triggerLabel(event) {
 
 function matchedLabel(event) {
   const matched = event.matched || [];
+  if (event.status === 'ignored') {
+    const why = event.error ? `Refused: ${event.error}` : 'Refused';
+    return `<span class="muted-cell clip" title="${escapeHtml(why)}">${escapeHtml(why)}</span>`;
+  }
   if (!matched.length) return '<span class="muted-cell">No workflow</span>';
   const all = matched.join(', ');
   return `<span class="clip" title="${escapeHtml(all)}">${escapeHtml(all)}</span>`;

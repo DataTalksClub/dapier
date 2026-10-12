@@ -100,6 +100,21 @@ def test_record_dedupes_on_the_event_id(table):
     assert stored["expires_at"] > 0
 
 
+def test_ignore_persists_the_refusal_reason(table):
+    """Webhook refusals (bad signature, unconfigured secret) close as
+    refused with the reason; plain sender refusals stay reasonless."""
+    inbox.record(EVENT, table_ref=table)
+    inbox.ignore("evt-1", error="invalid signature", table_ref=table)
+    row = table.items["evt-1"]
+    assert row["status"] == inbox.IGNORED
+    assert row["error"] == "invalid signature"
+
+    inbox.record({**EVENT, "id": "evt-2"}, table_ref=table)
+    inbox.ignore("evt-2", table_ref=table)
+    assert table.items["evt-2"]["status"] == inbox.IGNORED
+    assert "error" not in table.items["evt-2"]
+
+
 def test_complete_marks_matched_unmatched_and_failed(table):
     inbox.record(EVENT, table_ref=table)
     inbox.complete("evt-1", [], table_ref=table)

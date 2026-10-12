@@ -150,8 +150,16 @@ def registration_data(payload):
     }
 
 
-def handle(connection_id, headers, body, *, connections_table, publish, now=None):
-    """Return (HTTP status, JSON body) for a connection-specific Zoom URL."""
+def handle(connection_id, headers, body, *, connections_table, publish, now=None,
+           refuse=None):
+    """Return (HTTP status, JSON body) for a connection-specific Zoom URL.
+
+    ``refuse`` (optional) is called as ``refuse(reason, message)`` when a
+    delivery from a known connection is rejected (unconfigured secret,
+    bad signature, account mismatch) so the surface can record the
+    rejection — before it existed, a stale webhook secret 401'd silently
+    and recordings simply stopped triggering with no trace anywhere.
+    """
     try:
         connection_id = records.validate_connection_id(connection_id)
     except records.ConnectionError:
@@ -162,8 +170,15 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
     try:
         secret = credentials.get_credential(connection["credential_id"])["webhook_secret"]
     except (KeyError, TypeError):
+        if refuse:
+            refuse("Zoom webhook is not configured")
         return 503, {"error": "Zoom webhook is not configured"}
     if not verify(headers, body, secret, now=now):
+        if refuse:
+            try:
+                refuse("invalid signature", json.loads(body))
+            except (ValueError, UnicodeDecodeError):
+                refuse("invalid signature")
         return 401, {"error": "invalid signature"}
     try:
         message = json.loads(body)
@@ -228,11 +243,21 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
     try:
         records.check_binding(connection, account_id)
     except records.BindingError:
+        if refuse:
+            refuse("Zoom account does not match connection", message)
         return 403, {"error": "Zoom account does not match connection"}
-    if not connection.get("verified_account_id"):
+    if connection.get("status") != records.STATUS_CONNECTED:
+        # A signature-verified delivery whose account matches the binding
+        # proves the stored secret is the one Zoom signs with — so it also
+        # heals a connection a re-import reset to ready (same account, new
+        # token), the same way an endpoint-validation challenge does. Before
+        # this, a re-import with a changed token stayed ready forever unless
+        # Zoom happened to re-send the challenge first.
         updated = records.mark_connected(
             connection, verified_account_id=account_id,
-            account_title=account_id, granted_scopes=[], connected_by="zoom-webhook")
+            account_title=connection.get("account_title") or account_id,
+            granted_scopes=connection.get("granted_scopes") or [],
+            connected_by="zoom-webhook")
         records.put_connection(connections_table, updated)
     event_id = "zoom:" + hashlib.sha256(identity.encode()).hexdigest()[:32]
     publish("zoom", event, {"connection_id": connection_id, **data},

@@ -154,6 +154,34 @@ def _header(event, name):
     )
 
 
+def _refuse_zoom_delivery(connection_id):
+    """Record a rejected Zoom delivery in the trigger inbox.
+
+    Zoom retries what the endpoint rejects, and before this a stale
+    webhook secret 401'd invisibly — recordings stopped triggering with no
+    trace outside CloudWatch. The row id buckets by hour and names the
+    reason, so the retries collapse into one refused row while a fresh
+    incident (new hour, new reason) gets its own.
+    """
+    def refuse(reason, message=None):
+        from ..triggers import inbox
+        bucket = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H")
+        event_name = message.get("event") if isinstance(message, dict) else None
+        digest = hashlib.sha256(
+            f"{connection_id}|{reason}|{event_name or ''}".encode()).hexdigest()[:16]
+        inbox_id = f"zoom-refused:{digest}:{bucket}"
+        inbox.record({
+            "id": inbox_id,
+            "connector": "zoom",
+            "event": event_name or "webhook",
+            "source": connection_id,
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "data": {"error": reason, "connection_id": connection_id},
+        })
+        inbox.ignore(inbox_id, error=reason)
+    return refuse
+
+
 def _publish(connector, event_type, data, source=None, event_id=None, request=None):
     """Put one trigger envelope on the event queue; returns its event id.
 
@@ -677,6 +705,7 @@ def handler(event, _context):
         status, payload = zoom_webhooks.handle(
             connection_id, event.get("headers"), body,
             connections_table=table, publish=_publish,
+            refuse=_refuse_zoom_delivery(connection_id),
         )
         return _response(status, payload)
     elif path.startswith("/hooks/slack/"):
