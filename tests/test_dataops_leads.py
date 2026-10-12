@@ -39,7 +39,7 @@ def extraction_steps(newsletter="Data Bites Weekly", sponsors=(), step="extract-
 
 def leads_action(**overrides):
     action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
-              "url_env": "DATAOPS_LEADS_URL"}
+              "url": "https://ops.dtcdev.click/api/v1/intake/leads"}
     action.update(overrides)
     return action
 
@@ -55,18 +55,22 @@ def body(action=None, event=None, steps=None):
 
 
 class RoutingTests(unittest.TestCase):
-    def test_leads_env_routes_to_the_leads_body(self):
+    def test_leads_url_routes_to_the_leads_body(self):
         assert dataops_action._is_leads_action(leads_action()) is True
 
-    def test_leads_url_routes_to_the_leads_body(self):
+    def test_legacy_leads_env_still_routes_to_the_leads_body(self):
+        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+                  "url_env": "DATAOPS_LEADS_URL"}
+        assert dataops_action._is_leads_action(action) is True
+
+    def test_leads_url_overrides_document_env(self):
         action = leads_action(url_env="DATAOPS_INTAKE_URL",
                               url="https://ops.example.test/api/v1/intake/leads")
         assert dataops_action._is_leads_action(action) is True
 
     def test_document_intake_still_routes_to_documents(self):
-        action = leads_action(url_env="DATAOPS_INTAKE_URL")
-        del action["url_env"]
-        action["url_env"] = "DATAOPS_INTAKE_URL"
+        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+                  "url_env": "DATAOPS_INTAKE_URL"}
         assert dataops_action._is_leads_action(action) is False
 
     def test_intake_body_dispatches_to_leads(self):
@@ -199,14 +203,54 @@ class PostTests(unittest.TestCase):
         with patch("src.dapier.engine.actions.base.secrets_value",
                    return_value='{"token": "tok-123"}'), \
              patch("src.dapier.engine.actions.dataops.base._json_request",
-                   side_effect=fake_request), \
-             patch.dict(os.environ, {"DATAOPS_LEADS_URL": "https://ops.test/api/v1/intake/leads"}):
+                   side_effect=fake_request):
             result = dataops_action.run_dataops(leads_action(), email_event(), steps=steps)
         assert result == {"accepted": True}
-        assert seen["url"] == "https://ops.test/api/v1/intake/leads"
+        assert seen["url"] == "https://ops.dtcdev.click/api/v1/intake/leads"
         assert seen["headers"]["x-dataops-intake-secret"] == "tok-123"
         assert seen["payload"]["version"] == "2026-10-10"
         assert seen["payload"]["messageId"] == "<abc123@example.test>"
+
+    def test_connector_url_wins_over_env(self):
+        seen = {}
+
+        def fake_request(url, payload, headers=None, timeout=15):
+            seen["url"] = url
+            return {"accepted": True}
+
+        action = leads_action(url="https://ops.example.test/api/v1/intake/leads",
+                              url_env="DATAOPS_LEADS_URL")
+        with patch("src.dapier.engine.actions.base.secrets_value",
+                   return_value="tok-123"), \
+             patch("src.dapier.engine.actions.dataops.base._json_request",
+                   side_effect=fake_request), \
+             patch.dict(os.environ, {"DATAOPS_LEADS_URL": "https://from-env.test/leads"},
+                        clear=False):
+            dataops_action.run_dataops(
+                action, email_event(),
+                steps=extraction_steps(sponsors=[{"name": "Acme"}]))
+        assert seen["url"] == "https://ops.example.test/api/v1/intake/leads"
+
+    def test_legacy_leads_env_falls_back_to_the_connector_default(self):
+        seen = {}
+
+        def fake_request(url, payload, headers=None, timeout=15):
+            seen["url"] = url
+            return {"accepted": True}
+
+        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+                  "url_env": "DATAOPS_LEADS_URL"}
+        env = {key: value for key, value in os.environ.items()
+               if key != "DATAOPS_LEADS_URL"}
+        with patch("src.dapier.engine.actions.base.secrets_value",
+                   return_value="tok-123"), \
+             patch("src.dapier.engine.actions.dataops.base._json_request",
+                   side_effect=fake_request), \
+             patch.dict(os.environ, env, clear=True):
+            dataops_action.run_dataops(
+                action, email_event(),
+                steps=extraction_steps(sponsors=[{"name": "Acme"}]))
+        assert seen["url"] == dataops_action.LEADS_INTAKE_URL
 
     def test_deepcopy_of_event_is_untouched(self):
         event = email_event()

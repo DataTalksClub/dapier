@@ -39,7 +39,8 @@ def test_the_shipped_newsletter_sponsors_workflow_validates():
         "extract-sponsors", "forward-leads"]
     forward = workflow["actions"][1]
     assert forward["type"] == "dataops"
-    assert forward["url_env"] == "DATAOPS_LEADS_URL"
+    assert forward["url"] == "https://ops.dtcdev.click/api/v1/intake/leads"
+    assert "url_env" not in forward
     assert forward["auth_secret_id"] == "dapier/dataops"
     assert forward["extraction_step"] == "extract-sponsors"
     assert forward["on_fail"] == "continue"
@@ -89,14 +90,10 @@ def test_extract_sponsors_prompt_encodes_gold_paid_only_rules():
     assert "empty sponsors is valid" in system.lower()
 
 
-def test_template_wires_dataops_leads_url():
+def test_template_leaves_leads_url_to_the_connector():
     text = TEMPLATE_FILE.read_text(encoding="utf-8")
-    assert "DataOpsLeadsUrl:" in text
-    assert (
-        "https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws"
-        "/api/v1/intake/leads"
-    ) in text
-    assert "DATAOPS_LEADS_URL: !Ref DataOpsLeadsUrl" in text
+    assert "DataOpsLeadsUrl:" not in text
+    assert "DATAOPS_LEADS_URL" not in text
     assert "DATAOPS_INTAKE_URL: !Ref DataOpsIntakeUrl" in text
     assert (
         "https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws"

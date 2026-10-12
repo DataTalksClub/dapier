@@ -23,6 +23,11 @@ STAGING_PREFIX = "transfer/"
 # email only (trim/collapse, https-only URLs, within-email dedup, caps) and
 # fails loudly on anything the intake would reject.
 LEADS_VERSION = "2026-10-10"
+# Public DataOps API (same host as plugins/dataops IDENTITY_URL). Override
+# per step with the connector's `url` field; `url_env: DATAOPS_LEADS_URL`
+# still selects this default so a live step keeps working without a
+# Worker env var.
+LEADS_INTAKE_URL = "https://ops.dtcdev.click/api/v1/intake/leads"
 LEADS_URL_ENV = "DATAOPS_LEADS_URL"
 _LEADS_RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 _LEADS_WS_RE = re.compile(r"\s+")
@@ -84,11 +89,21 @@ def run_dataops(action, event, *, steps=None):
     if not token:
         raise ValueError("DataOps secret does not contain a token")
     return base._json_request(
-        action.get("url") or os.environ[action.get("url_env", "DATAOPS_INTAKE_URL")],
+        _target_url(action),
         _intake_body(action, event, steps=steps),
         headers={"x-dataops-intake-secret": token},
         timeout=action.get("timeout_seconds", 15),
     )
+
+
+def _target_url(action):
+    """Intake URL from the connector step, then env, then the leads default."""
+    if action.get("url"):
+        return action["url"]
+    env_name = action.get("url_env") or "DATAOPS_INTAKE_URL"
+    if env_name == LEADS_URL_ENV:
+        return os.environ.get(LEADS_URL_ENV) or LEADS_INTAKE_URL
+    return os.environ[env_name]
 
 def _intake_body(action, event, *, steps=None):
     if _is_leads_action(action):

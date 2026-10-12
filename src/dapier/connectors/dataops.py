@@ -12,8 +12,10 @@ register(Action(
                         "recipient_route", "extraction_step"}),
     fields=(
         {"key": "auth_secret_id", "label": "Auth secret ID", "placeholder": "dapier/dataops", "required": True},
-        {"key": "url_env", "label": "URL env var", "placeholder": "DATAOPS_INTAKE_URL (documents) or DATAOPS_LEADS_URL (sponsors leads)"},
-        {"key": "url", "label": "URL (overrides env)", "type": "url"},
+        {"key": "url", "label": "Intake URL", "type": "url",
+         "placeholder": "https://ops.dtcdev.click/api/v1/intake/leads",
+         "help": "Documents or sponsors-leads. Path /intake/leads selects the leads envelope."},
+        {"key": "url_env", "label": "URL env var", "placeholder": "DATAOPS_INTAKE_URL"},
         {"key": "connection_id", "label": "Dropbox connection ID", "placeholder": "dropbox — for file-event intakes"},
         {"key": "filename", "label": "Filename override"},
         {"key": "path", "label": "Dropbox file path", "placeholder": "{steps.move.output.item.path}"},

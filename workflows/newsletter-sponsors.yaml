@@ -7,8 +7,8 @@
 # (POST /api/v1/intake/leads, contract 2026-10-10). Nothing is stored in
 # Dapier: no sponsor store, no ledger, no review queue.
 #
-# Status: example only (`enabled: false`). Before enabling, confirm
-# DATAOPS_LEADS_URL (template.yaml DataOpsLeadsUrl), the intake secret, and
+# Status: example only (`enabled: false`). Before enabling, confirm the
+# dataops step's `url` (DataOps leads intake), the intake secret, and
 # the LLM_* env (docs/connectors/ai.md — Anthropic's OpenAI-compatible API
 # with model claude-sonnet-5-5; prefer a workspace-scoped key).
 id: newsletter-sponsors
@@ -108,6 +108,6 @@ actions:
   # x-dataops-intake-secret. on_fail: continue skips issues whose
   # extraction found no forwardable sponsors instead of failing the run.
   auth_secret_id: dapier/dataops
-  url_env: DATAOPS_LEADS_URL
+  url: https://ops.dtcdev.click/api/v1/intake/leads
   extraction_step: extract-sponsors
   on_fail: continue
