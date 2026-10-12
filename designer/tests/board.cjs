@@ -88,7 +88,7 @@ test('a workflow opens at 100% with the trigger at the top center', async () => 
 });
 
 test('step ids fall back to action-<n> in run order; conditions summarize their test', async () => {
-  const { effectiveActionId, shapesFromWorkflow, actionNodeSubtitle } = await load('workflows');
+  const { effectiveActionId, shapesFromWorkflow, actionNodeSubtitle, shortConditionField } = await load('workflows');
   const shapes = shapesFromWorkflow({
     id: 'w', enabled: true,
     trigger: { connector: 'telegram', event: 'message.received', filters: {} },
@@ -103,4 +103,29 @@ test('step ids fall back to action-<n> in run order; conditions summarize their 
   assert.equal(effectiveActionId(shapes, 'nope'), null);
   assert.equal(actionNodeSubtitle(actions[0].data), 'channel = course-ml');
   assert.equal(actionNodeSubtitle(actions[1].data), 'route ≠ x');
+  // Long template paths shorten to their last segment so the canvas card
+  // reads "has_attachment = true", not "steps.triage.output.res...".
+  assert.equal(shortConditionField('steps.triage.output.result.has_attachment'), 'has_attachment');
+  assert.equal(shortConditionField('subject'), 'subject');
+  assert.equal(shortConditionField('  '), '');
+});
+
+test('condition branches parse to preview rows; garbage reports an error', async () => {
+  const { parseBranchSteps, actionNodeSubtitle } = await load('workflows');
+  const thenText = '- id: email-date\n  type: date_time\n  value: "{date}"\n- id: archive-attachment\n  type: dropbox_upload\n  folder: /_dtc_paperwork/invoices\n';
+  const parsed = parseBranchSteps(thenText);
+  assert.equal(parsed.error, null);
+  assert.equal(parsed.steps.length, 2);
+  assert.equal(parsed.steps[0].id, 'email-date');
+  assert.equal(parsed.steps[0].detail, '{date}');
+  assert.equal(parsed.steps[1].id, 'archive-attachment');
+  assert.ok(parsed.steps[1].detail.includes('invoices'));
+  assert.deepEqual(parseBranchSteps('').steps, []);
+  assert.ok(parseBranchSteps('::: not yaml :::{{').error);
+  assert.ok(parseBranchSteps('just: a-mapping').error);
+  // The invoice-intake `when:` mapping form shortens the same way.
+  assert.equal(
+    actionNodeSubtitle({ nodeKind: 'action', actionType: 'condition', raw: { when: { 'steps.triage.output.result.has_attachment': { equals: true } } } }),
+    'has_attachment = true'
+  );
 });

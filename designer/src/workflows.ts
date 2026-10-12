@@ -62,10 +62,13 @@ export function actionNodeSubtitle(data: NodeData): string {
   const fields = data.fields ?? {};
   // A condition reads as its test ("channel = course-ml"), so a chain of
   // Conditions stays tellable apart on the canvas and in the node list.
+  // Long template paths ("steps.triage.output.result.has_attachment") shorten
+  // to their last segment ("has_attachment") — the canvas truncates at ~26
+  // characters, so the full path always rendered as unreadable "…res...".
   if (data.actionType === "condition") {
     const symbols: Record<string, string> = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
     const test = (field: string, operator: string, value: unknown) =>
-      `${field} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
+      `${shortConditionField(field)} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
     if ((fields.field ?? "").trim()) return test(fields.field.trim(), fields.operator || "equals", fields.value ?? "");
     // The YAML's `when:` mapping form ({field: {operator: value}}) rides in raw.
     const when = data.raw?.when;
@@ -83,6 +86,74 @@ export function actionNodeSubtitle(data: NodeData): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Last dot-segment of a condition field path, so canvas subtitles stay
+    readable: "steps.triage.output.result.has_attachment" → "has_attachment".
+    Short fields ("subject", "route") pass through untouched. */
+export function shortConditionField(field: string): string {
+  const trimmed = field.trim();
+  if (!trimmed) return trimmed;
+  const last = trimmed.split(".").pop()?.trim();
+  return last || trimmed;
+}
+
+export interface BranchStepSummary {
+  id: string;
+  type: string;
+  label: string;
+  detail: string;
+}
+
+export interface ParsedBranch {
+  steps: BranchStepSummary[];
+  /** Non-null when the YAML text does not parse to a step list. */
+  error: string | null;
+}
+
+/** Parses a condition branch (`then`/`else` YAML text) into displayable step
+    rows. Empty text is a valid empty branch; anything that does not parse to
+    a list of step objects reports an error and lets the caller fall back to
+    the raw-YAML editor. */
+export function parseBranchSteps(text: string): ParsedBranch {
+  if (!text.trim()) return { steps: [], error: null };
+  let parsed: unknown;
+  try {
+    parsed = load(text);
+  } catch {
+    return { steps: [], error: "Not valid YAML." };
+  }
+  if (!Array.isArray(parsed)) return { steps: [], error: "Must be a YAML list of steps." };
+  return { steps: parsed.map(describeBranchStep), error: null };
+}
+
+/** One nested step as an inspector row: its id, its catalog label, and the
+    first telling scalar (catalog field order wins, code shows its first
+    line). Nested/grouped objects are skipped — this is a preview, not a
+    full field renderer. */
+export function describeBranchStep(step: unknown): BranchStepSummary {
+  if (!isRecord(step)) return { id: "?", type: "?", label: "Step", detail: "" };
+  const id = String(step.id ?? "?");
+  const type = String(step.type ?? "?");
+  const label = actionMeta(type)?.label ?? type;
+  const catalogKeys = actionMeta(type)?.fields.map((field) => field.key) ?? [];
+  const preferred = [...catalogKeys, ...Object.keys(step)];
+  for (const key of preferred) {
+    if (key === "id" || key === "type" || key === "tests") continue;
+    const value = step[key];
+    if (typeof value === "string" && value.trim()) {
+      const firstLine = value.split("\n").map((line) => line.trim()).find((line) => line) ?? "";
+      return { id, type, label, detail: clipDetail(firstLine) };
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return { id, type, label, detail: String(value) };
+    }
+  }
+  return { id, type, label, detail: "" };
+}
+
+function clipDetail(text: string, limit = 64): string {
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
 /** Top-level key order for workflow YAML dumps — the server's

@@ -4,7 +4,7 @@ import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
 import { nodeTitle, nodeSubtitle } from "./board/nodes";
 import { actionCatalog, connectorCatalog, errorActionsField, eventInfo, filterOperators, onErrorField, onFailField } from "./catalog";
-import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, shapesFromWorkflow, summarize, triggerLabel, workflowFromShapes } from "./workflows";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, parseBranchSteps, shapesFromWorkflow, summarize, triggerLabel, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -358,6 +358,76 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
+  );
+}
+
+/** A condition's two sides as readable step rows, not raw YAML. Each branch
+    previews its parsed steps (id · type label · first telling value) with the
+    YAML textarea one disclosure away, so the invoice-intake style fork —
+    "4 archive steps vs 2 render steps" — reads at a glance. Steps are edited
+    on the canvas in a later pass; here they are preview rows, and YAML stays
+    the editor for adding, removing, or reordering them. */
+function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChange }: {
+  thenField: CatalogField;
+  elseField: CatalogField;
+  thenValue: string;
+  elseValue: string;
+  onChange: (key: string, value: string) => void;
+}) {
+  const branches = useMemo(() => ([
+    { key: "then", title: "Then", hint: "Runs when the test passes.", field: thenField, value: thenValue, parsed: parseBranchSteps(thenValue) },
+    { key: "else", title: "Else", hint: "Runs when the test fails.", field: elseField, value: elseValue, parsed: parseBranchSteps(elseValue) },
+  ]), [thenField, elseField, thenValue, elseValue]);
+  return (
+    <div className="branch-groups">
+      <p className="inspector-hint">
+        Two sides of one test: Then runs on a pass, Else on a fail. Steps run
+        top to bottom. Edit the lists as YAML to add, remove, or reorder steps.
+      </p>
+      {branches.map((branch) => (
+        <div key={branch.key} className={`branch-group branch-${branch.key}`}>
+          <div className="branch-head">
+            <span className={`branch-badge branch-badge-${branch.key}`}>{branch.title}</span>
+            <span className="branch-count">
+              {branch.parsed.error
+                ? "needs attention"
+                : branch.parsed.steps.length === 0
+                  ? "no steps"
+                  : `${branch.parsed.steps.length} step${branch.parsed.steps.length === 1 ? "" : "s"}`}
+            </span>
+          </div>
+          <p className="inspector-hint">{branch.hint}</p>
+          {branch.parsed.error ? (
+            <p className="branch-error" role="alert">
+              {branch.parsed.error} Fix it below — nothing was lost.
+            </p>
+          ) : branch.parsed.steps.length === 0 ? (
+            <p className="inspector-hint">Nothing runs on this side.</p>
+          ) : (
+            <ol className="branch-list">
+              {branch.parsed.steps.map((step, index) => (
+                <li key={`${step.id}-${index}`} className="branch-row">
+                  <span className="branch-index" aria-hidden="true">{index + 1}</span>
+                  <span className="branch-step">
+                    <span className="branch-step-label">{step.label}</span>
+                    <span className="branch-step-id">{step.id}</span>
+                    {step.detail && <span className="branch-step-detail">{step.detail}</span>}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <details className="inspector-advanced" open={Boolean(branch.parsed.error)}>
+            <summary>Edit {branch.title} steps as YAML</summary>
+            <FieldInput
+              field={branch.field}
+              value={branch.value}
+              onChange={(value) => onChange(branch.key, value)}
+            />
+          </details>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -2007,19 +2077,46 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           <>
           <section className="inspector-group">
             <h3>Settings</h3>
-            {meta.fields.map((field) => (
-              <FieldInput
-                key={field.key}
-                field={field}
-                value={data.fields?.[field.key] ?? ""}
-                connections={connections}
-                fields={data.fields}
-                siblingFields={meta.fields}
-                config={config}
-                nodeType={data.actionType}
-                onChange={(value) => setField(field.key, value)}
-              />
-            ))}
+            {data.actionType === "condition" ? (
+              <>
+                {meta.fields
+                  .filter((field) => field.key !== "then" && field.key !== "else")
+                  .map((field) => (
+                    <FieldInput
+                      key={field.key}
+                      field={field}
+                      value={data.fields?.[field.key] ?? ""}
+                      connections={connections}
+                      fields={data.fields}
+                      siblingFields={meta.fields}
+                      config={config}
+                      nodeType={data.actionType}
+                      onChange={(value) => setField(field.key, value)}
+                    />
+                  ))}
+                <ConditionBranches
+                  thenField={meta.fields.find((field) => field.key === "then")!}
+                  elseField={meta.fields.find((field) => field.key === "else")!}
+                  thenValue={data.fields?.then ?? ""}
+                  elseValue={data.fields?.else ?? ""}
+                  onChange={(key, value) => setField(key, value)}
+                />
+              </>
+            ) : (
+              meta.fields.map((field) => (
+                <FieldInput
+                  key={field.key}
+                  field={field}
+                  value={data.fields?.[field.key] ?? ""}
+                  connections={connections}
+                  fields={data.fields}
+                  siblingFields={meta.fields}
+                  config={config}
+                  nodeType={data.actionType}
+                  onChange={(value) => setField(field.key, value)}
+                />
+              ))
+            )}
           </section>
           {(data.actionType === "code" || data.actionType === "js") && (
             <section className="inspector-group">
