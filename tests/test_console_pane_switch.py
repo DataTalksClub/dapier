@@ -11,7 +11,7 @@ CSS = (WEB / "app.css").read_text()
 
 def test_each_trigger_workspace_has_a_switch_naming_both_panes():
     switches = re.findall(r'<div class="pane-switch"[^>]*data-workspace="([^"]+)">(.*?)</div>', HTML)
-    assert {ws for ws, _ in switches} == {"hooks-layout", "poll-workspace", "email-workspace", "sched-workspace"}
+    assert {ws for ws, _ in switches} == {"hooks-layout", "poll-workspace", "email-workspace", "sched-panes"}
     for workspace, body in switches:
         assert f'id="{workspace}" class="trigger-workspace" data-pane="activity"' in HTML
         assert 'data-pane="activity" aria-pressed="true"' in body

@@ -14,7 +14,7 @@ import { api } from '../api.js';
 import { escapeHtml, pad2 } from '../format.js';
 import { workflowName } from '../workflow-names.js';
 import { openRun } from './runs.js';
-import { OUTCOME_FILTERS, filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
+import { OUTCOME_FILTERS, filterChips, whenHtml, workflowNames, outcomeCell, activityRow } from './activity.js';
 
 let current = { schedules: [], now: null };
 let upcoming = { hours: 24, data: null };
@@ -125,33 +125,45 @@ function renderUpcoming() {
     ${data.truncated ? '<li class="source-row sched-quiet">More fires follow; narrow the window to see them all.</li>' : ''}`;
 }
 
-/* --- schedules (the tab's sources) ---------------------------------------------- */
+/* --- schedules (the tab's jobs table) ---------------------------------------------- */
 
-function lastLine(item) {
-  if (item.last_fired_at) return `Last fired ${when(item.last_fired_at)}`;
-  if (!item.enabled) return 'Never fired';
-  const manual = (item.fires || []).find((fire) => fire.manual);
-  if (manual) return `Run now ${when(manual.at)}; no scheduled fire yet`;
-  return 'Not fired yet';
+function latestFireCell(item) {
+  if (item.last_fired_at) {
+    const outcome = item.last_outcome || '';
+    const kind = outcome === 'failed' ? 'err' : outcome === 'no_listeners' ? 'warn' : 'ok';
+    const label = outcome === 'failed' ? 'Failed' : outcome === 'no_listeners' ? 'Fired · nothing listens' : 'Fired';
+    return `${dot(kind, label)}<span>${escapeHtml(when(item.last_fired_at))}</span>`;
+  }
+  if (!item.enabled) return dot('off', 'Paused');
+  return '<span class="muted-cell">Not fired yet</span>';
+}
+
+function startsCell(item) {
+  const flows = item.workflows || [];
+  if (!flows.length) return '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>';
+  return flows.map((flow) => `<a class="text-link workflow-edit" href="/workflows/${encodeURIComponent(flow.id)}" data-workflow="${escapeHtml(flow.id)}" title="${escapeHtml(flow.id)}">${escapeHtml(workflowName(flow.id))}</a>${flow.enabled ? '' : ' (off)'}`).join(', ');
+}
+
+function stateToggle(item) {
+  const id = escapeHtml(item.schedule_id);
+  return `<button type="button" class="sched-switch" role="switch" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${item.enabled ? 'Pause' : 'Resume'} ${id}" data-sched-toggle="${id}"><span class="sched-switch-track" aria-hidden="true"></span><span aria-hidden="true">${item.enabled ? 'On' : 'Off'}</span></button>`;
 }
 
 function scheduleRow(item) {
   const health = healthOf(item);
+  const id = escapeHtml(item.schedule_id);
+  const hover = escapeHtml([item.summary || '', item.expression || '', item.description || ''].filter(Boolean).join('\n'));
   const next = (item.next_runs || [])[0];
-  const flows = (item.workflows || []).map((flow) => flow.id);
-  return sourceRow({
-    attrs: `data-schedule-row="${escapeHtml(item.schedule_id)}"`,
-    name: escapeHtml(item.schedule_id),
-    nameAttrs: `data-schedule="${escapeHtml(item.schedule_id)}"`,
-    nameTitle: `Open ${item.schedule_id}`,
-    status: dot(health.kind, health.label),
-    lines: [
-      { html: `<span>${escapeHtml(item.summary || '')}</span> <code class="mono">${escapeHtml(item.expression || '')}</code>`, title: item.expression || '' },
-      `<span>${escapeHtml(lastLine(item))}${next ? ` · next ${escapeHtml(when(next))}` : ''}</span>`,
-      flows.length ? `<span>Starts ${workflowNames(flows)}</span>` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>Starts no workflow</span>',
-      health.state === 'attention' ? { html: `<span class="activity-error">${escapeHtml(health.reason)}</span>`, title: health.reason } : '',
-    ],
-  });
+  return `<tr class="sched-row" data-schedule-row="${id}">
+    <td class="cell-title" data-label="Schedule">
+      <button type="button" class="source-name mono" data-schedule="${id}" title="${hover.length ? hover : `Open ${id}`}">${id}</button>
+      <div class="sub" title="${escapeHtml(item.expression || '')}">${escapeHtml(item.summary || '')} <code class="mono">${escapeHtml(item.expression || '')}</code>${next ? ` · next ${escapeHtml(when(next))}` : ''}</div>
+      ${health.state === 'attention' ? `<div class="activity-error">${escapeHtml(health.reason)}</div>` : ''}
+    </td>
+    <td data-label="Starts">${startsCell(item)}</td>
+    <td data-label="Latest fire"><span class="sched-fire">${latestFireCell(item)}</span></td>
+    <td data-label="State">${stateToggle(item)}</td>
+  </tr>`;
 }
 
 /* --- fires (the tab's activity) --------------------------------------------------- */
@@ -276,8 +288,25 @@ async function confirmDelete(item) {
   return new Promise((resolve) => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
 }
 
-async function runAction(action, button) {
-  const item = current.schedules.find((entry) => entry.schedule_id === selected);
+/* The jobs-table state toggle: the same pause/resume endpoints the detail
+   dialog drives (and `dapier schedules pause|resume`), then a refresh. */
+async function toggleSchedule(name, button) {
+  const item = current.schedules.find((entry) => entry.schedule_id === name);
+  if (!item || button.disabled) return;
+  const action = item.enabled ? 'pause' : 'resume';
+  button.disabled = true;
+  try {
+    await api(`/api/admin/schedule-triggers/${encodeURIComponent(name)}/${action}`, { method: 'POST', body: '{}' });
+    notice(`Schedule ${name} ${action === 'pause' ? 'paused' : 'resumed'}`);
+    await fetchSchedules();
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function runAction(action, button) {  const item = current.schedules.find((entry) => entry.schedule_id === selected);
   if (!item || button.disabled) return;
   if (action === 'edit') return openDialog(item);
   const name = encodeURIComponent(item.schedule_id);
@@ -365,6 +394,8 @@ $('[data-page="schedules"]').addEventListener('click', (event) => {
   }
   if (event.target.closest('[data-sched-more]')) { upcomingExpanded = true; renderUpcoming(); return; }
   if (event.target.closest('[data-sched-less]')) { upcomingExpanded = false; renderUpcoming(); return; }
+  const toggle = event.target.closest('[data-sched-toggle]');
+  if (toggle) { void toggleSchedule(toggle.dataset.schedToggle, toggle); return; }
   const name = event.target.closest('[data-schedule]');
   if (name) { select(name.dataset.schedule); return; }
   const fire = event.target.closest('.activity-row[data-fire-schedule]');

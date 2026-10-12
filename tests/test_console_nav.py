@@ -71,8 +71,8 @@ def test_folded_pages_are_family_tabs_not_sidebar_items():
     assert 'href="/workflows?tab=polls"' in tabs
     assert _family_labels("workflows") == [
         "Workflows",
-        "Emails",
         "Schedules",
+        "Emails",
         "Hooks",
         "Polls",
     ]

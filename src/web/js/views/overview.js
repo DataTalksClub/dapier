@@ -185,12 +185,23 @@ function render(section) {
 export function renderWorkflows() {
   void loadCatalog();
   const all = state.data?.workflows || [];
+  /* Scheduled jobs live under the Schedules tab, not here: hide workflows
+     whose every trigger is a schedule trigger. A flow that also listens
+     elsewhere (email plus schedule, say) stays in this list. */
+  const scheduleOnly = (workflow) => {
+    const triggers = Array.isArray(workflow.triggers) && workflow.triggers.length
+      ? workflow.triggers : [workflow.trigger];
+    const known = triggers.filter((trigger) => trigger && trigger.connector);
+    return known.length > 0 && known.every((trigger) => trigger.connector === 'schedule');
+  };
+  const scheduled = all.filter(scheduleOnly);
+  const listed = all.filter((workflow) => !scheduleOnly(workflow));
   const query = $('#workflow-search').value.trim().toLowerCase();
   const status = $('#workflow-filter').value;
   // Zapier-style tag filter: the option list tracks the tags actually in
   // use (client-side; the API exposes the same narrowing as ?tag=).
   const tagSelect = $('#workflow-tag-filter');
-  const tagNames = [...new Set(all.flatMap((workflow) => workflow.tags || []).map((tag) => String(tag).toLowerCase()))].sort();
+  const tagNames = [...new Set(listed.flatMap((workflow) => workflow.tags || []).map((tag) => String(tag).toLowerCase()))].sort();
   if (tagSelect.dataset.tags !== tagNames.join(',')) {
     const selectedTag = tagSelect.value;
     tagSelect.dataset.tags = tagNames.join(',');
@@ -202,7 +213,7 @@ export function renderWorkflows() {
   // Zapier-style folder filter, beside the tag one: flat folders, one per
   // workflow (the API exposes the same narrowing as ?folder=).
   const folderSelect = $('#workflow-folder-filter');
-  const folderNames = [...new Set(all.flatMap((workflow) => {
+  const folderNames = [...new Set(listed.flatMap((workflow) => {
     const folder = String(workflow.folder || '').trim();
     return folder ? [folder] : [];
   }))].sort((a, b) => a.localeCompare(b));
@@ -220,15 +231,16 @@ export function renderWorkflows() {
   const serverIds = query ? state.workflowSearchIds : null;
   const matchesText = (workflow) =>
     `${workflow.id} ${workflow.name || ''} ${triggerLabel(workflow)} ${workflowTriggerText(workflow)} ${(workflow.actions || []).map((action) => `${action.type} ${workflowActionText(action)}`).join(' ')}`.toLowerCase().includes(query);
-  const shown = all.filter((workflow) =>
+  const shown = listed.filter((workflow) =>
     (serverIds ? serverIds.has(workflow.id) : matchesText(workflow)) &&
     (status === 'all' || workflow.enabled === (status === 'enabled')) &&
     (tagFilter === 'all' || (workflow.tags || []).some((tag) => String(tag).toLowerCase() === tagFilter)) &&
     (folderFilter === 'all' || String(workflow.folder || '').trim().toLowerCase() === folderFilter.toLowerCase()));
-  $('#workflow-count').textContent = `${shown.length} of ${all.length} shown`;
+  $('#workflow-count').textContent = `${shown.length} of ${listed.length} shown`
+    + (scheduled.length ? ` · ${scheduled.length} scheduled live under Schedules` : '');
   const runs = state.data?.runs || [];
   /* Location only when the account uses folders (Zapier's column). */
-  const hasFolders = all.some((workflow) => String(workflow.folder || '').trim());
+  const hasFolders = listed.some((workflow) => String(workflow.folder || '').trim());
   $('#workflow-location-head').hidden = !hasFolders;
   const locationCol = $('#workflow-cols .workflow-col-location');
   if (hasFolders && !locationCol) {
@@ -286,8 +298,23 @@ export function renderWorkflows() {
       </td>
     </tr>`;
   }).join('');
-  $('#workflow-empty').hidden = all.length > 0;
-  $('#workflow-filter-empty').hidden = all.length === 0 || shown.length > 0;
+  const empty = $('#workflow-empty');
+  const emptyTitle = empty.querySelector('h3');
+  const emptyText = empty.querySelector('p');
+  if (emptyTitle && emptyTitle.dataset.default === undefined) {
+    emptyTitle.dataset.default = emptyTitle.textContent || '';
+    if (emptyText) emptyText.dataset.default = emptyText.textContent || '';
+  }
+  /* Nothing listed and nothing filtered: when the account only runs
+     scheduled jobs, say where they went instead of "no workflows". */
+  const scheduledOnly = listed.length === 0 && scheduled.length > 0
+    && !query && status === 'all' && tagFilter === 'all' && folderFilter === 'all';
+  empty.hidden = listed.length > 0;
+  if (emptyTitle) emptyTitle.textContent = scheduledOnly ? 'Scheduled jobs live under Schedules' : (emptyTitle.dataset.default || '');
+  if (emptyText) emptyText.textContent = scheduledOnly
+    ? 'Every workflow here runs on a cron or rate schedule — open the Schedules tab to see them.'
+    : (emptyText.dataset.default || '');
+  $('#workflow-filter-empty').hidden = listed.length === 0 || shown.length > 0;
   $('#workflow-table-wrap').hidden = shown.length === 0;
   renderBulkBar(shown);
 }

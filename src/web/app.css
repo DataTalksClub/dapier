@@ -1447,6 +1447,18 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .workflow-switch[aria-checked="true"] .workflow-switch-track::after { left: 14px; }
 .workflow-switch:hover .workflow-switch-track { outline: 2px solid var(--dk-accent-border); outline-offset: 2px; }
 .workflow-toggle:disabled { opacity: .5; cursor: default; }
+/* The schedules jobs-table state toggle: the same switch recipe as the
+   workflows table, under its own classes (the global .workflow-toggle
+   handler publishes workflow enable/disable and must not catch these). */
+.sched-switch { display: inline-flex; align-items: center; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.sched-switch-track { display: inline-block; position: relative; width: 28px; height: 16px; border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-full); background: var(--dk-border-default); flex: none; }
+.sched-switch-track::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--dk-bg-surface); }
+.sched-switch[aria-checked="true"] { color: var(--dk-text-primary); }
+.sched-switch[aria-checked="true"] .sched-switch-track { background: var(--dk-accent-default); border-color: var(--dk-accent-default); }
+.sched-switch[aria-checked="true"] .sched-switch-track::after { left: 14px; }
+.sched-switch:hover .sched-switch-track { outline: 2px solid var(--dk-accent-border); outline-offset: 2px; }
+.sched-switch:disabled { opacity: .5; cursor: default; }
+.sched-fire { display: inline-flex; align-items: center; gap: var(--dk-space-2); white-space: nowrap; }
 .workflow-actions { text-align: right; }
 .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
 .workflow-list-row .workflow-actions .workflow-more:hover { border-color: var(--dk-border-default); }
@@ -1488,6 +1500,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .workflow-list-row .workflow-actions .workflow-more { width: var(--dk-size-touch); height: var(--dk-size-touch); border-color: transparent; }
   .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 var(--dk-space-3); }
   .workflow-switch { min-height: var(--dk-size-touch); }
+  .sched-switch { min-height: var(--dk-size-touch); }
   .workflow-run-link { min-height: var(--dk-size-touch); align-content: center; }
 }
 

@@ -83,8 +83,8 @@
       <nav id="page-tabs" class="page-tabs" hidden aria-label="Section">
         <div class="page-tab-set" data-family="workflows">
           <a class="view-link" href="/workflows" data-view="workflows" data-tab="list">Workflows</a>
-          <a class="view-link" href="/emails" data-view="emails">Emails</a>
           <a class="view-link" href="/schedules" data-view="schedules">Schedules</a>
+          <a class="view-link" href="/emails" data-view="emails">Emails</a>
           <a class="view-link" href="/workflows?tab=hooks" data-view="workflows" data-tab="hooks">Hooks</a>
           <a class="view-link" href="/workflows?tab=polls" data-view="workflows" data-tab="polls">Polls</a>
         </div>
@@ -340,28 +340,34 @@
       </section>
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">
-          <div class="pane-switch" role="group" aria-label="Show" data-workspace="sched-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Fires</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Schedules</button></div>
+          <div class="pane-switch" role="group" aria-label="Show" data-workspace="sched-panes"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Fires</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Coming up</button></div>
           <div id="sched-outcome-chips" class="dk-cluster" role="group" aria-label="Show fires"></div>
           <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
-        <div id="sched-workspace" class="trigger-workspace" data-pane="activity" hidden>
+        <div id="sched-workspace" class="sched-workspace" hidden>
+          <section class="data-panel" aria-labelledby="sched-register-title">
+            <div class="section-head"><h2 id="sched-register-title">Schedules</h2><p id="sched-summary" class="sub" role="status"></p></div>
+            <div class="table-wrap"><table class="sched-table">
+              <colgroup><col class="sched-col-name"><col class="sched-col-starts"><col class="sched-col-fire"><col class="sched-col-state"></colgroup>
+              <thead><tr><th>Schedule</th><th>Starts</th><th>Latest fire</th><th>State</th></tr></thead>
+              <tbody id="sched-list"></tbody>
+            </table></div>
+          </section>
+          <div id="sched-panes" class="trigger-workspace" data-pane="activity">
           <section class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
             <div class="section-head"><h2 id="sched-fires-title">Fires</h2><p id="sched-fires-summary" class="sub" role="status"></p></div>
             <div id="sched-fires-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
             <ul id="sched-fires" class="activity-list" aria-label="Fires"></ul>
           </section>
-          <aside class="trigger-sources" aria-label="Schedules">
-            <section class="data-panel" aria-labelledby="sched-register-title">
-              <div class="section-head"><h2 id="sched-register-title">Schedules</h2><p id="sched-summary" class="sub" role="status"></p></div>
-              <ul id="sched-list" class="source-list"></ul>
-            </section>
+          <aside class="trigger-sources" aria-label="Coming up">
             <section class="data-panel" aria-labelledby="sched-upcoming-title">
               <div class="section-head"><h2 id="sched-upcoming-title">Coming up</h2><div id="sched-window-chips" class="dk-cluster" role="group" aria-label="Upcoming window"></div></div>
               <p id="sched-upcoming-zone" class="sub panel-note"></p>
               <ul id="sched-upcoming" class="source-list"></ul>
             </section>
           </aside>
+          </div>
         </div>
       </section>
       <section class="view" data-page="tokens">
