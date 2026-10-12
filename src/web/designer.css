@@ -1800,6 +1800,117 @@ input[type="checkbox"], input[type="radio"] {
   color: var(--dk-text-primary);
 }
 
+/* ---- condition branches ---- */
+
+/* Then/Else preview: two labelled step lists replacing the raw-YAML walls.
+   Rows borrow the test-step card idiom; badges carry the fork semantics. */
+.branch-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.branch-group {
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.branch-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.branch-badge {
+  border-radius: var(--dk-radius-sm);
+  font-size: var(--dk-text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+.branch-badge-then {
+  background: var(--dk-success-bg, #e6f4ea);
+  color: var(--dk-success-text, #137333);
+}
+
+.branch-badge-else {
+  background: var(--dk-bg-muted);
+  color: var(--dk-text-muted);
+}
+
+.branch-count {
+  color: var(--dk-text-faint);
+  font-size: var(--dk-text-xs);
+}
+
+.branch-error {
+  color: var(--dk-danger-text);
+  font-size: var(--dk-text-sm);
+  margin: 0;
+}
+
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.branch-row {
+  align-items: flex-start;
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-sm);
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+.branch-index {
+  align-items: center;
+  background: var(--dk-bg-muted);
+  border-radius: 50%;
+  color: var(--dk-text-muted);
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: var(--dk-text-xs);
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+
+.branch-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.branch-step-label {
+  font-size: var(--dk-text-sm);
+  font-weight: 600;
+}
+
+.branch-step-id {
+  font-family: var(--dk-font-mono);
+  font-size: var(--dk-text-xs);
+  color: var(--dk-text-muted);
+}
+
+.branch-step-detail {
+  font-family: var(--dk-font-mono);
+  font-size: var(--dk-text-xs);
+  color: var(--dk-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- test run ---- */
 
 /* "Run" stays an explicitly-labelled destructive action; dakit owns its look

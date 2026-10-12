@@ -20214,7 +20214,7 @@
     const fields = data.fields ?? {};
     if (data.actionType === "condition") {
       const symbols = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
-      const test = (field, operator, value) => `${field} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
+      const test = (field, operator, value) => `${shortConditionField(field)} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
       if ((fields.field ?? "").trim()) return test(fields.field.trim(), fields.operator || "equals", fields.value ?? "");
       const when = data.raw?.when;
       const first2 = isRecord(when) ? Object.entries(when)[0] : void 0;
@@ -20230,6 +20230,46 @@
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function shortConditionField(field) {
+    const trimmed = field.trim();
+    if (!trimmed) return trimmed;
+    const last = trimmed.split(".").pop()?.trim();
+    return last || trimmed;
+  }
+  function parseBranchSteps(text) {
+    if (!text.trim()) return { steps: [], error: null };
+    let parsed;
+    try {
+      parsed = load(text);
+    } catch {
+      return { steps: [], error: "Not valid YAML." };
+    }
+    if (!Array.isArray(parsed)) return { steps: [], error: "Must be a YAML list of steps." };
+    return { steps: parsed.map(describeBranchStep), error: null };
+  }
+  function describeBranchStep(step) {
+    if (!isRecord(step)) return { id: "?", type: "?", label: "Step", detail: "" };
+    const id = String(step.id ?? "?");
+    const type2 = String(step.type ?? "?");
+    const label = actionMeta(type2)?.label ?? type2;
+    const catalogKeys = actionMeta(type2)?.fields.map((field) => field.key) ?? [];
+    const preferred = [...catalogKeys, ...Object.keys(step)];
+    for (const key of preferred) {
+      if (key === "id" || key === "type" || key === "tests") continue;
+      const value = step[key];
+      if (typeof value === "string" && value.trim()) {
+        const firstLine = value.split("\n").map((line) => line.trim()).find((line) => line) ?? "";
+        return { id, type: type2, label, detail: clipDetail(firstLine) };
+      }
+      if (typeof value === "number" || typeof value === "boolean") {
+        return { id, type: type2, label, detail: String(value) };
+      }
+    }
+    return { id, type: type2, label, detail: "" };
+  }
+  function clipDetail(text, limit = 64) {
+    return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
   }
   const WORKFLOW_KEY_ORDER = ["id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
   function orderedWorkflow(workflow) {
@@ -22171,6 +22211,48 @@
       )
     ] });
   }
+  function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChange }) {
+    const branches = reactExports.useMemo(() => [
+      { key: "then", title: "Then", hint: "Runs when the test passes.", field: thenField, value: thenValue, parsed: parseBranchSteps(thenValue) },
+      { key: "else", title: "Else", hint: "Runs when the test fails.", field: elseField, value: elseValue, parsed: parseBranchSteps(elseValue) }
+    ], [thenField, elseField, thenValue, elseValue]);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-groups", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Two sides of one test: Then runs on a pass, Else on a fail. Steps run top to bottom. Edit the lists as YAML to add, remove, or reorder steps." }),
+      branches.map((branch) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `branch-group branch-${branch.key}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `branch-badge branch-badge-${branch.key}`, children: branch.title }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: branch.parsed.error ? "needs attention" : branch.parsed.steps.length === 0 ? "no steps" : `${branch.parsed.steps.length} step${branch.parsed.steps.length === 1 ? "" : "s"}` })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: branch.hint }),
+        branch.parsed.error ? /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "branch-error", role: "alert", children: [
+          branch.parsed.error,
+          " Fix it below — nothing was lost."
+        ] }) : branch.parsed.steps.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Nothing runs on this side." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("ol", { className: "branch-list", children: branch.parsed.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "branch-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-index", "aria-hidden": "true", children: index + 1 }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "branch-step", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-label", children: step.label }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-id", children: step.id }),
+            step.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-detail", children: step.detail })
+          ] })
+        ] }, `${step.id}-${index}`)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-advanced", open: Boolean(branch.parsed.error), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("summary", { children: [
+            "Edit ",
+            branch.title,
+            " steps as YAML"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FieldInput,
+            {
+              field: branch.field,
+              value: branch.value,
+              onChange: (value) => onChange(branch.key, value)
+            }
+          )
+        ] })
+      ] }, branch.key))
+    ] });
+  }
   function resourceSingular(resource) {
     return resource.replace(/_/g, " ").replace(/s$/, "");
   }
@@ -23565,7 +23647,32 @@
         meta ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
-            meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            data.actionType === "condition" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              meta.fields.filter((field) => field.key !== "then" && field.key !== "else").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                FieldInput,
+                {
+                  field,
+                  value: data.fields?.[field.key] ?? "",
+                  connections,
+                  fields: data.fields,
+                  siblingFields: meta.fields,
+                  config,
+                  nodeType: data.actionType,
+                  onChange: (value) => setField(field.key, value)
+                },
+                field.key
+              )),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                ConditionBranches,
+                {
+                  thenField: meta.fields.find((field) => field.key === "then"),
+                  elseField: meta.fields.find((field) => field.key === "else"),
+                  thenValue: data.fields?.then ?? "",
+                  elseValue: data.fields?.else ?? "",
+                  onChange: (key, value) => setField(key, value)
+                }
+              )
+            ] }) : meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
               FieldInput,
               {
                 field,
