@@ -66,12 +66,17 @@ actions:
   chat_id: '-1001295648628'
   message_id: '{steps.post-announcement.output.message_id}'
   disable_notification: true
-- id: unpin-previous
-  type: telegram_unpin_message
-  connection_id: telegram-ods-bot
-  chat_id: '-1001295648628'
-  message_id: '{steps.find-chat.output.chat.pinned_message_id}'
-  on_fail: continue
+- id: maybe-unpin-previous
+  type: condition
   when:
     steps.find-chat.output.chat.pinned_message_id:
       exists: true
+    steps.find-chat.output.chat.pinned_is_ours:
+      equals: true
+  then:
+  - id: unpin-previous
+    type: telegram_unpin_message
+    connection_id: telegram-ods-bot
+    chat_id: '-1001295648628'
+    message_id: '{steps.find-chat.output.chat.pinned_message_id}'
+    on_fail: continue
