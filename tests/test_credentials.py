@@ -120,6 +120,24 @@ def test_conditional_write_rejects_stale_version(monkeypatch):
     assert credentials.get_credential("oauth#x") == {"a": 1}
 
 
+def test_api_save_credential_openrouter_keeps_the_key(monkeypatch):
+    configure(monkeypatch)
+    key = "sk-or-" + "a" * 40
+    status, payload = credentials.api_save_credential("openrouter",
+                                                      {"api_key": key})
+    assert (status, payload) == (200, {"provider": "openrouter", "configured": True})
+    assert credentials.get_credential("openrouter") == {"api_key": key}
+
+
+def test_api_save_credential_openrouter_rejects_non_keys(monkeypatch):
+    table = configure(monkeypatch)
+    for value in ("nope", "sk-" + "a" * 40, "", "sk-or-short"):
+        status, payload = credentials.api_save_credential("openrouter",
+                                                          {"api_key": value})
+        assert status == 400, value
+    assert table.items == {}
+
+
 def test_conditional_write_accepts_legacy_unversioned_item(monkeypatch):
     table = configure_versioned(monkeypatch)
     table.items["oauth#legacy"] = {"credential_id": "oauth#legacy", "value": {"a": 1}}

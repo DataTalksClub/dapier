@@ -460,6 +460,18 @@ def test_credentials_set_is_write_only(monkeypatch):
     invalid = agent_api.route(event({"token": "nope"}), "PUT", "/api/agent/credentials/slack")
     assert invalid["statusCode"] == 400
 
+    saved = agent_api.route(
+        event({"api_key": "sk-or-" + "a" * 40}),
+        "PUT", "/api/agent/credentials/openrouter",
+    )
+    assert saved["statusCode"] == 200
+    assert "sk-or" not in saved["body"]
+
+    invalid = agent_api.route(
+        event({"api_key": "nope"}), "PUT", "/api/agent/credentials/openrouter",
+    )
+    assert invalid["statusCode"] == 400
+
     unknown = agent_api.route(
         event({"api_key": "a" * 20 + "-us1"}), "PUT", "/api/agent/credentials/youtube",
     )

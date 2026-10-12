@@ -1,7 +1,7 @@
 """In-workflow logic step: decision — the LLM smart if/switch.
 
-One typed call to OpenRouter's decisions endpoint (the jev route — the same
-LLM_* env as ai_complete, LLM_API_KEY is the OpenRouter key) picks a branch:
+One typed call to OpenRouter's decisions endpoint (the jev route — keyed by
+the stored ``openrouter`` credential, not env) picks a branch:
 ``mode: if`` offers the model yes/no over the prompt's question and runs
 then/else; ``mode: switch`` offers ``choices`` and runs the matching case's
 actions, falling back to ``default_actions`` when no usable choice comes
@@ -13,6 +13,7 @@ for later steps.
 import json
 import os
 import unittest
+from contextlib import ExitStack
 from unittest import mock
 
 import pytest
@@ -80,13 +81,45 @@ class Hooks:
         self.calls.append(("error", action_id, str(exc)))
 
 
+def stored_credential():
+    """Patch the credentials table (the test_credentials.py seam) so the
+    decision step's key read goes through the real credential store."""
+    from src.dapier.connections import credentials
+
+    class Table:
+        def __init__(self):
+            self.items = {}
+
+        def put_item(self, *, Item, **kwargs):
+            self.items[Item["credential_id"]] = Item
+
+        def get_item(self, **kwargs):
+            item = self.items.get(kwargs["Key"]["credential_id"])
+            return {"Item": item} if item else {}
+
+    table = Table()
+
+    class Dynamo:
+        def Table(self, name):
+            assert name == "credentials"
+            return table
+
+    stack = ExitStack()
+    stack.enter_context(mock.patch.dict(os.environ,
+                                        {"CREDENTIALS_TABLE": "credentials"}))
+    stack.enter_context(mock.patch.object(credentials.boto3, "resource",
+                                          lambda service: Dynamo()))
+    return stack
+
+
 def run_decision(step, choice, *, event=None, run_action=None, hooks=None,
                  transport=None):
     hooks = hooks or Hooks()
     ran = []
     runner = run_action or (lambda action, event, workflow_id, steps=None:
                             ran.append(action["id"]) or {})
-    with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+    with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                    return_value={"api_key": "test-key"}):
         stop, output, status = logic._run_decision(
             "wf-1", str(step["id"]), step, event or EVENT, runner,
             before_action=hooks.before, after_action=hooks.after,
@@ -137,7 +170,8 @@ class SwitchTests(unittest.TestCase):
                                        "probabilities": {}, "confidence": 0.8}},
                 "usage": {}}).encode())
 
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}):
             logic._run_decision(
                 "wf-1", "classify", SWITCH_STEP, EVENT,
                 lambda action, event, workflow_id, steps=None: {},
@@ -165,7 +199,8 @@ class SwitchTests(unittest.TestCase):
                                        "probabilities": {}, "confidence": 0.8}},
                 "usage": {}}).encode())
 
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}):
             logic._run_decision(
                 "wf-1", "classify", step, EVENT,
                 lambda action, event, workflow_id, steps=None: {},
@@ -177,7 +212,8 @@ class SwitchTests(unittest.TestCase):
 
     def test_system_becomes_the_instructions(self):
         step = {**SWITCH_STEP, "system": "You route Zoom recordings."}
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}):
             logic._run_decision(
                 "wf-1", "classify", step, EVENT,
                 lambda action, event, workflow_id, steps=None: {},
@@ -249,7 +285,8 @@ class IfTests(unittest.TestCase):
                                        "probabilities": {}, "confidence": 0.7}},
                 "usage": {}}).encode())
 
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}):
             logic._run_decision(
                 "wf-1", "ask", IF_STEP, EVENT,
                 lambda action, event, workflow_id, steps=None: {},
@@ -270,11 +307,39 @@ class IfTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
-    def test_unconfigured_key_fails_with_setup_message(self):
-        from src.dapier.connectors import ai
+    def test_unconfigured_credential_fails_with_setup_message(self):
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value=None):
+            with pytest.raises(ValueError, match="credentials set openrouter"):
+                logic._run_decision(
+                    "wf-1", "classify", SWITCH_STEP, EVENT,
+                    lambda action, event, workflow_id, steps=None: {},
+                    before_action=None, after_action=None,
+                    on_action_error=None, step_outputs={},
+                    transport=decisions_transport("one-on-one"))
 
-        with mock.patch.dict(os.environ, {ai.API_KEY_ENV: ""}):
-            with pytest.raises(ValueError, match=ai.API_KEY_ENV):
+    def test_stored_credential_drives_the_decision(self):
+        """The real path: the key comes out of the credentials table and
+        reaches the wire as the Bearer header the transport asserts on."""
+        from src.dapier.connections import credentials
+
+        with stored_credential():
+            credentials.put_credential("openrouter", {"api_key": "test-key"},
+                                       provider="openrouter")
+            ran, hooks = [], Hooks()
+            stop, output, status = logic._run_decision(
+                "wf-1", "classify", SWITCH_STEP, EVENT,
+                lambda action, event, workflow_id, steps=None:
+                    ran.append(action["id"]) or {},
+                before_action=hooks.before, after_action=hooks.after,
+                on_action_error=hooks.error, step_outputs={},
+                transport=decisions_transport("one-on-one"))
+        assert ran == ["zoom-calls-agent"]
+        assert output["choice"] == "one-on-one"
+
+    def test_missing_stored_credential_fails_naming_the_fix(self):
+        with stored_credential():
+            with pytest.raises(ValueError, match="credentials set openrouter"):
                 logic._run_decision(
                     "wf-1", "classify", SWITCH_STEP, EVENT,
                     lambda action, event, workflow_id, steps=None: {},
@@ -299,7 +364,8 @@ class ConfigTests(unittest.TestCase):
             seen.update(steps or {})
             return {}
 
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}), \
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}), \
                 mock.patch("src.dapier.connectors.ai._default_transport",
                            default_transport_for("one-on-one")):
             logic.run_chain(
@@ -316,7 +382,8 @@ class EngineChainTests(unittest.TestCase):
     def test_run_chain_dispatches_decision(self):
         with mock.patch("src.dapier.connectors.ai._default_transport",
                         default_transport_for("one-on-one")):
-            with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}):
+            with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                            return_value={"api_key": "test-key"}):
                 ran, hooks = [], Hooks()
                 stop = logic.run_chain(
                     "wf-1", [SWITCH_STEP], EVENT,
@@ -434,7 +501,8 @@ class DryRunTests(unittest.TestCase):
                           "operator": "exists"}]},
             {"choice": "ai-shipping-labs", "actions": []},
         ]}]}
-        with mock.patch.dict(os.environ, {"LLM_API_KEY": "test-key"}), \
+        with mock.patch("src.dapier.connectors.ai.openrouter_credential",
+                        return_value={"api_key": "test-key"}), \
                 mock.patch("src.dapier.connectors.ai._default_transport",
                            default_transport_for("one-on-one")):
             result = dryrun.test_run(workflow, EVENT, execute=True)

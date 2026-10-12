@@ -1614,7 +1614,7 @@ export const actionCatalog: ActionEntry[] = [
     type: "decision",
     label: "Decision",
     icon: Sparkles,
-    description: "Ask the LLM and branch on the answer — a smart if (then/else) or a switch over choices; one typed call to OpenRouter's decisions endpoint (jev) via the ai_complete LLM_* env",
+    description: "Ask the LLM and branch on the answer — a smart if (then/else) or a switch over choices; one typed call to OpenRouter's decisions endpoint (jev), keyed by the stored openrouter credential",
     fields: [
       { key: "mode", label: "Mode", type: "select", options: ["if", "switch"], default: "switch",
         help: "if asks the prompt's yes/no question and runs then/else; switch picks one of the choices and runs the matching case" },

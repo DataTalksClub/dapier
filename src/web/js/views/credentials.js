@@ -12,10 +12,11 @@ const PROVIDERS = {
     { key: 'access_key_id', label: 'Access key ID' },
     { key: 'secret_access_key', label: 'Secret access key' },
   ] },
+  openrouter: { name: 'OpenRouter', fields: [{ key: 'api_key', label: 'API key' }] },
 };
 
 /* Credential-backed providers with a health check (pseudo connections). */
-const TESTABLE = new Set(['mailchimp', 'aws']);
+const TESTABLE = new Set(['mailchimp', 'aws', 'openrouter']);
 
 function providerName(provider) {
   if (PROVIDERS[provider]) return PROVIDERS[provider].name;

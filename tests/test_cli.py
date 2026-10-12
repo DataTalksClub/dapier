@@ -505,6 +505,24 @@ def test_credentials_set_posts_value_without_echoing(monkeypatch, tmp_path, caps
     assert "xoxb-" not in out
 
 
+def test_credentials_set_openrouter_posts_the_key(monkeypatch, tmp_path, capsys):
+    posted = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        posted.update(method=method, path=path, body=body)
+        return {"provider": "openrouter", "configured": True}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    secret = tmp_path / "openrouter-key"
+    secret.write_text("sk-or-" + "a" * 40 + "\n")
+    assert commands.credentials_set(
+        "https://api.example.test", "openrouter", str(secret)) == 0
+    assert posted == {"method": "PUT", "path": "/api/agent/credentials/openrouter",
+                      "body": {"api_key": "sk-or-" + "a" * 40}}
+    out, _ = capsys.readouterr()
+    assert "sk-or" not in out
+
+
 def test_credentials_set_reads_stdin(monkeypatch, capsys):
     posted = {}
 

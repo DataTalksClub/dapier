@@ -1,6 +1,6 @@
 # Zoom recording router: a Zoom cloud recording.completed webhook fires a
-# decision step (one structured LLM completion, the ai_complete env — point
-# it at OpenRouter and it is an OpenRouter decision) that classifies the
+# decision step (one typed call to OpenRouter's decisions endpoint, keyed by
+# the stored openrouter credential) that classifies the
 # recording into exactly one bucket and runs the matching agent in its own
 # workspace: one-on-one calls land in the zoom-calls repo, AI Shipping Labs
 # sessions go through the platform's recording pipeline.

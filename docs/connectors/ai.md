@@ -186,15 +186,15 @@ and `on_fail: continue` / `on_error` policies apply unchanged:
 step runs that branch's steps inline — a smart `if` statement, or a
 `switch` over named choices. The decisions endpoint returns a picked option
 with probabilities and a confidence, not chat text, so there is nothing to
-parse and a reply cannot route anywhere illegal. It reads the same `LLM_*`
-env as `ai_complete` (Worker and API functions), so configuring it is the
-same ops step:
-
-| Env var | OpenRouter value |
-|---------|------------------|
-| `LLM_BASE_URL` | leave unset (defaults to OpenRouter); a chat-style `…/api/v1` base is stripped back to the bare host for the decisions call |
-| `LLM_API_KEY` | an OpenRouter key (deploy-time parameter, never git) |
-| `LLM_MODEL` | not used by `decision` — the decision model defaults to `~typesafe/jev-latest`; set `model:` per step to override |
+parse and a reply cannot route anywhere illegal. The endpoint is OpenRouter's
+own, so the key is not env: `decision` authenticates with the stored
+**`openrouter` credential** — the same credential store behind the Slack,
+Mailchimp, and AWS secrets. Set it once from the console's Credentials tab
+or with `dapier credentials set openrouter` (the key travels only in the
+request body and is never shown again); the credential's **Test connection**
+exercises the key against OpenRouter's key-introspection endpoint. The
+decision model defaults to `~typesafe/jev-latest`; set `model:` per step to
+override.
 
 ```yaml
 actions:

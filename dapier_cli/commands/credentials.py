@@ -8,7 +8,8 @@ __all__ = ["credentials_set"]
 
 
 CREDENTIAL_FIELDS = {"slack": ["token"], "mailchimp": ["api_key"],
-                     "aws": ["access_key_id", "secret_access_key"]}
+                     "aws": ["access_key_id", "secret_access_key"],
+                     "openrouter": ["api_key"]}
 
 
 def credentials_set(api_url, provider, path, debug=False):

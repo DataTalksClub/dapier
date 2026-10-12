@@ -30,7 +30,8 @@ import urllib.request
 
 from ..engine.actions.templating import render
 from ..engine.actions.webhook import HttpError, retry_after_seconds
-from .registry import Action, Connector, connector, register
+from .registry import (Action, ConnectionTest, Connector, connector, register,
+                       register_connection_test)
 
 connector(Connector(name="ai", label="AI", events=(), icon="sparkles"))
 
@@ -439,29 +440,40 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
 # --- decision: OpenRouter's typed decisions endpoint (jev) ------------------
 
 JEV_MODEL = "~typesafe/jev-latest"
+DECISIONS_BASE_URL = "https://openrouter.ai"
 DECISIONS_PATH = "/api/alpha/decisions"
+# Unlike ai_complete's env-configured endpoint, the decisions endpoint is
+# OpenRouter's own — so its key is not env but a dapier credential: the
+# stored ``openrouter`` credential (console Credentials tab / `dapier
+# credentials set openrouter`), the same store behind the slack/mailchimp/aws
+# secrets.
+OPENROUTER_CREDENTIAL_ID = "openrouter"
 
 
-def _decisions_base_url():
-    """The host the decisions endpoint hangs off. LLM_BASE_URL is a
-    chat-completions root for ai_complete (`.../api/v1`); the decisions
-    endpoint lives off the bare host, so a chat-style suffix is stripped.
-    Unset, it is OpenRouter."""
-    base = os.environ.get(BASE_URL_ENV, "").strip().rstrip("/")
-    for suffix in ("/api/v1", "/v1"):
-        if base.endswith(suffix):
-            return base[: -len(suffix)]
-    return base or "https://openrouter.ai"
+def openrouter_credential():
+    """The stored ``openrouter`` credential value (``{"api_key": ...}``), or
+    None when it is not configured — the key source for the decision step and
+    its health check. Only a missing credential folds to None; an unreadable
+    credentials table raises, like any other infrastructure failure."""
+    from ..connections import credentials
+
+    try:
+        value = credentials.get_credential(OPENROUTER_CREDENTIAL_ID)
+    except KeyError:
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def run_decisions(*, state, instructions, criteria, model=None,
-                  timeout_seconds=None, transport=None):
+                  timeout_seconds=None, transport=None, credential=None):
     """One typed decision via OpenRouter's decisions endpoint (the jev
     route): the state plus one choice question in, a picked option with
     probabilities and confidence out — the endpoint returns typed answers,
     so there is no reply text to parse.
 
-    Transport is the same seam run_ai_complete uses — an injectable
+    The Bearer key is the stored ``openrouter`` credential (``credential=``
+    overrides, for callers that resolved it already). Transport is the same
+    seam run_ai_complete uses — an injectable
     ``(method, url, *, headers, body, timeout) -> (status, raw)`` so tests
     record the request instead of hitting the network; the default is
     urllib. HTTP 4xx/5xx, timeouts and an unreadable response raise
@@ -469,12 +481,13 @@ def run_decisions(*, state, instructions, criteria, model=None,
     what the engine's autoretry reads; a response whose answers do not
     carry the question is a ``{ok: False}`` verdict, never a raise.
     """
-    key = os.environ.get(API_KEY_ENV, "").strip()
+    resolved = credential if credential is not None else openrouter_credential()
+    key = str((resolved or {}).get("api_key") or "").strip()
     if not key:
         raise ValueError(
-            "decision is not configured (set "
-            f"{API_KEY_ENV} — and optionally {BASE_URL_ENV} and {MODEL_ENV} — "
-            "on the Worker function)")
+            "decision is not configured (store the OpenRouter key as the "
+            f"'{OPENROUTER_CREDENTIAL_ID}' credential — `dapier credentials set "
+            f"{OPENROUTER_CREDENTIAL_ID}` or the console Credentials tab)")
     payload = json.dumps({
         "model": str(model or "").strip() or JEV_MODEL,
         "state": state,
@@ -482,12 +495,11 @@ def run_decisions(*, state, instructions, criteria, model=None,
                                  "instructions": instructions,
                                  "criteria": criteria}},
     }).encode()
-    url = f"{_decisions_base_url()}{DECISIONS_PATH}"
+    url = f"{DECISIONS_BASE_URL}{DECISIONS_PATH}"
     headers = {
         "authorization": f"Bearer {key}",
         "content-type": "application/json",
         "user-agent": "dapier-decision",
-        **_extra_headers(),
     }
     timeout = timeout_seconds if timeout_seconds is not None else LLM_TIMEOUT_SECONDS
     if transport is not None:
@@ -531,3 +543,40 @@ def run_decisions(*, state, instructions, criteria, model=None,
             "probabilities": probabilities if isinstance(probabilities, dict) else {},
             "model": answered_model,
             "usage": usage}
+
+
+OPENROUTER_KEY_INFO_URL = "https://openrouter.ai/api/v1/auth/key"
+
+
+def _run_openrouter_test(_connection, *, transport=None):
+    """The openrouter health check: OpenRouter's key-introspection endpoint
+    (GET /api/v1/auth/key) with the stored credential's Bearer key. Verdict
+    only — the response's key data is never echoed back."""
+    key = str((openrouter_credential() or {}).get("api_key") or "").strip()
+    if not key:
+        return {"ok": False,
+                "detail": (f"no stored {OPENROUTER_CREDENTIAL_ID} credential "
+                           f"(`dapier credentials set {OPENROUTER_CREDENTIAL_ID}`)")}
+    headers = {"authorization": f"Bearer {key}"}
+    try:
+        if transport is not None:
+            status, _raw = transport("GET", OPENROUTER_KEY_INFO_URL,
+                                     headers=headers, body=None, timeout=10)
+        else:
+            request = urllib.request.Request(OPENROUTER_KEY_INFO_URL,
+                                             headers=headers, method="GET")
+            with urllib.request.urlopen(request, timeout=10) as response:
+                status = response.status
+    except urllib.error.HTTPError as exc:
+        return {"ok": False, "detail": f"OpenRouter rejected the key (HTTP {exc.code})"}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"ok": False, "detail": f"OpenRouter unreachable: {exc}"}
+    if status == 200:
+        return {"ok": True, "detail": "OpenRouter key verified"}
+    if status in (401, 403):
+        return {"ok": False, "detail": f"OpenRouter rejected the key (HTTP {status})"}
+    return {"ok": False, "detail": f"OpenRouter key check returned HTTP {status}"}
+
+
+register_connection_test(ConnectionTest(connector="openrouter",
+                                        run=_run_openrouter_test))

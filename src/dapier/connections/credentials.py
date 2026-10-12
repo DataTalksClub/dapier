@@ -8,6 +8,7 @@ CREDENTIAL_SPECS = {
     "slack": {"credential_id": "slack", "fields": ("token",)},
     "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
     "aws": {"credential_id": "aws", "fields": ("access_key_id", "secret_access_key")},
+    "openrouter": {"credential_id": "openrouter", "fields": ("api_key",)},
 }
 
 
@@ -156,6 +157,11 @@ def api_save_credential(provider, body):
         if not re.fullmatch(r"[A-Za-z0-9/+=]{40}", secret_access_key):
             return 400, {"error": "Enter a valid AWS secret access key"}
         secret_value = {"access_key_id": access_key_id, "secret_access_key": secret_access_key}
+    elif provider == "openrouter":
+        api_key = str(body.get("api_key", "")).strip()
+        if not re.fullmatch(r"sk-or-[A-Za-z0-9_-]{20,}", api_key):
+            return 400, {"error": "Enter a valid OpenRouter API key (sk-or-...)"}
+        secret_value = {"api_key": api_key}
     else:
         api_key = str(body.get("api_key", "")).strip()
         if not re.fullmatch(r"[A-Za-z0-9_-]{20,}-us\d{1,3}", api_key):

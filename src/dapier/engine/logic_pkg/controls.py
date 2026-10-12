@@ -1,7 +1,6 @@
 """The flow controls between steps: filters,
 conditions, paths, decisions (the LLM if/switch), and delays
 (the pause/resume machinery)."""
-import os
 import time
 from .core import (MAX_DELAY_SECONDS, MAX_SUSPENDED_SECONDS, RunSuspended, _iso,
                    evaluate_rules, parse_moment, predicate_rules, render_value)
@@ -214,11 +213,13 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
     from ..actions.templating import render
 
     mode, choices = _decision_plan(step, action_id)
-    if not os.environ.get(ai.API_KEY_ENV, "").strip():
+    credential = ai.openrouter_credential()
+    if not credential or not str(credential.get("api_key") or "").strip():
         raise ValueError(
-            f"decision '{action_id}' is not configured (set {ai.API_KEY_ENV} — "
-            f"and optionally {ai.BASE_URL_ENV} and {ai.MODEL_ENV} — on "
-            "the Worker function)")
+            f"decision '{action_id}' is not configured (store the OpenRouter "
+            f"key as the '{ai.OPENROUTER_CREDENTIAL_ID}' credential — `dapier "
+            f"credentials set {ai.OPENROUTER_CREDENTIAL_ID}` or the console "
+            "Credentials tab)")
     prompt = render(str(step["prompt"]), event, step_outputs).strip()
     if mode == "switch":
         described = {}
@@ -240,7 +241,8 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
     result = ai.run_decisions(
         state=prompt, instructions=instructions, criteria=criteria,
         model=step.get("model"),
-        timeout_seconds=step.get("timeout_seconds"), transport=transport)
+        timeout_seconds=step.get("timeout_seconds"), transport=transport,
+        credential=credential)
     model, usage = result.get("model"), (result.get("usage") if isinstance(result.get("usage"), dict) else {})
     extra = {"confidence": result.get("confidence"),
              "probabilities": result.get("probabilities")}
