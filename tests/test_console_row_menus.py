@@ -47,6 +47,23 @@ def test_hooks_endpoints_render_through_the_guard_and_keep_edit_in_the_menu():
     assert "hook-edit" in menu and "hook-delete" in menu and "hook-test" in menu
 
 
+def test_workflow_list_uses_the_shared_row_menu():
+    overview = (VIEWS / "overview.js").read_text()
+    assert "whenMenusClosed($('.view[data-page=\"workflows\"]'), paintWorkflows)" in overview
+    assert "rowActions(" in overview
+    assert 'class="workflow-menu"' not in overview
+    assert "row-menu-sep" in overview and "row-menu-danger" in overview
+    css = (WEB / "app.css").read_text()
+    match = re.search(r"\.row-menu \{[^}]+\}", css)
+    assert match, ".row-menu rule missing"
+    block = match.group(0)
+    assert "overflow-x: hidden" in block
+    assert "overflow-y: auto" in block
+    assert "min-width:" in block
+    assert re.search(r"\.workflow-menu \{", css) is None
+    assert ".row-menu-sep" in css
+
+
 def test_tab_reentry_refetch_only_fires_for_navigation_links():
     # `[data-view=…]` also matches the view <section>, so any click inside
     # the page (opening a row menu) used to refetch and re-render the list.

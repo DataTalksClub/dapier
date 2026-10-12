@@ -2,7 +2,7 @@
 import { createOverviewLoader } from '../overview-loader.js';
 import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
-import { $, icons, showApp, notice } from '../ui.js';
+import { $, icons, showApp, notice, rowActions, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, statusDot, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { icon } from '../icons.js';
@@ -200,6 +200,10 @@ function workflowIsScheduleOnly(workflow) {
 
 export function renderWorkflows() {
   void loadCatalog();
+  whenMenusClosed($('.view[data-page="workflows"]'), paintWorkflows);
+}
+
+function paintWorkflows() {
   const all = state.data?.workflows || [];
   const scheduled = all.filter(workflowIsScheduleOnly);
   const listed = all.filter((workflow) => !workflowIsScheduleOnly(workflow));
@@ -238,8 +242,8 @@ export function renderWorkflows() {
       ? `<span class="workflow-tags-inline" title="Tags: ${escapeHtml(tagList.join(', '))}">${tagList.slice(0, 1).map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}${tagList.length > 1 ? `<span class="tag-chip tag-chip--more">+${tagList.length - 1}</span>` : ''}</span>` : '';
     const detail = `<div class="workflow-name-line">${nameLink}${tags}</div>`;
     const edit = opensDesigner
-      ? `<a class="dk-button dk-button--secondary workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
-      : `<button class="dk-button dk-button--secondary workflow-detail" type="button" data-workflow="${id}">Details</button>`;
+      ? `<a class="row-menu-item workflow-edit" href="/workflows/${encodeURIComponent(workflow.id)}" data-workflow="${id}">Edit</a>`
+      : `<button class="row-menu-item workflow-detail" type="button" data-workflow="${id}">Details</button>`;
     const folder = String(workflow.folder || '').trim();
     const location = hasFolders
       ? `<td class="workflow-location" data-label="Location"${folder ? '' : ' data-empty'}>${folder ? `<span class="workflow-folder-name" title="Folder: ${escapeHtml(folder)}">${icon('folder', 'folder-icon')}<span>${escapeHtml(folder)}</span></span>` : ''}</td>` : '';
@@ -256,19 +260,17 @@ export function renderWorkflows() {
           ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="dk-button dk-button--secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
           : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${name}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}
       </div></td>
-      <td class="action-cell workflow-actions" data-label="Manage">
-        <button type="button" class="icon-button workflow-more" popovertarget="workflow-menu-${index}" aria-label="More actions for ${name}"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
-        <div id="workflow-menu-${index}" class="workflow-menu" popover aria-label="Actions for ${name}">
-        ${edit}
-        <button type="button" class="dk-button dk-button--secondary workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>
-        <button type="button" class="dk-button dk-button--secondary workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>
-        <button type="button" class="dk-button dk-button--secondary workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>
-        <button type="button" class="dk-button dk-button--secondary workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>
-        <button type="button" class="dk-button dk-button--secondary workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>
-        <button type="button" class="dk-button dk-button--secondary workflow-copy-id" data-workflow="${id}" title="Copy the id the CLI and API use (${id})">Copy ID</button>
-        <button type="button" class="dk-button dk-button--danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>
-        </div>
-      </td>
+      <td class="action-cell workflow-actions" data-label="Manage">${rowActions('', [
+        edit,
+        `<button type="button" class="row-menu-item workflow-runs" data-workflow="${escapeHtml(workflow.id)}">Runs</button>`,
+        `<button type="button" class="row-menu-item workflow-versions" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Versions</button>`,
+        `<button type="button" class="row-menu-item workflow-tags" data-file="${escapeHtml(workflow.source || '')}" data-tags="${escapeHtml((workflow.tags || []).join(','))}" ${sourceButtons}>Tags</button>`,
+        `<button type="button" class="row-menu-item workflow-folder" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" data-folder="${escapeHtml(String(workflow.folder || '').trim())}" ${sourceButtons}>Folder</button>`,
+        `<button type="button" class="row-menu-item workflow-duplicate" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons} title="Copy this workflow under a new name">Duplicate</button>`,
+        `<button type="button" class="row-menu-item workflow-copy-id" data-workflow="${id}" title="Copy the id the CLI and API use (${id})">Copy ID</button>`,
+        '<div class="row-menu-sep" role="separator"></div>',
+        `<button type="button" class="row-menu-item row-menu-danger workflow-delete" data-file="${escapeHtml(workflow.source || '')}" data-workflow="${escapeHtml(workflow.id)}" ${sourceButtons}>Delete</button>`,
+      ], { id: `workflow-menu-${index}`, label: name })}</td>
     </tr>`;
   }).join('');
   const empty = $('#workflow-empty');
@@ -980,27 +982,6 @@ document.addEventListener('click', async (event) => {
   }
 });
 
-
-/* Keep row actions in the viewport, including the last row and narrow screens.
-   The native popover handles Escape, outside clicks, and one open menu at a time. */
-document.addEventListener('toggle', (event) => {
-  const menu = event.target;
-  if (!menu.matches?.('.workflow-menu') || event.newState !== 'open') return;
-  const trigger = document.querySelector(`[popovertarget="${menu.id}"]`);
-  const anchor = trigger.getBoundingClientRect();
-  menu.style.maxHeight = `${window.innerHeight - 24}px`;
-  const bounds = menu.getBoundingClientRect();
-  menu.style.left = `${Math.max(12, Math.min(anchor.right - bounds.width, window.innerWidth - bounds.width - 12))}px`;
-  const below = anchor.bottom + 6;
-  menu.style.top = `${Math.max(12, below + bounds.height <= window.innerHeight - 12 ? below : anchor.top - bounds.height - 6)}px`;
-}, true);
-
-// Dismiss after choosing an enabled action; existing delegated handlers run
-// unchanged even when the popover closes.
-$('#workflow-table').addEventListener('click', (event) => {
-  const action = event.target.closest('.workflow-menu button, .workflow-menu a');
-  if (action && !action.disabled) action.closest('.workflow-menu').hidePopover();
-});
 
 /* Catalog labels arrive after the first paint: repaint the rows that use them. */
 document.addEventListener('dapier:catalog-loaded', () => {

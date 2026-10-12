@@ -67,11 +67,12 @@ def test_list_rows_carry_no_raw_id_text_and_no_second_line():
     # menu item's tooltip) — never as visible cell text.
     visible = re.sub(r'"[^"]*\$\{id\}[^"]*"', '""', row)
     assert ">${id}<" not in visible and "${id}</" not in visible
-    # Copy ID sits in the row menu beside the existing actions.
-    menu = row[row.index('class="workflow-menu"'):]
+    # Copy ID sits in the shared row menu beside the existing actions.
+    assert "rowActions(" in row
     for action in ("workflow-runs", "workflow-versions", "workflow-tags", "workflow-folder",
                    "workflow-duplicate", "workflow-copy-id", "workflow-delete"):
-        assert action in menu, action
+        assert action in row, action
+    assert "row-menu-item" in row and "row-menu-sep" in row and "row-menu-danger" in row
     # The full flow is one hover away on the name and the Apps strip.
     assert "workflowFlowText(workflow)" in row and "appStripHtml(workflow, flow)" in row
     # Search still matches ids.
