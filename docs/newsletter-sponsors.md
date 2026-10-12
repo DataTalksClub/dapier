@@ -18,11 +18,20 @@ its own stores; it forwards to the service that owns the domain.
 SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workflow:
   1. extract-sponsors — one ai_complete call (model claude-sonnet-5-5
      via Anthropic's OpenAI-compatible API) with a json_schema for
-     {newsletter: string, sponsors: [{name, url?, category?, blurb?, context?}]} pulls
-     the extraction from the subject and body. The schema is enforced
-     provider-side (response_format json_schema) and re-validated locally;
-     an unparsable reply or a schema mismatch returns {ok: false, ...} for
-     the chain to branch on.
+     {newsletter: string, sponsors: [{name, url?, category?, blurb?, context?}]}
+     pulls paid placements from the subject, text, and html. The prompt is
+     paid-only (gold 2026-10-10): labeled sponsor slots, asterisk
+     placements, "Brought to you by", partner/sponsor headings, mid-roll
+     ads, and third-party course-sponsor thanks. It skips editorial links,
+     author bios, unsubscribe, "sponsor this newsletter" CTAs, the
+     newsletter's own job board, and publisher self-promo. `name` is
+     required; `category` is optional (omit rather than guess). The schema
+     is enforced provider-side (response_format json_schema) and
+     re-validated locally; an unparsable reply or a schema mismatch
+     returns {ok: false, ...} for the chain to branch on. Datamailer
+     stores `data.body` as `{html: {value: ...}}` and SES intake stores
+     string `html`/`text`; the prompt lists both so the model sees the
+     issue either way.
   2. forward-leads — dataops POST to DATAOPS_LEADS_URL with the
      dapier/dataops secret as x-dataops-intake-secret, the same auth as
      the invoice intake. The envelope is built by
@@ -71,21 +80,11 @@ any level. Tests: `tests/test_dataops_leads.py`.
 
 ## Live setup (one-time)
 
-1. Deploy with the new env: add a `DataOpsLeadsUrl` parameter wired to
-   `DATAOPS_LEADS_URL` on the Worker function (additive only, next to
-   `DataOpsIntakeUrl`; existing flows keep reading `DATAOPS_INTAKE_URL`
-   untouched). Deferred while an unrelated template.yaml change is in
-   flight — apply after it lands so the hunks do not collide:
-
-    ```yaml
-    # Parameters:
-      DataOpsLeadsUrl:
-        Type: String
-        Default: ''
-        Description: DataOps sponsors-leads intake URL; empty leaves the newsletter-sponsors example unconfigured
-    # Globals → Function → Environment → Variables:
-        DATAOPS_LEADS_URL: !Ref DataOpsLeadsUrl
-    ```
+1. Deploy. `template.yaml` already wires `DataOpsLeadsUrl` (default
+   `https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws/api/v1/intake/leads`)
+   to `DATAOPS_LEADS_URL` on every function via Globals, next to
+   `DataOpsIntakeUrl`. Existing flows keep reading `DATAOPS_INTAKE_URL`
+   untouched.
 
 2. The `dapier/dataops` secret already holds the intake token — reuse it;
    the leads intake accepts the same credential as email-documents.

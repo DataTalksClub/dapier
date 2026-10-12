@@ -132,8 +132,11 @@ actions:
     type: ai_complete
     model: claude-sonnet-5-5
     prompt: |
-      Extract the newsletter subject and sponsors as JSON matching the schema.
-      Newsletter text: {body}
+      Extract the newsletter subject and paid sponsor placements as JSON matching the schema.
+      Text:
+      {text}
+      HTML:
+      {html}
     json_schema:
       type: object
       required: [newsletter, sponsors]
@@ -144,7 +147,7 @@ actions:
           type: array
         items:
           type: object
-          required: [name, category]
+          required: [name]
           properties:
             name:
               type: string
