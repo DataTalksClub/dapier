@@ -1,0 +1,77 @@
+id: ods-berlin-breakfast
+enabled: true
+description: 'ODS Berlin weekly Wednesday breakfast announcement. Runs on Sunday at 18:00 Europe/Berlin (schedule: ods-berlin-breakfast). Posts announcement to the Meetings topic, pins it, and unpins the previous announcement.'
+trigger:
+  connector: schedule
+  event: schedule.triggered
+  filters:
+    schedule:
+      equals: ods-berlin-breakfast
+actions:
+- id: prepare-announcement
+  type: code
+  code: |
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    BERLIN = ZoneInfo("Europe/Berlin")
+    now_iso = input.get("now")
+    if now_iso:
+        now_berlin = datetime.fromisoformat(now_iso).astimezone(BERLIN)
+    else:
+        now_berlin = datetime.now(BERLIN)
+
+    days_ahead = (2 - now_berlin.weekday()) % 7 or 7
+    meeting_date = now_berlin.date() + timedelta(days=days_ahead)
+    meeting = datetime(meeting_date.year, meeting_date.month, meeting_date.day, 8, 30, tzinfo=BERLIN)
+
+    date_text = meeting.strftime("%d.%m")
+    timezone_text = meeting.tzname()
+    maps_url = "https://maps.app.goo.gl/fN63iVfjGdfFDZRBA"
+
+    text = (
+        "☕ <b>Дата-завтрак в среду на Alexanderplatz</b>\n\n"
+        f"В среду, {date_text}, в 8:30 утра {timezone_text}\n"
+        f'📍 <a href="{maps_url}">Einstein Kaffee @ Alexanderplatz</a>\n\n'
+        "Ставим 👍 кто придёт"
+    )
+
+    output = {
+        "meeting_date": date_text,
+        "timezone": timezone_text,
+        "text": text,
+    }
+  tests:
+  - name: Sunday computes following Wednesday announcement
+    input:
+      now: '2026-10-11T18:00:00+02:00'
+    expected:
+      meeting_date: '14.10'
+      timezone: CEST
+      text: "☕ <b>Дата-завтрак в среду на Alexanderplatz</b>\n\nВ среду, 14.10, в 8:30 утра CEST\n📍 <a href=\"https://maps.app.goo.gl/fN63iVfjGdfFDZRBA\">Einstein Kaffee @ Alexanderplatz</a>\n\nСтавим 👍 кто придёт"
+- id: find-chat
+  type: telegram_find_chat
+  connection_id: telegram-ods-bot
+  chat_id: '-1001295648628'
+- id: post-announcement
+  type: telegram_send
+  connection_id: telegram-ods-bot
+  chat_id: '-1001295648628'
+  message_thread_id: 547
+  parse_mode: HTML
+  text: '{steps.prepare-announcement.output.result.text}'
+- id: pin-announcement
+  type: telegram_pin_message
+  connection_id: telegram-ods-bot
+  chat_id: '-1001295648628'
+  message_id: '{steps.post-announcement.output.message_id}'
+  disable_notification: true
+- id: unpin-previous
+  type: telegram_unpin_message
+  connection_id: telegram-ods-bot
+  chat_id: '-1001295648628'
+  message_id: '{steps.find-chat.output.chat.pinned_message_id}'
+  on_fail: continue
+  when:
+    steps.find-chat.output.chat.pinned_message_id:
+      exists: true
