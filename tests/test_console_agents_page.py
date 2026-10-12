@@ -1,9 +1,10 @@
 """Console Agents page: compact run head and independently scrolling panes.
 
 The selected run reads like an Emails message: a heading-size title held to
-two lines, ONE meta line (status · workflow · when · duration), and a
-Details disclosure for the exact times, engine and ids. On desktop the list
-and the detail each scroll inside a viewport-tall workspace."""
+two lines, ONE meta line (status · workflow · when · duration). Exact times,
+engine and ids sit in a Gmail-style Details popover on the workflow name.
+On desktop the list and the detail each scroll inside a viewport-tall
+workspace."""
 
 import pathlib
 import re
@@ -24,19 +25,28 @@ def _desktop_block():
     return CSS[start:CSS.index("\n}\n", start)]
 
 
-def test_detail_head_is_title_meta_line_then_details():
+def test_detail_head_is_title_meta_line_with_gmail_details():
     head = JS[JS.index('<div class="agent-detail-head">'):JS.index('<section class="agent-result"')]
     assert '<h2 tabindex="-1"' in head
     assert head.count('<p class="agent-detail-meta">') == 1
-    meta = head[head.index('agent-detail-meta'):head.index('<details')]
+    meta = head[head.index('agent-detail-meta'):head.index('agent-details-pop')]
     assert "${badge(task)}" in meta
     assert 'href="/workflows/${encodeURIComponent(task.workflow' in meta
     assert "duration(task)" in meta
-    # Everything else sits behind one Details disclosure, before the result.
-    assert '<details class="agent-technical"><summary>Details</summary>' in head
+    assert 'class="agent-details-toggle"' in meta
+    assert 'popovertarget="agent-task-details"' in meta
+    # Exact times, engine and ids sit in a popover, not a block disclosure.
+    assert '<details class="agent-technical">' not in JS
+    assert 'id="agent-task-details" class="agent-details-pop" popover' in head
     for label in ("Finished", "Duration", "Engine", "Task ID", "Required capabilities",
                   "Workspace", "Exit code", "Completion email sent"):
         assert f"<dt>{label}</dt>" in head, label
+    ui = (WEB / "js/ui.js").read_text()
+    assert ".row-menu, .agent-details-pop" in ui
+    pop = _rule(".agent-details-pop")
+    assert "position: fixed" in pop
+    assert "max-width: min(22rem, calc(100vw - 24px))" in pop
+    assert "var(--dk-shadow-overlay)" in pop
     # No second "Run details" block and no label/value summary rows left over.
     assert "Run details" not in JS
     assert "run-summary" not in JS

@@ -80,13 +80,13 @@ function renderDetail() {
   const startedLabel = task.started_at ? 'Started' : task.status === 'queued' ? 'Queued' : 'Created';
   /* One compact head, like an Emails message: the title, then ONE meta line
      (status · workflow · when · how long). Exact times, engine and ids sit
-     behind Details, so the result starts right after. */
+     in a Gmail-style Details popover on the workflow name. */
   panel.innerHTML = `<div class="agent-detail-body">
     <div class="agent-detail-head">
       <button class="agent-back dk-button dk-button--secondary dk-button--sm" type="button">Back to runs</button>
       <h2 tabindex="-1" title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</h2>
-      <p class="agent-detail-meta">${badge(task)}<span class="agent-meta-item"><a class="text-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a></span><span class="agent-meta-item">${startedLabel}&nbsp;${when(task.started_at || task.created_at)}</span><span class="agent-meta-item mono">${escapeHtml(duration(task))}</span></p>
-      <details class="agent-technical"><summary>Details</summary><dl>
+      <p class="agent-detail-meta">${badge(task)}<span class="agent-meta-item"><a class="text-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a><button class="agent-details-toggle" type="button" popovertarget="agent-task-details" aria-haspopup="dialog">Details</button></span><span class="agent-meta-item">${startedLabel}&nbsp;${when(task.started_at || task.created_at)}</span><span class="agent-meta-item mono">${escapeHtml(duration(task))}</span></p>
+      <div id="agent-task-details" class="agent-details-pop" popover role="dialog" aria-label="Details"><dl>
         <dt>${startedLabel}</dt><dd class="mono">${escapeHtml(formatTimestamp(task.started_at || task.created_at) || '—')}</dd>
         ${task.finished_at ? `<dt>Finished</dt><dd class="mono">${escapeHtml(formatTimestamp(task.finished_at))}</dd>` : ''}
         <dt>Duration</dt><dd class="mono">${escapeHtml(duration(task))}</dd>
@@ -96,7 +96,7 @@ function renderDetail() {
         <dt>Workspace</dt><dd>${escapeHtml(task.workspace || 'Worker default')}</dd>
         ${task.exit_code != null ? `<dt>Exit code</dt><dd>${escapeHtml(String(task.exit_code))}</dd>` : ''}
         ${task.notified_at ? `<dt>Completion email sent</dt><dd>${escapeHtml(formatTimestamp(task.notified_at))}</dd>` : ''}
-      </dl></details>
+      </dl></div>
     </div>
     <section class="agent-result" aria-labelledby="agent-result-heading">
       <h3 id="agent-result-heading">${failed ? 'What went wrong' : active ? 'Progress' : 'Result'}</h3>
@@ -114,8 +114,9 @@ async function selectTask(id, { updateUrl = true } = {}) {
   /* A newly picked run opens at its head; the 15s quiet refresh of the same
      run must not yank a reader back to the top of a long result. */
   const changed = selected !== id;
-  selected = id; detail = null;
-  if (changed) $('#agent-run-detail').scrollTop = 0;
+  const detailsOpen = !changed && Boolean(document.getElementById('agent-task-details')?.matches(':popover-open'));
+  selected = id;
+  if (changed) { detail = null; $('#agent-run-detail').scrollTop = 0; }
   const seq = ++detailSeq;
   renderList(); renderDetail();
   if (updateUrl) setTaskUrl(id);
@@ -123,6 +124,7 @@ async function selectTask(id, { updateUrl = true } = {}) {
     const data = await api(`/api/admin/agent-tasks?task_id=${encodeURIComponent(id)}`);
     if (seq !== detailSeq || selected !== id) return;
     detail = data.task; renderDetail();
+    if (detailsOpen) document.getElementById('agent-task-details')?.showPopover();
   } catch (error) {
     if (seq !== detailSeq) return;
     $('#agent-run-detail').innerHTML = `<div class="dialog-state"><strong>This run could not be loaded</strong><p>The task service answered: ${escapeHtml(error.message)}</p><div class="dk-cluster"><button class="agent-back dk-button dk-button--secondary" type="button">Back to runs</button><button class="dk-button dk-button--secondary" id="agent-detail-retry" type="button">Try again</button></div></div>`;

@@ -1839,7 +1839,7 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-back { display: none; }
 .agent-detail-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); }
 /* The compact head: a heading-size title held to two lines, one meta
-   line, and a Details disclosure for everything else. */
+   line. Exact times, engine and ids sit in a Details popover on the name. */
 .agent-detail-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
 .agent-detail-head h2 { justify-self: stretch; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
 /* Each part after the status leads with a "·" in a fixed slot. The line
@@ -1847,15 +1847,20 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
    wraps to a new line never starts with a stray dot. */
 .agent-detail-meta { --agent-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0 0 0 calc(-1 * var(--agent-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--agent-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .agent-detail-meta > .status { margin-left: var(--agent-sep); font-size: var(--dk-text-sm); }
-.agent-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; }
+.agent-meta-item { display: flex; align-items: center; min-width: 0; max-width: 100%; white-space: nowrap; }
 .agent-meta-item::before { content: "·"; flex: none; width: var(--agent-sep); text-align: center; color: var(--dk-text-faint); }
 /* A long workflow name ends in an ellipsis (the id rides in its title). */
 .agent-detail-meta .text-link { display: block; min-width: 0; height: auto; overflow: hidden; text-overflow: ellipsis; font-size: inherit; }
-.agent-detail-head .agent-technical { border-top: 0; padding: 0; justify-self: stretch; }
-.agent-detail-head .agent-technical summary { display: inline-flex; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); }
-.agent-detail-head .agent-technical summary:hover { color: var(--dk-text-primary); }
-.agent-detail-head .agent-technical summary::after { margin-left: 0; }
-.agent-detail-head .agent-technical dl { margin: var(--dk-space-2) 0 0; padding: var(--dk-space-3) var(--dk-space-4); background: var(--dk-bg-muted); gap: var(--dk-space-1) var(--dk-gap-control); font-size: var(--dk-text-sm); }
+.agent-details-toggle { display: inline-flex; align-items: center; gap: var(--dk-space-1); flex: none; margin-left: var(--dk-space-2); padding: 0 var(--dk-space-1); border: 0; border-radius: var(--dk-radius-sm); background: transparent; color: var(--dk-text-muted); font: inherit; font-weight: var(--dk-weight-medium); cursor: pointer; appearance: none; }
+.agent-details-toggle:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
+.agent-details-toggle::after { content: ""; width: 8px; height: 5px; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
+body:has(#agent-task-details:popover-open) .agent-details-toggle { color: var(--dk-text-primary); }
+body:has(#agent-task-details:popover-open) .agent-details-toggle::after { transform: rotate(180deg); }
+.agent-details-pop { position: fixed; inset: auto; margin: 0; width: max-content; height: max-content; min-width: 16rem; max-width: min(22rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: var(--dk-space-3) var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); overflow-x: hidden; overflow-y: auto; }
+.agent-details-pop:popover-open { display: block; }
+.agent-details-pop dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-space-4); margin: 0; font-size: var(--dk-text-sm); }
+.agent-details-pop dt { color: var(--dk-text-muted); }
+.agent-details-pop dd { margin: 0; overflow-wrap: anywhere; }
 .agent-result { margin: var(--dk-space-4) 0; border-top: 1px solid var(--dk-border-default); padding-top: var(--dk-space-4); }
 .agent-result h3 { font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); margin: 0 0 var(--dk-space-3); }
 .agent-result-text { overflow-wrap: anywhere; font-size: var(--dk-text-body); line-height: 1.7; max-width: 70ch; }
@@ -1877,17 +1882,14 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-result-text img { max-width: 100%; }
 .agent-result-text a { overflow-wrap: anywhere; }
 .agent-progress p { margin: 0 0 var(--dk-space-3); }
-.agent-log-section, .agent-technical { border-top: 1px solid var(--dk-border-default); padding: var(--dk-space-4) 0; }
-.agent-log-section summary, .agent-technical summary { display: flex; align-items: center; gap: var(--dk-gap-control); min-height: var(--dk-size-control-md); cursor: pointer; font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); }
-.agent-log-section summary::-webkit-details-marker, .agent-technical summary::-webkit-details-marker { display: none; }
-.agent-log-section summary::after, .agent-technical summary::after { content: ""; width: 10px; height: 6px; margin-left: auto; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
-.agent-log-section[open] summary::after, .agent-technical[open] summary::after { transform: rotate(180deg); }
+.agent-log-section { border-top: 1px solid var(--dk-border-default); padding: var(--dk-space-4) 0; }
+.agent-log-section summary { display: flex; align-items: center; gap: var(--dk-gap-control); min-height: var(--dk-size-control-md); cursor: pointer; font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); }
+.agent-log-section summary::-webkit-details-marker { display: none; }
+.agent-log-section summary::after { content: ""; width: 10px; height: 6px; margin-left: auto; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
+.agent-log-section[open] summary::after { transform: rotate(180deg); }
 .agent-log-hint { color: var(--dk-danger-text); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-regular); }
 .agent-log-tabs { margin-top: var(--dk-space-3); }
 .agent-log-output { margin: var(--dk-space-3) 0 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); font: var(--dk-text-sm)/1.7 var(--dk-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 480px; overflow-y: auto; }
-.agent-technical dl { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--dk-gap-control); font-size: var(--dk-text-md); margin: var(--dk-space-4) 0 0; }
-.agent-technical dt { color: var(--dk-text-muted); }
-.agent-technical dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 860px) {
   /* One pane at a time: the list, or the selected run with Back. */
   .agent-workspace { grid-template-columns: minmax(0, 1fr); }
@@ -1896,10 +1898,11 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .agent-workspace.has-selection .agent-run-sidebar { display: none; }
   .agent-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
   .agent-detail-meta .text-link { line-height: var(--dk-size-touch); }
+  .agent-details-toggle { min-height: var(--dk-size-touch); }
   .agent-detail-body { padding: var(--dk-space-4); }
-  .agent-log-section summary, .agent-technical summary, .agent-detail-head .agent-technical summary { min-height: var(--dk-size-touch); }
-  .agent-technical dl { grid-template-columns: minmax(0, 1fr); gap: var(--dk-space-1); }
-  .agent-technical dd { margin-bottom: var(--dk-space-3); }
+  .agent-log-section summary { min-height: var(--dk-size-touch); }
+  .agent-details-pop dl { grid-template-columns: minmax(0, 1fr); }
+  .agent-details-pop dd { margin-bottom: var(--dk-space-2); }
   .agent-toolbar .toolbar-filters > label.toolbar-search { flex-basis: 100%; }
 }
 
