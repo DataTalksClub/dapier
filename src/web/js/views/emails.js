@@ -1,7 +1,8 @@
 /* Emails is a mailbox of what Dapier received and what happened to each
-   message: handled by a workflow, refused by the sender list, or matched
-   by nothing. The receiving addresses and the sender allow-list sit beside
-   it as compact references. Rows come from the trigger inbox
+   message: handled by a workflow, refused by the sender policy, or matched
+   by nothing. The receiving addresses sit beside it; selecting one binds
+   the "Who can write" panel to that address's sender policy (or the
+   default). Rows come from the trigger inbox
    (GET /api/admin/triggers/inbox?connector=email), the same API behind
    `dapier emails received`; flows are still edited only in the designer. */
 import { state } from '../state.js';
@@ -27,7 +28,8 @@ const FILTERS = {
 const CHIPS = [['all', 'All'], ['handled', 'Handled'], ['failed', 'Failed'], ['refused', 'Refused'], ['none', 'No workflow']];
 const mail = { events: null, next: null, filter: 'all', loading: false, error: '' };
 let config = {};
-let allowed = [];
+let fromPolicy = { default: { mode: 'allowlist', addresses: [] }, routes: {}, addresses: [] };
+let selectedKey = null;
 
 /* ---- formatting ------------------------------------------------------- */
 
@@ -185,7 +187,7 @@ function detailHtml(event) {
       ? `<ul class="email-runs">${candidates.map((workflow) => `<li><span class="cell-name" title="${escapeHtml(workflow)}">${escapeHtml(workflowName(workflow))}</span><span class="email-muted">handles this address</span><button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(`${workflow}:${event.inbox_id}`)}">Open run</button></li>`).join('')}</ul>` : ''}`;
   } else if (event.outcome === 'refused') {
     const sender = email.from_address;
-    result = `<p class="sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} on the allowed senders list, so no workflow ran. Allow the sender, then replay the message to run it now.</p>`;
+    result = `<p class="sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} allowed to write to this address, so no workflow ran. Allow the sender, then replay the message to run it now.</p>`;
   } else if (event.outcome === 'unmatched') {
     result = `<p class="sub">${isFeedback(event)
       ? 'No workflow watches bounce or complaint feedback.'
@@ -227,9 +229,11 @@ async function openEmail(inboxId) {
     : (email.subject || '(no subject)');
   $('#email-dialog-body').innerHTML = detailHtml(event);
   const sender = (email.from_address || '').toLowerCase();
+  const route = (email.route || '').toLowerCase();
   const allow = $('#email-allow-sender');
-  allow.hidden = !(event.outcome === 'refused' && sender && !allowed.includes(sender));
+  allow.hidden = !(event.outcome === 'refused' && sender && !senderAllowed(sender, route));
   allow.dataset.address = sender;
+  allow.dataset.route = route;
   allow.textContent = `Allow ${sender}`;
   allow.disabled = false;
   icons();
@@ -250,15 +254,58 @@ function routeRule(route) {
 
 const menuId = (text) => String(text).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 
-function addressItem({ label, kind = '', copy = '', handlers }) {
+function localPart(address) {
+  const value = String(address || '').toLowerCase();
+  const at = value.indexOf('@');
+  return at > 0 ? value.slice(0, at) : value;
+}
+
+function normalizeFrom(data) {
+  if (Array.isArray(data)) {
+    return { default: { mode: 'allowlist', addresses: data }, routes: {}, addresses: data };
+  }
+  const def = (data && data.default) || { mode: 'allowlist', addresses: (data && data.addresses) || [] };
+  return {
+    default: { mode: def.mode || 'allowlist', addresses: def.addresses || [] },
+    routes: (data && data.routes) || {},
+    addresses: def.addresses || [],
+  };
+}
+
+function resolvePolicy(route) {
+  const named = route && (fromPolicy.routes || {})[route];
+  if (named) return { ...named, inherited: false, route };
+  const def = fromPolicy.default || { mode: 'allowlist', addresses: fromPolicy.addresses || [] };
+  return { mode: def.mode || 'allowlist', addresses: def.addresses || [], inherited: true, route: route || '' };
+}
+
+function senderAllowed(sender, route) {
+  const policy = resolvePolicy(route);
+  if (policy.mode === 'anyone') return true;
+  return (policy.addresses || []).some((item) => String(item).toLowerCase() === sender);
+}
+
+function senderChip(route) {
+  const policy = resolvePolicy(route);
+  if (policy.mode === 'anyone') return 'anyone';
+  const count = (policy.addresses || []).length;
+  return count === 1 ? '1 sender' : `${count} senders`;
+}
+
+function addressItem({ label, kind = '', copy = '', handlers, route = '' }) {
   const off = handlers.filter((handler) => handler.status && handler.status !== 'enabled').length;
+  const chips = [];
+  if (kind) chips.push(`<span class="dk-chip">${escapeHtml(kind)}</span>`);
+  else chips.push(`<span class="dk-chip">${escapeHtml(senderChip(route))}</span>`);
   return sourceRow({
+    attrs: `data-email-select="${escapeHtml(route)}"`,
+    selected: Boolean(route) && selectedKey === route,
     /* The address itself is the copy button: one target, the icon says so. */
     name: `<span class="source-name-text">${escapeHtml(label)}</span>${copy ? '<i data-lucide="copy" aria-hidden="true"></i>' : ''}`,
     nameClass: copy ? 'email-copy' : '',
     nameAttrs: copy ? `data-copy="${escapeHtml(copy)}" aria-label="Copy ${escapeHtml(copy)}"` : 'disabled',
     nameTitle: copy ? `Copy ${copy}` : label,
-    status: kind ? `<span class="dk-chip">${escapeHtml(kind)}</span>` : '',
+    status: chips.join(''),
     /* Each workflow the address starts opens from the row menu. */
     tools: handlers.length ? `<button class="icon-button row-more" type="button" popovertarget="email-menu-${escapeHtml(menuId(label))}" aria-label="Workflows for ${escapeHtml(label)}" title="Open a workflow"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
       <div id="email-menu-${escapeHtml(menuId(label))}" class="row-menu" popover aria-label="Workflows for ${escapeHtml(label)}">${handlers.map((handler) =>
@@ -271,20 +318,28 @@ function addressItem({ label, kind = '', copy = '', handlers }) {
   });
 }
 
-export function renderEmails(data) {
-  whenMenusClosed($('.view[data-page="emails"]'), () => renderEmailsNow(data));
+function addressRoutes() {
+  return (config.addresses || []).map((address) => localPart(address.address)).filter(Boolean);
 }
 
-function renderEmailsNow(data) {
-  config = data || {};
-  $('#email-domain-hint').textContent = config.domain ? `*@${config.domain}` : 'the receiving domain';
-  $('#email-load-error').textContent = config.error || '';
+function chooseSelection() {
+  const routes = addressRoutes();
+  if (selectedKey === null) {
+    selectedKey = routes[0] || '';
+    return;
+  }
+  if (selectedKey && !routes.includes(selectedKey)) selectedKey = routes[0] || '';
+}
+
+function renderAddressList() {
+  chooseSelection();
   const addresses = config.addresses || [];
   const subscriptions = config.subscriptions || [];
   const watchers = config.watchers || [];
   const items = [
     ...addresses.map((address) => addressItem({
       label: address.address, copy: address.address, handlers: address.handlers || [],
+      route: localPart(address.address),
     })),
     ...subscriptions.map((handler) => addressItem({
       label: routeRule((handler.filters || {}).route), kind: 'pattern', handlers: [handler],
@@ -298,12 +353,19 @@ function renderEmailsNow(data) {
   $('#email-addresses').innerHTML = items.join('');
   $('#email-addresses').hidden = items.length === 0;
   $('#email-empty').hidden = items.length > 0 || Boolean(config.error);
-  if (mail.events && mail.events.length === 0) renderMail();
-  icons();
 }
 
-export function renderEmailFrom(addresses) {
-  allowed = (addresses || []).map((address) => String(address).toLowerCase());
+function bindSenderRemoves() {
+  $$('.sender-remove').forEach((button) => button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await removeSender(button.dataset.address);
+    } catch (error) { notice(error.message, true); }
+    finally { button.disabled = false; }
+  }));
+}
+
+function renderSenderList(addresses) {
   const list = $('#email-from-list');
   const items = addresses || [];
   list.innerHTML = items.map((address) => `<li class="source-row sender-row">
@@ -312,15 +374,70 @@ export function renderEmailFrom(addresses) {
       <button class="icon-button sender-remove" type="button" data-address="${escapeHtml(address)}" aria-label="Remove ${escapeHtml(address)}" title="Remove sender"><i data-lucide="x"></i></button>
     </div>
   </li>`).join('') || '<li class="source-row sender-empty">No senders yet. Every incoming message is refused until one is added.</li>';
+  bindSenderRemoves();
+}
+
+function renderSenderPanel() {
+  const policy = resolvePolicy(selectedKey || '');
+  const named = Boolean(selectedKey);
+  const anyone = policy.mode === 'anyone';
+  $('#email-from-title').textContent = named ? `Who can write to ${selectedKey}@` : 'Default senders';
+  const note = $('#email-from-note');
+  note.textContent = named
+    ? 'Mail from anyone else is refused before any workflow runs.'
+    : 'Used when an address has no sender policy of its own. Mail from anyone else is refused.';
+  note.hidden = anyone;
+  $('#email-from-mode').hidden = !named;
+  $$('#email-from-mode [data-from-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.fromMode === (anyone ? 'anyone' : 'allowlist')));
+  });
+  $('#email-from-anyone').hidden = !anyone;
+  $('#email-from-list').hidden = anyone;
+  $('#email-from-add').hidden = anyone;
+  if (!anyone) renderSenderList(policy.addresses || []);
+}
+
+async function removeSender(address) {
+  const route = selectedKey || '';
+  if (route && !(fromPolicy.routes || {})[route]) {
+    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify({ route, mode: 'allowlist' }) });
+  }
+  const params = new URLSearchParams({ address });
+  if (route) params.set('route', route);
+  await api(`/api/admin/email-from?${params}`, { method: 'DELETE' });
+  await refresh();
+}
+
+function selectAddress(key) {
+  selectedKey = key || '';
+  $$('#email-addresses .source-row').forEach((row) => {
+    const route = row.dataset.emailSelect || '';
+    row.classList.toggle('is-selected', Boolean(route) && route === selectedKey);
+  });
+  renderSenderPanel();
+}
+
+export function renderEmails(data) {
+  whenMenusClosed($('.view[data-page="emails"]'), () => renderEmailsNow(data));
+}
+
+function renderEmailsNow(data) {
+  config = data || {};
+  $('#email-domain-hint').textContent = config.domain ? `*@${config.domain}` : 'the receiving domain';
+  $('#email-load-error').textContent = config.error || '';
+  renderAddressList();
+  renderSenderPanel();
+  if (mail.events && mail.events.length === 0) renderMail();
   icons();
-  $$('.sender-remove').forEach((button) => button.addEventListener('click', async () => {
-    button.disabled = true;
-    try {
-      await api(`/api/admin/email-from?address=${encodeURIComponent(button.dataset.address)}`, { method: 'DELETE' });
-      await refresh();
-    } catch (error) { notice(error.message, true); }
-    finally { button.disabled = false; }
-  }));
+}
+
+export function renderEmailFrom(data) {
+  fromPolicy = normalizeFrom(data);
+  whenMenusClosed($('.view[data-page="emails"]'), () => {
+    renderAddressList();
+    renderSenderPanel();
+    icons();
+  });
 }
 
 /* ---- events ----------------------------------------------------------- */
@@ -330,9 +447,23 @@ $('#email-from-add').addEventListener('submit', async (event) => {
   const form = event.currentTarget;
   const address = form.address.value.trim();
   if (!address) return;
+  const body = { address };
+  if (selectedKey) body.route = selectedKey;
   try {
-    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify({ address }) });
+    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify(body) });
     form.reset();
+    await refresh();
+  } catch (error) { notice(error.message, true); }
+});
+
+$('#email-from-mode').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-from-mode]');
+  if (!button || !selectedKey) return;
+  try {
+    await api('/api/admin/email-from', {
+      method: 'POST',
+      body: JSON.stringify({ route: selectedKey, mode: button.dataset.fromMode }),
+    });
     await refresh();
   } catch (error) { notice(error.message, true); }
 });
@@ -355,6 +486,10 @@ $('.view[data-page="emails"]').addEventListener('click', async (event) => {
   if (run) { event.stopPropagation(); void openRun(run.dataset.run); return; }
   const workflow = event.target.closest('.email-workflow');
   if (workflow) { void openDesigner(workflow.dataset.workflow); return; }
+  const source = event.target.closest('#email-addresses .source-row');
+  if (source && !event.target.closest('.row-more, .row-menu')) {
+    selectAddress(source.dataset.emailSelect || '');
+  }
   const copy = event.target.closest('.email-copy');
   if (copy) {
     try {
@@ -384,10 +519,11 @@ $('#email-allow-sender').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   const address = button.dataset.address;
   if (!address) return;
+  const body = { address };
+  if (button.dataset.route) body.route = button.dataset.route;
   button.disabled = true;
   try {
-    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify({ address }) });
-    allowed.push(address);
+    await api('/api/admin/email-from', { method: 'POST', body: JSON.stringify(body) });
     button.hidden = true;
     notice(`Allowed ${address}. Replay the message to run it now.`);
     await refresh();

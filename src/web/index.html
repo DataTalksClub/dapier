@@ -275,9 +275,14 @@
             </section>
             <section class="data-panel" aria-labelledby="email-from-title">
               <div class="section-head">
-                <h2 id="email-from-title">Allowed senders</h2>
+                <h2 id="email-from-title">Who can write</h2>
               </div>
-              <p class="sub panel-note">Mail from anyone else is refused before any workflow runs, for every address.</p>
+              <p id="email-from-note" class="sub panel-note">Used when an address has no sender policy of its own. Mail from anyone else is refused.</p>
+              <div id="email-from-mode" class="dk-cluster email-from-mode" role="group" aria-label="Who can write" hidden>
+                <button type="button" class="dk-filter-chip" data-from-mode="anyone" aria-pressed="false">Anyone</button>
+                <button type="button" class="dk-filter-chip" data-from-mode="allowlist" aria-pressed="true">Allowed senders</button>
+              </div>
+              <p id="email-from-anyone" class="sub panel-note" hidden>Anyone can mail this address. A message with no From is still refused.</p>
               <ul id="email-from-list" class="source-list"></ul>
               <form id="email-from-add" class="dk-table-footer sender-add" autocomplete="off">
                 <label class="visually-hidden" for="email-from-address">Sender address</label>

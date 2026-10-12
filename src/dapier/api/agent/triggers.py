@@ -1,5 +1,5 @@
-"""Trigger endpoints: samples and discovery, the inbound sender
-allow-list, and email/hook/schedule/poll trigger management."""
+"""Trigger endpoints: samples and discovery, per-address sender
+policy, and email/hook/schedule/poll trigger management."""
 
 import json
 
@@ -76,10 +76,11 @@ def email_from_api(event, method):
             status, payload = email_from.api_list()
         elif method == "POST":
             body = json.loads(event.get("body") or "{}")
-            status, payload = email_from.api_add((body or {}).get("address"))
+            status, payload = email_from.api_save(body or {})
         else:
             query = event.get("queryStringParameters") or {}
-            status, payload = email_from.api_remove(query.get("address", ""))
+            status, payload = email_from.api_remove(
+                query.get("address", ""), route=query.get("route"))
     except (email_from.FromError, ValueError, json.JSONDecodeError) as exc:
         return _json_response(400, {"error": str(exc) or "Invalid request"})
     audit.emit("email-from", "email-from", subject, outcome="ok" if status == 200 else "error")

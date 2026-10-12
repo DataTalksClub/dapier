@@ -192,7 +192,7 @@ def _route_grants_tokens(event, method, path, operator_payload, operator_subject
 
 
 def _route_ops_email(event, method, path, operator_payload, operator_subject):
-    """The email inventory, the sender allowlist, host tasks, workers."""
+    """The email inventory, per-address sender policy, host tasks, workers."""
     if method == "GET" and path == "/api/admin/email-triggers":
         return routes.list_email_triggers(event)
     if method == "GET" and path == "/api/admin/email-from":

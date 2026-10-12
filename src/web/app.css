@@ -1035,6 +1035,10 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .sender-row:last-child { padding-bottom: var(--dk-gap-block); }
 .sender-add { flex-wrap: nowrap; }
 .sender-add input { flex: 1 1 auto; min-width: 0; height: var(--dk-size-control-sm); }
+.email-from-mode { padding: var(--dk-space-3) var(--dk-space-4) 0; }
+#email-addresses .source-row { cursor: pointer; }
+#email-addresses .source-row:hover { background: var(--dk-bg-hover); }
+#email-addresses .source-row.is-selected:hover { background: var(--dk-accent-soft); }
 /* Detail dialog: outcome first, then headers, then attachments. */
 #email-dialog { --dk-dialog-width: 640px; }
 #email-dialog-title { overflow-wrap: anywhere; }

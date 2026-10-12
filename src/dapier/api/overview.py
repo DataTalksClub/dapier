@@ -145,11 +145,12 @@ def _email_triggers():
                 "error": "Email configuration could not be loaded. Refresh to retry."}
 
 def _email_from():
-    """The shared sender list. Empty when the table is not configured."""
+    """Per-address sender policy. Empty default when the table is not configured."""
     try:
-        return email_from.api_list()[1]["addresses"]
+        return email_from.api_list()[1]
     except Exception:  # noqa: BLE001 — the overview must render without the table
-        return []
+        return {"default": {"mode": "allowlist", "addresses": []},
+                "routes": {}, "addresses": []}
 
 
 def _usage(visible=None, owners=None):

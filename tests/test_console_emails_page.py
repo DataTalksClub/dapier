@@ -16,12 +16,16 @@ def test_emails_page_has_no_new_email_button():
 
 def test_emails_page_is_a_mailbox_of_received_mail():
     """The page lists received email from the inbox API with outcome
-    filters, then the addresses and allowed senders as compact lists."""
+    filters, then the addresses and a per-address sender policy panel."""
     html = (WEB / "index.html").read_text()
     page = html[html.index('data-page="emails"'):html.index('data-page="agents"')]
     for marker in ('id="email-mail-list"', 'id="email-filter-chips"',
-                   'id="email-mail-more"', 'id="email-addresses"', 'id="email-from-list"'):
+                   'id="email-mail-more"', 'id="email-addresses"', 'id="email-from-list"',
+                   'id="email-from-mode"', 'id="email-from-anyone"', 'id="email-from-title"'):
         assert marker in page
+    assert "Who can write" in page
+    assert 'data-from-mode="anyone"' in page and 'data-from-mode="allowlist"' in page
+    assert "for every address" not in page
     # The outcome chips are the trigger family's (views/activity.js), rendered
     # by emails.js: All, Handled, Failed, Refused, No workflow.
     js = (WEB / "js" / "views" / "emails.js").read_text()
@@ -41,5 +45,9 @@ def test_emails_view_uses_the_shared_inbox_and_sender_apis():
     assert "/api/admin/triggers/inbox/${" in js  # detail read
     assert "openReplayConfirm(" in js  # replay goes through the inbox replay API
     assert "/api/admin/email-from" in js  # allow this sender
+    assert "data-email-select" in js
+    assert "email.route" in js
+    assert "data-from-mode" in js
+    assert "selectAddress(" in js
     for outcome in ("'handled'", "'failed'", "'refused'", "'unmatched'"):
         assert outcome in js

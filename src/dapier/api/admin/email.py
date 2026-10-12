@@ -1,4 +1,4 @@
-"""The email inventory endpoint and the sender allowlist."""
+"""The email inventory endpoint and the per-address sender policy."""
 from ...triggers import email_from
 from ... import http
 import json
@@ -21,7 +21,7 @@ def email_from_list(event):
 def email_from_add(event, operator):
     try:
         body = http._request_json(event)
-        status, payload = email_from.api_add((body or {}).get("address"))
+        status, payload = email_from.api_save(body or {})
     except (email_from.FromError, ValueError, json.JSONDecodeError) as exc:
         return http._json_response(400, {"error": str(exc) or "Invalid request"})
     session._audit_event("email-from", "email-from", operator, outcome="added")
@@ -31,7 +31,8 @@ def email_from_add(event, operator):
 def email_from_remove(event, operator):
     query = event.get("queryStringParameters") or {}
     try:
-        status, payload = email_from.api_remove(query.get("address", ""))
+        status, payload = email_from.api_remove(
+            query.get("address", ""), route=query.get("route"))
     except email_from.FromError as exc:
         return http._json_response(400, {"error": str(exc)})
     session._audit_event("email-from", "email-from", operator, outcome="removed")

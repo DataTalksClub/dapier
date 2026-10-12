@@ -140,7 +140,7 @@ not move until a worker is running again.
 
 ## Forward a task
 
-Send from an address in `dapier emails from list` to `agents@dtcdev.click`.
+Send from an address on the `agent` allow-list (`dapier emails from list --route agent`) to `agents@dtcdev.click`.
 Put your task instructions above the forwarded message, for example, "Write a
 Telegram article from this Zoom conversation." Include the Zoom shared
 recording URL and passcode in the email body. The stored route is defined in

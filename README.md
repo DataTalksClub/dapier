@@ -348,7 +348,8 @@ a workflow (with a link to the run), failed, refused because the sender is not
 allowed, or matched by no workflow. Filter by outcome; open a message for its
 headers, attachment names, runs, **Replay**, and — for a refused sender —
 **Allow this sender**. Beside it, the receiving addresses (patterns and
-bounce/complaint watchers in the same list) and the allowed senders.
+bounce/complaint watchers in the same list). Select an address to see who
+can write to it — an allow-list of senders, or anyone.
 `dapier emails received [--outcome handled,failed|refused|unmatched]` prints
 the same list from the same inbox API; `dapier inbox show <id>` the detail.
 
@@ -361,6 +362,9 @@ dapier workflows save flow.yaml            # save a draft; live stays unchanged
 dapier workflows publish invoice-intake    # promote the draft
 dapier emails from list
 dapier emails from add alexey@datatalks.club
+dapier emails from anyone newsletter
+dapier emails from allowlist invoice
+dapier emails from add alexey@datatalks.club --route invoice
 ```
 
 In the console, each address links its workflow into the designer used by
@@ -376,11 +380,14 @@ workflow being published; set it in the designer's YAML view or workflow YAML.
 The Emails list then shows all handlers for the address. Broad subscriptions
 require the same explicit choice when they overlap existing routes.
 
-One sender list applies to every incoming message, including Datamailer SNS
-events. It starts as `alexey.s.grigoriev@gmail.com` and
-`alexey@datatalks.club`. A sender outside the list runs no actions; an empty list
-ignores everyone. Additional workflow filters AND with the address rule. Sender
-admission is separate from receiving-address configuration and outbound senders.
+Sender policy is per inbound address, with a default for addresses that have
+no row of their own. The default starts as `alexey.s.grigoriev@gmail.com` and
+`alexey@datatalks.club` in allow-list mode. `dapier emails from anyone newsletter`
+lets anyone write to `newsletter@`; invoice, consulting, and agent keep an
+allow-list. A sender outside an address's allow-list runs no actions; an empty
+allow-list ignores everyone. `mode=anyone` still refuses a message with no
+From. Additional workflow filters AND with the address rule. Sender admission
+is separate from receiving-address configuration and outbound senders.
 
 An `agent` action queues a prompt for a Dapier worker — a machine running
 `dapier worker`, which picks the task up and runs a headless Claude Code
