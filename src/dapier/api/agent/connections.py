@@ -323,7 +323,7 @@ def create_connection(event):
         return _json_response(400, {"error": "Invalid request"})
     # display_name is retired: connections are named by account + service.
     # Older clients may still send it; it is accepted and ignored.
-    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path", "kind"}
+    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path", "url", "kind"}
     if not isinstance(body, dict) or "provider" not in body or set(body) - allowed:
         return _json_response(400, {"error": "Provide provider and supported connection fields"})
     try:
@@ -348,7 +348,7 @@ def create_connection(event):
 
 
 def update_connection_metadata(event, connection_id):
-    """Operator-only edit of a connection's scopes or Dropbox path."""
+    """Operator-only edit of a connection's scopes, Dropbox path, or DataOps URL."""
     subject, error = require_operator(event, audit.CONNECT)
     if error:
         return error
@@ -356,7 +356,7 @@ def update_connection_metadata(event, connection_id):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    allowed = {"display_name", "scopes", "root_path"}
+    allowed = {"display_name", "scopes", "root_path", "url"}
     if isinstance(body, dict):
         body.pop("display_name", None)  # retired; accepted from older clients and ignored
     if not isinstance(body, dict) or not body or set(body) - allowed:
@@ -380,6 +380,7 @@ def update_connection_metadata(event, connection_id):
             "scopes": body.get("scopes", previous.get("scopes") or []),
             "expected_account_id": previous.get("expected_account_id"),
             "root_path": body.get("root_path", previous.get("root_path") or ""),
+            "url": body.get("url", previous.get("url") or ""),
         })
         # A scope edit never flips a Zoom connection between API and webhook.
         zoom.resolve_kind(fields, previous=previous)

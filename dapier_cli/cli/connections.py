@@ -40,12 +40,13 @@ def register(sub):
                           help="Zoom only: connection kind (default api; a webhook "
                                "is created with `connections import --token-file`)")
     create_p.add_argument("--root-path", default=None, help="Dropbox only: listing root")
-    edit_p = conn_sub.add_parser("edit", help="Edit connection scopes or Dropbox path")
+    edit_p = conn_sub.add_parser("edit", help="Edit connection scopes, Dropbox path, or DataOps URL")
     edit_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
     edit_p.add_argument("--scopes", nargs="+", default=None, metavar="SCOPE")
     root_group = edit_p.add_mutually_exclusive_group()
     root_group.add_argument("--root-path", default=None, help="Dropbox only: listing root")
     root_group.add_argument("--clear-root-path", action="store_true", help="Dropbox only: list from the Dropbox root")
+    edit_p.add_argument("--url", default=None, help="DataOps only: API origin, e.g. https://ops.dtcdev.click")
     import_p = conn_sub.add_parser("import", help="One-time operator import of an existing credential")
     import_p.add_argument("connection_id")
     import_p.add_argument("--provider", required=True)
@@ -63,6 +64,8 @@ def register(sub):
     import_p.add_argument("--scopes", nargs="*", default=[])
     import_p.add_argument("--root-path", default=None,
                           help="Dropbox only: folder webhook resolution lists (empty lists everything)")
+    import_p.add_argument("--url", default=None,
+                          help="DataOps only: API origin, e.g. https://ops.dtcdev.click")
     revoke_p = conn_sub.add_parser("revoke", help="Revoke a connection's stored tokens")
     revoke_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
     delete_p = conn_sub.add_parser("delete", help="Delete a connection outright (operator)")
@@ -127,7 +130,7 @@ def run(args, api_url, debug, child=None):
             args.client_secret_file, args.authorized_user_file,
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
             token_path=args.token_file, root_path=args.root_path,
-            signing_secret_path=args.signing_secret_file,
+            signing_secret_path=args.signing_secret_file, url=args.url,
         )
     if args.command == "send-expiry-digest":
         return commands.connections_send_expiry_digest(api_url, debug)
@@ -141,7 +144,7 @@ def run(args, api_url, debug, child=None):
         root_path = "" if args.clear_root_path else args.root_path
         return commands.connections_edit(
             api_url, connection_id,
-            scopes=args.scopes, root_path=root_path, debug=debug,
+            scopes=args.scopes, root_path=root_path, url=args.url, debug=debug,
         )
     if args.command == "revoke":
         return commands.connections_revoke(api_url, connection_id, debug)

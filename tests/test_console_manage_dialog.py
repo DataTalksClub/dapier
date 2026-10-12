@@ -58,9 +58,10 @@ def test_scopes_and_cli_hint_sit_behind_advanced():
 
 def test_provider_fields_stay_reachable():
     dialog = _dialog()
-    for name in ("root_path", "signing_secret", "token", "scopes"):
+    for name in ("root_path", "url", "signing_secret", "token", "scopes"):
         assert f'name="{name}"' in dialog
-    for section in ("edit-zoom-url", "edit-slack-url", "edit-dropbox-url", "edit-youtube-url"):
+    for section in ("edit-zoom-url", "edit-slack-url", "edit-dropbox-url",
+                    "edit-youtube-url", "edit-dataops-setup"):
         assert f'id="{section}"' in dialog
 
 
@@ -109,7 +110,7 @@ def _manage(connection):
             const $ = id => nodes[id] ||= node();
             const $$ = () => [];
             const form = $('#edit-connection-form');
-            for (const field of ['scopes', 'token', 'root_path', 'signing_secret']) form[field] = node();
+            for (const field of ['scopes', 'token', 'root_path', 'url', 'signing_secret']) form[field] = node();
             const state = {{data: {{connections: [{json.dumps(connection)}]}}}};
             const escapeHtml = value => String(value);
             const statusLine = value => value;
@@ -155,3 +156,15 @@ def test_manage_save_sends_the_zoom_kind():
     save = JS[JS.index("$('#edit-connection-form').addEventListener('submit'"):]
     assert "if (form.dataset.kind) body.kind = form.dataset.kind;" in save
     assert "if (!form.dataset.pastesToken) {" in save
+    assert "if (provider === 'dataops') body.url = form.url.value.trim();" in save
+
+
+def test_dataops_manage_shows_the_api_origin():
+    nodes = _manage({"connection_id": "dataops", "provider": "dataops",
+                     "status": "connected", "url": "https://ops.dtcdev.click",
+                     "scopes": ["invoices:read"]})
+    form = nodes['#edit-connection-form']
+    assert form['dataset']['provider'] == 'dataops'
+    assert form['url']['value'] == 'https://ops.dtcdev.click'
+    assert nodes['#edit-dataops-setup']['hidden'] is False
+    assert nodes['#edit-dropbox-setup']['hidden'] is True

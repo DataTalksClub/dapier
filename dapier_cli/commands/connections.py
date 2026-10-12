@@ -89,7 +89,7 @@ def print_connection(item):
     refs = item.get("refs") or []
     if refs:
         print(f"address as: {refs[0]}" + (f"  (also: {', '.join(refs[1:])})" if refs[1:] else ""))
-    for key in ("status", "health", "provider",
+    for key in ("status", "health", "provider", "url",
                 "verified_account_id", "expected_account_id",
                 "granted_scopes", "scopes", "version", "updated_at",
                 "connected_at", "auto_refresh"):
@@ -248,14 +248,16 @@ def connections_create(api_url, connection_id, provider, scopes, *,
 
 
 def connections_edit(api_url, connection_id, *, scopes=None,
-                     root_path=None, debug=False):
+                     root_path=None, url=None, debug=False):
     body = {}
     if scopes is not None:
         body["scopes"] = list(scopes)
     if root_path is not None:
         body["root_path"] = root_path
+    if url is not None:
+        body["url"] = url
     if not body:
-        print("Provide --scopes, --root-path, or --clear-root-path.")
+        print("Provide --scopes, --root-path, --clear-root-path, or --url.")
         return 2
     api.call(api_url, "PUT", f"/api/agent/connections/{connection_id}", body, debug=debug)
     print(f"Updated {connection_id}.")
@@ -329,7 +331,7 @@ TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops", "cmp")
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
                        authorized_user_path, expected_account_id=None, scopes=(), debug=False,
                        token_path=None, root_path=None,
-                       signing_secret_path=None):
+                       signing_secret_path=None, url=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
     body = {
         "connection_id": connection_id,
@@ -401,6 +403,8 @@ def connections_import(api_url, connection_id, provider, client_id, client_secre
         body["scopes"] = list(scopes)
     if root_path is not None:
         body["root_path"] = root_path
+    if url is not None:
+        body["url"] = url
     # Secrets travel only in the TLS request body to the operator endpoint;
     # they never appear in argv, logs, or output. The local files are only read.
     data = api.call(api_url, "POST", "/api/agent/connections/import", body, debug=debug)

@@ -668,6 +668,8 @@ def test_main_operator_command_parsing(monkeypatch):
                         seen.update(edited=connection_id, edit_kwargs=kwargs) or 0)
     assert main.main(["connections", "edit", "dropbox", "--clear-root-path"]) == 0
     assert seen["edited"] == "dropbox" and seen["edit_kwargs"]["root_path"] == ""
+    assert main.main(["connections", "edit", "dataops", "--url", "https://ops.dtcdev.click"]) == 0
+    assert seen["edited"] == "dataops" and seen["edit_kwargs"]["url"] == "https://ops.dtcdev.click"
 
 
 HOOK = {
@@ -802,6 +804,26 @@ def test_connections_import_passes_root_path(monkeypatch, tmp_path):
     assert seen["body"]["root_path"] == "/incoming"
 
 
+def test_connections_import_passes_url(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        seen.update(body=body)
+        return {"connection_id": "dataops", "account_title": "DataOps invoice reader"}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    token_file = tmp_path / "dataops-token"
+    token_file.write_text("dops_svc_" + "ab" * 32)
+
+    code = commands.connections_import(
+        "https://api.example.test", "dataops", "dataops", None, None, None,
+        token_path=str(token_file), url="https://ops.dtcdev.click")
+
+    assert code == 0
+    assert seen["body"]["url"] == "https://ops.dtcdev.click"
+    assert seen["body"]["token"].startswith("dops_svc_")
+
+
 def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):
     calls = []
 
@@ -819,6 +841,10 @@ def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):
         "https://api.example.test", "dropbox",
         root_path="/incoming",
     ) == 0
+    assert commands.connections_edit(
+        "https://api.example.test", "dataops",
+        url="https://ops.dtcdev.click",
+    ) == 0
     assert calls == [
         ("PUT", "/api/agent/connections", {
             "connection_id": "dropbox", "provider": "dropbox", "scopes": scopes,
@@ -827,9 +853,13 @@ def test_connections_create_and_edit_call_operator_api(monkeypatch, capsys):
         ("PUT", "/api/agent/connections/dropbox", {
             "root_path": "/incoming",
         }),
+        ("PUT", "/api/agent/connections/dataops", {
+            "url": "https://ops.dtcdev.click",
+        }),
     ]
     out, _ = capsys.readouterr()
     assert "Created dropbox" in out and "Updated dropbox" in out
+    assert "Updated dataops" in out
 
 
 def test_oauth_clients_set_posts_secret_without_echoing(monkeypatch, tmp_path, capsys):

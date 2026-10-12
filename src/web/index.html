@@ -849,6 +849,10 @@
           <label id="edit-root-path-field" hidden>Listing root<input name="root_path" class="mono-input" placeholder="/incoming"><small class="field-hint">The folder webhook resolution lists; empty lists the whole Dropbox.</small></label>
           <p class="field-hint">Dropbox signs every delivery with the app secret, so the secret stored for the dropbox OAuth client (<a href="/credentials">Credentials</a>, or <code>dapier oauth-clients set dropbox</code>) must match the App Console secret. Use the <code>dropbox / file.created</code> trigger (also <code>file.updated</code>, <code>file.deleted</code>) in a workflow.</p>
         </section>
+        <section id="edit-dataops-setup" class="manage-section" hidden>
+          <h3>DataOps API</h3>
+          <label id="edit-dataops-url-field">API origin<input name="url" class="mono-input" placeholder="https://ops.dtcdev.click" type="url"><small class="field-hint">https origin of the DataOps API. A dataops step appends <code>/api/v1/intake/leads</code> or <code>/api/v1/intake/email-documents</code>. Pasting a full intake path is fine — it strips to the origin.</small></label>
+        </section>
         <details id="edit-advanced" class="manage-advanced">
           <summary>Advanced <span id="edit-advanced-count" class="manage-advanced-count"></span></summary>
           <div class="manage-advanced-body">

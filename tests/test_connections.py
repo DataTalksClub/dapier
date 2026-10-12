@@ -160,6 +160,68 @@ def test_public_view_includes_root_path():
     assert public_view(item)["root_path"] == "/incoming"
 
 
+def _dataops_body(**overrides):
+    connections.TOKEN_PROVIDERS.add("dataops")
+    payload = body(connection_id="dataops", provider="dataops", scopes=["invoices:read"])
+    payload.update(overrides)
+    return payload
+
+
+def test_dataops_url_strips_intake_paths_to_origin():
+    cases = (
+        ("https://ops.dtcdev.click", "https://ops.dtcdev.click"),
+        ("https://ops.dtcdev.click/", "https://ops.dtcdev.click"),
+        ("https://ops.dtcdev.click/api/v1/intake/leads", "https://ops.dtcdev.click"),
+        ("https://ops.dtcdev.click/api/v1/intake/email-documents", "https://ops.dtcdev.click"),
+        ("https://ops.dtcdev.click/api/me", "https://ops.dtcdev.click"),
+        ("https://ops.dtcdev.click/api", "https://ops.dtcdev.click"),
+        ("https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws"
+         "/api/v1/intake/email-documents",
+         "https://el4jt4z2k4lnxwvoqawrdcsedm0axjzc.lambda-url.eu-west-1.on.aws"),
+        ("", ""),
+    )
+    for raw, want in cases:
+        assert validate_new_connection(_dataops_body(url=raw))["url"] == want
+
+
+def test_dataops_url_is_dataops_only():
+    with pytest.raises(ConnectionError, match="url applies only"):
+        validate_new_connection(body(provider="slack", url="https://ops.dtcdev.click"))
+    assert validate_new_connection(body(provider="slack", url=""))["url"] == ""
+
+
+def test_dataops_url_rejects_http_and_whitespace():
+    for bad in ("http://ops.dtcdev.click", "ops.dtcdev.click",
+                "https://ops.dtcdev.click/foo bar"):
+        with pytest.raises(ConnectionError):
+            validate_new_connection(_dataops_body(url=bad))
+
+
+def test_dataops_url_survives_edits_that_omit_it():
+    created = build_item(
+        validate_new_connection(_dataops_body(url="https://ops.dtcdev.click")),
+        owner_subject="s",
+    )
+    edited = build_item(
+        validate_new_connection(_dataops_body()),
+        owner_subject="s", previous=created,
+    )
+    assert edited["url"] == "https://ops.dtcdev.click"
+    cleared = build_item(
+        validate_new_connection(_dataops_body(url="")),
+        owner_subject="s", previous=created,
+    )
+    assert cleared["url"] == ""
+
+
+def test_public_view_includes_url():
+    item = build_item(
+        validate_new_connection(_dataops_body(url="https://ops.dtcdev.click")),
+        owner_subject="s",
+    )
+    assert public_view(item)["url"] == "https://ops.dtcdev.click"
+
+
 def test_check_binding_rejects_wrong_account():
     item = build_item(
         validate_new_connection(body(expected_account_id="UC-personal")), owner_subject="s",

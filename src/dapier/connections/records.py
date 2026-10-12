@@ -23,6 +23,14 @@ from . import services as connection_services
 from .providers import oauth_providers, slack_tokens
 
 CONNECTION_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{1,62}")
+# Full intake/identity paths strip to the origin so operators can paste
+# either https://ops.dtcdev.click or a complete /api/v1/intake/... URL.
+_DATAOPS_URL_SUFFIXES = (
+    "/api/v1/intake/leads",
+    "/api/v1/intake/email-documents",
+    "/api/me",
+    "/api",
+)
 # Path segments under /api/*/connections/ that name a route, not a record.
 RESERVED_CONNECTION_IDS = {"resolve", "import"}
 
@@ -129,6 +137,14 @@ def validate_new_connection(body):
             raise ConnectionError("root_path applies only to Dropbox connections")
         root_path = root_path.strip("/")
         root_path = f"/{root_path}" if root_path else ""
+    url = None
+    if "url" in body:
+        if provider != "dataops":
+            if str(body.get("url") or "").strip():
+                raise ConnectionError("url applies only to DataOps connections")
+            url = ""
+        else:
+            url = normalize_dataops_url(body.get("url"))
     return {
         "connection_id": connection_id,
         "provider": provider,
@@ -139,7 +155,27 @@ def validate_new_connection(body):
         # None = the request didn't mention it (build_item keeps the previous
         # value); "" = explicitly clear (list the whole Dropbox).
         "root_path": root_path if "root_path" in body else None,
+        "url": url,
     }
+
+
+def normalize_dataops_url(raw):
+    """https origin for a DataOps connection. Full intake paths strip to origin."""
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    if not re.match(r"^https://[^\s/]+", text, flags=re.I):
+        raise ConnectionError(
+            "DataOps url must be an https origin, e.g. https://ops.dtcdev.click")
+    if re.search(r"\s", text):
+        raise ConnectionError("DataOps url must not contain whitespace")
+    text = text.rstrip("/")
+    lowered = text.lower()
+    for suffix in _DATAOPS_URL_SUFFIXES:
+        if lowered.endswith(suffix):
+            text = text[: -len(suffix)].rstrip("/")
+            break
+    return text
 
 
 def credential_id_for(connection_id):
@@ -173,6 +209,8 @@ def build_item(fields, *, owner_subject, previous=None):
         # the whole Dropbox).
         "root_path": (previous.get("root_path") or "") if fields.get("root_path") is None
         else fields["root_path"],
+        "url": (previous.get("url") or "") if fields.get("url") is None
+        else fields["url"],
         "verified_account_id": verified,
         "account_title": previous.get("account_title"),
         "owner_subject": owner_subject or previous.get("owner_subject"),
@@ -301,6 +339,7 @@ def public_view(item, stored=None):
         "granted_scopes": item.get("granted_scopes", []),
         "expected_account_id": item.get("expected_account_id"),
         "root_path": item.get("root_path") or "",
+        "url": item.get("url") or "",
         "verified_account_id": item.get("verified_account_id"),
         "account_title": item.get("account_title"),
         "account_identity": account_identity(item, stored),

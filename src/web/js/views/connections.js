@@ -184,7 +184,7 @@ const SERVICE_HELP = {
   slack: 'Agent access to a Slack workspace with a bot or user token. Workflow Slack actions can also use the shared Slack Service credential.',
   telegram: 'A Telegram bot: start workflows from the messages it receives and post messages from actions.',
   cmp: 'Manage access to a production CMP API token. Course data stays in CMP.',
-  dataops: 'Read invoices from DataOps with its invoice-reader credential. Invoice parsing and bookkeeping stay in DataOps.',
+  dataops: 'Forward events into DataOps (documents or leads) and read invoices with the invoice-reader credential. Set the API origin on this connection. Invoice parsing and bookkeeping stay in DataOps.',
   google: "A Google sign-in whose grant doesn't cover a specific product yet. Edit its scopes to choose what it is for.",
 };
 
@@ -738,6 +738,8 @@ export function openEditConnection(connectionId) {
   form.root_path.value = connection.root_path || '';
   $('#edit-root-path-field').hidden = provider !== 'dropbox';
   if (provider === 'dropbox') $('#edit-dropbox-url').textContent = `${window.location.origin}/hooks/dropbox`;
+  $('#edit-dataops-setup').hidden = provider !== 'dataops';
+  form.url.value = connection.url || '';
 
   const reconnect = $('#edit-connection-reconnect');
   reconnect.hidden = !usesOAuthConsent(connection) || connection.status === 'ready';
@@ -1413,6 +1415,7 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     if (signingSecret) body.signing_secret = signingSecret;
   }
   if (provider === 'dropbox') body.root_path = form.root_path.value.trim();
+  if (provider === 'dataops') body.url = form.url.value.trim();
   const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
   if (connection && connection.expected_account_id) body.expected_account_id = connection.expected_account_id;
   try {
