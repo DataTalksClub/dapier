@@ -6,13 +6,11 @@ const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'sc
 const WORKFLOW_TABS = new Set(['list', 'hooks', 'polls']);
 const NAV_FOR = {
   designer: 'workflows',
-  emails: 'workflows',
   schedules: 'workflows',
   credentials: 'connections',
 };
 const TAB_FAMILY = {
   workflows: 'workflows',
-  emails: 'workflows',
   schedules: 'workflows',
   connections: 'connections',
   credentials: 'connections',
@@ -137,14 +135,15 @@ export async function setView(view, push = true, options = {}) {
   if (view === 'workflows') applyWorkflowTab(workflowTab);
   syncPageTabs(view, workflowTab);
   /* Family tabs swap the body under the strip, not the page header above
-     it. Child views (App setup, Emails, Hooks…) keep their own
-     routes; the title stays the parent page. */
+     it. Child views (App setup, Hooks…) keep their own routes; the
+     title stays the parent page. */
   const FAMILY_META = {
     workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
     connections: ['Connections', 'The connected accounts workflows act through.'],
   };
   const VIEW_META = {
     overview: ['Home', 'Automations and their latest results at a glance.'],
+    emails: ['Emails', 'Mail Dapier received, and which workflow ran.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
     agents: ['Agents', 'Agent tasks and the runs behind them.'],
     workers: ['Workers', 'Machines that run agent tasks.'],

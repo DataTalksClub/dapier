@@ -29,6 +29,7 @@ def test_sidebar_lists_daily_pages_then_settings():
     assert labels == [
         "Home",
         "Workflows",
+        "Emails",
         "Runs",
         "Agents",
         "Workers",
@@ -41,7 +42,6 @@ def test_sidebar_lists_daily_pages_then_settings():
         "Monitor",
         "Automate",
         "Administration",
-        "Emails",
         "Schedules",
         "Credentials",
         "API tokens",
@@ -64,7 +64,7 @@ def _family_labels(family: str) -> list[str]:
 def test_folded_pages_are_family_tabs_not_sidebar_items():
     sidebar = _sidebar()
     tabs = _page_tabs()
-    for href in ("/emails", "/schedules", "/credentials"):
+    for href in ("/schedules", "/credentials"):
         assert f'class="nav-item" href="{href}"' not in sidebar
         assert href in tabs
     assert 'href="/workflows?tab=hooks"' in tabs
@@ -72,12 +72,24 @@ def test_folded_pages_are_family_tabs_not_sidebar_items():
     assert _family_labels("workflows") == [
         "Workflows",
         "Schedules",
-        "Emails",
         "Hooks",
         "Polls",
     ]
     assert _family_labels("connections") == ["Accounts", "App setup"]
     assert 'data-family="agents"' not in tabs
+    assert 'data-family="emails"' not in tabs
+
+
+def test_emails_is_its_own_sidebar_page():
+    """Emails left the Workflows tab strip for its own sidebar entry.
+    The mailbox is a first-class page, like Agents. /emails still lands."""
+    sidebar = _sidebar()
+    assert 'class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span>' in sidebar
+    assert sidebar.index('href="/workflows"') < sidebar.index('href="/emails"') < sidebar.index('href="/runs"')
+    assert 'href="/emails"' not in _page_tabs()
+    assert "emails: 'workflows'" not in ROUTER
+    assert "emails: ['Emails', 'Mail Dapier received, and which workflow ran.']" in ROUTER
+    assert "/emails" in ingress.CONSOLE_VIEWS
 
 
 def test_workers_is_its_own_page_next_to_agents():
@@ -106,13 +118,12 @@ def test_page_tabs_clip_vertical_overflow():
 
 
 def test_family_tabs_keep_the_parent_header():
-    """Switching Accounts / App setup (or Workflows / Emails) swaps the body under the tab strip, not the title or
+    """Switching Accounts / App setup (or Workflows / Schedules) swaps the body under the tab strip, not the title or
     primary action above it."""
     assert "FAMILY_META" in ROUTER
     assert "connections: ['Connections'" in ROUTER
     assert "workflows: ['Workflows'" in ROUTER
     assert "credentials: ['App setup'" not in ROUTER
-    assert "emails: ['Emails'" not in ROUTER
     assert "if (TAB_FAMILY[view?.dataset.page]) return;" in ROUTER
     html = INDEX
     # Adding lives on each service group now, not in a page-level header button.
@@ -123,7 +134,6 @@ def test_family_tabs_keep_the_parent_header():
 
 
 def test_parent_nav_highlights_folded_views():
-    assert "emails: 'workflows'" in ROUTER
     assert "schedules: 'workflows'" in ROUTER
     assert "credentials: 'connections'" in ROUTER
 

@@ -1,7 +1,7 @@
 /* The Workflows family's trigger tabs: Hooks (hooks.js) and Polls
    (polls.js) each own their tab, their dialogs and their API calls. This
    module keeps the one entry point the overview refresh calls. Email
-   triggers live in the Emails tab, schedules in Schedules. */
+   triggers live on the Emails page, schedules in Schedules. */
 import { renderHooks } from './hooks.js';
 import { renderPolls } from './polls.js';
 
