@@ -2268,3 +2268,10 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .home-result { grid-template-columns: 6.5rem minmax(0, 1fr); }
   .home-result-when { grid-column: 2; grid-row: 2; text-align: left; }
 }
+
+/* Untriggered runs: runs.js marks the trigger cell data-empty, and the
+   "No trigger" meta line drops off the phone card (the <=860 recipe already
+   hides empty cells above this band). */
+@media (max-width: 560px) {
+  #run-table .run-trigger[data-empty] { display: none; }
+}

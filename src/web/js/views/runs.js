@@ -43,7 +43,7 @@ function runRow(run) {
   const started = formatTimestamp(run.started_at) || '—';
   return `<tr class="run-open" data-run="${escapeHtml(run.run_id)}" role="button" tabindex="0">
     <td class="cell-title run-name"><span class="cell-name workflow-label clip" title="${escapeHtml(run.workflow_id || name)}">${workflowLabelHtml(run.workflow_id)}</span></td>
-    <td class="run-trigger" data-label="Trigger"><span class="clip" title="${escapeHtml(machineTrigger(run))}">${escapeHtml(triggerLabel(run))}</span>${run.event_summary
+    <td class="run-trigger" data-label="Trigger"${run.connector ? '' : ' data-empty'}><span class="clip" title="${escapeHtml(machineTrigger(run))}">${escapeHtml(triggerLabel(run))}</span>${run.event_summary
       ? `<span class="cell-note clip run-event-summary" title="${escapeHtml(run.event_summary)}">${escapeHtml(run.event_summary)}</span>` : ''}</td>
     <td class="run-status" data-label="Status">${statusCell(run)}</td>
     <td class="num mono run-steps" data-label="Steps">${run.steps ?? '—'}</td>
