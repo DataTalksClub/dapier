@@ -2418,3 +2418,14 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .workers-table td[data-label="Engine"]:not([data-empty]) { grid-column: 1; grid-row: 4; justify-self: start; align-self: center; }
   .workers-table td[data-label="Started"]:not([data-empty]) { grid-column: 2; grid-row: 4; justify-self: end; }
 }
+/* --- mobile: register toolbar wraps two filters per row (<=560) -------------------
+   Last surviving hunk of the polish branch, rebased onto the settled
+   pass: 0f65b84 sizes each select to its longest option, so at 375 the
+   filter cluster stacked one select per row. The cluster takes the row
+   and its selects fill their label column a step smaller, so two fit
+   side by side with no clipped text. Above 560px nothing changes. */
+@media (max-width: 560px) {
+  .register-toolbar .toolbar-filters { flex: 1 1 100%; min-width: 0; }
+  .register-toolbar .toolbar-filters > label { flex: 1 1 150px; min-width: 0; }
+  .register-toolbar .toolbar-filters > label select { width: 100%; min-width: 0; max-width: none; font-size: var(--dk-text-sm); }
+}
