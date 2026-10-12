@@ -17,6 +17,7 @@ from plugins.telegram.runners.telegram import (
     run_telegram_send_photo,
     run_telegram_send_poll,
     run_telegram_unban_member,
+    run_telegram_unpin_message,
 )
 from src.dapier.connections import discovery as provider
 from src.dapier.connectors import trigger_discovery
@@ -55,11 +56,13 @@ register(Action(
     icon="send",
     run=lambda action, event, workflow_id, steps=None: run_telegram_send(action, event, steps=steps),
     required=frozenset({"connection_id"}),
-    optional=frozenset({"chat_id", "text", "timeout_seconds"}),
+    optional=frozenset({"chat_id", "text", "timeout_seconds", "message_thread_id", "parse_mode"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "required": True},
         {"key": "chat_id", "label": "Chat ID", "placeholder": "defaults to the triggering chat",
          "discover": {"resource": "telegram.chats"}},
+        {"key": "message_thread_id", "label": "Topic / Thread ID", "placeholder": "e.g. 547"},
+        {"key": "parse_mode", "label": "Parse mode", "placeholder": "HTML or Markdown"},
         {"key": "text", "label": "Text template", "type": "textarea", "placeholder": "{text}"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
@@ -231,6 +234,31 @@ register(Action(
         {"key": "disable_notification", "label": "Pin silently", "type": "boolean",
          "default": "false",
          "help": "Telegram skips the pin notification when on"},
+        {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
+    ),
+))
+
+
+register(Action(
+    type="telegram_unpin_message",
+    label="Telegram unpin message",
+    icon="telegram",
+    description=("Unpin one message in a chat (Bot API unpinChatMessage). "
+                 "chat_id falls back to the triggering chat; message_id "
+                 "comes from the trigger or an earlier step. Output: "
+                 "{unpinned: true, chat_id, message_id}."),
+    run=lambda action, event, workflow_id, steps=None: run_telegram_unpin_message(
+        action, event, steps=steps),
+    required=frozenset({"connection_id", "message_id"}),
+    optional=frozenset({"chat_id", "timeout_seconds"}),
+    fields=(
+        {"key": "connection_id", "label": "Connection ID", "required": True},
+        {"key": "chat_id", "label": "Chat ID",
+         "placeholder": "defaults to the triggering chat",
+         "discover": {"resource": "telegram.chats"}},
+        {"key": "message_id", "label": "Message ID", "required": True,
+         "placeholder": "{message_id}",
+         "help": "The message to unpin"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
 ))

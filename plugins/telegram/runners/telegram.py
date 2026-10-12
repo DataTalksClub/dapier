@@ -35,9 +35,26 @@ def run_telegram_send(action, event, *, transport=None, steps=None):
     if chat_id is None or str(chat_id).strip() == "":
         raise ValueError("telegram_send needs a chat_id in the action or the triggering message")
     text = render(action.get("text", "{text}"), event, steps)
+    message_thread_id = action.get("message_thread_id") or data.get("message_thread_id")
+    if isinstance(message_thread_id, str):
+        rendered_thread = render(message_thread_id, event, steps).strip()
+        message_thread_id = _api_int(rendered_thread) if rendered_thread else None
+    elif isinstance(message_thread_id, int):
+        pass
+    else:
+        message_thread_id = None
+    parse_mode = action.get("parse_mode")
+    if isinstance(parse_mode, str):
+        parse_mode = render(parse_mode, event, steps).strip() or None
+    send_kwargs = {}
+    if message_thread_id is not None:
+        send_kwargs["message_thread_id"] = message_thread_id
+    if parse_mode is not None:
+        send_kwargs["parse_mode"] = parse_mode
     result = telegram_api.send_message(
         token, chat_id, text, transport=transport,
         timeout=action.get("timeout_seconds", 10),
+        **send_kwargs,
     )
     if not result:
         raise RuntimeError("Telegram did not confirm the message")
@@ -69,6 +86,13 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
         if "chat not found" in str(exc).lower():
             return {"found": False, "chat": None}
         raise
+    pinned = chat.get("pinned_message")
+    pinned_info = None
+    if isinstance(pinned, dict):
+        pinned_info = {
+            "message_id": pinned.get("message_id"),
+            "from_id": (pinned.get("from") or {}).get("id"),
+        }
     return {
         "found": True,
         "chat": {
@@ -76,6 +100,8 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
             "title": chat.get("title"),
             "username": chat.get("username"),
             "type": chat.get("type"),
+            "pinned_message_id": (pinned or {}).get("message_id") if isinstance(pinned, dict) else None,
+            "pinned_message": pinned_info,
         },
     }
 
@@ -450,3 +476,26 @@ def run_telegram_pin_message(action, event, *, transport=None, steps=None):
         raise RuntimeError("Telegram did not confirm the pin")
     return {"pinned": True, "chat_id": chat_id,
             "message_id": _api_int(message_id)}
+
+
+def run_telegram_unpin_message(action, event, *, transport=None, steps=None):
+    """Unpin one message in a chat (pinChatMessage).
+
+    ``chat_id`` falls back to the triggering chat; ``message_id`` names the
+    message to unpin. Output: ``{unpinned: True, chat_id, message_id}``.
+    """
+    token = _connection_token(action)
+    chat_id = _resolve_chat_id(action, event, steps)
+    message_id = render(str(action.get("message_id") or ""), event, steps).strip()
+    if not message_id:
+        raise ValueError("telegram_unpin_message requires a message_id — a "
+                         "telegram trigger envelope carries {message_id}")
+    payload = {"chat_id": chat_id, "message_id": _api_int(message_id)}
+    result = telegram_api.call(token, "unpinChatMessage", payload,
+                               transport=transport,
+                               timeout=action.get("timeout_seconds", 10))
+    if not result:
+        raise RuntimeError("Telegram did not confirm the unpin")
+    return {"unpinned": True, "chat_id": chat_id,
+            "message_id": _api_int(message_id)}
+

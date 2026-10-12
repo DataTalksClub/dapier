@@ -12,7 +12,11 @@ from src.dapier.connections import discovery as connections_discovery
 from src.dapier.connections.providers import telegram_api
 from src.dapier.connectors import registry
 from src.dapier.engine import execute
-from plugins.telegram.runners.telegram import run_telegram_send
+from plugins.telegram.runners.telegram import (
+    run_telegram_find_chat,
+    run_telegram_send,
+    run_telegram_unpin_message,
+)
 from plugins.slack.runners import slack as slack_action
 
 
@@ -162,6 +166,73 @@ class SendMessageActionTests(unittest.TestCase):
              patch("src.dapier.connections.providers.telegram_api.send_message", side_effect=fake_send):
             execute(event)
         self.assertEqual(recorded, [{"token": "bot-token", "chat_id": 555, "text": "ping"}])
+
+    def test_execute_dispatches_telegram_send_with_thread_and_parse_mode(self):
+        event = {"connector": "telegram", "event": "message.received",
+                 "data": {"hook": "bot-inbox", "chat_id": 555, "text": "ping"}}
+        recorded = []
+
+        def fake_send(token, chat_id, text, *, transport=None, timeout=10,
+                      message_thread_id=None, parse_mode=None):
+            recorded.append({
+                "token": token, "chat_id": chat_id, "text": text,
+                "message_thread_id": message_thread_id, "parse_mode": parse_mode,
+            })
+            return {"message_id": 1}
+
+        workflow = {"id": "bot-inbox", "enabled": True,
+                    "trigger": {"connector": "telegram", "event": "message.received",
+                                "filters": {"hook": {"equals": "bot-inbox"}}},
+                    "actions": [{"type": "telegram_send", "connection_id": "tg-bot",
+                                 "message_thread_id": "547", "parse_mode": "HTML"}]}
+        with patch("src.dapier.engine.all_workflows", return_value=[workflow]), \
+             patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.send_message", side_effect=fake_send):
+            execute(event)
+        self.assertEqual(recorded, [{
+            "token": "bot-token", "chat_id": 555, "text": "ping",
+            "message_thread_id": 547, "parse_mode": "HTML",
+        }])
+
+    def test_find_chat_surfaces_pinned_message(self):
+        chat_data = {
+            "id": -1001295648628,
+            "title": "ODS Berlin",
+            "type": "supergroup",
+            "pinned_message": {
+                "message_id": 18766,
+                "from": {"id": 8606382261, "is_bot": True},
+            },
+        }
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.call", return_value=chat_data):
+            res = run_telegram_find_chat(
+                {"connection_id": "tg-bot", "chat_id": "-1001295648628"},
+                {"data": {}},
+            )
+        self.assertTrue(res["found"])
+        self.assertEqual(res["chat"]["pinned_message_id"], 18766)
+        self.assertEqual(res["chat"]["pinned_message"]["from_id"], 8606382261)
+
+    def test_unpin_message_calls_api(self):
+        calls = []
+
+        def fake_call(token, method, payload, **kwargs):
+            calls.append({"method": method, "payload": payload})
+            return True
+
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.call", side_effect=fake_call):
+            res = run_telegram_unpin_message(
+                {"connection_id": "tg-bot", "chat_id": "-1001295648628", "message_id": "18766"},
+                {"data": {}},
+            )
+        self.assertEqual(res, {"unpinned": True, "chat_id": "-1001295648628", "message_id": 18766})
+        self.assertEqual(calls, [{"method": "unpinChatMessage",
+                                  "payload": {"chat_id": "-1001295648628", "message_id": 18766}}])
 
 
 class SlackTelegramFormatTests(unittest.TestCase):

@@ -124,8 +124,10 @@ in place (`{data.chat_id}`); any other trigger must name the chat.
 
 | action | Bot API call | notes |
 | --- | --- | --- |
-| `telegram_send` | `sendMessage` | templated `text`; `chat_id` defaults to the triggering chat; output `{message_id, chat_id}` |
-| `telegram_find_chat` | `getChat` | one chat's profile; a chat the bot cannot see is `{found: false}`, not an error |
+| `telegram_send` | `sendMessage` | templated `text`; optional `message_thread_id` (topic) and `parse_mode` (`HTML` or `Markdown`); `chat_id` defaults to the triggering chat; output `{message_id, chat_id}` |
+| `telegram_find_chat` | `getChat` | one chat's profile; surfaces `pinned_message_id` and `pinned_message`; a chat the bot cannot see is `{found: false}`, not an error |
+| `telegram_pin_message` | `pinChatMessage` | pin one message in a chat; `disable_notification` pins silently; output `{pinned: true, chat_id, message_id}` |
+| `telegram_unpin_message` | `unpinChatMessage` | unpin one message in a chat; output `{unpinned: true, chat_id, message_id}` |
 | `telegram_send_photo` | `sendPhoto` | media from exactly one of `source_url` (dapier downloads it, so it need not be reachable by Telegram) or staged `source_s3 {bucket, key}`; JPEG/PNG/GIF/WEBP under 10 MB; optional `caption`, `filename`; output `{message_id, chat_id}` |
 | `telegram_send_document` | `sendDocument` | same media sourcing; any file type up to 50 MB; the filename rides along |
 | `telegram_send_poll` | `sendPoll` | `question` plus `options` one per line (2–10 after trimming empty lines); `anonymous` defaults to true; output `{message_id, chat_id, poll: {id, question}}` |

@@ -106,9 +106,16 @@ def delete_webhook(token, *, transport=None):
     call(token, "deleteWebhook", {"drop_pending_updates": False}, transport=transport)
 
 
-def send_message(token, chat_id, text, *, transport=None, timeout=10):
-    return call(token, "sendMessage", {
+def send_message(token, chat_id, text, *, transport=None, timeout=10,
+                 message_thread_id=None, parse_mode=None):
+    payload = {
         "chat_id": chat_id,
         "text": text,
         "link_preview_options": {"is_disabled": True},
-    }, transport=transport, timeout=timeout)
+    }
+    if message_thread_id is not None:
+        payload["message_thread_id"] = message_thread_id
+    if parse_mode is not None:
+        payload["parse_mode"] = parse_mode
+    return call(token, "sendMessage", payload, transport=transport, timeout=timeout)
+
