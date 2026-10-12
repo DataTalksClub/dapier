@@ -64,6 +64,22 @@ def test_workflow_list_uses_the_shared_row_menu():
     assert ".row-menu-sep" in css
 
 
+def test_workflow_select_column_fits_the_checkbox():
+    """The checkbox column is the 16px box plus the table's outer inset,
+    not a leftover 44px touch slot. Left padding matches the footer band."""
+    css = (WEB / "app.css").read_text()
+    select = re.search(
+        r"#workflow-table-wrap th\.select-col, #workflow-table-wrap td\.select-col \{[^}]+\}",
+        css,
+    )
+    assert select, "select-col padding rule missing"
+    assert "padding-left: var(--dk-space-4)" in select.group(0)
+    assert "padding-right: 0" in select.group(0)
+    assert ".workflow-col-select { width: calc(var(--dk-space-4) + 16px); }" in css
+    assert ".workflow-check { width: 16px; height: 16px; }" in css
+    assert ".workflow-col-select { width: 44px; }" not in css
+
+
 def test_tab_reentry_refetch_only_fires_for_navigation_links():
     # `[data-view=…]` also matches the view <section>, so any click inside
     # the page (opening a row menu) used to refetch and re-render the list.
