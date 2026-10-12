@@ -353,8 +353,11 @@ Resources:
                   - !GetAtt PublishedWorkflowsTable.Arn
                   - !GetAtt StorageTable.Arn
                   - !GetAtt DigestsTable.Arn
-        # Read-only tables: cursor failure counts, the trigger inbox, the
-        # usage rollup (DynamoDBReadPolicy, one document).
+                  # The zoom webhook intake records refused deliveries here
+                  # (triggers.inbox.record/ignore) — writes, not just reads.
+                  - !GetAtt TriggerInboxTable.Arn
+        # Read-only tables: cursor failure counts, the usage rollup
+        # (DynamoDBReadPolicy, one document).
         - PolicyName: dapier-api-dynamodb-read
           PolicyDocument:
             Version: '2012-10-17'
@@ -366,7 +369,6 @@ Resources:
                          dynamodb:Query, dynamodb:Scan]
                 Resource:
                   - !GetAtt CursorsTable.Arn
-                  - !GetAtt TriggerInboxTable.Arn
                   - !GetAtt TaskUsageTable.Arn
         # Operator teardown and authenticated hook retry claims share this
         # table. Keep writes within trigger cursor/seen keys.

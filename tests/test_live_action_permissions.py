@@ -94,7 +94,9 @@ def test_api_role_reads_every_table_the_handlers_touch():
     assert "ConnectionsTable.Arn" in crud
     assert "PublishedWorkflowsTable.Arn" in crud
     assert "CursorsTable.Arn" in crud and "CursorsTable.Arn" in read
-    assert "TriggerInboxTable.Arn" in read
+    # The zoom webhook intake records refused deliveries in the trigger
+    # inbox from the API — writes, not just the console's reads.
+    assert "TriggerInboxTable.Arn" in crud
     assert "CredentialsTable.Arn" in crud
     assert "TaskUsageTable.Arn" in read
 
