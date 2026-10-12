@@ -2229,3 +2229,39 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .service-add svg { display: none; }
   .service-add span { display: inline; }
 }
+
+/* --- mobile density refinements (<=560) ------------------------------------------
+   Screenshot-audit fixes on the pass above: labels only where a control
+   doesn't speak for itself, gaps back between inline labels and values,
+   empty cells stay hidden, and the Home strip keeps its designed 2x2. */
+@media (max-width: 560px) {
+  /* Schedules: the name is the schedule; the switch is the state. */
+  .sched-table td.cell-title::before,
+  .sched-table td[data-label="State"]::before { display: none; }
+
+  /* Workers: the status line reads by itself; task, engine, workspace and
+     started run as full-width labelled lines with a real label gap. */
+  .workers-table td[data-label="Status"]::before { display: none; }
+  .workers-table td[data-label="Task"],
+  .workers-table td[data-label="Engine"],
+  .workers-table td[data-label="Workspace"],
+  .workers-table td[data-label="Started"] { grid-column: 1 / -1; }
+  .workers-table td[data-label="Engine"] { display: flex; align-items: center; justify-self: start; }
+  .workers-table td[data-label="Started"] { display: flex; align-items: baseline; }
+  .workers-table td[data-label="Engine"]::before,
+  .workers-table td[data-label="Workspace"]::before,
+  .workers-table td[data-label="Started"]::before { margin-right: var(--dk-space-2); }
+
+  /* App setup: the status dot speaks for itself; empty client ids and
+     sources stay hidden even under the labelled-line display above. */
+  .setup-table td[data-label="Status"]::before { display: none; }
+  .setup-table td[data-empty] { display: none; }
+
+  /* Home: four counts wrap mid-word at 375 — the strip keeps its designed
+     2x2, and results keep the two-line row that fits whole names. */
+  .status-strip { grid-template-columns: 1fr 1fr; }
+  .status-item:nth-child(3) { border-left: 0; }
+  .status-item:nth-child(n+3) { border-top: 1px solid var(--dk-border-default); }
+  .home-result { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .home-result-when { grid-column: 2; grid-row: 2; text-align: left; }
+}
