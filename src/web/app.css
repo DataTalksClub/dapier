@@ -889,17 +889,38 @@ tr.workflow-open:hover td, tr.run-open:hover td { background: var(--dk-bg-hover)
 tr.workflow-open:focus-visible, tr.run-open:focus-visible, tr.inbox-open:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
 tr.inbox-open { cursor: pointer; }
 
-/* --- status (dot + word, one language everywhere) ----------------------------- */
+/* --- status (mark + word, one language everywhere) ----------------------------
+   Ok/fail are emoji shapes (check vs cross), not 8px green/red dots —
+   those two colors are the same blob if you can't tell them apart. Slightly
+   larger than surrounding text so the Latest run column reads at a glance. */
 .status { display: inline-flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: nowrap; }
-.status-dot { width: 8px; height: 8px; flex: none; border-radius: var(--dk-radius-full); background: var(--dk-text-faint); }
-.status.ok .status-dot { background: var(--dk-success-text); }
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  flex: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 1.15em;
+  line-height: 1;
+}
+.status-dot::before { content: "○"; }
+.status.ok .status-dot { background: transparent; font-size: 1.35em; }
+.status.ok .status-dot::before { content: "✅"; }
 .status.run { color: var(--dk-info-text); }
-.status.run .status-dot { background: var(--dk-info-text); }
+.status.run .status-dot { background: transparent; }
+.status.run .status-dot::before { content: "🔵"; }
 .status.err { color: var(--dk-danger-text); }
-.status.err .status-dot { background: var(--dk-danger-text); }
+.status.err .status-dot { background: transparent; font-size: 1.35em; }
+.status.err .status-dot::before { content: "❌"; }
 .status.warn { color: var(--dk-warning-text); }
-.status.warn .status-dot { background: var(--dk-warning-text); }
+.status.warn .status-dot { background: transparent; }
+.status.warn .status-dot::before { content: "⚠️"; }
 .status.off { color: var(--dk-text-muted); }
+.status.off .status-dot { background: transparent; }
+.status.off .status-dot::before { content: "○"; }
 
 /* --- empty state --------------------------------------------------------------- */
 /* One empty-state pattern: inside the register's own container (the frame
