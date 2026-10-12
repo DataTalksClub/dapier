@@ -2275,3 +2275,52 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 @media (max-width: 560px) {
   #run-table .run-trigger[data-empty] { display: none; }
 }
+
+/* --- mobile density pass: verification fixes (<=560) -----------------------------
+   Follow-ups from the screenshot judging round: the provider-group heads on
+   Connections cannot wrap (they alone set a 484px min-width on the page), the
+   audit/runs toolbar strands Export CSV on its own band, long token names clip
+   where wrapping fits, and the overview stat labels wrap their counts out of
+   alignment. */
+@media (max-width: 560px) {
+  /* Connections: the group head flows onto further lines; its nowrap
+     inline-flex title was the widest element on the page. */
+  .service-panel > .section-head { flex-wrap: wrap; row-gap: var(--dk-space-1); }
+  .service-panel-title { flex-wrap: wrap; white-space: normal; min-width: 0; }
+  .service-account { align-items: start; }
+
+  /* Audit and runs toolbars: filter labels size to three-per-row so the
+     Export button shares a row instead of stranding right-aligned on its
+     own full-width band above the register. */
+  .register-toolbar .toolbar-filters { flex: 1 1 230px; min-width: 230px; }
+  .register-toolbar .toolbar-filters > label { flex: 1 1 110px; }
+  .register-toolbar .dk-toolbar__end .dk-button { height: var(--dk-size-control-sm); padding: 0 var(--dk-space-2); font-size: var(--dk-text-xs); }
+
+  /* Tokens: the name wraps instead of clipping mid-word. */
+  #token-table .cell-title .cell-name { white-space: normal; overflow-wrap: anywhere; }
+
+  /* Overview: keep the status | name | when-below card; only stop the
+     stat label from wrapping its count out of alignment. */
+  .status-item-label { white-space: nowrap; }
+}
+
+/* --- mobile: tooltip anchor fix (help tips) --------------------------------------
+   The ? tooltips anchor at their button's left edge and extend up to 340px, so an
+   invisible tooltip inside a Connections group head alone made the document 484px
+   wide on phones. Clip what leaks (overflow-x: clip scrolls nothing and keeps the
+   sticky topbar), and under 560px anchor the group-head tooltip to its section
+   head so the shown text fits the panel. */
+@media (max-width: 860px) {
+  body { overflow-x: clip; }
+}
+@media (max-width: 560px) {
+  .service-panel > .section-head { position: relative; }
+  .service-panel > .section-head .help-tip { position: static; }
+  .service-panel > .section-head .help-tip::after {
+    left: var(--dk-space-3);
+    right: var(--dk-space-3);
+    top: calc(100% + var(--dk-space-1));
+    width: auto;
+    max-width: none;
+  }
+}
