@@ -1,8 +1,6 @@
 # Migration draft; save through dapier workflows save. No cutover is authorized.
 id: youtube-slack
 enabled: false
-description: 'YouTube WebSub announcements; preserve channel, display
-  name, message order and unfurling.'
 actions:
 - id: notify-slack
   type: slack

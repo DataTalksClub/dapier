@@ -1,11 +1,5 @@
 id: invoice-intake
 enabled: true
-description: 'Invoice emails: triage on arrival. Email boilerplate (HTML/text
-  parts such as stapled Terms of Service) is ignored end to end; a single
-  document attachment is archived to Dropbox and forwarded to DataOps; a
-  body-only email has its forwarded header stripped and renders to PDF (the
-  completion flow archives and forwards it); two or more documents fail the
-  run.'
 trigger:
   connector: email
   event: message.received

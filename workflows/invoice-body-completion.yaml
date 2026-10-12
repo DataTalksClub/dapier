@@ -3,7 +3,6 @@
 # completes through this flow.
 id: invoice-body-completion
 enabled: true
-description: Archive the completed email PDF and forward its exact bytes to DataOps.
 trigger:
   connector: renderer
   event: job.completed

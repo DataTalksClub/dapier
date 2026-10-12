@@ -13,9 +13,6 @@
 # with model claude-sonnet-5-5; prefer a workspace-scoped key).
 id: newsletter-sponsors
 enabled: false
-description: 'Newsletter emails: extract paid sponsor placements with one LLM call
-  and forward them to the DataOps sponsors-leads intake. Transport only — no
-  sponsor store in Dapier.'
 trigger:
   connector: email
   event: message.received

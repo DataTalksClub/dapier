@@ -1,6 +1,5 @@
 id: ods-berlin-breakfast
 enabled: true
-description: 'ODS Berlin weekly Wednesday breakfast announcement. Runs on Sunday at 18:00 Europe/Berlin (schedule: ods-berlin-breakfast). Posts announcement to the Meetings topic, pins it, and unpins the previous announcement.'
 trigger:
   connector: schedule
   event: schedule.triggered

@@ -1,8 +1,6 @@
 # Migration draft; save through dapier workflows save. No cutover is authorized.
 id: dropbox_on_upload
 enabled: false
-description: 'Date-prefix files in invoices-landing, move to invoices,
-  then forward the archived file to DataOps.'
 actions:
 - id: processing-date
   type: date_time
