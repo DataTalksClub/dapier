@@ -33,8 +33,9 @@ Verified against the live `/connections` register (2026-10-05):
 A vertical **register of services**. Every service — Gmail, Calendar,
 Drive, Docs, Sheets, YouTube, Dropbox, Slack, Telegram, Zoom — gets one
 panel; a Google grant covering several products appears under each of
-them, with a "Same sign-in also covers …" line so the shared credential
-stays visible. Rows within a panel sort by verified account.
+them. Shared-credential and usage copy lives in a Gmail-style Details
+popover on the account name so every row uses the same layout. Rows
+within a panel sort by verified account.
 
 Under the hood the Google products on one email still share one connection
 record and one refresh token. Adding Gmail to an account that already has
@@ -63,11 +64,13 @@ email is "Not signed in", never a fake Drive account.
   address a connection as `<service> <account>` (`drive alexey@…`, or any
   unique part of the account), and Manage shows that CLI reference.
   Display names stay in Manage as a nickname.
-- **Same-sign-in line** on rows whose grant covers other products:
-  `Same sign-in also covers Calendar, Drive`. Sentence case, muted, not
-  a chip.
-- **Usage** is a count on the row (`Used in 3 flows` / `Not used by any
-  flow`); Manage lists the flows by name, workflows linked.
+- **Same-sign-in** and **usage** sit in a Details popover on every row
+  (`Details ▾` next to the account name, the same Gmail-style card as
+  Agents). Primary rows say `Same sign-in also covers Calendar, Drive`;
+  shared-sign-in references say `Same sign-in as Gmail`. Usage is a
+  count (`Used in 3 flows` / `Not used by any flow`); Manage lists the
+  flows by name, workflows linked. The row itself is one line: account,
+  Details, status, actions.
 - **Status** is a stacked dot+word; renewable OAuth grants show no expiry
   or renewal line. Only tokens without a refresh
   credential show expiry warnings or appear in the re-auth digest.
@@ -78,11 +81,12 @@ email is "Not signed in", never a fake Drive account.
   Tokens without renewal inside the 48h horizon read **expiring soon**;
   lapsed tokens read **needs reconnection**. Both count as needing attention.
 - **Actions:** one action column per row, ending under the panel's Add
-  account: Finish setup or Reconnect when the account needs it, otherwise
-  Manage; the account name always opens Manage. An unfinished sign-in
-  also gets **Remove** on the row (the same delete as Manage → Delete),
-  left of Finish setup. A shared sign-in's one-line reference in its
-  other services carries the same Finish setup / Reconnect. Adding starts from the group it lands
+  account. Every row shows **Manage**. Finish setup or Reconnect sit
+  beside it when the account needs them; the account name always opens
+  Manage. An unfinished sign-in also gets **Remove** on the row (the
+  same delete as Manage → Delete), left of Finish setup. A shared
+  sign-in's compact reference in its other services carries the same
+  Manage, Finish setup, and Reconnect. Adding starts from the group it lands
   in: each service panel's header has its own **Add account** (Zoom
   Webhooks: **Add webhook**; icon-only + at phone width, named by its
   aria-label) that runs that service's connect flow in place. Zoom API

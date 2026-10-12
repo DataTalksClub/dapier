@@ -233,6 +233,7 @@ def test_console_rows_say_who_each_slack_token_acts_as():
         markup = js.eval("nodes['#connection-register'].innerHTML")
         label = js.eval(f'accountLabel({json.dumps(connections[0])})')
     assert markup.count('>DataTalks.Club</button>') == 2
-    assert '<span class="account-acts-as">Au-Tomator (App)</span>' in markup
-    assert '<span class="account-acts-as">User token</span>' in markup
+    assert '<dt>Acts as</dt><dd>Au-Tomator (App)</dd>' in markup
+    assert '<dt>Acts as</dt><dd>User token</dd>' in markup
+    assert markup.count('>Manage</button>') == 2
     assert label == 'DataTalks.Club · Au-Tomator (App)'

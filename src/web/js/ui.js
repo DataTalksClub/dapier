@@ -90,19 +90,19 @@ export function hardenSecretInputs(root = document) {
   });
 }
 
-/* Anchored popovers (row overflow menus and the Agents Details card)
+/* Anchored popovers (row overflow menus and Gmail-style Details cards)
    opened by a `[popovertarget]` trigger: kept inside the viewport.
    Row menus hang from the trigger's right edge; Details from the left.
    The native popover handles Escape, outside clicks, and one open at a time. */
 document.addEventListener('toggle', (event) => {
   const menu = event.target;
-  if (!menu.matches?.('.row-menu, .agent-details-pop') || event.newState !== 'open') return;
+  if (!menu.matches?.('.row-menu, .agent-details-pop, .connection-details-pop') || event.newState !== 'open') return;
   const trigger = document.querySelector(`[popovertarget="${menu.id}"]`);
   if (!trigger) return;
   const anchor = trigger.getBoundingClientRect();
   const bounds = menu.getBoundingClientRect();
   const gap = 4;
-  const start = menu.matches('.agent-details-pop') ? anchor.left : anchor.right - bounds.width;
+  const start = menu.matches('.agent-details-pop, .connection-details-pop') ? anchor.left : anchor.right - bounds.width;
   menu.style.left = `${Math.max(12, Math.min(start, window.innerWidth - bounds.width - 12))}px`;
   const below = anchor.bottom + gap;
   menu.style.top = `${Math.max(12, below + bounds.height <= window.innerHeight - 12 ? below : anchor.top - bounds.height - gap)}px`;

@@ -801,10 +801,10 @@ function renderConnectionsNow(connections) {
   };
   /* One panel per service, each with its own add button. A Google grant
      covering Calendar and Drive is one account: its full row sits under its
-     first service (with a "Same sign-in also covers" line), and the other
-     services list it as a compact one-line reference instead of a repeated
-     card. Grants that never finished consent have no verified identity and
-     count as not signed in. */
+     first service, and the other services list it as a compact reference.
+     Same-sign-in and usage sit in a Details popover on every row. Grants
+     that never finished consent have no verified identity and count as
+     not signed in. */
   const groups = new Map();
   for (const connection of filtered) {
     for (const service of servicesFor(connection)) {
@@ -826,7 +826,7 @@ function renderConnectionsNow(connections) {
     const titles = sorted.map((connection) => rowTitle(connection));
     const rows = sorted.map((connection, index) => {
       const primary = connectionGroupId(connection, servicesFor(connection)[0]);
-      if (primary !== serviceId) return accountRef(connection, primary);
+      if (primary !== serviceId) return accountRef(connection, primary, serviceId);
       const twin = titles.filter((title) => title === titles[index]).length > 1;
       return accountRow(connection, zoom ? 'zoom' : serviceId, { twin });
     }).join('');
@@ -873,19 +873,80 @@ function rowTitle(connection) {
     ? accountLabel(connection) : identity || (unfinished ? 'Not signed in' : accountLabel(connection));
 }
 
-/* Another service's view of a shared sign-in: one line naming the account
-   and where its full row lives; the name still opens Manage. */
-function accountRef(connection, primaryGroup) {
+function detailsId(connection, serviceId) {
+  const slug = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+  return `conn-details-${slug(connection.connection_id)}-${slug(serviceId)}`;
+}
+
+/* Sign-in sharing, usage, and the rare twin/expiry notes. Same card on
+   full rows and compact references so every account looks alike. */
+function detailsFields(connection, { serviceId, primaryGroup, twin = false } = {}) {
+  const status = effectiveStatus(connection);
+  const identity = accountIdentity(connection);
+  const unfinished = !identity && verifiesIdentity(connection);
+  const rows = [];
+  if (primaryGroup) {
+    rows.push(['Sign-in', `Same sign-in as ${serviceLabel(primaryGroup).replace(/^Google /, '')}`]);
+  } else {
+    const others = servicesFor(connection).filter((service) => service.id !== serviceId)
+      .map((service) => service.label.replace(/^Google /, ''));
+    if (others.length) rows.push(['Sign-in', `Same sign-in also covers ${others.join(', ')}`]);
+  }
+  const usage = unfinished && !(connection.provider === 'zoom' && !scopesOf(connection).length)
+    ? 'Sign-in was never finished' : usageLabel(connection);
+  rows.push(['Used in', usage]);
+  const expires = formatTimestamp(connection.token_expires_at);
+  if (!connection.auto_refresh && expires && status !== 'expired') {
+    rows.push(['Expires', expires]);
+  }
+  const acts = actsAsLabel(connection);
+  if (acts) rows.push(['Acts as', acts]);
+  if (twin) {
+    const created = formatTimestamp(connection.created_at);
+    rows.push(['Connection', `${connection.connection_id}${created ? ` · added ${created}` : ''}`]);
+  }
+  return rows;
+}
+
+function detailsCard(connection, opts) {
+  const popId = detailsId(connection, opts.serviceId);
+  const dl = detailsFields(connection, opts)
+    .map(([dt, dd]) => `<dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd>`).join('');
+  return `<button class="connection-details-toggle" type="button" popovertarget="${popId}" aria-haspopup="dialog">Details</button>
+    <div id="${popId}" class="connection-details-pop" popover role="dialog" aria-label="Details"><dl>${dl}</dl></div>`;
+}
+
+function identityHead(connection, opts) {
   const title = rowTitle(connection);
-  /* A shared sign-in that needs attention carries its next step here too,
-     not only on its full row under another service. */
-  return `<li class="service-account service-ref">
-    <div class="service-account-main service-ref-main">
-      <button class="connection-name connection-edit" data-connection="${escapeHtml(connection.connection_id)}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
-      <span class="service-ref-note">Same sign-in as ${escapeHtml(serviceLabel(primaryGroup).replace(/^Google /, ''))}</span>
+  const id = escapeHtml(connection.connection_id);
+  return `<div class="service-account-identity">
+      <button class="connection-name connection-edit" data-connection="${id}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
+      ${detailsCard(connection, opts)}
+    </div>`;
+}
+
+/* Manage is always in the action column. Finish setup / Reconnect sit
+   beside it when the grant needs them; an abandoned setup also gets Remove. */
+function accountActions(connection, { unfinished = false, title } = {}) {
+  const id = escapeHtml(connection.connection_id);
+  const remove = unfinished
+    ? `<button class="dk-button dk-button--secondary dk-button--sm connection-remove" data-connection="${id}" type="button" aria-label="Remove ${escapeHtml(title)}">Remove</button>` : '';
+  const next = nextActionHtml(connection);
+  const manage = `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
+  return { html: remove + next + manage, many: Boolean(remove || next) };
+}
+
+/* Another service's view of a shared sign-in: the account, Details, status,
+   and the same actions as the full row. The name still opens Manage. */
+function accountRef(connection, primaryGroup, serviceId) {
+  const title = rowTitle(connection);
+  const actions = accountActions(connection, { title });
+  return `<li class="service-account service-ref${actions.many ? ' has-many-actions' : ''}">
+    <div class="service-account-main">
+      ${identityHead(connection, { serviceId, primaryGroup })}
     </div>
     <div class="service-account-status">${statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS)}</div>
-    <div class="row-actions service-account-actions">${nextActionHtml(connection)}</div>
+    <div class="row-actions service-account-actions">${actions.html}</div>
   </li>`;
 }
 
@@ -905,39 +966,17 @@ function nextActionHtml(connection) {
 }
 
 function accountRow(connection, serviceId, { twin = false } = {}) {
-    /* The API distinguishes automatic renewal from expiry needing consent. */
     const status = effectiveStatus(connection);
-    const id = escapeHtml(connection.connection_id);
-    const nextAction = nextActionHtml(connection);
     const identity = accountIdentity(connection);
     const unfinished = !identity && verifiesIdentity(connection);
     const title = rowTitle(connection);
-    /* One sign-in can back several services; say so quietly instead of
-       naming the internal connection_id, which nobody needs to read. */
-    const others = servicesFor(connection).filter((service) => service.id !== serviceId)
-      .map((service) => service.label.replace(/^Google /, ''));
-    const shareHtml = others.length ? escapeHtml(`Same sign-in also covers ${others.join(', ')}`) : '';
-    /* One action column: what the account needs next, else Manage (the
-       name always opens Manage). An abandoned setup is clutter, so it also
-       offers Remove right on the row — Manage → Delete's path. */
-    const remove = unfinished
-      ? `<button class="dk-button dk-button--secondary dk-button--sm connection-remove" data-connection="${id}" type="button" aria-label="Remove ${escapeHtml(title)}">Remove</button>` : '';
-    const action = remove + (nextAction || `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`);
-    const expires = formatTimestamp(connection.token_expires_at);
-    /* Two connections that read alike (two Slack tokens of one app) say
-       which is which: their key and when they were added. */
-    const created = formatTimestamp(connection.created_at);
-    const twinNote = twin ? `<span class="cell-note">Connection <span class="mono">${id}</span>${created ? ` · added ${escapeHtml(created)}` : ''}</span>` : '';
-    return `<li class="service-account${remove ? ' has-remove' : ''}">
+    const actions = accountActions(connection, { unfinished, title });
+    return `<li class="service-account${unfinished ? ' has-remove' : ''}${actions.many ? ' has-many-actions' : ''}">
     <div class="service-account-main">
-      <button class="connection-name connection-edit" data-connection="${id}" type="button" title="Manage ${escapeHtml(title)}">${escapeHtml(title)}</button>
-      ${actsAsLabel(connection) ? `<span class="account-acts-as">${escapeHtml(actsAsLabel(connection))}</span>` : ''}
-      ${twinNote}
-      ${shareHtml ? `<span class="service-share">${shareHtml}</span>` : ''}
-      <span class="cell-note">${escapeHtml(identity || (connection.provider === 'zoom' && !scopesOf(connection).length) ? usageLabel(connection) : 'Sign-in was never finished')}${!connection.auto_refresh && expires && status !== 'expired' ? ` · <span class="${status === 'expiring' ? 'expiring' : ''}">expires ${escapeHtml(expires)}</span>` : ''}</span>
+      ${identityHead(connection, { serviceId, twin })}
     </div>
     <div class="service-account-status">${statusLine(status, CONNECTION_STATUS_LABELS)}</div>
-    <div class="row-actions service-account-actions">${action}</div>
+    <div class="row-actions service-account-actions">${actions.html}</div>
   </li>`;
 }
 

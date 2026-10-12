@@ -15,7 +15,7 @@ CSS = (WEB / "app.css").read_text()
 
 
 def _rule(selector, css=CSS):
-    match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    match = re.search(re.escape(selector) + r"(?:\s*,\s*[^{,]+)*\s*\{([^}]*)\}", css)
     assert match, selector
     return match.group(1)
 

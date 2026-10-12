@@ -699,31 +699,28 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .service-panel > .section-head .service-add { margin-left: auto; flex: none; }
 .service-add svg { display: none; }
 .service-accounts { list-style: none; margin: 0; padding: 0; }
-/* Full rows and one-line references share one grid: statuses start on one
-   edge, actions end on the band's right edge under Add account. */
-.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 7rem; align-items: start; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
+/* Full rows and shared-sign-in references share one grid: name + Details,
+   status, Manage. Extra sign-in/usage copy lives in the Details popover. */
+.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 7rem; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
 .service-account:last-child, .service-ref:last-child { border-bottom: 0; }
-.service-account-main { display: grid; gap: var(--dk-space-1); min-width: 0; }
-.connection-name { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
+.service-account-main { min-width: 0; }
+.service-account-identity { display: flex; align-items: center; min-width: 0; }
+.connection-name { justify-self: start; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
+.service-account-identity .connection-name { flex: 0 1 auto; }
 .connection-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
-/* Who the credential acts as when one account holds several (Slack app vs. person). */
-.account-acts-as { display: block; font-size: var(--dk-text-sm); color: var(--dk-text-primary); }
-.service-share { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.service-account-main .cell-note { margin-top: 0; }
-.service-account-main .expiring { color: var(--dk-warning-text); }
-.service-account-status { padding-top: var(--dk-space-1); }
 .service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
 .service-account-actions { justify-content: flex-end; gap: var(--dk-gap-control); }
-/* Remove + Finish setup need more than the action column: they take a
-   second line under status and action, still ending on the right edge. */
-.service-account.has-remove .service-account-main { grid-row: 1 / span 2; }
-.service-account.has-remove .service-account-actions { grid-column: 2 / -1; grid-row: 2; }
-/* A shared sign-in seen from its other services: one quiet line. */
-.service-ref { align-items: center; padding-block: var(--dk-space-3); }
-.service-ref-main { display: flex; align-items: baseline; gap: var(--dk-gap-control); }
-.service-ref .connection-name { flex: 0 1 auto; font-weight: var(--dk-weight-medium); }
-.service-ref .service-account-status { padding-top: 0; }
-.service-ref-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+/* Remove / Finish setup / Reconnect plus Manage need more than the action
+   column: they take a second line under status and action, still ending
+   on the right edge. */
+.service-account.has-remove .service-account-main,
+.service-account.has-many-actions .service-account-main { grid-row: 1 / span 2; }
+.service-account.has-remove .service-account-actions,
+.service-account.has-many-actions .service-account-actions { grid-column: 2 / -1; grid-row: 2; }
+.service-account.has-remove, .service-account.has-many-actions { align-items: start; }
+/* A shared sign-in seen from its other services: same chrome, quieter name. */
+.service-ref { padding-block: var(--dk-space-3); }
+.service-ref .connection-name { font-weight: var(--dk-weight-medium); }
 .connect-services { margin-top: var(--dk-gap-section); }
 .connect-list { list-style: none; margin: 0; padding: 0; }
 .connect-card { display: grid; grid-template-columns: minmax(10rem, 22%) minmax(0, 1fr) auto; align-items: center; gap: var(--dk-space-1) var(--dk-gap-control); padding: var(--dk-space-3) var(--dk-space-4); border-bottom: 1px solid var(--dk-border-default); }
@@ -752,10 +749,10 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
   .service-account-status { grid-column: 2; grid-row: 1; padding-top: calc((var(--dk-size-touch) - 1lh) / 2); }
   .service-account-main { grid-row: 1 / span 2; }
   .service-account-actions { grid-column: 2; grid-row: 2; align-self: end; }
-  .service-ref-main { display: grid; gap: 0; }
-  .service-ref .service-account-actions:empty { display: none; }
-  .service-account.has-remove .service-account-main { grid-row: 1 / span 2; }
-  .service-account.has-remove .service-account-actions { grid-column: 1 / -1; grid-row: 3; }
+  .service-account.has-remove .service-account-main,
+  .service-account.has-many-actions .service-account-main { grid-row: 1 / span 2; }
+  .service-account.has-remove .service-account-actions,
+  .service-account.has-many-actions .service-account-actions { grid-column: 1 / -1; grid-row: 3; }
   .service-ref { align-items: start; }
   .service-ref .service-account-status { padding-top: calc((var(--dk-size-touch) - 1lh) / 2); }
   .connect-card { grid-template-columns: minmax(0, 1fr) auto; gap: var(--dk-space-1) var(--dk-gap-control); }
@@ -1851,16 +1848,18 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .agent-meta-item::before { content: "·"; flex: none; width: var(--agent-sep); text-align: center; color: var(--dk-text-faint); }
 /* A long workflow name ends in an ellipsis (the id rides in its title). */
 .agent-detail-meta .text-link { display: block; min-width: 0; height: auto; overflow: hidden; text-overflow: ellipsis; font-size: inherit; }
-.agent-details-toggle { display: inline-flex; align-items: center; gap: var(--dk-space-1); flex: none; margin-left: var(--dk-space-2); padding: 0 var(--dk-space-1); border: 0; border-radius: var(--dk-radius-sm); background: transparent; color: var(--dk-text-muted); font: inherit; font-weight: var(--dk-weight-medium); cursor: pointer; appearance: none; }
-.agent-details-toggle:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
-.agent-details-toggle::after { content: ""; width: 8px; height: 5px; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
-body:has(#agent-task-details:popover-open) .agent-details-toggle { color: var(--dk-text-primary); }
-body:has(#agent-task-details:popover-open) .agent-details-toggle::after { transform: rotate(180deg); }
-.agent-details-pop { position: fixed; inset: auto; margin: 0; width: max-content; height: max-content; min-width: 16rem; max-width: min(22rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: var(--dk-space-3) var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); overflow-x: hidden; overflow-y: auto; }
-.agent-details-pop:popover-open { display: block; }
-.agent-details-pop dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-space-4); margin: 0; font-size: var(--dk-text-sm); }
-.agent-details-pop dt { color: var(--dk-text-muted); }
-.agent-details-pop dd { margin: 0; overflow-wrap: anywhere; }
+.agent-details-toggle, .connection-details-toggle { display: inline-flex; align-items: center; gap: var(--dk-space-1); flex: none; margin-left: var(--dk-space-2); padding: 0 var(--dk-space-1); border: 0; border-radius: var(--dk-radius-sm); background: transparent; color: var(--dk-text-muted); font: inherit; font-weight: var(--dk-weight-medium); cursor: pointer; appearance: none; }
+.agent-details-toggle:hover, .connection-details-toggle:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
+.agent-details-toggle::after, .connection-details-toggle::after { content: ""; width: 8px; height: 5px; background: var(--dk-select-chevron) no-repeat center; transition: transform 120ms ease; }
+body:has(#agent-task-details:popover-open) .agent-details-toggle,
+.service-account:has(.connection-details-pop:popover-open) .connection-details-toggle { color: var(--dk-text-primary); }
+body:has(#agent-task-details:popover-open) .agent-details-toggle::after,
+.service-account:has(.connection-details-pop:popover-open) .connection-details-toggle::after { transform: rotate(180deg); }
+.agent-details-pop, .connection-details-pop { position: fixed; inset: auto; margin: 0; width: max-content; height: max-content; min-width: 16rem; max-width: min(22rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: var(--dk-space-3) var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-lg); background: var(--dk-bg-surface); color: var(--dk-text-primary); box-shadow: var(--dk-shadow-overlay); overflow-x: hidden; overflow-y: auto; }
+.agent-details-pop:popover-open, .connection-details-pop:popover-open { display: block; }
+.agent-details-pop dl, .connection-details-pop dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--dk-space-1) var(--dk-space-4); margin: 0; font-size: var(--dk-text-sm); }
+.agent-details-pop dt, .connection-details-pop dt { color: var(--dk-text-muted); }
+.agent-details-pop dd, .connection-details-pop dd { margin: 0; overflow-wrap: anywhere; }
 .agent-result { margin: var(--dk-space-4) 0; border-top: 1px solid var(--dk-border-default); padding-top: var(--dk-space-4); }
 .agent-result h3 { font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); margin: 0 0 var(--dk-space-3); }
 .agent-result-text { overflow-wrap: anywhere; font-size: var(--dk-text-body); line-height: 1.7; max-width: 70ch; }
@@ -1898,11 +1897,11 @@ body:has(#agent-task-details:popover-open) .agent-details-toggle::after { transf
   .agent-workspace.has-selection .agent-run-sidebar { display: none; }
   .agent-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
   .agent-detail-meta .text-link { line-height: var(--dk-size-touch); }
-  .agent-details-toggle { min-height: var(--dk-size-touch); }
+  .agent-details-toggle, .connection-details-toggle { min-height: var(--dk-size-touch); }
   .agent-detail-body { padding: var(--dk-space-4); }
   .agent-log-section summary { min-height: var(--dk-size-touch); }
-  .agent-details-pop dl { grid-template-columns: minmax(0, 1fr); }
-  .agent-details-pop dd { margin-bottom: var(--dk-space-2); }
+  .agent-details-pop dl, .connection-details-pop dl { grid-template-columns: minmax(0, 1fr); }
+  .agent-details-pop dd, .connection-details-pop dd { margin-bottom: var(--dk-space-2); }
   .agent-toolbar .toolbar-filters > label.toolbar-search { flex-basis: 100%; }
 }
 

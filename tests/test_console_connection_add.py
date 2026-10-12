@@ -116,7 +116,8 @@ def test_add_buttons_start_the_service_flow_in_place():
 
 def test_shared_sign_in_shows_once_with_compact_references():
     """A Google grant covering Gmail and Drive is one full row (under its
-    first service); Drive lists it as a one-line reference, not a repeat."""
+    first service); Drive lists it as a compact reference, not a repeat.
+    Same-sign-in copy lives in the Details popover on both rows."""
     connections = [{"connection_id": "g1", "provider": "google", "status": "connected",
                     "account_title": "a@example.com",
                     "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly",
@@ -126,17 +127,35 @@ def test_shared_sign_in_shows_once_with_compact_references():
     assert register.count('class="service-account service-ref"') == 1
     assert 'Same sign-in as Gmail' in register
     assert 'Same sign-in also covers Drive' in register
+    assert 'class="service-share"' not in register
+    assert 'class="service-ref-note"' not in register
+    assert register.count('class="connection-details-toggle"') == 2
+    assert register.count('class="connection-details-pop" popover') == 2
+    assert register.count('>Manage</button>') == 2
 
 
 def test_compact_reference_carries_the_next_action():
     """A shared sign-in needing reconnection shows Reconnect in every panel
-    it appears in, not only on its full row under another service."""
+    it appears in, not only on its full row under another service. Manage
+    stays on every row beside it."""
     connections = [{"connection_id": "g1", "provider": "google", "status": "expired",
                     "account_title": "a@example.com", "oauth_consent": True,
                     "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly",
                                        "https://www.googleapis.com/auth/drive.readonly"]}]
     register = _render(connections)['#connection-register']['innerHTML']
     assert register.count('connection-oauth') == 2
+    assert register.count('>Manage</button>') == 2
+
+
+def test_details_popover_matches_agents_gmail_card():
+    """Connections Details uses the same anchored popover chrome as Agents."""
+    ui = (ROOT / "js" / "ui.js").read_text()
+    assert ".row-menu, .agent-details-pop, .connection-details-pop" in ui
+    pop = CSS[CSS.index(".agent-details-pop, .connection-details-pop"):]
+    pop = pop[:pop.index("}")]
+    assert "position: fixed" in pop
+    assert "max-width: min(22rem, calc(100vw - 24px))" in pop
+    assert "var(--dk-shadow-overlay)" in pop
 
 
 def test_phone_layout_keeps_add_buttons_tappable():
@@ -149,15 +168,16 @@ def test_phone_layout_keeps_add_buttons_tappable():
 
 def test_unfinished_sign_in_offers_remove_beside_finish_setup():
     """An abandoned Google/YouTube consent keeps Remove on its row (Manage →
-    Delete's path), to the left of Finish setup in the one action column."""
+    Delete's path), to the left of Finish setup, with Manage still present."""
     connections = [{"connection_id": "yt1", "provider": "youtube", "status": "ready",
                     "oauth_consent": True, "account_title": None,
                     "services": [{"id": "youtube", "label": "YouTube"}]}]
     register = _render(connections)['#connection-register']['innerHTML']
-    assert 'class="service-account has-remove"' in register
+    assert 'has-remove' in register
     actions = register[register.index('service-account-actions'):]
     assert 'connection-remove' in actions
     assert actions.index('connection-remove') < actions.index('Finish setup')
+    assert actions.index('Finish setup') < actions.index('>Manage</button>')
 
 
 def test_zoom_api_is_listed_until_one_exists_and_starts_oauth():
