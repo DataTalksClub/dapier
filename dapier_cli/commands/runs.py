@@ -121,6 +121,70 @@ def runs_export(api_url, out=None, max_rows=None, workflow=None, status=None,
     return 0
 
 
+def _child_branch_segment(parent_id, child_id):
+    rest = child_id[len(parent_id):]
+    if rest.startswith("."):
+        parts = rest[1:].split(".")
+        return parts[0] if len(parts) > 1 else None
+    if rest.startswith("[") and "]" in rest:
+        return rest[:rest.index("]") + 1]
+    return None
+
+
+def _group_steps_tree(steps):
+    nodes = [{"step": step, "id": str(step.get("action_id") or ""),
+              "children": [], "parent": None, "branch_segment": None}
+             for step in (steps or [])]
+    for node in nodes:
+        if not node["id"]:
+            continue
+        best_parent = None
+        for candidate in nodes:
+            if candidate is node or not candidate["id"]:
+                continue
+            cid = candidate["id"]
+            if node["id"].startswith(cid + ".") or node["id"].startswith(cid + "["):
+                if best_parent is None or len(cid) > len(best_parent["id"]):
+                    best_parent = candidate
+        if best_parent is not None:
+            node["parent"] = best_parent
+            node["branch_segment"] = _child_branch_segment(best_parent["id"], node["id"])
+            best_parent["children"].append(node)
+    return [node for node in nodes if node["parent"] is None]
+
+
+def _branch_summary(step, inferred_branch=None):
+    action_type = str(step.get("action_type") or step.get("type") or "")
+    out = step.get("output") if isinstance(step.get("output"), dict) else {}
+    if action_type == "condition":
+        branch = out.get("branch") or inferred_branch or (
+            "then" if out.get("condition") == "passed" else "else")
+        return str(branch)
+    if action_type == "paths":
+        branch = out.get("matched") or out.get("branch") or inferred_branch or (
+            "else" if (out.get("ran") or 0) > 0 else "none")
+        return str(branch)
+    if action_type == "decision":
+        choice = out.get("choice")
+        branch = out.get("branch") or (str(choice) if choice not in (None, "") else None) or inferred_branch or "none"
+        conf = out.get("confidence")
+        if conf is not None:
+            try:
+                return f"{branch} ({round(float(conf) * 100)}%)"
+            except (TypeError, ValueError):
+                pass
+        return str(branch)
+    if action_type == "union":
+        branch = out.get("branch") or out.get("from") or "branches"
+        return f"{branch} (union)"
+    if action_type == "filter":
+        if not out and step.get("status") != "filtered":
+            return None
+        passed = out.get("filter") == "passed"
+        return "passed" if passed else "stopped"
+    return None
+
+
 def runs_show(api_url, run_id, debug=False):
     data = api.call(api_url, "GET", f"/api/agent/runs/{quote(run_id, safe='')}", debug=debug)
     run = data.get("run") or {}
@@ -133,18 +197,33 @@ def runs_show(api_url, run_id, debug=False):
                 "started_at", "finished_at", "duration_ms", "failed_step", "error"):
         if run.get(key) not in (None, ""):
             print(f"{key}: {run[key]}")
-    for index, step in enumerate(data.get("steps") or [], 1):
+    counter = [0]
+
+    def _print_node(node, depth=0):
+        counter[0] += 1
+        index = counter[0]
+        step = node["step"]
+        indent = "  " * depth
         label = step.get("action_id") or "?"
         if step.get("action_type"):
             label = f"{label} ({step['action_type']})"
-        print(f"\nstep[{index}]: {label}  {step.get('status', '?')}"
+        print(f"\n{indent}step[{index}]: {label}  {step.get('status', '?')}"
               + (f"  {step['duration_ms']}ms" if step.get("duration_ms") is not None else ""))
+        inferred = next((c["branch_segment"] for c in node["children"] if c.get("branch_segment")), None)
+        branch = _branch_summary(step, inferred_branch=inferred)
+        if branch:
+            print(f"{indent}  branch: {branch}")
         if step.get("error"):
-            print(f"  error: {step['error']}")
+            print(f"{indent}  error: {step['error']}")
         for field in ("input", "output"):
             value = step.get(field)
             if value not in (None, "", [], {}):
-                print(f"  {field}: {json.dumps(value, sort_keys=True, default=str)}")
+                print(f"{indent}  {field}: {json.dumps(value, sort_keys=True, default=str)}")
+        for child in node["children"]:
+            _print_node(child, depth + 1)
+
+    for root in _group_steps_tree(data.get("steps") or []):
+        _print_node(root, 0)
     return 0
 
 

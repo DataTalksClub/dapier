@@ -16,7 +16,76 @@ const STEP_ICONS = {
   dropbox_delete: 'trash-2',
   render_html_to_pdf: 'file-text',
   code: 'code-2',
+  js: 'code-2',
+  condition: 'git-branch',
+  paths: 'git-branch',
+  decision: 'sparkles',
+  filter: 'filter',
+  union: 'git-merge',
+  for_each: 'repeat',
+  delay: 'clock',
+  digest: 'inbox',
+  digest_add: 'inbox',
+  digest_flush: 'inbox',
+  ai_complete: 'sparkles',
+  agent: 'terminal',
 };
+
+const BRANCHING_STEP_TYPES = new Set(['condition', 'paths', 'decision']);
+
+export function branchVerdict(step) {
+  if (!step || typeof step !== 'object') return null;
+  const type = step.action_type || step.type || '';
+  const out = step.output && typeof step.output === 'object' ? step.output : null;
+  if (!out) return null;
+  if (type === 'condition') {
+    const branch = out.branch || (out.condition === 'passed' ? 'then' : 'else');
+    return {
+      kind: 'condition',
+      branch,
+      badge: 'Branch → ' + branch,
+      passed: out.condition !== undefined ? out.condition === 'passed' : branch === 'then',
+    };
+  }
+  if (type === 'paths') {
+    const branch = out.matched || out.branch || (out.ran > 0 ? 'else' : null);
+    return {
+      kind: 'paths',
+      branch,
+      badge: branch ? ('Path → ' + branch) : 'No path matched',
+    };
+  }
+  if (type === 'decision') {
+    const branch = out.branch || (out.choice != null && out.choice !== '' ? String(out.choice) : null);
+    const conf = out.confidence != null && Number.isFinite(Number(out.confidence))
+      ? Math.round(Number(out.confidence) * 100) + '%'
+      : '';
+    return {
+      kind: 'decision',
+      branch,
+      choice: out.choice,
+      confidence: out.confidence,
+      badge: 'Decision → ' + (branch || 'none') + (conf ? ' · ' + conf : ''),
+    };
+  }
+  if (type === 'union') {
+    const branch = out.branch || out.from || null;
+    return {
+      kind: 'union',
+      branch,
+      badge: 'Union ← ' + (branch || 'branches'),
+    };
+  }
+  if (type === 'filter') {
+    const passed = out.filter === 'passed';
+    return {
+      kind: 'filter',
+      branch: passed ? 'pass' : 'stop',
+      badge: passed ? 'Filter → passed' : 'Filter → stopped',
+    };
+  }
+  return null;
+}
 
 function triggerLabel(run) {
   return triggerEventLabel(run.connector, run.event_type);
@@ -241,7 +310,34 @@ $('#runs-export').addEventListener('click', async (event) => {
 /* One flow step: a divided row in the flow list (no card inside a card) —
    head line, then the data it carried. A top-level step carries "Replay
    from here" when a run id is in scope. */
-function stepCard({ icon, title, titleMono = false, badge, status, duration, at, data, error, replayFrom, stepId }) {
+export function stepCard(first, second) {
+  const opts = (typeof first === 'object' && first !== null) ? first : (second || {});
+  const {
+    icon,
+    title,
+    localTitle,
+    scopedId,
+    actionType,
+    titleMono = false,
+    badge,
+    branchBadge,
+    status,
+    duration,
+    at,
+    data,
+    error,
+    replayFrom,
+    stepId,
+    branchLaneHtml = '',
+    isBranching = false,
+  } = opts;
+  const displayTitle = localTitle || title || '';
+  const subParts = scopedId
+    ? [scopedId, actionType || (badge ? String(badge).toLowerCase() : ''), duration].filter(Boolean)
+    : [];
+  const subLine = subParts.length
+    ? `<span class="flow-sub mono">${escapeHtml(subParts.join(' · '))}</span>`
+    : '';
   const sections = Object.entries(data || {})
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([label, value]) => `<div class="flow-data-item"><h4>${escapeHtml(label)}</h4>${dataBlock(value, { openRaw: Boolean(error) }) || '<p class="detail-muted">Empty</p>'}</div>`)
@@ -251,23 +347,82 @@ function stepCard({ icon, title, titleMono = false, badge, status, duration, at,
         title="Re-run from this step: earlier steps do not run again, their recorded outputs seed the rerun">Replay from here</button>`
     : '';
   const meta = [
+    branchBadge ? `<span class="flow-branch-pill">${escapeHtml(branchBadge)}</span>` : '',
     status ? statusLine(status) : '',
     duration ? `<span class="mono">${escapeHtml(duration)}</span>` : '',
     at ? `<span class="mono">${escapeHtml(at)}</span>` : '',
   ].filter(Boolean).join('');
-  return `<li class="flow-step ${error ? 'failed' : ''}">
+  const stepClasses = ['flow-step', isBranching ? 'flow-step-branching' : '', error ? 'failed' : '']
+    .filter(Boolean)
+    .join(' ');
+  return `<li class="${stepClasses}">
     <div class="flow-head">
       <span class="flow-icon"><i data-lucide="${icon}"></i></span>
-      <span class="flow-name"><span class="flow-title${titleMono ? ' mono' : ''}">${escapeHtml(title)}</span>${badge ? `<span class="flow-type">${escapeHtml(badge)}</span>` : ''}</span>
+      <span class="flow-name"><span class="flow-title${titleMono ? ' mono' : ''}">${escapeHtml(displayTitle)}</span>${badge ? `<span class="flow-type">${escapeHtml(badge)}</span>` : ''}${subLine}</span>
       <span class="flow-meta">${meta}</span>
       ${replayFromHere}
     </div>
     ${error ? `<div class="detail-error"><i data-lucide="triangle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${sections ? `<div class="flow-data">${sections}</div>` : ''}
+    ${branchLaneHtml}
   </li>`;
 }
 
-function flow(data) {
+function parseChildRelativeId(parentId, childId) {
+  const rest = childId.slice(parentId.length);
+  if (rest.startsWith('.')) {
+    const trimmed = rest.slice(1);
+    const parts = trimmed.split('.');
+    if (parts.length > 1) {
+      return { branchSegment: parts[0], localTitle: parts[parts.length - 1] };
+    }
+    return { branchSegment: null, localTitle: trimmed };
+  }
+  if (rest.startsWith('[')) {
+    const closeBracket = rest.indexOf(']');
+    if (closeBracket !== -1) {
+      const bracketPart = rest.slice(0, closeBracket + 1);
+      const after = rest.slice(closeBracket + 1).replace(/^\./, '');
+      const parts = after.split('.').filter(Boolean);
+      return { branchSegment: bracketPart, localTitle: parts[parts.length - 1] || childId };
+    }
+  }
+  return { branchSegment: null, localTitle: childId };
+}
+
+export function groupStepsTree(steps) {
+  const nodes = (steps || []).map((step, index) => ({
+    step,
+    index,
+    id: String(step?.action_id || ''),
+    children: [],
+    parent: null,
+    branchSegment: null,
+    localTitle: null,
+  }));
+  for (const node of nodes) {
+    if (!node.id) continue;
+    let bestParent = null;
+    for (const candidate of nodes) {
+      if (candidate === node || !candidate.id) continue;
+      if (node.id.startsWith(candidate.id + '.') || node.id.startsWith(candidate.id + '[')) {
+        if (!bestParent || candidate.id.length > bestParent.id.length) {
+          bestParent = candidate;
+        }
+      }
+    }
+    if (bestParent) {
+      node.parent = bestParent;
+      const parsed = parseChildRelativeId(bestParent.id, node.id);
+      node.branchSegment = parsed.branchSegment;
+      node.localTitle = parsed.localTitle;
+      bestParent.children.push(node);
+    }
+  }
+  return nodes.filter((node) => !node.parent);
+}
+
+export function flow(data) {
   const run = data.run || {};
   const steps = data.steps || [];
   const firstInput = steps.find((step) => step.input !== undefined && step.input !== null);
@@ -280,19 +435,43 @@ function flow(data) {
     at: formatTimestamp(run.started_at),
     data: firstInput ? { 'Event data': firstInput.input } : null,
   }));
-  steps.forEach((step, index) => {
+
+  function renderNode(node) {
+    const { step, index } = node;
+    const type = String(step.action_type || step.type || '');
+    const inferredBranch = node.children.find((child) => child.branchSegment)?.branchSegment || null;
+    const verdict = branchVerdict(step) || (
+      inferredBranch && BRANCHING_STEP_TYPES.has(type)
+        ? branchVerdict({ ...step, output: { branch: inferredBranch, matched: inferredBranch, choice: inferredBranch } })
+        : null
+    );
+    const isBranching = BRANCHING_STEP_TYPES.has(type) || node.children.length > 0;
+    const branchName = verdict?.branch || inferredBranch || (type === 'for_each' ? 'loop' : 'else');
+    let branchLaneHtml = '';
+    if (isBranching) {
+      const childrenHtml = node.children.map((child) => renderNode(child)).join('');
+      branchLaneHtml = `<div class="flow-branch-lane">
+      <div class="flow-branch-header"><span class="flow-branch-tag">Branch taken: <strong>${escapeHtml(branchName)}</strong></span></div>
+      ${childrenHtml
+        ? `<ol class="flow-branch-steps">${childrenHtml}</ol>`
+        : `<div class="flow-branch-empty">No steps in ${escapeHtml(branchName)} branch — continued</div>`}
+    </div>`;
+    }
     /* The API replays from top-level steps only (a nested id like
        `branch.post` cannot start a chain), and the action targets a failed
        step — offer it exactly there. */
-    const replayable = step.status === 'failed' &&
+    const replayable = !node.parent && step.status === 'failed' &&
       step.action_id && !String(step.action_id).includes('.');
-    /* Input is the run's trigger envelope on every step — the Trigger card
-       shows it once; the action card carries what the step added. */
-    cards.push(stepCard({
-      icon: STEP_ICONS[step.action_type] || 'arrow-right',
+    const isChild = Boolean(node.parent);
+    return stepCard(index, {
+      icon: STEP_ICONS[type] || 'arrow-right',
       title: step.action_id || `Step ${index + 1}`,
+      localTitle: isChild ? (node.localTitle || step.action_id) : undefined,
+      scopedId: isChild ? step.action_id : undefined,
+      actionType: type,
       titleMono: Boolean(step.action_id),
-      badge: sentenceCase(String(step.action_type || '').replace(/[._]+/g, ' ')),
+      badge: sentenceCase(type.replace(/[._]+/g, ' ')),
+      branchBadge: verdict?.badge || '',
       status: step.status,
       duration: formatDuration(step.duration_ms),
       at: formatTimestamp(step.finished_at),
@@ -300,7 +479,21 @@ function flow(data) {
       error: step.error,
       replayFrom: replayable ? replayFrom : '',
       stepId: step.action_id,
-    }));
+      branchLaneHtml,
+      isBranching,
+    });
+  }
+
+  const rootNodes = groupStepsTree(steps);
+  rootNodes.forEach((node, idx) => {
+    cards.push(renderNode(node));
+    const type = String(node.step.action_type || node.step.type || '');
+    const hadBranchActivity = BRANCHING_STEP_TYPES.has(type) || node.children.length > 0;
+    const nextNode = rootNodes[idx + 1];
+    const nextType = nextNode ? String(nextNode.step.action_type || nextNode.step.type || '') : '';
+    if (hadBranchActivity && nextNode && nextType !== 'union') {
+      cards.push('<li class="flow-union-divider" aria-label="Branches merged"><span>Union · flow continues</span></li>');
+    }
   });
   return `<ol class="flow">${cards.join('')}</ol>`;
 }

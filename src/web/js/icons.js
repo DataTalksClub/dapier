@@ -38,6 +38,15 @@ const PATHS = {
     "check": "<path d='M 20 6 9 17 l -5 -5'/>",
     "external-link": "<path d='M 15 3 h 6 v 6'/><path d='M 10 14 21 3'/><path d='M 18 13 v 6 a2 2 0 0 1 -2 2 H 5 a2 2 0 0 1 -2 -2 V 8 a2 2 0 0 1 2 -2 h 6'/>",
     "plus": "<path d='M 5 12 h 14'/><path d='M 12 5 v 14'/>",
+    "git-branch": "<line x1='6' x2='6' y1='3' y2='15'/><circle cx='18' cy='6' r='3'/><circle cx='6' cy='18' r='3'/><path d='M 18 9 a9 9 0 0 1 -9 9'/>",
+    "git-merge": "<circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M 6 21 V 9 a9 9 0 0 0 9 9'/>",
+    "filter": "<polygon points='22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3'/>",
+    "sparkles": "<path d='M 9.94 15.5 A2 2 0 0 0 8.5 14.06 l -6.14 -1.58 a0.5 0.5 0 0 1 0 -0.96 L 8.5 9.94 A2 2 0 0 0 9.94 8.5 l 1.58 -6.14 a0.5 0.5 0 0 1 0.96 0 L 14.06 8.5 A2 2 0 0 0 15.5 9.94 l 6.14 1.58 a0.5 0.5 0 0 1 0 0.96 L 15.5 14.06 a2 2 0 0 0 -1.44 1.44 l -1.58 6.14 a0.5 0.5 0 0 1 -0.96 0 z'/><path d='M 20 3 v 4'/><path d='M 22 5 h -4'/><path d='M 4 17 v 2'/><path d='M 5 18 H 3'/>",
+    "repeat": "<path d='m 17 2 4 4 -4 4'/><path d='M 3 11 v -1 a4 4 0 0 1 4 -4 h 14'/><path d='m 7 22 -4 -4 4 -4'/><path d='M 21 13 v 1 a4 4 0 0 1 -4 4 H 3'/>",
+    "layers": "<path d='m 12.83 2.18 a2 2 0 0 0 -1.66 0 L 2.6 6.08 a1 1 0 0 0 0 1.83 l 8.58 3.91 a2 2 0 0 0 1.66 0 l 8.58 -3.9 a1 1 0 0 0 0 -1.83 Z'/><path d='m 22 17.65 -9.17 4.16 a2 2 0 0 1 -1.66 0 L 2 17.65'/><path d='m 22 12.65 -9.17 4.16 a2 2 0 0 1 -1.66 0 L 2 12.65'/>",
+    "inbox": "<polyline points='22 12 16 12 14 15 10 15 8 12 2 12'/><path d='M 5.45 5.11 2 12 v 6 a2 2 0 0 0 2 2 h 16 a2 2 0 0 0 2 -2 v -6 l -3.45 -6.89 A2 2 0 0 0 16.76 4 H 7.24 a2 2 0 0 0 -1.79 1.11 z'/>",
+    "terminal": "<polyline points='4 17 10 11 4 5'/><line x1='12' x2='20' y1='19' y2='19'/>",
+    "cpu": "<rect width='16' height='16' x='4' y='4' rx='2'/><rect width='6' height='6' x='9' y='9' rx='1'/><path d='M 15 2 v 2'/><path d='M 15 20 v 2'/><path d='M 2 15 h 2'/><path d='M 2 9 h 2'/><path d='M 20 15 h 2'/><path d='M 20 9 h 2'/><path d='M 9 2 v 2'/><path d='M 9 20 v 2'/>",
 };
 
 /* Historical names some call sites still use. */
