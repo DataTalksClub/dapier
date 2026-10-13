@@ -825,3 +825,37 @@ def test_handler_parks_a_suspended_schedule_run(monkeypatch):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_mark_completed_stores_float_outputs_as_decimals(monkeypatch):
+    """A decision step's confidence/probabilities are floats, which the
+    DynamoDB resource API rejects; the step must still close out."""
+    from decimal import Decimal
+
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    worker._mark_completed("wf", "classify", EVENT, output={
+        "choice": "yes", "confidence": 0.93,
+        "probabilities": {"yes": 0.93, "no": 0.07}, "usage": {"tokens": 12}})
+    output = calls[0][1]["ExpressionAttributeValues"][":output"]
+    assert output["confidence"] == Decimal("0.93")
+    assert output["probabilities"] == {"yes": Decimal("0.93"), "no": Decimal("0.07")}
+    assert output["usage"] == {"tokens": 12}
+    from boto3.dynamodb.types import TypeSerializer
+    TypeSerializer().serialize(output)  # raises on any leftover float
+
+
+def test_recovered_output_reads_back_as_plain_numbers(monkeypatch):
+    from decimal import Decimal
+
+    calls = []
+    conflict = ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
+    _patch_table(monkeypatch, calls, put_raises=conflict, existing={
+        "status": "completed",
+        "output": {"confidence": Decimal("0.93"), "steps": Decimal("2")}})
+    monkeypatch.setattr(worker.usage, "enforce", lambda workflow_id: None)
+
+    step = worker._quota_pending("wf", "classify", EVENT)
+    assert step.output == {"confidence": 0.93, "steps": 2}
+    json.dumps(step.output)

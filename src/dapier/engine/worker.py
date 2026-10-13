@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from ..connectors.ingress import normalize_event, processing_id
 from ..triggers import failure_counts, inbox
@@ -153,6 +154,28 @@ def _trim(value, limit=6000):
     return {"truncated": True, "preview": text[:limit]}
 
 
+def _stored(value, limit=6000):
+    """Trim a step value for an execution item and make it DynamoDB-safe:
+    the resource API rejects Python floats (a decision step's confidence
+    and probabilities), so they are written as Decimals."""
+    text = json.dumps(_trim(value, limit),
+                      default=lambda v: _loaded(v) if isinstance(v, Decimal) else str(v))
+    return json.loads(text, parse_float=Decimal)
+
+
+def _loaded(value):
+    """Undo :func:`_stored` for a recovered output: the resource API reads
+    numbers back as Decimals, which later steps' templating and JSON
+    serialization do not accept."""
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    if isinstance(value, dict):
+        return {key: _loaded(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_loaded(item) for item in value]
+    return value
+
+
 def _is_pending(workflow_id, action_id, event, action_type=None, retry_attempt=None):
     import boto3
     from botocore.exceptions import ClientError
@@ -175,7 +198,7 @@ def _is_pending(workflow_id, action_id, event, action_type=None, retry_attempt=N
         # every action in the flow receives as its input. The input is the
         # trigger envelope, so it gets the replay-sized cap (run-history
         # replay re-injects it); outputs keep the small step cap.
-        "input": _trim(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
+        "input": _stored(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
     }
     if action_type:
         item["action_type"] = action_type
@@ -230,7 +253,7 @@ def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None
     if output is not None:
         sets.append("#output = :output")
         names["#output"] = "output"
-        values[":output"] = _trim(output)
+        values[":output"] = _stored(output)
     if duration_ms is not None:
         sets.append("duration_ms = :duration")
         values[":duration"] = int(duration_ms)
@@ -514,12 +537,12 @@ def _mark_reused(workflow_id, event, *, action_id, action_type=None, output=None
         "started_at": _now_iso(),
         "finished_at": _now_iso(),
         "expires_at": now + 90 * 86400,
-        "input": _trim(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
+        "input": _stored(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
     }
     if action_type:
         item["action_type"] = str(action_type)
     if output is not None:
-        item["output"] = _trim(output)
+        item["output"] = _stored(output)
     boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(Item=item)
 
 
@@ -694,7 +717,7 @@ def _quota_pending(workflow_id, action_id, event, action_type=None,
     ).get("Item") or {}
     if saved.get("status") not in ("completed", "filtered"):
         raise LeaseBusy(f"completed step {action_id} was not available for recovery")
-    return CompletedStep(saved.get("status", "completed"), saved.get("output"))
+    return CompletedStep(saved.get("status", "completed"), _loaded(saved.get("output")))
 
 
 def _attempt_hooks(attempt):
