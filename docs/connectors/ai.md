@@ -1,57 +1,46 @@
 # AI connector (ai_complete, decision)
 
 `ai_complete` sends a templated prompt to an OpenAI-compatible chat endpoint
-and lands the reply in the step output — summarize, classify, extract,
-draft, right inside a workflow. There is **no connection**: configuration is
-environment-only, and nothing new is deployed to enable it.
+using a verified LLM connection. The connection stores its endpoint, default
+model and authentication; provider keys never come from environment variables.
 
-## Configure it
+## Configure a connection
 
-The endpoint, key, default model and extra headers are environment-only:
+In Console → Connections, add **LLM**, choose **Anthropic OIDC** or **API key**,
+and enter the connection settings. Save checks authentication and model access
+before writing anything. Invalid or missing credentials cannot create a
+connection. The connection's **Test** button repeats the check; the CLI drives
+the same API with `dapier connections test llm`.
 
-| Env var | Meaning | Default |
-|---------|---------|---------|
-| `LLM_API_KEY` | Bearer key for the endpoint (**required** — without it `ai_complete` refuses to run) | — |
-| `LLM_BASE_URL` | OpenAI-compatible base URL | `https://api.openai.com/v1` |
-| `LLM_MODEL` | Default model for completions | `gpt-4o-mini` |
-| `LLM_HEADERS_JSON` | Extra request headers as a JSON object (rarely needed) | — |
+For Anthropic OIDC, reuse the verified IDs documented in
+[Anthropic workload identity](../anthropic-workload-identity.md). The worker
+mints an AWS STS identity token and exchanges it for a short-lived Anthropic
+access token. Tokens are cached in worker memory and renewed before expiry;
+no API key or token is stored in Lambda environment variables.
 
-template.yaml wires these onto both the API function (designer test runs)
-and the **Worker** function (real runs) via the `LlmBaseUrl` / `LlmApiKey`
-/ `LlmModel` parameters, empty by default. Enabling the action is an ops
-step:
+The CLI creates or updates a connection with a JSON configuration file:
 
-1. Keep the secret value out of git: store the key as the repository's
-   `LLM_API_KEY` Actions secret (`gh secret set LLM_API_KEY`) and, for a
-   non-OpenAI endpoint, `LLM_BASE_URL` / `LLM_MODEL` as Actions variables
-   (`gh variable set LLM_BASE_URL --body https://api.anthropic.com/v1`).
-   `scripts/deploy.sh` passes each one that is set as the `LlmApiKey` /
-   `LlmBaseUrl` / `LlmModel` override; an unset one keeps the deployed value.
-2. Redeploy (`gh workflow run deploy.yml`). No table, queue or connection
-   changes are involved.
+```sh
+dapier connections import llm --provider llm --config-file llm.json
+dapier connections test llm
+```
 
-Unconfigured, the step fails with
-`ai_complete is not configured (set LLM_API_KEY …)`, naming every variable
-it needs.
+For OIDC, `llm.json` contains `auth_type: "anthropic_oidc"`,
+`base_url: "https://api.anthropic.com/v1"`, `model`, `federation_rule_id`,
+`organization_id`, `service_account_id`, and `workspace_id`. For a keyed
+provider use `auth_type: "api_key"`, `base_url`, `model`, `api_key`, and optional
+`headers` (string pairs). Store any file containing a key privately; the CLI
+also accepts `--config-file -` for stdin. API responses expose only public
+connection settings. Keys and custom headers stay in the credentials store.
 
-## Anthropic (Claude) via the official OpenAI-compatible API
+API connection tests and executed designer tests run on the workflow worker,
+so they exercise the same IAM role and federation rule as production.
+The health check resolves the configured Anthropic model through the Models
+API, accepting aliases, or checks the model list for other compatible APIs.
+It does not generate paid inference. A workflow step test with `--execute`
+can verify actual inference separately.
 
-Anthropic serves an OpenAI-compatible `POST /v1/chat/completions` on
-`https://api.anthropic.com/v1/` taking the Claude key as a Bearer token —
-no gateway needed:
-
-| Env var | Value |
-|---------|-------|
-| `LLM_BASE_URL` | `https://api.anthropic.com/v1` |
-| `LLM_API_KEY` | the `ANTHROPIC_API_KEY` value (deploy-time parameter, never git) |
-| `LLM_MODEL` | `claude-sonnet-5-5` (or per-step `model:`) |
-
-Prefer a **workspace-scoped** key (console → API keys): it needs no extra
-headers. A personal key that is not scoped to a workspace must send
-`anthropic-workspace-id` on every request — put it in `LLM_HEADERS_JSON`
-(`{"anthropic-workspace-id": "wrkspc_…"}`), which keeps header values out
-of committed workflow YAML. A malformed `LLM_HEADERS_JSON` fails the step
-with a setup error before any request goes out.
+## Anthropic compatibility
 
 Verified compat notes (probed live against `claude-sonnet-5-5`):
 
@@ -80,18 +69,19 @@ actions:
     json_mode: true
     temperature: 0.2
     # system: You are the support triage assistant.
-    # model: gpt-4o        # overrides LLM_MODEL
+    # model: gpt-4o        # overrides the connection default
     # timeout_seconds: 25
 ```
 
 | Field | Required | Notes |
 |-------|----------|-------|
+| `connection_id` | no | Verified LLM connection; defaults to `llm` |
 | `prompt` | yes | Templated: `{field}`, `{trigger.*}`, `{steps.<id>.output.*}` and formatters all expand before the call |
 | `system` | no | Sent as the system message |
 | `json_mode` | no | Requests a JSON object (`response_format: json_object`) and parses it into `data` |
 | `json_schema` | no | A JSON Schema object (dict or JSON string) with `type: object`; implies JSON mode, sends `response_format: json_schema` named `extraction`, and validates the parsed reply (required fields, top-level and array-item types). Note: Anthropic's compatibility layer ignores `response_format`, so with Claude the prompt must demand JSON and local validation is the guarantee |
 | `temperature` | no | 0–2; omitted when left out (the provider default applies — required for Claude, which rejects the field) |
-| `model` | no | Overrides `LLM_MODEL` for this step |
+| `model` | no | Overrides the connection default model for this step |
 | `timeout_seconds` | no | Default 25 |
 
 ### Output
@@ -239,6 +229,7 @@ actions:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `mode` | no | `if` or `switch`; omitted, it is inferred — a step carrying `choices`/`cases` is a switch, everything else an if |
+| `connection_id` | no | Verified LLM connection; defaults to `llm` |
 | `prompt` | yes | Templated like `ai_complete`; sent as the question's `state` |
 | `system` | no | The question's instructions (a mode-appropriate default when omitted) |
 | `model` | no | Overrides the default decision model (`~typesafe/jev-latest`) |

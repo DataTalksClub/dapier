@@ -92,7 +92,7 @@ def test_console_has_cmp_create_and_maintenance_parity():
     js = Path('src/web/js/views/connections.js').read_text()
     assert "provider: 'cmp'" in js
     assert "connectionId: 'cmp-production'" in js
-    assert "['slack', 'telegram', 'cmp', 'zoom']" in js
+    assert "['slack', 'telegram', 'cmp', 'zoom', 'llm']" in js
 
 
 def test_cli_token_import_accepts_stdin_without_secret_file(monkeypatch, capsys):

@@ -11,6 +11,7 @@ import { refresh } from './overview.js';
    pins the pair. Google products share one OAuth provider; the picker still
    offers each product on its own. */
 const CONNECT_SERVICES = {
+  llm: { label: 'LLM', blurb: 'Verified language model access with Anthropic OIDC or a stored API key.', provider: 'llm', connectionId: 'llm', scopes: [] },
   gmail: {
     label: 'Gmail',
     blurb: 'Read mail and send from the connected inbox.',
@@ -174,6 +175,7 @@ function servicesFor(connection) {
 /* What each register group is for, shown behind the (?) next to its
    title. Zoom's two kinds carry their own text from the API's services. */
 const SERVICE_HELP = {
+  llm: 'Run AI workflow steps through a verified model connection. Anthropic OIDC uses workload identity; provider keys stay with the connection.',
   gmail: 'Read messages and send mail from the connected inbox. Email triggers and Gmail send actions use it.',
   calendar: 'List calendars and free/busy times, start workflows from events, and edit events this account owns.',
   drive: 'Find, read, and watch files in Google Drive, within the permissions granted.',
@@ -259,7 +261,7 @@ function productList(connection) {
 
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
    starts consent); the webhook secret is a Manage field, not the reconnect path. */
-const TOKEN_PROVIDERS = ['slack', 'telegram', 'cmp', 'zoom'];
+const TOKEN_PROVIDERS = ['slack', 'telegram', 'cmp', 'zoom', 'llm'];
 /* A Zoom API service or connection is OAuth; only the webhook kind pastes
    its secret like the token providers. */
 const metaPastesToken = (meta) => TOKEN_PROVIDERS.includes(meta.provider) && meta.kind !== 'api';
@@ -280,6 +282,7 @@ const verifiesIdentity = (connection) => ['google', 'youtube'].includes(connecti
   || (connection.provider === 'zoom' && !isZoomWebhook(connection));
 
 const TOKEN_PROVIDER_META = {
+  llm: { heading: 'New LLM connection', blurb: 'Authentication and the selected model are tested before saving.', label: 'API key', placeholder: '', connectionId: 'llm' },
   slack: {
     heading: 'New Slack connection',
     blurb: 'Paste a bot (xoxb-…) or user (xoxp-…) token from your Slack app settings. This creates an account for agent access; the shared Slack Service credential for workflow actions is configured separately under Credentials. To listen for messages, open Manage afterwards and wire up event subscriptions.',
@@ -647,6 +650,46 @@ function watchOAuthPopup(popup, connectionId) {
   return () => clearInterval(timer);
 }
 
+function renderLLMFields(form, config) {
+  form.querySelector('[data-llm-fields]')?.remove();
+  if (config === null) return;
+  const fields = document.createElement('div');
+  fields.dataset.llmFields = '1';
+  fields.style.display = 'grid';
+  fields.style.gap = '12px';
+  const input = (key, label, value = '', secret = false) => `<label>${label}<input name="llm_${key}" type="${secret ? 'password' : 'text'}" autocomplete="${secret ? 'new-password' : 'off'}" value="${escapeHtml(value)}"></label>`;
+  fields.innerHTML = `<label>Authentication<select name="llm_auth_type"><option value="anthropic_oidc">Anthropic OIDC</option><option value="api_key">API key</option></select></label>`
+    + input('base_url', 'API base URL', config.base_url || 'https://api.anthropic.com/v1')
+    + input('model', 'Default model', config.model || 'claude-sonnet-5-5')
+    + '<div data-llm-oidc>'
+    + input('federation_rule_id', 'Federation rule ID', config.federation_rule_id || '')
+    + input('organization_id', 'Organization ID', config.organization_id || '')
+    + input('service_account_id', 'Service account ID', config.service_account_id || '')
+    + input('workspace_id', 'Workspace ID', config.workspace_id || '') + '</div>'
+    + '<div data-llm-key>' + input('api_key', 'API key (leave blank to keep a stored key)', '', true) + '</div>';
+  const anchor = form.querySelector('#connection-token-label, #edit-token-field');
+  anchor.after(fields);
+  const oidcFields = fields.querySelector('[data-llm-oidc]');
+  for (const label of oidcFields.querySelectorAll('label')) label.style.marginBottom = '12px';
+  const select = fields.querySelector('select');
+  select.value = config.auth_type || 'anthropic_oidc';
+  const toggle = () => {
+    fields.querySelector('[data-llm-oidc]').hidden = select.value !== 'anthropic_oidc';
+    fields.querySelector('[data-llm-key]').hidden = select.value !== 'api_key';
+  };
+  select.addEventListener('change', toggle);
+  toggle();
+}
+
+function readLLMFields(form) {
+  const value = (key) => form.querySelector(`[name="llm_${key}"]`)?.value.trim() || '';
+  const config = { auth_type: value('auth_type'), base_url: value('base_url'), model: value('model') };
+  if (config.auth_type === 'anthropic_oidc') {
+    for (const key of ['federation_rule_id', 'organization_id', 'service_account_id', 'workspace_id']) config[key] = value(key);
+  } else if (value('api_key')) config.api_key = value('api_key');
+  return config;
+}
+
 function openTokenDialog(provider) {
   const meta = TOKEN_PROVIDER_META[provider] || TOKEN_PROVIDER_META.slack;
   const form = $('#connection-form');
@@ -656,9 +699,13 @@ function openTokenDialog(provider) {
   $('#connection-blurb').textContent = meta.blurb;
   $('#connection-token-label').firstChild.textContent = meta.label;
   form.token.placeholder = meta.placeholder;
+  $('#connection-token-label').hidden = provider === 'llm';
+  form.token.required = provider !== 'llm';
+  renderLLMFields(form, provider === 'llm' ? {} : null);
   $('#connection-error').textContent = '';
   $('#connection-dialog').showModal();
-  form.token.focus();
+  if (provider === 'llm') form.querySelector('[name=llm_auth_type]').focus();
+  else form.token.focus();
 }
 
 /* Google scopes read better without their shared URL prefix; Save puts it
@@ -703,7 +750,9 @@ export function openEditConnection(connectionId) {
   $('#edit-advanced-count').textContent = tokenProvider ? ''
     : `· ${scopeCount} scope${scopeCount === 1 ? '' : 's'}`;
   form.token.value = '';
-  $('#edit-token-field').hidden = !tokenProvider;
+  $('#edit-token-field').hidden = !tokenProvider || provider === 'llm';
+  if (provider === 'llm') renderLLMFields(form, connection.llm_config || {});
+  else form.querySelector?.('[data-llm-fields]')?.remove();
   $('#edit-token-field').firstChild.textContent = zoomWebhook ? 'Replace webhook Secret Token' : 'Replace token';
   form.token.placeholder = zoomWebhook ? 'Secret Token from Zoom Marketplace' : 'xoxb-… or 123456:ABC-…';
   $('#edit-token-field .field-hint').textContent = zoomWebhook
@@ -1413,7 +1462,7 @@ $('#connection-form').addEventListener('submit', async (event) => {
   const body = {
     connection_id: id,
     provider,
-    token: form.token.value,
+    ...(provider === 'llm' ? { llm_config: readLLMFields(form) } : { token: form.token.value }),
   };
   // Slack and Telegram are verified here and named by their workspace /
   // bot identity; Zoom verifies via its webhook callback later.
@@ -1449,6 +1498,7 @@ $('#edit-connection-form').addEventListener('submit', async (event) => {
     const token = form.token.value.trim();
     if (token) body.token = token;
   }
+  if (provider === 'llm') body.llm_config = readLLMFields(form);
   if (provider === 'slack') {
     const signingSecret = form.signing_secret.value.trim();
     if (signingSecret) body.signing_secret = signingSecret;

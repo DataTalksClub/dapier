@@ -1,7 +1,7 @@
 """ai_complete action: registry dispatch, transport, json_mode, config seam.
 
 The transport is injected (the webhook/http_request seam), so no test hits
-the network; configuration is the LLM_* env, set per
+the network; configuration is a stored connection, stubbed per
 test. Content problems are verdicts ({ok: false}); transport problems raise
 the engine's HttpError.
 """
@@ -19,27 +19,25 @@ from src.dapier.connectors.registry import ActionError, validate_action_chain
 from src.dapier.engine import execute
 from src.dapier.engine.actions.webhook import HttpError
 
-ENV = {
-    "LLM_API_KEY": "test-key",
-    "LLM_BASE_URL": "https://llm.example.test/v1",
-    "LLM_MODEL": "test-model",
-}
+CONFIG = {"auth_type": "api_key", "api_key": "test-key",
+          "base_url": "https://llm.example.test/v1", "model": "test-model"}
 
 CATALOG_TS = Path(__file__).resolve().parents[1] / "designer" / "src" / "catalog.ts"
 
 
 @contextmanager
 def configured(**overrides):
-    """The LLM env, as the Worker would carry it (docs/connectors/ai.md)."""
-    with patch.dict(os.environ, {**ENV, **overrides}):
+    from plugins.llm.plugin import validate
+    def resolve(_connection_id):
+        value = validate({**CONFIG, **overrides})
+        return {**value, "token": value["api_key"]}
+    with patch.object(ai_connector, "_connection_resolver", resolve):
         yield
 
 
 @contextmanager
 def unconfigured():
-    """No API key anywhere in the environment."""
-    with patch.dict(os.environ):
-        os.environ.pop("LLM_API_KEY", None)
+    with patch.object(ai_connector, "_connection_resolver", None):
         yield
 
 
@@ -329,10 +327,7 @@ class ConfigTests(unittest.TestCase):
                     transport=stub_transport())
             except ValueError as exc:
                 message = str(exc)
-                assert "ai_complete is not configured" in message
-                assert "LLM_API_KEY" in message
-                assert "LLM_BASE_URL" in message
-                assert "LLM_MODEL" in message
+                assert "verified LLM connection" in message
             else:
                 raise AssertionError("unconfigured env must refuse the step")
 
@@ -367,13 +362,13 @@ class ConfigTests(unittest.TestCase):
 
 
 class HeadersTests(unittest.TestCase):
-    """LLM_HEADERS_JSON carries provider account headers (such as
+    """Connection configuration carries provider account headers (such as
     Anthropic's anthropic-workspace-id) without putting values into
     committed workflow YAML."""
 
     def test_extra_headers_merge_over_the_defaults(self):
         transport = stub_transport()
-        with configured(LLM_HEADERS_JSON='{"anthropic-workspace-id": "wrkspc_test"}'):
+        with configured(headers={'anthropic-workspace-id': 'wrkspc_test'}):
             run({"type": "ai_complete", "prompt": "x"}, transport=transport)
         headers = transport.calls[0]["headers"]
         assert headers["anthropic-workspace-id"] == "wrkspc_test"
@@ -393,12 +388,12 @@ class HeadersTests(unittest.TestCase):
     def test_malformed_headers_refuse_before_any_request(self):
         for bad in ('{"unclosed"', '["not", "an", "object"]', '{"x": 42}'):
             transport = stub_transport()
-            with configured(LLM_HEADERS_JSON=bad):
+            with configured(headers=bad):
                 try:
                     run({"type": "ai_complete", "prompt": "x"},
                         transport=transport)
                 except ValueError as exc:
-                    assert "LLM_HEADERS_JSON" in str(exc)
+                    assert "headers" in str(exc).lower()
                 else:
                     raise AssertionError(f"{bad!r} must refuse the step")
             assert transport.calls == []
@@ -409,7 +404,7 @@ class AnthropicTests(unittest.TestCase):
     json_schema needs strict:true plus additionalProperties:false (live
     400s), json_object is rejected, and temperature is deprecated."""
 
-    ANTHROPIC_ENV = {"LLM_BASE_URL": "https://api.anthropic.com/v1"}
+    ANTHROPIC_ENV = {"base_url": "https://api.anthropic.com/v1"}
 
     SCHEMA = {
         "type": "object",
@@ -472,10 +467,10 @@ class AnthropicTests(unittest.TestCase):
         assert "additionalProperties" not in sent["schema"]
 
     def test_trailing_slash_base_url_still_matches(self):
-        with configured(LLM_BASE_URL="https://api.anthropic.com/v1/"):
-            assert ai_connector._is_anthropic_endpoint() is True
+        with configured(base_url="https://api.anthropic.com/v1/"):
+            assert ai_connector._is_anthropic_endpoint("https://api.anthropic.com/v1/") is True
         with configured():
-            assert ai_connector._is_anthropic_endpoint() is False
+            assert ai_connector._is_anthropic_endpoint("https://gateway.test/v1") is False
 
 
 class EngineErrorTests(unittest.TestCase):

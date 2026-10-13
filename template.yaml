@@ -385,6 +385,13 @@ Resources:
                   - !Sub arn:aws:s3:::${MailBucket}/*
         # Designer/CLI execution tests run file-read steps in the API process.
         # Stage and read their bytes just as the worker does.
+        - PolicyName: dapier-api-test-worker-connections
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [lambda:InvokeFunction]
+                Resource: !GetAtt WorkerFunction.Arn
         - PolicyName: dapier-api-render-artifacts
           PolicyDocument:
             Version: '2012-10-17'
@@ -692,7 +699,7 @@ Resources:
             Action: sts:AssumeRole
             Resource: !Ref AwsAssumableRoleArns
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
-        # Outbound identity for future Anthropic Lambda jobs. Only the worker
+        # Outbound identity for verified Anthropic LLM connections. Only the worker
         # may mint these tokens; the Anthropic rule pins this role's exact ARN.
         - Statement:
             Sid: WorkerAnthropicIdentityToken

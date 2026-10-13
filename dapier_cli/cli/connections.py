@@ -56,6 +56,7 @@ def register(sub):
                           help="Optional; needed only for refresh tokens issued by another client")
     import_p.add_argument("--authorized-user-file", default=None,
                           help="Refresh-token JSON for OAuth providers")
+    import_p.add_argument("--config-file", default=None, help="LLM connection configuration JSON (file or - for stdin)")
     import_p.add_argument("--token-file", default=None,
                           help="Provider token or Zoom webhook Secret Token (file, or - for stdin)")
     import_p.add_argument("--signing-secret-file", default=None,
@@ -130,7 +131,7 @@ def run(args, api_url, debug, child=None):
             args.client_secret_file, args.authorized_user_file,
             expected_account_id=args.expected_account, scopes=args.scopes, debug=debug,
             token_path=args.token_file, root_path=args.root_path,
-            signing_secret_path=args.signing_secret_file, url=args.url,
+            signing_secret_path=args.signing_secret_file, url=args.url, config_path=args.config_file,
         )
     if args.command == "send-expiry-digest":
         return commands.connections_send_expiry_digest(api_url, debug)

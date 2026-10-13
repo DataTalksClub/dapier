@@ -4,6 +4,15 @@ from . import credentials, zoom
 from . import records as connections
 from .providers import oauth_clients, oauth_providers, slack_tokens, telegram_api
 
+CONNECTION_SAVERS = {}
+
+
+def register_connection_saver(provider, save):
+    """Plugin-owned verification/save, shared by console and CLI import."""
+    connections.TOKEN_PROVIDERS.add(provider)
+    CONNECTION_SAVERS[provider] = save
+
+
 TOKEN_PROVIDER_VERIFIERS = {}
 TOKEN_PROVIDER_SCOPES = {}
 
@@ -74,6 +83,11 @@ def save_token_connection(body, *, operator_subject, connections_table, audit_ev
 
     Returns ``(status_code, payload)``.
     """
+    provider = str(body.get("provider") or "").strip().lower()
+    if provider in CONNECTION_SAVERS:
+        return CONNECTION_SAVERS[provider](body, operator_subject=operator_subject,
+            connections_table=connections_table, audit_event=audit_event, action=action,
+            reuse_stored_token=reuse_stored_token)
     actor = operator_subject or "unknown"
     try:
         fields = connections.validate_new_connection(body)

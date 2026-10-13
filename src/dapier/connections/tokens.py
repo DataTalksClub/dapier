@@ -21,6 +21,12 @@ from .credentials import (
 )
 
 STATUS_REVOKED = connections.STATUS_REVOKED
+PROVIDER_TOKEN_HANDLERS = {}
+
+
+def register_token_handler(provider, handler):
+    """Plugin-owned token issuance for non-OAuth credential lifecycles."""
+    PROVIDER_TOKEN_HANDLERS[provider] = handler
 
 
 class TokenError(Exception):
@@ -120,6 +126,9 @@ def get_access_token(connection, *, transport=None, _retry=True):
         raise TokenError(f"Connection {connection['connection_id']} is revoked")
     record = _record(connection["connection_id"])
     stored = _stored_tokens(record)
+    handler = PROVIDER_TOKEN_HANDLERS.get(connection.get("provider"))
+    if handler:
+        return handler(connection, stored, transport=transport)
     if connection.get("provider") in connections.TOKEN_PROVIDERS:
         from .importing import verify_token_provider
         token = stored.get("token")

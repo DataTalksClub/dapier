@@ -285,7 +285,8 @@ def token_expires_at(stored):
 
 def auto_refresh(item, stored=None):
     """Whether the connected grant has a credential for automatic renewal."""
-    return item.get("status") == "connected" and bool((stored or {}).get("refresh_token"))
+    return item.get("status") == "connected" and (bool((stored or {}).get("refresh_token"))
+        or (item.get("llm_config") or {}).get("auth_type") == "anthropic_oidc")
 
 
 def health(item, stored=None, *, now=None):
@@ -333,6 +334,7 @@ def public_view(item, stored=None):
     reconnection.
     """
     return {
+        **({"llm_config": item["llm_config"]} if item.get("llm_config") else {}),
         "connection_id": item.get("connection_id"),
         "provider": item.get("provider"),
         "scopes": item.get("scopes", []),

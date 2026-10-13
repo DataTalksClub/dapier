@@ -22,6 +22,7 @@ trigger:
 actions:
 - id: extract-sponsors
   type: ai_complete
+  connection_id: llm
   # json_schema constrains the reply to this shape (implies JSON mode) and
   # validates it: an unparsable reply or a schema mismatch returns
   # {ok: false, error, text} for the chain to branch on instead of failing

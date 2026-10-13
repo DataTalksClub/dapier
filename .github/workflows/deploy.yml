@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plugin: [slack, rss, mailchimp, telegram, dropbox, aws, zoom, google, dataops, cmp]
+        plugin: [slack, rss, mailchimp, telegram, dropbox, aws, zoom, google, dataops, cmp, llm]
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7

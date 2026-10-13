@@ -331,13 +331,23 @@ TOKEN_PROVIDERS = ("slack", "telegram", "zoom", "dataops", "cmp")
 def connections_import(api_url, connection_id, provider, client_id, client_secret_file,
                        authorized_user_path, expected_account_id=None, scopes=(), debug=False,
                        token_path=None, root_path=None,
-                       signing_secret_path=None, url=None):
+                       signing_secret_path=None, url=None, config_path=None):
     """Operator import over a Bearer identity (operator allowlist enforced server-side)."""
     body = {
         "connection_id": connection_id,
         "provider": provider,
     }
-    if provider in TOKEN_PROVIDERS:
+    if provider == "llm":
+        if not config_path:
+            print("LLM connections import with --config-file (verified before saving).")
+            return 2
+        try:
+            raw_config = sys.stdin.read() if config_path == "-" else open(config_path, encoding="utf-8").read()
+            body["llm_config"] = json.loads(raw_config)
+        except (OSError, ValueError):
+            print("Cannot read LLM configuration JSON.")
+            return 2
+    elif provider in TOKEN_PROVIDERS:
         # Token providers paste their credential directly; a refresh-token
         # file makes no sense for them.
         if not token_path:

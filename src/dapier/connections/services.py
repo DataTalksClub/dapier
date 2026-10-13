@@ -12,6 +12,8 @@ USERINFO_EMAIL = "https://www.googleapis.com/auth/userinfo.email"
 # Display order is the Connections register order. Google products first,
 # then YouTube, then the standalone providers.
 CATALOG = (
+    {"id": "llm", "label": "LLM", "provider": "llm",
+     "connection_id": "llm", "standalone": True, "default_scopes": ()},
     {
         "id": "gmail",
         "label": "Gmail",

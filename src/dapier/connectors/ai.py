@@ -1,25 +1,7 @@
-"""AI connector: one OpenAI-compatible LLM completion as a workflow action.
+"""Provider-neutral AI completion; authentication comes from verified connections.
 
-``ai_complete`` sends a templated prompt — plus an optional system message —
-to a configured OpenAI-compatible /chat/completions endpoint, with stdlib
-urllib: no new infrastructure, no connection record and no discovery.
-Configuration is environment-only on the Worker function: LLM_BASE_URL
-(default https://api.openai.com/v1), LLM_API_KEY (no default — unset fails
-the step with a setup message naming the env vars, loud like any other
-unconfigured action), LLM_MODEL (default gpt-4o-mini), and LLM_HEADERS_JSON
-(optional JSON object of extra request headers). template.yaml carries no
-env default for the key, so enabling it is an ops step
-(docs/connectors/ai.md). Any OpenAI-compatible endpoint works — including
-Anthropic's own OpenAI-compatible API at https://api.anthropic.com/v1 with
-a Bearer Claude key (strict json_schema there is normalized automatically;
-see the Anthropic section in docs/connectors/ai.md).
-
-Content problems never raise: a ``json_mode``/``json_schema`` reply that
-will not parse — or parses but misses the schema's required fields/types —
-comes back as ``{ok: false, error, text}`` for the chain to branch on.
-Transport problems raise the webhook/http_request ``HttpError`` (status and
-Retry-After included), so autoretry and failure notify treat an LLM outage
-like any other HTTP call.
+The LLM plugin owns endpoint configuration, stored keys and Anthropic workload
+identity. API tests execute on the worker so they use the same bound identity.
 """
 import json
 import os
@@ -45,33 +27,25 @@ _JSON_TRUE = frozenset({"true", "1", "yes", "on"})
 # and the JSON parse should not care.
 _JSON_FENCE_RE = re.compile(r"```(?:json)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
-BASE_URL_ENV = "LLM_BASE_URL"
-API_KEY_ENV = "LLM_API_KEY"
-MODEL_ENV = "LLM_MODEL"
-HEADERS_ENV = "LLM_HEADERS_JSON"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 LLM_TIMEOUT_SECONDS = 25
+_connection_resolver = None
 
 
-def _base_url():
-    return os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL).rstrip("/")
+def register_connection_resolver(resolve):
+    global _connection_resolver
+    _connection_resolver = resolve
 
 
-def _is_anthropic_endpoint():
-    """Whether the configured endpoint is Anthropic's first-party API.
+def _configuration(action):
+    if _connection_resolver is None:
+        raise ValueError("ai_complete needs a verified LLM connection")
+    return _connection_resolver(action.get("connection_id") or "llm")
 
-    api.anthropic.com speaks the OpenAI-compatible shape but enforces it
-    strictly: response_format must be json_schema with strict:true and
-    additionalProperties:false on objects (json_object is rejected,
-    temperature is deprecated). Only the exact first-party host gets the
-    normalized payload; gateways in front of Claude keep the generic one.
-    """
-    try:
-        return (urllib.parse.urlparse(_base_url()).hostname or "").lower() \
-            == "api.anthropic.com"
-    except ValueError:
-        return False
+
+def _is_anthropic_endpoint(base_url):
+    return (urllib.parse.urlparse(base_url).hostname or "").lower() == "api.anthropic.com"
 
 
 def _normalize_schema_for_anthropic(node):
@@ -91,45 +65,13 @@ def _normalize_schema_for_anthropic(node):
     return node
 
 
-def _model():
-    return os.environ.get(MODEL_ENV, DEFAULT_MODEL).strip() or DEFAULT_MODEL
-
-
-def _extra_headers():
-    """Static request headers from LLM_HEADERS_JSON, or {} when unset.
-
-    A JSON object of string pairs, merged over the default authorization /
-    content-type / user-agent headers — the slot for provider account
-    headers such as Anthropic's anthropic-workspace-id (needed when the
-    Claude key is not scoped to a workspace). Anything else — unparsable
-    JSON, a non-object, or non-string pairs — is a configuration error and
-    raises ValueError. Kept in env (not an action field) so header values
-    never land in committed workflow YAML.
-    """
-    raw = os.environ.get(HEADERS_ENV, "").strip()
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except ValueError as exc:
-        raise ValueError(
-            f"ai_complete {HEADERS_ENV} must be a JSON object of header pairs: {exc}"
-        ) from None
-    if not isinstance(parsed, dict) or not all(
-        isinstance(name, str) and isinstance(value, str)
-        for name, value in parsed.items()
-    ):
-        raise ValueError(
-            f"ai_complete {HEADERS_ENV} must be a JSON object of header pairs")
-    return parsed
-
 
 register(Action(
     type="ai_complete",
     label="AI: complete",
     icon="sparkles",
     description=("One chat completion against a configured OpenAI-compatible "
-                 "endpoint (LLM_* env on the Worker function). The "
+                 "endpoint through a verified LLM connection. The "
                  "prompt renders from the event; JSON mode parses the reply "
                  "into `data` (an unparsable reply returns {ok: false, error} "
                  "instead of failing the step). `json_schema` constrains the "
@@ -137,8 +79,9 @@ register(Action(
                  "{ok, text|data, model, usage}."),
     run=lambda action, event, workflow_id, steps=None: run_ai_complete(action, event, steps=steps),
     required=frozenset({"prompt"}),
-    optional=frozenset({"system", "json_mode", "json_schema", "temperature", "model", "timeout_seconds"}),
+    optional=frozenset({"connection_id", "system", "json_mode", "json_schema", "temperature", "model", "timeout_seconds"}),
     fields=(
+        {"key": "connection_id", "label": "LLM connection", "default": "llm"},
         {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
          "placeholder": "Summarize this message for the digest:\n{body}"},
         {"key": "system", "label": "System message", "type": "textarea",
@@ -157,7 +100,7 @@ register(Action(
         {"key": "temperature", "label": "Temperature", "type": "number",
          "help": "0-2; omitted when left out (the provider default applies)"},
         {"key": "model", "label": "Model",
-         "help": "Overrides the configured default (LLM_MODEL)"},
+         "help": "Overrides the connection default model"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
     ),
 ))
@@ -334,12 +277,12 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     temperature = _temperature(action.get("temperature"))
     schema = _parse_json_schema(action)
     structured = bool(schema is not None or _json_mode(action))
-    key = os.environ.get(API_KEY_ENV, "").strip()
-    if not key:
-        raise ValueError(
-            f"ai_complete is not configured (set {API_KEY_ENV} — and "
-            f"optionally {BASE_URL_ENV} and {MODEL_ENV} — on "
-            "the Worker function)")
+    if transport is None and os.environ.get("WORKER_FUNCTION_ARN"):
+        from ..engine.runtime_rpc import call
+        return call("action", action=action, event=event, steps=steps)
+    config = _configuration(action)
+    key = config["token"]
+    base_url = config["base_url"].rstrip("/")
     prompt = render(action.get("prompt") or "", event, steps).strip()
     if not prompt:
         raise ValueError("ai_complete requires a rendered prompt")
@@ -348,8 +291,8 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    model = str(action.get("model") or "").strip() or _model()
-    anthropic = _is_anthropic_endpoint()
+    model = str(action.get("model") or "").strip() or config.get("model") or DEFAULT_MODEL
+    anthropic = _is_anthropic_endpoint(base_url)
     if schema is not None:
         # Anthropic enforces strict json_schema (strict:true plus
         # additionalProperties:false on objects) and rejects json_object,
@@ -372,12 +315,12 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
         **({"temperature": temperature} if temperature is not None else {}),
         **({"response_format": response_format} if response_format else {}),
     }).encode()
-    url = f"{_base_url()}/chat/completions"
+    url = f"{base_url}/chat/completions"
     headers = {
         "authorization": f"Bearer {key}",
         "content-type": "application/json",
         "user-agent": "dapier-ai-complete",
-        **_extra_headers(),
+        **config.get("headers", {}),
     }
     timeout = action.get("timeout_seconds", LLM_TIMEOUT_SECONDS)
     if transport is not None:

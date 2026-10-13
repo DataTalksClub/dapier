@@ -880,6 +880,13 @@ def _poll_now(message):
 
 
 def handler(event, _context):
+    if isinstance(event, dict) and event.get("dapier_rpc"):
+        from .runtime_rpc import dispatch
+        try:
+            return dispatch(event)
+        except Exception as exc:
+            # Provider implementations redact credential and token details.
+            return {"rpc_error": str(exc)}
     if isinstance(event, dict) and event.get("trigger") == "poll" and event.get("poll_id"):
         # EventBridge invokes the function directly (dapier-poll-* rules):
         # fetch one page, emit each new item as its own event.

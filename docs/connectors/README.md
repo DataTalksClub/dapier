@@ -11,7 +11,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Telegram | [Telegram](../../plugins/telegram/README.md) (plugin) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
 | Mailchimp | [Mailchimp](../../plugins/mailchimp/README.md) (plugin) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
 | Amazon S3 | [AWS / S3](../../plugins/aws/README.md) (plugin) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
-| AI (LLM) | [AI](ai.md) | — (no connection; the env is the config) | `LLM_API_KEY` (+ optional `LLM_BASE_URL`/`LLM_MODEL`) |
+| AI (LLM) | [AI](ai.md) | `connection_id` (default `llm`) | Verified connection: Anthropic OIDC or a stored API key |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle
 procedures. A connection is a named record (`connection_id`, provider, display

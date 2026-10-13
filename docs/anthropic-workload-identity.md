@@ -1,9 +1,8 @@
 # Anthropic workload identity for Dapier Lambda jobs
 
 Dapier's sandbox Lambda workflow worker can use AWS-signed identity tokens
-to authenticate to the direct Anthropic API. This prepares authentication
-for future Anthropic jobs; it does not implement a new action or change the
-existing host-based `agent` runner or OpenAI-compatible `ai_complete` action.
+to authenticate to the direct Anthropic API. The LLM plugin connects this identity to `ai_complete` through a verified
+connection stored in Dapier. The host-based `agent` runner uses its own auth.
 
 ## Configuration inventory
 
@@ -88,56 +87,37 @@ rule and service account. If a later job runs in a separate Lambda, provision
 its own restricted token policy and a rule for its exact role; it does not
 inherit this worker's trust. Update the rule if SAM replaces the worker role.
 
-## Future Lambda integration
+## LLM connection
 
-Package recent `boto3` and `anthropic` SDK versions that expose
-`get_web_identity_token` and `WorkloadIdentityCredentials`, respectively.
-The current application requirements do not install the Anthropic SDK.
-Set these non-secret values on the future job Lambda through its SAM template:
+The application packages a recent Boto3 SDK exposing `get_web_identity_token`.
+Create the connection through Console → Connections → LLM → Anthropic OIDC,
+or save the non-secret JSON configuration below with the CLI:
 
-```text
-ANTHROPIC_FEDERATION_RULE_ID=fdrl_01JT2rGCPQUmBh6M7gBntwxS
-ANTHROPIC_ORGANIZATION_ID=bebaed24-6ac5-4b50-832d-c02be9706f2a
-ANTHROPIC_SERVICE_ACCOUNT_ID=svac_01PPpcCtmeRMQzJwHDA3stzC
-ANTHROPIC_WORKSPACE_ID=wrkspc_01Nd6VYVAfdo9zSvk8VoA1Zn
+```json
+{
+  "auth_type": "anthropic_oidc",
+  "base_url": "https://api.anthropic.com/v1",
+  "model": "claude-sonnet-5-5",
+  "federation_rule_id": "fdrl_01JT2rGCPQUmBh6M7gBntwxS",
+  "organization_id": "bebaed24-6ac5-4b50-832d-c02be9706f2a",
+  "service_account_id": "svac_01PPpcCtmeRMQzJwHDA3stzC",
+  "workspace_id": "wrkspc_01Nd6VYVAfdo9zSvk8VoA1Zn"
+}
 ```
 
-Use a token-provider callback so refreshes obtain fresh STS tokens from the
-Lambda's ambient credentials. A static token file would need its own refresh
-mechanism. Use the regional STS endpoint explicitly:
-
-```python
-import os
-
-import boto3
-from anthropic import Anthropic, WorkloadIdentityCredentials
-
-sts = boto3.client("sts", region_name="eu-west-1")
-
-def identity_token():
-    return sts.get_web_identity_token(
-        Audience=["https://api.anthropic.com"],
-        SigningAlgorithm="RS256",
-        DurationSeconds=900,
-    )["WebIdentityToken"]
-
-client = Anthropic(credentials=WorkloadIdentityCredentials(
-    identity_token_provider=identity_token,
-    federation_rule_id=os.environ["ANTHROPIC_FEDERATION_RULE_ID"],
-    organization_id=os.environ["ANTHROPIC_ORGANIZATION_ID"],
-    service_account_id=os.environ["ANTHROPIC_SERVICE_ACCOUNT_ID"],
-    workspace_id=os.environ["ANTHROPIC_WORKSPACE_ID"],
-))
-# The future job calls client.messages.create(...) with its chosen model.
+```sh
+dapier connections import llm --provider llm --config-file llm.json
+dapier connections test llm
 ```
 
-Keep credentials in memory and never log either token. This WIF setup does
-not add automatic token exchange or refresh to `ai_complete`; that action's
-existing `LLM_API_KEY` configuration is separate, including when it calls
-Anthropic's OpenAI-compatible endpoint. Do not store a short-lived WIF token
-as a permanent `LLM_API_KEY`. Implement any future provider integration in
-`plugins/`, preserving Console/CLI/API parity.
-Domain work remains in the owning service (for example, DataOps).
+Saving verifies authentication and model access on the worker before storing
+the connection. Console **Test** uses the same API check. `ai_complete`
+steps select `connection_id: llm` (also the default for existing definitions).
+The plugin exchanges fresh STS identity tokens for Anthropic Bearer tokens,
+caches them in worker memory and renews them before expiry. No long-lived key,
+JWT or access token is supplied through environment variables. See
+[AI connection configuration](connectors/ai.md) for keyed providers and
+executed step tests.
 
 ## Verification and troubleshooting
 

@@ -56,8 +56,7 @@ sides parse as float — plus exists and empty):
       # if mode asks a yes/no question instead and runs then/else:
       # then: [...]
       # else: [...]
-      # One structured completion against the ai_complete env (LLM_* on the
-      # Worker — LLM_BASE_URL at OpenRouter makes it an OpenRouter decision);
+      # One typed decision through OpenRouter using its stored credential;
       # output carries {choice, branch, model, usage} for later steps.
 
     - id: pause

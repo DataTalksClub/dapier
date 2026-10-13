@@ -41,8 +41,8 @@ logic_step(LogicStep(
     icon="sparkles",
     description="Ask the LLM and branch on the answer: a smart if (then/else) "
                 "or a switch over choices. One typed call to OpenRouter's "
-                "decisions endpoint (the jev route) over the ai_complete "
-                "LLM_* env — the reply is a picked option with confidence, "
+                "decisions endpoint (the jev route) with the stored OpenRouter "
+                "credential — the reply is a picked option with confidence, "
                 "not chat text. Output: {mode, choice, branch, steps, model, "
                 "usage, confidence, probabilities}.",
     fields=(
