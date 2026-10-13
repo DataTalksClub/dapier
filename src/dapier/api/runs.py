@@ -196,6 +196,14 @@ def run_summary(run_id, items):
     rollup reads completed again. A ``cancelled`` step means a suspended run
     was deliberately stopped — its workflow went away, or an operator
     cancelled it — and the parked continuation was dropped: nothing resumes.
+
+    A ``processing`` run whose every processing step lease has expired is
+    not running: the worker died mid-step (a deploy, a crash, a timeout)
+    and nothing will close the step out. The engine agrees - a redelivery
+    takes an expired-lease step over, and a step written before leases
+    (no ``lease_until``) can never be re-taken - so such a run is flagged
+    ``stalled`` (additive, no new run status) with the step and the moment
+    work last advanced.
     """
     statuses = [item.get("status", "") for item in items]
     if any(status == "failed" for status in statuses):
@@ -221,7 +229,7 @@ def run_summary(run_id, items):
     # across runs, by _derive_recovered — nothing writes it.
     resolved_at = max((str(item.get("resolved_at") or "") for item in items),
                       default="")
-    return {
+    summary = {
         "run_id": run_id,
         "workflow_id": first.get("workflow_id") or run_id.split(":")[0],
         "connector": first.get("connector"),
@@ -252,6 +260,22 @@ def run_summary(run_id, items):
         "duration_ms": _sum_duration(items),
         "error": errors[0] if errors else None,
     }
+    # Stalled = the run open steps are ones no worker holds anymore. The lease is the
+    # engine liveness marker (engine.worker._is_pending re-takes a step only once its
+    # lease is past; a step recorded before leases carries none and can never be
+    # re-taken), so an expired-or-absent lease on every processing step means a
+    # replay or fresh delivery is the only way forward. Readers: the console pills
+    # (format.js runStatusLine) and the CLI list; stalled_since is the step start,
+    # i.e. the moment progress stopped.
+    if status == "processing":
+        pending = [item for item in items if item.get("status") == "processing"]
+        if pending and not any((_int(item.get("lease_until")) or 0) > int(time.time())
+                               for item in pending):
+            stalled_step = pending[0]
+            summary["stalled"] = True
+            summary["stalled_step"] = stalled_step.get("action_id")
+            summary["stalled_since"] = stalled_step.get("started_at")
+    return summary
 
 
 def event_summary(step):

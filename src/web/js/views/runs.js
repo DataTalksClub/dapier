@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { $, icons, notice } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, resolvedLine, formatTimestamp, formatDuration, dataBlock, triggerEventLabel, sentenceCase } from '../format.js';
+import { escapeHtml, statusLine, runStatusLine, resolvedLine, formatTimestamp, formatDuration, dataBlock, triggerEventLabel, sentenceCase } from '../format.js';
 import { workflowName, workflowLabelHtml } from '../workflow-names.js';
 
 const STEP_ICONS = {
@@ -35,7 +35,9 @@ function statusCell(run) {
     ? `<span class="cell-note" title="${escapeHtml(run.failed_step)}">at <span class="mono">${escapeHtml(run.failed_step)}</span></span>` : '';
   const delayedUntil = run.status === 'delayed' && run.delayed_until
     ? `<span class="cell-note">until <span class="mono">${escapeHtml(formatTimestamp(run.delayed_until))}</span></span>` : '';
-  return `${statusLine(run.status)}${failed}${delayedUntil}`;
+  const stalledSince = run.stalled && run.stalled_since
+    ? `<span class="cell-note">since <span class="mono">${escapeHtml(formatTimestamp(run.stalled_since))}</span></span>` : '';
+  return `${runStatusLine(run)}${failed}${delayedUntil}${stalledSince}`;
 }
 
 function runRow(run) {
@@ -339,7 +341,7 @@ export async function openRun(runId) {
     : ''}<button class="dk-button dk-button--secondary run-replay" type="button" data-run="${escapeHtml(id)}"
         title="Re-inject this run's original trigger event">Replay</button>`;
   const summary = [
-    ['Status', `${statusLine(run.status)}${run.resolved ? resolvedLine(run) : ''}`],
+    ['Status', `${runStatusLine(run)}${run.resolved ? resolvedLine(run) : ''}`],
     ['Run', `<span class="mono clip" title="${escapeHtml(id)}">${escapeHtml(id)}</span>`],
     ['Started', run.started_at ? `<span class="mono">${escapeHtml(formatTimestamp(run.started_at))}</span>` : ''],
     ['Duration', run.duration_ms != null ? `<span class="mono">${escapeHtml(formatDuration(run.duration_ms))}</span>` : ''],

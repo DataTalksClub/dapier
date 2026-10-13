@@ -104,6 +104,33 @@ def test_run_summary_failed_wins_over_processing(monkeypatch):
     assert run["failed_step"] == "post"
 
 
+def test_run_summary_stalled_when_leases_expired(monkeypatch):
+    # A processing step whose lease is long past (or that predates leases)
+    # has no worker behind it: the run shows processing but must say stalled.
+    _configure(monkeypatch, [
+        _step("wf-1", "decide", "evt-1", status="processing", action_type="decision",
+              run_id="wf-1:evt-1", started="2026-09-25T10:00:02+00:00"),
+    ])
+
+    status, payload = runs.api_list()
+    run = payload["runs"][0]
+    assert run["status"] == "processing"
+    assert run["stalled"] is True
+    assert run["stalled_step"] == "decide"
+    assert run["stalled_since"] == "2026-09-25T10:00:02+00:00"
+
+
+def test_run_summary_processing_with_live_lease_is_not_stalled(monkeypatch):
+    item = _step("wf-1", "post", "evt-1", status="processing", run_id="wf-1:evt-1")
+    item["lease_until"] = int(time.time()) + 300
+    _configure(monkeypatch, [item])
+
+    status, payload = runs.api_list()
+    run = payload["runs"][0]
+    assert run["status"] == "processing"
+    assert not run.get("stalled")
+
+
 def test_run_summary_filtered_is_finished_not_processing(monkeypatch):
     _configure(monkeypatch, [
         _step("wf-1", "gate", "evt-1", status="filtered", action_type="filter",

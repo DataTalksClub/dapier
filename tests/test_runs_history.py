@@ -476,6 +476,24 @@ def test_list_rows_carry_an_event_summary(monkeypatch):
     assert rows["wf-bare:evt-3"]["event_summary"] is None
 
 
+def test_cli_print_runs_flags_stalled_and_gives_the_reason(capsys):
+    commands.print_runs([{"run_id": "wf-zoom:evt-1", "status": "processing", "stalled": True,
+                          "stalled_step": "classify-recording",
+                          "stalled_since": "2026-10-12T20:29:05+00:00",
+                          "steps": 2, "started_at": "2026-10-12T20:29:05+00:00",
+                          "connector": "zoom", "event_type": "recording.completed"},
+                         {"run_id": "wf-news:evt-2", "status": "failed", "steps": 3,
+                          "started_at": "2026-10-13T09:01:04+00:00",
+                          "error": "ai_complete is not configured (store the LlmApiKey)"}])
+
+    out = capsys.readouterr().out
+    assert "wf-zoom:evt-1" in out
+    assert "stalled" in out
+    assert "stalled at classify-recording since 2026-10-12T20:29:05" in out
+    assert "replay the run to continue" in out
+    assert "error: ai_complete is not configured" in out
+
+
 def test_cli_print_runs_shows_trigger_and_summary(capsys):
     commands.print_runs([{"run_id": "wf-telegram:evt-1", "status": "completed", "steps": 2,
                           "started_at": "2026-09-25T10:00:00+00:00",

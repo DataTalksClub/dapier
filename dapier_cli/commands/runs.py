@@ -18,6 +18,8 @@ def print_runs(items):
         # longer needs action, and why — the operator marked it, or a later
         # run of the workflow completed.
         status = item.get("status", "")
+        if item.get("stalled"):
+            status = "stalled"
         if item.get("resolved"):
             status = f"{status} (fixed: {item.get('resolved_reason') or 'resolved'})"
         print(f"{item.get('run_id', ''):42} {status:12} "
@@ -30,6 +32,15 @@ def print_runs(items):
         detail = " — ".join(part for part in (trigger, summary) if part)
         if detail:
             print(f"    {detail}")
+        # The why under the what: a stalled run says which step stopped and
+        # that only a replay continues it; a failure carries its recorded
+        # error. Both roll up from the same API fields the console shows.
+        if item.get("stalled"):
+            print(f"    stalled at {item.get('stalled_step') or 'a step'} since "
+                  f"{str(item.get('stalled_since') or '-')[:19]} — the worker stopped "
+                  "mid-step; replay the run to continue")
+        elif item.get("status") == "failed" and item.get("error"):
+            print(f"    error: {item['error']}")
 
 
 def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,

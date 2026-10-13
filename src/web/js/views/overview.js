@@ -4,7 +4,7 @@ import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
 import { $, icons, showApp, notice, rowActions, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, statusDot, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
+import { escapeHtml, statusLine, statusDot, runStatusLine, runStatusDot, runStatusTitle, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { icon } from '../icons.js';
 import { openDesigner, postConnectionsToDesigner } from './designer.js';
 import { renderConnections, accountLabel } from './connections.js';
@@ -52,7 +52,7 @@ function workflowRow(workflow) {
   const about = workflow.description || workflowTriggerText(workflow);
   const name = workflowName(workflow);
   const run = latest
-    ? `<span class="home-latest"><span class="home-latest-label">Latest run</span>${statusLine(latest.status)}</span>`
+    ? `<span class="home-latest"><span class="home-latest-label">Latest run</span>${runStatusLine(latest)}</span>`
     : `<span class="home-latest muted-cell">${state.loadedSections.has('activity') ? 'No recent runs' : 'Loading runs…'}</span>`;
   return `<button type="button" class="home-workflow workflow-detail" data-workflow="${escapeHtml(workflow.id)}" aria-label="Open ${escapeHtml(name)}">
     <span class="home-row-main"><span class="cell-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span><span class="home-row-sub" title="${escapeHtml(about)}">${escapeHtml(about)}</span></span>
@@ -155,8 +155,8 @@ function render(section) {
   if (['workflows', 'activity'].includes(section) && data.workflows && data.runs) {
     $('#overview-runs').innerHTML = model.runs.slice(0, 6).map((run) =>
       `<button type="button" class="home-result workflow-run-link" data-run="${escapeHtml(run.run_id)}" aria-label="Open run of ${escapeHtml(workflowName(run.workflow_id || 'workflow'))}">
-        <span class="home-row-main"><span class="cell-name workflow-label" title="${escapeHtml(run.workflow_id || '')}">${workflowLabelHtml(run.workflow_id)}</span>${run.failed_step ? `<span class="home-row-sub" title="Failed at ${escapeHtml(run.failed_step)}">Failed at ${escapeHtml(run.failed_step)}</span>` : ''}</span>
-        <span class="home-result-status">${statusLine(run.status)}</span>
+        <span class="home-row-main"><span class="cell-name workflow-label" title="${escapeHtml(run.workflow_id || '')}">${workflowLabelHtml(run.workflow_id)}</span>${run.stalled ? `<span class="home-row-sub" title="Stalled at ${escapeHtml(run.stalled_step || 'a step')} — the worker stopped mid-step; replay to continue">Stalled at ${escapeHtml(run.stalled_step || 'a step')}</span>` : (run.failed_step ? `<span class="home-row-sub" title="Failed at ${escapeHtml(run.failed_step)}">Failed at ${escapeHtml(run.failed_step)}</span>` : '')}</span>
+        <span class="home-result-status">${runStatusLine(run)}</span>
         <span class="home-result-when mono">${escapeHtml(formatTimestamp(run.started_at) || '—')}</span>
       </button>`).join('');
     $('#overview-runs-empty').hidden = model.runs.length > 0;
@@ -255,7 +255,7 @@ function paintWorkflows() {
       <td class="cell-title">${detail}</td>
       <td class="workflow-apps" data-label="Apps">${appStripHtml(workflow, flow)}</td>
       ${location}
-      <td class="workflow-latest" data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run of ${name}" title="${escapeHtml(statusLabel(recent.status))} · ${when}" data-run="${escapeHtml(recent.run_id)}">${statusDot(recent.status)}<span>${when}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading…'}</span>`}</td>
+      <td class="workflow-latest" data-label="Latest run">${recent ? `<button class="workflow-run-link" type="button" aria-label="Inspect latest run of ${name}" title="${escapeHtml(runStatusTitle(recent) || statusLabel(recent.status))} · ${when}" data-run="${escapeHtml(recent.run_id)}">${runStatusDot(recent)}<span>${when}</span></button>` : `<span class="muted-cell">${state.loadedSections.has('activity') ? 'No runs yet' : 'Loading…'}</span>`}</td>
       <td data-label="State"><div class="workflow-state-control">${workflow.auto_paused
           ? `${statusLine('auto-paused', { 'auto-paused': 'Auto-paused' })}<span class="visually-hidden">${Number(workflow.failures || 0)} failed runs</span><button type="button" class="dk-button dk-button--secondary workflow-resume" data-file="${escapeHtml(workflow.source || '')}" ${sourceButtons} title="Re-enable — clears the auto-pause and resets the failure streak">Resume</button>`
           : `<button type="button" class="workflow-switch workflow-toggle" role="switch" aria-checked="${workflow.enabled ? 'true' : 'false'}" aria-label="Enable ${name}" data-file="${escapeHtml(workflow.source || '')}" data-enabled="${workflow.enabled ? 'true' : 'false'}" ${sourceButtons}><span class="workflow-switch-track" aria-hidden="true"></span><span aria-hidden="true">${workflow.enabled ? 'On' : 'Off'}</span></button>`}

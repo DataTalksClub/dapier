@@ -20,6 +20,7 @@ const STATUS_LABELS = {
   interrupted: 'Interrupted',
   running: 'Running',
   processing: 'Running',
+  stalled: 'Stalled',
   queued: 'Queued',
   delayed: 'Delayed',
   cancelled: 'Cancelled',
@@ -53,22 +54,50 @@ export function statusLabel(status) {
 function statusKind(value) {
   return ['completed', 'succeeded', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'running', 'ready', 'queued', 'delayed'].includes(value) ? 'run'
-    : ['failed', 'timed_out', 'interrupted', 'error', 'expired', 'auto-paused'].includes(value) ? 'err'
+    : ['failed', 'timed_out', 'interrupted', 'error', 'expired', 'stalled', 'auto-paused'].includes(value) ? 'err'
     : ['expiring'].includes(value) ? 'warn'
     : 'off';
 }
 
-export function statusLine(status, labels) {
+export function statusLine(status, labels, title) {
   const value = String(status || 'unknown');
   const text = (labels || {})[value] || statusLabel(value);
-  return `<span class="status ${statusKind(value)}"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+  const tip = title ? ` title="${escapeHtml(title)}"` : '';
+  return `<span class="status ${statusKind(value)}"${tip}><span class="status-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
 }
 
 /* The dot alone, its word kept for screen readers (dense one-line cells
    that pair the dot with a date). */
-export function statusDot(status) {
+export function statusDot(status, title) {
   const value = String(status || 'unknown');
-  return `<span class="status ${statusKind(value)}"><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">${escapeHtml(statusLabel(value))}</span></span>`;
+  const tip = title ? ` title="${escapeHtml(title)}"` : '';
+  return `<span class="status ${statusKind(value)}"${tip}><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">${escapeHtml(statusLabel(value))}</span></span>`;
+}
+
+/* Run rows know more than their status word: the API flags a run stalled
+   when its only open steps are ones no worker holds anymore (the lease —
+   the engine's own liveness marker — has expired on each of them), and a
+   failure carries its recorded error. Show the honest word and put the
+   reason on hover. */
+export function runStatusTitle(run) {
+  if (run && run.stalled) {
+    const at = run.stalled_step ? ` at ${run.stalled_step}` : '';
+    const when = run.stalled_since
+      ? ` Progress stopped ${formatTimestamp(run.stalled_since) || run.stalled_since}.` : '';
+    return `The worker stopped mid-step${at} and nothing will resume it. Replay the run to continue.${when}`;
+  }
+  if (run && run.status === 'failed' && run.error) return String(run.error);
+  return '';
+}
+
+export function runStatusLine(run, labels) {
+  return statusLine(run && run.stalled ? 'stalled' : (run ? run.status : 'unknown'),
+    labels, runStatusTitle(run));
+}
+
+export function runStatusDot(run) {
+  return statusDot(run && run.stalled ? 'stalled' : (run ? run.status : 'unknown'),
+    runStatusTitle(run));
 }
 
 /* A failure that no longer needs action. The run keeps its status pill
