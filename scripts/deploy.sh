@@ -62,6 +62,19 @@ if [ -n "${DATAMAILER_API_KEY:-}" ]; then
   mailer_override_lines="DatamailerApiKey: \"${DATAMAILER_API_KEY}\""$'\n'
 fi
 
+# ai_complete's OpenAI-compatible endpoint (docs/connectors/ai.md). CI
+# passes them from the LLM_API_KEY secret and the LLM_BASE_URL / LLM_MODEL
+# variables; like the OAuth clients, each is omitted when unset so
+# CloudFormation keeps the previously deployed value.
+llm_override_lines=""
+for pair in "LlmApiKey:LLM_API_KEY" "LlmBaseUrl:LLM_BASE_URL" "LlmModel:LLM_MODEL"; do
+  param="${pair%%:*}" env_var="${pair##*:}"
+  value="${!env_var:-}"
+  if [ -n "$value" ]; then
+    llm_override_lines+="${param}: \"${value}\""$'\n'
+  fi
+done
+
 # Overrides go through a YAML file: SAM rejects empty values in the shorthand
 # key=value format and CloudFormation keeps a parameter's previous value when
 # an override is omitted — so this file passes every parameter explicitly
@@ -82,7 +95,7 @@ AuthJwksUrl: "$AUTH_JWKS_URL"
 AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
-${oauth_override_lines}${github_token_lines}${mailer_override_lines}
+${oauth_override_lines}${github_token_lines}${mailer_override_lines}${llm_override_lines}
 EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"

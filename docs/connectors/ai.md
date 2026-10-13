@@ -21,10 +21,14 @@ and the **Worker** function (real runs) via the `LlmBaseUrl` / `LlmApiKey`
 / `LlmModel` parameters, empty by default. Enabling the action is an ops
 step:
 
-1. Keep the secret value out of git: pass `LlmApiKey` at deploy time
-   (parameter override backed by Secrets Manager or your usual parameter
-   store), the way the other function secrets are handled.
-2. Redeploy. No table, queue or connection changes are involved.
+1. Keep the secret value out of git: store the key as the repository's
+   `LLM_API_KEY` Actions secret (`gh secret set LLM_API_KEY`) and, for a
+   non-OpenAI endpoint, `LLM_BASE_URL` / `LLM_MODEL` as Actions variables
+   (`gh variable set LLM_BASE_URL --body https://api.anthropic.com/v1`).
+   `scripts/deploy.sh` passes each one that is set as the `LlmApiKey` /
+   `LlmBaseUrl` / `LlmModel` override; an unset one keeps the deployed value.
+2. Redeploy (`gh workflow run deploy.yml`). No table, queue or connection
+   changes are involved.
 
 Unconfigured, the step fails with
 `ai_complete is not configured (set LLM_API_KEY …)`, naming every variable
