@@ -5,8 +5,11 @@ happened to each message; `dapier emails received` / `dapier inbox list`
 print the same columns. Both read these fields from the inbox API.
 """
 import json
+from email.message import EmailMessage
+from unittest.mock import MagicMock
 
 from src.dapier.triggers import inbox
+from src.dapier.triggers.intake import email_ingress
 from tests.test_inbox import EVENT, seed_event, table  # noqa: F401 (fixture)
 
 
@@ -160,6 +163,59 @@ def test_truncated_detail_flags_the_clipped_body(table):  # noqa: F811
     _, payload = inbox.api_get("big-1", table_ref=table)
     assert payload["event"]["email"]["truncated"] is True
     assert payload["event"]["email"]["subject"] == "March invoice"
+
+
+def _raw_message():
+    message = EmailMessage()
+    message["From"] = "Ann <ann@example.com>"
+    message["To"] = "invoice@mail.example"
+    message["Subject"] = "March invoice"
+    message["Message-ID"] = "<m1@example.com>"
+    message.set_content("plain body")
+    message.add_alternative("<h1>March invoice</h1><p>Pay me</p>", subtype="html")
+    return message.as_bytes()
+
+
+def _s3_mock(raw):
+    s3 = MagicMock()
+    s3.get_object.return_value = {"Body": MagicMock(read=lambda: raw)}
+    return s3
+
+
+def test_truncated_detail_rehydrates_the_display_body_from_the_raw_copy(table, monkeypatch):  # noqa: F811
+    """The detail read — and only the detail read — rebuilds the display
+    body from the raw s3 copy, so the reading pane shows the full HTML
+    like a mail client. Replay keeps its own intake-capped path."""
+    big = {**EMAIL["data"], "s3": {"bucket": "b", "key": "k"},
+           "body": {"text": {"value": "x" * (inbox.DATA_LIMIT + 1)}}}
+    inbox.record({**EMAIL, "id": "big-1", "data": big}, table_ref=table)
+    assert table.items["big-1"]["data"]["truncated"] is True
+    assert table.items["big-1"]["data"]["s3"] == {"bucket": "b", "key": "k"}
+    monkeypatch.setattr(email_ingress, "s3", _s3_mock(_raw_message()))
+
+    _, payload = inbox.api_get("big-1", table_ref=table)
+
+    email = payload["event"]["email"]
+    assert email.get("truncated") is None
+    assert email["rehydrated"] is True
+    assert email["html"] == "<h1>March invoice</h1><p>Pay me</p>\n"
+    assert email["text"] == "plain body\n"
+    _, listed = inbox.api_list("email", table_ref=table)
+    assert "html" not in listed["events"][0]["email"]
+
+
+def test_truncated_detail_falls_back_when_the_raw_copy_is_gone(table, monkeypatch):  # noqa: F811
+    big = {**EMAIL["data"], "s3": {"bucket": "b", "key": "k"},
+           "body": {"text": {"value": "x" * (inbox.DATA_LIMIT + 1)}}}
+    inbox.record({**EMAIL, "id": "big-1", "data": big}, table_ref=table)
+    s3 = MagicMock()
+    s3.get_object.side_effect = RuntimeError("no such key")
+    monkeypatch.setattr(email_ingress, "s3", s3)
+
+    _, payload = inbox.api_get("big-1", table_ref=table)
+
+    assert payload["event"]["email"]["truncated"] is True
+    assert "rehydrated" not in payload["event"]["email"]
 
 
 def test_api_get_reports_each_matched_run_status(table):  # noqa: F811

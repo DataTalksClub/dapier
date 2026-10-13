@@ -14,8 +14,13 @@ queue = boto3.client("sqs")
 # as a truncated, unreplayable preview.
 BODY_LIMIT = 60_000
 
+# The reading pane is not the replay path: it may show more than the engine
+# ever delivered. Capped well under the Lambda 6 MB response so one lavish
+# newsletter cannot dominate the detail payload.
+DISPLAY_BODY_LIMIT = 500_000
 
-def _body(message, *prefer):
+
+def _body(message, *prefer, limit=BODY_LIMIT):
     """One decoded body part (``"plain"`` or ``"html"``), capped, or None."""
     part = message.get_body(preferencelist=prefer)
     if part is None:
@@ -24,14 +29,14 @@ def _body(message, *prefer):
         content = part.get_content()
     except (LookupError, UnicodeDecodeError):
         return None  # undecodable charset — the s3 pointer still has the raw
-    return content[:BODY_LIMIT] if isinstance(content, str) else None
+    return content[:limit] if isinstance(content, str) else None
 
 
 def parse_message(raw):
     return BytesParser(policy=policy.default).parsebytes(raw)
 
 
-def data_from_message(message, pointer):
+def data_from_message(message, pointer, limit=BODY_LIMIT):
     """The event data dict for a parsed message and its s3 pointer — the
     shape the intake envelope and the replay paths both carry."""
     return {
@@ -39,17 +44,19 @@ def data_from_message(message, pointer):
         "to": message.get("To", ""),
         "subject": message.get("Subject"),
         "message_id": message.get("Message-ID"),
-        "text": _body(message, "plain"),
-        "html": _body(message, "html"),
+        "text": _body(message, "plain", limit=limit),
+        "html": _body(message, "html", limit=limit),
         "s3": pointer,
     }
 
 
-def replay_data(pointer):
+def replay_data(pointer, limit=BODY_LIMIT):
     """Rebuild stored email event data from its raw s3 copy, for replay.
 
-    Same caps as the intake envelope, so a replayed event carries exactly
-    what the engine first delivered (the flow never saw more either).
+    Same caps as the intake envelope by default, so a replayed event
+    carries exactly what the engine first delivered (the flow never saw
+    more either). Pass ``limit=DISPLAY_BODY_LIMIT`` for the reading pane,
+    which may show more than the replay path carries.
     Returns ``(data, None)``, or ``(None, error)`` when the raw copy cannot
     be fetched or parsed.
     """
@@ -64,7 +71,8 @@ def replay_data(pointer):
     except Exception:
         return None, "the raw email could not be parsed"
     return data_from_message(
-        message, {"bucket": pointer["bucket"], "key": pointer["key"]}), None
+        message, {"bucket": pointer["bucket"], "key": pointer["key"]},
+        limit=limit), None
 
 
 def handler(event, _context):

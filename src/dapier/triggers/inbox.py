@@ -428,6 +428,41 @@ def note_replay_bounced(inbox_id, error, *, table_ref=None):
     return complete(inbox_id, None, error=error, table_ref=table_ref)
 
 
+def _display_body(data):
+    """Full text/html for the reading pane.
+
+    Stored bodies arrive capped at 60 KB a part; a message bigger than the
+    storage cap keeps only a clipped preview plus its raw s3 pointer. The
+    detail read — and only the detail read — rebuilds the display body
+    from that raw copy (up to the display cap), best-effort: when the
+    copy is unreadable the caller keeps the clipped preview. Returns
+    ``(content, rehydrated)`` like :func:`email_body` plus whether the
+    body came from the raw copy. Replay never uses this path; it keeps
+    its own intake-capped rehydration.
+    """
+    content = email_body(data)
+    if not (isinstance(data, dict) and data.get("truncated")):
+        return content, False
+    pointer = data.get("s3")
+    if not isinstance(pointer, dict):
+        return content, False
+    try:
+        from .intake import email_ingress
+
+        full, error = email_ingress.replay_data(
+            pointer, limit=email_ingress.DISPLAY_BODY_LIMIT)
+    except Exception:
+        logger.warning("inbox display rehydrate failed",
+                       extra={"pointer": str(pointer)[:200]})
+        return content, False
+    if error or not isinstance(full, dict):
+        return content, False
+    display = email_body(full)
+    if not display:
+        return content, False
+    return display, True
+
+
 def _view(item, *, body=False):
     keys = ("inbox_id", "connector", "event", "source", "occurred_at",
             "received_at", "processed_at", "status", "data", "matched", "error")
@@ -441,9 +476,15 @@ def _view(item, *, body=False):
         stored_summary = _decode_numbers(item.get("email"))
         view["email"] = stored_summary or email_summary(view.get("data")) or {}
         if body:
-            content = email_body(view.get("data"))
+            content, rehydrated = _display_body(view.get("data"))
             if content:
                 view["email"] = {**view["email"], **content}
+                if rehydrated:
+                    # The clipped preview is gone: the pane shows the raw
+                    # copy's body (display-capped), and replay uses that
+                    # same raw copy.
+                    view["email"].pop("truncated", None)
+                    view["email"]["rehydrated"] = True
         else:
             # List rows stay envelope-only so a page of mail stays small;
             # the reading pane loads text/html through api_get.
