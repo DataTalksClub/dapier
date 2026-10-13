@@ -39,7 +39,7 @@ RETRY_DEFAULTS = {"attempts": 1, "backoff_seconds": 60}
 # Steps the engine runs itself (engine.logic) rather than dispatching to a
 # connector runner; their failures are configuration problems a repeat cannot
 # fix, so they fall through to the failure path at once.
-LOGIC_STEP_TYPES = frozenset({"filter", "condition", "delay", "paths", "for_each"})
+LOGIC_STEP_TYPES = frozenset({"filter", "condition", "delay", "paths", "for_each", "union"})
 
 # Zapier-style auto-pause: after this many consecutive failed runs the
 # workflow is paused (``auto_paused`` on the stored definition; matching

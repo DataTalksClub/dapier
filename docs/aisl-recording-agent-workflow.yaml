@@ -36,6 +36,9 @@ actions:
     choices: [one-on-one, ai-shipping-labs]
     cases:
       - choice: one-on-one
+        description: >
+          A recorded call between Alexey and one other person (1x1 discussion,
+          mentoring session, interview, coaching call, or personal sync).
         actions:
           - id: process-call
             type: agent
@@ -83,6 +86,9 @@ actions:
               4. Report, in this order: the transcript and summary paths, the
               commit, and any blocker. Do not delete or cancel anything.
       - choice: ai-shipping-labs
+        description: >
+          An AI Shipping Labs session: cohort lecture, workshop, guest talk,
+          office hours, or any call linked to an AI Shipping Labs event.
         actions:
           - id: process-recording
             type: agent

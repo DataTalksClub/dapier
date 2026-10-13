@@ -1,9 +1,11 @@
 """The flow controls between steps: filters,
 conditions, paths, decisions (the LLM if/switch), and delays
 (the pause/resume machinery)."""
+import re
 import time
-from .core import (MAX_DELAY_SECONDS, MAX_SUSPENDED_SECONDS, RunSuspended, _iso,
-                   evaluate_rules, parse_moment, predicate_rules, render_value)
+from .core import (MAX_DELAY_SECONDS, MAX_SUSPENDED_SECONDS, RunSuspended,
+                   _TOKEN, _iso, _lookup, evaluate_rules, parse_moment,
+                   predicate_rules, render_value)
 
 
 def _predicate_scope(event, scope):
@@ -11,6 +13,35 @@ def _predicate_scope(event, scope):
     if scope is not None:
         return scope
     return event.get("data") or {}
+
+
+def _collect_branch_summary(branch_prefix, step_outputs):
+    """Summarize the outputs recorded under ``<branch_prefix>.*``."""
+    if not branch_prefix or not isinstance(step_outputs, dict):
+        return {"last_step_id": None, "result": {}, "outputs": {}}
+    prefix = f"{branch_prefix}."
+    outputs = {}
+    last_step_id = None
+    for key, entry in step_outputs.items():
+        if not isinstance(key, str) or not key.startswith(prefix):
+            continue
+        local_id = key[len(prefix):]
+        if not local_id:
+            continue
+        out = entry.get("output") if isinstance(entry, dict) else None
+        outputs[local_id] = dict(out) if isinstance(out, dict) else (out if out is not None else {})
+        last_step_id = key
+    if last_step_id is not None:
+        last_entry = step_outputs.get(last_step_id)
+        raw_result = last_entry.get("output") if isinstance(last_entry, dict) else {}
+        result = dict(raw_result) if isinstance(raw_result, dict) else (raw_result if raw_result is not None else {})
+    else:
+        result = {}
+    return {
+        "last_step_id": last_step_id,
+        "result": result,
+        "outputs": outputs,
+    }
 
 
 def _run_filter(step, data):
@@ -42,8 +73,9 @@ def _run_condition(workflow_id, action_id, step, event, run_action, *,
         on_action_error=on_action_error, prefix=f"{action_id}.{branch}",
         scope=scope, step_outputs=step_outputs,
     )
+    summary = _collect_branch_summary(f"{action_id}.{branch}", step_outputs)
     return stop, {"condition": "passed" if passed else "failed",
-                  "branch": branch, "steps": len(steps)}, "completed"
+                  "branch": branch, "steps": len(steps), **summary}, "completed"
 
 
 def _run_paths(workflow_id, action_id, step, event, run_action, *,
@@ -53,13 +85,13 @@ def _run_paths(workflow_id, action_id, step, event, run_action, *,
 
     Branches are evaluated in order against the same scope filters read, and
     the first match wins — later predicates are not evaluated. With no match
-    the optional ``default`` steps run. A filter inside a branch stops the
-    chain quietly, exactly like condition branches.
+    the optional ``default`` (or ``else``) steps run. A filter inside a branch
+    stops the chain quietly, exactly like condition branches.
     """
     branches = step.get("paths")
     if not isinstance(branches, list) or not branches:
         raise ValueError(f"paths '{step.get('id', '')}' needs a non-empty list of paths")
-    default_steps = step.get("default")
+    default_steps = step.get("default") if step.get("default") is not None else step.get("else")
     if default_steps is not None and not isinstance(default_steps, list):
         raise ValueError(f"paths '{action_id}' default must be a list of steps")
     data = {**_predicate_scope(event, scope), "steps": step_outputs or {}}
@@ -86,7 +118,8 @@ def _run_paths(workflow_id, action_id, step, event, run_action, *,
             on_action_error=on_action_error, prefix=f"{action_id}.{label}",
             scope=scope, step_outputs=step_outputs,
         )
-        return stop, {"matched": label, "ran": len(steps)}, "completed"
+        summary = _collect_branch_summary(f"{action_id}.{label}", step_outputs)
+        return stop, {"matched": label, "branch": label, "ran": len(steps), **summary}, "completed"
     if default_steps:
         stop = run_chain(
             workflow_id, default_steps, event, run_action,
@@ -94,8 +127,10 @@ def _run_paths(workflow_id, action_id, step, event, run_action, *,
             on_action_error=on_action_error, prefix=f"{action_id}.default",
             scope=scope, step_outputs=step_outputs,
         )
-        return stop, {"matched": None, "ran": len(default_steps)}, "completed"
-    return None, {"matched": None, "ran": 0}, "completed"
+        summary = _collect_branch_summary(f"{action_id}.default", step_outputs)
+        return stop, {"matched": None, "branch": "default", "ran": len(default_steps), **summary}, "completed"
+    return None, {"matched": None, "branch": None, "ran": 0,
+                  "last_step_id": None, "result": {}, "outputs": {}}, "completed"
 
 
 # --- decision: the LLM smart if / switch -----------------------------------
@@ -149,21 +184,29 @@ def _decision_plan(step, action_id):
     return mode, (_decision_choices(step, action_id) if mode == "switch" else None)
 
 
+def _decision_fallback_steps(step):
+    """Fallback step list for a switch decision (default_actions / default / else)."""
+    for fallback_key in ("default_actions", "default", "else"):
+        if step.get(fallback_key) is not None:
+            return step.get(fallback_key)
+    return None
+
+
 def _decision_branch(workflow_id, action_id, step, event, run_action, *,
                      before_action, after_action, on_action_error, scope,
                      step_outputs, mode, choice, model, usage, note=None,
                      extra=None):
     """Run the branch a decision picked: ``then``/``else`` for an if, the
-    matching case's ``actions`` (or ``default_actions``) for a switch. The
-    branch id nests under the step like a condition's or a path's, and the
-    output carries the choice and the branch so later steps can template
-    ``{steps.<id>.choice}`` and react without re-asking the model."""
+    matching case's ``actions`` (or ``default_actions`` / ``default`` / ``else``)
+    for a switch. The branch id nests under the step like a condition's or a
+    path's, and the output carries the choice and the branch so later steps
+    can template ``{steps.<id>.choice}`` and react without re-asking the model."""
     if mode == "if":
         branch = "then" if choice else "else"
         steps = step.get(branch) or []
     elif choice is None:
         branch = "default"
-        steps = step.get("default_actions") or []
+        steps = _decision_fallback_steps(step) or []
     else:
         branch = choice
         steps = []
@@ -181,10 +224,11 @@ def _decision_branch(workflow_id, action_id, step, event, run_action, *,
         on_action_error=on_action_error, prefix=f"{action_id}.{branch}",
         scope=scope, step_outputs=step_outputs,
     )
+    summary = _collect_branch_summary(f"{action_id}.{branch}", step_outputs)
     output = {"mode": mode,
               "choice": choice if choice is not None else "",
               "branch": branch, "steps": len(steps), "model": model,
-              "usage": usage}
+              "usage": usage, **summary}
     output.update(extra or {})
     if note:
         output["note"] = note
@@ -205,9 +249,9 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
     offers ``choices`` (a case may carry a ``description:`` that becomes
     that option's criterion) and runs the matching case's ``actions``.
     A response with no usable choice — or one outside ``choices`` — runs
-    ``default_actions`` when the step has one and fails the step otherwise,
-    so on_fail/on_error policies apply. ``system``, when set, is the
-    question's instructions.
+    ``default_actions`` (or ``default`` / ``else``) when the step has one and
+    fails the step otherwise, so on_fail/on_error policies apply. ``system``,
+    when set, is the question's instructions.
     """
     from ...connectors import ai
     from ..actions.templating import render
@@ -248,7 +292,7 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
              "probabilities": result.get("probabilities")}
 
     def _unusable(note):
-        default_steps = step.get("default_actions")
+        default_steps = _decision_fallback_steps(step)
         if mode == "switch" and isinstance(default_steps, list):
             return _decision_branch(
                 workflow_id, action_id, step, event, run_action,
@@ -276,6 +320,108 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
         on_action_error=on_action_error, scope=scope,
         step_outputs=step_outputs, mode=mode, choice=picked,
         model=model, usage=usage, extra=extra)
+
+
+def _resolve_union_candidate(candidate, context):
+    """Evaluate one union field candidate against ``context``.
+
+    Returns ``(value, resolved_ok)`` where ``resolved_ok`` is True when the
+    candidate resolved to a non-empty value without unexpanded ``{...}`` tokens.
+    """
+    if candidate is None:
+        return None, False
+    if isinstance(candidate, str):
+        stripped = candidate.strip()
+        if not stripped:
+            return "", False
+        if _TOKEN.search(candidate):
+            single = re.fullmatch(r"\{([^{}]+)\}", stripped)
+            if single:
+                val, found = _lookup(context, single.group(1).strip())
+                if not found or val is None or val == "":
+                    return "", False
+                return val, True
+            rendered = render_value(candidate, context)
+            if isinstance(rendered, str) and (_TOKEN.search(rendered) or rendered == ""):
+                return "", False
+            return rendered, True
+        val, found = _lookup(context, stripped)
+        if found and val is not None and val != "":
+            return val, True
+        if stripped.startswith(("steps.", "trigger.")):
+            return "", False
+        return candidate, True
+    return candidate, True
+
+
+def _run_union(workflow_id, action_id, step, event, run_connector=None, *,
+               before_action=None, after_action=None, on_action_error=None,
+               prefix="", scope=None, step_outputs=None):
+    """Explicit branch convergence and output coalescing (``type: union``)."""
+    del workflow_id, action_id, run_connector, before_action, after_action, on_action_error, prefix
+    source_id = str(step.get("from") or "").strip()
+    if not source_id and isinstance(step_outputs, dict):
+        for candidate_id in reversed(list(step_outputs.keys())):
+            entry = step_outputs.get(candidate_id)
+            out = entry.get("output") if isinstance(entry, dict) else None
+            if isinstance(out, dict) and ("branch" in out or "matched" in out) and "from" not in out:
+                source_id = str(candidate_id)
+                break
+    source_entry = (step_outputs or {}).get(source_id) if source_id and isinstance(step_outputs, dict) else None
+    source_out = (source_entry.get("output")
+                  if isinstance(source_entry, dict) and isinstance(source_entry.get("output"), dict)
+                  else {})
+    branch = source_out.get("branch") if "branch" in source_out else source_out.get("matched")
+    last_step_id = source_out.get("last_step_id")
+    result = source_out.get("result") if "result" in source_out else {}
+    outputs = source_out.get("outputs") if isinstance(source_out.get("outputs"), dict) else {}
+    if source_id and not outputs and isinstance(step_outputs, dict):
+        inferred_branch = branch
+        if not inferred_branch:
+            src_prefix = f"{source_id}."
+            for key in step_outputs:
+                if isinstance(key, str) and key.startswith(src_prefix):
+                    rest = key[len(src_prefix):]
+                    inferred_branch = rest.split(".", 1)[0] if "." in rest else rest
+                    break
+        if inferred_branch:
+            branch = branch or inferred_branch
+            summary = _collect_branch_summary(f"{source_id}.{inferred_branch}", step_outputs)
+            last_step_id = last_step_id or summary["last_step_id"]
+            if not result:
+                result = summary["result"]
+            outputs = summary["outputs"]
+
+    context = {
+        **_predicate_scope(event, scope),
+        "trigger": event or {},
+        "steps": step_outputs or {},
+    }
+    fields_spec = step.get("fields")
+    values = {}
+    if isinstance(fields_spec, dict):
+        for field_name, spec in fields_spec.items():
+            candidates = spec if isinstance(spec, list) else [spec]
+            picked = ""
+            for cand in candidates:
+                val, ok = _resolve_union_candidate(cand, context)
+                if ok:
+                    picked = val
+                    break
+            values[str(field_name)] = picked
+
+    out = {
+        "from": source_id or None,
+        "branch": branch,
+        "last_step_id": last_step_id,
+        "result": dict(result) if isinstance(result, dict) else result,
+        "outputs": dict(outputs) if isinstance(outputs, dict) else {},
+        "values": values,
+    }
+    for key, val in values.items():
+        if key not in out:
+            out[key] = val
+    return None, out, "completed"
 
 
 def _run_delay(step, context):

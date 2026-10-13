@@ -127,14 +127,25 @@ def _lookup(context, path):
     tell "absent" from a stored null.
     """
     current = context
-    for part in str(path).split("."):
+    parts = str(path).split(".")
+    index = 0
+    while index < len(parts):
+        part = parts[index]
         if isinstance(current, list):
             try:
                 current = current[int(part)]
             except (ValueError, IndexError):
                 return None, False
-        elif isinstance(current, dict) and part in current:
-            current = current[part]
+            index += 1
+        elif isinstance(current, dict):
+            for end in range(len(parts), index, -1):
+                key = ".".join(parts[index:end])
+                if key in current:
+                    current = current[key]
+                    index = end
+                    break
+            else:
+                return None, False
         else:
             return None, False
     return current, True

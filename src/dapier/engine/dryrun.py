@@ -140,6 +140,170 @@ def _render_warnings(action, rendered):
     return warnings
 
 
+def _dry_run_steps(actions, envelope, step_outputs, *, strict=False, prefix="", workflow_id=""):
+    from . import logic
+
+    steps = []
+    for index, action in enumerate(actions or []):
+        if not isinstance(action, dict):
+            steps.append({"action_id": logic._step_id(prefix, {}, index), "action_type": "", "ok": False,
+                          "rendered_input": None, "error": "every action needs a type"})
+            continue
+        action_id = logic._step_id(prefix, action, index)
+        action_type = str(action.get("type") or "")
+        step = {
+            "action_id": action_id,
+            "action_type": action_type,
+        }
+        try:
+            rendered = _render_step_preview(action, envelope, step_outputs)
+        except Exception as exc:
+            steps.append({**step, "ok": False, "rendered_input": None,
+                          "error": f"template error: {exc}"})
+            continue
+        if action_type not in _supported_action_types():
+            step["ok"] = False
+            step["error"] = f"unsupported action: {action_type}"
+        else:
+            step["ok"] = True
+        warnings = _render_warnings(action, rendered)
+        if warnings:
+            step["warnings"] = warnings
+            if strict and step["ok"]:
+                step["ok"] = False
+                step["error"] = warnings[0]
+        step["rendered_input"] = rendered
+        steps.append(step)
+        branch_steps = []
+        if step["ok"] and action_type == "date_time":
+            # Pure formatting/clock lookup: safe to preview without provider calls.
+            from .actions.date_time import run_date_time
+            try:
+                step["output"] = run_date_time(action, envelope, steps=step_outputs)
+            except Exception as exc:
+                step["ok"] = False
+                step["error"] = str(exc)
+        elif step["ok"] and action_type == "condition":
+            rules = logic.predicate_rules(action)
+            if rules is not None:
+                try:
+                    passed = logic.evaluate_rules(
+                        rules, {**(envelope.get("data") or {}), "steps": step_outputs})
+                except Exception as exc:
+                    step["ok"] = False
+                    step["error"] = str(exc)
+                else:
+                    branch = "then" if passed else "else"
+                    body = action.get(branch) or []
+                    if isinstance(body, list) and body:
+                        branch_steps = _dry_run_steps(
+                            body, envelope, step_outputs, strict=strict,
+                            prefix=f"{action_id}.{branch}", workflow_id=workflow_id)
+                    summary = logic._collect_branch_summary(f"{action_id}.{branch}", step_outputs)
+                    step["output"] = {
+                        "condition": "passed" if passed else "failed",
+                        "branch": branch,
+                        "steps": len(body) if isinstance(body, list) else 0,
+                        **summary,
+                    }
+                    step["branch_steps"] = branch_steps
+        elif step["ok"] and action_type == "paths":
+            branches = action.get("paths") if isinstance(action.get("paths"), list) else []
+            data = {**(envelope.get("data") or {}), "steps": step_outputs}
+            matched = None
+            branch_name = None
+            body = []
+            try:
+                for cand in branches:
+                    if not isinstance(cand, dict):
+                        continue
+                    rules = logic.predicate_rules(cand)
+                    if rules is not None and logic.evaluate_rules(rules, data):
+                        matched = str(cand.get("label") or "").strip() or "path"
+                        branch_name = matched
+                        body = cand.get("actions") if isinstance(cand.get("actions"), list) else []
+                        break
+                if matched is None:
+                    default_steps = (action.get("default")
+                                     if action.get("default") is not None
+                                     else action.get("else"))
+                    if isinstance(default_steps, list) and default_steps:
+                        branch_name = "default"
+                        body = default_steps
+            except Exception as exc:
+                step["ok"] = False
+                step["error"] = str(exc)
+            else:
+                if branch_name and body:
+                    branch_steps = _dry_run_steps(
+                        body, envelope, step_outputs, strict=strict,
+                        prefix=f"{action_id}.{branch_name}", workflow_id=workflow_id)
+                summary = (logic._collect_branch_summary(f"{action_id}.{branch_name}", step_outputs)
+                           if branch_name else {"last_step_id": None, "result": {}, "outputs": {}})
+                step["output"] = {
+                    "matched": matched,
+                    "branch": branch_name,
+                    "ran": len(body),
+                    **summary,
+                }
+                step["branch_steps"] = branch_steps
+        elif step["ok"] and action_type == "decision":
+            try:
+                mode, choices = logic._decision_plan(action, action_id)
+            except Exception as exc:
+                step["ok"] = False
+                step["error"] = str(exc)
+            else:
+                if mode == "switch":
+                    picked = choices[0] if choices else None
+                    for case in action.get("cases") or []:
+                        if isinstance(case, dict) and isinstance(case.get("actions"), list) and case["actions"]:
+                            c_label = str(case.get("choice") or "").strip() or "case"
+                            sub = _dry_run_steps(
+                                case["actions"], envelope, step_outputs, strict=strict,
+                                prefix=f"{action_id}.{c_label}", workflow_id=workflow_id)
+                            if c_label == picked:
+                                branch_steps.extend(sub)
+                    summary = (logic._collect_branch_summary(f"{action_id}.{picked}", step_outputs)
+                               if picked else {"last_step_id": None, "result": {}, "outputs": {}})
+                    step["output"] = {
+                        "mode": mode,
+                        "choice": picked,
+                        "branch": picked,
+                        "note": "LLM not consulted — branch previewed",
+                        **summary,
+                    }
+                    step["branch_steps"] = branch_steps
+                else:
+                    body = action.get("then") if isinstance(action.get("then"), list) else []
+                    if body:
+                        branch_steps = _dry_run_steps(
+                            body, envelope, step_outputs, strict=strict,
+                            prefix=f"{action_id}.then", workflow_id=workflow_id)
+                    summary = logic._collect_branch_summary(f"{action_id}.then", step_outputs)
+                    step["output"] = {
+                        "mode": mode,
+                        "choice": True,
+                        "branch": "then",
+                        "note": "LLM not consulted — branch previewed",
+                        **summary,
+                    }
+                    step["branch_steps"] = branch_steps
+        elif step["ok"] and action_type == "union":
+            _, out, _ = logic._run_union(
+                workflow_id, action_id, action, envelope, None,
+                step_outputs=step_outputs)
+            step["output"] = out
+
+        step_outputs[action_id] = {
+            "status": "completed" if step["ok"] else "failed",
+            "output": step.get("output", {"dry_run": True}),
+        }
+        if branch_steps:
+            steps.extend(branch_steps)
+    return steps
+
+
 def dry_run(workflow, sample, *, strict=False):
     """Walk the resolved action chain, rendering each step. No side effects:
     provider runners are never executed. Date/time formatting is previewed locally.
@@ -151,47 +315,9 @@ def dry_run(workflow, sample, *, strict=False):
     resolved = workflow
     envelope = normalize_sample_event(sample, resolved)
     step_outputs = {}
-    steps = []
-    for index, action in enumerate(resolved.get("actions") or []):
-        if not isinstance(action, dict):
-            steps.append({"action_id": str(index), "action_type": "", "ok": False,
-                          "rendered_input": None, "error": "every action needs a type"})
-            continue
-        step = {
-            "action_id": str(action.get("id", index)),
-            "action_type": str(action.get("type") or ""),
-        }
-        try:
-            rendered = _render_step_preview(action, envelope, step_outputs)
-        except Exception as exc:
-            steps.append({**step, "ok": False, "rendered_input": None,
-                          "error": f"template error: {exc}"})
-            continue
-        if step["action_type"] not in _supported_action_types():
-            step["ok"] = False
-            step["error"] = f"unsupported action: {step['action_type']}"
-        else:
-            step["ok"] = True
-        warnings = _render_warnings(action, rendered)
-        if warnings:
-            step["warnings"] = warnings
-            if strict and step["ok"]:
-                step["ok"] = False
-                step["error"] = warnings[0]
-        step["rendered_input"] = rendered
-        steps.append(step)
-        if step["ok"] and step["action_type"] == "date_time":
-            # Pure formatting/clock lookup: safe to preview without provider calls.
-            from .actions.date_time import run_date_time
-            try:
-                step["output"] = run_date_time(action, envelope, steps=step_outputs)
-            except Exception as exc:
-                step["ok"] = False
-                step["error"] = str(exc)
-        step_outputs[step["action_id"]] = {
-            "status": "completed" if step["ok"] else "failed",
-            "output": step.get("output", {"dry_run": True}),
-        }
+    steps = _dry_run_steps(
+        resolved.get("actions") or [], envelope, step_outputs,
+        strict=strict, prefix="", workflow_id=str(resolved.get("id") or ""))
     report = _report(resolved, envelope, steps, mode="dry-run")
     return report
 
@@ -213,9 +339,8 @@ def execute_once(workflow, sample):
         "enabled": True,
         "triggers": [{"connector": envelope["connector"], "event": envelope["event"]}],
     }
-    action_types = {str(action.get("id", index)): str(action.get("type") or "")
-                    for index, action in enumerate(resolved.get("actions") or [])
-                    if isinstance(action, dict)}
+    action_types = {action_id: str(action.get("type") or "")
+                    for action_id, action in _iter_steps(resolved.get("actions") or [])}
     steps = []
 
     def after_action(workflow_id, action_id, event, output=None, duration_ms=None,
@@ -337,8 +462,7 @@ def _evaluate_logic_step(step, step_type, envelope, context,
     """
     from . import logic
 
-    del steps_context
-    data = envelope.get("data") or {}
+    data = {**(envelope.get("data") or {}), "steps": steps_context or {}}
     if step_type == "filter":
         try:
             stop, output, status = logic._run_filter(step, data)
@@ -374,7 +498,8 @@ def _evaluate_logic_step(step, step_type, envelope, context,
             if not isinstance(branches, list) or not branches:
                 raise ValueError(f"paths '{step.get('id', '')}' needs a non-empty list of paths")
             matched = None
-            body = step.get("default") or []
+            default_steps = step.get("default") if step.get("default") is not None else step.get("else")
+            body = default_steps or []
             for branch in branches:
                 rules = logic.predicate_rules(branch)
                 if rules is None:
@@ -415,9 +540,10 @@ def _evaluate_logic_step(step, step_type, envelope, context,
                             raise ValueError(
                                 f"decision '{step.get('id', '')}': case '{choice}' "
                                 "actions must be a list of steps")
-                if not isinstance(step.get("default_actions") or [], list):
-                    raise ValueError(
-                        f"decision '{step.get('id', '')}' default_actions must be a list of steps")
+                for fallback_key in ("default_actions", "default", "else"):
+                    if step.get(fallback_key) is not None and not isinstance(step.get(fallback_key), list):
+                        raise ValueError(
+                            f"decision '{step.get('id', '')}' {fallback_key} must be a list of steps")
             else:
                 for branch in ("then", "else"):
                     if step.get(branch) is not None and not isinstance(step[branch], list):
@@ -431,6 +557,18 @@ def _evaluate_logic_step(step, step_type, envelope, context,
         entry["status"] = "completed"
         entry["output"] = {"mode": mode, "choice": None, "branch": None,
                            "note": "LLM not consulted — branch not executed"}
+    elif step_type == "union":
+        try:
+            _, output, status = logic._run_union(
+                workflow_id, entry.get("action_id", step.get("id", "")),
+                step, envelope, None, step_outputs=steps_context)
+        except ValueError as exc:
+            entry["ok"] = False
+            entry["error"] = str(exc)
+            return
+        entry["ok"] = True
+        entry["status"] = status
+        entry["output"] = output
     elif step_type == "delay":
         try:
             total, until = logic._delay_request(step, context, step.get("id", ""))
@@ -571,16 +709,19 @@ def _iter_steps(steps, prefix=""):
                     label = str(branch.get("label") or "").strip() or "path"
                     if isinstance(branch.get("actions"), list):
                         yield from _iter_steps(branch["actions"], f"{action_id}.{label}")
-            if isinstance(step.get("default"), list):
-                yield from _iter_steps(step["default"], f"{action_id}.default")
+            default_steps = step.get("default") if step.get("default") is not None else step.get("else")
+            if isinstance(default_steps, list):
+                yield from _iter_steps(default_steps, f"{action_id}.default")
         elif kind == "decision":
             if logic._decision_mode(step) == "switch":
                 for case in step.get("cases") or []:
                     if isinstance(case, dict) and isinstance(case.get("actions"), list):
                         label = str(case.get("choice") or "").strip() or "case"
                         yield from _iter_steps(case["actions"], f"{action_id}.{label}")
-                if isinstance(step.get("default_actions"), list):
-                    yield from _iter_steps(step["default_actions"], f"{action_id}.default")
+                for fallback_key in ("default_actions", "default", "else"):
+                    if isinstance(step.get(fallback_key), list):
+                        yield from _iter_steps(step[fallback_key], f"{action_id}.default")
+                        break
             else:
                 for branch in ("then", "else"):
                     if isinstance(step.get(branch), list):

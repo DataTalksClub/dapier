@@ -100,6 +100,7 @@ _ACTION_LABELS = {
     "condition": "Condition",
     "paths": "Paths",
     "decision": "Decision",
+    "union": "Union",
     "delay": "Delay",
     "for_each": "Loop",
     "digest": "Digest",
@@ -109,7 +110,7 @@ _ACTION_LABELS = {
 
 # Steps that move data around rather than do what the flow is for.
 _PLUMBING = {"date_time", "code", "js", "filter", "condition", "paths", "delay",
-             "for_each", "digest", "decision", "digest_add", "formatter",
+             "for_each", "digest", "decision", "union", "digest_add", "formatter",
              "storage_get", "storage_find"}
 _PLUMBING_PATTERN = re.compile(r"_(find|read|lookup|get|head|list|presign)(_|$)")
 
@@ -244,13 +245,17 @@ def _flatten(steps):
         if not isinstance(step, dict):
             continue
         yield step
-        for key in ("then", "else", "actions", "default"):
+        for key in ("then", "else", "actions", "default", "default_actions"):
             if isinstance(step.get(key), list):
                 yield from _flatten(step[key])
         if isinstance(step.get("paths"), list):
             for branch in step["paths"]:
                 if isinstance(branch, dict):
                     yield from _flatten(branch.get("actions"))
+        if isinstance(step.get("cases"), list):
+            for case in step["cases"]:
+                if isinstance(case, dict):
+                    yield from _flatten(case.get("actions"))
 
 
 def _is_plumbing(kind):

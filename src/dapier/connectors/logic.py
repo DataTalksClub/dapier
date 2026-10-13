@@ -130,3 +130,16 @@ logic_step(LogicStep(
          "help": "Accumulate in one workflow, flush from the schedule-triggered one"},
     ),
 ))
+
+logic_step(LogicStep(
+    type="union",
+    label="Union",
+    icon="git-merge",
+    description="Rejoin branches and coalesce their outputs into one step",
+    fields=(
+        {"key": "from", "label": "Branch step ID", "placeholder": "classify-recording",
+         "help": "ID of the condition, decision, or paths step to merge (defaults to the preceding branch step)"},
+        {"key": "fields", "label": "Coalesced fields (YAML)", "type": "yaml",
+         "placeholder": "document_url:\n  - \"{steps.route.then.make-document.output.url}\"\n  - \"{steps.route.else.render-pdf.output.url}\""},
+    ),
+))

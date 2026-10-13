@@ -312,11 +312,14 @@ def _validate_steps(steps, where="actions"):
                     raise WorkflowError(
                         f"step '{label}': path '{branch_label}' actions must be a list of steps")
                 _validate_steps(actions, where=f"{label}.{branch_label}")
-            default_steps = step.get("default")
-            if default_steps is not None:
-                if not isinstance(default_steps, list):
-                    raise WorkflowError(f"step '{label}': paths default must be a list of steps")
-                _validate_steps(default_steps, where=f"{label}.default")
+            for fallback_key in ("default", "else"):
+                default_steps = step.get(fallback_key)
+                if default_steps is not None:
+                    if not isinstance(default_steps, list):
+                        raise WorkflowError(f"step '{label}': paths {fallback_key} must be a list of steps")
+                    _validate_steps(default_steps, where=f"{label}.default")
+        if kind == "union":
+            _validate_union(step, label)
         if kind == "agent":
             from ...worker_capabilities import capabilities
 
@@ -359,6 +362,28 @@ def _validate_steps(steps, where="actions"):
             _validate_steps(step["error_actions"], where=f"{label}.error")
 
 
+def _validate_union(step, label):
+    """Save-time check for a union step (mirrors engine.logic._run_union)."""
+    from_val = step.get("from")
+    if from_val is not None:
+        if not isinstance(from_val, str) or not from_val.strip():
+            raise WorkflowError(f"step '{label}': union 'from' must be a non-empty step id")
+    fields = step.get("fields")
+    if fields is not None:
+        if not isinstance(fields, dict):
+            raise WorkflowError(f"step '{label}': union 'fields' must be a mapping")
+        for key, spec in fields.items():
+            if not isinstance(key, str) or not key.strip():
+                raise WorkflowError(f"step '{label}': union field names must be non-empty strings")
+            if isinstance(spec, list):
+                if not spec or not all(isinstance(item, (str, int, float, bool)) for item in spec):
+                    raise WorkflowError(
+                        f"step '{label}': union field '{key}' must be a scalar or non-empty list of scalars")
+            elif not isinstance(spec, (str, int, float, bool)):
+                raise WorkflowError(
+                    f"step '{label}': union field '{key}' must be a scalar or non-empty list of scalars")
+
+
 def _validate_decision(step, label):
     """Save-time check for a decision step (mirrors engine.logic._run_decision).
 
@@ -368,8 +393,9 @@ def _validate_decision(step, label):
     LLM answers). A switch needs a non-empty, unique ``choices`` list — the
     options the typed decision answer is picked from — and every case's
     ``choice`` must be one of them, at most once per case, with optional
-    ``actions``; ``default_actions`` covers an unusable or off-list reply.
-    Branches recurse as step chains, like condition's then/else.
+    ``actions``; ``default_actions`` (or ``default`` / ``else``) covers an
+    unusable or off-list reply. Branches recurse as step chains, like
+    condition's then/else.
     """
     from ...engine import logic
 
@@ -406,12 +432,13 @@ def _validate_decision(step, label):
                         raise WorkflowError(
                             f"step '{label}': case '{choice}' actions must be a list of steps")
                     _validate_steps(actions, where=f"{label}.{choice}")
-        default_steps = step.get("default_actions")
-        if default_steps is not None:
-            if not isinstance(default_steps, list):
-                raise WorkflowError(
-                    f"step '{label}': decision default_actions must be a list of steps")
-            _validate_steps(default_steps, where=f"{label}.default")
+        for fallback_key in ("default_actions", "default", "else"):
+            default_steps = step.get(fallback_key)
+            if default_steps is not None:
+                if not isinstance(default_steps, list):
+                    raise WorkflowError(
+                        f"step '{label}': decision {fallback_key} must be a list of steps")
+                _validate_steps(default_steps, where=f"{label}.default")
     else:
         for branch in ("then", "else"):
             value = step.get(branch)

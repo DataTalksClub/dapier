@@ -688,6 +688,63 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     }
 
 
+def _order_steps_hierarchically(items):
+    """Ensure nested branch/loop child steps always follow their parent step.
+
+    On a retried run a parent branching step may carry a newer ``started_at``
+    than an already-completed child step, which would sort the child before
+    its parent under a pure timestamp sort. Grouping each step under its
+    nearest recorded ancestor preserves sibling ``(started_at, execution_id)``
+    order while guaranteeing parents precede their children.
+    """
+    if len(items) <= 1:
+        return items
+    known_ids = {
+        str(item.get("action_id") or "")
+        for item in items
+        if str(item.get("action_id") or "")
+    }
+    children_by_parent = {}
+    roots = []
+    for item in items:
+        action_id = str(item.get("action_id") or "")
+        parent_id = None
+        if action_id:
+            candidates = [
+                candidate for candidate in known_ids
+                if candidate != action_id and (
+                    action_id.startswith(f"{candidate}.")
+                    or action_id.startswith(f"{candidate}[")
+                )
+            ]
+            if candidates:
+                parent_id = max(candidates, key=len)
+        if parent_id is not None:
+            children_by_parent.setdefault(parent_id, []).append(item)
+        else:
+            roots.append(item)
+
+    ordered = []
+    visited = set()
+
+    def _emit(item):
+        item_id = id(item)
+        if item_id in visited:
+            return
+        visited.add(item_id)
+        ordered.append(item)
+        action_id = str(item.get("action_id") or "")
+        if action_id and action_id in children_by_parent:
+            for child in children_by_parent.pop(action_id):
+                _emit(child)
+
+    for root in roots:
+        _emit(root)
+    for item in items:
+        _emit(item)
+    return ordered
+
+
 def _run_items(run_id):
     """One run's stored steps, oldest first: ``(status, payload)``.
 
@@ -710,7 +767,7 @@ def _run_items(run_id):
             if run_id_of(item) == run_id
         ]
     items.sort(key=lambda item: (str(item.get("started_at") or ""), str(item.get("execution_id") or "")))
-    return items
+    return _order_steps_hierarchically(items)
 
 
 def api_get(run_id, visible=None):

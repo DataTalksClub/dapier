@@ -177,10 +177,11 @@ from .core import (AUTORETRY_DEFAULTS, CompletedStep, DIGEST_MODES, ERROR_MODES,
                    _iso, _lookup, _rendered, _step_id, evaluate_rules,
                    parse_moment, predicate_rules, render_value)
 from .controls import (DECISION_MODES, DURATION_KEYS, DURATION_UNITS,
-                       _decision_branch, _decision_choices, _decision_mode,
-                       _decision_plan, _delay_number, _delay_request,
-                       _predicate_scope, _run_condition, _run_decision,
-                       _run_delay, _run_filter, _run_paths)
+                       _collect_branch_summary, _decision_branch,
+                       _decision_choices, _decision_mode, _decision_plan,
+                       _delay_number, _delay_request, _predicate_scope,
+                       _run_condition, _run_decision, _run_delay, _run_filter,
+                       _run_paths, _run_union)
 from .loops import _digest_batch, _run_digest, _run_for_each
 from .execution import (_autoretry_backoff, _autoretry_plan, _dispatch_action,
                         _execute_step, _handle_error, _retry_after_hint,

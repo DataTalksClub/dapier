@@ -76,7 +76,9 @@ class PathsTests(unittest.TestCase):
         assert ran == ["post"]
         assert ("before", "route.invoices.post", "slack") in hooks.calls
         assert ("after", "route", "completed",
-                {"matched": "invoices", "ran": 1}) in hooks.calls
+                {"matched": "invoices", "branch": "invoices", "ran": 1,
+                 "last_step_id": "route.invoices.post", "result": {},
+                 "outputs": {"post": {}}}) in hooks.calls
 
     def test_later_predicates_are_not_evaluated_after_a_match(self):
         ran = []
@@ -103,7 +105,9 @@ class PathsTests(unittest.TestCase):
         assert stop is None
         assert ran == ["file"]
         assert ("after", "route", "completed",
-                {"matched": "receipts", "ran": 1}) in hooks.calls
+                {"matched": "receipts", "branch": "receipts", "ran": 1,
+                 "last_step_id": "route.receipts.file", "result": {},
+                 "outputs": {"file": {}}}) in hooks.calls
 
     def test_no_match_runs_the_default_branch_and_the_chain_continues(self):
         ran = []
@@ -116,7 +120,9 @@ class PathsTests(unittest.TestCase):
         assert ran == ["fallback", "post"]
         assert ("before", "route.default.fallback", "webhook") in hooks.calls
         assert ("after", "route", "completed",
-                {"matched": None, "ran": 1}) in hooks.calls
+                {"matched": None, "branch": "default", "ran": 1,
+                 "last_step_id": "route.default.fallback", "result": {},
+                 "outputs": {"fallback": {}}}) in hooks.calls
 
     def test_no_match_without_default_continues_the_chain(self):
         ran = []
@@ -129,7 +135,8 @@ class PathsTests(unittest.TestCase):
         assert stop is None
         assert ran == ["post"]
         assert ("after", "route", "completed",
-                {"matched": None, "ran": 0}) in hooks.calls
+                {"matched": None, "branch": None, "ran": 0,
+                 "last_step_id": None, "result": {}, "outputs": {}}) in hooks.calls
 
     def test_filtered_stop_inside_a_branch_propagates(self):
         ran = []

@@ -146,7 +146,9 @@ class ConditionTests(unittest.TestCase):
         assert stop is None
         assert runner_calls == ["notify"]
         assert ("after", "route", "completed",
-                {"condition": "passed", "branch": "then", "steps": 1}) in hooks.calls
+                {"condition": "passed", "branch": "then", "steps": 1,
+                 "last_step_id": "route.then.notify", "result": {},
+                 "outputs": {"notify": {}}}) in hooks.calls
 
     def test_false_predicate_runs_the_else_branch(self):
         runner_calls = []
@@ -178,7 +180,8 @@ class ConditionTests(unittest.TestCase):
         )
         assert stop is None
         assert ("after", "gate", "completed", {"condition": "failed", "branch": "else",
-                                               "steps": 0}) in hooks.calls
+                                               "steps": 0, "last_step_id": None,
+                                               "result": {}, "outputs": {}}) in hooks.calls
 
     def test_non_list_branch_is_a_config_error(self):
         with pytest.raises(ValueError, match="must be a list of steps"):
@@ -420,7 +423,10 @@ class ExecuteIntegrationTests(unittest.TestCase):
         assert [call.args[0]["url"] for call in run_webhook.call_args_list] == \
             ["https://example.test/inv"]
         assert ("after", "route", "completed",
-                {"condition": "passed", "branch": "then", "steps": 1}) in hooks.calls
+                {"condition": "passed", "branch": "then", "steps": 1,
+                 "last_step_id": "route.then.invoice-hook",
+                 "result": {"status": 200},
+                 "outputs": {"invoice-hook": {"status": 200}}}) in hooks.calls
 
         hooks, run_webhook = self.run_workflow(steps, data={"route": "receipt"})
         assert [call.args[0]["url"] for call in run_webhook.call_args_list] == \
