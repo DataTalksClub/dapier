@@ -4,6 +4,7 @@ import { $, $$ } from './ui.js';
 
 const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'audit', 'costs', 'runs', 'agents', 'workers'];
 const WORKFLOW_TABS = new Set(['list', 'hooks', 'polls']);
+const EMAIL_TABS = new Set(['received', 'addresses']);
 const NAV_FOR = {
   designer: 'workflows',
   schedules: 'workflows',
@@ -14,6 +15,7 @@ const TAB_FAMILY = {
   schedules: 'workflows',
   connections: 'connections',
   credentials: 'connections',
+  emails: 'emails',
 };
 let viewGuard = null;
 let rememberedUrl = `${window.location.pathname}${window.location.search}`;
@@ -23,7 +25,7 @@ export function rememberViewUrl(url) { rememberedUrl = url; }
 
 /* The title row has an empty middle. A standalone view's .page-tools fills
    it, and comes back to the view before the next one is mounted so inactive
-   pages keep their controls. Family tabs (Connections, Workflows)
+   pages keep their controls. Family tabs (Connections, Workflows, Emails)
    keep their actions in the body — the header above the tabs stays still. */
 let mountedTools = null;
 function mountPageTools() {
@@ -64,10 +66,13 @@ function workflowTabFor(view, push, options) {
   return 'list';
 }
 
-function pathFor(view, workflowTab) {
+function pathFor(view, workflowTab, emailTab) {
   if (view === 'overview') return '/';
   if (view === 'workflows' && (workflowTab === 'hooks' || workflowTab === 'polls')) {
     return `/workflows?tab=${workflowTab}`;
+  }
+  if (view === 'emails' && emailTab === 'addresses') {
+    return '/emails?tab=addresses';
   }
   return `/${view}`;
 }
@@ -83,6 +88,17 @@ function applyWorkflowTab(tab) {
   });
 }
 
+function emailTabFor(view, push, options) {
+  if (view !== 'emails') return null;
+  const requested = options.tab;
+  if (requested && EMAIL_TABS.has(requested)) return requested;
+  if (!push) {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return EMAIL_TABS.has(tab) ? tab : 'received';
+  }
+  return 'received';
+}
+
 /* A tab strip wider than the screen scrolls; it carries .is-clipped (a
    trailing fade) while tabs remain hidden past its right edge. */
 function syncTabOverflow() {
@@ -96,7 +112,22 @@ document.addEventListener('scroll', (event) => {
   if (event.target && event.target.id === 'page-tabs') syncTabOverflow();
 }, true);
 
-function syncPageTabs(view, workflowTab) {
+/* Family tabs swap the body under the strip: the Received / Addresses
+   split works like the Workflows / Hooks / Polls split — one route per
+   tab (?tab=addresses for the second), the header above the strip stays
+   still, and back/forward re-reads the tab from the URL. */
+export function applyEmailTab(tab) {
+  const view = $('[data-page="emails"]');
+  if (!view) return;
+  $$('[data-email-panel]', view).forEach((panel) => {
+    panel.hidden = panel.dataset.emailPanel !== tab;
+  });
+  $$('[data-email-tools]', view).forEach((tools) => {
+    tools.hidden = tools.dataset.emailTools !== tab;
+  });
+}
+
+function syncPageTabs(view, workflowTab, emailTab) {
   const tabs = $('#page-tabs');
   if (!tabs) return;
   const family = TAB_FAMILY[view];
@@ -106,7 +137,9 @@ function syncPageTabs(view, workflowTab) {
   });
   $$('.page-tabs a').forEach((link) => {
     const sameView = link.dataset.view === view;
-    const sameTab = view !== 'workflows' || (link.dataset.tab || 'list') === workflowTab;
+    let sameTab = true;
+    if (view === 'workflows') sameTab = (link.dataset.tab || 'list') === workflowTab;
+    else if (view === 'emails') sameTab = (link.dataset.tab || 'received') === emailTab;
     if (sameView && sameTab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
@@ -121,10 +154,13 @@ export async function setView(view, push = true, options = {}) {
     return false;
   }
   const workflowTab = workflowTabFor(view, push, options);
+  const emailTab = emailTabFor(view, push, options);
   state.view = view;
   document.body.dataset.view = view; // CSS hooks (designer full-height canvas)
   if (workflowTab) document.body.dataset.workflowTab = workflowTab;
   else delete document.body.dataset.workflowTab;
+  if (emailTab) document.body.dataset.emailTab = emailTab;
+  else delete document.body.dataset.emailTab;
   const navView = NAV_FOR[view] || view;
   $$('.nav-item').forEach((item) => {
     item.classList.toggle('active', item.dataset.view === navView);
@@ -133,17 +169,18 @@ export async function setView(view, push = true, options = {}) {
   });
   $$('.view').forEach((page) => page.classList.toggle('active', page.dataset.page === view));
   if (view === 'workflows') applyWorkflowTab(workflowTab);
-  syncPageTabs(view, workflowTab);
+  if (view === 'emails') applyEmailTab(emailTab);
+  syncPageTabs(view, workflowTab, emailTab);
   /* Family tabs swap the body under the strip, not the page header above
      it. Child views (App setup, Hooks…) keep their own routes; the
      title stays the parent page. */
   const FAMILY_META = {
     workflows: ['Workflows', 'Published workflows and the triggers that start them.'],
     connections: ['Connections', 'The connected accounts workflows act through.'],
+    emails: ['Emails', 'Mail Dapier received, and which workflow ran.'],
   };
   const VIEW_META = {
     overview: ['Home', 'Automations and their latest results at a glance.'],
-    emails: ['Emails', 'Mail Dapier received, and which workflow ran.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
     agents: ['Agents', 'Agent tasks and the runs behind them.'],
     workers: ['Workers', 'Machines that run agent tasks.'],
@@ -162,7 +199,7 @@ export async function setView(view, push = true, options = {}) {
   if (!push && ['/inbox', '/usage'].includes(window.location.pathname)) history.replaceState(null, '', `/runs${window.location.search}`);
   if (!push && window.location.pathname === '/triggers') history.replaceState(null, '', '/workflows?tab=hooks');
   if (!push && window.location.pathname === '/storage') history.replaceState(null, '', '/workflows');
-  if (push) history.pushState(null, '', pathFor(view, workflowTab));
+  if (push) history.pushState(null, '', pathFor(view, workflowTab, emailTab));
   rememberedUrl = `${window.location.pathname}${window.location.search}`;
   mountPageTools();
   window.scrollTo(0, 0);

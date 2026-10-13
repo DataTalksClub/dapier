@@ -93,6 +93,10 @@
           <a class="view-link" href="/connections" data-view="connections">Accounts</a>
           <a class="view-link" href="/credentials" data-view="credentials">App setup</a>
         </div>
+        <div class="page-tab-set" data-family="emails">
+          <a class="view-link" href="/emails" data-view="emails" data-tab="received">Received</a>
+          <a class="view-link" href="/emails?tab=addresses" data-view="emails" data-tab="addresses">Addresses</a>
+        </div>
       </nav>
 
       <div id="loading" class="loading" hidden><span></span><span></span><span></span></div>
@@ -254,13 +258,12 @@
       </section>
 
       <section class="view" data-page="emails">
-        <div class="page-tools dk-toolbar trigger-toolbar">
-          <div class="pane-switch" role="group" aria-label="Show" data-workspace="email-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Received</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Addresses</button></div>
+        <div class="page-tools dk-toolbar trigger-toolbar" data-email-tools="received">
           <div id="email-filter-chips" class="dk-cluster" role="group" aria-label="Filter received email"></div>
         </div>
         <p id="email-load-error" class="form-error" role="alert"></p>
-        <div id="email-workspace" class="trigger-workspace" data-pane="activity">
-          <div class="email-mail-workspace trigger-activity">
+        <div id="email-workspace" class="trigger-workspace">
+          <div class="email-mail-workspace trigger-activity" data-email-panel="received">
             <section class="data-panel email-mail-sidebar" aria-labelledby="email-mail-title">
               <div class="section-head">
                 <h2 id="email-mail-title">Received</h2>
@@ -273,7 +276,7 @@
             </section>
             <article id="email-read" class="data-panel" aria-label="Selected email"><div class="dialog-state"><strong>Select a message</strong><p>Read the email and see which workflow ran.</p></div></article>
           </div>
-          <aside class="trigger-sources" aria-label="Addresses and senders">
+          <aside class="trigger-sources" aria-label="Addresses and senders" data-email-panel="addresses" hidden>
             <section class="data-panel" aria-labelledby="email-addresses-title">
               <div class="section-head">
                 <h2 id="email-addresses-title">Addresses</h2>

@@ -77,18 +77,21 @@ def test_folded_pages_are_family_tabs_not_sidebar_items():
         "Polls",
     ]
     assert _family_labels("connections") == ["Accounts", "App setup"]
+    assert _family_labels("emails") == ["Received", "Addresses"]
     assert 'data-family="agents"' not in tabs
-    assert 'data-family="emails"' not in tabs
 
 
 def test_emails_is_its_own_sidebar_page():
-    """Emails left the Workflows tab strip for its own sidebar entry.
-    The mailbox is a first-class page, like Agents. /emails still lands."""
+    """Emails is a sidebar page with its own family strip: Received /
+    Addresses tabs under one header, like Workflows / Hooks / Polls."""
     sidebar = _sidebar()
     assert 'class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span>' in sidebar
     assert sidebar.index('href="/workflows"') < sidebar.index('href="/emails"') < sidebar.index('href="/runs"')
-    assert 'href="/emails"' not in _page_tabs()
-    assert "emails: 'workflows'" not in ROUTER
+    tabs = _page_tabs()
+    assert 'href="/emails"' in tabs
+    assert 'href="/emails?tab=addresses"' in tabs
+    assert _family_labels("emails") == ["Received", "Addresses"]
+    assert "emails: 'emails'" in ROUTER
     assert "emails: ['Emails', 'Mail Dapier received, and which workflow ran.']" in ROUTER
     assert "/emails" in ingress.CONSOLE_VIEWS
 

@@ -43,12 +43,47 @@ def test_emails_page_is_a_mailbox_of_received_mail():
     assert "bodyHtml(" in js
 
 
+def test_emails_reading_pane_renders_html_sandboxed():
+    """HTML bodies render like a mail client: a sandboxed iframe whose
+    srcdoc is assigned as a property after innerHTML (never interpolated
+    into the page string), scripts blocked, links forced to a new tab,
+    plain text kept as the collapsed fallback."""
+    js = (WEB / "js" / "views" / "emails.js").read_text()
+    assert "email-body-frame" in js
+    assert "allow-same-origin" in js
+    assert "EMAIL_FRAME_SANDBOX" in js
+    assert "'allow-scripts'" not in js and '"allow-scripts"' not in js
+    assert "frame.srcdoc" in js or ".srcdoc =" in js
+    assert "wireEmailFrame(" in js
+    assert 'target", "_blank"' in js or "target', '_blank'" in js
+    assert "prepareSrcdoc(" in js
+    # The old escaped-source dump is gone: HTML renders, it is not printed.
+    assert "Original HTML" not in js
+    assert "email-body-html" not in js
+    css = (WEB / "app.css").read_text()
+    assert ".email-body-frame" in css
+    # Section anchors parallel tasks rely on stay stable.
+    assert "email-body-heading" in js
+    assert ".email-body" in css
+
+
 def test_emails_reading_pane_matches_the_agent_runs_layout():
     """List on the left, selected message (body + which workflow ran) on
-    the right; phone shows one pane at a time with Back."""
+    the right; phone shows one pane at a time with Back. Received /
+    Addresses are family tabs in the shared strip (the Workflows
+    pattern), not an in-content switch."""
+    html = (WEB / "index.html").read_text()
+    page = html[html.index('data-page="emails"'):html.index('data-page="agents"')]
+    assert "pane-switch" not in page
+    assert 'data-family="emails"' in html
+    assert 'data-email-panel="received"' in page
+    assert 'data-email-panel="addresses"' in page
+    assert 'data-email-tools="received"' in page
+    router = (WEB / "js" / "router.js").read_text()
+    assert "EMAIL_TABS" in router and "applyEmailTab" in router
+    assert 'href="/emails?tab=addresses"' in html
     css = (WEB / "app.css").read_text()
     assert ".email-mail-workspace { display: grid;" in css
-    assert "body[data-view=\"emails\"] .pane-switch { display: grid;" in css
     assert ".email-mail-workspace.has-selection #email-read { display: block; }" in css
     assert ".email-mail-workspace.has-selection .email-mail-sidebar { display: none; }" in css
     assert ".email-mail-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto;" in css

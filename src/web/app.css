@@ -1082,11 +1082,14 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-back { display: none; }
 .email-read-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); display: grid; gap: var(--dk-space-5); }
 .email-read-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
-.email-read-head h2 { justify-self: stretch; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
-.email-read-meta { --email-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0 0 0 calc(-1 * var(--email-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--email-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.email-read-meta > .status { margin-left: var(--email-sep); font-size: var(--dk-text-sm); }
+.email-subject-row { justify-self: stretch; display: flex; align-items: center; gap: var(--dk-gap-control); min-width: 0; }
+.email-subject-row h2 { flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); }
+.email-subject-row > .status { flex: none; font-size: var(--dk-text-sm); }
+.email-read-meta { --email-sep: var(--dk-space-2); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: 0; margin: 0 0 0 calc(-1 * var(--email-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--email-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .email-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .email-meta-item::before { content: "·"; flex: none; width: var(--email-sep); text-align: center; color: var(--dk-text-faint); }
+.email-meta-item:first-child::before { content: none; }
+.email-meta-sep { flex: none; color: var(--dk-text-faint); }
 .email-read-head .email-technical { border-top: 0; padding: 0; justify-self: stretch; }
 .email-read-head .email-technical summary { display: inline-flex; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); cursor: pointer; }
 .email-read-head .email-technical summary:hover { color: var(--dk-text-primary); }
@@ -1097,22 +1100,31 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-read-head .email-technical dt { color: var(--dk-text-muted); }
 .email-read-head .email-technical dd { margin: 0; overflow-wrap: anywhere; }
 .email-detail-block { display: grid; gap: var(--dk-space-2); }
+.email-workflow { justify-self: stretch; display: flex; align-items: center; flex-wrap: wrap; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-space-2) var(--dk-space-3); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-muted); min-width: 0; }
+.email-workflow h3 { margin: 0; flex: none; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); }
+.email-workflow-body { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: var(--dk-space-2) var(--dk-gap-control); min-width: 0; }
+.email-workflow-error { flex: 1 1 12rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dk-danger-text); font-size: var(--dk-text-sm); }
+.email-workflow-note { margin: 0; }
+.email-workflow-body > .email-runs { flex: 1 1 100%; }
 .email-detail-block h3, .email-body h3 { margin: 0; font-size: var(--dk-text-md); font-weight: var(--dk-weight-semibold); color: var(--dk-text-muted); }
 .email-detail-block h3 .email-muted { margin-left: var(--dk-space-1); }
 .email-detail-block > .sub { margin: 0; }
 .email-detail-block .detail-error { margin: 0; overflow-wrap: anywhere; font-size: var(--dk-text-sm); }
 .email-body { display: grid; gap: var(--dk-space-3); min-width: 0; }
-.email-body-text, .email-body-html { margin: 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
+.email-body-frame { width: 100%; min-height: 20rem; height: 40rem; max-height: 100rem; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: #fff; }
+.email-body-text { margin: 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
 .email-body-text { font: var(--dk-text-body)/1.7 var(--dk-font-sans); }
-.email-body-html { font: var(--dk-text-sm)/1.6 var(--dk-font-mono); max-height: 24rem; overflow: auto; }
 .email-body-empty { color: var(--dk-text-muted); font-size: var(--dk-text-md); }
 .email-body-empty p { margin: 0; }
 .email-html-alt summary { cursor: pointer; font-size: var(--dk-text-sm); color: var(--dk-text-muted); min-height: var(--dk-size-control-sm); }
-.email-html-alt[open] .email-body-html { margin-top: var(--dk-space-2); }
-.email-runs, .email-files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
+.email-html-alt[open] .email-body-text { margin-top: var(--dk-space-2); }
+.email-runs, .email-files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); }
 .email-runs li, .email-files li { display: flex; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); flex-wrap: wrap; padding: var(--dk-space-2) var(--dk-space-3); border-bottom: 1px solid var(--dk-border-default); }
 .email-runs li:last-child, .email-files li:last-child { border-bottom: 0; }
 .email-runs .dk-button { margin-left: auto; }
+.email-workflow-body > .email-runs { border: 0; border-radius: 0; background: transparent; }
+.email-runs--compact li { padding: var(--dk-space-1) 0; border-bottom: 0; }
+.email-workflow-body > .email-workflow-error + .email-runs { flex-basis: 100%; }
 .email-files svg { width: 16px; height: 16px; flex: none; color: var(--dk-text-muted); }
 .email-files .mono { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: var(--dk-text-md); }
 .email-muted { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
@@ -1122,10 +1134,7 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
   body[data-view="emails"] section.view[data-page="emails"].active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   body[data-view="emails"] .trigger-toolbar { flex: none; }
   body[data-view="emails"] .trigger-workspace { flex: 1; min-height: 18rem; align-items: stretch; grid-template-columns: minmax(0, 1fr); }
-  body[data-view="emails"] .pane-switch { display: grid; grid-template-columns: auto auto; flex: none; }
-  body[data-view="emails"] .trigger-toolbar[data-pane="sources"] > #email-filter-chips { display: none; }
-  body[data-view="emails"] .trigger-workspace[data-pane="activity"] > .trigger-sources,
-  body[data-view="emails"] .trigger-workspace[data-pane="sources"] > .email-mail-workspace { display: none; }
+  body[data-view="emails"] .trigger-workspace > [hidden] { display: none; }
   .email-mail-workspace { flex: 1; min-height: 18rem; align-items: stretch; }
   .email-mail-sidebar, #email-read { min-height: 0; }
   #email-read { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -1933,6 +1942,11 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
    share one grid — when | what | outcome — and one outcome vocabulary. */
 .trigger-toolbar { justify-content: space-between; }
 .view > .page-tools.trigger-toolbar { justify-content: space-between; }
+/* Emails: the outcome filter chips take a full-width row in the Received
+   toolbar (the .dk-cluster wraps internally), so wide screens no longer
+   crowd the detail pane header. Received / Addresses live in the shared
+   family strip above, like Workflows / Hooks / Polls. */
+.view[data-page="emails"] .page-tools.trigger-toolbar #email-filter-chips { flex: 1 1 100%; max-width: 100%; }
 .trigger-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: var(--dk-gap-section); align-items: start; }
 .trigger-sources { display: grid; gap: var(--dk-gap-section); min-width: 0; }
 .trigger-sources .data-panel + .data-panel { margin-top: 0; }
@@ -2101,7 +2115,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .register-toolbar .toolbar-filters > label.toolbar-search { flex: 1 1 100%; max-width: none; }
   .register-toolbar .dk-toolbar__end { display: flex; flex-wrap: wrap; gap: var(--dk-gap-control); }
   .register-toolbar .dk-toolbar__end > .dk-button { width: auto; }
-  /* The pane switch (Deliveries/Endpoints, Received/Addresses, Fires/Coming
+  /* The pane switch (Deliveries/Endpoints, Fires/Coming
      up) is a pair of labelled chips on one line, not a half-width pair. */
   .pane-switch { display: flex; flex: 0 1 auto; }
   .pane-switch .dk-filter-chip { flex: 0 0 auto; }

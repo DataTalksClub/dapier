@@ -104,6 +104,7 @@ function bodies(event) {
     text: part(email.text) || part(data.text) || part(body.text),
     html: part(email.html) || part(data.html) || part(body.html),
     truncated: Boolean(email.truncated || data.truncated),
+    rehydrated: Boolean(email.rehydrated),
   };
 }
 
@@ -113,19 +114,66 @@ function htmlToText(html) {
   return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/* The raw message HTML is never interpolated into the page string below:
+   renderRead assigns it to the iframe's srcdoc property after innerHTML,
+   so no quoting or `</iframe>` breakout applies. The sandbox grants no
+   script permission — scripts, forms and top navigation stay blocked while
+   links (rewritten to _blank via <base>) may open a new tab. */
+const EMAIL_FRAME_SANDBOX = 'allow-same-origin allow-popups allow-popups-to-escape-sandbox';
+
+function prepareSrcdoc(html) {
+  const base = '<base target="_blank" rel="noopener">';
+  const style = '<style>img{max-width:100%;height:auto}body{margin:0;padding:16px;overflow-wrap:anywhere}</style>';
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (match) => `${match}${base}${style}`);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (match) => `${match}<head>${base}${style}</head>`);
+  return `<head>${base}${style}</head>${html}`;
+}
+
 function bodyHtml(event) {
-  const { text, html, truncated } = bodies(event);
+  const { text, html, truncated, rehydrated } = bodies(event);
+  if (html) {
+    const note = rehydrated
+      ? '<p class="sub">Full message restored from the raw copy for display. Replay uses the same raw copy.</p>'
+      : (truncated ? '<p class="sub">Only the stored portion of this message is shown.</p>' : '');
+    const readable = text || htmlToText(html);
+    const plain = readable && readable !== html
+      ? `<details class="email-html-alt"><summary>Plain text</summary><pre class="email-body-text">${escapeHtml(readable)}</pre></details>`
+      : '';
+    return `${note}<iframe class="email-body-frame" sandbox="${EMAIL_FRAME_SANDBOX}" title="Email message"></iframe>${plain}`;
+  }
   const note = truncated ? '<p class="sub">Only the stored portion of this message is shown.</p>' : '';
-  const readable = text || (html ? htmlToText(html) : '');
-  if (!readable && !html) {
+  if (!text) {
     return `<div class="email-body-empty"><p>${truncated
       ? 'This message was too large to store in full. Replay still uses the raw copy.'
       : 'No body was recorded for this message.'}</p></div>`;
   }
-  const source = html
-    ? `<details class="email-html-alt"><summary>Original HTML</summary><pre class="email-body-html">${escapeHtml(html)}</pre></details>`
-    : '';
-  return `${note}${readable ? `<pre class="email-body-text">${escapeHtml(readable)}</pre>` : ''}${source}`;
+  return `${note}<pre class="email-body-text">${escapeHtml(text)}</pre>`;
+}
+
+function wireEmailFrame(panel, event) {
+  const frame = panel.querySelector('iframe.email-body-frame');
+  if (!frame) return;
+  const { html } = bodies(event);
+  if (!html) return;
+  frame.srcdoc = prepareSrcdoc(html);
+  const fit = () => {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc) return;
+      /* Links must open a new tab, never navigate the console. The
+         <base> above covers well-formed mail; enforce it per link too. */
+      doc.querySelectorAll('a[href]').forEach((link) => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener');
+      });
+      const height = Math.min(
+        Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0, 320),
+        1600,
+      );
+      frame.style.height = `${height}px`;
+    } catch (_) { /* opaque frame: keep the default height */ }
+  };
+  frame.addEventListener('load', fit, { once: false });
 }
 
 /* ---- received list ---------------------------------------------------- */
@@ -186,6 +234,29 @@ function setMailUrl(id) {
   history.replaceState(null, '', url);
 }
 
+/* Family tabs (router.js) swap Received / Addresses under the shared
+   strip, like Workflows / Hooks / Polls. A row open always lands on
+   Received — rows only exist there — without pushing a history entry. */
+function addressesActive() {
+  const panel = $('[data-email-panel="addresses"]');
+  return Boolean(panel && !panel.hidden);
+}
+
+function showReceivedTab() {
+  if (!addressesActive()) return;
+  $$('[data-email-panel]').forEach((panel) => { panel.hidden = panel.dataset.emailPanel !== 'received'; });
+  $$('[data-email-tools]').forEach((tools) => { tools.hidden = tools.dataset.emailTools !== 'received'; });
+  document.body.dataset.emailTab = 'received';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('tab');
+  history.replaceState(null, '', url);
+  $$('.page-tabs a').forEach((link) => {
+    if (link.dataset.view !== 'emails') return;
+    if ((link.dataset.tab || 'received') === 'received') link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+}
+
 function listedEvent(inboxId) {
   return (mail.events || []).find((event) => event.inbox_id === inboxId);
 }
@@ -195,26 +266,33 @@ function listedEvent(inboxId) {
 function runsHtml(event) {
   const email = event.email || {};
   const runs = event.runs || [];
+  /* Compact workflow line: one row per run (status + name + Open run).
+     The message-level error renders once here — readHtml() no longer
+     renders outcomeHtml() above this, so the text cannot repeat. */
   if (runs.length) {
-    return `<ul class="email-runs">${runs.map((run) => `<li>
+    const error = event.error
+      ? `<span class="email-workflow-error" title="${escapeHtml(event.error)}">${escapeHtml(event.error)}</span>`
+      : '';
+    return `${error}<ul class="email-runs email-runs--compact">${runs.map((run) => `<li>
         <span class="cell-name" title="${escapeHtml(run.workflow)}">${escapeHtml(workflowName(run.workflow))}</span>
-        ${run.status ? statusLine(run.status) : '<span class="email-muted">status unknown</span>'}
-        <button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(run.run_id)}">Open run</button>
+        ${run.status ? statusLine(run.status, undefined, run.error && run.error !== event.error ? run.error : undefined) : '<span class="email-muted">status unknown</span>'}
+        <button type="button" class="dk-button dk-button--secondary dk-button--sm email-run" data-run="${escapeHtml(run.run_id)}">Open run</button>
       </li>`).join('')}</ul>`;
   }
   if (event.outcome === 'failed') {
     const candidates = handlersFor(event);
-    return `<p class="detail-error">${escapeHtml(event.error || 'The run failed.')}</p>${candidates.length
-      ? `<ul class="email-runs">${candidates.map((workflow) => `<li><span class="cell-name" title="${escapeHtml(workflow)}">${escapeHtml(workflowName(workflow))}</span><span class="email-muted">handles this address</span><button type="button" class="dk-button dk-button--secondary email-run" data-run="${escapeHtml(`${workflow}:${event.inbox_id}`)}">Open run</button></li>`).join('')}</ul>` : ''}`;
+    const error = `<span class="email-workflow-error" title="${escapeHtml(event.error || 'The run failed.')}">${escapeHtml(event.error || 'The run failed.')}</span>`;
+    return `${error}${candidates.length
+      ? `<ul class="email-runs email-runs--compact">${candidates.map((workflow) => `<li><span class="cell-name" title="${escapeHtml(workflow)}">${escapeHtml(workflowName(workflow))}</span><span class="email-muted">handles this address</span><button type="button" class="dk-button dk-button--secondary dk-button--sm email-run" data-run="${escapeHtml(`${workflow}:${event.inbox_id}`)}">Open run</button></li>`).join('')}</ul>` : ''}`;
   }
   if (event.outcome === 'refused') {
     const sender = email.from_address;
-    return `<p class="sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} allowed to write to this address, so no workflow ran. Allow the sender, then replay the message to run it now.</p>`;
+    return `<p class="email-workflow-note sub">${sender ? `<span class="mono">${escapeHtml(sender)}</span> is not` : 'The sender is not'} allowed — allow the sender, then replay to run it.</p>`;
   }
   if (event.outcome === 'unmatched') {
-    return `<p class="sub">${isFeedback(event)
+    return `<p class="email-workflow-note sub">${isFeedback(event)
       ? 'No workflow watches bounce or complaint feedback.'
-      : 'No published workflow has an email trigger for this address.'} Add one in Workflows, then replay the message.</p>`;
+      : 'No published workflow has an email trigger for this address.'} Add one in Workflows, then replay.</p>`;
   }
   return '';
 }
@@ -249,18 +327,18 @@ function readHtml(event) {
   const sender = (email.from_address || '').toLowerCase();
   const route = (email.route || '').toLowerCase();
   const canAllow = event.outcome === 'refused' && sender && !senderAllowed(sender, route);
+  const workflow = runsHtml(event);
   return `<div class="email-read-body">
     <div class="email-read-head">
       <button class="email-back dk-button dk-button--secondary dk-button--sm" type="button">Back to received</button>
-      <h2 tabindex="-1" title="${escapeHtml(title)}">${escapeHtml(title)}</h2>
-      <p class="email-read-meta">${outcomeBadge(event)}${from ? `<span class="email-meta-item" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>` : ''}${to ? `<span class="email-meta-item mono" title="${escapeHtml(to)}">${escapeHtml(to)}</span>` : ''}${when ? `<span class="email-meta-item">${when}</span>` : ''}</p>
+      <div class="email-subject-row"><h2 tabindex="-1" title="${escapeHtml(title)}">${escapeHtml(title)}</h2>${outcomeBadge(event)}</div>
+      <p class="email-read-meta">${from ? `<span class="email-meta-item" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>` : ''}${from && to ? '<span class="email-meta-sep" aria-hidden="true">→</span>' : ''}${to ? `<span class="email-meta-item mono" title="${escapeHtml(to)}">${escapeHtml(to)}</span>` : ''}${when ? `<span class="email-meta-item">${when}</span>` : ''}</p>
       <details class="email-technical"><summary>Details</summary><dl>${headers}</dl></details>
+      ${workflow ? `<section class="email-workflow" aria-labelledby="email-outcome-heading">
+        <h3 id="email-outcome-heading">Workflow</h3>
+        <div class="email-workflow-body">${workflow}</div>
+      </section>` : ''}
     </div>
-    <section class="email-detail-block" aria-labelledby="email-outcome-heading">
-      <h3 id="email-outcome-heading">Workflow</h3>
-      <div class="activity-outcome">${outcomeHtml(event)}</div>
-      ${runsHtml(event)}
-    </section>
     <section class="email-body" aria-labelledby="email-body-heading">
       <h3 id="email-body-heading">Message</h3>
       ${bodyHtml(event)}
@@ -287,12 +365,14 @@ function renderRead() {
     return;
   }
   panel.innerHTML = readHtml(event);
+  wireEmailFrame(panel, event);
   icons();
 }
 
 async function openEmail(inboxId, { updateUrl = true } = {}) {
   const changed = openInboxId !== inboxId;
   openInboxId = inboxId;
+  showReceivedTab();
   if (changed) {
     detail = null;
     $('#email-read').scrollTop = 0;
@@ -332,6 +412,10 @@ function pickMail() {
     setMailUrl(null);
   }
   const fromUrl = new URLSearchParams(window.location.search).get('mail');
+  /* An explicit ?mail= deep link always reads on Received. Otherwise the
+     Addresses tab stays put — no auto-selecting a hidden row. */
+  if (fromUrl && ids.has(fromUrl)) showReceivedTab();
+  else if (addressesActive()) { renderRead(); return; }
   const desktop = window.matchMedia('(min-width: 861px)').matches;
   const id = (fromUrl && ids.has(fromUrl) && fromUrl)
     || openInboxId
