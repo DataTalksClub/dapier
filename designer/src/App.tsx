@@ -2123,7 +2123,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
               <h3>Code tests</h3>
               <p className="inspector-hint">
                 Cases riding on this step as its <code>tests</code> list (YAML).
-                Each runs the snippet against its own <code>input</code>:
+                Each runs the snippet against its own <code>input</code> with
+                prior outputs as <code>steps</code>:
                 <code>expected</code> asserts the result deep-equal,
                 <code>expected_error</code> asserts a failing run, neither only
                 asserts it runs. Pure — no connections, nothing recorded.

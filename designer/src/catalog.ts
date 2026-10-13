@@ -197,8 +197,9 @@ export const actionCatalog: ActionEntry[] = [
     type: "ai_complete",
     label: "AI: complete",
     icon: Sparkles,
-    description: "One chat completion against a configured OpenAI-compatible endpoint (LLM_* env on the Worker function — no connection). The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
+    description: "One chat completion against a configured OpenAI-compatible endpoint through a verified LLM connection. The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
     fields: [
+      { key: "connection_id", label: "LLM connection", default: "llm" },
       { key: "prompt", label: "Prompt", type: "textarea", required: true,
         placeholder: "Summarize this message for the digest:\n{body}" },
       { key: "system", label: "System message", type: "textarea" },
@@ -1686,7 +1687,7 @@ export const actionCatalog: ActionEntry[] = [
     type: "code",
     label: "Code (Python)",
     icon: Code2,
-    description: "Sandboxed Python transform: the event data arrives as `input`; the last expression (or an `output` variable) becomes the step result.",
+    description: "Sandboxed Python transform: the event data arrives as `input`, prior step outputs as `steps`; the last expression (or an `output` variable) becomes the step result.",
     fields: [
       {
         key: "code",
@@ -1702,7 +1703,7 @@ export const actionCatalog: ActionEntry[] = [
     type: "js",
     label: "Code (JavaScript)",
     icon: Braces,
-    description: "Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`; `return` a value to make it the step result. console.log is captured.",
+    description: "Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`, prior step outputs as `steps`; `return` a value to make it the step result. console.log is captured.",
     fields: [
       {
         key: "code",
