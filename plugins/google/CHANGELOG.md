@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+YouTube push notifications and backup polls now share step execution identities
+by video ID, preventing duplicate announcements across the two sources. Failed
+steps still retry and explicit operator replays still run again.
+
 ## 1.0.0 — 2026-10-03
 
 First release as a plugin. No behavior change: the Sheets, Drive, Calendar,

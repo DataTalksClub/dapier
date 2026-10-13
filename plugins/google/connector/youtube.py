@@ -8,6 +8,7 @@ discovery and health-check runners delegate to the shared provider layer
 connection's own token.
 """
 from src.dapier.connections import discovery as provider
+from src.dapier.connectors.ingress import event_identity
 from plugins.google.runners.youtube import (
     run_youtube_add_to_playlist,
     run_youtube_create_playlist,
@@ -28,6 +29,13 @@ from src.dapier.connectors.registry import (
     register_connection_test,
     register_discovery,
 )
+
+
+@event_identity("youtube", "video.published")
+def _video_processing_id(event):
+    """Push and backup polls share the existing WebSub video identity."""
+    video_id = (event.get("data") or {}).get("video_id")
+    return f"youtube:{video_id}" if video_id else None
 
 register(Action(
     type="youtube_subscription_status",

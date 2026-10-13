@@ -6,7 +6,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from ..connectors.ingress import normalize_event
+from ..connectors.ingress import normalize_event, processing_id
 from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
 from .logic import CompletedStep, RunSuspended, resume_chain, run_chain
@@ -121,7 +121,7 @@ def normalize_payload(payload):
 
 
 def _execution_id(workflow_id, action_id, event):
-    return f"{workflow_id}:{action_id}:{event['id']}"
+    return f"{workflow_id}:{action_id}:{processing_id(event)}"
 
 
 def _run_id(workflow_id, event):

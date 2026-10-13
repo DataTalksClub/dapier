@@ -260,6 +260,13 @@ push feed, delivered to `https://dapier.dtcdev.click/hooks/youtube`. Connecting
 the channel alone subscribes nothing: a channel is subscribed when a youtube
 workflow item names it.
 
+Push notifications and `youtube.videos` backup polls share a processing identity
+by video ID. Each workflow step uses the same atomic execution lease, so a
+completed step is skipped when another source reports that video, including
+title changes or provider retries. Failed steps can retry. Execution records
+retain this protection for 90 days; explicit CLI or console replays get a new
+identity and can run again. Existing WebSub execution records remain compatible.
+
 1. Connect the channel (OAuth, `youtube.readonly`) as described above.
 2. Create a workflow item with `connector: youtube`,
    `event: video.published`, and a `channel_id` filter (for example

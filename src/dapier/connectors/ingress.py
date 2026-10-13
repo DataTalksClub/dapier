@@ -9,6 +9,24 @@ itself is unwrapped by the worker before this runs.
 """
 
 NORMALIZERS = []
+EVENT_IDENTITIES = {}
+
+
+def event_identity(connector, event):
+    """Register a plugin's stable processing identity across ingress paths."""
+    def register(identity):
+        EVENT_IDENTITIES[(connector, event)] = identity
+        return identity
+    return register
+
+
+def processing_id(payload):
+    """Stable step identity; explicit operator replays keep their fresh id."""
+    delivery_id = payload["id"]
+    if str(delivery_id).startswith(("replay-", "inbox-replay-")):
+        return delivery_id
+    identity = EVENT_IDENTITIES.get((payload.get("connector"), payload.get("event")))
+    return (identity(payload) if identity else None) or delivery_id
 
 
 def ingress(normalize):
