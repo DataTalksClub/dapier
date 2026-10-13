@@ -81,7 +81,7 @@ register(Action(
     required=frozenset({"prompt"}),
     optional=frozenset({"connection_id", "system", "json_mode", "json_schema", "temperature", "model", "timeout_seconds"}),
     fields=(
-        {"key": "connection_id", "label": "LLM connection", "default": "llm"},
+        {"key": "connection_id", "label": "LLM connection", "default": "llm", "provider": "llm"},
         {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
          "placeholder": "Summarize this message for the digest:\n{body}"},
         {"key": "system", "label": "System message", "type": "textarea",

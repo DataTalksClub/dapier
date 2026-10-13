@@ -199,7 +199,7 @@ export const actionCatalog: ActionEntry[] = [
     icon: Sparkles,
     description: "One chat completion against a configured OpenAI-compatible endpoint through a verified LLM connection. The prompt renders from the event; JSON mode parses the reply into `data` (an unparsable reply returns {ok: false, error} instead of failing the step). Output: {ok, text|data, model, usage}.",
     fields: [
-      { key: "connection_id", label: "LLM connection", default: "llm" },
+      { key: "connection_id", label: "LLM connection", default: "llm", provider: "llm" },
       { key: "prompt", label: "Prompt", type: "textarea", required: true,
         placeholder: "Summarize this message for the digest:\n{body}" },
       { key: "system", label: "System message", type: "textarea" },

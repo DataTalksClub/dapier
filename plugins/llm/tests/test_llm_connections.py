@@ -189,3 +189,12 @@ def test_deployment_has_no_llm_key_environment_or_parameter():
     assert 'LlmApiKey:' not in template
     assert 'ANTHROPIC_API_KEY' not in template + workflow
     assert 'lambda:InvokeFunction' in template
+
+
+def test_llm_actions_use_standard_connection_reference_resolution(monkeypatch):
+    from src.dapier.engine.actions import base
+    resolve = Mock(return_value={'provider': 'llm', 'status': 'connected', 'credential_id': 'oauth#llm-private'})
+    monkeypatch.setattr(base, '_connected_connection', resolve)
+    monkeypatch.setattr(plugin.credentials, 'get_credential', lambda key: KEY)
+    assert plugin.configuration('llm my-account')['token'] == KEY['api_key']
+    resolve.assert_called_once_with('llm my-account')

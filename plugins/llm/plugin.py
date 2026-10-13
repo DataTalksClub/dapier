@@ -118,11 +118,10 @@ def issue_token(connection, stored, *, transport=None):
 
 
 def configuration(connection_id):
-    import boto3
-    table = boto3.resource('dynamodb').Table(os.environ['CONNECTIONS_TABLE'])
-    connection = records.get_connection(table, connection_id)
-    if not connection or connection.get('provider') != 'llm' or connection.get('status') != 'connected':
-        raise ValueError(f'LLM connection {connection_id} is not connected')
+    from src.dapier.engine.actions.base import _connected_connection
+    connection = _connected_connection(connection_id)
+    if connection.get('provider') != 'llm':
+        raise ValueError(f'Connection {connection_id} is not an LLM connection')
     try:
         config = validate(credentials.get_credential(connection['credential_id']))
     except KeyError:
