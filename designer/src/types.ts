@@ -32,6 +32,24 @@ export interface NodeData {
    * (minus id/type) so hand-written workflows survive a round-trip.
    */
   raw?: Record<string, unknown>;
+  /** Shape ID of the parent branching node (condition, paths, decision). */
+  parentBranchNodeId?: string;
+  /** Branch key in YAML ("then", "else", "default", choice name, or path label). */
+  branchKey?: string;
+  /** Human-readable branch label ("then", "else", "one-on-one", etc.). */
+  branchLabel?: string;
+  /** 0-based index of this step inside the branch. */
+  branchIndex?: number;
+  /** Dotted action_id for engine/test-step ("classify-recording.one-on-one.process-call"). */
+  scopedActionId?: string;
+  /** Outgoing branch labels for a branching split node. */
+  branchPills?: string[];
+  /** True for a dashed empty-branch slot node on the canvas when a branch has 0 steps. */
+  isBranchPlaceholder?: boolean;
+  /** True for the visual convergence / union join node below a branching node's columns. */
+  isUnionJoin?: boolean;
+  /** Shape ID of the branching node that this union join node closes. */
+  unionForNodeId?: string;
 }
 
 export interface DiagramShape {
@@ -47,6 +65,10 @@ export interface DiagramShape {
   targetId?: string;
   sourceHandleId?: string;
   targetHandleId?: string;
+  /** Branch label rendered as a pill on a split->branch connector edge. */
+  branchLabel?: string;
+  isBranchEdge?: boolean;
+  isMergeEdge?: boolean;
 }
 
 export interface TriggerSpec {

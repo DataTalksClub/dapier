@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
-import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "./icons";
+import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, GitMerge, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "./icons";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
-import { nodeTitle, nodeSubtitle } from "./board/nodes";
+import { nodeTitle, nodeSubtitle, paletteLabel, type PaletteKind } from "./board/nodes";
+import { StepPicker } from "./board/StepPicker";
 import { actionCatalog, connectorCatalog, errorActionsField, eventInfo, filterOperators, onErrorField, onFailField } from "./catalog";
-import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, defaultFields, effectiveActionId, orderedActionNodes, orderedWorkflow, parseBranchSteps, shapesFromWorkflow, summarize, triggerLabel, workflowFromShapes } from "./workflows";
+import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, decisionMode, defaultFields, effectiveActionId, extractNodeBranches, extractPredicateRules, filterRulesToYaml, isBranchingAction, orderedActionNodes, orderedWorkflow, parseBranchSteps, rebuildShapesFromBranchEdit, shapesFromWorkflow, summarize, syncBranchFieldsFromCanvas, triggerLabel, workflowFromShapes } from "./workflows";
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
@@ -361,18 +362,190 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
   );
 }
 
-/** A condition's two sides as readable step rows, not raw YAML. Each branch
-    previews its parsed steps (id · type label · first telling value) with the
-    YAML textarea one disclosure away, so the invoice-intake style fork —
-    "4 archive steps vs 2 render steps" — reads at a glance. Steps are edited
-    on the canvas in a later pass; here they are preview rows, and YAML stays
-    the editor for adding, removing, or reordering them. */
-function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChange }: {
+/** Structured multi-rule AND predicate editor for Condition, Filter, and Paths. */
+function RuleBuilder({
+  rules,
+  onChange,
+  addLabel = "Add rule (AND)"
+}: {
+  rules: FilterRule[];
+  onChange: (nextRules: FilterRule[]) => void;
+  addLabel?: string;
+}) {
+  const effectiveRules: FilterRule[] = rules.length > 0
+    ? rules
+    : [{ field: "", operator: "equals", value: "" }];
+  return (
+    <div className="rule-builder">
+      {effectiveRules.map((rule, index) => (
+        <div key={index} className="filter-row">
+          <input
+            className="mono-input"
+            placeholder="field (e.g. subject)"
+            aria-label="Field"
+            value={rule.field}
+            onChange={(event) => onChange(
+              effectiveRules.map((entry, i): FilterRule => i === index ? { ...entry, field: event.target.value } : entry)
+            )}
+          />
+          <select
+            aria-label="Operator"
+            value={rule.operator}
+            onChange={(event) => onChange(
+              effectiveRules.map((entry, i): FilterRule => i === index
+                ? { ...entry, operator: event.target.value as FilterRule["operator"] }
+                : entry)
+            )}
+          >
+            {filterOperators.map((op) => <option key={op} value={op}>{op}</option>)}
+          </select>
+          <button
+            className="icon-button"
+            title="Remove rule"
+            type="button"
+            disabled={effectiveRules.length <= 1}
+            onClick={() => onChange(effectiveRules.filter((_, i) => i !== index))}
+          >
+            ×
+          </button>
+          <input
+            className="mono-input filter-value"
+            aria-label="Value"
+            placeholder={rule.operator === "in" ? '["a", "b"]' : "value"}
+            value={rule.value}
+            onChange={(event) => onChange(
+              effectiveRules.map((entry, i): FilterRule => i === index ? { ...entry, value: event.target.value } : entry)
+            )}
+          />
+        </div>
+      ))}
+      <button
+        className="add-row"
+        type="button"
+        onClick={() => onChange([...effectiveRules, { field: "", operator: "equals", value: "" }])}
+      >
+        + {addLabel}
+      </button>
+    </div>
+  );
+}
+
+/** Interactive branch step list shared by Condition, Decision, and Paths. */
+function BranchStepList({
+  branchKey,
+  branchTitle,
+  parsed,
+  onSelectChild,
+  onAddStep,
+  onMoveStep,
+  onDeleteStep
+}: {
+  branchKey: string;
+  branchTitle: string;
+  parsed: ReturnType<typeof parseBranchSteps>;
+  onSelectChild?: (branchKey: string, stepIndex: number) => void;
+  onAddStep?: (branchKey: string, branchTitle: string) => void;
+  onMoveStep?: (branchKey: string, stepIndex: number, delta: -1 | 1) => void;
+  onDeleteStep?: (branchKey: string, stepIndex: number) => void;
+}) {
+  return (
+    <>
+      {parsed.error ? (
+        <p className="branch-error" role="alert">
+          {parsed.error} Fix it below — nothing was lost.
+        </p>
+      ) : parsed.steps.length === 0 ? (
+        <p className="inspector-hint">Nothing runs on this side yet.</p>
+      ) : (
+        <ol className="branch-list">
+          {parsed.steps.map((step, index) => (
+            <li key={`${step.id}-${index}`} className="branch-row branch-row-interactive">
+              <button
+                type="button"
+                className="branch-row-select"
+                onClick={() => onSelectChild?.(branchKey, index)}
+                title="Select this step on the canvas"
+              >
+                <span className="branch-index" aria-hidden="true">{index + 1}</span>
+                <span className="branch-step">
+                  <span className="branch-step-label">{step.label}</span>
+                  <span className="branch-step-id">{step.id}</span>
+                  {step.detail && <span className="branch-step-detail">{step.detail}</span>}
+                </span>
+              </button>
+              <span className="branch-row-actions">
+                {onMoveStep && (
+                  <>
+                    <button
+                      type="button"
+                      className="icon-button branch-row-btn"
+                      disabled={index === 0}
+                      title="Move step up"
+                      onClick={() => onMoveStep(branchKey, index, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button branch-row-btn"
+                      disabled={index === parsed.steps.length - 1}
+                      title="Move step down"
+                      onClick={() => onMoveStep(branchKey, index, 1)}
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
+                {onDeleteStep && (
+                  <button
+                    type="button"
+                    className="icon-button branch-row-btn"
+                    title="Remove step from branch"
+                    onClick={() => onDeleteStep(branchKey, index)}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {onAddStep && (
+        <button
+          type="button"
+          className="add-row branch-add-step"
+          onClick={() => onAddStep(branchKey, branchTitle)}
+        >
+          + Add step to {branchTitle}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** A condition's two sides as interactive step rows with click-to-select on
+    canvas, + Add step, reorder/remove controls, and YAML disclosure. */
+function ConditionBranches({
+  thenField,
+  elseField,
+  thenValue,
+  elseValue,
+  onChange,
+  onSelectChild,
+  onAddStep,
+  onMoveStep,
+  onDeleteStep
+}: {
   thenField: CatalogField;
   elseField: CatalogField;
   thenValue: string;
   elseValue: string;
   onChange: (key: string, value: string) => void;
+  onSelectChild?: (branchKey: string, stepIndex: number) => void;
+  onAddStep?: (branchKey: string, branchTitle: string) => void;
+  onMoveStep?: (branchKey: string, stepIndex: number, delta: -1 | 1) => void;
+  onDeleteStep?: (branchKey: string, stepIndex: number) => void;
 }) {
   const branches = useMemo(() => ([
     { key: "then", title: "Then", hint: "Runs when the test passes.", field: thenField, value: thenValue, parsed: parseBranchSteps(thenValue) },
@@ -381,8 +554,8 @@ function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChang
   return (
     <div className="branch-groups">
       <p className="inspector-hint">
-        Two sides of one test: Then runs on a pass, Else on a fail. Steps run
-        top to bottom. Edit the lists as YAML to add, remove, or reorder steps.
+        Two sides of one test: Then runs on a pass, Else on a fail. Click a step
+        to edit it on the canvas, or add and reorder steps directly.
       </p>
       {branches.map((branch) => (
         <div key={branch.key} className={`branch-group branch-${branch.key}`}>
@@ -397,26 +570,15 @@ function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChang
             </span>
           </div>
           <p className="inspector-hint">{branch.hint}</p>
-          {branch.parsed.error ? (
-            <p className="branch-error" role="alert">
-              {branch.parsed.error} Fix it below — nothing was lost.
-            </p>
-          ) : branch.parsed.steps.length === 0 ? (
-            <p className="inspector-hint">Nothing runs on this side.</p>
-          ) : (
-            <ol className="branch-list">
-              {branch.parsed.steps.map((step, index) => (
-                <li key={`${step.id}-${index}`} className="branch-row">
-                  <span className="branch-index" aria-hidden="true">{index + 1}</span>
-                  <span className="branch-step">
-                    <span className="branch-step-label">{step.label}</span>
-                    <span className="branch-step-id">{step.id}</span>
-                    {step.detail && <span className="branch-step-detail">{step.detail}</span>}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <BranchStepList
+            branchKey={branch.key}
+            branchTitle={branch.title}
+            parsed={branch.parsed}
+            onSelectChild={onSelectChild}
+            onAddStep={onAddStep}
+            onMoveStep={onMoveStep}
+            onDeleteStep={onDeleteStep}
+          />
           <details className="inspector-advanced" open={Boolean(branch.parsed.error)}>
             <summary>Edit {branch.title} steps as YAML</summary>
             <FieldInput
@@ -427,6 +589,437 @@ function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChang
           </details>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Interactive branch editor for Decision (jev) steps in both switch and if modes. */
+function DecisionBranchesEditor({
+  mode,
+  choicesField,
+  casesField,
+  defaultActionsField,
+  thenField,
+  elseField,
+  choicesValue,
+  casesValue,
+  defaultActionsValue,
+  thenValue,
+  elseValue,
+  rawBranches,
+  onChangeFields,
+  onSelectChild,
+  onAddStep,
+  onMoveStep,
+  onDeleteStep
+}: {
+  mode: "switch" | "if";
+  choicesField: CatalogField;
+  casesField: CatalogField;
+  defaultActionsField: CatalogField;
+  thenField: CatalogField;
+  elseField: CatalogField;
+  choicesValue: string;
+  casesValue: string;
+  defaultActionsValue: string;
+  thenValue: string;
+  elseValue: string;
+  rawBranches?: unknown;
+  onChangeFields: (updates: Record<string, string>, options?: { rebuildCanvas?: boolean; renameBranch?: { from: string; to: string } }) => void;
+  onSelectChild?: (branchKey: string, stepIndex: number) => void;
+  onAddStep?: (branchKey: string, branchTitle: string) => void;
+  onMoveStep?: (branchKey: string, stepIndex: number, delta: -1 | 1) => void;
+  onDeleteStep?: (branchKey: string, stepIndex: number) => void;
+}) {
+  if (mode === "if") {
+    return (
+      <ConditionBranches
+        thenField={thenField}
+        elseField={elseField}
+        thenValue={thenValue}
+        elseValue={elseValue}
+        onChange={(key, val) => onChangeFields({ [key]: val })}
+        onSelectChild={onSelectChild}
+        onAddStep={onAddStep}
+        onMoveStep={onMoveStep}
+        onDeleteStep={onDeleteStep}
+      />
+    );
+  }
+
+  let parseError: string | undefined;
+  let parsedCases: Array<Record<string, unknown>> = [];
+  let parsedChoiceList: string[] = [];
+
+  if (choicesValue.trim()) {
+    try {
+      const loadedChoices = load(choicesValue);
+      if (Array.isArray(loadedChoices)) {
+        parsedChoiceList = loadedChoices.map((c) => String(c ?? "").trim()).filter(Boolean);
+      }
+    } catch { /* handled via cases or disclosure */ }
+  }
+
+  if (casesValue.trim()) {
+    try {
+      const loaded = load(casesValue);
+      if (Array.isArray(loaded)) {
+        parsedCases = loaded.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+      } else {
+        parseError = "Cases must be a YAML list of { choice, actions } objects.";
+      }
+    } catch (err) {
+      parseError = err instanceof Error ? err.message.split("\n")[0] : String(err);
+    }
+  } else if (rawBranches && typeof rawBranches === "object" && !Array.isArray(rawBranches)) {
+    for (const [k, v] of Object.entries(rawBranches as Record<string, unknown>)) {
+      if (Array.isArray(v)) {
+        parsedCases.push({ choice: k, actions: v });
+      } else if (v && typeof v === "object") {
+        const entryObj = v as Record<string, unknown>;
+        parsedCases.push({
+          choice: k,
+          ...(typeof entryObj.description === "string" ? { description: entryObj.description } : {}),
+          actions: Array.isArray(entryObj.actions) ? entryObj.actions : []
+        });
+      }
+    }
+  }
+
+  const seenChoices = new Set<string>();
+  const choiceEntries: Array<{ key: string; description: string; actions: unknown[]; parsed: ReturnType<typeof parseBranchSteps> }> = [];
+  for (const c of parsedCases) {
+    const key = String(c.choice ?? c.label ?? "").trim();
+    if (!key) continue;
+    seenChoices.add(key);
+    const description = typeof c.description === "string" ? c.description : "";
+    const actions = Array.isArray(c.actions) ? c.actions : [];
+    const yamlSteps = actions.length > 0 ? dump(actions, { lineWidth: 100 }).trimEnd() : "";
+    choiceEntries.push({ key, description, actions, parsed: parseBranchSteps(yamlSteps) });
+  }
+  for (const choiceName of parsedChoiceList) {
+    if (!seenChoices.has(choiceName)) {
+      seenChoices.add(choiceName);
+      choiceEntries.push({ key: choiceName, description: "", actions: [], parsed: { steps: [], error: null } });
+    }
+  }
+
+  const commitChoices = (
+    nextEntries: Array<{ key: string; description: string; actions: unknown[] }>,
+    options?: { rebuildCanvas?: boolean; renameBranch?: { from: string; to: string } }
+  ) => {
+    const nextChoices = nextEntries.map((item) => item.key.trim() || "choice");
+    const nextCases = nextEntries.map((item) => {
+      const k = item.key.trim() || "choice";
+      return {
+        choice: k,
+        ...(item.description.trim() ? { description: item.description } : {}),
+        actions: item.actions
+      };
+    });
+    const serializedChoices = nextChoices.length > 0 ? dump(nextChoices, { lineWidth: 100 }).trimEnd() : "";
+    const serializedCases = nextCases.length > 0 ? dump(nextCases, { lineWidth: 100 }).trimEnd() : "";
+    onChangeFields({ choices: serializedChoices, cases: serializedCases }, options);
+  };
+
+  const defaultParsed = parseBranchSteps(defaultActionsValue);
+
+  return (
+    <div className="branch-groups">
+      <p className="inspector-hint">
+        Jev classifies the event into one of the named choices below, or falls
+        back to <code>else</code> when none fit.
+      </p>
+      {parseError && (
+        <p className="branch-error" role="alert">
+          {parseError} Fix it in the YAML disclosure below.
+        </p>
+      )}
+      {choiceEntries.map((choice, idx) => (
+        <div key={idx} className="branch-group branch-choice">
+          <div className="branch-head">
+            <input
+              className="mono-input branch-key-input"
+              aria-label={`Choice ${idx + 1} name`}
+              value={choice.key}
+              placeholder="choice_name"
+              onChange={(event) => {
+                const newKey = event.target.value;
+                const next = choiceEntries.map((c, i) => i === idx ? { ...c, key: newKey } : c);
+                commitChoices(next, { renameBranch: { from: choice.key, to: newKey.trim() || "choice" } });
+              }}
+            />
+            <span className="branch-count">
+              {choice.parsed.steps.length === 0
+                ? "no steps"
+                : `${choice.parsed.steps.length} step${choice.parsed.steps.length === 1 ? "" : "s"}`}
+            </span>
+            <button
+              type="button"
+              className="icon-button branch-row-btn"
+              title="Remove choice branch"
+              disabled={choiceEntries.length <= 1}
+              onClick={() => commitChoices(choiceEntries.filter((_, i) => i !== idx), { rebuildCanvas: true })}
+            >
+              ×
+            </button>
+          </div>
+          <label className="branch-criterion-label">
+            Criterion for Jev (optional)
+            <input
+              type="text"
+              placeholder="When should Jev pick this choice?"
+              value={choice.description}
+              onChange={(event) => {
+                const next = choiceEntries.map((c, i) => i === idx ? { ...c, description: event.target.value } : c);
+                commitChoices(next);
+              }}
+            />
+          </label>
+          <BranchStepList
+            branchKey={choice.key}
+            branchTitle={choice.key}
+            parsed={choice.parsed}
+            onSelectChild={onSelectChild}
+            onAddStep={onAddStep}
+            onMoveStep={onMoveStep}
+            onDeleteStep={onDeleteStep}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        className="add-row"
+        onClick={() => {
+          let idx = choiceEntries.length + 1;
+          let candidate = `choice_${idx}`;
+          while (choiceEntries.some((c) => c.key === candidate)) {
+            idx += 1;
+            candidate = `choice_${idx}`;
+          }
+          commitChoices([...choiceEntries, { key: candidate, description: "", actions: [] }], { rebuildCanvas: true });
+        }}
+      >
+        + Add choice branch
+      </button>
+
+      <div className="branch-group branch-else">
+        <div className="branch-head">
+          <span className="branch-badge branch-badge-else">else</span>
+          <span className="branch-count">
+            {defaultParsed.steps.length === 0
+              ? "no steps"
+              : `${defaultParsed.steps.length} step${defaultParsed.steps.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <p className="inspector-hint">Fallback steps when Jev returns none or an unknown choice.</p>
+        <BranchStepList
+          branchKey="default"
+          branchTitle="else"
+          parsed={defaultParsed}
+          onSelectChild={onSelectChild}
+          onAddStep={onAddStep}
+          onMoveStep={onMoveStep}
+          onDeleteStep={onDeleteStep}
+        />
+      </div>
+
+      <details className="inspector-advanced" open={Boolean(parseError)}>
+        <summary>Edit decision branches as YAML</summary>
+        <FieldInput
+          field={choicesField}
+          value={choicesValue}
+          onChange={(val) => onChangeFields({ choices: val })}
+        />
+        <FieldInput
+          field={casesField}
+          value={casesValue}
+          onChange={(val) => onChangeFields({ cases: val })}
+        />
+        <FieldInput
+          field={defaultActionsField}
+          value={defaultActionsValue}
+          onChange={(val) => onChangeFields({ default_actions: val })}
+        />
+      </details>
+    </div>
+  );
+}
+
+/** Interactive branch editor for Paths (multi-branch switch) steps. */
+function PathsBranchesEditor({
+  pathsField,
+  defaultField,
+  pathsValue,
+  defaultValue,
+  onChangeField,
+  onSelectChild,
+  onAddStep,
+  onMoveStep,
+  onDeleteStep
+}: {
+  pathsField: CatalogField;
+  defaultField: CatalogField;
+  pathsValue: string;
+  defaultValue: string;
+  onChangeField: (key: string, value: string, options?: { rebuildCanvas?: boolean; renameBranch?: { from: string; to: string } }) => void;
+  onSelectChild?: (branchKey: string, stepIndex: number) => void;
+  onAddStep?: (branchKey: string, branchTitle: string) => void;
+  onMoveStep?: (branchKey: string, stepIndex: number, delta: -1 | 1) => void;
+  onDeleteStep?: (branchKey: string, stepIndex: number) => void;
+}) {
+  let rawPaths: Array<Record<string, unknown>> = [];
+  let parseError: string | undefined;
+  if (pathsValue.trim()) {
+    try {
+      const loaded = load(pathsValue);
+      if (Array.isArray(loaded)) {
+        rawPaths = loaded.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+      } else {
+        parseError = "Paths must be a YAML list of path objects.";
+      }
+    } catch (err) {
+      parseError = err instanceof Error ? err.message.split("\n")[0] : String(err);
+    }
+  }
+
+  const commitPaths = (
+    nextPaths: Array<Record<string, unknown>>,
+    options?: { rebuildCanvas?: boolean; renameBranch?: { from: string; to: string } }
+  ) => {
+    const serialized = nextPaths.length > 0 ? dump(nextPaths, { lineWidth: 100 }).trimEnd() : "";
+    onChangeField("paths", serialized, options);
+  };
+
+  const defaultParsed = parseBranchSteps(defaultValue);
+
+  return (
+    <div className="branch-groups">
+      <p className="inspector-hint">
+        Evaluates paths top to bottom and runs the first matching path, or{" "}
+        <code>else</code> when none match.
+      </p>
+      {parseError && (
+        <p className="branch-error" role="alert">
+          {parseError} Fix it in the YAML disclosure below.
+        </p>
+      )}
+      {rawPaths.map((pathObj, idx) => {
+        const key = (typeof pathObj.id === "string" && pathObj.id.trim())
+          || (typeof pathObj.label === "string" && pathObj.label.trim())
+          || `path_${idx + 1}`;
+        const label = (typeof pathObj.label === "string" && pathObj.label)
+          || (typeof pathObj.id === "string" && pathObj.id)
+          || `Path ${idx + 1}`;
+        const rules = extractPredicateRules(undefined, { when: pathObj.when });
+        const actions = Array.isArray(pathObj.actions) ? pathObj.actions : [];
+        const yamlSteps = actions.length > 0 ? dump(actions, { lineWidth: 100 }).trimEnd() : "";
+        const parsed = parseBranchSteps(yamlSteps);
+        return (
+          <div key={idx} className="branch-group branch-path">
+            <div className="branch-head">
+              <input
+                className="mono-input branch-key-input"
+                aria-label={`Path ${idx + 1} label`}
+                value={label}
+                placeholder={`Path ${idx + 1}`}
+                onChange={(event) => {
+                  const newLabel = event.target.value;
+                  const newKey = (typeof pathObj.id === "string" && pathObj.id.trim()) || newLabel.trim() || `path_${idx + 1}`;
+                  const next = rawPaths.map((p, i) => i === idx ? { ...p, label: newLabel } : p);
+                  commitPaths(next, { renameBranch: { from: key, to: newKey } });
+                }}
+              />
+              <span className="branch-count">
+                {parsed.steps.length === 0
+                  ? "no steps"
+                  : `${parsed.steps.length} step${parsed.steps.length === 1 ? "" : "s"}`}
+              </span>
+              <button
+                type="button"
+                className="icon-button branch-row-btn"
+                title="Remove path"
+                disabled={rawPaths.length <= 1}
+                onClick={() => commitPaths(rawPaths.filter((_, i) => i !== idx), { rebuildCanvas: true })}
+              >
+                ×
+              </button>
+            </div>
+            <div className="branch-rules-box">
+              <span className="branch-rules-title">When all rules match:</span>
+              <RuleBuilder
+                rules={rules}
+                onChange={(nextRules) => {
+                  const whenYaml = filterRulesToYaml(nextRules);
+                  const next = rawPaths.map((p, i) => i === idx ? { ...p, when: whenYaml } : p);
+                  commitPaths(next);
+                }}
+              />
+            </div>
+            <BranchStepList
+              branchKey={key}
+              branchTitle={label}
+              parsed={parsed}
+              onSelectChild={onSelectChild}
+              onAddStep={onAddStep}
+              onMoveStep={onMoveStep}
+              onDeleteStep={onDeleteStep}
+            />
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="add-row"
+        onClick={() => {
+          const nextIdx = rawPaths.length + 1;
+          commitPaths([
+            ...rawPaths,
+            {
+              label: `Path ${nextIdx}`,
+              when: { field: "", operator: "equals", value: "" },
+              actions: []
+            }
+          ], { rebuildCanvas: true });
+        }}
+      >
+        + Add path branch
+      </button>
+
+      <div className="branch-group branch-else">
+        <div className="branch-head">
+          <span className="branch-badge branch-badge-else">else</span>
+          <span className="branch-count">
+            {defaultParsed.steps.length === 0
+              ? "no steps"
+              : `${defaultParsed.steps.length} step${defaultParsed.steps.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <p className="inspector-hint">Fallback steps when no path matches.</p>
+        <BranchStepList
+          branchKey="default"
+          branchTitle="else"
+          parsed={defaultParsed}
+          onSelectChild={onSelectChild}
+          onAddStep={onAddStep}
+          onMoveStep={onMoveStep}
+          onDeleteStep={onDeleteStep}
+        />
+      </div>
+
+      <details className="inspector-advanced" open={Boolean(parseError)}>
+        <summary>Edit paths as YAML</summary>
+        <FieldInput
+          field={pathsField}
+          value={pathsValue}
+          onChange={(val) => onChangeField("paths", val)}
+        />
+        <FieldInput
+          field={defaultField}
+          value={defaultValue}
+          onChange={(val) => onChangeField("default", val)}
+        />
+      </details>
     </div>
   );
 }
@@ -891,15 +1484,256 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     setEnabled(next);
   }
 
+  const [branchPicker, setBranchPicker] = useState<{ parentNodeId: string; branchKey: string; title: string } | null>(null);
+
+  /** Mutates the step list of `branchKey` on `parentNodeId` and re-lays out the 2D branching canvas. */
+  function mutateParentBranchSteps(
+    parentNodeId: string,
+    branchKey: string,
+    mutateSteps: (steps: Record<string, unknown>[]) => Record<string, unknown>[],
+    selectAfter?: (rebuilt: DiagramShape[], canonParentId: string) => string | null
+  ) {
+    const current = draftRef.current.shapes;
+    const synced = syncBranchFieldsFromCanvas(current, parentNodeId);
+    const parent = synced.find((s) => s.id === parentNodeId);
+    if (!parent || !parent.data) return;
+    const topOrder = orderedActionNodes(synced);
+    const parentOrderIdx = topOrder.findIndex((s) => s.id === parentNodeId);
+    const canonParentId = parentOrderIdx >= 0 ? `action-${parentOrderIdx}` : parentNodeId;
+
+    const isDefaultBranch = branchKey === "else" || branchKey === "default";
+    const branches = extractNodeBranches(parent.data);
+    const targetBranch = branches.find(
+      (b) => b.key === branchKey || (isDefaultBranch && (b.key === "else" || b.key === "default"))
+    );
+    const nextSteps = mutateSteps(targetBranch ? targetBranch.steps : []);
+    const serializedSteps = nextSteps.length > 0 ? dump(nextSteps, { lineWidth: 100 }).trimEnd() : "";
+
+    const actionType = parent.data.actionType;
+    const nextFields = { ...(parent.data.fields ?? {}) };
+    const nextRaw = { ...(parent.data.raw ?? {}) };
+
+    if (actionType === "condition") {
+      if (branchKey === "then") {
+        nextFields.then = serializedSteps;
+        delete nextRaw.then;
+      } else {
+        nextFields.else = serializedSteps;
+        delete nextRaw.else;
+      }
+    } else if (actionType === "decision") {
+      const mode = decisionMode(nextFields, nextRaw);
+      if (mode === "if") {
+        if (branchKey === "then") {
+          nextFields.then = serializedSteps;
+          delete nextRaw.then;
+          delete nextRaw.then_actions;
+        } else {
+          nextFields.else = serializedSteps;
+          delete nextRaw.else;
+          delete nextRaw.default_actions;
+        }
+      } else if (isDefaultBranch) {
+        nextFields.default_actions = serializedSteps;
+        delete nextRaw.default_actions;
+        delete nextRaw.else;
+        delete nextRaw.default;
+      } else if (
+        nextRaw.branches &&
+        typeof nextRaw.branches === "object" &&
+        !Array.isArray(nextRaw.branches) &&
+        !(nextFields.cases ?? "").trim()
+      ) {
+        const parsedMap = { ...(nextRaw.branches as Record<string, unknown>) };
+        const existingEntry = parsedMap[branchKey];
+        if (existingEntry && typeof existingEntry === "object" && !Array.isArray(existingEntry)) {
+          parsedMap[branchKey] = { ...(existingEntry as Record<string, unknown>), actions: nextSteps };
+        } else {
+          parsedMap[branchKey] = nextSteps;
+        }
+        nextRaw.branches = parsedMap;
+      } else {
+        let parsedCases: Array<Record<string, unknown>> = [];
+        if ((nextFields.cases ?? "").trim()) {
+          try {
+            const loaded = load(nextFields.cases);
+            if (Array.isArray(loaded)) {
+              parsedCases = loaded.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+            }
+          } catch { /* fallback */ }
+        }
+        let found = false;
+        const updatedCases = parsedCases.map((c) => {
+          const k = String(c.choice ?? c.label ?? "").trim();
+          if (k === branchKey) {
+            found = true;
+            return { ...c, choice: branchKey, actions: nextSteps };
+          }
+          return c;
+        });
+        if (!found) {
+          updatedCases.push({ choice: branchKey, actions: nextSteps });
+        }
+        const choiceNames = branches
+          .filter((b) => !b.isDefault)
+          .map((b) => b.key);
+        if (!choiceNames.includes(branchKey)) choiceNames.push(branchKey);
+        nextFields.choices = choiceNames.length > 0 ? dump(choiceNames, { lineWidth: 100 }).trimEnd() : "";
+        nextFields.cases = updatedCases.length > 0 ? dump(updatedCases, { lineWidth: 100 }).trimEnd() : "";
+        delete nextRaw.choices;
+        delete nextRaw.cases;
+      }
+    } else if (actionType === "paths") {
+      if (isDefaultBranch) {
+        nextFields.default = serializedSteps;
+        delete nextRaw.default;
+        delete nextRaw.else;
+      } else {
+        let rawPaths: Array<Record<string, unknown>> = [];
+        if ((nextFields.paths ?? "").trim()) {
+          try {
+            const loaded = load(nextFields.paths);
+            if (Array.isArray(loaded)) {
+              rawPaths = loaded.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+            }
+          } catch { /* fallback */ }
+        }
+        const updatedPaths = rawPaths.map((p, idx) => {
+          const k = (typeof p.id === "string" && p.id.trim())
+            || (typeof p.label === "string" && p.label.trim())
+            || `path_${idx + 1}`;
+          return k === branchKey ? { ...p, actions: nextSteps } : p;
+        });
+        nextFields.paths = updatedPaths.length > 0 ? dump(updatedPaths, { lineWidth: 100 }).trimEnd() : "";
+        delete nextRaw.paths;
+      }
+    }
+
+    const stripped = synced.map((s) =>
+      s.id === parentNodeId ? { ...s, data: { ...s.data!, fields: nextFields, raw: nextRaw } } : s
+    );
+
+    const rebuilt = rebuildShapesFromBranchEdit(stripped, workflowId, enabled, base, parentNodeId);
+    commitEdit(draftRef.current);
+    setShapes(rebuilt);
+    if (selectAfter) {
+      const nextSelected = selectAfter(rebuilt, canonParentId);
+      if (nextSelected) setSelectedId(nextSelected);
+    }
+  }
+
+  function addStepToBranch(parentNodeId: string, branchKey: string, kind: PaletteKind) {
+    if (kind === "note" || kind.startsWith("trigger:")) return;
+    const defaults = defaultFields(kind);
+    const isDefaultBranch = branchKey === "else" || branchKey === "default";
+    mutateParentBranchSteps(
+      parentNodeId,
+      branchKey,
+      (steps) => {
+        const nextIdx = steps.length + 1;
+        const stepObj: Record<string, unknown> = {
+          id: `${kind}_${nextIdx}`,
+          type: kind
+        };
+        for (const [k, v] of Object.entries(defaults)) {
+          if (k === "id" || v === "") continue;
+          stepObj[k] = v;
+        }
+        return [...steps, stepObj];
+      },
+      (rebuilt, canonParentId) => {
+        const children = rebuilt.filter(
+          (s) =>
+            s.data?.parentBranchNodeId === canonParentId &&
+            (s.data?.branchKey === branchKey || (isDefaultBranch && (s.data?.branchKey === "else" || s.data?.branchKey === "default"))) &&
+            !s.data?.isBranchPlaceholder
+        );
+        return children[children.length - 1]?.id ?? canonParentId;
+      }
+    );
+    setStatus({ kind: "ok", message: `Added ${paletteLabel(kind)} to branch "${branchKey}".` });
+  }
+
+  function moveBranchStep(parentNodeId: string, branchKey: string, stepIndex: number, delta: -1 | 1) {
+    mutateParentBranchSteps(
+      parentNodeId,
+      branchKey,
+      (steps) => {
+        const targetIdx = stepIndex + delta;
+        if (targetIdx < 0 || targetIdx >= steps.length) return steps;
+        const next = [...steps];
+        const [moved] = next.splice(stepIndex, 1);
+        next.splice(targetIdx, 0, moved);
+        return next;
+      },
+      (_rebuilt, canonParentId) => canonParentId
+    );
+  }
+
+  function deleteBranchStep(parentNodeId: string, branchKey: string, stepIndex: number) {
+    mutateParentBranchSteps(
+      parentNodeId,
+      branchKey,
+      (steps) => steps.filter((_, idx) => idx !== stepIndex),
+      (_rebuilt, canonParentId) => canonParentId
+    );
+  }
+
+  /** Converts a synthetic Union join bar into an explicit `type: "union"` step right after its branching parent. */
+  function convertUnionJoinToExplicit(branchNodeId: string) {
+    const current = draftRef.current.shapes;
+    const synced = syncBranchFieldsFromCanvas(current, branchNodeId);
+    const built = workflowFromShapes(synced, workflowId, enabled, base);
+    const parentActionId = effectiveActionId(synced, branchNodeId) ?? branchNodeId;
+    const topOrder = orderedActionNodes(synced);
+    const parentIdx = topOrder.findIndex((s) => s.id === branchNodeId);
+    const actions = [...(built.workflow.actions ?? [])];
+    const unionStep: Record<string, unknown> = {
+      id: `union_${parentActionId}`,
+      type: "union",
+      from: parentActionId
+    };
+    if (parentIdx >= 0 && parentIdx < actions.length) {
+      actions.splice(parentIdx + 1, 0, unionStep);
+    } else {
+      actions.push(unionStep);
+    }
+    const rebuilt = shapesFromWorkflow({ ...built.workflow, actions });
+    commitEdit(draftRef.current);
+    setShapes(rebuilt);
+    const unionNode = rebuilt.find((s) => s.type === "node" && s.data?.actionType === "union" && s.data?.fields?.from === parentActionId);
+    if (unionNode) setSelectedId(unionNode.id);
+    setStatus({ kind: "ok", message: `Inserted explicit Union step for "${parentActionId}".` });
+  }
+
   /** Deletes the selected shape (node — with its arrows — note, or connector).
       One undo entry, so no confirm dialog. */
   function deleteSelectedShape() {
     const id = selectedId;
     if (!id) return;
+    const target = draftRef.current.shapes.find((shape) => shape.id === id);
+    if (target?.data?.isUnionJoin || target?.data?.isBranchPlaceholder) {
+      setSelectedId(null);
+      return;
+    }
+    if (target?.data?.parentBranchNodeId && target.data.branchKey !== undefined && target.data.branchIndex !== undefined) {
+      deleteBranchStep(target.data.parentBranchNodeId, target.data.branchKey, target.data.branchIndex);
+      return;
+    }
     commitEdit(draftRef.current);
-    setShapes((current) => current.filter((shape) => (
-      shape.id !== id && shape.sourceId !== id && shape.targetId !== id
-    )));
+    setShapes((current) => {
+      const removedNodeIds = new Set<string>([id]);
+      for (const shape of current) {
+        if (shape.data?.parentBranchNodeId === id || shape.data?.unionForNodeId === id) {
+          removedNodeIds.add(shape.id);
+        }
+      }
+      return current.filter((shape) => (
+        !removedNodeIds.has(shape.id)
+        && (!shape.sourceId || !removedNodeIds.has(shape.sourceId))
+        && (!shape.targetId || !removedNodeIds.has(shape.targetId))
+      ));
+    });
     setSelectedId(null);
   }
 
@@ -1854,14 +2688,37 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
     if (!selectedId) return;
     // Coalesced under the node's key: field edits arrive per keystroke, and
     // one undo step per burst beats one per character.
-    editShapes((current) => current.map((shape) => {
-      if (shape.id !== selectedId || !shape.data) return shape;
-      const data = mutate(shape.data);
-      const label = data.nodeKind === "trigger"
-        ? triggerLabel(data.connector ?? "custom", data.event ?? "")
-        : shape.label;
-      return { ...shape, data, label };
-    }), `node:${selectedId}`);
+    editShapes((current) => {
+      const target = current.find((shape) => shape.id === selectedId);
+      if (!target || !target.data) return current;
+      const nextData = mutate(target.data);
+      const label = nextData.nodeKind === "trigger"
+        ? triggerLabel(nextData.connector ?? "custom", dataOrEmpty(nextData.event))
+        : target.label;
+      let nextShapes = current.map((shape) => (
+        shape.id === selectedId ? { ...shape, data: nextData, label } : shape
+      ));
+      if (nextData.parentBranchNodeId) {
+        nextShapes = syncBranchFieldsFromCanvas(nextShapes, nextData.parentBranchNodeId);
+      } else if (isBranchingAction(nextData.actionType)) {
+        const prevFields = target.data.fields ?? {};
+        const curFields = nextData.fields ?? {};
+        const branchStructureChanged = ["then", "else", "branches", "then_actions", "default_actions", "paths", "default", "mode"].some(
+          (k) => (prevFields[k] ?? "") !== (curFields[k] ?? "")
+        );
+        if (branchStructureChanged) {
+          const stripped = nextShapes.filter(
+            (s) => s.data?.parentBranchNodeId !== selectedId && s.data?.unionForNodeId !== selectedId
+          );
+          nextShapes = rebuildShapesFromBranchEdit(stripped, workflowId, enabled, base);
+        }
+      }
+      return nextShapes;
+    }, `node:${selectedId}`);
+  }
+
+  function dataOrEmpty(val: string | undefined): string {
+    return val ?? "";
   }
 
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
@@ -1898,6 +2755,51 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       );
     }
     const data = selected.data;
+    if (data.isUnionJoin) {
+      const parentNode = shapes.find((s) => s.id === data.unionForNodeId);
+      const parentActionId = (data.unionForNodeId && effectiveActionId(shapes, data.unionForNodeId)) || "branch_step";
+      return (
+        <section className="inspector-group">
+          <h3>Branches rejoin</h3>
+          <p className="inspector-hint">
+            All branches from <strong>{parentNode ? nodeTitle(parentNode) : parentActionId}</strong> converge here before the next step runs.
+          </p>
+          <div className="union-dataflow-card">
+            <p className="inspector-hint">
+              Downstream steps can read the active branch&rsquo;s output without knowing which branch ran:
+            </p>
+            <div className="template-chips">
+              <button
+                type="button"
+                className="template-chip"
+                onClick={() => copyTemplate(`{steps.${parentActionId}.output.result}`)}
+              >
+                {`{steps.${parentActionId}.output.result}`}
+              </button>
+              <button
+                type="button"
+                className="template-chip"
+                onClick={() => copyTemplate(`{steps.${parentActionId}.output.branch}`)}
+              >
+                {`{steps.${parentActionId}.output.branch}`}
+              </button>
+            </div>
+          </div>
+          {data.unionForNodeId && (
+            <div className="test-actions">
+              <button
+                type="button"
+                className="dk-button dk-button--secondary"
+                onClick={() => convertUnionJoinToExplicit(data.unionForNodeId!)}
+              >
+                <GitMerge size={18} strokeWidth={1.8} />
+                <span>Convert to explicit Union step</span>
+              </button>
+            </div>
+          )}
+        </section>
+      );
+    }
     if (data.nodeKind === "trigger") {
       const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom"))
         ?? { name: "custom", events: [] as string[] };
@@ -2043,12 +2945,144 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
 
     const type = data.actionType ?? "webhook";
     const meta = actionMeta(type);
-    const setField = (key: string, value: string) => updateSelected((current) => ({
-      ...current,
-      fields: { ...current.fields, [key]: value }
-    }));
+    const setField = (key: string, value: string) => updateSelected((current) => {
+      const nextFields = { ...current.fields, [key]: value };
+      const nextData: NodeData = { ...current, fields: nextFields };
+      if (isBranchingAction(current.actionType)) {
+        nextData.branchPills = extractNodeBranches(nextData).map((b) => b.label);
+      }
+      return nextData;
+    });
+    const updateBranchFields = (
+      updates: Record<string, string>,
+      options?: { rebuildCanvas?: boolean; renameBranch?: { from: string; to: string } }
+    ) => {
+      commitEdit(draftRef.current, `inspector:${selected.id}:${Object.keys(updates).join(",")}`);
+      setShapes((currentShapes) => {
+        const nextShapes = currentShapes.map((shape) => {
+          if (shape.id === selected.id && shape.data) {
+            const nextFields = { ...shape.data.fields, ...updates };
+            const nextRaw = { ...(shape.data.raw ?? {}) };
+            if ("cases" in updates || "choices" in updates) {
+              delete nextRaw.cases;
+              delete nextRaw.choices;
+              delete nextRaw.branches;
+            }
+            if ("paths" in updates) delete nextRaw.paths;
+            if ("then" in updates) delete nextRaw.then;
+            if ("else" in updates) delete nextRaw.else;
+            if ("default" in updates) delete nextRaw.default;
+            if ("default_actions" in updates) delete nextRaw.default_actions;
+            const nextData: NodeData = { ...shape.data, fields: nextFields, raw: nextRaw };
+            nextData.branchPills = extractNodeBranches(nextData).map((b) => b.label);
+            return { ...shape, data: nextData };
+          }
+          if (
+            options?.renameBranch &&
+            shape.data?.parentBranchNodeId === selected.id &&
+            shape.data?.branchKey === options.renameBranch.from
+          ) {
+            return {
+              ...shape,
+              label: shape.data.isBranchPlaceholder ? `+ Add step to ${options.renameBranch.to}` : shape.label,
+              data: {
+                ...shape.data,
+                branchKey: options.renameBranch.to,
+                branchLabel: options.renameBranch.to
+              }
+            };
+          }
+          if (
+            options?.renameBranch &&
+            shape.type === "arrow" &&
+            shape.sourceId === selected.id &&
+            shape.label === options.renameBranch.from
+          ) {
+            return { ...shape, label: options.renameBranch.to };
+          }
+          return shape;
+        });
+        if (options?.rebuildCanvas) {
+          return rebuildShapesFromBranchEdit(nextShapes, workflowId, enabled, base, selected.id);
+        }
+        return syncBranchFieldsFromCanvas(nextShapes, selected.id);
+      });
+    };
+    const selectBranchChild = (branchKey: string, stepIdx: number) => {
+      const isDefault = branchKey === "else" || branchKey === "default";
+      const child = shapes.find(
+        (s) =>
+          s.data?.parentBranchNodeId === selected.id &&
+          (s.data?.branchKey === branchKey || (isDefault && (s.data?.branchKey === "else" || s.data?.branchKey === "default"))) &&
+          s.data?.branchIndex === stepIdx &&
+          !s.data?.isBranchPlaceholder
+      );
+      if (child) setSelectedId(child.id);
+    };
+    const updatePredicateRules = (nextRules: FilterRule[]) => {
+      updateSelected((current) => {
+        const first = nextRules[0] ?? { field: "", operator: "equals", value: "" };
+        const nextFields = { ...(current.fields ?? {}) };
+        const nextRaw = { ...(current.raw ?? {}) };
+        if (nextRules.length <= 1) {
+          nextFields.field = first.field;
+          nextFields.operator = first.operator;
+          nextFields.value = first.value;
+          delete nextRaw.when;
+        } else {
+          nextFields.field = "";
+          nextFields.operator = "equals";
+          nextFields.value = "";
+          nextRaw.when = filterRulesToYaml(nextRules);
+        }
+        return { ...current, fields: nextFields, raw: nextRaw };
+      });
+    };
+    const parentBranchNode = data.parentBranchNodeId
+      ? shapes.find((s) => s.id === data.parentBranchNodeId)
+      : null;
+    const branchSiblingCount = data.parentBranchNodeId && data.branchKey
+      ? shapes.filter(
+          (s) => s.data?.parentBranchNodeId === data.parentBranchNodeId
+            && s.data?.branchKey === data.branchKey
+            && !s.data?.isBranchPlaceholder
+        ).length
+      : 0;
     return (
       <>
+        {parentBranchNode && data.branchKey !== undefined && (
+          <section className="inspector-group branch-context-bar" aria-label="Branch context">
+            <div className="branch-context-crumb">
+              <button
+                type="button"
+                className="branch-back-link"
+                onClick={() => setSelectedId(parentBranchNode.id)}
+              >
+                ← {nodeTitle(parentBranchNode)}
+              </button>
+              <span className="branch-badge">{data.branchLabel ?? data.branchKey}</span>
+              <span className="branch-count">Step {(data.branchIndex ?? 0) + 1} of {branchSiblingCount}</span>
+            </div>
+            <div className="branch-context-actions">
+              <button
+                type="button"
+                className="dk-button dk-button--secondary"
+                disabled={(data.branchIndex ?? 0) <= 0}
+                onClick={() => moveBranchStep(parentBranchNode.id, data.branchKey!, data.branchIndex ?? 0, -1)}
+              >
+                ↑ Move up
+              </button>
+              <button
+                type="button"
+                className="dk-button dk-button--secondary"
+                disabled={(data.branchIndex ?? 0) >= branchSiblingCount - 1}
+                onClick={() => moveBranchStep(parentBranchNode.id, data.branchKey!, data.branchIndex ?? 0, 1)}
+              >
+                ↓ Move down
+              </button>
+            </div>
+          </section>
+        )}
         <section className="inspector-group">
           <h3>Action</h3>
           <label>Action type
@@ -2079,8 +3113,40 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             <h3>Settings</h3>
             {data.actionType === "condition" ? (
               <>
+                <div className="branch-rules-box">
+                  <span className="branch-rules-title">When all rules match:</span>
+                  <RuleBuilder
+                    rules={extractPredicateRules(data.fields, data.raw)}
+                    onChange={updatePredicateRules}
+                  />
+                </div>
+                <ConditionBranches
+                  thenField={meta.fields.find((field) => field.key === "then")!}
+                  elseField={meta.fields.find((field) => field.key === "else")!}
+                  thenValue={data.fields?.then ?? ""}
+                  elseValue={data.fields?.else ?? ""}
+                  onChange={(key, value) => updateBranchFields({ [key]: value }, { rebuildCanvas: true })}
+                  onSelectChild={selectBranchChild}
+                  onAddStep={(branchKey, branchTitle) => setBranchPicker({
+                    parentNodeId: selected.id,
+                    branchKey,
+                    title: `Add step to ${branchTitle}`
+                  })}
+                  onMoveStep={(branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta)}
+                  onDeleteStep={(branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)}
+                />
+              </>
+            ) : data.actionType === "filter" ? (
+              <>
+                <div className="branch-rules-box">
+                  <span className="branch-rules-title">Continue only when all rules match:</span>
+                  <RuleBuilder
+                    rules={extractPredicateRules(data.fields, data.raw)}
+                    onChange={updatePredicateRules}
+                  />
+                </div>
                 {meta.fields
-                  .filter((field) => field.key !== "then" && field.key !== "else")
+                  .filter((field) => field.key !== "field" && field.key !== "operator" && field.key !== "value")
                   .map((field) => (
                     <FieldInput
                       key={field.key}
@@ -2094,13 +3160,137 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                       onChange={(value) => setField(field.key, value)}
                     />
                   ))}
-                <ConditionBranches
+              </>
+            ) : data.actionType === "decision" ? (
+              <>
+                {meta.fields
+                  .filter((field) => field.key === "mode" || field.key === "prompt" || field.key === "system")
+                  .map((field) => (
+                    <FieldInput
+                      key={field.key}
+                      field={field}
+                      value={data.fields?.[field.key] ?? ""}
+                      connections={connections}
+                      fields={data.fields}
+                      siblingFields={meta.fields}
+                      config={config}
+                      nodeType={data.actionType}
+                      onChange={(value) => {
+                        if (field.key === "mode") {
+                          updateBranchFields({ mode: value }, { rebuildCanvas: true });
+                        } else {
+                          setField(field.key, value);
+                        }
+                      }}
+                    />
+                  ))}
+                <DecisionBranchesEditor
+                  mode={decisionMode(data.fields, data.raw)}
+                  choicesField={meta.fields.find((field) => field.key === "choices")!}
+                  casesField={meta.fields.find((field) => field.key === "cases")!}
+                  defaultActionsField={meta.fields.find((field) => field.key === "default_actions")!}
                   thenField={meta.fields.find((field) => field.key === "then")!}
                   elseField={meta.fields.find((field) => field.key === "else")!}
+                  choicesValue={data.fields?.choices ?? ""}
+                  casesValue={data.fields?.cases ?? ""}
+                  defaultActionsValue={data.fields?.default_actions ?? ""}
                   thenValue={data.fields?.then ?? ""}
                   elseValue={data.fields?.else ?? ""}
-                  onChange={(key, value) => setField(key, value)}
+                  rawBranches={data.raw?.branches}
+                  onChangeFields={(updates, options) => updateBranchFields(updates, options)}
+                  onSelectChild={selectBranchChild}
+                  onAddStep={(branchKey, branchTitle) => setBranchPicker({
+                    parentNodeId: selected.id,
+                    branchKey,
+                    title: `Add step to ${branchTitle}`
+                  })}
+                  onMoveStep={(branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta)}
+                  onDeleteStep={(branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)}
                 />
+                <details className="inspector-advanced">
+                  <summary>Model &amp; timeout</summary>
+                  {meta.fields
+                    .filter((field) => field.key === "model" || field.key === "timeout_seconds")
+                    .map((field) => (
+                      <FieldInput
+                        key={field.key}
+                        field={field}
+                        value={data.fields?.[field.key] ?? ""}
+                        connections={connections}
+                        fields={data.fields}
+                        siblingFields={meta.fields}
+                        config={config}
+                        nodeType={data.actionType}
+                        onChange={(value) => setField(field.key, value)}
+                      />
+                    ))}
+                </details>
+              </>
+            ) : data.actionType === "paths" ? (
+              <PathsBranchesEditor
+                pathsField={meta.fields.find((field) => field.key === "paths")!}
+                defaultField={meta.fields.find((field) => field.key === "default")!}
+                pathsValue={data.fields?.paths ?? ""}
+                defaultValue={data.fields?.default ?? ""}
+                onChangeField={(key, value, options) => updateBranchFields({ [key]: value }, options)}
+                onSelectChild={selectBranchChild}
+                onAddStep={(branchKey, branchTitle) => setBranchPicker({
+                  parentNodeId: selected.id,
+                  branchKey,
+                  title: `Add step to ${branchTitle}`
+                })}
+                onMoveStep={(branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta)}
+                onDeleteStep={(branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)}
+              />
+            ) : data.actionType === "union" ? (
+              <>
+                {(() => {
+                  const branchCandidates = orderedActionNodes(shapes)
+                    .filter((s) => s.id !== selected.id && isBranchingAction(s.data?.actionType))
+                    .map((s) => ({
+                      id: effectiveActionId(shapes, s.id) ?? s.id,
+                      title: nodeTitle(s)
+                    }));
+                  return (
+                    <label>Branching step ID (from)
+                      <input
+                        className="mono-input"
+                        list={`union-from-${selected.id}`}
+                        value={data.fields?.from ?? ""}
+                        placeholder={branchCandidates[0]?.id ?? "route_by_kind"}
+                        onChange={(event) => setField("from", event.target.value)}
+                      />
+                      <datalist id={`union-from-${selected.id}`}>
+                        {branchCandidates.map((c) => (
+                          <option key={c.id} value={c.id}>{c.title}</option>
+                        ))}
+                      </datalist>
+                    </label>
+                  );
+                })()}
+                {meta.fields
+                  .filter((field) => field.key !== "from")
+                  .map((field) => (
+                    <FieldInput
+                      key={field.key}
+                      field={field}
+                      value={data.fields?.[field.key] ?? ""}
+                      connections={connections}
+                      fields={data.fields}
+                      siblingFields={meta.fields}
+                      config={config}
+                      nodeType={data.actionType}
+                      onChange={(value) => setField(field.key, value)}
+                    />
+                  ))}
+                <div className="union-dataflow-card">
+                  <p className="inspector-hint">
+                    Coalesces outputs from whichever branch ran into{" "}
+                    <code>{`{steps.${effectiveActionId(shapes, selected.id) ?? "union"}.output.result.*}`}</code>{" "}
+                    and exposes the winning branch name as{" "}
+                    <code>{`{steps.${effectiveActionId(shapes, selected.id) ?? "union"}.output.branch}`}</code>.
+                  </p>
+                </div>
               </>
             ) : (
               meta.fields.map((field) => (
@@ -2585,6 +3775,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             onDuplicateStep={duplicateStep}
             onCopyStep={copyStep}
             onPasteStep={pasteStep}
+            onAddBranchStep={addStepToBranch}
             sessionControls={(actions) => (
               <>
                 <button className="icon-button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" type="button"><RotateCcw size={20} strokeWidth={1.8} /></button>
@@ -2691,7 +3882,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             )}
             {selected?.type === "node" && selected.data ? (
               <header className={`inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`}>
-                <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : "Action"}</h2>
+                <h2>{selected.data.nodeKind === "trigger" ? "Trigger" : selected.data.isUnionJoin ? "Union" : "Action"}</h2>
                 <p className="inspector-summary">{selected.data.nodeKind === "trigger"
                   ? triggerLabel(selected.data.connector ?? "custom", selected.data.event ?? "")
                   : nodeListLabel(selected)}</p>
@@ -2705,10 +3896,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                open its fields start right under the header (the canvas is
                the map). Entries use the canvas card's title and summary so
                repeated steps (eight Conditions) stay distinguishable. */}
-            {selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && (
+            {selected?.type !== "node" && shapes.some((shape) => shape.type === "node" && !shape.data?.isBranchPlaceholder) && (
               <nav className="node-jump" aria-label="Select a workflow node">
                 <p>Steps on the canvas</p>
-                {shapes.filter((shape) => shape.type === "node").map((shape) => (
+                {shapes.filter((shape) => shape.type === "node" && !shape.data?.isBranchPlaceholder).map((shape) => (
                   <button
                     key={shape.id}
                     type="button"
@@ -2721,7 +3912,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 ))}
               </nav>
             )}
-            {selected?.type === "node" && selected.data?.nodeKind === "action" && (
+            {selected?.type === "node" && selected.data?.nodeKind === "action" && !selected.data?.isUnionJoin && !selected.data?.isBranchPlaceholder && (
               <div className="inspector-toolbar">
                 <button className="dk-button dk-button--secondary" type="button" onClick={() => duplicateStep(selected.id)} title="Duplicate this step (Ctrl/Cmd+D)">
                   <Copy size={20} strokeWidth={1.8} /><span>Duplicate</span>
@@ -2763,6 +3954,18 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       )}
       {shortcutsOpen && (
         <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />
+      )}
+      {branchPicker && (
+        <StepPicker
+          mode="action"
+          title={branchPicker.title}
+          onPick={(kind) => {
+            const target = branchPicker;
+            setBranchPicker(null);
+            addStepToBranch(target.parentNodeId, target.branchKey, kind);
+          }}
+          onClose={() => setBranchPicker(null)}
+        />
       )}
     </div>
   );

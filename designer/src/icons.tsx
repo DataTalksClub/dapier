@@ -29,6 +29,7 @@ const ICON_NODES: Record<string, string> = {
   "flask-conical": "<path d='M 14 2 v 6 a2 2 0 0 0 0.24 0.96 l 5.5 10.08 A2 2 0 0 1 18 22 H 6 a2 2 0 0 1 -1.75 -2.96 l 5.5 -10.08 A2 2 0 0 0 10 8 V 2'/><path d='M 6.45 15 h 11.1'/><path d='M 8.5 2 h 7'/>",
   "folder": "<path d='M 20 20 a2 2 0 0 0 2 -2 V 8 a2 2 0 0 0 -2 -2 h -7.9 a2 2 0 0 1 -1.69 -0.9 L 9.6 3.9 A2 2 0 0 0 7.94 3 H 4 a2 2 0 0 0 -2 2 v 13 a2 2 0 0 0 2 2 Z'/>",
   "git-branch": "<line x1='6' x2='6' y1='3' y2='15'/><circle cx='18' cy='6' r='3'/><circle cx='6' cy='18' r='3'/><path d='M 18 9 a9 9 0 0 1 -9 9'/>",
+  "git-merge": "<circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M 6 21 V 9 a9 9 0 0 0 9 9'/>",
   "globe": "<circle cx='12' cy='12' r='10'/><path d='M 12 2 a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0 -20'/><path d='M 2 12 h 20'/>",
   "keyboard": "<path d='M 10 8 h 0.01'/><path d='M 12 12 h 0.01'/><path d='M 14 8 h 0.01'/><path d='M 16 12 h 0.01'/><path d='M 18 8 h 0.01'/><path d='M 6 8 h 0.01'/><path d='M 7 16 h 10'/><path d='M 8 12 h 0.01'/><rect width='20' height='16' x='2' y='4' rx='2'/>",
   "key-round": "<path d='M 2.58 17.41 A2 2 0 0 0 2 18.83 V 21 a1.01 1.01 0 0 0 1.01 1.01 h 3 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 1.01 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 0.17 a2 2 0 0 0 1.41 -0.58 l 0.81 -0.81 a6.5 6.5 0 1 0 -4 -4 z'/><circle cx='16.5' cy='7.5' r='0.49' fill='currentColor'/>",
@@ -113,6 +114,7 @@ export const Filter = makeIcon("filter");
 export const FlaskConical = makeIcon("flask-conical");
 export const Folder = makeIcon("folder");
 export const GitBranch = makeIcon("git-branch");
+export const GitMerge = makeIcon("git-merge");
 export const Globe = makeIcon("globe");
 export const Keyboard = makeIcon("keyboard");
 export const KeyRound = makeIcon("key-round");

@@ -14260,6 +14260,7 @@
     "flask-conical": "<path d='M 14 2 v 6 a2 2 0 0 0 0.24 0.96 l 5.5 10.08 A2 2 0 0 1 18 22 H 6 a2 2 0 0 1 -1.75 -2.96 l 5.5 -10.08 A2 2 0 0 0 10 8 V 2'/><path d='M 6.45 15 h 11.1'/><path d='M 8.5 2 h 7'/>",
     "folder": "<path d='M 20 20 a2 2 0 0 0 2 -2 V 8 a2 2 0 0 0 -2 -2 h -7.9 a2 2 0 0 1 -1.69 -0.9 L 9.6 3.9 A2 2 0 0 0 7.94 3 H 4 a2 2 0 0 0 -2 2 v 13 a2 2 0 0 0 2 2 Z'/>",
     "git-branch": "<line x1='6' x2='6' y1='3' y2='15'/><circle cx='18' cy='6' r='3'/><circle cx='6' cy='18' r='3'/><path d='M 18 9 a9 9 0 0 1 -9 9'/>",
+    "git-merge": "<circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M 6 21 V 9 a9 9 0 0 0 9 9'/>",
     "globe": "<circle cx='12' cy='12' r='10'/><path d='M 12 2 a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0 -20'/><path d='M 2 12 h 20'/>",
     "keyboard": "<path d='M 10 8 h 0.01'/><path d='M 12 12 h 0.01'/><path d='M 14 8 h 0.01'/><path d='M 16 12 h 0.01'/><path d='M 18 8 h 0.01'/><path d='M 6 8 h 0.01'/><path d='M 7 16 h 10'/><path d='M 8 12 h 0.01'/><rect width='20' height='16' x='2' y='4' rx='2'/>",
     "key-round": "<path d='M 2.58 17.41 A2 2 0 0 0 2 18.83 V 21 a1.01 1.01 0 0 0 1.01 1.01 h 3 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 1.01 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 0.17 a2 2 0 0 0 1.41 -0.58 l 0.81 -0.81 a6.5 6.5 0 1 0 -4 -4 z'/><circle cx='16.5' cy='7.5' r='0.49' fill='currentColor'/>",
@@ -14338,6 +14339,7 @@
   const FlaskConical = makeIcon("flask-conical");
   const Folder = makeIcon("folder");
   const GitBranch = makeIcon("git-branch");
+  const GitMerge = makeIcon("git-merge");
   const Globe = makeIcon("globe");
   const Keyboard = makeIcon("keyboard");
   const Layers = makeIcon("layers");
@@ -17540,6 +17542,29 @@
     const anchor = nodes.filter((shape) => shape.data?.nodeKind === "trigger").sort(byPosition)[0] ?? [...nodes].sort(byPosition)[0];
     if (!anchor) return { zoom: 1, pan: { x: 0, y: 0 } };
     const top = Math.min(anchor.y, anchor.y + anchor.height);
+    const hasBranches = nodes.some((node) => Boolean(
+      node.data?.parentBranchNodeId || node.data?.branchPills?.length || node.data?.isBranchPlaceholder || node.data?.isUnionJoin
+    ));
+    if (hasBranches && world.width > 64) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const node of nodes) {
+        minX = Math.min(minX, node.x, node.x + node.width);
+        maxX = Math.max(maxX, node.x, node.x + node.width);
+      }
+      const boundsWidth = maxX - minX;
+      if (boundsWidth > world.width - 32) {
+        const zoom = Math.max(0.55, Math.min(1, Math.round((world.width - 32) / boundsWidth * 100) / 100));
+        const centerX = (minX + maxX) / 2;
+        return {
+          zoom,
+          pan: {
+            x: centerX - world.width / 2,
+            y: top - margin - (world.height - world.height / zoom) / 2
+          }
+        };
+      }
+    }
     return {
       zoom: 1,
       pan: { x: centerOf(anchor).x - world.width / 2, y: top - margin }
@@ -19881,6 +19906,26 @@
       ]
     },
     {
+      type: "union",
+      label: "Union",
+      icon: GitMerge,
+      description: "Rejoin branches and coalesce their outputs into one step",
+      fields: [
+        {
+          key: "from",
+          label: "Branch step ID",
+          placeholder: "classify-recording",
+          help: "ID of the condition, decision, or paths step to merge (defaults to the preceding branch step)"
+        },
+        {
+          key: "fields",
+          label: "Coalesced fields (YAML)",
+          type: "yaml",
+          placeholder: 'document_url:\n  - "{steps.route.then.make-document.output.url}"\n  - "{steps.route.else.render-pdf.output.url}"'
+        }
+      ]
+    },
+    {
       type: "delay",
       label: "Delay",
       icon: Timer,
@@ -20179,6 +20224,7 @@
     condition: "flow",
     decision: "flow",
     paths: "flow",
+    union: "flow",
     delay: "flow",
     for_each: "flow",
     digest: "flow",
@@ -20238,9 +20284,16 @@
   }
   const NODE_WIDTH = 264;
   const NODE_HEIGHT = 96;
+  const BRANCH_PLACEHOLDER_HEIGHT = 60;
+  const UNION_JOIN_HEIGHT = 52;
+  const BRANCH_GAP_X = 64;
   const NODE_GAP_Y = 130;
+  const BRANCH_NODE_GAP_Y = 88;
   const ORIGIN_X = 420;
   const ORIGIN_Y = 140;
+  function isBranchingAction(type2) {
+    return type2 === "condition" || type2 === "paths" || type2 === "decision";
+  }
   function actionMeta(type2) {
     return actionCatalog.find((entry) => entry.type === type2);
   }
@@ -20269,27 +20322,6 @@
   function defaultNodeData(kind) {
     return { nodeKind: "action", actionType: "webhook", fields: defaultFields("webhook") };
   }
-  function actionNodeTitle(data) {
-    return actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Action";
-  }
-  function actionNodeSubtitle(data) {
-    const fields = data.fields ?? {};
-    if (data.actionType === "condition") {
-      const symbols = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
-      const test = (field, operator, value) => `${shortConditionField(field)} ${symbols[operator] ?? operator} ${typeof value === "string" ? value : JSON.stringify(value)}`.trim();
-      if ((fields.field ?? "").trim()) return test(fields.field.trim(), fields.operator || "equals", fields.value ?? "");
-      const when = data.raw?.when;
-      const first2 = isRecord(when) ? Object.entries(when)[0] : void 0;
-      if (first2) {
-        const [field, rule] = first2;
-        const clause = isRecord(rule) ? Object.entries(rule)[0] : void 0;
-        return clause ? test(field, clause[0], clause[1]) : test(field, "equals", rule);
-      }
-    }
-    const meta = actionMeta(data.actionType ?? "webhook");
-    const first = meta?.fields.find((field) => fields[field.key]);
-    return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
-  }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
@@ -20298,6 +20330,214 @@
     if (!trimmed) return trimmed;
     const last = trimmed.split(".").pop()?.trim();
     return last || trimmed;
+  }
+  function extractPredicateRules(fields, raw) {
+    const flatField = (fields?.field ?? "").trim();
+    if (flatField) {
+      const op = (fields?.operator || "equals").trim();
+      return [{
+        field: flatField,
+        operator: logicOperators.includes(op) ? op : "equals",
+        value: fields?.value ?? ""
+      }];
+    }
+    const when = raw?.when;
+    if (Array.isArray(when)) {
+      const out = [];
+      for (const item of when) {
+        if (!isRecord(item)) continue;
+        if (typeof item.field === "string" && item.field.trim()) {
+          const op = String(item.operator ?? "equals").trim();
+          out.push({
+            field: item.field.trim(),
+            operator: logicOperators.includes(op) ? op : "equals",
+            value: String(item.value ?? "")
+          });
+        } else {
+          out.push(...yamlFiltersToRules(item));
+        }
+      }
+      if (out.length > 0) return out;
+    }
+    if (isRecord(when)) {
+      return yamlFiltersToRules(when);
+    }
+    return [];
+  }
+  function decisionMode(fields, raw) {
+    const explicit = (fields?.mode ?? (typeof raw?.mode === "string" ? raw.mode : "")).trim();
+    if (explicit === "if" || explicit === "switch") return explicit;
+    if ((fields?.choices ?? "").trim() || (fields?.cases ?? "").trim() || (fields?.branches ?? "").trim() || Array.isArray(raw?.choices) || Array.isArray(raw?.cases) || isRecord(raw?.branches)) {
+      return "switch";
+    }
+    if ((fields?.then ?? "").trim() || (fields?.else ?? "").trim() || (fields?.then_actions ?? "").trim() || Array.isArray(raw?.then) || Array.isArray(raw?.else) || Array.isArray(raw?.then_actions)) {
+      return "if";
+    }
+    return "switch";
+  }
+  function parseYamlArray(text, fallback) {
+    if (text !== void 0) {
+      const trimmed = text.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = load(trimmed);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+      }
+    }
+    return Array.isArray(fallback) ? fallback : [];
+  }
+  function parseYamlStepObjects(text, fallback) {
+    return parseYamlArray(text, fallback).filter(isRecord);
+  }
+  function extractNodeBranches(data) {
+    const fields = data.fields ?? {};
+    const raw = data.raw ?? {};
+    const type2 = data.actionType;
+    if (type2 === "condition") {
+      const thenSteps = parseYamlStepObjects(fields.then, raw.then);
+      const elseSteps = parseYamlStepObjects(fields.else, raw.else);
+      return [
+        { key: "then", label: "then", steps: thenSteps },
+        { key: "else", label: "else", steps: elseSteps, isDefault: true }
+      ];
+    }
+    if (type2 === "decision") {
+      const mode = decisionMode(fields, raw);
+      if (mode === "if") {
+        const thenSteps = parseYamlStepObjects(fields.then ?? fields.then_actions, raw.then ?? raw.then_actions);
+        const elseSteps = parseYamlStepObjects(fields.else ?? fields.default_actions, raw.else ?? raw.default_actions);
+        return [
+          { key: "then", label: "then", steps: thenSteps },
+          { key: "else", label: "else", steps: elseSteps, isDefault: true }
+        ];
+      }
+      let branchesMap = null;
+      if ((fields.branches ?? "").trim()) {
+        try {
+          const loaded = load(fields.branches);
+          if (isRecord(loaded)) branchesMap = loaded;
+        } catch {
+        }
+      } else if (isRecord(raw.branches) && !(fields.cases ?? "").trim() && !(fields.choices ?? "").trim()) {
+        branchesMap = raw.branches;
+      }
+      let branches;
+      if (branchesMap) {
+        branches = Object.entries(branchesMap).map(([key, entry]) => {
+          const isObj = isRecord(entry);
+          const description = isObj && typeof entry.description === "string" ? entry.description : void 0;
+          const steps = Array.isArray(entry) ? entry.filter(isRecord) : isObj && Array.isArray(entry.actions) ? entry.actions.filter(isRecord) : [];
+          return {
+            key,
+            label: key,
+            ...description !== void 0 ? { description } : {},
+            steps
+          };
+        });
+      } else {
+        const rawChoices = parseYamlArray(fields.choices, raw.choices).map((item) => String(item ?? "").trim()).filter(Boolean);
+        const rawCases = parseYamlArray(fields.cases, raw.cases).filter(isRecord);
+        const choiceNames = [...rawChoices];
+        for (const c of rawCases) {
+          const name = String(c.choice ?? c.label ?? "").trim();
+          if (name && !choiceNames.includes(name)) choiceNames.push(name);
+        }
+        const effectiveChoices = choiceNames.length > 0 ? choiceNames : ["choice-1", "choice-2"];
+        branches = effectiveChoices.map((choice) => {
+          const matching = rawCases.find((c) => String(c.choice ?? c.label ?? "").trim() === choice);
+          const description = typeof matching?.description === "string" ? matching.description : void 0;
+          const steps = Array.isArray(matching?.actions) ? matching.actions.filter(isRecord) : Array.isArray(matching?.then) ? matching.then.filter(isRecord) : [];
+          return {
+            key: choice,
+            label: choice,
+            ...description !== void 0 ? { description } : {},
+            steps
+          };
+        });
+      }
+      const defaultSource = raw.default_actions ?? raw.default ?? raw.else;
+      const defaultSteps = parseYamlStepObjects(fields.default_actions, defaultSource);
+      const hasDefaultDefined = defaultSteps.length > 0 || (fields.default_actions ?? "").trim() !== "" || raw.default_actions !== void 0 || raw.default !== void 0 || raw.else !== void 0;
+      if (hasDefaultDefined) {
+        branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
+      }
+      return branches;
+    }
+    if (type2 === "paths") {
+      const rawPaths = parseYamlArray(fields.paths, raw.paths).filter(isRecord);
+      const effectivePaths = rawPaths.length > 0 ? rawPaths : [{ label: "path-1", when: {}, actions: [] }];
+      const branches = effectivePaths.map((p, idx) => {
+        const key = String(p.id ?? p.label ?? `path-${idx + 1}`).trim() || `path-${idx + 1}`;
+        const label = String(p.label ?? p.id ?? `path-${idx + 1}`).trim() || `path-${idx + 1}`;
+        let when = {};
+        if (isRecord(p.when)) {
+          when = p.when;
+        } else if (typeof p.field === "string" && p.field.trim()) {
+          when = { [p.field.trim()]: { [String(p.operator || "equals")]: p.value ?? "" } };
+        }
+        const steps = Array.isArray(p.actions) ? p.actions.filter(isRecord) : Array.isArray(p.then) ? p.then.filter(isRecord) : [];
+        return { key, label, when, steps };
+      });
+      const defaultSource = raw.default ?? raw.else;
+      const defaultSteps = parseYamlStepObjects(fields.default, defaultSource);
+      branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
+      return branches;
+    }
+    return [];
+  }
+  function actionNodeTitle(data) {
+    if (data.isBranchPlaceholder) {
+      return `+ Add step to ${data.branchLabel || "branch"}`;
+    }
+    if (data.isUnionJoin) {
+      return "Union";
+    }
+    return actionMeta(data.actionType ?? "webhook")?.label ?? data.actionType ?? "Action";
+  }
+  function actionNodeSubtitle(data) {
+    if (data.isBranchPlaceholder) {
+      return data.branchLabel ? `Empty ${data.branchLabel} branch` : "Empty branch";
+    }
+    if (data.isUnionJoin) {
+      return "branches rejoin";
+    }
+    const fields = data.fields ?? {};
+    if (data.actionType === "condition" || data.actionType === "filter") {
+      const symbols = { equals: "=", not_equals: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤" };
+      const rules = extractPredicateRules(fields, data.raw);
+      if (rules.length > 0) {
+        const first2 = rules[0];
+        const base = `${shortConditionField(first2.field)} ${symbols[first2.operator] ?? first2.operator} ${first2.value}`.trim();
+        return rules.length > 1 ? `${base} (+${rules.length - 1})` : base;
+      }
+    }
+    if (data.actionType === "decision") {
+      const mode = decisionMode(fields, data.raw);
+      if (mode === "if") {
+        const promptSnippet = (fields.prompt ?? "").trim().replace(/\s+/g, " ").slice(0, 22) || "yes / no";
+        return `jev if · ${promptSnippet}`;
+      }
+      const branches = extractNodeBranches(data).filter((b) => !b.isDefault);
+      if (branches.length > 0) {
+        return `jev · ${branches.map((b) => b.label).join(" | ")}`;
+      }
+      return "jev · switch";
+    }
+    if (data.actionType === "paths") {
+      const branches = extractNodeBranches(data).filter((b) => !b.isDefault);
+      if (branches.length > 0) {
+        return branches.map((b) => b.label).join(" | ");
+      }
+      return "Paths";
+    }
+    if (data.actionType === "union") {
+      const from = (fields.from ?? "").trim() || "branches";
+      return `merge ← ${from}`;
+    }
+    const meta = actionMeta(data.actionType ?? "webhook");
+    const first = meta?.fields.find((field) => fields[field.key]);
+    return first ? String(fields[first.key]) : meta?.fields[0]?.label ?? "";
   }
   function parseBranchSteps(text) {
     if (!text.trim()) return { steps: [], error: null };
@@ -20364,28 +20604,46 @@
     action[field.group] = created;
     return created;
   }
+  function isSyntheticHelperNode(shape) {
+    return Boolean(shape.data?.isBranchPlaceholder || shape.data?.isUnionJoin);
+  }
+  function isBranchChildNode(shape) {
+    return Boolean(shape.data?.parentBranchNodeId && !shape.data?.isBranchPlaceholder && !shape.data?.isUnionJoin);
+  }
   function orderedActions(shapes, roots) {
     const outgoing = /* @__PURE__ */ new Map();
+    const mergeTargets = /* @__PURE__ */ new Set();
     for (const shape of shapes) {
       if (shape.type !== "arrow" || !shape.sourceId || !shape.targetId) continue;
       outgoing.set(shape.sourceId, [...outgoing.get(shape.sourceId) ?? [], shape.targetId]);
+      if (shape.isMergeEdge) mergeTargets.add(shape.targetId);
     }
+    const byId = new Map(shapes.map((s) => [s.id, s]));
     const actions = [];
     const visited = new Set(roots.map((root2) => root2.id));
     const problems = [];
+    let reportedCycle = false;
     let frontier = roots.flatMap((root2) => (outgoing.get(root2.id) ?? []).filter((id) => !visited.has(id)));
     while (frontier.length) {
       const nextFrontier = [];
       for (const id of frontier) {
+        const node = byId.get(id);
         if (visited.has(id)) {
-          problems.push("The connector graph has a cycle; actions were ordered by traversal.");
+          const isConvergence = mergeTargets.has(id) || Boolean(node?.data?.isUnionJoin) || node?.data?.actionType === "union";
+          if (!isConvergence && !reportedCycle) {
+            problems.push("The connector graph has a cycle; actions were ordered by traversal.");
+            reportedCycle = true;
+          }
           continue;
         }
         visited.add(id);
-        const node = shapes.find((shape) => shape.id === id);
         if (!node || node.type !== "node") continue;
         if (node.data?.nodeKind === "trigger") {
           problems.push("A trigger can only start a workflow; the mid-chain trigger was ignored.");
+          continue;
+        }
+        if (isSyntheticHelperNode(node) || isBranchChildNode(node)) {
+          nextFrontier.push(...outgoing.get(id) ?? []);
           continue;
         }
         actions.push(node);
@@ -20394,7 +20652,7 @@
       frontier = nextFrontier;
     }
     const lost = shapes.filter(
-      (shape) => shape.type === "node" && shape.data?.nodeKind === "action" && !visited.has(shape.id)
+      (shape) => shape.type === "node" && shape.data?.nodeKind === "action" && !isSyntheticHelperNode(shape) && !isBranchChildNode(shape) && !visited.has(shape.id)
     );
     for (const shape of lost) {
       problems.push(`"${shape.label}" is not connected to a trigger and was not saved.`);
@@ -20407,11 +20665,21 @@
   }
   function effectiveActionId(shapes, nodeId) {
     const chain = orderedActionNodes(shapes);
-    const index = chain.findIndex((node) => node.id === nodeId);
-    if (index < 0) return null;
-    return (chain[index].data?.fields?.id ?? "").trim() || `action-${index + 1}`;
+    const index = chain.findIndex((node2) => node2.id === nodeId);
+    if (index >= 0) {
+      return (chain[index].data?.fields?.id ?? "").trim() || `action-${index + 1}`;
+    }
+    const node = shapes.find((shape) => shape.id === nodeId);
+    if (!node || node.type !== "node" || !isBranchChildNode(node)) return null;
+    const parentId = node.data?.parentBranchNodeId;
+    const branchKey = node.data?.branchKey;
+    if (!parentId || !branchKey) return null;
+    const parentEffectiveId = effectiveActionId(shapes, parentId);
+    if (!parentEffectiveId) return null;
+    const localId = (node.data?.fields?.id ?? "").trim() || `step-${(node.data?.branchIndex ?? 0) + 1}`;
+    return `${parentEffectiveId}.${branchKey}.${localId}`;
   }
-  function filterRulesToYaml(rules, problems) {
+  function filterRulesToYaml(rules, problems = []) {
     const filters = {};
     for (const rule of rules ?? []) {
       const field = rule.field.trim();
@@ -20429,16 +20697,18 @@
           problems.push(`Filter ${field}: ${rule.operator} needs true or false.`);
         }
         value = rule.value === "true";
+      } else if (rule.value === "true" || rule.value === "false") {
+        value = rule.value === "true";
       }
       filters[field] = { ...filters[field], [rule.operator]: value };
     }
     return filters;
   }
-  function actionToYaml(node, index, problems) {
+  function actionToYaml(node, index, problems, allShapes = [], defaultIdPrefix = "action") {
     const data = node.data ?? defaultNodeData();
     const type2 = data.actionType ?? "webhook";
     const action = {
-      id: (data.fields?.id ?? "").trim() || `action-${index + 1}`,
+      id: (data.fields?.id ?? "").trim() || `${defaultIdPrefix}-${index + 1}`,
       type: type2
     };
     const meta = actionMeta(type2);
@@ -20473,7 +20743,12 @@
         if (text === "") continue;
         try {
           const parsed2 = load(text);
-          if (!Array.isArray(parsed2)) {
+          if (type2 === "union" && field.key === "fields") {
+            if (!isRecord(parsed2)) {
+              problems.push(`"${node.label ?? type2}": ${field.label} must be a YAML mapping.`);
+              continue;
+            }
+          } else if (!Array.isArray(parsed2)) {
             problems.push(`"${node.label ?? type2}": ${field.label} must be a YAML list of steps.`);
             continue;
           }
@@ -20494,6 +20769,124 @@
     for (const field of [...meta.fields, ...errorHandlingFields]) {
       if ((field.type === "yaml" || field.type === "json") && !(data.fields?.[field.key] ?? "").trim()) {
         delete merged[field.key];
+      }
+    }
+    if (type2 === "condition" || type2 === "filter") {
+      if ((data.fields?.field ?? "").trim()) {
+        delete merged.when;
+      } else if (isRecord(data.raw?.when) || Array.isArray(data.raw?.when)) {
+        merged.when = data.raw.when;
+        delete merged.field;
+        delete merged.operator;
+        delete merged.value;
+      }
+    }
+    const canvasBranchNodes = allShapes.filter(
+      (s) => s.type === "node" && s.data?.parentBranchNodeId === node.id
+    );
+    if (canvasBranchNodes.length > 0 && isBranchingAction(type2)) {
+      const serializeBranchChildren = (branchKey) => {
+        const matchDefault = branchKey === "else" || branchKey === "default";
+        const children = canvasBranchNodes.filter((s) => {
+          const k = s.data?.branchKey;
+          const matchesKey = k === branchKey || matchDefault && (k === "else" || k === "default");
+          return matchesKey && !s.data?.isBranchPlaceholder && !s.data?.isUnionJoin;
+        }).sort((a, b) => (a.data?.branchIndex ?? 0) - (b.data?.branchIndex ?? 0) || a.y - b.y);
+        return children.map((child, childIdx) => actionToYaml(child, childIdx, problems, allShapes, "step"));
+      };
+      if (type2 === "condition") {
+        const thenSteps = serializeBranchChildren("then");
+        const elseSteps = serializeBranchChildren("else");
+        if (thenSteps.length > 0 || data.fields?.then !== void 0 || data.raw?.then !== void 0) {
+          merged.then = thenSteps;
+        }
+        if (elseSteps.length > 0 || (data.fields?.else ?? "").trim() !== "" || Array.isArray(data.raw?.else)) {
+          merged.else = elseSteps;
+        } else {
+          delete merged.else;
+        }
+      } else if (type2 === "decision") {
+        const mode = decisionMode(data.fields, data.raw);
+        if (mode === "if") {
+          const thenSteps = serializeBranchChildren("then");
+          const elseSteps = serializeBranchChildren("else");
+          merged.then = thenSteps;
+          if (elseSteps.length > 0 || (data.fields?.else ?? "").trim() !== "" || Array.isArray(data.raw?.else)) {
+            merged.else = elseSteps;
+          } else {
+            delete merged.else;
+          }
+          delete merged.choices;
+          delete merged.cases;
+          delete merged.branches;
+          delete merged.default_actions;
+        } else {
+          const branches = extractNodeBranches(data);
+          const choiceBranches = branches.filter((b) => !b.isDefault);
+          const useBranchesDict = (isRecord(data.raw?.branches) || Boolean((data.fields?.branches ?? "").trim())) && !Array.isArray(data.raw?.cases) && !(data.fields?.cases ?? "").trim();
+          if (useBranchesDict) {
+            const origBranches = isRecord(data.raw?.branches) ? data.raw.branches : {};
+            const nextBranches = {};
+            for (const b of choiceBranches) {
+              const origEntry = origBranches[b.key];
+              const steps = serializeBranchChildren(b.key);
+              if (isRecord(origEntry) || b.description !== void 0 && b.description.trim() !== "") {
+                const entryObj = isRecord(origEntry) ? { ...origEntry } : {};
+                if (b.description !== void 0 && b.description.trim() !== "") {
+                  entryObj.description = b.description;
+                } else if (b.description === "") {
+                  delete entryObj.description;
+                }
+                entryObj.actions = steps;
+                nextBranches[b.key] = entryObj;
+              } else {
+                nextBranches[b.key] = steps;
+              }
+            }
+            merged.branches = nextBranches;
+          } else {
+            const origCases = parseYamlArray(data.fields?.cases, data.raw?.cases).filter(isRecord);
+            merged.choices = choiceBranches.map((b) => b.key);
+            merged.cases = choiceBranches.map((b) => {
+              const orig = origCases.find((c) => String(c.choice ?? c.label ?? "").trim() === b.key) ?? {};
+              const caseEntry = { ...orig, choice: b.key };
+              if (b.description !== void 0 && b.description.trim() !== "") {
+                caseEntry.description = b.description;
+              } else if (b.description === "") {
+                delete caseEntry.description;
+              }
+              caseEntry.actions = serializeBranchChildren(b.key);
+              return caseEntry;
+            });
+          }
+          const defaultSteps = serializeBranchChildren("default");
+          const defaultKey = data.raw?.else !== void 0 && data.raw?.default_actions === void 0 ? "else" : data.raw?.default !== void 0 && data.raw?.default_actions === void 0 ? "default" : "default_actions";
+          if (defaultSteps.length > 0 || (data.fields?.default_actions ?? "").trim() !== "" || Array.isArray(data.raw?.[defaultKey])) {
+            merged[defaultKey] = defaultSteps;
+          } else {
+            delete merged.default_actions;
+          }
+        }
+      } else if (type2 === "paths") {
+        const branches = extractNodeBranches(data);
+        const pathBranches = branches.filter((b) => !b.isDefault);
+        const origPaths = parseYamlArray(data.fields?.paths, data.raw?.paths).filter(isRecord);
+        merged.paths = pathBranches.map((b, idx) => {
+          const orig = origPaths.find((p) => String(p.label ?? p.id ?? "").trim() === b.key) ?? origPaths[idx] ?? {};
+          const pathEntry = { ...orig, label: b.label };
+          if (b.when && Object.keys(b.when).length > 0 && !orig.field) {
+            pathEntry.when = b.when;
+          }
+          pathEntry.actions = serializeBranchChildren(b.key);
+          return pathEntry;
+        });
+        const defaultSteps = serializeBranchChildren("default");
+        const defaultKey = data.raw?.else !== void 0 && data.raw?.default === void 0 ? "else" : "default";
+        if (defaultSteps.length > 0 || (data.fields?.default ?? "").trim() !== "" || Array.isArray(data.raw?.[defaultKey])) {
+          merged[defaultKey] = defaultSteps;
+        } else {
+          delete merged.default;
+        }
       }
     }
     return merged;
@@ -20521,10 +20914,16 @@
     if (base?.flow) {
       const flows = isRecord(base.flows) ? base.flows : {};
       const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
-      workflow.flows = { ...flows, [base.flow]: { ...bound, actions: actions.map((action, index) => actionToYaml(action, index, problems)) } };
+      workflow.flows = {
+        ...flows,
+        [base.flow]: {
+          ...bound,
+          actions: actions.map((action, index) => actionToYaml(action, index, problems, shapes))
+        }
+      };
       workflow.flow = base.flow;
     } else {
-      workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems));
+      workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems, shapes));
     }
     if (triggerNodes.length === 1) {
       workflow.trigger = triggerToYaml(triggerNodes[0].data, problems);
@@ -20549,13 +20948,23 @@
     if (!meta) return fields;
     for (const field of [...meta.fields, ...errorHandlingFields]) {
       const holder = field.group ? action[field.group] : action;
-      const value = isRecord(holder) ? holder[field.key] : void 0;
+      let value = isRecord(holder) ? holder[field.key] : void 0;
+      if (value === void 0 && !field.group) {
+        if (type2 === "paths" && field.key === "default" && Array.isArray(action.else)) {
+          value = action.else;
+        } else if (type2 === "decision" && field.key === "default_actions") {
+          if (Array.isArray(action.default)) value = action.default;
+          else if (Array.isArray(action.else) && (action.mode ?? "switch") === "switch") value = action.else;
+        }
+      }
       if (field.type === "json") {
         if (value !== void 0) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
         continue;
       }
       if (field.type === "yaml") {
-        if (Array.isArray(value)) fields[field.key] = dump(value, { lineWidth: 100 }).trim();
+        if (Array.isArray(value) || isRecord(value)) {
+          fields[field.key] = dump(value, { lineWidth: 100 }).trim();
+        }
         continue;
       }
       if (value !== void 0) fields[field.key] = String(value);
@@ -20567,10 +20976,15 @@
   }
   function rawExtras(action) {
     const extras = rawAction(action);
-    const meta = actionMeta(String(action.type ?? "webhook"));
+    const type2 = String(action.type ?? "webhook");
+    const meta = actionMeta(type2);
     for (const field of [...meta?.fields ?? [], ...meta ? errorHandlingFields : []]) {
       if (!field.group) {
-        delete extras[field.key];
+        if (field.type === "yaml" && Array.isArray(action[field.key]) && action[field.key].length === 0) {
+          extras[field.key] = [];
+        } else {
+          delete extras[field.key];
+        }
         continue;
       }
       const group = extras[field.group];
@@ -20583,9 +20997,55 @@
     }
     return Object.keys(extras).length ? extras : void 0;
   }
+  function makeNodeDataFromAction(action) {
+    const type2 = String(action.type ?? "webhook");
+    const extras = rawExtras(action);
+    const data = {
+      nodeKind: "action",
+      actionType: type2,
+      fields: actionFields(type2, action),
+      ...extras ? { raw: extras } : {}
+    };
+    if (isBranchingAction(type2)) {
+      data.branchPills = extractNodeBranches(data).map((b) => b.label);
+    }
+    return data;
+  }
+  function actionSubtreeWidth(action) {
+    const type2 = String(action.type ?? "webhook");
+    if (!isBranchingAction(type2)) return NODE_WIDTH;
+    const data = makeNodeDataFromAction(action);
+    const branches = extractNodeBranches(data);
+    if (branches.length === 0) return NODE_WIDTH;
+    const branchWidths = branches.map((b) => branchColumnWidth(b.steps));
+    const total = branchWidths.reduce((sum, w) => sum + w, 0) + BRANCH_GAP_X * Math.max(0, branches.length - 1);
+    return Math.max(NODE_WIDTH, total);
+  }
+  function branchColumnWidth(steps) {
+    if (steps.length === 0) return NODE_WIDTH;
+    return Math.max(NODE_WIDTH, ...steps.map(actionSubtreeWidth));
+  }
+  function makeArrow(sourceId, targetId, extra) {
+    return {
+      id: `link-${sourceId}-${targetId}`,
+      type: "arrow",
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      sourceId,
+      targetId,
+      sourceHandleId: "bottom",
+      targetHandleId: "top",
+      ...extra ?? {}
+    };
+  }
   function shapesFromWorkflow(workflow) {
-    const shapes = [];
-    const rowY = (index) => ORIGIN_Y + index * (NODE_HEIGHT + NODE_GAP_Y);
+    const triggerShapes = [];
+    const topActionShapes = [];
+    const childActionShapes = [];
+    const helperNodeShapes = [];
+    const arrowShapes = [];
     const triggers = workflowTriggers(workflow);
     const actions = workflowActions(workflow);
     const TRIGGER_GAP_X = 72;
@@ -20596,7 +21056,7 @@
         id: triggers.length === 1 ? "trigger" : `trigger-${index}`,
         type: "node",
         x: rowStartX + index * (NODE_WIDTH + TRIGGER_GAP_X),
-        y: rowY(0),
+        y: ORIGIN_Y,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         label: triggerLabel(spec.connector, spec.event),
@@ -20607,46 +21067,221 @@
           filters: yamlFiltersToRules(spec.filters)
         }
       };
-      shapes.push(node);
+      triggerShapes.push(node);
       return node;
     });
-    let previous = triggerNodes[triggerNodes.length - 1] ?? null;
+    function layoutBranchesForNode(branchNode, scopedPrefix, centerX, nextSiblingIsExplicitUnion) {
+      const branches = extractNodeBranches(branchNode.data);
+      branchNode.data.branchPills = branches.map((b) => b.label);
+      const colWidths = branches.map((b) => branchColumnWidth(b.steps));
+      const totalWidth = colWidths.reduce((sum, w) => sum + w, 0) + BRANCH_GAP_X * Math.max(0, branches.length - 1);
+      const groupLeft = centerX + NODE_WIDTH / 2 - totalWidth / 2;
+      const branchStartY = branchNode.y + branchNode.height + 104;
+      let cursorLeft = groupLeft;
+      let maxBranchBottomY = branchStartY;
+      const branchLeafNodes = [];
+      branches.forEach((branch, bIdx) => {
+        const colW = colWidths[bIdx];
+        const colNodeX = Math.round(cursorLeft + colW / 2 - NODE_WIDTH / 2);
+        cursorLeft += colW + BRANCH_GAP_X;
+        if (branch.steps.length === 0) {
+          const placeholder = {
+            id: `${branchNode.id}-${branch.key}-empty`,
+            type: "node",
+            x: colNodeX,
+            y: branchStartY,
+            width: NODE_WIDTH,
+            height: BRANCH_PLACEHOLDER_HEIGHT,
+            label: `+ Add step`,
+            data: {
+              nodeKind: "action",
+              actionType: "__branch_placeholder__",
+              parentBranchNodeId: branchNode.id,
+              branchKey: branch.key,
+              branchLabel: branch.label,
+              branchIndex: 0,
+              isBranchPlaceholder: true
+            }
+          };
+          helperNodeShapes.push(placeholder);
+          arrowShapes.push(makeArrow(branchNode.id, placeholder.id, {
+            branchLabel: branch.label,
+            isBranchEdge: true
+          }));
+          branchLeafNodes.push(placeholder);
+          maxBranchBottomY = Math.max(maxBranchBottomY, placeholder.y + placeholder.height);
+          return;
+        }
+        let curY = branchStartY;
+        let prevInBranch = branchNode;
+        branch.steps.forEach((stepAction, stepIdx) => {
+          const stepType = String(stepAction.type ?? "webhook");
+          const stepId = String(stepAction.id ?? "").trim() || `step-${stepIdx + 1}`;
+          const scopedId = `${scopedPrefix}.${branch.key}.${stepId}`;
+          const childData = makeNodeDataFromAction(stepAction);
+          childData.parentBranchNodeId = branchNode.id;
+          childData.branchKey = branch.key;
+          childData.branchLabel = branch.label;
+          childData.branchIndex = stepIdx;
+          childData.scopedActionId = scopedId;
+          const childNode = {
+            id: `${branchNode.id}-${branch.key}-${stepIdx}`,
+            type: "node",
+            x: colNodeX,
+            y: curY,
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+            label: actionMeta(stepType)?.label ?? stepType,
+            data: childData
+          };
+          childActionShapes.push(childNode);
+          if (stepIdx === 0) {
+            arrowShapes.push(makeArrow(branchNode.id, childNode.id, {
+              branchLabel: branch.label,
+              isBranchEdge: true
+            }));
+          } else {
+            arrowShapes.push(makeArrow(prevInBranch.id, childNode.id));
+          }
+          if (isBranchingAction(stepType)) {
+            const nextInBranchIsUnion = String(branch.steps[stepIdx + 1]?.type ?? "") === "union";
+            const subLayout = layoutBranchesForNode(childNode, scopedId, colNodeX, nextInBranchIsUnion);
+            prevInBranch = subLayout.exitNodes[0]?.node ?? childNode;
+            curY = subLayout.bottomY + BRANCH_NODE_GAP_Y;
+          } else {
+            prevInBranch = childNode;
+            curY = childNode.y + childNode.height + BRANCH_NODE_GAP_Y;
+          }
+        });
+        branchLeafNodes.push(prevInBranch);
+        maxBranchBottomY = Math.max(maxBranchBottomY, prevInBranch.y + prevInBranch.height);
+      });
+      if (nextSiblingIsExplicitUnion) {
+        return {
+          exitNodes: branchLeafNodes.map((n) => ({ node: n, isMerge: true })),
+          bottomY: maxBranchBottomY
+        };
+      }
+      const unionY = maxBranchBottomY + 88;
+      const unionNode = {
+        id: `${branchNode.id}-union`,
+        type: "node",
+        x: centerX,
+        y: unionY,
+        width: NODE_WIDTH,
+        height: UNION_JOIN_HEIGHT,
+        label: "Union",
+        data: {
+          nodeKind: "action",
+          actionType: "__union_join__",
+          isUnionJoin: true,
+          unionForNodeId: branchNode.id,
+          branchPills: branches.map((b) => b.label),
+          ...branchNode.data?.parentBranchNodeId ? { parentBranchNodeId: branchNode.data.parentBranchNodeId } : {}
+        }
+      };
+      helperNodeShapes.push(unionNode);
+      for (const leaf of branchLeafNodes) {
+        arrowShapes.push(makeArrow(leaf.id, unionNode.id, { isMergeEdge: true }));
+      }
+      return {
+        exitNodes: [{ node: unionNode, isMerge: false }],
+        bottomY: unionNode.y + unionNode.height
+      };
+    }
+    let currentY = ORIGIN_Y + (triggers.length ? NODE_HEIGHT + NODE_GAP_Y : 0);
+    let previousSources = triggerNodes.map((t) => ({ node: t, isMerge: false }));
     actions.forEach((action, index) => {
       const type2 = String(action.type ?? "webhook");
-      const extras = rawExtras(action);
+      const data = makeNodeDataFromAction(action);
       const node = {
         id: `action-${index}`,
         type: "node",
         x: ORIGIN_X,
-        y: rowY(index + 1),
+        y: currentY,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         label: actionMeta(type2)?.label ?? String(type2),
-        data: {
-          nodeKind: "action",
-          actionType: type2,
-          fields: actionFields(type2, action),
-          ...extras ? { raw: extras } : {}
+        data
+      };
+      topActionShapes.push(node);
+      for (const source of previousSources) {
+        arrowShapes.push(makeArrow(
+          source.node.id,
+          node.id,
+          source.isMerge ? { isMergeEdge: true } : void 0
+        ));
+      }
+      if (isBranchingAction(type2)) {
+        const effectiveId = String(action.id ?? "").trim() || `action-${index + 1}`;
+        const nextIsExplicitUnion = String(actions[index + 1]?.type ?? "") === "union";
+        const branchLayout = layoutBranchesForNode(node, effectiveId, ORIGIN_X, nextIsExplicitUnion);
+        previousSources = branchLayout.exitNodes;
+        currentY = branchLayout.bottomY + (nextIsExplicitUnion ? 88 : NODE_GAP_Y);
+      } else {
+        previousSources = [{ node, isMerge: false }];
+        currentY = node.y + node.height + NODE_GAP_Y;
+      }
+    });
+    return [
+      ...triggerShapes,
+      ...topActionShapes,
+      ...childActionShapes,
+      ...helperNodeShapes,
+      ...arrowShapes
+    ];
+  }
+  function syncBranchFieldsFromCanvas(shapes, _targetParentId) {
+    const branchingNodes = shapes.filter(
+      (s) => s.type === "node" && isBranchingAction(s.data?.actionType)
+    );
+    if (branchingNodes.length === 0) return shapes;
+    const sortedIds = [...branchingNodes].sort((a, b) => b.y - a.y).map((n) => n.id);
+    let current = shapes;
+    for (const branchNodeId of sortedIds) {
+      const hasChildren = current.some(
+        (s) => s.type === "node" && s.data?.parentBranchNodeId === branchNodeId
+      );
+      if (!hasChildren) continue;
+      current = current.map((shape) => {
+        if (shape.id !== branchNodeId || !shape.data) return shape;
+        const serialized = actionToYaml(shape, 0, [], current);
+        const updatedFields = actionFields(shape.data.actionType ?? "condition", serialized);
+        const updatedData = {
+          ...shape.data,
+          raw: serialized,
+          fields: {
+            ...shape.data.fields,
+            ...updatedFields,
+            id: shape.data.fields?.id ?? ""
+          }
+        };
+        updatedData.branchPills = extractNodeBranches(updatedData).map((b) => b.label);
+        return { ...shape, data: updatedData };
+      });
+    }
+    return current;
+  }
+  function rebuildShapesFromBranchEdit(shapes, workflowId, enabled, base, stripChildrenOfNodeId) {
+    let working = shapes;
+    if (stripChildrenOfNodeId) {
+      const toRemove = /* @__PURE__ */ new Set();
+      const collectDescendants = (parentId) => {
+        for (const s of working) {
+          if (s.type === "node" && (s.data?.parentBranchNodeId === parentId || s.data?.unionForNodeId === parentId)) {
+            toRemove.add(s.id);
+            collectDescendants(s.id);
+          }
         }
       };
-      shapes.push(node);
-      for (const source of index === 0 ? triggerNodes : [previous]) {
-        shapes.push({
-          id: `link-${source.id}-${node.id}`,
-          type: "arrow",
-          x: 0,
-          y: 0,
-          width: 0,
-          height: 0,
-          sourceId: source.id,
-          targetId: node.id,
-          sourceHandleId: "bottom",
-          targetHandleId: "top"
-        });
-      }
-      previous = node;
-    });
-    return shapes;
+      collectDescendants(stripChildrenOfNodeId);
+      working = working.filter(
+        (s) => !toRemove.has(s.id) && (!s.sourceId || !toRemove.has(s.sourceId)) && (!s.targetId || !toRemove.has(s.targetId))
+      );
+    }
+    const notes = working.filter((s) => s.type === "note");
+    const { workflow } = workflowFromShapes(working, workflowId, enabled, base);
+    return [...shapesFromWorkflow(workflow), ...notes];
   }
   function summarize(source, workflow) {
     const primary = workflowTriggers(workflow)[0];
@@ -20664,6 +21299,8 @@
   }
   function nodeIcon(data) {
     if (data?.nodeKind === "trigger") return connectorMeta(data.connector ?? "custom")?.logo ?? Zap;
+    if (data?.isUnionJoin) return GitMerge;
+    if (data?.isBranchPlaceholder) return Plus;
     return actionIcon(data?.actionType ?? "webhook");
   }
   const triggerPalette = connectorCatalog.map((entry) => ({
@@ -20913,6 +21550,7 @@
     onDuplicateStep,
     onCopyStep,
     onPasteStep,
+    onAddBranchStep,
     sessionControls
   }) {
     const [picker, setPicker] = reactExports.useState(null);
@@ -21055,6 +21693,10 @@
       const request = picker;
       setPicker(null);
       if (!request) return;
+      if (request.branchTarget && onAddBranchStep) {
+        onAddBranchStep(request.branchTarget.parentNodeId, request.branchTarget.branchKey, kind);
+        return;
+      }
       if (request.mode === "change" && request.shapeId) {
         changeActionType(request.shapeId, kind);
         return;
@@ -21086,6 +21728,17 @@
       }
       const point = toCanvasPoint(event);
       const hit = findNodeAt(shapes, point);
+      if (hit?.data?.isBranchPlaceholder && hit.data.parentBranchNodeId && hit.data.branchKey) {
+        setPicker({
+          mode: "action",
+          title: `Add step to ${hit.data.branchLabel ?? hit.data.branchKey}`,
+          branchTarget: {
+            parentNodeId: hit.data.parentBranchNodeId,
+            branchKey: hit.data.branchKey
+          }
+        });
+        return;
+      }
       const connectorHit = hit ? void 0 : findConnectorAt(shapes, point);
       const draggableHit = hit && hit.type !== "arrow";
       setSelectedId(hit?.id ?? connectorHit?.id ?? null);
@@ -21523,43 +22176,201 @@
               const strokeWidth = selected ? "3" : "2";
               const color = shapeColor(shape);
               if (shape.type === "node") {
+                if (shape.data?.isBranchPlaceholder) {
+                  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "g",
+                    {
+                      className: "branch-placeholder-node",
+                      onClick: (event) => {
+                        event.stopPropagation();
+                        if (shape.data?.parentBranchNodeId && shape.data?.branchKey) {
+                          setPicker({
+                            mode: "action",
+                            title: `Add step to ${shape.data.branchLabel ?? shape.data.branchKey}`,
+                            branchTarget: {
+                              parentNodeId: shape.data.parentBranchNodeId,
+                              branchKey: shape.data.branchKey
+                            }
+                          });
+                        }
+                      },
+                      style: { cursor: "pointer" },
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "rect",
+                          {
+                            x: shape.x,
+                            y: shape.y,
+                            width: shape.width,
+                            height: shape.height,
+                            rx: "6",
+                            fill: "var(--dk-bg-muted)",
+                            stroke: "var(--dk-border-strong)",
+                            strokeWidth: "1.5",
+                            strokeDasharray: "5 4"
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          Plus,
+                          {
+                            size: 16,
+                            x: shape.x + 18,
+                            y: shape.y + (shape.height - 16) / 2,
+                            color: "var(--dk-text-muted)",
+                            strokeWidth: 1.8
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "text",
+                          {
+                            x: shape.x + 42,
+                            y: shape.y + shape.height / 2 + 4,
+                            fill: "var(--dk-text-muted)",
+                            fontSize: "13",
+                            fontWeight: "500",
+                            children: `+ Add step to ${shape.data.branchLabel ?? "branch"}`
+                          }
+                        )
+                      ]
+                    },
+                    shape.id
+                  );
+                }
+                if (shape.data?.isUnionJoin) {
+                  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "g",
+                    {
+                      className: `union-join-node${selected ? " is-selected" : ""}`,
+                      onClick: (event) => {
+                        event.stopPropagation();
+                        setSelectedId(shape.id);
+                      },
+                      style: { cursor: "pointer" },
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "rect",
+                          {
+                            x: shape.x,
+                            y: shape.y,
+                            width: shape.width,
+                            height: shape.height,
+                            rx: "26",
+                            fill: "var(--dk-bg-surface)",
+                            stroke: selected ? color : "var(--dk-border-strong)",
+                            strokeWidth: selected ? "2.5" : "1.5"
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "rect",
+                          {
+                            x: shape.x + 12,
+                            y: shape.y + (shape.height - 28) / 2,
+                            width: "28",
+                            height: "28",
+                            rx: "14",
+                            fill: "var(--dk-accent-soft)"
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          GitMerge,
+                          {
+                            size: 16,
+                            x: shape.x + 18,
+                            y: shape.y + (shape.height - 16) / 2,
+                            color,
+                            strokeWidth: 1.8
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "text",
+                          {
+                            x: shape.x + 48,
+                            y: shape.y + shape.height / 2 + 4,
+                            fill: "var(--dk-text-secondary)",
+                            fontSize: "13",
+                            fontWeight: "500",
+                            children: "Union · branches rejoin"
+                          }
+                        )
+                      ]
+                    },
+                    shape.id
+                  );
+                }
                 const Icon = nodeIcon(shape.data);
                 const title = nodeTitle(shape);
                 const subtitle = nodeSubtitle(shape);
-                return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { onDoubleClick: (event) => {
-                  event.stopPropagation();
-                  openEditor(shape);
-                }, children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "rect",
-                    {
-                      x: shape.x,
-                      y: shape.y,
-                      width: shape.width,
-                      height: shape.height,
-                      rx: "6",
-                      fill: "var(--dk-bg-surface)",
-                      stroke: color,
-                      strokeWidth
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Icon,
-                    {
-                      size: 22,
-                      x: shape.x + 21,
-                      y: shape.y + (shape.height - 36) / 2 + 7,
-                      color,
-                      strokeWidth: 1.8
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
-                    displayLabel(title)
-                  ] }),
-                  subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--dk-text-muted)", fontSize: "12", children: displayLabel(subtitle) })
-                ] }, shape.id);
+                const actionType = shape.data?.actionType;
+                const isBranchSplit = shape.data?.nodeKind === "action" && (actionType === "condition" || actionType === "decision" || actionType === "paths");
+                const branchBadge = actionType === "condition" ? "IF / ELSE" : actionType === "paths" ? "PATHS" : actionType === "decision" ? shape.data?.fields?.mode === "if" ? "JEV · IF" : "JEV · SWITCH" : null;
+                const badgeWidth = branchBadge ? Math.round(branchBadge.length * 6.5 + 16) : 0;
+                return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "g",
+                  {
+                    className: isBranchSplit ? "is-branch-split" : void 0,
+                    onDoubleClick: (event) => {
+                      event.stopPropagation();
+                      openEditor(shape);
+                    },
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "rect",
+                        {
+                          x: shape.x,
+                          y: shape.y,
+                          width: shape.width,
+                          height: shape.height,
+                          rx: "6",
+                          fill: "var(--dk-bg-surface)",
+                          stroke: color,
+                          strokeWidth
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        Icon,
+                        {
+                          size: 22,
+                          x: shape.x + 21,
+                          y: shape.y + (shape.height - 36) / 2 + 7,
+                          color,
+                          strokeWidth: 1.8
+                        }
+                      ),
+                      branchBadge && /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { className: "branch-split-badge", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "rect",
+                          {
+                            x: shape.x + shape.width - badgeWidth - 10,
+                            y: shape.y + 8,
+                            width: badgeWidth,
+                            height: 18,
+                            rx: "9",
+                            fill: "var(--dk-accent-soft)"
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "text",
+                          {
+                            x: shape.x + shape.width - badgeWidth / 2 - 10,
+                            y: shape.y + 20,
+                            textAnchor: "middle",
+                            fill: "var(--dk-accent-text)",
+                            fontSize: "10",
+                            fontWeight: "600",
+                            children: branchBadge
+                          }
+                        )
+                      ] }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
+                        displayLabel(title)
+                      ] }),
+                      subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("text", { className: "node-subtitle", x: shape.x + 62, y: shape.y + 62, fill: "var(--dk-text-muted)", fontSize: "12", children: displayLabel(subtitle) })
+                    ]
+                  },
+                  shape.id
+                );
               }
               if (shape.type === "note") {
                 return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { onDoubleClick: (event) => {
@@ -21591,9 +22402,42 @@
                     stroke: color,
                     strokeLinecap: "round",
                     strokeWidth: "2",
+                    strokeDasharray: shape.isMergeEdge ? "5 4" : void 0,
                     markerEnd: `url(#arrowhead-${shape.id})`
                   }
                 ),
+                shape.branchLabel && (() => {
+                  const pillText = shape.branchLabel.length > 18 ? `${shape.branchLabel.slice(0, 16)}…` : shape.branchLabel;
+                  const pillW = Math.max(44, pillText.length * 7 + 18);
+                  const pillH = 22;
+                  return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { className: "branch-edge-pill", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "rect",
+                      {
+                        x: midpoint.x - pillW / 2,
+                        y: midpoint.y - pillH / 2,
+                        width: pillW,
+                        height: pillH,
+                        rx: "11",
+                        fill: "var(--dk-bg-surface)",
+                        stroke: "var(--dk-border-strong)",
+                        strokeWidth: "1.5"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "text",
+                      {
+                        x: midpoint.x,
+                        y: midpoint.y + 4,
+                        textAnchor: "middle",
+                        fill: "var(--dk-text-secondary)",
+                        fontSize: "11",
+                        fontWeight: "600",
+                        children: pillText
+                      }
+                    )
+                  ] });
+                })(),
                 selected && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "circle",
@@ -22273,30 +23117,192 @@
       )
     ] });
   }
-  function ConditionBranches({ thenField, elseField, thenValue, elseValue, onChange }) {
+  function RuleBuilder({
+    rules,
+    onChange,
+    addLabel = "Add rule (AND)"
+  }) {
+    const effectiveRules = rules.length > 0 ? rules : [{ field: "", operator: "equals", value: "" }];
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rule-builder", children: [
+      effectiveRules.map((rule, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "filter-row", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "mono-input",
+            placeholder: "field (e.g. subject)",
+            "aria-label": "Field",
+            value: rule.field,
+            onChange: (event) => onChange(
+              effectiveRules.map((entry, i) => i === index ? { ...entry, field: event.target.value } : entry)
+            )
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "select",
+          {
+            "aria-label": "Operator",
+            value: rule.operator,
+            onChange: (event) => onChange(
+              effectiveRules.map((entry, i) => i === index ? { ...entry, operator: event.target.value } : entry)
+            ),
+            children: filterOperators.map((op) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: op, children: op }, op))
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "icon-button",
+            title: "Remove rule",
+            type: "button",
+            disabled: effectiveRules.length <= 1,
+            onClick: () => onChange(effectiveRules.filter((_, i) => i !== index)),
+            children: "×"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "mono-input filter-value",
+            "aria-label": "Value",
+            placeholder: rule.operator === "in" ? '["a", "b"]' : "value",
+            value: rule.value,
+            onChange: (event) => onChange(
+              effectiveRules.map((entry, i) => i === index ? { ...entry, value: event.target.value } : entry)
+            )
+          }
+        )
+      ] }, index)),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          className: "add-row",
+          type: "button",
+          onClick: () => onChange([...effectiveRules, { field: "", operator: "equals", value: "" }]),
+          children: [
+            "+ ",
+            addLabel
+          ]
+        }
+      )
+    ] });
+  }
+  function BranchStepList({
+    branchKey,
+    branchTitle,
+    parsed,
+    onSelectChild,
+    onAddStep,
+    onMoveStep,
+    onDeleteStep
+  }) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      parsed.error ? /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "branch-error", role: "alert", children: [
+        parsed.error,
+        " Fix it below — nothing was lost."
+      ] }) : parsed.steps.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Nothing runs on this side yet." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("ol", { className: "branch-list", children: parsed.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "branch-row branch-row-interactive", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            type: "button",
+            className: "branch-row-select",
+            onClick: () => onSelectChild?.(branchKey, index),
+            title: "Select this step on the canvas",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-index", "aria-hidden": "true", children: index + 1 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "branch-step", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-label", children: step.label }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-id", children: step.id }),
+                step.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-detail", children: step.detail })
+              ] })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "branch-row-actions", children: [
+          onMoveStep && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "icon-button branch-row-btn",
+                disabled: index === 0,
+                title: "Move step up",
+                onClick: () => onMoveStep(branchKey, index, -1),
+                children: "↑"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "icon-button branch-row-btn",
+                disabled: index === parsed.steps.length - 1,
+                title: "Move step down",
+                onClick: () => onMoveStep(branchKey, index, 1),
+                children: "↓"
+              }
+            )
+          ] }),
+          onDeleteStep && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              className: "icon-button branch-row-btn",
+              title: "Remove step from branch",
+              onClick: () => onDeleteStep(branchKey, index),
+              children: "×"
+            }
+          )
+        ] })
+      ] }, `${step.id}-${index}`)) }),
+      onAddStep && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          type: "button",
+          className: "add-row branch-add-step",
+          onClick: () => onAddStep(branchKey, branchTitle),
+          children: [
+            "+ Add step to ",
+            branchTitle
+          ]
+        }
+      )
+    ] });
+  }
+  function ConditionBranches({
+    thenField,
+    elseField,
+    thenValue,
+    elseValue,
+    onChange,
+    onSelectChild,
+    onAddStep,
+    onMoveStep,
+    onDeleteStep
+  }) {
     const branches = reactExports.useMemo(() => [
       { key: "then", title: "Then", hint: "Runs when the test passes.", field: thenField, value: thenValue, parsed: parseBranchSteps(thenValue) },
       { key: "else", title: "Else", hint: "Runs when the test fails.", field: elseField, value: elseValue, parsed: parseBranchSteps(elseValue) }
     ], [thenField, elseField, thenValue, elseValue]);
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-groups", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Two sides of one test: Then runs on a pass, Else on a fail. Steps run top to bottom. Edit the lists as YAML to add, remove, or reorder steps." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Two sides of one test: Then runs on a pass, Else on a fail. Click a step to edit it on the canvas, or add and reorder steps directly." }),
       branches.map((branch) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `branch-group branch-${branch.key}`, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `branch-badge branch-badge-${branch.key}`, children: branch.title }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: branch.parsed.error ? "needs attention" : branch.parsed.steps.length === 0 ? "no steps" : `${branch.parsed.steps.length} step${branch.parsed.steps.length === 1 ? "" : "s"}` })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: branch.hint }),
-        branch.parsed.error ? /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "branch-error", role: "alert", children: [
-          branch.parsed.error,
-          " Fix it below — nothing was lost."
-        ] }) : branch.parsed.steps.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Nothing runs on this side." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("ol", { className: "branch-list", children: branch.parsed.steps.map((step, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "branch-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-index", "aria-hidden": "true", children: index + 1 }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "branch-step", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-label", children: step.label }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-id", children: step.id }),
-            step.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-step-detail", children: step.detail })
-          ] })
-        ] }, `${step.id}-${index}`)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          BranchStepList,
+          {
+            branchKey: branch.key,
+            branchTitle: branch.title,
+            parsed: branch.parsed,
+            onSelectChild,
+            onAddStep,
+            onMoveStep,
+            onDeleteStep
+          }
+        ),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-advanced", open: Boolean(branch.parsed.error), children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("summary", { children: [
             "Edit ",
@@ -22313,6 +23319,407 @@
           )
         ] })
       ] }, branch.key))
+    ] });
+  }
+  function DecisionBranchesEditor({
+    mode,
+    choicesField,
+    casesField,
+    defaultActionsField,
+    thenField,
+    elseField,
+    choicesValue,
+    casesValue,
+    defaultActionsValue,
+    thenValue,
+    elseValue,
+    rawBranches,
+    onChangeFields,
+    onSelectChild,
+    onAddStep,
+    onMoveStep,
+    onDeleteStep
+  }) {
+    if (mode === "if") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        ConditionBranches,
+        {
+          thenField,
+          elseField,
+          thenValue,
+          elseValue,
+          onChange: (key, val) => onChangeFields({ [key]: val }),
+          onSelectChild,
+          onAddStep,
+          onMoveStep,
+          onDeleteStep
+        }
+      );
+    }
+    let parseError;
+    let parsedCases = [];
+    let parsedChoiceList = [];
+    if (choicesValue.trim()) {
+      try {
+        const loadedChoices = load(choicesValue);
+        if (Array.isArray(loadedChoices)) {
+          parsedChoiceList = loadedChoices.map((c) => String(c ?? "").trim()).filter(Boolean);
+        }
+      } catch {
+      }
+    }
+    if (casesValue.trim()) {
+      try {
+        const loaded = load(casesValue);
+        if (Array.isArray(loaded)) {
+          parsedCases = loaded.filter((item) => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+        } else {
+          parseError = "Cases must be a YAML list of { choice, actions } objects.";
+        }
+      } catch (err) {
+        parseError = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      }
+    } else if (rawBranches && typeof rawBranches === "object" && !Array.isArray(rawBranches)) {
+      for (const [k, v] of Object.entries(rawBranches)) {
+        if (Array.isArray(v)) {
+          parsedCases.push({ choice: k, actions: v });
+        } else if (v && typeof v === "object") {
+          const entryObj = v;
+          parsedCases.push({
+            choice: k,
+            ...typeof entryObj.description === "string" ? { description: entryObj.description } : {},
+            actions: Array.isArray(entryObj.actions) ? entryObj.actions : []
+          });
+        }
+      }
+    }
+    const seenChoices = /* @__PURE__ */ new Set();
+    const choiceEntries = [];
+    for (const c of parsedCases) {
+      const key = String(c.choice ?? c.label ?? "").trim();
+      if (!key) continue;
+      seenChoices.add(key);
+      const description = typeof c.description === "string" ? c.description : "";
+      const actions = Array.isArray(c.actions) ? c.actions : [];
+      const yamlSteps = actions.length > 0 ? dump(actions, { lineWidth: 100 }).trimEnd() : "";
+      choiceEntries.push({ key, description, actions, parsed: parseBranchSteps(yamlSteps) });
+    }
+    for (const choiceName of parsedChoiceList) {
+      if (!seenChoices.has(choiceName)) {
+        seenChoices.add(choiceName);
+        choiceEntries.push({ key: choiceName, description: "", actions: [], parsed: { steps: [], error: null } });
+      }
+    }
+    const commitChoices = (nextEntries, options) => {
+      const nextChoices = nextEntries.map((item) => item.key.trim() || "choice");
+      const nextCases = nextEntries.map((item) => {
+        const k = item.key.trim() || "choice";
+        return {
+          choice: k,
+          ...item.description.trim() ? { description: item.description } : {},
+          actions: item.actions
+        };
+      });
+      const serializedChoices = nextChoices.length > 0 ? dump(nextChoices, { lineWidth: 100 }).trimEnd() : "";
+      const serializedCases = nextCases.length > 0 ? dump(nextCases, { lineWidth: 100 }).trimEnd() : "";
+      onChangeFields({ choices: serializedChoices, cases: serializedCases }, options);
+    };
+    const defaultParsed = parseBranchSteps(defaultActionsValue);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-groups", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+        "Jev classifies the event into one of the named choices below, or falls back to ",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "else" }),
+        " when none fit."
+      ] }),
+      parseError && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "branch-error", role: "alert", children: [
+        parseError,
+        " Fix it in the YAML disclosure below."
+      ] }),
+      choiceEntries.map((choice, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-group branch-choice", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              className: "mono-input branch-key-input",
+              "aria-label": `Choice ${idx + 1} name`,
+              value: choice.key,
+              placeholder: "choice_name",
+              onChange: (event) => {
+                const newKey = event.target.value;
+                const next = choiceEntries.map((c, i) => i === idx ? { ...c, key: newKey } : c);
+                commitChoices(next, { renameBranch: { from: choice.key, to: newKey.trim() || "choice" } });
+              }
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: choice.parsed.steps.length === 0 ? "no steps" : `${choice.parsed.steps.length} step${choice.parsed.steps.length === 1 ? "" : "s"}` }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              className: "icon-button branch-row-btn",
+              title: "Remove choice branch",
+              disabled: choiceEntries.length <= 1,
+              onClick: () => commitChoices(choiceEntries.filter((_, i) => i !== idx), { rebuildCanvas: true }),
+              children: "×"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "branch-criterion-label", children: [
+          "Criterion for Jev (optional)",
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "text",
+              placeholder: "When should Jev pick this choice?",
+              value: choice.description,
+              onChange: (event) => {
+                const next = choiceEntries.map((c, i) => i === idx ? { ...c, description: event.target.value } : c);
+                commitChoices(next);
+              }
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          BranchStepList,
+          {
+            branchKey: choice.key,
+            branchTitle: choice.key,
+            parsed: choice.parsed,
+            onSelectChild,
+            onAddStep,
+            onMoveStep,
+            onDeleteStep
+          }
+        )
+      ] }, idx)),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          type: "button",
+          className: "add-row",
+          onClick: () => {
+            let idx = choiceEntries.length + 1;
+            let candidate = `choice_${idx}`;
+            while (choiceEntries.some((c) => c.key === candidate)) {
+              idx += 1;
+              candidate = `choice_${idx}`;
+            }
+            commitChoices([...choiceEntries, { key: candidate, description: "", actions: [] }], { rebuildCanvas: true });
+          },
+          children: "+ Add choice branch"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-group branch-else", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-badge branch-badge-else", children: "else" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: defaultParsed.steps.length === 0 ? "no steps" : `${defaultParsed.steps.length} step${defaultParsed.steps.length === 1 ? "" : "s"}` })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Fallback steps when Jev returns none or an unknown choice." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          BranchStepList,
+          {
+            branchKey: "default",
+            branchTitle: "else",
+            parsed: defaultParsed,
+            onSelectChild,
+            onAddStep,
+            onMoveStep,
+            onDeleteStep
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-advanced", open: Boolean(parseError), children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("summary", { children: "Edit decision branches as YAML" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          FieldInput,
+          {
+            field: choicesField,
+            value: choicesValue,
+            onChange: (val) => onChangeFields({ choices: val })
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          FieldInput,
+          {
+            field: casesField,
+            value: casesValue,
+            onChange: (val) => onChangeFields({ cases: val })
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          FieldInput,
+          {
+            field: defaultActionsField,
+            value: defaultActionsValue,
+            onChange: (val) => onChangeFields({ default_actions: val })
+          }
+        )
+      ] })
+    ] });
+  }
+  function PathsBranchesEditor({
+    pathsField,
+    defaultField,
+    pathsValue,
+    defaultValue,
+    onChangeField,
+    onSelectChild,
+    onAddStep,
+    onMoveStep,
+    onDeleteStep
+  }) {
+    let rawPaths = [];
+    let parseError;
+    if (pathsValue.trim()) {
+      try {
+        const loaded = load(pathsValue);
+        if (Array.isArray(loaded)) {
+          rawPaths = loaded.filter((item) => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+        } else {
+          parseError = "Paths must be a YAML list of path objects.";
+        }
+      } catch (err) {
+        parseError = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      }
+    }
+    const commitPaths = (nextPaths, options) => {
+      const serialized = nextPaths.length > 0 ? dump(nextPaths, { lineWidth: 100 }).trimEnd() : "";
+      onChangeField("paths", serialized, options);
+    };
+    const defaultParsed = parseBranchSteps(defaultValue);
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-groups", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+        "Evaluates paths top to bottom and runs the first matching path, or",
+        " ",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "else" }),
+        " when none match."
+      ] }),
+      parseError && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "branch-error", role: "alert", children: [
+        parseError,
+        " Fix it in the YAML disclosure below."
+      ] }),
+      rawPaths.map((pathObj, idx) => {
+        const key = typeof pathObj.id === "string" && pathObj.id.trim() || typeof pathObj.label === "string" && pathObj.label.trim() || `path_${idx + 1}`;
+        const label = typeof pathObj.label === "string" && pathObj.label || typeof pathObj.id === "string" && pathObj.id || `Path ${idx + 1}`;
+        const rules = extractPredicateRules(void 0, { when: pathObj.when });
+        const actions = Array.isArray(pathObj.actions) ? pathObj.actions : [];
+        const yamlSteps = actions.length > 0 ? dump(actions, { lineWidth: 100 }).trimEnd() : "";
+        const parsed = parseBranchSteps(yamlSteps);
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-group branch-path", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "mono-input branch-key-input",
+                "aria-label": `Path ${idx + 1} label`,
+                value: label,
+                placeholder: `Path ${idx + 1}`,
+                onChange: (event) => {
+                  const newLabel = event.target.value;
+                  const newKey = typeof pathObj.id === "string" && pathObj.id.trim() || newLabel.trim() || `path_${idx + 1}`;
+                  const next = rawPaths.map((p, i) => i === idx ? { ...p, label: newLabel } : p);
+                  commitPaths(next, { renameBranch: { from: key, to: newKey } });
+                }
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: parsed.steps.length === 0 ? "no steps" : `${parsed.steps.length} step${parsed.steps.length === 1 ? "" : "s"}` }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "icon-button branch-row-btn",
+                title: "Remove path",
+                disabled: rawPaths.length <= 1,
+                onClick: () => commitPaths(rawPaths.filter((_, i) => i !== idx), { rebuildCanvas: true }),
+                children: "×"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-rules-box", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-rules-title", children: "When all rules match:" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              RuleBuilder,
+              {
+                rules,
+                onChange: (nextRules) => {
+                  const whenYaml = filterRulesToYaml(nextRules);
+                  const next = rawPaths.map((p, i) => i === idx ? { ...p, when: whenYaml } : p);
+                  commitPaths(next);
+                }
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            BranchStepList,
+            {
+              branchKey: key,
+              branchTitle: label,
+              parsed,
+              onSelectChild,
+              onAddStep,
+              onMoveStep,
+              onDeleteStep
+            }
+          )
+        ] }, idx);
+      }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          type: "button",
+          className: "add-row",
+          onClick: () => {
+            const nextIdx = rawPaths.length + 1;
+            commitPaths([
+              ...rawPaths,
+              {
+                label: `Path ${nextIdx}`,
+                when: { field: "", operator: "equals", value: "" },
+                actions: []
+              }
+            ], { rebuildCanvas: true });
+          },
+          children: "+ Add path branch"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-group branch-else", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-head", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-badge branch-badge-else", children: "else" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-count", children: defaultParsed.steps.length === 0 ? "no steps" : `${defaultParsed.steps.length} step${defaultParsed.steps.length === 1 ? "" : "s"}` })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Fallback steps when no path matches." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          BranchStepList,
+          {
+            branchKey: "default",
+            branchTitle: "else",
+            parsed: defaultParsed,
+            onSelectChild,
+            onAddStep,
+            onMoveStep,
+            onDeleteStep
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-advanced", open: Boolean(parseError), children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("summary", { children: "Edit paths as YAML" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          FieldInput,
+          {
+            field: pathsField,
+            value: pathsValue,
+            onChange: (val) => onChangeField("paths", val)
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          FieldInput,
+          {
+            field: defaultField,
+            value: defaultValue,
+            onChange: (val) => onChangeField("default", val)
+          }
+        )
+      ] })
     ] });
   }
   function resourceSingular(resource) {
@@ -22666,11 +24073,222 @@
       commitEdit(draftRef.current);
       setEnabled(next);
     }
+    const [branchPicker, setBranchPicker] = reactExports.useState(null);
+    function mutateParentBranchSteps(parentNodeId, branchKey, mutateSteps, selectAfter) {
+      const current = draftRef.current.shapes;
+      const synced = syncBranchFieldsFromCanvas(current);
+      const parent = synced.find((s) => s.id === parentNodeId);
+      if (!parent || !parent.data) return;
+      const topOrder = orderedActionNodes(synced);
+      const parentOrderIdx = topOrder.findIndex((s) => s.id === parentNodeId);
+      const canonParentId = parentOrderIdx >= 0 ? `action-${parentOrderIdx}` : parentNodeId;
+      const isDefaultBranch = branchKey === "else" || branchKey === "default";
+      const branches = extractNodeBranches(parent.data);
+      const targetBranch = branches.find(
+        (b) => b.key === branchKey || isDefaultBranch && (b.key === "else" || b.key === "default")
+      );
+      const nextSteps = mutateSteps(targetBranch ? targetBranch.steps : []);
+      const serializedSteps = nextSteps.length > 0 ? dump(nextSteps, { lineWidth: 100 }).trimEnd() : "";
+      const actionType = parent.data.actionType;
+      const nextFields = { ...parent.data.fields ?? {} };
+      const nextRaw = { ...parent.data.raw ?? {} };
+      if (actionType === "condition") {
+        if (branchKey === "then") {
+          nextFields.then = serializedSteps;
+          delete nextRaw.then;
+        } else {
+          nextFields.else = serializedSteps;
+          delete nextRaw.else;
+        }
+      } else if (actionType === "decision") {
+        const mode = decisionMode(nextFields, nextRaw);
+        if (mode === "if") {
+          if (branchKey === "then") {
+            nextFields.then = serializedSteps;
+            delete nextRaw.then;
+            delete nextRaw.then_actions;
+          } else {
+            nextFields.else = serializedSteps;
+            delete nextRaw.else;
+            delete nextRaw.default_actions;
+          }
+        } else if (isDefaultBranch) {
+          nextFields.default_actions = serializedSteps;
+          delete nextRaw.default_actions;
+          delete nextRaw.else;
+          delete nextRaw.default;
+        } else if (nextRaw.branches && typeof nextRaw.branches === "object" && !Array.isArray(nextRaw.branches) && !(nextFields.cases ?? "").trim()) {
+          const parsedMap = { ...nextRaw.branches };
+          const existingEntry = parsedMap[branchKey];
+          if (existingEntry && typeof existingEntry === "object" && !Array.isArray(existingEntry)) {
+            parsedMap[branchKey] = { ...existingEntry, actions: nextSteps };
+          } else {
+            parsedMap[branchKey] = nextSteps;
+          }
+          nextRaw.branches = parsedMap;
+        } else {
+          let parsedCases = [];
+          if ((nextFields.cases ?? "").trim()) {
+            try {
+              const loaded = load(nextFields.cases);
+              if (Array.isArray(loaded)) {
+                parsedCases = loaded.filter((item) => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+              }
+            } catch {
+            }
+          }
+          let found = false;
+          const updatedCases = parsedCases.map((c) => {
+            const k = String(c.choice ?? c.label ?? "").trim();
+            if (k === branchKey) {
+              found = true;
+              return { ...c, choice: branchKey, actions: nextSteps };
+            }
+            return c;
+          });
+          if (!found) {
+            updatedCases.push({ choice: branchKey, actions: nextSteps });
+          }
+          const choiceNames = branches.filter((b) => !b.isDefault).map((b) => b.key);
+          if (!choiceNames.includes(branchKey)) choiceNames.push(branchKey);
+          nextFields.choices = choiceNames.length > 0 ? dump(choiceNames, { lineWidth: 100 }).trimEnd() : "";
+          nextFields.cases = updatedCases.length > 0 ? dump(updatedCases, { lineWidth: 100 }).trimEnd() : "";
+          delete nextRaw.choices;
+          delete nextRaw.cases;
+        }
+      } else if (actionType === "paths") {
+        if (isDefaultBranch) {
+          nextFields.default = serializedSteps;
+          delete nextRaw.default;
+          delete nextRaw.else;
+        } else {
+          let rawPaths = [];
+          if ((nextFields.paths ?? "").trim()) {
+            try {
+              const loaded = load(nextFields.paths);
+              if (Array.isArray(loaded)) {
+                rawPaths = loaded.filter((item) => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+              }
+            } catch {
+            }
+          }
+          const updatedPaths = rawPaths.map((p, idx) => {
+            const k = typeof p.id === "string" && p.id.trim() || typeof p.label === "string" && p.label.trim() || `path_${idx + 1}`;
+            return k === branchKey ? { ...p, actions: nextSteps } : p;
+          });
+          nextFields.paths = updatedPaths.length > 0 ? dump(updatedPaths, { lineWidth: 100 }).trimEnd() : "";
+          delete nextRaw.paths;
+        }
+      }
+      const stripped = synced.map(
+        (s) => s.id === parentNodeId ? { ...s, data: { ...s.data, fields: nextFields, raw: nextRaw } } : s
+      );
+      const rebuilt = rebuildShapesFromBranchEdit(stripped, workflowId, enabled, base, parentNodeId);
+      commitEdit(draftRef.current);
+      setShapes(rebuilt);
+      if (selectAfter) {
+        const nextSelected = selectAfter(rebuilt, canonParentId);
+        if (nextSelected) setSelectedId(nextSelected);
+      }
+    }
+    function addStepToBranch(parentNodeId, branchKey, kind) {
+      if (kind === "note" || kind.startsWith("trigger:")) return;
+      const defaults = defaultFields(kind);
+      const isDefaultBranch = branchKey === "else" || branchKey === "default";
+      mutateParentBranchSteps(
+        parentNodeId,
+        branchKey,
+        (steps) => {
+          const nextIdx = steps.length + 1;
+          const stepObj = {
+            id: `${kind}_${nextIdx}`,
+            type: kind
+          };
+          for (const [k, v] of Object.entries(defaults)) {
+            if (k === "id" || v === "") continue;
+            stepObj[k] = v;
+          }
+          return [...steps, stepObj];
+        },
+        (rebuilt, canonParentId) => {
+          const children = rebuilt.filter(
+            (s) => s.data?.parentBranchNodeId === canonParentId && (s.data?.branchKey === branchKey || isDefaultBranch && (s.data?.branchKey === "else" || s.data?.branchKey === "default")) && !s.data?.isBranchPlaceholder
+          );
+          return children[children.length - 1]?.id ?? canonParentId;
+        }
+      );
+      setStatus({ kind: "ok", message: `Added ${paletteLabel(kind)} to branch "${branchKey}".` });
+    }
+    function moveBranchStep(parentNodeId, branchKey, stepIndex, delta) {
+      mutateParentBranchSteps(
+        parentNodeId,
+        branchKey,
+        (steps) => {
+          const targetIdx = stepIndex + delta;
+          if (targetIdx < 0 || targetIdx >= steps.length) return steps;
+          const next = [...steps];
+          const [moved] = next.splice(stepIndex, 1);
+          next.splice(targetIdx, 0, moved);
+          return next;
+        },
+        (_rebuilt, canonParentId) => canonParentId
+      );
+    }
+    function deleteBranchStep(parentNodeId, branchKey, stepIndex) {
+      mutateParentBranchSteps(
+        parentNodeId,
+        branchKey,
+        (steps) => steps.filter((_, idx) => idx !== stepIndex),
+        (_rebuilt, canonParentId) => canonParentId
+      );
+    }
+    function convertUnionJoinToExplicit(branchNodeId) {
+      const current = draftRef.current.shapes;
+      const synced = syncBranchFieldsFromCanvas(current);
+      const built = workflowFromShapes(synced, workflowId, enabled, base);
+      const parentActionId = effectiveActionId(synced, branchNodeId) ?? branchNodeId;
+      const topOrder = orderedActionNodes(synced);
+      const parentIdx = topOrder.findIndex((s) => s.id === branchNodeId);
+      const actions = [...built.workflow.actions ?? []];
+      const unionStep = {
+        id: `union_${parentActionId}`,
+        type: "union",
+        from: parentActionId
+      };
+      if (parentIdx >= 0 && parentIdx < actions.length) {
+        actions.splice(parentIdx + 1, 0, unionStep);
+      } else {
+        actions.push(unionStep);
+      }
+      const rebuilt = shapesFromWorkflow({ ...built.workflow, actions });
+      commitEdit(draftRef.current);
+      setShapes(rebuilt);
+      const unionNode = rebuilt.find((s) => s.type === "node" && s.data?.actionType === "union" && s.data?.fields?.from === parentActionId);
+      if (unionNode) setSelectedId(unionNode.id);
+      setStatus({ kind: "ok", message: `Inserted explicit Union step for "${parentActionId}".` });
+    }
     function deleteSelectedShape() {
       const id = selectedId;
       if (!id) return;
+      const target = draftRef.current.shapes.find((shape) => shape.id === id);
+      if (target?.data?.isUnionJoin || target?.data?.isBranchPlaceholder) {
+        setSelectedId(null);
+        return;
+      }
+      if (target?.data?.parentBranchNodeId && target.data.branchKey !== void 0 && target.data.branchIndex !== void 0) {
+        deleteBranchStep(target.data.parentBranchNodeId, target.data.branchKey, target.data.branchIndex);
+        return;
+      }
       commitEdit(draftRef.current);
-      setShapes((current) => current.filter((shape) => shape.id !== id && shape.sourceId !== id && shape.targetId !== id));
+      setShapes((current) => {
+        const removedNodeIds = /* @__PURE__ */ new Set([id]);
+        for (const shape of current) {
+          if (shape.data?.parentBranchNodeId === id || shape.data?.unionForNodeId === id) {
+            removedNodeIds.add(shape.id);
+          }
+        }
+        return current.filter((shape) => !removedNodeIds.has(shape.id) && (!shape.sourceId || !removedNodeIds.has(shape.sourceId)) && (!shape.targetId || !removedNodeIds.has(shape.targetId)));
+      });
       setSelectedId(null);
     }
     function duplicateStep(id) {
@@ -23499,12 +25117,32 @@
     }
     function updateSelected(mutate) {
       if (!selectedId) return;
-      editShapes((current) => current.map((shape) => {
-        if (shape.id !== selectedId || !shape.data) return shape;
-        const data = mutate(shape.data);
-        const label = data.nodeKind === "trigger" ? triggerLabel(data.connector ?? "custom", data.event ?? "") : shape.label;
-        return { ...shape, data, label };
-      }), `node:${selectedId}`);
+      editShapes((current) => {
+        const target = current.find((shape) => shape.id === selectedId);
+        if (!target || !target.data) return current;
+        const nextData = mutate(target.data);
+        const label = nextData.nodeKind === "trigger" ? triggerLabel(nextData.connector ?? "custom", dataOrEmpty(nextData.event)) : target.label;
+        let nextShapes = current.map((shape) => shape.id === selectedId ? { ...shape, data: nextData, label } : shape);
+        if (nextData.parentBranchNodeId) {
+          nextShapes = syncBranchFieldsFromCanvas(nextShapes, nextData.parentBranchNodeId);
+        } else if (isBranchingAction(nextData.actionType)) {
+          const prevFields = target.data.fields ?? {};
+          const curFields = nextData.fields ?? {};
+          const branchStructureChanged = ["then", "else", "branches", "then_actions", "default_actions", "paths", "default", "mode"].some(
+            (k) => (prevFields[k] ?? "") !== (curFields[k] ?? "")
+          );
+          if (branchStructureChanged) {
+            const stripped = nextShapes.filter(
+              (s) => s.data?.parentBranchNodeId !== selectedId && s.data?.unionForNodeId !== selectedId
+            );
+            nextShapes = rebuildShapesFromBranchEdit(stripped, workflowId, enabled, base);
+          }
+        }
+        return nextShapes;
+      }, `node:${selectedId}`);
+    }
+    function dataOrEmpty(val) {
+      return val ?? "";
     }
     const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
     const triggerNodes = shapes.filter((shape) => shape.type === "node" && shape.data?.nodeKind === "trigger");
@@ -23530,6 +25168,53 @@
         ] });
       }
       const data = selected.data;
+      if (data.isUnionJoin) {
+        const parentNode = shapes.find((s) => s.id === data.unionForNodeId);
+        const parentActionId = data.unionForNodeId && effectiveActionId(shapes, data.unionForNodeId) || "branch_step";
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Branches rejoin" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+            "All branches from ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: parentNode ? nodeTitle(parentNode) : parentActionId }),
+            " converge here before the next step runs."
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "union-dataflow-card", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-hint", children: "Downstream steps can read the active branch’s output without knowing which branch ran:" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "template-chips", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  onClick: () => copyTemplate(`{steps.${parentActionId}.output.result}`),
+                  children: `{steps.${parentActionId}.output.result}`
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "template-chip",
+                  onClick: () => copyTemplate(`{steps.${parentActionId}.output.branch}`),
+                  children: `{steps.${parentActionId}.output.branch}`
+                }
+              )
+            ] })
+          ] }),
+          data.unionForNodeId && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "test-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              type: "button",
+              className: "dk-button dk-button--secondary",
+              onClick: () => convertUnionJoinToExplicit(data.unionForNodeId),
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(GitMerge, { size: 18, strokeWidth: 1.8 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Convert to explicit Union step" })
+              ]
+            }
+          ) })
+        ] });
+      }
       if (data.nodeKind === "trigger") {
         const connectorEntry = connectorCatalog.find((entry) => entry.name === (data.connector ?? "custom")) ?? { name: "custom", events: [] };
         return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
@@ -23675,11 +25360,133 @@
       }
       const type2 = data.actionType ?? "webhook";
       const meta = actionMeta(type2);
-      const setField = (key, value) => updateSelected((current) => ({
-        ...current,
-        fields: { ...current.fields, [key]: value }
-      }));
+      const setField = (key, value) => updateSelected((current) => {
+        const nextFields = { ...current.fields, [key]: value };
+        const nextData = { ...current, fields: nextFields };
+        if (isBranchingAction(current.actionType)) {
+          nextData.branchPills = extractNodeBranches(nextData).map((b) => b.label);
+        }
+        return nextData;
+      });
+      const updateBranchFields = (updates, options) => {
+        commitEdit(draftRef.current, `inspector:${selected.id}:${Object.keys(updates).join(",")}`);
+        setShapes((currentShapes) => {
+          const nextShapes = currentShapes.map((shape) => {
+            if (shape.id === selected.id && shape.data) {
+              const nextFields = { ...shape.data.fields, ...updates };
+              const nextRaw = { ...shape.data.raw ?? {} };
+              if ("cases" in updates || "choices" in updates) {
+                delete nextRaw.cases;
+                delete nextRaw.choices;
+                delete nextRaw.branches;
+              }
+              if ("paths" in updates) delete nextRaw.paths;
+              if ("then" in updates) delete nextRaw.then;
+              if ("else" in updates) delete nextRaw.else;
+              if ("default" in updates) delete nextRaw.default;
+              if ("default_actions" in updates) delete nextRaw.default_actions;
+              const nextData = { ...shape.data, fields: nextFields, raw: nextRaw };
+              nextData.branchPills = extractNodeBranches(nextData).map((b) => b.label);
+              return { ...shape, data: nextData };
+            }
+            if (options?.renameBranch && shape.data?.parentBranchNodeId === selected.id && shape.data?.branchKey === options.renameBranch.from) {
+              return {
+                ...shape,
+                label: shape.data.isBranchPlaceholder ? `+ Add step to ${options.renameBranch.to}` : shape.label,
+                data: {
+                  ...shape.data,
+                  branchKey: options.renameBranch.to,
+                  branchLabel: options.renameBranch.to
+                }
+              };
+            }
+            if (options?.renameBranch && shape.type === "arrow" && shape.sourceId === selected.id && shape.label === options.renameBranch.from) {
+              return { ...shape, label: options.renameBranch.to };
+            }
+            return shape;
+          });
+          if (options?.rebuildCanvas) {
+            return rebuildShapesFromBranchEdit(nextShapes, workflowId, enabled, base, selected.id);
+          }
+          return syncBranchFieldsFromCanvas(nextShapes, selected.id);
+        });
+      };
+      const selectBranchChild = (branchKey, stepIdx) => {
+        const isDefault = branchKey === "else" || branchKey === "default";
+        const child = shapes.find(
+          (s) => s.data?.parentBranchNodeId === selected.id && (s.data?.branchKey === branchKey || isDefault && (s.data?.branchKey === "else" || s.data?.branchKey === "default")) && s.data?.branchIndex === stepIdx && !s.data?.isBranchPlaceholder
+        );
+        if (child) setSelectedId(child.id);
+      };
+      const updatePredicateRules = (nextRules) => {
+        updateSelected((current) => {
+          const first = nextRules[0] ?? { field: "", operator: "equals", value: "" };
+          const nextFields = { ...current.fields ?? {} };
+          const nextRaw = { ...current.raw ?? {} };
+          if (nextRules.length <= 1) {
+            nextFields.field = first.field;
+            nextFields.operator = first.operator;
+            nextFields.value = first.value;
+            delete nextRaw.when;
+          } else {
+            nextFields.field = "";
+            nextFields.operator = "equals";
+            nextFields.value = "";
+            nextRaw.when = filterRulesToYaml(nextRules);
+          }
+          return { ...current, fields: nextFields, raw: nextRaw };
+        });
+      };
+      const parentBranchNode = data.parentBranchNodeId ? shapes.find((s) => s.id === data.parentBranchNodeId) : null;
+      const branchSiblingCount = data.parentBranchNodeId && data.branchKey ? shapes.filter(
+        (s) => s.data?.parentBranchNodeId === data.parentBranchNodeId && s.data?.branchKey === data.branchKey && !s.data?.isBranchPlaceholder
+      ).length : 0;
       return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        parentBranchNode && data.branchKey !== void 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group branch-context-bar", "aria-label": "Branch context", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-context-crumb", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                className: "branch-back-link",
+                onClick: () => setSelectedId(parentBranchNode.id),
+                children: [
+                  "← ",
+                  nodeTitle(parentBranchNode)
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-badge", children: data.branchLabel ?? data.branchKey }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "branch-count", children: [
+              "Step ",
+              (data.branchIndex ?? 0) + 1,
+              " of ",
+              branchSiblingCount
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-context-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "dk-button dk-button--secondary",
+                disabled: (data.branchIndex ?? 0) <= 0,
+                onClick: () => moveBranchStep(parentBranchNode.id, data.branchKey, data.branchIndex ?? 0, -1),
+                children: "↑ Move up"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "dk-button dk-button--secondary",
+                disabled: (data.branchIndex ?? 0) >= branchSiblingCount - 1,
+                onClick: () => moveBranchStep(parentBranchNode.id, data.branchKey, data.branchIndex ?? 0, 1),
+                children: "↓ Move down"
+              }
+            )
+          ] })
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Action" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
@@ -23710,7 +25517,162 @@
           /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "inspector-group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Settings" }),
             data.actionType === "condition" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-              meta.fields.filter((field) => field.key !== "then" && field.key !== "else").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-rules-box", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-rules-title", children: "When all rules match:" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  RuleBuilder,
+                  {
+                    rules: extractPredicateRules(data.fields, data.raw),
+                    onChange: updatePredicateRules
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                ConditionBranches,
+                {
+                  thenField: meta.fields.find((field) => field.key === "then"),
+                  elseField: meta.fields.find((field) => field.key === "else"),
+                  thenValue: data.fields?.then ?? "",
+                  elseValue: data.fields?.else ?? "",
+                  onChange: (key, value) => updateBranchFields({ [key]: value }, { rebuildCanvas: true }),
+                  onSelectChild: selectBranchChild,
+                  onAddStep: (branchKey, branchTitle) => setBranchPicker({
+                    parentNodeId: selected.id,
+                    branchKey,
+                    title: `Add step to ${branchTitle}`
+                  }),
+                  onMoveStep: (branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta),
+                  onDeleteStep: (branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)
+                }
+              )
+            ] }) : data.actionType === "filter" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "branch-rules-box", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "branch-rules-title", children: "Continue only when all rules match:" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  RuleBuilder,
+                  {
+                    rules: extractPredicateRules(data.fields, data.raw),
+                    onChange: updatePredicateRules
+                  }
+                )
+              ] }),
+              meta.fields.filter((field) => field.key !== "field" && field.key !== "operator" && field.key !== "value").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                FieldInput,
+                {
+                  field,
+                  value: data.fields?.[field.key] ?? "",
+                  connections,
+                  fields: data.fields,
+                  siblingFields: meta.fields,
+                  config,
+                  nodeType: data.actionType,
+                  onChange: (value) => setField(field.key, value)
+                },
+                field.key
+              ))
+            ] }) : data.actionType === "decision" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              meta.fields.filter((field) => field.key === "mode" || field.key === "prompt" || field.key === "system").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                FieldInput,
+                {
+                  field,
+                  value: data.fields?.[field.key] ?? "",
+                  connections,
+                  fields: data.fields,
+                  siblingFields: meta.fields,
+                  config,
+                  nodeType: data.actionType,
+                  onChange: (value) => {
+                    if (field.key === "mode") {
+                      updateBranchFields({ mode: value }, { rebuildCanvas: true });
+                    } else {
+                      setField(field.key, value);
+                    }
+                  }
+                },
+                field.key
+              )),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                DecisionBranchesEditor,
+                {
+                  mode: decisionMode(data.fields, data.raw),
+                  choicesField: meta.fields.find((field) => field.key === "choices"),
+                  casesField: meta.fields.find((field) => field.key === "cases"),
+                  defaultActionsField: meta.fields.find((field) => field.key === "default_actions"),
+                  thenField: meta.fields.find((field) => field.key === "then"),
+                  elseField: meta.fields.find((field) => field.key === "else"),
+                  choicesValue: data.fields?.choices ?? "",
+                  casesValue: data.fields?.cases ?? "",
+                  defaultActionsValue: data.fields?.default_actions ?? "",
+                  thenValue: data.fields?.then ?? "",
+                  elseValue: data.fields?.else ?? "",
+                  rawBranches: data.raw?.branches,
+                  onChangeFields: (updates, options) => updateBranchFields(updates, options),
+                  onSelectChild: selectBranchChild,
+                  onAddStep: (branchKey, branchTitle) => setBranchPicker({
+                    parentNodeId: selected.id,
+                    branchKey,
+                    title: `Add step to ${branchTitle}`
+                  }),
+                  onMoveStep: (branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta),
+                  onDeleteStep: (branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "inspector-advanced", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("summary", { children: "Model & timeout" }),
+                meta.fields.filter((field) => field.key === "model" || field.key === "timeout_seconds").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  FieldInput,
+                  {
+                    field,
+                    value: data.fields?.[field.key] ?? "",
+                    connections,
+                    fields: data.fields,
+                    siblingFields: meta.fields,
+                    config,
+                    nodeType: data.actionType,
+                    onChange: (value) => setField(field.key, value)
+                  },
+                  field.key
+                ))
+              ] })
+            ] }) : data.actionType === "paths" ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              PathsBranchesEditor,
+              {
+                pathsField: meta.fields.find((field) => field.key === "paths"),
+                defaultField: meta.fields.find((field) => field.key === "default"),
+                pathsValue: data.fields?.paths ?? "",
+                defaultValue: data.fields?.default ?? "",
+                onChangeField: (key, value, options) => updateBranchFields({ [key]: value }, options),
+                onSelectChild: selectBranchChild,
+                onAddStep: (branchKey, branchTitle) => setBranchPicker({
+                  parentNodeId: selected.id,
+                  branchKey,
+                  title: `Add step to ${branchTitle}`
+                }),
+                onMoveStep: (branchKey, stepIdx, delta) => moveBranchStep(selected.id, branchKey, stepIdx, delta),
+                onDeleteStep: (branchKey, stepIdx) => deleteBranchStep(selected.id, branchKey, stepIdx)
+              }
+            ) : data.actionType === "union" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              (() => {
+                const branchCandidates = orderedActionNodes(shapes).filter((s) => s.id !== selected.id && isBranchingAction(s.data?.actionType)).map((s) => ({
+                  id: effectiveActionId(shapes, s.id) ?? s.id,
+                  title: nodeTitle(s)
+                }));
+                return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { children: [
+                  "Branching step ID (from)",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      className: "mono-input",
+                      list: `union-from-${selected.id}`,
+                      value: data.fields?.from ?? "",
+                      placeholder: branchCandidates[0]?.id ?? "route_by_kind",
+                      onChange: (event) => setField("from", event.target.value)
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("datalist", { id: `union-from-${selected.id}`, children: branchCandidates.map((c) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: c.id, children: c.title }, c.id)) })
+                ] });
+              })(),
+              meta.fields.filter((field) => field.key !== "from").map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                 FieldInput,
                 {
                   field,
@@ -23724,16 +25686,16 @@
                 },
                 field.key
               )),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                ConditionBranches,
-                {
-                  thenField: meta.fields.find((field) => field.key === "then"),
-                  elseField: meta.fields.find((field) => field.key === "else"),
-                  thenValue: data.fields?.then ?? "",
-                  elseValue: data.fields?.else ?? "",
-                  onChange: (key, value) => setField(key, value)
-                }
-              )
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "union-dataflow-card", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "inspector-hint", children: [
+                "Coalesces outputs from whichever branch ran into",
+                " ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: `{steps.${effectiveActionId(shapes, selected.id) ?? "union"}.output.result.*}` }),
+                " ",
+                "and exposes the winning branch name as",
+                " ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: `{steps.${effectiveActionId(shapes, selected.id) ?? "union"}.output.branch}` }),
+                "."
+              ] }) })
             ] }) : meta.fields.map((field) => /* @__PURE__ */ jsxRuntimeExports.jsx(
               FieldInput,
               {
@@ -24250,6 +26212,7 @@
               onDuplicateStep: duplicateStep,
               onCopyStep: copyStep,
               onPasteStep: pasteStep,
+              onAddBranchStep: addStepToBranch,
               sessionControls: (actions) => /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canUndo, onClick: undo, title: "Undo (Ctrl+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 20, strokeWidth: 1.8 }) }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", disabled: !canRedo, onClick: redo, title: "Redo (Ctrl+Shift+Z)", type: "button", children: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCw, { size: 20, strokeWidth: 1.8 }) }),
@@ -24355,12 +26318,12 @@
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: selected?.type === "node" ? "inspector" : "inspector empty", children: [
             selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : "Action" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: selected.data.nodeKind === "trigger" ? "Trigger" : selected.data.isUnionJoin ? "Union" : "Action" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "inspector-summary", children: selected.data.nodeKind === "trigger" ? triggerLabel(selected.data.connector ?? "custom", selected.data.event ?? "") : nodeListLabel(selected) })
             ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("header", { className: "inspector-head", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Inspector" }) }),
-            selected?.type !== "node" && shapes.some((shape) => shape.type === "node") && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
+            selected?.type !== "node" && shapes.some((shape) => shape.type === "node" && !shape.data?.isBranchPlaceholder) && /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "node-jump", "aria-label": "Select a workflow node", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Steps on the canvas" }),
-              shapes.filter((shape) => shape.type === "node").map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              shapes.filter((shape) => shape.type === "node" && !shape.data?.isBranchPlaceholder).map((shape) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "button",
                 {
                   type: "button",
@@ -24372,7 +26335,7 @@
                 shape.id
               ))
             ] }),
-            selected?.type === "node" && selected.data?.nodeKind === "action" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
+            selected?.type === "node" && selected.data?.nodeKind === "action" && !selected.data?.isUnionJoin && !selected.data?.isBranchPlaceholder && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "inspector-toolbar", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-button dk-button--secondary", type: "button", onClick: () => duplicateStep(selected.id), title: "Duplicate this step (Ctrl/Cmd+D)", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 20, strokeWidth: 1.8 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Duplicate" })
@@ -24412,7 +26375,20 @@
           onClose: () => setStepsPickerOpen(false)
         }
       ),
-      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(ShortcutsDialog, { onClose: () => setShortcutsOpen(false) })
+      shortcutsOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(ShortcutsDialog, { onClose: () => setShortcutsOpen(false) }),
+      branchPicker && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        StepPicker,
+        {
+          mode: "action",
+          title: branchPicker.title,
+          onPick: (kind) => {
+            const target = branchPicker;
+            setBranchPicker(null);
+            addStepToBranch(target.parentNodeId, target.branchKey, kind);
+          },
+          onClose: () => setBranchPicker(null)
+        }
+      )
     ] });
   }
   const THEME_KEY = "dakit-theme";

@@ -1,4 +1,4 @@
-import { FileText, StickyNote, Zap } from "../icons";
+import { FileText, GitMerge, Plus, StickyNote, Zap } from "../icons";
 import { actionCatalog, actionMeta, actionNodeSubtitle, actionNodeTitle, connectorCatalog, connectorMeta, defaultFields, triggerLabel } from "../workflows";
 import type { IconComponent } from "../catalog";
 import type { ActionType, DiagramShape, NodeData } from "../types";
@@ -11,6 +11,8 @@ export function actionIcon(type: ActionType) {
 /** Icon for a canvas node: the trigger connector's logo, or the action's. */
 export function nodeIcon(data: NodeData | undefined): IconComponent {
   if (data?.nodeKind === "trigger") return connectorMeta(data.connector ?? "custom")?.logo ?? Zap;
+  if (data?.isUnionJoin) return GitMerge;
+  if (data?.isBranchPlaceholder) return Plus;
   return actionIcon(data?.actionType ?? "webhook");
 }
 

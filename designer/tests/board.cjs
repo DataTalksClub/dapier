@@ -129,3 +129,129 @@ test('condition branches parse to preview rows; garbage reports an error', async
     'has_attachment = true'
   );
 });
+
+test('2D branching layout materializes condition, decision, and paths columns with labeled edges and union join', async () => {
+  const { shapesFromWorkflow, workflowFromShapes, effectiveActionId } = await load('workflows');
+  const { openingViewport } = await load('geometry');
+  const wf = {
+    id: 'branch-flow',
+    enabled: true,
+    trigger: { connector: 'email', event: 'message.received', filters: { route: 'support' } },
+    actions: [
+      {
+        id: 'triage',
+        type: 'decision',
+        mode: 'switch',
+        prompt: 'Classify support request',
+        branches: {
+          billing: {
+            description: 'Invoice or payment question',
+            actions: [
+              { id: 'post_billing', type: 'slack', channel: 'C1', text: 'Billing' }
+            ]
+          },
+          technical: [
+            { id: 'post_tech', type: 'slack', channel: 'C2', text: 'Tech' }
+          ]
+        },
+        default_actions: []
+      },
+      {
+        id: 'after_join',
+        type: 'webhook',
+        url: 'https://example.com/done'
+      }
+    ]
+  };
+  const shapes = shapesFromWorkflow(wf);
+  const childNodes = shapes.filter((s) => s.type === 'node' && s.data?.parentBranchNodeId === 'action-0' && !s.data?.isBranchPlaceholder);
+  assert.equal(childNodes.length, 2);
+  assert.ok(childNodes[0].x < childNodes[1].x, 'parallel branch columns have distinct horizontal X coordinates');
+  assert.equal(effectiveActionId(shapes, childNodes[0].id), 'triage.billing.post_billing');
+  assert.equal(effectiveActionId(shapes, childNodes[1].id), 'triage.technical.post_tech');
+
+  // Empty default_actions branch produces a placeholder node
+  const placeholders = shapes.filter((s) => s.type === 'node' && s.data?.isBranchPlaceholder);
+  assert.equal(placeholders.length, 1);
+  assert.equal(placeholders[0].data.branchLabel, 'else');
+
+  // Labeled branch edges and synthetic union join node
+  const branchEdges = shapes.filter((s) => s.type === 'arrow' && s.isBranchEdge);
+  assert.equal(branchEdges.length, 3);
+  assert.deepEqual(branchEdges.map((e) => e.branchLabel), ['billing', 'technical', 'else']);
+  const unionJoin = shapes.find((s) => s.type === 'node' && s.data?.isUnionJoin);
+  assert.ok(unionJoin, 'synthetic union join node is created before downstream step');
+
+  // Opening viewport scales down on a narrow 400px viewport so parallel branches fit
+  const narrowView = openingViewport(shapes, { width: 400, height: 600 }, 48);
+  assert.ok(narrowView.zoom < 1 && narrowView.zoom >= 0.55, 'narrow viewport scales zoom to fit branches');
+
+  // Round-trip editing a child node updates nested YAML in workflowFromShapes
+  const editedShapes = shapes.map((s) => (
+    s.id === childNodes[0].id
+      ? { ...s, data: { ...s.data, fields: { ...s.data.fields, text: 'Updated Billing Text' } } }
+      : s
+  ));
+  const roundTripped = workflowFromShapes(editedShapes, 'branch-flow', true, wf);
+  assert.equal(roundTripped.problems.length, 0);
+  const savedDecision = roundTripped.workflow.actions[0];
+  assert.equal(savedDecision.branches.billing.description, 'Invoice or payment question');
+  assert.equal(savedDecision.branches.billing.actions[0].text, 'Updated Billing Text');
+});
+
+test('multi-rule when predicates and explicit union step round-trip cleanly', async () => {
+  const { shapesFromWorkflow, workflowFromShapes, extractPredicateRules, actionNodeSubtitle } = await load('workflows');
+  const wf = {
+    id: 'paths-union-flow',
+    enabled: true,
+    trigger: { connector: 'email', event: 'message.received', filters: {} },
+    actions: [
+      {
+        id: 'multi_filter',
+        type: 'filter',
+        when: [
+          { field: 'subject', operator: 'contains', value: 'Invoice' },
+          { field: 'from', operator: 'contains', value: 'billing@' }
+        ],
+        reason: 'Only billing invoices'
+      },
+      {
+        id: 'route_paths',
+        type: 'paths',
+        paths: [
+          {
+            id: 'eu',
+            label: 'EU',
+            when: { currency: { equals: 'EUR' } },
+            actions: [{ id: 'eu_step', type: 'webhook', url: 'https://example.com/eu' }]
+          }
+        ],
+        default: []
+      },
+      {
+        id: 'join_results',
+        type: 'union',
+        from: 'route_paths',
+        fields: { target_url: '{steps.route_paths.output.result.url}' }
+      }
+    ]
+  };
+  const shapes = shapesFromWorkflow(wf);
+  const topActions = shapes.filter((s) => s.type === 'node' && s.data?.nodeKind === 'action' && !s.data?.parentBranchNodeId && !s.data?.isUnionJoin);
+  assert.equal(topActions.length, 3);
+  const rules = extractPredicateRules(topActions[0].data.fields, topActions[0].data.raw);
+  assert.equal(rules.length, 2);
+  assert.ok(actionNodeSubtitle(topActions[0].data).includes('(+1)'), 'multi-rule filter subtitle shows (+1) badge');
+  assert.ok(actionNodeSubtitle(topActions[2].data).includes('route_paths'), 'union subtitle shows source branch step');
+
+  // Explicit union step immediately following paths suppresses synthetic union join bar
+  const syntheticUnions = shapes.filter((s) => s.type === 'node' && s.data?.isUnionJoin);
+  assert.equal(syntheticUnions.length, 0);
+
+  const built = workflowFromShapes(shapes, 'paths-union-flow', true, wf);
+  assert.equal(built.problems.length, 0);
+  assert.equal(built.workflow.actions[2].type, 'union');
+  assert.equal(built.workflow.actions[2].from, 'route_paths');
+  assert.deepEqual(built.workflow.actions[2].fields, { target_url: '{steps.route_paths.output.result.url}' });
+});
+

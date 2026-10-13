@@ -2,6 +2,7 @@ import {
   ClipboardCopy,
   ClipboardPaste,
   Copy,
+  GitMerge,
   ListPlus,
   ListRestart,
   Maximize,
@@ -28,6 +29,7 @@ interface PickerRequest {
   point?: Point;
   connect?: { sourceId: string; handleId: string };
   shapeId?: string;
+  branchTarget?: { parentNodeId: string; branchKey: string };
 }
 
 interface WorkflowBoardProps {
@@ -48,6 +50,7 @@ interface WorkflowBoardProps {
   onDuplicateStep: (id: string) => void;
   onCopyStep: (id: string) => void;
   onPasteStep: (point: Point) => void;
+  onAddBranchStep?: (parentNodeId: string, branchKey: string, kind: PaletteKind) => void;
   sessionControls?: (actions: { clearCanvas: () => void }) => ReactNode;
 }
 export function WorkflowBoard({
@@ -61,6 +64,7 @@ export function WorkflowBoard({
   onDuplicateStep,
   onCopyStep,
   onPasteStep,
+  onAddBranchStep,
   sessionControls
 }: WorkflowBoardProps) {
   const [picker, setPicker] = useState<PickerRequest | null>(null);
@@ -223,6 +227,10 @@ export function WorkflowBoard({
     const request = picker;
     setPicker(null);
     if (!request) return;
+    if (request.branchTarget && onAddBranchStep) {
+      onAddBranchStep(request.branchTarget.parentNodeId, request.branchTarget.branchKey, kind);
+      return;
+    }
     if (request.mode === "change" && request.shapeId) {
       changeActionType(request.shapeId, kind as ActionType);
       return;
@@ -256,6 +264,17 @@ export function WorkflowBoard({
 
     const point = toCanvasPoint(event);
     const hit = findNodeAt(shapes, point);
+    if (hit?.data?.isBranchPlaceholder && hit.data.parentBranchNodeId && hit.data.branchKey) {
+      setPicker({
+        mode: "action",
+        title: `Add step to ${hit.data.branchLabel ?? hit.data.branchKey}`,
+        branchTarget: {
+          parentNodeId: hit.data.parentBranchNodeId,
+          branchKey: hit.data.branchKey
+        }
+      });
+      return;
+    }
     const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
 
     const draggableHit = hit && hit.type !== "arrow";
@@ -746,11 +765,127 @@ export function WorkflowBoard({
           const color = shapeColor(shape);
 
           if (shape.type === "node") {
+            if (shape.data?.isBranchPlaceholder) {
+              return (
+                <g
+                  key={shape.id}
+                  className="branch-placeholder-node"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (shape.data?.parentBranchNodeId && shape.data?.branchKey) {
+                      setPicker({
+                        mode: "action",
+                        title: `Add step to ${shape.data.branchLabel ?? shape.data.branchKey}`,
+                        branchTarget: {
+                          parentNodeId: shape.data.parentBranchNodeId,
+                          branchKey: shape.data.branchKey
+                        }
+                      });
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={shape.x}
+                    y={shape.y}
+                    width={shape.width}
+                    height={shape.height}
+                    rx="6"
+                    fill="var(--dk-bg-muted)"
+                    stroke="var(--dk-border-strong)"
+                    strokeWidth="1.5"
+                    strokeDasharray="5 4"
+                  />
+                  <Plus
+                    size={16}
+                    x={shape.x + 18}
+                    y={shape.y + (shape.height - 16) / 2}
+                    color="var(--dk-text-muted)"
+                    strokeWidth={1.8}
+                  />
+                  <text
+                    x={shape.x + 42}
+                    y={shape.y + shape.height / 2 + 4}
+                    fill="var(--dk-text-muted)"
+                    fontSize="13"
+                    fontWeight="500"
+                  >
+                    {`+ Add step to ${shape.data.branchLabel ?? "branch"}`}
+                  </text>
+                </g>
+              );
+            }
+
+            if (shape.data?.isUnionJoin) {
+              return (
+                <g
+                  key={shape.id}
+                  className={`union-join-node${selected ? " is-selected" : ""}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedId(shape.id);
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={shape.x}
+                    y={shape.y}
+                    width={shape.width}
+                    height={shape.height}
+                    rx="26"
+                    fill="var(--dk-bg-surface)"
+                    stroke={selected ? color : "var(--dk-border-strong)"}
+                    strokeWidth={selected ? "2.5" : "1.5"}
+                  />
+                  <rect
+                    x={shape.x + 12}
+                    y={shape.y + (shape.height - 28) / 2}
+                    width="28"
+                    height="28"
+                    rx="14"
+                    fill="var(--dk-accent-soft)"
+                  />
+                  <GitMerge
+                    size={16}
+                    x={shape.x + 18}
+                    y={shape.y + (shape.height - 16) / 2}
+                    color={color}
+                    strokeWidth={1.8}
+                  />
+                  <text
+                    x={shape.x + 48}
+                    y={shape.y + shape.height / 2 + 4}
+                    fill="var(--dk-text-secondary)"
+                    fontSize="13"
+                    fontWeight="500"
+                  >
+                    Union · branches rejoin
+                  </text>
+                </g>
+              );
+            }
+
             const Icon = nodeIcon(shape.data);
             const title = nodeTitle(shape);
             const subtitle = nodeSubtitle(shape);
+            const actionType = shape.data?.actionType;
+            const isBranchSplit = shape.data?.nodeKind === "action"
+              && (actionType === "condition" || actionType === "decision" || actionType === "paths");
+            const branchBadge = actionType === "condition"
+              ? "IF / ELSE"
+              : actionType === "paths"
+                ? "PATHS"
+                : actionType === "decision"
+                  ? (shape.data?.fields?.mode === "if" ? "JEV · IF" : "JEV · SWITCH")
+                  : null;
+            const badgeWidth = branchBadge ? Math.round(branchBadge.length * 6.5 + 16) : 0;
+
             return (
-              <g key={shape.id} onDoubleClick={(event) => { event.stopPropagation(); openEditor(shape); }}>
+              <g
+                key={shape.id}
+                className={isBranchSplit ? "is-branch-split" : undefined}
+                onDoubleClick={(event) => { event.stopPropagation(); openEditor(shape); }}
+              >
                 <rect
                   x={shape.x}
                   y={shape.y}
@@ -769,6 +904,28 @@ export function WorkflowBoard({
                   color={color}
                   strokeWidth={1.8}
                 />
+                {branchBadge && (
+                  <g className="branch-split-badge">
+                    <rect
+                      x={shape.x + shape.width - badgeWidth - 10}
+                      y={shape.y + 8}
+                      width={badgeWidth}
+                      height={18}
+                      rx="9"
+                      fill="var(--dk-accent-soft)"
+                    />
+                    <text
+                      x={shape.x + shape.width - badgeWidth / 2 - 10}
+                      y={shape.y + 20}
+                      textAnchor="middle"
+                      fill="var(--dk-accent-text)"
+                      fontSize="10"
+                      fontWeight="600"
+                    >
+                      {branchBadge}
+                    </text>
+                  </g>
+                )}
                 <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill="var(--dk-text-primary)" fontSize={subtitle ? 15 : 13} fontWeight="500">
                   <title>{shape.label}</title>
                   {displayLabel(title)}
@@ -815,8 +972,38 @@ export function WorkflowBoard({
                 stroke={color}
                 strokeLinecap="round"
                 strokeWidth="2"
+                strokeDasharray={shape.isMergeEdge ? "5 4" : undefined}
                 markerEnd={`url(#arrowhead-${shape.id})`}
               />
+              {shape.branchLabel && (() => {
+                const pillText = shape.branchLabel.length > 18 ? `${shape.branchLabel.slice(0, 16)}…` : shape.branchLabel;
+                const pillW = Math.max(44, pillText.length * 7 + 18);
+                const pillH = 22;
+                return (
+                  <g className="branch-edge-pill">
+                    <rect
+                      x={midpoint.x - pillW / 2}
+                      y={midpoint.y - pillH / 2}
+                      width={pillW}
+                      height={pillH}
+                      rx="11"
+                      fill="var(--dk-bg-surface)"
+                      stroke="var(--dk-border-strong)"
+                      strokeWidth="1.5"
+                    />
+                    <text
+                      x={midpoint.x}
+                      y={midpoint.y + 4}
+                      textAnchor="middle"
+                      fill="var(--dk-text-secondary)"
+                      fontSize="11"
+                      fontWeight="600"
+                    >
+                      {pillText}
+                    </text>
+                  </g>
+                );
+              })()}
               {selected && (
                 <>
                   <circle className="connection-handle" cx={endpoints.start.x} cy={endpoints.start.y} r="8" fill={handleColor} stroke="var(--dk-bg-surface)" strokeWidth="3"

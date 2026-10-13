@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, Copy, DatabaseZap, FileText, Filter, Folder, GitBranch, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
+import { Bot, Braces, Calendar, Clock, Code2, Copy, DatabaseZap, FileText, Filter, Folder, GitBranch, GitMerge, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -1647,6 +1647,18 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
+    type: "union",
+    label: "Union",
+    icon: GitMerge,
+    description: "Rejoin branches and coalesce their outputs into one step",
+    fields: [
+      { key: "from", label: "Branch step ID", placeholder: "classify-recording",
+        help: "ID of the condition, decision, or paths step to merge (defaults to the preceding branch step)" },
+      { key: "fields", label: "Coalesced fields (YAML)", type: "yaml",
+        placeholder: "document_url:\n  - \"{steps.route.then.make-document.output.url}\"\n  - \"{steps.route.else.render-pdf.output.url}\"" }
+    ]
+  },
+  {
     type: "delay",
     label: "Delay",
     icon: Timer,
@@ -1973,6 +1985,7 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   condition: "flow",
   decision: "flow",
   paths: "flow",
+  union: "flow",
   delay: "flow",
   for_each: "flow",
   digest: "flow",

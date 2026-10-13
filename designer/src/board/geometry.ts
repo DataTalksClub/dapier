@@ -142,6 +142,32 @@ export function openingViewport(shapes: DiagramShape[], world: { width: number; 
     ?? [...nodes].sort(byPosition)[0];
   if (!anchor) return { zoom: 1, pan: { x: 0, y: 0 } };
   const top = Math.min(anchor.y, anchor.y + anchor.height);
+  const hasBranches = nodes.some((node) => Boolean(
+    node.data?.parentBranchNodeId
+    || node.data?.branchPills?.length
+    || node.data?.isBranchPlaceholder
+    || node.data?.isUnionJoin
+  ));
+  if (hasBranches && world.width > 64) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (const node of nodes) {
+      minX = Math.min(minX, node.x, node.x + node.width);
+      maxX = Math.max(maxX, node.x, node.x + node.width);
+    }
+    const boundsWidth = maxX - minX;
+    if (boundsWidth > world.width - 32) {
+      const zoom = Math.max(0.55, Math.min(1, Math.round(((world.width - 32) / boundsWidth) * 100) / 100));
+      const centerX = (minX + maxX) / 2;
+      return {
+        zoom,
+        pan: {
+          x: centerX - world.width / 2,
+          y: top - margin - (world.height - world.height / zoom) / 2
+        }
+      };
+    }
+  }
   return {
     zoom: 1,
     pan: { x: centerOf(anchor).x - world.width / 2, y: top - margin }
