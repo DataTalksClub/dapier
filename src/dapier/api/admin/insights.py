@@ -95,3 +95,10 @@ def export_audit(event, operator):
     return http._json_response(status, payload)
 
 
+
+
+def costs(event, visible=None):
+    from ...paid_api_usage import api_costs
+    query = event.get("queryStringParameters") or {}
+    status, payload = api_costs(query.get("months", 1), visible=visible)
+    return http._json_response(status, payload)

@@ -350,6 +350,9 @@ def run_ai_complete(action, event, *, steps=None, transport=None, workflow_id=""
         body = json.loads(raw.decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise HttpError(f"ai_complete returned an unexpected response: {exc}") from exc
+    if isinstance(body, dict):
+        from ..paid_api_usage import record_response
+        record_response(provider="anthropic" if anthropic else "openrouter" if "openrouter.ai" == urllib.parse.urlparse(base_url).hostname else urllib.parse.urlparse(base_url).hostname or "unknown", model=str(body.get("model") or model), response=body, connection_id=action.get("connection_id") or "llm", workflow_id=workflow_id, context=usage_context)
     if not isinstance(body, dict) or not body.get("choices"):
         raise HttpError("ai_complete returned an unexpected response: "
                         f"{json.dumps(body)[:300]}")
@@ -477,6 +480,8 @@ def run_decisions(*, state, instructions, criteria, model=None,
     if not isinstance(body, dict):
         raise HttpError("decision returned an unexpected response: "
                         f"{json.dumps(body)[:300]}")
+    from ..paid_api_usage import record_response
+    record_response(provider="openrouter", model=str(body.get("model") or model or JEV_MODEL), response=body, connection_id="openrouter", workflow_id=workflow_id, context=usage_context)
     answered_model = str(body.get("model") or model or JEV_MODEL)
     answers = body.get("answers") if isinstance(body.get("answers"), dict) else {}
     answer = answers.get("choice")

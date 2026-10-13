@@ -26,7 +26,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "runs_resolve_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
+__all__ = ["costs_api", "agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "runs_resolve_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
 
 
 
@@ -447,4 +447,14 @@ def inbox_replay_api(event, inbox_id):
     status, payload = inbox.api_replay(inbox_id)
     if status == 202:
         audit.emit(inbox_id, "triggers.inbox-replay", subject, outcome="ok")
+    return _no_store(_json_response(status, payload))
+
+
+def costs_api(event):
+    from ...paid_api_usage import api_costs
+    subject, error = require_operator(event, "costs")
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    status, payload = api_costs(query.get("months", 1), visible=_visibility(event, subject))
     return _no_store(_json_response(status, payload))

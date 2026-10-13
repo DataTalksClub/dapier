@@ -3,7 +3,7 @@
 
 from .. import api
 
-__all__ = ["errors_send_digest", "errors_summary", "quota", "usage"]
+__all__ = ["costs", "errors_send_digest", "errors_summary", "quota", "usage"]
 
 
 def _print_quota(quota):
@@ -78,3 +78,19 @@ def errors_send_digest(api_url, debug=False):
     return 0
 
 
+
+
+def costs(api_url, debug=False, months=1):
+    data = api.call(api_url, "GET", f"/api/agent/costs?months={int(months)}", debug=debug)
+    print(f"Recorded charges: ${float(data.get('reported_usd', 0)):.6f} USD; "
+          f"estimates: ${float(data.get('estimated_usd', 0)):.6f} USD; "
+          f"unpriced requests: {data.get('unpriced_requests', 0)}")
+    print("Tracked from deployment onward; historical charges are not included.")
+    if data.get("truncated"):
+        print("Partial results: request limit reached; totals cover returned requests only.")
+    for row in data.get("requests", []):
+        amount = row.get("cost_usd")
+        charge = f"${float(amount):.6f}" if amount is not None else "unknown"
+        print(f"{row.get('timestamp', '')} {row.get('provider', '')} {row.get('model', '')} "
+              f"{row.get('workflow_id') or row.get('context', '')} {charge} {row.get('cost_source', '')}")
+    return 0

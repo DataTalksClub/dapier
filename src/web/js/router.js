@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'audit', 'runs', 'agents', 'workers'];
+const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'audit', 'costs', 'runs', 'agents', 'workers'];
 const WORKFLOW_TABS = new Set(['list', 'hooks', 'polls']);
 const NAV_FOR = {
   designer: 'workflows',
@@ -148,6 +148,7 @@ export async function setView(view, push = true, options = {}) {
     agents: ['Agents', 'Agent tasks and the runs behind them.'],
     workers: ['Workers', 'Machines that run agent tasks.'],
     tokens: ['Access', 'Machine tokens for API access.'],
+    costs: ['Costs', 'Recorded paid API charges and token usage.'],
     audit: ['Audit', 'Who changed what — newest first.'],
   };
   const family = TAB_FAMILY[view];

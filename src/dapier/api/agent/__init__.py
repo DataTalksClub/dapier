@@ -170,6 +170,8 @@ def _route(event, method, path):
         return runs_export_api(event)
     if path == "/api/agent/runs/replay-failed" and method == "POST":
         return runs_replay_failed_api(event)
+    if path == "/api/agent/costs" and method == "GET":
+        return costs_api(event)
     if path == "/api/agent/usage" and method == "GET":
         return usage_api(event)
     if path == "/api/agent/quota" and method in ("GET", "PUT"):

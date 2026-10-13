@@ -1,3 +1,4 @@
+import { renderCosts } from './views/costs.js';
 import { renderAgentTasks } from './views/agents.js';
 import { renderWorkers } from './views/workers.js';
 /* Console bootstrap: global event wiring and the first fetch. */
@@ -199,6 +200,7 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   if (!await setView(target, true, tab ? { tab } : {})) return;
   if (target === 'agents') renderAgentTasks();
   if (target === 'workers') renderWorkers();
+  if (target === 'costs') renderCosts();
   if (target === 'audit') refreshAudit();
 }));
 $('#overview-attention').addEventListener('click', async (event) => {
@@ -229,6 +231,7 @@ window.addEventListener('popstate', async () => {
     if (view === 'designer') await designerFromLocation();
     if (view === 'agents') renderAgentTasks();
     if (view === 'workers') renderWorkers();
+    if (view === 'costs') renderCosts();
     if (view === 'audit') refreshAudit();
   }
 });
@@ -306,6 +309,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const runId = new URLSearchParams(window.location.search).get('run');
     if (runId) await openRun(runId);
   }
+  if (initialView === 'costs') renderCosts();
   if (initialView === 'audit') refreshAudit();
   if (initialView === 'agents') renderAgentTasks();
   if (initialView === 'workers') renderWorkers();

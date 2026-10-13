@@ -100,6 +100,8 @@ def _route_overview_runs(event, method, path, operator_payload, operator_subject
 
 def _route_usage_errors(event, method, path, operator_payload, operator_subject):
     """Usage, quota, error digests, and the per-run lookups."""
+    if method == "GET" and path == "/api/admin/costs":
+        return routes.costs(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/usage":
         return routes.usage(event, visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/quota":

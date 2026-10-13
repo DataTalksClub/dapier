@@ -242,7 +242,7 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
         state=prompt, instructions=instructions, criteria=criteria,
         model=step.get("model"),
         timeout_seconds=step.get("timeout_seconds"), transport=transport,
-        credential=credential)
+        credential=credential, workflow_id=workflow_id)
     model, usage = result.get("model"), (result.get("usage") if isinstance(result.get("usage"), dict) else {})
     extra = {"confidence": result.get("confidence"),
              "probabilities": result.get("probabilities")}

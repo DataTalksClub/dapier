@@ -57,6 +57,7 @@
         <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
         <p class="nav-group-label">Settings</p>
         <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>Access</span></a>
+        <a class="nav-item" href="/costs" data-view="costs"><i data-lucide="database"></i><span>Costs</span></a>
         <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit</span></a>
       </nav>
       <div class="sidebar-foot">
@@ -97,6 +98,12 @@
       <div id="loading" class="loading" hidden><span></span><span></span><span></span></div>
       <div id="notice" class="notice" role="status" hidden></div>
 
+      <section class="view" data-page="costs">
+        <div class="panel-tools"><label for="costs-months">Period</label><select id="costs-months"><option value="1">This month</option><option value="3">Last 3 months</option><option value="12">Last 12 months</option><option value="24">Last 24 months</option></select></div>
+        <p class="sub">Tracked from deployment onward. Historical charges are not included. Provider charges and estimates are shown separately; unknown prices remain unpriced.</p>
+        <p id="costs-summary" aria-live="polite"></p>
+        <div class="table-wrap"><table><thead><tr><th>When</th><th>Provider / model</th><th>Workflow / test</th><th>Tokens in / out</th><th>USD</th><th>Source</th></tr></thead><tbody id="costs-rows"></tbody></table></div>
+      </section>
       <section class="view active" data-page="overview">
         <div class="page-tools primary-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>

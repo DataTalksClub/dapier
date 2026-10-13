@@ -35,6 +35,7 @@ def test_sidebar_lists_daily_pages_then_settings():
         "Workers",
         "Connections",
         "Access",
+        "Costs",
         "Audit",
     ]
     assert "Settings" in sidebar

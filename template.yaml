@@ -125,6 +125,7 @@ Globals:
         EXECUTIONS_TABLE: !Ref ExecutionsTable
         GRANTS_TABLE: !Ref GrantsTable
         TASK_USAGE_TABLE: !Ref TaskUsageTable
+        PAID_API_USAGE_TABLE: !Ref PaidApiUsageTable
         STORAGE_TABLE: !Ref StorageTable
         DIGESTS_TABLE: !Ref DigestsTable
         AUDIT_TABLE: !Ref AuditTable
@@ -318,6 +319,11 @@ Resources:
                 Resource:
                   - !GetAtt CursorsTable.Arn
                   - !GetAtt TaskUsageTable.Arn
+                  - !GetAtt PaidApiUsageTable.Arn
+              # Inline decisions and OpenRouter health probes run on the API.
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt PaidApiUsageTable.Arn
         # Operator teardown and authenticated hook retry claims share this
         # table. Keep writes within trigger cursor/seen keys.
         - PolicyName: dapier-api-cursor-scoped-writes
@@ -481,6 +487,9 @@ Resources:
         ConsoleUsage:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /usage, Method: GET}
+        ConsoleCosts:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: /costs, Method: GET}
         ConsoleAudit:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /audit, Method: GET}
@@ -691,6 +700,7 @@ Resources:
           # into the ses-notifications hook; empty sends untagged.
           SES_CONFIGURATION_SET: !Ref SesConfigurationSet
           TASK_USAGE_TABLE: !Ref TaskUsageTable
+          PAID_API_USAGE_TABLE: !Ref PaidApiUsageTable
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable
       Policies:
@@ -733,6 +743,10 @@ Resources:
             Condition:
               ForAllValues:StringLike:
                 dynamodb:LeadingKeys: ["oauth#*"]
+        - Statement:
+            Effect: Allow
+            Action: [dynamodb:PutItem]
+            Resource: !GetAtt PaidApiUsageTable.Arn
         - DynamoDBCrudPolicy:
             TableName: !Ref TaskUsageTable
         - Statement:
@@ -1079,6 +1093,20 @@ Resources:
         - {AttributeName: connection_id, AttributeType: S}
       KeySchema:
         - {AttributeName: connection_id, KeyType: HASH}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  PaidApiUsageTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: month, AttributeType: S}
+        - {AttributeName: request_key, AttributeType: S}
+      KeySchema:
+        - {AttributeName: month, KeyType: HASH}
+        - {AttributeName: request_key, KeyType: RANGE}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
 
   TaskUsageTable:
