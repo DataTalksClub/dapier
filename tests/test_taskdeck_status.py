@@ -236,7 +236,7 @@ def test_run_history_is_not_claimed_as_empty_of_failures():
 # --- the bearer gate --------------------------------------------------------------
 
 def test_an_unset_token_answers_404(monkeypatch):
-    monkeypatch.delenv("TASKDECK_STATUS_TOKEN", raising=False)
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential", lambda key: {})
     status, body = taskdeck_status.api_status(request(), table_ref=Table())
     assert (status, body) == (404, {"error": "not found"})
 
@@ -244,13 +244,15 @@ def test_an_unset_token_answers_404(monkeypatch):
 def test_a_wrong_token_answers_the_same_404(monkeypatch):
     """A wrong token and a route that is not here are indistinguishable, so a
     caller learns nothing about whether this endpoint exists at all."""
-    monkeypatch.setenv("TASKDECK_STATUS_TOKEN", "console-token")
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential",
+                        lambda key: {"token": "console-token"})
     status, body = taskdeck_status.api_status(request(token="guess"), table_ref=Table())
     assert (status, body) == (404, {"error": "not found"})
 
 
 def test_the_configured_token_returns_the_payload(monkeypatch):
-    monkeypatch.setenv("TASKDECK_STATUS_TOKEN", "console-token")
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential",
+                        lambda key: {"token": "console-token"})
     table = Table([fired("digest", NOW - timedelta(hours=1))])
     status, body = taskdeck_status.api_status(request(), table_ref=table, now=NOW)
     assert status == 200
@@ -258,7 +260,8 @@ def test_the_configured_token_returns_the_payload(monkeypatch):
 
 
 def test_a_malformed_authorization_header_is_not_a_crash(monkeypatch):
-    monkeypatch.setenv("TASKDECK_STATUS_TOKEN", "console-token")
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential",
+                        lambda key: {"token": "console-token"})
     status, _ = taskdeck_status.api_status(
         request() | {"headers": {"Authorization": "Bearer"}}, table_ref=Table())
     assert status == 404
@@ -269,7 +272,8 @@ def test_a_malformed_authorization_header_is_not_a_crash(monkeypatch):
 def test_the_route_is_served_outside_the_operator_gate(monkeypatch):
     """No session cookie, no operator sign-in: the bearer token is the whole
     credential, so this is not an /api/admin route."""
-    monkeypatch.setenv("TASKDECK_STATUS_TOKEN", "console-token")
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential",
+                        lambda key: {"token": "console-token"})
     response = router.handler(request(), None)
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["project"] == "dapier"
@@ -285,7 +289,8 @@ def test_the_gateway_routes_it_and_allows_the_bearer_header():
 
 
 def test_other_methods_stay_not_found(monkeypatch):
-    monkeypatch.setenv("TASKDECK_STATUS_TOKEN", "console-token")
+    monkeypatch.setattr("src.dapier.connections.credentials.get_credential",
+                        lambda key: {"token": "console-token"})
     response = router.handler(
         {"requestContext": {"http": {"method": "POST",
                                      "path": "/internal/ops/status"}},

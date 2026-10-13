@@ -245,9 +245,8 @@ def _dropbox_secrets():
     """Dropbox app secrets that may sign webhook deliveries.
 
     Dropbox signs each webhook body with the app secret (X-Dropbox-Signature,
-    HMAC-SHA256) of the OAuth client. The runtime-configured client (config
-    DB, set from the console) and the deploy-time environment variable are
-    both accepted so a rotation window doesn't drop deliveries. With no
+    HMAC-SHA256) of the OAuth client. Only the runtime-configured client (config DB, set from the console or
+    CLI) is accepted; rotation takes effect immediately. With no
     secret configured anywhere there is nothing to verify against and
     verification fails closed.
     """
@@ -257,9 +256,6 @@ def _dropbox_secrets():
         secrets.append(configured_secret)
     except oauth_clients.ClientConfigError:
         pass
-    env_secret = os.environ.get("DROPBOX_OAUTH_CLIENT_SECRET", "").strip()
-    if env_secret and env_secret not in secrets:
-        secrets.append(env_secret)
     return secrets
 
 

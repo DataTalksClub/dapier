@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import boto3
 
 CREDENTIAL_SPECS = {
+    "taskdeck": {"credential_id": "taskdeck", "fields": ("token",)},
     "slack": {"credential_id": "slack", "fields": ("token",)},
     "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
     "aws": {"credential_id": "aws", "fields": ("access_key_id", "secret_access_key")},
@@ -112,7 +113,12 @@ def api_save_credential(provider, body):
     spec = CREDENTIAL_SPECS.get(provider)
     if not spec:
         return 404, {"error": "Unknown credential provider"}
-    if provider == "slack":
+    if provider == "taskdeck":
+        token = str(body.get("token", "")).strip()
+        if len(token) < 32 or any(char.isspace() for char in token):
+            return 400, {"error": "Use a Taskdeck bearer token of at least 32 characters with no whitespace"}
+        secret_value = {"token": token}
+    elif provider == "slack":
         token = str(body.get("token", "")).strip()
         if not token.startswith(("xoxb-", "xapp-")) or len(token) < 20:
             return 400, {"error": "Enter a valid Slack bot token"}

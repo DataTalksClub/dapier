@@ -204,7 +204,9 @@ The sandbox deployment is available at `https://dapier.dtcdev.click`.
 
 ## Status contract endpoint
 
-The stack takes an optional `TaskdeckStatusToken`. With it set,
+Configure a Taskdeck bearer token in **Credentials → Taskdeck status** or
+`dapier credentials set taskdeck --file <token-file>`. The token lives
+in the credential store, never in deployment environment variables. With it set,
 `GET /internal/ops/status` answers with the read-only status contract the
 cross-project console polls: every schedule's next fire, last fire, last
 success, and Dapier's own health verdict. The bearer token is the whole
@@ -269,22 +271,10 @@ App Marketplace for Zoom API access) with the redirect URI
 table and take effect immediately, with no redeploy. YouTube shares the Google
 client. See the [connector guides](docs/connectors/README.md) for the current
 Google consent, test-user, Dropbox access-level, Zoom OAuth, and scope requirements.
-Rotating a Dropbox client there is also how you re-webhook Dropbox: the
-ingress accepts the configured secret and the deploy-time one during a
-rotation window. The deploy-time environment remains a fallback for a fresh
-stack — export the variables before a deploy that should seed or rotate them;
-omit them and CloudFormation keeps the previous values:
-
-```bash
-GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \
-DROPBOX_OAUTH_CLIENT_ID=... DROPBOX_OAUTH_CLIENT_SECRET=... \
-  make deploy
-```
-
-Zoom OAuth credentials are configured at runtime with
-`uv run dapier oauth-clients set zoom` or in **Credentials → OAuth clients**;
-the current deploy script does not seed Zoom OAuth credentials from
-environment variables.
+Rotating a Dropbox client also updates webhook verification: ingress uses
+only the stored app secret. Configure OAuth clients in the console or CLI
+before connecting accounts on a fresh stack; deployments do not receive
+provider keys or OAuth client secrets through environment variables.
 
 The `CredentialsTableName` and `CredentialsTableArn` stack outputs allow
 authorized consumers such as DataOps to receive exact-table, read-only IAM

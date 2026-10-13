@@ -29,8 +29,10 @@ def configure_client(monkeypatch, **overrides):
         "GOOGLE_OAUTH_CLIENT_SECRET": "shared-client-secret",
     }
     values.update(overrides)
-    for key, value in values.items():
-        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(tokens.oauth_clients, "stored_client", lambda provider: {
+        "client_id": values.get(f"{provider.upper()}_OAUTH_CLIENT_ID", ""),
+        "client_secret": values.get(f"{provider.upper()}_OAUTH_CLIENT_SECRET", ""),
+    })
 
 
 def connection(**overrides):

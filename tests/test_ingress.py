@@ -85,9 +85,9 @@ def test_dropbox_accounts_deduplicates_across_sections():
     assert ingress._dropbox_accounts(payload) == ["dbid:a", "dbid:b", "dbid:c"]
 
 
-def test_dropbox_secrets_come_from_the_deploy_time_app_secret(monkeypatch):
+def test_dropbox_secrets_ignore_deploy_time_app_secret(monkeypatch):
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "app-secret")
-    assert ingress._dropbox_secrets() == ["app-secret"]
+    assert ingress._dropbox_secrets() == []
 
     monkeypatch.delenv("DROPBOX_OAUTH_CLIENT_SECRET")
     assert ingress._dropbox_secrets() == []

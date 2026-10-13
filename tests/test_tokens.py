@@ -18,8 +18,10 @@ def configure_client(monkeypatch, **overrides):
         "DROPBOX_OAUTH_CLIENT_SECRET": "shared-dropbox-secret",
     }
     values.update(overrides)
-    for key, value in values.items():
-        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(tokens.oauth_clients, "stored_client", lambda provider: {
+        "client_id": values.get(f"{provider.upper()}_OAUTH_CLIENT_ID", ""),
+        "client_secret": values.get(f"{provider.upper()}_OAUTH_CLIENT_SECRET", ""),
+    })
 
 
 def connection(**overrides):
@@ -176,7 +178,7 @@ def test_missing_shared_client_fails_closed(monkeypatch):
     )
     with pytest.raises(TokenError) as exc:
         get_access_token(connection())
-    assert "GOOGLE_OAUTH_CLIENT_ID" in str(exc.value)
+    assert "oauth-clients set" in str(exc.value)
 
 
 def test_refresh_rotation_adopts_new_refresh_token(monkeypatch):

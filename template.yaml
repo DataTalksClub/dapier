@@ -52,15 +52,6 @@ Parameters:
     Type: String
     Default: ''
     Description: Comma-separated stable DTC subjects allowed to administer connections
-  GoogleOAuthClientId:
-    Type: String
-    Default: ''
-    Description: Google OAuth client ID shared by Calendar and YouTube connections
-  GoogleOAuthClientSecret:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Secret of the shared Google OAuth client
   GmailScopes:
     Type: String
     Default: ''
@@ -69,15 +60,6 @@ Parameters:
       Google connection that touches Gmail, comma- or whitespace-separated
       full URLs or short names (gmail.modify); empty grants only the
       connector's declared gmail.readonly and gmail.send
-  DropboxOAuthClientId:
-    Type: String
-    Default: ''
-    Description: Dropbox app key shared by Dropbox connections
-  DropboxOAuthClientSecret:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Dropbox app secret (also verifies webhook signatures)
   TriggerEmailDomain:
     Type: String
     Default: dtcdev.click
@@ -104,40 +86,6 @@ Parameters:
       Secrets Manager secret name holding a GitHub token (Contents: read/write
       on the workflows repo). Set to let the console designer commit
       workflows/*.yaml straight to the repo; empty disables designer saves.
-  LlmBaseUrl:
-    Type: String
-    Default: https://api.openai.com/v1
-    Description: OpenAI-compatible chat-completions base URL for the ai_complete action
-  LlmApiKey:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: >
-      API key for the ai_complete action's OpenAI-compatible endpoint; empty
-      leaves the action unconfigured (steps fail with setup instructions)
-  LlmModel:
-    Type: String
-    Default: gpt-4o-mini
-    Description: Default model name the ai_complete action requests
-  TaskdeckStatusToken:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: >
-      Bearer token the cross-project console sends to GET /internal/ops/status
-      (the taskdeck status contract). Empty leaves the endpoint answering 404
-      for every caller, which is how it reads when no console is configured.
-  DatamailerUrl:
-    Type: String
-    Default: https://datamailer.dtcdev.click
-    Description: Base URL of the Datamailer API the backup emails failures through
-  DatamailerApiKey:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: >
-      Datamailer client API key; empty disables the backup failure email
-      (the CloudWatch alarm still covers failures)
   SesNotificationTopics:
     Type: String
     Default: ''
@@ -467,18 +415,8 @@ Resources:
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
-          LLM_BASE_URL: !Ref LlmBaseUrl
-          LLM_API_KEY: !Ref LlmApiKey
-          LLM_MODEL: !Ref LlmModel
-          # Bearer token for GET /internal/ops/status; empty leaves the route
-          # answering 404 rather than opening it up.
-          TASKDECK_STATUS_TOKEN: !Ref TaskdeckStatusToken
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
-          GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
-          GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
-          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
-          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
         Root:
           Type: HttpApi
@@ -738,10 +676,6 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
-          GOOGLE_OAUTH_CLIENT_ID: !Ref GoogleOAuthClientId
-          GOOGLE_OAUTH_CLIENT_SECRET: !Ref GoogleOAuthClientSecret
-          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
-          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
@@ -752,11 +686,6 @@ Resources:
           TASK_USAGE_TABLE: !Ref TaskUsageTable
           STORAGE_TABLE: !Ref StorageTable
           DIGESTS_TABLE: !Ref DigestsTable
-          # The ai_complete action's OpenAI-compatible endpoint; empty key
-          # leaves the action unconfigured (docs/connectors/ai.md).
-          LLM_BASE_URL: !Ref LlmBaseUrl
-          LLM_API_KEY: !Ref LlmApiKey
-          LLM_MODEL: !Ref LlmModel
       Policies:
         - Statement:
             Effect: Allow
@@ -893,10 +822,6 @@ Resources:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem]
             Resource: !GetAtt CredentialsTable.Arn
-      Environment:
-        Variables:
-          DROPBOX_OAUTH_CLIENT_ID: !Ref DropboxOAuthClientId
-          DROPBOX_OAUTH_CLIENT_SECRET: !Ref DropboxOAuthClientSecret
       Events:
         Notifications:
           Type: SQS
@@ -1433,10 +1358,16 @@ Resources:
       Environment:
         Variables:
           BACKUP_BUCKET: !Ref BackupBucket
-          DATAMAILER_URL: !Ref DatamailerUrl
-          DATAMAILER_API_KEY: !Ref DatamailerApiKey
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_EMAIL_REGION: !Ref EmailSendRegion
           BACKUP_ALERT_EMAIL: !Ref BackupAlertEmail
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ExecutionsTable
+        - Statement:
+            Effect: Allow
+            Action: [ses:SendEmail]
+            Resource: '*'
         - S3CrudPolicy:
             BucketName: !Ref BackupBucket
         # Scan access to every table the stack owns, including future ones.

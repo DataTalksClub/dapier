@@ -44,8 +44,8 @@ def env(monkeypatch):
     monkeypatch.setenv("BACKUP_BUCKET", "dapier-backups-test")
     monkeypatch.setenv("CONNECTIONS_TABLE", "dapier-ConnectionsTable-x")
     monkeypatch.setenv("CREDENTIALS_TABLE", "dapier-CredentialsTable-x")
-    monkeypatch.delenv("DATAMAILER_URL", raising=False)
-    monkeypatch.delenv("DATAMAILER_API_KEY", raising=False)
+    monkeypatch.setattr(backup, "_claim_email", lambda day: True)
+    monkeypatch.setattr(backup, "_release_email", lambda day: None)
     monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
 
 
@@ -89,11 +89,9 @@ def test_backup_writes_ndjson_and_manifest(env, monkeypatch):
 def test_backup_raises_after_attempting_every_table(env, monkeypatch):
     posts = []
     monkeypatch.setattr(
-        backup, "_post_json",
-        lambda url, key, payload: posts.append((url, key, payload)),
+        backup, "_send_email",
+        lambda payload: posts.append(payload),
     )
-    monkeypatch.setenv("DATAMAILER_URL", "https://datamailer.example")
-    monkeypatch.setenv("DATAMAILER_API_KEY", "dm-key")
     monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
     fake_s3 = FakeS3()
     monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
@@ -114,9 +112,7 @@ def test_backup_raises_after_attempting_every_table(env, monkeypatch):
     # The failure was reported by email, with the failed table and a per-day
     # idempotency key so re-invocations don't spam.
     assert len(posts) == 1
-    url, api_key, payload = posts[0]
-    assert url == "https://datamailer.example/api/transactional/send"
-    assert api_key == "dm-key"
+    payload = posts[0]
     assert payload["email"] == "ops@example.com"
     assert payload["template_key"] == "cli-message"
     assert payload["idempotency_key"] == f"dapier-backup-failure-{day}"
@@ -127,11 +123,9 @@ def test_backup_raises_after_attempting_every_table(env, monkeypatch):
 def test_successful_backup_sends_no_email(env, monkeypatch):
     posts = []
     monkeypatch.setattr(
-        backup, "_post_json",
-        lambda url, key, payload: posts.append(payload),
+        backup, "_send_email",
+        lambda payload: posts.append(payload),
     )
-    monkeypatch.setenv("DATAMAILER_URL", "https://datamailer.example")
-    monkeypatch.setenv("DATAMAILER_API_KEY", "dm-key")
     monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
     monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
         "dapier-ConnectionsTable-x": [{"connection_id": "c1"}],
@@ -145,12 +139,10 @@ def test_successful_backup_sends_no_email(env, monkeypatch):
 
 
 def test_failure_email_is_skipped_when_unconfigured_and_never_raises(env, monkeypatch):
-    def broken_post(url, key, payload):
+    def broken_post(payload):
         raise OSError("no network")
 
-    monkeypatch.setattr(backup, "_post_json", broken_post)
-    monkeypatch.setenv("DATAMAILER_URL", "https://datamailer.example")
-    monkeypatch.setenv("DATAMAILER_API_KEY", "dm-key")
+    monkeypatch.setattr(backup, "_send_email", broken_post)
     monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
     monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
         "dapier-ConnectionsTable-x": None,
@@ -165,10 +157,10 @@ def test_failure_email_is_skipped_when_unconfigured_and_never_raises(env, monkey
 def test_failure_email_skipped_without_config(env, monkeypatch):
     posts = []
     monkeypatch.setattr(
-        backup, "_post_json",
-        lambda url, key, payload: posts.append(payload),
+        backup, "_send_email",
+        lambda payload: posts.append(payload),
     )
-    # env fixture removes the DATAMAILER_* / BACKUP_ALERT_EMAIL vars.
+    # env fixture removes BACKUP_ALERT_EMAIL.
     monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
         "dapier-ConnectionsTable-x": None,
     }))
@@ -185,11 +177,9 @@ def test_manifest_failure_also_triggers_the_email(env, monkeypatch):
     still go out — this is exactly the all-bets-are-off case."""
     posts = []
     monkeypatch.setattr(
-        backup, "_post_json",
-        lambda url, key, payload: posts.append((url, payload)),
+        backup, "_send_email",
+        lambda payload: posts.append(payload),
     )
-    monkeypatch.setenv("DATAMAILER_URL", "https://datamailer.example")
-    monkeypatch.setenv("DATAMAILER_API_KEY", "dm-key")
     monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
     monkeypatch.setattr(backup, "_dynamodb", lambda: FakeDynamo({
         "dapier-ConnectionsTable-x": [],
@@ -201,7 +191,60 @@ def test_manifest_failure_also_triggers_the_email(env, monkeypatch):
         backup.handler({}, {})
 
     assert len(posts) == 1
-    url, payload = posts[0]
+    payload = posts[0]
     assert "0 of 2 tables" in payload["context"]["subject"]
     assert "manifest.json" in payload["context"]["body"]
     assert "The specified bucket does not exist" in payload["context"]["body"]
+
+
+def test_failure_email_does_not_send_when_already_claimed(env, monkeypatch):
+    posts = []
+    monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
+    monkeypatch.setattr(backup, "_claim_email", lambda day: False)
+    monkeypatch.setattr(backup, "_send_email", posts.append)
+    backup.notify_failure("2026-10-13", {}, {"table": "failed"})
+    assert posts == []
+
+
+def test_failed_email_releases_the_daily_claim(env, monkeypatch):
+    released = []
+    monkeypatch.setenv("BACKUP_ALERT_EMAIL", "ops@example.com")
+    monkeypatch.setattr(backup, "_release_email", released.append)
+    monkeypatch.setattr(backup, "_send_email", lambda payload: (_ for _ in ()).throw(OSError("SES unavailable")))
+    backup.notify_failure("2026-10-13", {}, {"table": "failed"})
+    assert released == ["2026-10-13"]
+
+
+def test_backup_email_uses_iam_ses_without_a_mailer_key(monkeypatch):
+    from src.dapier.engine import notify
+    calls = []
+    class Ses:
+        def send_email(self, **kwargs):
+            calls.append(kwargs)
+            return {"MessageId": "sent"}
+    monkeypatch.setattr(notify, "ses_client", lambda: Ses())
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "dapier@example.com")
+    backup._send_email({"email": "ops@example.com", "context": {"subject": "failure", "body": "details"}})
+    assert calls[0]["Source"] == "dapier@example.com"
+    assert calls[0]["Destination"] == {"ToAddresses": ["ops@example.com"]}
+    assert calls[0]["Message"]["Body"]["Text"]["Data"] == "details"
+
+
+def test_daily_claim_is_atomic_and_duplicate_is_skipped(monkeypatch):
+    from botocore.exceptions import ClientError
+    calls = []
+    class Table:
+        def put_item(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) > 1:
+                raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
+    class Dynamo:
+        def Table(self, name):
+            assert name == "executions"
+            return Table()
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setattr(backup.boto3, "resource", lambda name: Dynamo())
+    assert backup._claim_email("2026-10-13") is True
+    assert backup._claim_email("2026-10-13") is False
+    assert calls[0]["ConditionExpression"] == "attribute_not_exists(execution_id)"
+    assert calls[0]["Item"]["execution_id"] == "backup-failure-notice:2026-10-13"

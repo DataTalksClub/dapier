@@ -10,11 +10,10 @@ as gzip-compressed NDJSON (one JSON item per line), followed by a
 manifest.json summarising the day. The bucket's lifecycle rule expires
 every object after 30 days, giving a rolling month of daily snapshots.
 
-A failed run also emails the operator through the Datamailer transactional
-API (same bargain as rds-export's notify_run.sh: report failures, stay
-silent on success). Unconfigured (no DATAMAILER_URL/API_KEY or
-BACKUP_ALERT_EMAIL) the email is skipped and only the CloudWatch alarm
-remains.
+A failed run also emails the operator through the AWS mail
+service SES with the function's IAM role: report failures, stay silent on
+success. No mailer API key is needed. Without BACKUP_ALERT_EMAIL the email
+is skipped and only the CloudWatch alarm remains.
 
 Restoring replays a snapshot's lines back into a table with the same key
 schema:
@@ -29,7 +28,6 @@ import base64
 import gzip
 import json
 import os
-import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -74,28 +72,45 @@ def backup_table(dynamodb, s3, name, bucket, day):
     return {"key": key, "items": len(items), "bytes": len(body)}
 
 
-def _post_json(url, api_key, payload):
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
+def _claim_email(day):
+    """One failure email per backup date, including Lambda retries."""
+    from botocore.exceptions import ClientError
+
+    try:
+        boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(
+            Item={"execution_id": f"backup-failure-notice:{day}",
+                  "kind": "backup-failure-notice", "status": "notified",
+                  "expires_at": int(datetime.now(timezone.utc).timestamp()) + 90 * 86400},
+            ConditionExpression="attribute_not_exists(execution_id)",
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return False
+        raise
+    return True
+
+
+def _release_email(day):
+    boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).delete_item(
+        Key={"execution_id": f"backup-failure-notice:{day}"})
+
+
+def _send_email(payload):
+    from .engine.notify import operator_sender, ses_client
+
+    return ses_client().send_email(
+        Source=operator_sender(),
+        Destination={"ToAddresses": [payload["email"]]},
+        Message={"Subject": {"Data": payload["context"]["subject"], "Charset": "utf-8"},
+                 "Body": {"Text": {"Data": payload["context"]["body"], "Charset": "utf-8"}}},
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return response.status
 
 
 def notify_failure(day, results, errors, manifest_error=None):
     """Email the failure report; never raises (best-effort like notify_run.sh)."""
-    url = os.environ.get("DATAMAILER_URL", "").rstrip("/")
-    api_key = os.environ.get("DATAMAILER_API_KEY", "")
     recipient = os.environ.get("BACKUP_ALERT_EMAIL", "")
-    if not (url and api_key and recipient):
-        print("backup failure email skipped: datamailer is not configured")
+    if not recipient:
+        print("backup failure email skipped: recipient is not configured")
         return
     failed = "\n".join(f"  {name}: {err}" for name, err in sorted(errors.items()))
     backed_up = "\n".join(
@@ -129,7 +144,13 @@ def notify_failure(day, results, errors, manifest_error=None):
         "idempotency_key": f"dapier-backup-failure-{day}",
     }
     try:
-        _post_json(f"{url}/api/transactional/send", api_key, payload)
+        if not _claim_email(day):
+            return
+        try:
+            _send_email(payload)
+        except Exception:
+            _release_email(day)
+            raise
         print(f"backup failure email sent to {recipient}")
     except Exception as exc:  # the alarm still fires on the raise below
         print(f"backup failure email could not be sent: {exc}")

@@ -26,54 +26,14 @@ if [ "$AUTH_CLI_CLIENT_ID" = "None" ]; then AUTH_CLI_CLIENT_ID=""; fi
 # OPERATOR_EMAILS="a@datatalks.club,b@datatalks.club" to restrict it.
 OPERATOR_EMAILS="${OPERATOR_EMAILS:-}"
 
-# Shared OAuth clients (Google for Calendar/YouTube, Dropbox), created once in
-# each provider console with the redirect URI https://dapier.dtcdev.click/oauth/
-# callback. Export GOOGLE_OAUTH_CLIENT_ID/SECRET and DROPBOX_OAUTH_CLIENT_ID/
-# SECRET to (re)set them; a variable left unset is omitted from the overrides
-# file so CloudFormation keeps the previously deployed value instead of
-# clearing it — do not "fix" that by passing empty strings.
-oauth_override_lines=""
-for pair in \
-  "GoogleOAuthClientId:GOOGLE_OAUTH_CLIENT_ID" \
-  "GoogleOAuthClientSecret:GOOGLE_OAUTH_CLIENT_SECRET" \
-  "DropboxOAuthClientId:DROPBOX_OAUTH_CLIENT_ID" \
-  "DropboxOAuthClientSecret:DROPBOX_OAUTH_CLIENT_SECRET"; do
-  param="${pair%%:*}" env_var="${pair##*:}"
-  value="${!env_var:-}"
-  if [ -n "$value" ]; then
-    oauth_override_lines+="${param}: \"${value}\""$'\n'
-  fi
-done
-
 # Optional: Secrets Manager secret name holding the GitHub token the console
 # designer uses to commit workflows/*.yaml (Contents: read/write on this
-# repo). Like the OAuth clients, omitted when unset so CloudFormation keeps
+# repo). Omitted when unset so CloudFormation keeps
 # the previously deployed value.
 github_token_lines=""
 if [ -n "${GITHUB_WORKFLOWS_TOKEN_SECRET:-}" ]; then
   github_token_lines="GithubWorkflowsTokenSecret: \"${GITHUB_WORKFLOWS_TOKEN_SECRET}\""$'\n'
 fi
-
-# The DynamoDB backup emails failures through the Datamailer transactional
-# API (src/dapier/backup.py). Like the OAuth clients, the key is omitted
-# when unset so CloudFormation keeps the previously deployed value.
-mailer_override_lines=""
-if [ -n "${DATAMAILER_API_KEY:-}" ]; then
-  mailer_override_lines="DatamailerApiKey: \"${DATAMAILER_API_KEY}\""$'\n'
-fi
-
-# ai_complete's OpenAI-compatible endpoint (docs/connectors/ai.md). CI
-# passes them from the LLM_API_KEY secret and the LLM_BASE_URL / LLM_MODEL
-# variables; like the OAuth clients, each is omitted when unset so
-# CloudFormation keeps the previously deployed value.
-llm_override_lines=""
-for pair in "LlmApiKey:LLM_API_KEY" "LlmBaseUrl:LLM_BASE_URL" "LlmModel:LLM_MODEL"; do
-  param="${pair%%:*}" env_var="${pair##*:}"
-  value="${!env_var:-}"
-  if [ -n "$value" ]; then
-    llm_override_lines+="${param}: \"${value}\""$'\n'
-  fi
-done
 
 # Overrides go through a YAML file: SAM rejects empty values in the shorthand
 # key=value format and CloudFormation keeps a parameter's previous value when
@@ -95,7 +55,7 @@ AuthJwksUrl: "$AUTH_JWKS_URL"
 AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
-${oauth_override_lines}${github_token_lines}${mailer_override_lines}${llm_override_lines}
+${github_token_lines}
 EOF
 
 sam deploy --config-env sandbox --parameter-overrides "file://$params_file" "$@"

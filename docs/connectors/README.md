@@ -97,18 +97,13 @@ uv run dapier oauth-clients list
 
 This confirms the client is stored as **configured** without returning its
 secret. It does not prove that the provider accepts the secret. Retry the
-connection's OAuth setup as an end-to-end check. Dropbox client rotation also
-re-webhooks Dropbox: ingress accepts both the configured secret and the
-deploy-time secret during the rotation window.
+connection's OAuth setup as an end-to-end check. Dropbox webhook verification
+uses the configured app secret, so rotations take effect immediately.
 
-The deploy-time environment (`GOOGLE_OAUTH_CLIENT_ID` /
-`GOOGLE_OAUTH_CLIENT_SECRET`, `DROPBOX_OAUTH_CLIENT_ID` /
-`DROPBOX_OAUTH_CLIENT_SECRET`) remains a fallback for a fresh stack. Export
-the variables before `make deploy` when the deployment should seed or rotate
-them; omit them and CloudFormation keeps the previous values. Values set in
-the console/CLI take precedence. The current deploy script does not seed the
-Zoom OAuth client from environment variables; set it at runtime with
-`uv run dapier oauth-clients set zoom` or **Credentials → OAuth clients**.
+OAuth client credentials are stored through the Console or CLI. Deployments
+never seed provider secrets from environment variables; a fresh stack needs
+`dapier oauth-clients set` before starting OAuth consent.
+
 
 ## Creating and connecting a provider account
 

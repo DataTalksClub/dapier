@@ -64,18 +64,20 @@ def test_config_db_wins_over_environment(monkeypatch, config_db):
     assert oauth_clients.get("google") == ("db-id", "db-secret")
 
 
-def test_environment_is_the_fallback_without_a_record(monkeypatch, config_db):
+def test_environment_is_ignored_without_a_record(monkeypatch, config_db):
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_ID", "env-id")
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "env-secret")
 
-    assert oauth_clients.get("dropbox") == ("env-id", "env-secret")
+    with pytest.raises(ClientConfigError):
+        oauth_clients.get("dropbox")
 
 
-def test_mixed_sources_fill_each_other(monkeypatch, config_db):
+def test_incomplete_stored_config_cannot_use_environment(monkeypatch, config_db):
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "env-secret")
     config_db["oauth-client#google"] = {"value": {"client_id": "db-id"}}
 
-    assert oauth_clients.get("google") == ("db-id", "env-secret")
+    with pytest.raises(ClientConfigError):
+        oauth_clients.get("google")
 
 
 def test_unconfigured_provider_names_the_console_path(config_db):
@@ -84,7 +86,7 @@ def test_unconfigured_provider_names_the_console_path(config_db):
     assert "Credentials" in str(exc.value)
 
 
-def test_storage_failure_falls_back_to_environment(monkeypatch, config_db):
+def test_storage_failure_fails_closed_even_with_environment(monkeypatch, config_db):
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_ID", "env-id")
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "env-secret")
 
@@ -92,7 +94,8 @@ def test_storage_failure_falls_back_to_environment(monkeypatch, config_db):
         raise RuntimeError("dynamodb unavailable")
 
     monkeypatch.setattr("boto3.resource", broken)
-    assert oauth_clients.get("dropbox") == ("env-id", "env-secret")
+    with pytest.raises(ClientConfigError):
+        oauth_clients.get("dropbox")
 
 
 def test_skip_config_db_gate_keeps_tests_off_the_network(monkeypatch, config_db):
@@ -101,7 +104,8 @@ def test_skip_config_db_gate_keeps_tests_off_the_network(monkeypatch, config_db)
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "env-secret")
     config_db["oauth-client#google"] = {"value": {"client_id": "db-id", "client_secret": "db-secret"}}
 
-    assert oauth_clients.get("google") == ("env-id", "env-secret")
+    with pytest.raises(ClientConfigError):
+        oauth_clients.get("google")
 
 
 def test_youtube_shares_the_google_record(monkeypatch, config_db):
@@ -155,7 +159,7 @@ def test_status_reports_config_source_and_never_the_secret(monkeypatch, config_d
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_ID", "env-id")
     monkeypatch.setenv("DROPBOX_OAUTH_CLIENT_SECRET", "env-secret")
     status = overview._oauth_client_status("dropbox")
-    assert status == {"provider": "dropbox", "client_id": "env-id", "source": "deploy", "configured": True}
+    assert status == {"provider": "dropbox", "client_id": "", "source": "none", "configured": False}
 
     config_db["oauth-client#dropbox"] = {"value": {"client_id": "db-id", "client_secret": "db-secret"}}
     oauth_clients.invalidate_cache()

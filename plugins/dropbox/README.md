@@ -84,10 +84,9 @@ Webhook-driven `dropbox` / `file.created` (also `file.updated` and
    (`X-Dropbox-Signature`, HMAC-SHA256). Dapier verifies against the secret
    stored for the `dropbox` OAuth client — the one the
    [shared credential procedure](README.md#updating-or-rotating-an-oauth-client-id-and-secret)
-   maintains — so it must match the current App Console secret. The deploy-time
-   `DROPBOX_OAUTH_CLIENT_SECRET` environment variable is accepted too, so a
-   rotation window does not drop deliveries. With no secret configured
-   anywhere, verification fails closed and every notification is rejected.
+   maintains — so it must match the current App Console secret. Environment
+   variables are never used as an alternate app secret. With no stored secret,
+   verification fails closed and every notification is rejected.
 
 3. Connect the Dropbox account as above. A notification only names the changed
    account; Dapier's resolver lists the account's changes with the

@@ -6,6 +6,7 @@ import { refresh } from './overview.js';
 
 /* The fields each provider stores; the API validates the values. */
 const PROVIDERS = {
+  taskdeck: { name: 'Taskdeck status', fields: [{ key: 'token', label: 'Bearer token' }] },
   slack: { name: 'Slack bot', fields: [{ key: 'token', label: 'Bot token' }] },
   mailchimp: { name: 'Mailchimp', fields: [{ key: 'api_key', label: 'API key' }] },
   aws: { name: 'AWS', fields: [

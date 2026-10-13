@@ -104,8 +104,8 @@ def test_console_zoom_api_start_redirects_to_zoom_consent(monkeypatch):
     connection_id = view["connection_id"]
     monkeypatch.setattr(oauth_flow, "_connection", lambda cid: table.items.get(cid))
     monkeypatch.setenv("OAUTH_CALLBACK_URL", "https://fixed.example.test/oauth/callback")
-    monkeypatch.setenv("ZOOM_OAUTH_CLIENT_ID", "zoom-client")
-    monkeypatch.setenv("ZOOM_OAUTH_CLIENT_SECRET", "zoom-secret")
+    monkeypatch.setattr("src.dapier.connections.providers.oauth_clients.stored_client",
+                        lambda provider: {"client_id": "zoom-client", "client_secret": "zoom-secret"})
     monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
     response = oauth_flow.oauth_start({"headers": {"host": "fixed.example.test"}, "cookies": []},
                                       connection_id)
@@ -133,8 +133,8 @@ def test_agent_create_zoom_api_and_connect(monkeypatch):
     assert item["scopes"] == DEFAULTS and item["status"] == "ready"
 
     monkeypatch.setenv("OAUTH_CALLBACK_URL", "https://fixed.example.test/oauth/callback")
-    monkeypatch.setenv("ZOOM_OAUTH_CLIENT_ID", "zoom-client")
-    monkeypatch.setenv("ZOOM_OAUTH_CLIENT_SECRET", "zoom-secret")
+    monkeypatch.setattr("src.dapier.connections.providers.oauth_clients.stored_client",
+                        lambda provider: {"client_id": "zoom-client", "client_secret": "zoom-secret"})
     monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
     started = agent_api.route(agent_event({"agent": "zoom-agent"}),
                               "POST", "/api/agent/connections/zoom-api/connect")

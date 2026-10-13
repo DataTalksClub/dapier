@@ -29,7 +29,7 @@ from . import schedule_triggers
 
 CONTRACT_VERSION = 1
 PROJECT = "dapier"
-TOKEN_ENV = "TASKDECK_STATUS_TOKEN"
+TOKEN_CREDENTIAL_ID = "taskdeck"
 # ``schedule_triggers.health`` reports this state for "needs a human".
 ATTENTION = "attention"
 
@@ -211,7 +211,12 @@ def _authorised(event):
     signed request would add buys nothing. Compared as bytes because a
     non-ASCII header would make ``compare_digest`` raise.
     """
-    expected = os.environ.get(TOKEN_ENV, "")
+    from ..connections.credentials import get_credential
+
+    try:
+        expected = str(get_credential(TOKEN_CREDENTIAL_ID).get("token") or "")
+    except Exception:  # storage errors and unconfigured tokens fail closed
+        return False
     if not expected:
         return False
     supplied = _bearer(event)

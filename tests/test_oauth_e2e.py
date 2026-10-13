@@ -164,8 +164,8 @@ def configure(monkeypatch, http):
     monkeypatch.setenv("OPERATOR_EMAILS", EMAIL)
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
-    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "shared-client-id")
-    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "shared-client-secret")
+    monkeypatch.setattr("src.dapier.connections.providers.oauth_clients.stored_client",
+                        lambda provider: {"client_id": "shared-client-id", "client_secret": "shared-client-secret"})
     monkeypatch.delenv("AUDIT_TABLE", raising=False)
     monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
     monkeypatch.setattr(boto3, "resource", lambda service: dynamo)
