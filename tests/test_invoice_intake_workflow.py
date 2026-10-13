@@ -94,21 +94,25 @@ def test_attachment_branch_builds_and_archives_one_document():
     branch = next(action for action in workflow["actions"]
                   if action.get("id") == "route")["then"]
     assert [action["id"] for action in branch] == [
-        "email-date", "clean-subject", "make-document", "archive-document",
-        "file-to-dataops",
+        "email-date", "clean-subject", "make-document", "file-to-dataops",
+        "build-filename", "archive-document",
     ]
-    make_document, archive, intake = branch[2], branch[3], branch[4]
+    make_document, intake, build_filename, archive = branch[2], branch[3], branch[4], branch[5]
     assert make_document["type"] == "merge_pdfs"
     assert make_document["plan_step"] == "triage"
-    # The archive names come from prefixed run-history ids (bare branch ids
-    # silently rendered empty and archived every PDF as "--.pdf") and the
-    # document key now comes from triage's decision.
-    assert "steps.route.then.email-date" in archive["filename"]
-    assert "steps.route.then.clean-subject" in archive["filename"]
-    assert "steps.triage.output.result.document_key" in archive["filename"]
+    # DataOps runs before the archive so its invoice preview can name the
+    # file; the archive takes the builder's filename, falling back to the
+    # subject/checksum form when the intake returns no preview.
+    assert intake["document_step"] == "route.then.make-document"
+    assert "steps.route.then.build-filename" in archive["filename"]
     assert archive["source"] == "step"
     assert archive["step"] == "route.then.make-document"
-    assert intake["document_step"] == "route.then.make-document"
+    assert archive.get("skip_existing") is True
+
+    from src.dapier.engine.code_tests import run_code_tests
+
+    report = run_code_tests(build_filename)
+    assert report["failed"] == 0, report
 
 
 def test_subject_cleanup_still_normalizes_vendors():

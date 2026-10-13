@@ -33,13 +33,24 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
      document: a single attachment passes through untouched (bytes and
      checksum stay the original's), several merge page-wise in email order
      into `invoice-document/{event_id}.pdf` in the artifacts bucket.
-  5. archive-document — dropbox_upload (source: step) archives that one
-     document using date, clean subject and document key, so different
-     invoices on the same day do not collide.
-  6. file-to-dataops — document_step points at make-document, so the intake
+  5. file-to-dataops — document_step points at make-document, so the intake
      stages exactly the selected document (transfer/ prefix, sha256 in
      object metadata) and posts the envelope to the DataOps connection's
-     origin (`/api/v1/intake/email-documents`) with x-dataops-intake-secret
+     origin (`/api/v1/intake/email-documents`) with x-dataops-intake-secret.
+     DataOps goes first so its invoice preview — `invoices[0]` with
+     counterparty/transactionDate/invoiceNumber — can name the file. A 409
+     completes as already_exists (idempotent replay), like Dropbox
+     skip_existing.
+  6. build-filename — a Python code step reads prior step outputs via
+     `steps` and builds the Dropbox name: the preview's transaction date,
+     counterparty and invoice number when present, else the email date and
+     clean subject; the checksum document key always rides along so names
+     stay unique. Body-only mail renders to PDF first (the else branch,
+     completed by invoice-body-completion, which runs the same
+     intake → build-filename → archive order).
+  7. archive-document — dropbox_upload (source: step) archives that one
+     document under the built filename with skip_existing, so replays of
+     an already-archived path complete instead of failing.
 ```
 
 Each email is one SQS message, so concurrent invoices file concurrently.
@@ -54,6 +65,13 @@ from there. The code steps do not change the original email subject sent to
 DataOps or parse invoice contents. DataOps handles extraction, verification and
 spreadsheet publication, and uses its own stable document ID for archive names.
 Nothing in Dapier keeps invoice state.
+
+Filename preview contract (DataOps intake response): when the intake
+returns `invoices: [{invoiceId, counterparty, transactionDate (YYYY-MM-DD),
+invoiceNumber}]` alongside `status/intakeItemId/artifacts`, build-filename
+uses the first entry; without it the email date + clean subject + checksum
+form applies. Until the intake returns the preview, every file lands with
+the fallback name — the reorder is safe either way.
 
 ## Live setup (one-time)
 

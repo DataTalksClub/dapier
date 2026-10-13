@@ -1,6 +1,8 @@
 # Paired with invoice-intake's body branch: the renderer reports
 # job.completed with the source event's route, so a rendered invoice body
-# completes through this flow.
+# completes through this flow. DataOps goes first; its invoice preview
+# (when the intake returns one) names the Dropbox file via build-filename,
+# falling back to the email subject and checksum.
 id: invoice-body-completion
 enabled: true
 trigger:
@@ -58,22 +60,86 @@ actions:
         data:
           subject: Invoice
     expected_error: checksum is required
+- id: intake-rendered
+  type: dataops
+  connection_id: dataops
+  auth_secret_id: dapier/dataops
+- id: build-filename
+  type: code
+  code: |
+    import re
+    def _out(*path):
+        node = steps
+        for key in path:
+            if not isinstance(node, dict):
+                return None
+            node = node.get(key)
+        return node
+    def _slug(value, limit=70):
+        text = re.sub(r"\s+", " ", str(value or "")).strip()
+        text = text.replace("/", "_").replace("\\", "_")
+        return text[:limit].strip() or None
+    date = _out("email-date", "output", "formatted")
+    subject = _out("clean-subject", "output", "result", "subject")
+    doc_key = _out("clean-subject", "output", "result", "document_key")
+    intake = _out("intake-rendered", "output") or {}
+    invoices = intake.get("invoices") if isinstance(intake, dict) else None
+    preview = invoices[0] if isinstance(invoices, list) and invoices \
+        and isinstance(invoices[0], dict) else {}
+    tx_date = str(preview.get("transactionDate") or preview.get("transaction_date") or "").strip()
+    use_date = tx_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tx_date) \
+        else (str(date or "").strip() or "undated")
+    vendor = _slug(preview.get("counterparty")) or _slug(subject) or "Invoice"
+    inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
+    key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
+    parts = [use_date, vendor]
+    if inv_no:
+        parts.append(inv_no)
+    if key:
+        parts.append(key)
+    output = {"filename": "-".join(parts) + ".pdf"}
+  tests:
+  - name: no DataOps preview falls back to subject and checksum
+    steps:
+      email-date:
+        output:
+          formatted: 2026-10-04
+      clean-subject:
+        output:
+          result:
+            subject: Your Google Play Order Receipt from Oct 2, 2026
+            document_key: 839f39e8a3ba
+      intake-rendered:
+        output:
+          status: accepted
+    expected:
+      filename: 2026-10-04-Your Google Play Order Receipt from Oct 2, 2026-839f39e8a3ba.pdf
+  - name: a DataOps preview names vendor, invoice date and number
+    steps:
+      email-date:
+        output:
+          formatted: 2026-10-04
+      clean-subject:
+        output:
+          result:
+            subject: Receipt
+            document_key: 839f39e8a3ba
+      intake-rendered:
+        output:
+          status: accepted
+          invoices:
+          - counterparty: Google Play
+            transactionDate: 2026-10-02
+            invoiceNumber: GPA-123
+    expected:
+      filename: 2026-10-02-Google Play-GPA-123-839f39e8a3ba.pdf
 - id: archive-rendered
   type: dropbox_upload
   connection_id: dropbox
   source: output
   folder: /_dtc_paperwork/invoices
-  filename: '{steps.email-date.output.formatted}-{steps.clean-subject.output.result.subject}-{steps.clean-subject.output.result.document_key}.pdf'
+  filename: '{steps.build-filename.output.result.filename}'
   overwrite: false
   autorename: false
   strict_conflict: true
   skip_existing: true
-- id: skip-duplicate
-  type: filter
-  when:
-    steps.archive-rendered.output.already_exists:
-      not_equals: true
-- id: intake-rendered
-  type: dataops
-  connection_id: dataops
-  auth_secret_id: dapier/dataops
