@@ -199,6 +199,12 @@ def test_connection(connection_id, *, connections_table=None):
         "ok": bool(verdict.get("ok")),
         "detail": str(verdict.get("detail") or ("ok" if verdict.get("ok") else "provider check failed")),
     }
+    for key in ('reply', 'model'):
+        if isinstance(verdict.get(key), str):
+            payload[key] = verdict[key]
+    for key in ('usage', 'cost'):
+        if isinstance(verdict.get(key), dict):
+            payload[key] = verdict[key]
     identity = verdict.get("identity")
     if isinstance(identity, dict):
         payload["identity"] = identity

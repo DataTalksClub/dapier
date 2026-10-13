@@ -44,6 +44,9 @@ def dispatch(event):
         action = event['action']
         if action.get('type') != 'ai_complete':
             raise ValueError('Unsupported worker test action')
-        return registry.ACTIONS[action['type']].run(
-            action, event['event'], 'connection-test', steps=event.get('steps'))
+        from ..connectors.ai import run_ai_complete
+        return run_ai_complete(
+            action, event['event'], steps=event.get('steps'),
+            workflow_id=event.get('workflow_id') or 'connection-test',
+            usage_context=event.get('usage_context') or 'connection-test')
     raise ValueError('Unknown worker operation')

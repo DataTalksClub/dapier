@@ -2431,3 +2431,14 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .register-toolbar .toolbar-filters > label { flex: 1 1 150px; min-width: 0; }
   .register-toolbar .toolbar-filters > label select { width: 100%; min-width: 0; max-width: none; font-size: var(--dk-text-sm); }
 }
+
+/* OpenRouter's inference check stays visible next to Replace. */
+@media (min-width: 861px) {
+  .setup-table:has(.credential-test[data-provider="openrouter"]) .col-action { width: 14rem; }
+}
+.credential-test-result { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .setup-table tr:has(.credential-test-result:not([hidden])) .cell-title { grid-column: 1 / -1; }
+  .setup-table tr:has(.credential-test-result:not([hidden])) .action-cell { grid-column: 1 / -1; grid-row: 2; }
+  .setup-table tr:has(.credential-test-result:not([hidden])) td[data-label="Updated"] { grid-column: 1 / -1; grid-row: 3; }
+}

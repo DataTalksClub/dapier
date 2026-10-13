@@ -77,9 +77,9 @@ register(Action(
                  "instead of failing the step). `json_schema` constrains the "
                  "reply to a JSON Schema object (implies JSON mode). Output: "
                  "{ok, text|data, model, usage}."),
-    run=lambda action, event, workflow_id, steps=None: run_ai_complete(action, event, steps=steps),
+    run=lambda action, event, workflow_id, steps=None: run_ai_complete(action, event, steps=steps, workflow_id=workflow_id),
     required=frozenset({"prompt"}),
-    optional=frozenset({"connection_id", "system", "json_mode", "json_schema", "temperature", "model", "timeout_seconds"}),
+    optional=frozenset({"connection_id", "system", "json_mode", "json_schema", "temperature", "model", "timeout_seconds", "max_tokens"}),
     fields=(
         {"key": "connection_id", "label": "LLM connection", "default": "llm", "provider": "llm"},
         {"key": "prompt", "label": "Prompt", "type": "textarea", "required": True,
@@ -102,6 +102,7 @@ register(Action(
         {"key": "model", "label": "Model",
          "help": "Overrides the connection default model"},
         {"key": "timeout_seconds", "label": "Timeout (s)", "type": "number"},
+        {"key": "max_tokens", "label": "Maximum output tokens", "type": "number"},
     ),
 ))
 
@@ -259,7 +260,7 @@ def _default_transport(url, payload, headers, timeout):
         return response.status, response.read()
 
 
-def run_ai_complete(action, event, *, steps=None, transport=None):
+def run_ai_complete(action, event, *, steps=None, transport=None, workflow_id="", usage_context="workflow"):
     """One completion: the rendered prompt (plus optional system message) in,
     ``{ok, text|data, model, usage}`` out.
 
@@ -279,7 +280,8 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
     structured = bool(schema is not None or _json_mode(action))
     if transport is None and os.environ.get("WORKER_FUNCTION_ARN"):
         from ..engine.runtime_rpc import call
-        return call("action", action=action, event=event, steps=steps)
+        return call("action", action=action, event=event, steps=steps,
+                    workflow_id=workflow_id, usage_context=usage_context)
     config = _configuration(action)
     key = config["token"]
     base_url = config["base_url"].rstrip("/")
@@ -309,8 +311,12 @@ def run_ai_complete(action, event, *, steps=None, transport=None):
         # speaks json_schema: the prompt must demand JSON and the local
         # parse is the guarantee.
         response_format = None
+    max_tokens = action.get("max_tokens")
+    if max_tokens is not None and (isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= 100000):
+        raise ValueError("max_tokens must be an integer between 1 and 100000")
     payload = json.dumps({
         "model": model,
+        **({"max_tokens": max_tokens} if max_tokens is not None else {}),
         "messages": messages,
         **({"temperature": temperature} if temperature is not None else {}),
         **({"response_format": response_format} if response_format else {}),
@@ -408,7 +414,8 @@ def openrouter_credential():
 
 
 def run_decisions(*, state, instructions, criteria, model=None,
-                  timeout_seconds=None, transport=None, credential=None):
+                  timeout_seconds=None, transport=None, credential=None,
+                  workflow_id="", usage_context="workflow"):
     """One typed decision via OpenRouter's decisions endpoint (the jev
     route): the state plus one choice question in, a picked option with
     probabilities and confidence out — the endpoint returns typed answers,
@@ -492,33 +499,35 @@ OPENROUTER_KEY_INFO_URL = "https://openrouter.ai/api/v1/auth/key"
 
 
 def _run_openrouter_test(_connection, *, transport=None):
-    """The openrouter health check: OpenRouter's key-introspection endpoint
-    (GET /api/v1/auth/key) with the stored credential's Bearer key. Verdict
-    only — the response's key data is never echoed back."""
-    key = str((openrouter_credential() or {}).get("api_key") or "").strip()
+    """Run the workflow's typed jev inference with a tiny known choice."""
+    credential = openrouter_credential()
+    key = str((credential or {}).get("api_key") or "").strip()
     if not key:
         return {"ok": False,
                 "detail": (f"no stored {OPENROUTER_CREDENTIAL_ID} credential "
                            f"(`dapier credentials set {OPENROUTER_CREDENTIAL_ID}`)")}
-    headers = {"authorization": f"Bearer {key}"}
     try:
-        if transport is not None:
-            status, _raw = transport("GET", OPENROUTER_KEY_INFO_URL,
-                                     headers=headers, body=None, timeout=10)
-        else:
-            request = urllib.request.Request(OPENROUTER_KEY_INFO_URL,
-                                             headers=headers, method="GET")
-            with urllib.request.urlopen(request, timeout=10) as response:
-                status = response.status
-    except urllib.error.HTTPError as exc:
-        return {"ok": False, "detail": f"OpenRouter rejected the key (HTTP {exc.code})"}
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return {"ok": False, "detail": f"OpenRouter unreachable: {exc}"}
-    if status == 200:
-        return {"ok": True, "detail": "OpenRouter key verified"}
-    if status in (401, 403):
-        return {"ok": False, "detail": f"OpenRouter rejected the key (HTTP {status})"}
-    return {"ok": False, "detail": f"OpenRouter key check returned HTTP {status}"}
+        result = run_decisions(
+            state={"connection_test": True},
+            instructions="Select working to confirm this connection can make decisions.",
+            criteria={"working": "The connection_test field is true.",
+                      "failing": "The connection_test field is false."},
+            model=JEV_MODEL, timeout_seconds=20, transport=transport,
+            credential=credential, workflow_id="connection-test",
+            usage_context="connection-test")
+    except HttpError as exc:
+        status = getattr(exc, "status", None)
+        return {"ok": False, "detail": (
+            f"OpenRouter inference failed (HTTP {status})" if status
+            else "OpenRouter inference failed; check provider availability")}
+    except Exception:
+        return {"ok": False, "detail": "OpenRouter inference failed; check the stored connection"}
+    valid = result.get("ok") and result.get("choice") == "working"
+    return {"ok": bool(valid),
+            "detail": ("OpenRouter jev inference verified" if valid
+                       else "OpenRouter returned an invalid test decision"),
+            **({"reply": result["choice"]} if valid else {}),
+            **{key: result[key] for key in ("model", "usage", "cost") if key in result}}
 
 
 register_connection_test(ConnectionTest(connector="openrouter",

@@ -209,6 +209,7 @@ export const actionCatalog: ActionEntry[] = [
         help: "A JSON Schema object with type: object; implies JSON mode and validates the reply" },
       { key: "temperature", label: "Temperature", type: "number" },
       { key: "model", label: "Model" },
+      { key: "max_tokens", label: "Maximum output tokens", type: "number", help: "Cap the response length; connection tests use 32 tokens." },
       { key: "timeout_seconds", label: "Timeout (s)", type: "number" }
     ]
   },

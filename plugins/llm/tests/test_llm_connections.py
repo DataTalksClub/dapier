@@ -109,19 +109,18 @@ def test_save_verifies_before_writing_and_hides_key(monkeypatch):
 
 def test_rpc_preserves_action_result_and_does_not_record_run(monkeypatch):
     run = Mock(return_value={'ok': True, 'text': 'hello'})
-    from src.dapier.connectors import registry
-    monkeypatch.setitem(registry.ACTIONS, 'ai_complete', Mock(run=run))
-    result = worker.handler({'dapier_rpc': 'action', 'action': {'type': 'ai_complete'}, 'event': {}}, None)
+    monkeypatch.setattr(ai, 'run_ai_complete', run)
+    result = worker.handler({'dapier_rpc': 'action', 'action': {'type': 'ai_complete'}, 'event': {}, 'workflow_id': 'inline-workflow', 'usage_context': 'workflow'}, None)
     assert result == {'ok': True, 'text': 'hello'}
-    run.assert_called_once()
+    run.assert_called_once_with({'type': 'ai_complete'}, {}, steps=None, workflow_id='inline-workflow', usage_context='workflow')
 
 
 def test_ai_api_tests_delegate_to_worker(monkeypatch):
     monkeypatch.setenv('WORKER_FUNCTION_ARN', 'worker')
     call = Mock(return_value={'ok': True, 'text': 'hello'})
     monkeypatch.setattr(runtime_rpc, 'call', call)
-    assert ai.run_ai_complete({'type': 'ai_complete', 'prompt': 'hello'}, {})['ok']
-    call.assert_called_once()
+    assert ai.run_ai_complete({'type': 'ai_complete', 'prompt': 'hello'}, {}, workflow_id='inline-workflow')['ok']
+    call.assert_called_once_with('action', action={'type': 'ai_complete', 'prompt': 'hello'}, event={}, steps=None, workflow_id='inline-workflow', usage_context='workflow')
 
 
 def test_shared_connection_test_route(monkeypatch):
@@ -210,3 +209,48 @@ def test_worker_rpc_serializes_dynamodb_numbers(monkeypatch):
     assert result['ok']
     request = json.loads(invoke.call_args.kwargs['Payload'])
     assert request['connection']['version'] == 1
+
+
+def test_explicit_test_runs_real_stored_connection_inference(monkeypatch):
+    connection = {'provider': 'llm', 'connection_id': 'anthropic', 'status': 'connected',
+                  'credential_id': 'oauth#anthropic'}
+    monkeypatch.setattr(plugin.credentials, 'get_credential', lambda key: WIF)
+    monkeypatch.setattr(plugin, 'authenticate', lambda config, **kwargs: 'oidc-bearer')
+    from src.dapier.engine.actions import base
+    monkeypatch.setattr(base, '_connected_connection', lambda key: connection)
+    http = Mock(return_value=(200, json.dumps({'model': 'claude-sonnet-5-5-dated',
+        'choices': [{'message': {'content': 'Dapier connection OK'}}],
+        'usage': {'prompt_tokens': 12, 'completion_tokens': 4}}).encode()))
+    result = plugin.test_connection(connection, http=http)
+    assert result['ok'] and result['reply'] == 'Dapier connection OK'
+    assert result['model'] == 'claude-sonnet-5-5-dated'
+    assert http.call_args.args == ('POST', plugin.ANTHROPIC_URL + '/chat/completions')
+    payload = json.loads(http.call_args.kwargs['body'])
+    assert payload['max_tokens'] == 32
+    assert payload['model'] == WIF['model']
+    assert http.call_args.kwargs['headers']['authorization'] == 'Bearer oidc-bearer'
+
+
+@pytest.mark.parametrize('reply', ['', None, '   '])
+def test_explicit_test_rejects_empty_inference(monkeypatch, reply):
+    monkeypatch.setattr(ai, 'run_ai_complete', lambda *a, **kw: {'ok': True, 'text': reply})
+    result = plugin.test_connection({'connection_id': 'llm', 'status': 'connected'})
+    assert not result['ok'] and 'reply' not in result
+
+
+def test_explicit_test_redacts_provider_exceptions(monkeypatch):
+    monkeypatch.setattr(ai, 'run_ai_complete', Mock(side_effect=ValueError('secret-bearer')))
+    result = plugin.test_connection({'connection_id': 'llm', 'status': 'connected'})
+    assert not result['ok'] and 'secret-bearer' not in json.dumps(result)
+
+
+def test_shared_test_route_preserves_inference_evidence(monkeypatch):
+    from src.dapier.connectors import registry
+    monkeypatch.setattr(discovery, '_load', lambda *a: ({'provider': 'llm'}, None))
+    monkeypatch.setitem(registry.CONNECTION_TESTS, 'llm', Mock(run=lambda connection: {
+        'ok': True, 'reply': 'Dapier connection OK', 'model': 'small',
+        'usage': {'output_tokens': 4}, 'cost': {'usd': '0.00002'}}))
+    status, result = discovery.test_connection('llm')
+    assert status == 200 and result['reply'] == 'Dapier connection OK'
+    assert result['usage']['output_tokens'] == 4
+    assert result['cost']['usd'] == '0.00002'

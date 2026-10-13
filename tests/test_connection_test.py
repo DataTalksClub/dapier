@@ -358,13 +358,16 @@ def test_openrouter_test_verifies_the_stored_key(monkeypatch):
 
     monkeypatch.setattr(ai, "openrouter_credential",
                         lambda: {"api_key": "sk-or-" + "a" * 40})
-    transport = FakeTransport(("auth/key", 200, {"data": {"label": "dapier"}}))
+    transport = FakeTransport(("/decisions", 200, {"model": ai.JEV_MODEL,
+        "answers": {"choice": {"choice": "working"}}, "usage": {}}))
     verdict = ai._run_openrouter_test({"connection_id": "openrouter"},
                                       transport=transport)
     assert verdict["ok"] is True
     assert "verified" in verdict["detail"]
-    assert all(call["url"].endswith("/api/v1/auth/key") for call in transport.calls)
-    assert all(call["method"] == "GET" for call in transport.calls)
+    assert verdict["reply"] == "working"
+    assert verdict["model"] == ai.JEV_MODEL
+    assert all(call["url"].endswith("/api/alpha/decisions") for call in transport.calls)
+    assert all(call["method"] == "POST" for call in transport.calls)
 
 
 def test_openrouter_test_reports_rejection_and_unconfigured(monkeypatch):
@@ -373,7 +376,7 @@ def test_openrouter_test_reports_rejection_and_unconfigured(monkeypatch):
     monkeypatch.setattr(ai, "openrouter_credential",
                         lambda: {"api_key": "sk-or-" + "a" * 40})
     rejected = ai._run_openrouter_test(
-        {}, transport=FakeTransport(("auth/key", 401, {"error": "no"})))
+        {}, transport=FakeTransport(("/decisions", 401, {"error": "no"})))
     assert rejected["ok"] is False and "401" in rejected["detail"]
 
     monkeypatch.setattr(ai, "openrouter_credential", lambda: None)
@@ -388,3 +391,12 @@ def test_openrouter_is_a_testable_pseudo_connection():
 
     assert registry.connection_test_for("openrouter") is not None
     assert PSEUDO_CONNECTION_PROVIDERS["openrouter"] == "openrouter"
+
+
+@pytest.mark.parametrize('answer', [{}, {'choice': 'failing'}, {'choice': 'unknown'}])
+def test_openrouter_probe_requires_valid_expected_choice(monkeypatch, answer):
+    from src.dapier.connectors import ai
+    monkeypatch.setattr(ai, 'openrouter_credential', lambda: {'api_key': 'secret-key'})
+    transport = FakeTransport(('/decisions', 200, {'answers': {'choice': answer}}))
+    result = ai._run_openrouter_test({}, transport=transport)
+    assert not result['ok'] and 'reply' not in result

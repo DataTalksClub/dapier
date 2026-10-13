@@ -549,6 +549,10 @@ def connections_test(api_url, connection_id, debug=False):
     data = api.call(api_url, "POST", f"/api/agent/connections/{connection_id}/test",
                     body={}, debug=debug)
     print(f"{'OK' if data.get('ok') else 'FAILED'} — {data.get('detail') or ''}")
+    if data.get('model'):
+        print(f"Model: {data['model']}")
+    if data.get('reply'):
+        print(f"Reply: {data['reply']}")
     identity = data.get("identity") or {}
     if identity:
         summary = ", ".join(f"{key}={value}" for key, value in sorted(identity.items()))

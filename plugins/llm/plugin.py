@@ -130,17 +130,28 @@ def configuration(connection_id):
 
 
 def test_connection(connection, *, http=None):
-    """Test stored auth and selected model from the worker's IAM identity."""
+    """Run a small inference; unsaved candidates only verify auth/model."""
     from src.dapier.engine.runtime_rpc import call
     if os.environ.get('WORKER_FUNCTION_ARN') and http is None:
         return call('connection-test', connection=connection)
     try:
-        config = connection.get('_llm_config')
-        if config is None:
+        if '_llm_config' not in connection:
             if connection.get('status') != 'connected':
                 return {'ok': False, 'detail': 'LLM connection is not connected'}
-            config = credentials.get_credential(connection['credential_id'])
-        config = validate(config)
+            result = ai.run_ai_complete({'type': 'ai_complete',
+                'connection_id': connection['connection_id'],
+                'prompt': 'Reply with exactly: Dapier connection OK',
+                'max_tokens': 32, 'timeout_seconds': 20}, {},
+                transport=http, workflow_id='connection-test',
+                usage_context='connection-test')
+            reply = result.get('text')
+            valid = result.get('ok') and isinstance(reply, str) and bool(reply.strip())
+            return {'ok': bool(valid),
+                'detail': ('Inference succeeded using the stored connection'
+                           if valid else 'The model returned no text reply'),
+                **({'reply': reply.strip()} if valid else {}),
+                **{key: result[key] for key in ('model', 'usage', 'cost') if key in result}}
+        config = validate(connection['_llm_config'])
         token = authenticate(config, http=http)
         headers = {'authorization': f'Bearer {token}', **config.get('headers', {})}
         if urllib.parse.urlsplit(config['base_url']).hostname == 'api.anthropic.com':
@@ -160,7 +171,7 @@ def test_connection(connection, *, http=None):
             return {'ok': False, 'detail': 'Authentication failed or the default model is unavailable'}
         return {'ok': True, 'detail': f"Authenticated; model {config['model']} is available"}
     except Exception:
-        return {'ok': False, 'detail': 'LLM authentication or model check failed'}
+        return {'ok': False, 'detail': 'LLM authentication, model verification, or inference failed'}
 
 
 def save_connection(body, *, operator_subject, connections_table, audit_event,

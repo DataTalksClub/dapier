@@ -9,8 +9,9 @@ model and authentication; provider keys never come from environment variables.
 In Console → Connections, add **LLM**, choose **Anthropic OIDC** or **API key**,
 and enter the connection settings. Save checks authentication and model access
 before writing anything. Invalid or missing credentials cannot create a
-connection. The connection's **Test** button repeats the check; the CLI drives
-the same API with `dapier connections test llm`.
+connection. The connection's **Test** button sends a small completion and
+shows the actual reply; the CLI drives the same API with
+`dapier connections test llm`.
 
 For Anthropic OIDC, reuse the verified IDs documented in
 [Anthropic workload identity](../anthropic-workload-identity.md). The worker
@@ -35,10 +36,12 @@ connection settings. Keys and custom headers stay in the credentials store.
 
 API connection tests and executed designer tests run on the workflow worker,
 so they exercise the same IAM role and federation rule as production.
-The health check resolves the configured Anthropic model through the Models
-API, accepting aliases, or checks the model list for other compatible APIs.
-It does not generate paid inference. A workflow step test with `--execute`
-can verify actual inference separately.
+Saving resolves the configured Anthropic model through the Models API,
+accepting aliases, or checks the model list for other compatible APIs.
+Explicit **Test** sends a completion through the production inference path,
+limits its output to 32 tokens, and shows the model and reply. This can incur
+a small provider charge. `dapier connections test openrouter` sends a tiny
+typed jev decision and shows the returned choice.
 
 ## Anthropic compatibility
 

@@ -4,6 +4,11 @@ The plugin owns connection verification and authentication for `ai_complete`.
 Choose Anthropic OIDC or a stored API key in Console → Connections → LLM.
 Save verifies authentication and model availability before writing a record.
 Console **Test** and `dapier connections test llm` use the same API behavior.
+Test sends a small completion to the configured model and shows its actual reply.
+It uses the same authentication and inference path as workflows, with a 32-token
+output limit. Testing can incur a small provider charge.
+`dapier connections test openrouter` tests the typed jev decision endpoint and
+shows the returned choice.
 
 Anthropic exchanges the worker's AWS identity for a short-lived token, cached
 only in worker memory and refreshed before expiry. API tests execute on that

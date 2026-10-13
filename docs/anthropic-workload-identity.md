@@ -111,7 +111,9 @@ dapier connections test llm
 ```
 
 Saving verifies authentication and model access on the worker before storing
-the connection. Console **Test** uses the same API check. `ai_complete`
+the connection. Console **Test** and `dapier connections test llm` send a
+small real completion through OIDC and show the reply (up to 32 output tokens).
+The inference can incur a small provider charge. `ai_complete`
 steps select `connection_id: llm` (also the default for existing definitions).
 The plugin exchanges fresh STS identity tokens for Anthropic Bearer tokens,
 caches them in worker memory and renews them before expiry. No long-lived key,

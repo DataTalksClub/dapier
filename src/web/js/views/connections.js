@@ -894,6 +894,10 @@ function renderConnectionsNow(connections) {
     </section>`;
   }).join('');
   $$('.connection-edit').forEach((button) => button.addEventListener('click', () => openEditConnection(button.dataset.connection)));
+  $$('.connection-test').forEach((button) => button.addEventListener('click', () => {
+    openEditConnection(button.dataset.connection);
+    $('#edit-connection-test').click();
+  }));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
   bindConnectButtons();
@@ -982,7 +986,9 @@ function accountActions(connection, { unfinished = false, title } = {}) {
     ? `<button class="dk-button dk-button--secondary dk-button--sm connection-remove" data-connection="${id}" type="button" aria-label="Remove ${escapeHtml(title)}">Remove</button>` : '';
   const next = nextActionHtml(connection);
   const manage = `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
-  return { html: remove + next + manage, many: Boolean(remove || next) };
+  const test = connection.provider === 'llm'
+    ? `<button class="dk-button dk-button--secondary dk-button--sm connection-test" data-connection="${id}" type="button">Test</button>` : '';
+  return { html: remove + next + test + manage, many: Boolean(remove || next || test) };
 }
 
 /* Another service's view of a shared sign-in: the account, Details, status,
@@ -1153,11 +1159,15 @@ $('#edit-connection-test').addEventListener('click', async (event) => {
   const result = $('#edit-connection-test-result');
   button.disabled = true;
   button.textContent = 'Testing…';
-  result.hidden = true;
+  result.hidden = false;
+  result.classList.remove('form-error');
+  result.textContent = $('#edit-connection-form').dataset.provider === 'llm' ? 'Sending a short prompt…' : 'Testing connection…';
   try {
     const verdict = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/test`, { method: 'POST' });
     const identity = verdict.identity?.name ? ` — ${verdict.identity.name}` : '';
-    result.textContent = `${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || 'no health check for this provider'}${identity}`;
+    const reply = verdict.reply ? ` · Reply: ${verdict.reply}` : '';
+    const model = verdict.model ? ` · Model: ${verdict.model}` : '';
+    result.textContent = `${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || 'no health check for this provider'}${identity}${model}${reply}`;
     result.hidden = false;
     result.classList.toggle('form-error', !verdict.ok);
   } catch (error) {

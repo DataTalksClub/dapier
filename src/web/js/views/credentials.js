@@ -34,17 +34,16 @@ function renderCredentials(credentials) {
     const status = credential.configured ? 'configured' : 'missing';
     const provider = escapeHtml(credential.provider);
     const edit = `<button class="dk-button dk-button--secondary dk-button--sm credential-edit" data-provider="${provider}" type="button">${credential.configured ? 'Replace' : 'Add'}</button>`;
-    /* Test stays reachable whether or not a value is stored (it reports
-       what is missing); it sits behind More beside the one visible action. */
+    /* LLM tests are visible alongside Replace and run a small inference. */
     const test = TESTABLE.has(credential.provider)
-      ? `<button class="row-menu-item credential-test" data-provider="${provider}" type="button">Test connection</button>`
+      ? `<button class="${credential.provider === 'openrouter' ? 'dk-button dk-button--secondary dk-button--sm' : 'row-menu-item'} credential-test" data-provider="${provider}" type="button">Test</button>`
       : '';
     return `<tr>
-      <td class="cell-title"><span class="cell-name">${escapeHtml(name)}</span></td>
+      <td class="cell-title"><span class="cell-name">${escapeHtml(name)}</span><div class="sub credential-test-result" role="status" hidden></div></td>
       <td class="mono muted-cell nowrap" data-label="Updated"${credential.updated_at ? '' : ' data-empty'}>${credential.updated_at ? formatTimestamp(credential.updated_at) : '—'}</td>
       <td data-empty></td>
       <td data-label="Status">${statusLine(status)}</td>
-      <td class="action-cell">${rowActions(edit, [test], { id: `credential-menu-${provider}`, label: escapeHtml(name) })}</td>
+      <td class="action-cell">${credential.provider === 'openrouter' ? `<div class="row-actions">${edit}${test}</div>` : rowActions(edit, [test], { id: `credential-menu-${provider}`, label: escapeHtml(name) })}</td>
     </tr>`;
   }).join('');
   $$('.credential-edit').forEach((button) => button.addEventListener('click', () => openCredential(button.dataset.provider)));
@@ -53,12 +52,22 @@ function renderCredentials(credentials) {
 
 async function testCredential(button) {
   const provider = button.dataset.provider;
+  const result = button.closest('tr').querySelector('.credential-test-result');
   button.disabled = true;
+  button.textContent = 'Testing…';
+  result.hidden = false;
+  result.classList.remove('form-error');
+  result.textContent = provider === 'openrouter' ? 'Sending a short prompt…' : 'Testing connection…';
   try {
     const verdict = await api(`/api/admin/connections/${provider}/test`, { method: 'POST', body: '{}' });
-    notice(`${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || (verdict.ok ? 'connection OK' : 'check failed')}`, !verdict.ok);
-  } catch (error) { notice(`Test failed: ${error.message}`); }
-  finally { button.disabled = false; }
+    const reply = verdict.reply ? ` · Reply: ${verdict.reply}` : '';
+    const model = verdict.model ? ` · Model: ${verdict.model}` : '';
+    result.textContent = `${verdict.ok ? 'OK' : 'Failed'} — ${verdict.detail || (verdict.ok ? 'connection OK' : 'check failed')}${model}${reply}`;
+    result.classList.toggle('form-error', !verdict.ok);
+  } catch (error) {
+    result.textContent = `Test failed: ${error.message}`;
+    result.classList.add('form-error');
+  } finally { button.disabled = false; button.textContent = 'Test'; }
 }
 
 function openCredential(provider) {

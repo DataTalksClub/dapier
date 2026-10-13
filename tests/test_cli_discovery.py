@@ -167,3 +167,13 @@ def test_connections_test_reports_unknown_connection(isolated_home, monkeypatch,
 
     assert main.main(["connections", "test", "nope"]) == 4
     assert "Unknown connection" in capsys.readouterr().out
+
+
+def test_connections_test_prints_actual_llm_reply(isolated_home, monkeypatch, capsys):
+    monkeypatch.setattr(commands.api, 'call', lambda *a, **kw: {
+        'ok': True, 'detail': 'Inference succeeded', 'model': 'claude',
+        'reply': 'Dapier connection OK'})
+    assert main.main(['connections', 'test', 'llm']) == 0
+    output = capsys.readouterr().out
+    assert 'Reply: Dapier connection OK' in output
+    assert 'Model: claude' in output
