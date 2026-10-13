@@ -198,3 +198,15 @@ def test_llm_actions_use_standard_connection_reference_resolution(monkeypatch):
     monkeypatch.setattr(plugin.credentials, 'get_credential', lambda key: KEY)
     assert plugin.configuration('llm my-account')['token'] == KEY['api_key']
     resolve.assert_called_once_with('llm my-account')
+
+
+def test_worker_rpc_serializes_dynamodb_numbers(monkeypatch):
+    import boto3
+    from decimal import Decimal
+    monkeypatch.setenv('WORKER_FUNCTION_ARN', 'worker')
+    invoke = Mock(return_value={'Payload': io.BytesIO(b'{"ok":true}')})
+    monkeypatch.setattr(boto3, 'client', lambda service: Mock(invoke=invoke))
+    result = runtime_rpc.call('connection-test', connection={'provider': 'llm', 'version': Decimal(1)})
+    assert result['ok']
+    request = json.loads(invoke.call_args.kwargs['Payload'])
+    assert request['connection']['version'] == 1

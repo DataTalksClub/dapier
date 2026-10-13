@@ -2,6 +2,8 @@
 import json
 import os
 
+from ..http import _json_default
+
 
 def call(operation, **payload):
     import boto3
@@ -9,7 +11,7 @@ def call(operation, **payload):
     response = boto3.client('lambda').invoke(
         FunctionName=os.environ['WORKER_FUNCTION_ARN'],
         InvocationType='RequestResponse',
-        Payload=json.dumps({'dapier_rpc': operation, **payload}).encode(),
+        Payload=json.dumps({'dapier_rpc': operation, **payload}, default=_json_default).encode(),
     )
     result = json.loads(response['Payload'].read())
     if response.get('FunctionError') or not isinstance(result, dict):
