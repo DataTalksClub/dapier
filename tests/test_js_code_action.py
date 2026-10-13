@@ -29,6 +29,15 @@ class JsCodeStepTests(unittest.TestCase):
         )
         self.assertEqual(output["result"], ["a"])
 
+    def test_timeout_seconds_allows_work_longer_than_five_milliseconds(self):
+        output = run(
+            "const started = Date.now();\n"
+            "while (Date.now() - started < 50) {}\n"
+            "return Date.now() - started;",
+            timeout_seconds=5,
+        )
+        self.assertGreaterEqual(output["result"], 50)
+
     def test_no_return_is_null(self):
         self.assertIsNone(run("console.log('side effect only')")["result"])
 

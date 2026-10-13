@@ -293,7 +293,7 @@ def run_js(action, event, steps=None):
     context = MiniRacer()
     context.set_hard_memory_limit(_JS_MEMORY_LIMIT_BYTES)
     try:
-        raw = context.eval(_js_script(source, event.get("data") or {}, steps), timeout=timeout)
+        raw = context.eval(_js_script(source, event.get("data") or {}, steps), timeout_sec=timeout)
     except JSTimeoutException:
         raise RuntimeError(
             f"code step timed out after {timeout:g}s (limit {MAX_TIMEOUT_SECONDS:g}s)"
