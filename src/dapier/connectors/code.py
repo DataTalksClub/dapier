@@ -6,9 +6,10 @@ register(Action(
     type="code",
     label="Code (Python)",
     icon="code-2",
-    description=("Sandboxed Python transform: the event data arrives as `input`; "
-                 "the last expression (or an `output` variable) becomes the step result."),
-    run=lambda action, event, workflow_id, steps=None: run_code(action, event),
+    description=("Sandboxed Python transform: the event data arrives as `input`, "
+                  "prior step outputs as `steps`; "
+                  "the last expression (or an `output` variable) becomes the step result."),
+    run=lambda action, event, workflow_id, steps=None: run_code(action, event, steps=steps),
     required=frozenset({"code"}),
     optional=frozenset({"timeout_seconds", "tests"}),
     fields=(
@@ -22,9 +23,10 @@ register(Action(
     type="js",
     label="Code (JavaScript)",
     icon="braces",
-    description=("Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`; "
-                 "`return` a value to make it the step result. console.log is captured."),
-    run=lambda action, event, workflow_id, steps=None: run_js(action, event),
+    description=("Sandboxed JavaScript transform (embedded V8): the event data arrives as `input`, "
+                  "prior step outputs as `steps`; "
+                  "`return` a value to make it the step result. console.log is captured."),
+    run=lambda action, event, workflow_id, steps=None: run_js(action, event, steps=steps),
     required=frozenset({"code"}),
     optional=frozenset({"timeout_seconds", "tests"}),
     fields=(

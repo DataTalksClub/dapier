@@ -22,7 +22,9 @@ A case with ``expected`` asserts the step result equals it deep-equal —
 against the same JSON-safe value the run history records (same capping). A
 case with ``expected_error`` asserts the step fails with that substring in
 the error. A case with neither only asserts the snippet runs cleanly.
-``input`` defaults to ``{}``; ``name`` defaults to the case's position.
+``input`` defaults to ``{}``; ``steps`` defaults to ``{}`` and seeds the
+snippet's ``steps`` global (prior step outputs) so filename builders and
+other downstream snippets are pinnable; ``name`` defaults to the case's position.
 
 Tests are pure: no connections are touched and nothing is recorded to the
 executions table — the same contract as the dry-run, at snippet granularity.
@@ -59,11 +61,13 @@ def validate_code_tests(action):
         label = f"code tests case {index + 1}"
         if not isinstance(case, dict):
             raise CodeTestsError(f"{label}: each case must be an object")
-        unknown = sorted(set(case) - {"name", "input", "expected", "expected_error"})
+        unknown = sorted(set(case) - {"name", "input", "steps", "expected", "expected_error"})
         if unknown:
             raise CodeTestsError(f"{label}: unknown keys: {', '.join(unknown)}")
         if "input" in case and case["input"] is not None and not isinstance(case["input"], dict):
             raise CodeTestsError(f"{label}: 'input' must be an object")
+        if "steps" in case and case["steps"] is not None and not isinstance(case["steps"], dict):
+            raise CodeTestsError(f"{label}: 'steps' must be an object")
         if "expected" in case and "expected_error" in case:
             raise CodeTestsError(f"{label}: 'expected' and 'expected_error' are mutually exclusive")
         name = case.get("name")
@@ -92,7 +96,7 @@ def run_code_tests(action):
         event = {"data": case.get("input") or {}}
         actual = error = stdout = None
         try:
-            output = runner(action, event)
+            output = runner(action, event, steps=case.get("steps") or {})
         except RuntimeError as exc:
             error = str(exc)
             ok = expected_error is not None and str(expected_error) in error

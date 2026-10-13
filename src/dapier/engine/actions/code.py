@@ -5,7 +5,8 @@ The snippet transforms the triggering event and returns JSON for later steps
 (issue #12). Contract (both flavors):
 
 - the snippet runs with the event's ``data`` payload bound to the name
-  ``input`` (a dict);
+  ``input`` (a dict) and the prior steps' outputs bound to ``steps``
+  (``{step_id: {"output": ...}}``, ``{}`` standalone);
 - the step output is what the snippet produces — Python: its last top-level
   *expression*, falling back to a variable named ``output`` (``result`` is
   accepted as an alias); JavaScript: the value it ``return``s from the
@@ -91,16 +92,22 @@ def _guarded_import(name, _globals=None, _locals=None, fromlist=(), level=0):
     return importlib.import_module(name)
 
 
-def _sandbox_for(input_value, stdout):
+def _sandbox_for(input_value, stdout, steps_value=None):
     """Globals for one snippet run: ``input`` in, restricted builtins, and a
-    ``print`` that captures instead of touching the process stdout."""
+    ``print`` that captures instead of touching the process stdout.
+
+    ``steps`` carries the prior steps' outputs (``{step_id: {"output": ...}}``)
+    so a snippet can build on what earlier steps returned — e.g. a DataOps
+    invoice preview — without reimplementing the action that produced it.
+    Absent when the step runs standalone (code tests)."""
     def _print(*values, sep=" ", end="\n"):
         stdout.write(sep.join(str(value) for value in values) + end)
 
     builtins = _safe_builtins()
     builtins["__import__"] = _guarded_import
     builtins["print"] = _print
-    return {"__builtins__": builtins, "input": input_value}
+    return {"__builtins__": builtins, "input": input_value,
+            "steps": _json_safe(steps_value) if steps_value is not None else {}}
 
 
 def _compile_snippet(source):
@@ -180,7 +187,7 @@ def _capped_text(text, limit=_OUTPUT_PART_LIMIT):
     return text[:limit] + f"\n[truncated, {len(text)} chars total]"
 
 
-def run_code(action, event):
+def run_code(action, event, steps=None):
     """Execute the snippet and return what happened for the run record."""
     source = action.get("code")
     if not isinstance(source, str) or not source.strip():
@@ -189,7 +196,7 @@ def run_code(action, event):
     exec_code, tail_code = _compile_snippet(source)
 
     stdout = io.StringIO()
-    sandbox = _sandbox_for(event.get("data") or {}, stdout)
+    sandbox = _sandbox_for(event.get("data") or {}, stdout, steps)
     outcome = {}
     thread = threading.Thread(
         target=_run, args=(sandbox, exec_code, tail_code, outcome),
@@ -236,11 +243,12 @@ function __capture() {
 }
 var console = {log: __capture, info: __capture, warn: __capture, error: __capture};
 var __input = __INPUT_JSON__;
+var __steps = __STEPS_JSON__;
 var __outcome = (function () {
   try {
-    var result = (function (input) {
+    var result = (function (input, steps) {
 __SOURCE__
-    })(__input);
+    })(__input, __steps);
     return {ok: true, result: result === undefined ? null : result};
   } catch (e) {
     return {ok: false, error: String(e && e.name ? e.name + ": " + e.message : e)};
@@ -251,16 +259,18 @@ JSON.stringify({ok: __outcome.ok, result: __outcome.result,
 """
 
 
-def _js_script(source, data):
+def _js_script(source, data, steps=None):
     """The harness around one snippet: input as a JSON literal, a capturing
     console, and the outcome JSON-stringified so it round-trips as plain
     data (syntax errors fail the whole script and surface as JSParseException)."""
     return _JS_HARNESS.replace("__INPUT_JSON__", json.dumps(data or {})).replace(
+        "__STEPS_JSON__", json.dumps(_json_safe(steps) if steps is not None else {})
+    ).replace(
         "__SOURCE__", source
     )
 
 
-def run_js(action, event):
+def run_js(action, event, steps=None):
     """Execute the JavaScript snippet and return what happened for the run
     record — the same ``{"result", "stdout"}`` shape as the Python flavor."""
     source = action.get("code")
@@ -283,7 +293,7 @@ def run_js(action, event):
     context = MiniRacer()
     context.set_hard_memory_limit(_JS_MEMORY_LIMIT_BYTES)
     try:
-        raw = context.eval(_js_script(source, event.get("data") or {}), timeout=timeout)
+        raw = context.eval(_js_script(source, event.get("data") or {}, steps), timeout=timeout)
     except JSTimeoutException:
         raise RuntimeError(
             f"code step timed out after {timeout:g}s (limit {MAX_TIMEOUT_SECONDS:g}s)"
