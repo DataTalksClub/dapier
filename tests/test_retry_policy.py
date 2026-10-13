@@ -276,7 +276,7 @@ def test_handler_without_a_retry_key_keeps_todays_behavior(monkeypatch):
             {"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}, None)
 
     assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
-    assert notified == [EVENT]
+    assert notified == []
     assert queue.messages == []
 
 

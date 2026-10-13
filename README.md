@@ -74,7 +74,8 @@ signature of the request body.
 Failed runs email the operator by default (the `NotifyEmail` deployment
 parameter) and appear on the console Home page, grouped by workflow. A
 workflow can override recipients with a top-level `notify` list; an explicit
-`notify: []` opts that workflow out. Each failed run sends one SES email
+`notify: []` opts that workflow out. Queue failures stay quiet for the first
+two attempts; after the third failed attempt each run sends one SES email
 (workflow id, run id, failing step's error); SQS redeliveries of the same
 record never re-notify:
 
@@ -126,9 +127,10 @@ A workflow can also retry its own transient action failures with a top-level
 `retry` mapping: `attempts` is the total try count (1–5) and `backoff_seconds`
 the delay between tries (1–900). The failed event is re-enqueued on the event
 queue with that delay; run history shows the attempt count, and once the
-attempts are exhausted the failure notification above fires as usual. Steps
+attempts are exhausted the record enters queue redrive; a failure notice
+is sent once at least three attempts have failed. Steps
 that handle their own failure (`on_fail`/`on_error`) are unaffected, and a
-workflow without the key gets exactly one attempt:
+workflow without the key uses SQS redelivery instead of scheduled retries:
 
 ```yaml
 retry: {attempts: 3, backoff_seconds: 120}

@@ -103,6 +103,15 @@ def _message_attempt(record):
         return 0
 
 
+def _notification_attempt(record):
+    """Scheduled attempts plus this message's native queue deliveries."""
+    try:
+        receives = max(1, int((record.get("attributes") or {}).get("ApproximateReceiveCount", "1")))
+    except (TypeError, ValueError):
+        receives = 1
+    return max(0, _message_attempt(record)) + receives
+
+
 class LeaseBusy(Exception):
     """A redelivery hit a step whose processing lease is still live.
 
@@ -978,8 +987,11 @@ def handler(event, _context):
                 continue
             inbox.complete(inbox_id, None, error=exc)
             _note_schedule_fire(payload, "failed", _failed_workflow(exc), exc)
-            _emit_failure_notice(exc, payload,
-                                 paused=_auto_pause_on_failure(exc, payload))
+            # Workflow retry counters count scheduled attempts; native queue
+            # receives count redeliveries when no workflow retry took over.
+            if _notification_attempt(record) >= 3:
+                _emit_failure_notice(exc, payload,
+                                     paused=_auto_pause_on_failure(exc, payload))
             failures.append({"itemIdentifier": record.get("messageId")})
         else:
             inbox.complete(inbox_id, matched)

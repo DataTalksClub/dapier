@@ -352,7 +352,7 @@ def test_handler_notifies_on_failed_queue_records(monkeypatch):
         raise exc
 
     monkeypatch.setattr(worker, "execute", boom)
-    event = {"Records": [{"messageId": "m1",
+    event = {"Records": [{"messageId": "m1", "attributes": {"ApproximateReceiveCount": "3"},
                           "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
 
     result = worker.handler(event, None)
@@ -408,7 +408,7 @@ def test_handler_skips_notifications_when_the_payload_never_parses(monkeypatch):
     result = worker.handler(event, None)
 
     assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
-    assert notified == [None]
+    assert notified == []
 
 
 def test_handler_notifies_and_reraises_for_failed_schedule_triggers(monkeypatch):
