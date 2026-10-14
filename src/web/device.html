@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Approve device — dapier</title>
+<meta name="robots" content="noindex">
+<title>Authorize device — dapier</title>
 <script src="/assets/js/theme-init.js"></script>
 <link rel="icon" href="/assets/favicon.svg">
 <link rel="stylesheet" href="/assets/vendor/dakit.css">
@@ -13,20 +14,14 @@
 </head>
 <body>
 <main class="device-card">
-  <h1>Approve device</h1>
-  <p class="device-lede">A <code>dapier</code> CLI asked to sign in as you.
-  Enter the code it shows, or follow the link it printed.</p>
   <p id="device-identity" class="device-fineprint" role="status">Checking your signed-in identity…</p>
-  <form id="pair-form">
-    <input id="pair-code" name="code" inputmode="text" autocomplete="off"
-           spellcheck="false" maxlength="9" placeholder="XXXX-XXXX"
-           aria-label="Pairing code" required>
-    <button type="submit" id="pair-button">Approve</button>
-  </form>
-  <p id="pair-status" class="device-status" role="status"></p>
-  <p class="device-fineprint">Approving signs the CLI in as your DTC identity.
-  It can only act where your grants allow it, and you can undo it with
-  <code>dapier auth logout</code>.</p>
+  <header class="device-head">
+    <h1 id="device-title" tabindex="-1">Authorize a device</h1>
+    <p id="device-lede" class="device-lede">A <code>dapier</code> CLI asked to sign in as you.
+    Enter the code shown in your terminal.</p>
+  </header>
+  <div id="device-body"></div>
+  <footer id="device-foot" class="device-fineprint"></footer>
 </main>
 <script src="/assets/js/device.js"></script>
 </body>
