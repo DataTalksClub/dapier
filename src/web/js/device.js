@@ -16,6 +16,29 @@
   var SEPARATORS = /[\s\-–—._]/g;
   var CODE_LIFETIME_MINUTES = 15;
 
+  /* ---- canonical host ---- */
+
+  // The CLI can be pointed at a raw API host; this page is only useful on
+  // the canonical console origin, where the sign-in session cookie lives.
+  // Raw AWS API hosts bounce there (keeping the code); every other host --
+  // canonical, localhost, a custom domain -- is left alone.
+  var CANONICAL_ORIGIN = "https://dapier.dtcdev.click";
+
+  function isRawApiHost(hostname) {
+    return typeof hostname === "string" &&
+      (hostname.indexOf(".lambda-url.") !== -1 ||
+       hostname.slice(-7) === ".on.aws" ||
+       hostname.indexOf(".execute-api.") !== -1);
+  }
+
+  function canonicalDeviceRedirect(hostname, rawCode) {
+    if (!isRawApiHost(hostname)) return null;
+    return CANONICAL_ORIGIN + "/device" +
+      (rawCode ? "?code=" + encodeURIComponent(rawCode) : "");
+  }
+
+  /* ---- end canonical host ---- */
+
   var title = document.getElementById("device-title");
   var lede = document.getElementById("device-lede");
   var body = document.getElementById("device-body");
@@ -451,6 +474,11 @@
   var params = new URLSearchParams(window.location.search);
   code = formatCode(params.get("code") || "");
   prefilled = Boolean(code);
+  var bounce = canonicalDeviceRedirect(window.location.hostname, code);
+  if (bounce) {
+    window.location.replace(bounce);
+    return;
+  }
   if (code) history.replaceState(null, "", "/device");
   updateIdentity();
   render();
