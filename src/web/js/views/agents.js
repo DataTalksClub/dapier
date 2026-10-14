@@ -46,7 +46,8 @@ function renderList() {
     button.setAttribute('aria-pressed', String(button.dataset.agentFilter === filter));
     button.querySelector('.dk-filter-chip__count').textContent = counts[button.dataset.agentFilter];
   });
-  $('#agent-runs-note').textContent = fetched ? `${rows.length} shown${tasks.length === 200 ? ' · newest 200 loaded' : ''}` : 'Loading runs…';
+  /* The filter chips carry the counts; the note only says what is partial. */
+  $('#agent-runs-note').textContent = fetched ? (tasks.length === 200 ? 'Newest 200 loaded' : '') : 'Loading runs…';
   $('#agent-runs-list').innerHTML = rows.length ? rows.map(task => `<button type="button" class="agent-run-item ${task.task_id === selected ? 'selected' : ''}" data-agent-task="${escapeHtml(task.task_id).replace(/"/g, '&quot;')}" aria-current="${task.task_id === selected ? 'true' : 'false'}">
     <span class="agent-run-line"><strong title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</strong>${badge(task)}</span>
     <span class="agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span>${when(task.created_at)}</span>
