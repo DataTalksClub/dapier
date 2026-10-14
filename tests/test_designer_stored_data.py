@@ -22,7 +22,7 @@ BUNDLE_CSS = ROOT / "src" / "web" / "designer.css"
 def test_panel_lists_sets_and_deletes_through_the_storage_api():
     panel = PANEL_TSX.read_text()
     assert "`/storage/${encodeURIComponent(workflowId)}`" in panel
-    assert "?prefix=${encodeURIComponent(nextPrefix)}" in panel
+    assert "?prefix=${encodeURIComponent(prefix)}" in panel
     assert 'method: "POST"' in panel and "ttl_seconds" in panel
     assert "?key=${encodeURIComponent(itemKey)}`, { method: \"DELETE\" }" in panel
     # Expiry and the last write show on every listed key.
@@ -31,13 +31,18 @@ def test_panel_lists_sets_and_deletes_through_the_storage_api():
 
 def test_app_offers_the_panel_only_for_saved_workflows_with_storage_steps():
     app = APP_TSX.read_text()
-    assert 'import { StoredDataPanel, workflowUsesStorage } from "./StoredData";' in app
+    assert 'import { StoredDataPanel, listStoredItems, workflowUsesStorage, type StoredItem } from "./StoredData";' in app
     assert re.search(
         r'config\.mode === "console" && !!sourceName && workflowUsesStorage\(', app)
     # The panel talks to /api/admin (not the designer's own prefix) and is
     # keyed by the saved workflow id.
     assert 'api<T>(config, path, init, "/api/admin")' in app
     assert "<StoredDataPanel workflowId={savedId}" in app
+    # Load before open: the button lists the keys (busy meanwhile) and the
+    # panel mounts with them; it never opens on a loading line.
+    assert "listStoredItems(storageRequest, savedId, \"\", signal)" in app
+    assert "initialItems={storedItems}" in app
+    assert "Loading keys" not in PANEL_TSX.read_text()
     assert "{storedDataAvailable && (" in app
 
 

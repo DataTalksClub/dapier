@@ -14237,6 +14237,7 @@
   }
   var clientExports = requireClient();
   var reactExports = requireReact();
+  var reactDomExports = requireReactDom();
   const ICON_NODES = {
     "arrow-left": "<path d='m 12 19 -7 -7 7 -7'/><path d='M 19 12 H 5'/>",
     "arrow-right": "<path d='M 5 12 h 14'/><path d='m 12 5 7 7 -7 7'/>",
@@ -22583,11 +22584,19 @@
     const date = new Date(expires * 1e3);
     return Number.isNaN(date.getTime()) ? { text: `Expires ${expires}` } : { text: `Expires ${shortTime(date)}`, title: date.toISOString() };
   }
-  function StoredDataPanel({ workflowId, request, onClose }) {
+  function storageBase(workflowId) {
+    return `/storage/${encodeURIComponent(workflowId)}`;
+  }
+  async function listStoredItems(request, workflowId, prefix = "", signal) {
+    const query = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+    const data = await request(`${storageBase(workflowId)}${query}`, signal ? { signal } : void 0);
+    return data.items ?? [];
+  }
+  function StoredDataPanel({ workflowId, request, initialItems, onClose }) {
     const ids = reactExports.useId();
-    const base = `/storage/${encodeURIComponent(workflowId)}`;
+    const base = storageBase(workflowId);
     const [prefix, setPrefix] = reactExports.useState("");
-    const [items, setItems] = reactExports.useState(null);
+    const [items, setItems] = reactExports.useState(initialItems);
     const [listing, setListing] = reactExports.useState(false);
     const [error, setError] = reactExports.useState("");
     const [notice, setNotice] = reactExports.useState("");
@@ -22602,18 +22611,21 @@
       setListing(true);
       setError("");
       try {
-        const query = nextPrefix ? `?prefix=${encodeURIComponent(nextPrefix)}` : "";
-        const data = await request(`${base}${query}`);
+        const listed = await listStoredItems(request, workflowId, nextPrefix);
         listedPrefix.current = nextPrefix;
-        setItems(data.items ?? []);
+        setItems(listed);
       } catch (problem) {
         setError(problem instanceof Error ? problem.message : String(problem));
       } finally {
         setListing(false);
       }
-    }, [base, request]);
+    }, [workflowId, request]);
+    const mounted = reactExports.useRef(false);
     reactExports.useEffect(() => {
-      setItems(null);
+      if (!mounted.current) {
+        mounted.current = true;
+        return;
+      }
       setExpanded({});
       setNotice("");
       void list("");
@@ -22687,7 +22699,7 @@
         }
       ),
       (error || notice) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: error ? "stored-status error" : "stored-status", role: error ? "alert" : "status", children: error || notice }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stored-register", children: items === null ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "stored-empty-line", children: listing ? "Loading keys…" : "Keys could not be listed." }) : items.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stored-empty", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stored-register", children: items.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stored-empty", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: listedPrefix.current ? `No keys under ${listedPrefix.current}` : "No stored keys" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Keys appear as this workflow’s storage steps run. Store one below to try it." })
       ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "stored-list", "aria-label": "Stored keys", children: items.map((item) => {
@@ -22960,7 +22972,7 @@
   const NEW_WORKFLOW_ID = "new-workflow";
   function useMountedModal() {
     const ref = reactExports.useRef(null);
-    reactExports.useEffect(() => {
+    reactExports.useLayoutEffect(() => {
       const el = ref.current;
       if (el && !el.open) el.showModal();
     }, []);
@@ -23134,7 +23146,7 @@
     ] });
   }
   function FieldInput({ field, value, onChange, connections, fields, siblingFields, config, nodeType }) {
-    const [discovering, setDiscovering] = reactExports.useState(false);
+    const [pickerItems, setPickerItems] = reactExports.useState(null);
     if (field.type === "boolean") {
       return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "check-label", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23227,7 +23239,28 @@
                 onChange: (event) => onChange(event.target.value)
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "dk-button quiet", type: "button", disabled: !account, onClick: () => setDiscovering(true), children: "Browse…" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "dk-button quiet",
+                type: "button",
+                disabled: !account,
+                onClick: (event) => {
+                  const resource = discover.resource.replace(/_/g, " ");
+                  const path = discoveryPath(discover, account, fields ?? {});
+                  void dakitDialogs.openWhenReady(
+                    event.currentTarget,
+                    (signal) => api(config, path, { signal }, adminBase(config)).then((data) => data.items ?? []),
+                    // The picker mounts and opens itself (useMountedModal) inside flushSync.
+                    (items) => {
+                      reactDomExports.flushSync(() => setPickerItems(items));
+                    },
+                    { label: `Loading ${resource}…`, errorMessage: (error) => `Couldn't load ${resource}: ${error.message}` }
+                  );
+                },
+                children: "Browse…"
+              }
+            )
           ] }),
           !account && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "connection-hint", children: [
             "Set ",
@@ -23235,18 +23268,16 @@
             " first"
           ] })
         ] }),
-        account && discovering && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        pickerItems && /* @__PURE__ */ jsxRuntimeExports.jsx(
           DiscoveryPicker,
           {
-            config,
             discover,
-            accountId: account,
-            fields: fields ?? {},
+            items: pickerItems,
             onPick: (picked) => {
-              setDiscovering(false);
+              setPickerItems(null);
               onChange(picked);
             },
-            onClose: () => setDiscovering(false)
+            onClose: () => setPickerItems(null)
           }
         )
       ] });
@@ -23881,37 +23912,24 @@
   function applyTemplate(template, item) {
     return template.replace(/\{(\w+)\}/g, (_, key) => String(item[key] ?? ""));
   }
-  function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose }) {
-    const [items, setItems] = reactExports.useState(null);
-    const [error, setError] = reactExports.useState("");
-    const [query, setQuery] = reactExports.useState("");
-    const adminBase = config.apiBase.replace(/\/designer$/, "");
+  function adminBase(config) {
+    return config.apiBase.replace(/\/designer$/, "");
+  }
+  function discoveryPath(discover, accountId, fields) {
     const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
-    const url = reactExports.useMemo(() => {
-      const params = new URLSearchParams();
-      for (const [param, key] of Object.entries(discover.params ?? {})) {
-        const val = (fields[key] ?? "").trim();
-        if (val) params.set(param, val);
-      }
-      const qs = params.toString();
-      return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
-    }, [accountPath, discover.resource, discover.params, fields]);
-    reactExports.useEffect(() => {
-      let cancelled = false;
-      setItems(null);
-      setError("");
-      api(config, url, void 0, adminBase).then((data) => {
-        if (!cancelled) setItems(data.items ?? []);
-      }).catch((err) => {
-        if (!cancelled) setError(String(err));
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [config, url, adminBase]);
+    const params = new URLSearchParams();
+    for (const [param, key] of Object.entries(discover.params ?? {})) {
+      const val = (fields[key] ?? "").trim();
+      if (val) params.set(param, val);
+    }
+    const qs = params.toString();
+    return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
+  }
+  function DiscoveryPicker({ discover, items, onPick, onClose }) {
+    const [query, setQuery] = reactExports.useState("");
     const dialogRef = useMountedModal();
     const needle = query.trim().toLowerCase();
-    const matches = (items ?? []).filter((item) => !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
+    const matches = items.filter((item) => !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
     const resource = discover.resource.replace(/_/g, " ");
     return /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "dialog",
@@ -23939,9 +23957,7 @@
                 onChange: (event) => setQuery(event.target.value)
               }
             ),
-            error && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-error", role: "alert", children: error }),
-            !error && items === null && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "picker-status", children: "Loading…" }),
-            items !== null && matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
+            matches.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "picker-status", children: [
               "No ",
               resource,
               " found"
@@ -24132,6 +24148,7 @@
     const [draftInfo, setDraftInfo] = reactExports.useState(null);
     const [testOpen, setTestOpen] = reactExports.useState(false);
     const [storedOpen, setStoredOpen] = reactExports.useState(false);
+    const [storedItems, setStoredItems] = reactExports.useState([]);
     const [testEvent, setTestEvent] = reactExports.useState('{\n  "title": "Sample event"\n}');
     const [testBusy, setTestBusy] = reactExports.useState(false);
     const [testStrict, setTestStrict] = reactExports.useState(false);
@@ -24726,12 +24743,12 @@
         return;
       }
       let cancelled = false;
-      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      const adminBase2 = config.apiBase.replace(/\/designer$/, "");
       api(
         config,
         `/triggers/sample?workflow=${encodeURIComponent(workflowId)}`,
         void 0,
-        adminBase
+        adminBase2
       ).then((payload) => {
         if (cancelled) return;
         const data = payload.data && typeof payload.data === "object" ? payload.data : {};
@@ -25112,7 +25129,7 @@
         setStatus({ kind: "error", message: "Add a trigger node first — the sample is pulled for its connector." });
         return;
       }
-      const adminBase = config.apiBase.replace(/\/designer$/, "");
+      const adminBase2 = config.apiBase.replace(/\/designer$/, "");
       setSampleBusy(true);
       try {
         const pulled = await api(
@@ -25126,7 +25143,7 @@
               connection_id: trigger.fields?.connection_id || void 0
             })
           },
-          adminBase
+          adminBase2
         );
         const sample = pulled.sample ?? {};
         const data = sample.data;
@@ -26278,9 +26295,23 @@
                   className: storedOpen ? "dk-button dk-button--secondary active" : "dk-button dk-button--secondary",
                   type: "button",
                   "aria-pressed": storedOpen,
-                  onClick: () => {
-                    setTestOpen(false);
-                    setStoredOpen(!storedOpen);
+                  onClick: (event) => {
+                    if (storedOpen) {
+                      setStoredOpen(false);
+                      return;
+                    }
+                    void dakitDialogs.openWhenReady(
+                      event.currentTarget,
+                      (signal) => listStoredItems(storageRequest, savedId, "", signal),
+                      (items) => {
+                        reactDomExports.flushSync(() => {
+                          setTestOpen(false);
+                          setStoredItems(items);
+                          setStoredOpen(true);
+                        });
+                      },
+                      { label: "Loading stored data…", errorMessage: (error) => `Couldn't list stored keys: ${error.message}` }
+                    );
                   },
                   disabled: view === "yaml",
                   title: view === "yaml" ? "Switch to Canvas to see stored data" : "The keys this workflow's storage steps read and write",
@@ -26464,7 +26495,7 @@
               ] }, `${step.action_id}-${index}`))
             ] })
           ] }),
-          storedOpen && storedDataAvailable && /* @__PURE__ */ jsxRuntimeExports.jsx(StoredDataPanel, { workflowId: savedId, request: storageRequest, onClose: () => setStoredOpen(false) }),
+          storedOpen && storedDataAvailable && /* @__PURE__ */ jsxRuntimeExports.jsx(StoredDataPanel, { workflowId: savedId, request: storageRequest, initialItems: storedItems, onClose: () => setStoredOpen(false) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: selected?.type === "node" ? "inspector" : "inspector empty", children: [
             selected?.type === "node" && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button inspector-close", type: "button", "aria-label": "Close panel", onClick: () => setSelectedId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 20, strokeWidth: 1.8 }) }),
             selected?.type === "node" && selected.data ? /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: `inspector-head ${selected.data.nodeKind === "trigger" ? "kind-trigger" : "kind-action"}`, children: [

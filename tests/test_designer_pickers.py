@@ -106,3 +106,16 @@ def test_hints_map_required_params_to_sibling_fields(resource, required):
             assert f'"{required}"' in match.group(0), (
                 f"the {resource} hint must map the required param "
                 f"'{required}' to a sibling field")
+
+
+def test_browse_loads_the_items_before_the_picker_opens():
+    """dakit load-before-open: Browse… goes busy while discovery answers and
+    the picker mounts with its items; it never opens on "Loading…"."""
+    app = (CATALOG_TS.parent / "App.tsx").read_text()
+    picker = app[app.index("function DiscoveryPicker("):app.index("function RawJsonInput(")]
+    assert "Loading" not in picker
+    assert "useEffect" not in picker  # no fetch after mount
+    browse = app[app.index("const path = discoveryPath(discover, account, fields ?? {});"):]
+    browse = browse[:browse.index("Browse…")]
+    assert "dakitDialogs.openWhenReady(" in browse and "event.currentTarget" in browse
+    assert "flushSync(() => setPickerItems(items))" in browse

@@ -3273,11 +3273,6 @@ input[type="checkbox"], input[type="radio"] {
   font-size: var(--dk-text-sm);
 }
 
-.picker-error {
-  color: var(--dk-danger-text);
-  font-size: var(--dk-text-sm);
-}
-
 .picker-list {
   border-top: 1px solid var(--dk-border-default);
   display: flex;
@@ -3540,8 +3535,7 @@ input[type="checkbox"], input[type="radio"] {
 .stored-delete { flex: none; }
 .stored-empty { padding: var(--dk-space-4); }
 .stored-empty h3 { font-size: var(--dk-text-lg); font-weight: 600; margin: 0 0 var(--dk-space-1); }
-.stored-empty p, .stored-empty-line { color: var(--dk-text-muted); font-size: var(--dk-text-sm); margin: 0; }
-.stored-empty-line { padding: var(--dk-space-4); }
+.stored-empty p { color: var(--dk-text-muted); font-size: var(--dk-text-sm); margin: 0; }
 
 .stored-form { border-top: 1px solid var(--dk-border-default); display: flex; flex-direction: column; gap: var(--dk-space-3); padding-top: var(--dk-space-4); }
 .stored-form h3 { font-size: var(--dk-text-body); font-weight: 600; margin: 0; }

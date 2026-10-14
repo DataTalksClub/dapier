@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useId } from "react";
+import { flushSync } from "react-dom";
 import { ClipboardCopy, CloudDownload, Copy, FlaskConical, GitBranch, GitMerge, Keyboard, Loader2, Menu, Play, RotateCcw, RotateCw, Trash2, TriangleAlert, Workflow as WorkflowIcon, X } from "./icons";
 import { dump, load } from "js-yaml";
 import { WorkflowBoard } from "./board/WorkflowBoard";
@@ -9,9 +10,21 @@ import { NODE_HEIGHT, NODE_WIDTH, actionMeta, connectorLabel, connectorMeta, dec
 import type { CatalogField } from "./catalog";
 import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
-import { StoredDataPanel, workflowUsesStorage } from "./StoredData";
+import { StoredDataPanel, listStoredItems, workflowUsesStorage, type StoredItem } from "./StoredData";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 import "../../src/web/vendor/dakit-dialogs.js";
+
+/** dakit's load-before-open helper (vendor/dakit-dialogs.js, docs/dialog-loading.md). */
+declare global {
+  var dakitDialogs: {
+    openWhenReady<T>(
+      trigger: Element,
+      load: (signal: AbortSignal) => T | Promise<T>,
+      render: (data: T, signal: AbortSignal) => HTMLDialogElement | void | Promise<HTMLDialogElement | void>,
+      options?: { label?: string; spinner?: "inline" | "overlay"; errorMessage?: string | ((error: Error) => string) },
+    ): Promise<unknown>;
+  };
+}
 
 const EMPTY_SHAPES: DiagramShape[] = [];
 /** The id a never-saved canvas carries until the API assigns one from its name. */
@@ -21,7 +34,7 @@ const NEW_WORKFLOW_ID = "new-workflow";
     come from the vendored dakit helper; the caller unmounts on close. */
 function useMountedModal() {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (el && !el.open) el.showModal();
   }, []);
@@ -217,7 +230,9 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
   /** The step's action type, which picks the service in a connection reference. */
   nodeType?: string;
 }) {
-  const [discovering, setDiscovering] = useState(false);
+  // The Browse… picker's items: null while closed. The picker mounts only
+  // once its items are in (load before open).
+  const [pickerItems, setPickerItems] = useState<DiscoveryItem[] | null>(null);
   if (field.type === "boolean") {
     return (
       <label className="check-label">
@@ -322,7 +337,23 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
               placeholder={field.placeholder}
               onChange={(event) => onChange(event.target.value)}
             />
-            <button className="dk-button quiet" type="button" disabled={!account} onClick={() => setDiscovering(true)}>
+            <button
+              className="dk-button quiet"
+              type="button"
+              disabled={!account}
+              onClick={(event) => {
+                const resource = discover.resource.replace(/_/g, " ");
+                const path = discoveryPath(discover, account, fields ?? {});
+                void dakitDialogs.openWhenReady(
+                  event.currentTarget,
+                  (signal) => api<{ items: DiscoveryItem[] }>(config, path, { signal }, adminBase(config))
+                    .then((data) => data.items ?? []),
+                  // The picker mounts and opens itself (useMountedModal) inside flushSync.
+                  (items) => { flushSync(() => setPickerItems(items)); },
+                  { label: `Loading ${resource}…`, errorMessage: (error) => `Couldn't load ${resource}: ${error.message}` },
+                );
+              }}
+            >
               Browse…
             </button>
           </span>
@@ -332,17 +363,15 @@ function FieldInput({ field, value, onChange, connections, fields, siblingFields
             </span>
           )}
         </label>
-        {account && discovering && (
+        {pickerItems && (
           <DiscoveryPicker
-            config={config}
             discover={discover}
-            accountId={account}
-            fields={fields ?? {}}
+            items={pickerItems}
             onPick={(picked) => {
-              setDiscovering(false);
+              setPickerItems(null);
               onChange(picked);
             }}
-            onClose={() => setDiscovering(false)}
+            onClose={() => setPickerItems(null)}
           />
         )}
       </>
@@ -1046,44 +1075,38 @@ function applyTemplate(template: string, item: DiscoveryItem): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(item[key] ?? ""));
 }
 
-/** Modal browser over the discovery API for one field's resources. Mounts
-    open, fetches once, and applies the picked template through onPick. */
-function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose }: {
-  config: DesignerConfig;
+/** Discovery answers on /api/admin, not the designer prefix. */
+function adminBase(config: DesignerConfig): string {
+  return config.apiBase.replace(/\/designer$/, "");
+}
+
+/** The discovery route for one field's resources. Only the tag's declared
+    discovery params ride along, resolved from their sibling fields; the
+    backend rejects any other query param with a 400. */
+function discoveryPath(discover: NonNullable<CatalogField["discover"]>, accountId: string, fields: Record<string, string>): string {
+  const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
+  const params = new URLSearchParams();
+  for (const [param, key] of Object.entries(discover.params ?? {})) {
+    const val = (fields[key] ?? "").trim();
+    if (val) params.set(param, val);
+  }
+  const qs = params.toString();
+  return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
+}
+
+/** Modal browser over one field's discovered resources. Mounts open with the
+    items already loaded (the Browse… button loads them first) and applies
+    the picked template through onPick. */
+function DiscoveryPicker({ discover, items, onPick, onClose }: {
   discover: NonNullable<CatalogField["discover"]>;
-  accountId: string;
-  fields: Record<string, string>;
+  items: DiscoveryItem[];
   onPick: (value: string) => void;
   onClose: () => void;
 }) {
-  const [items, setItems] = useState<DiscoveryItem[] | null>(null);
-  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const adminBase = config.apiBase.replace(/\/designer$/, "");
-  const accountPath = `/connections/${encodeURIComponent(accountId)}/discover`;
-  // Only the tag's declared discovery params ride along, resolved from their
-  // sibling fields; the backend rejects any other query param with a 400.
-  const url = useMemo(() => {
-    const params = new URLSearchParams();
-    for (const [param, key] of Object.entries(discover.params ?? {})) {
-      const val = (fields[key] ?? "").trim();
-      if (val) params.set(param, val);
-    }
-    const qs = params.toString();
-    return qs ? `${accountPath}/${discover.resource}?${qs}` : `${accountPath}/${discover.resource}`;
-  }, [accountPath, discover.resource, discover.params, fields]);
-  useEffect(() => {
-    let cancelled = false;
-    setItems(null);
-    setError("");
-    api<{ items: DiscoveryItem[] }>(config, url, undefined, adminBase)
-      .then((data) => { if (!cancelled) setItems(data.items ?? []); })
-      .catch((err) => { if (!cancelled) setError(String(err)); });
-    return () => { cancelled = true; };
-  }, [config, url, adminBase]);
   const dialogRef = useMountedModal();
   const needle = query.trim().toLowerCase();
-  const matches = (items ?? []).filter((item) =>
+  const matches = items.filter((item) =>
     !needle || `${item.name} ${item.id}`.toLowerCase().includes(needle));
   const resource = discover.resource.replace(/_/g, " ");
   return (
@@ -1105,9 +1128,7 @@ function DiscoveryPicker({ config, discover, accountId, fields, onPick, onClose 
           autoFocus
           onChange={(event) => setQuery(event.target.value)}
         />
-        {error && <p className="picker-error" role="alert">{error}</p>}
-        {!error && items === null && <p className="picker-status">Loading…</p>}
-        {items !== null && matches.length === 0 && <p className="picker-status">No {resource} found</p>}
+        {matches.length === 0 && <p className="picker-status">No {resource} found</p>}
         <div className="picker-list">
           {matches.map((item) => (
             <button
@@ -1349,6 +1370,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   /** The Stored data panel (StoredData.tsx): the saved workflow's
       key-value state, offered only when a step reads or writes it. */
   const [storedOpen, setStoredOpen] = useState(false);
+  /** The keys the Stored data button listed before opening the panel. */
+  const [storedItems, setStoredItems] = useState<StoredItem[]>([]);
   const [testEvent, setTestEvent] = useState("{\n  \"title\": \"Sample event\"\n}");
   const [testBusy, setTestBusy] = useState(false);
   const [testStrict, setTestStrict] = useState(false);
@@ -3686,7 +3709,17 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
                 className={storedOpen ? "dk-button dk-button--secondary active" : "dk-button dk-button--secondary"}
                 type="button"
                 aria-pressed={storedOpen}
-                onClick={() => { setTestOpen(false); setStoredOpen(!storedOpen); }}
+                onClick={(event) => {
+                  if (storedOpen) { setStoredOpen(false); return; }
+                  void dakitDialogs.openWhenReady(
+                    event.currentTarget,
+                    (signal) => listStoredItems(storageRequest, savedId, "", signal),
+                    (items) => {
+                      flushSync(() => { setTestOpen(false); setStoredItems(items); setStoredOpen(true); });
+                    },
+                    { label: "Loading stored data…", errorMessage: (error) => `Couldn't list stored keys: ${error.message}` },
+                  );
+                }}
                 disabled={view === "yaml"}
                 title={view === "yaml" ? "Switch to Canvas to see stored data" : "The keys this workflow's storage steps read and write"}
               >
@@ -3870,7 +3903,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             </section>
           )}
           {storedOpen && storedDataAvailable && (
-            <StoredDataPanel workflowId={savedId} request={storageRequest} onClose={() => setStoredOpen(false)} />
+            <StoredDataPanel workflowId={savedId} request={storageRequest} initialItems={storedItems} onClose={() => setStoredOpen(false)} />
           )}
           {/* "empty" lets the narrow-frame layout drop the panel until a node
              is selected — on a phone the hints would cost half the canvas. */}

@@ -44,15 +44,30 @@ function expiryLabel(expires?: number | null): { text: string; title?: string } 
   return Number.isNaN(date.getTime()) ? { text: `Expires ${expires}` } : { text: `Expires ${shortTime(date)}`, title: date.toISOString() };
 }
 
-export function StoredDataPanel({ workflowId, request, onClose }: {
+function storageBase(workflowId: string): string {
+  return `/storage/${encodeURIComponent(workflowId)}`;
+}
+
+/** Lists a workflow's stored keys, optionally under a prefix. */
+export async function listStoredItems(request: Request, workflowId: string, prefix = "", signal?: AbortSignal): Promise<StoredItem[]> {
+  const query = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+  const data = await request<{ items?: StoredItem[] }>(`${storageBase(workflowId)}${query}`, signal ? { signal } : undefined);
+  return data.items ?? [];
+}
+
+/** Opens with `initialItems` already listed: the Stored data button loads
+    them before the panel mounts, so the panel never opens on a loading line
+    and then grows (dakit load-before-open). */
+export function StoredDataPanel({ workflowId, request, initialItems, onClose }: {
   workflowId: string;
   request: Request;
+  initialItems: StoredItem[];
   onClose: () => void;
 }) {
   const ids = useId();
-  const base = `/storage/${encodeURIComponent(workflowId)}`;
+  const base = storageBase(workflowId);
   const [prefix, setPrefix] = useState("");
-  const [items, setItems] = useState<StoredItem[] | null>(null);
+  const [items, setItems] = useState<StoredItem[]>(initialItems);
   const [listing, setListing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -68,20 +83,25 @@ export function StoredDataPanel({ workflowId, request, onClose }: {
     setListing(true);
     setError("");
     try {
-      const query = nextPrefix ? `?prefix=${encodeURIComponent(nextPrefix)}` : "";
-      const data = await request<{ items?: StoredItem[] }>(`${base}${query}`);
+      const listed = await listStoredItems(request, workflowId, nextPrefix);
       listedPrefix.current = nextPrefix;
-      setItems(data.items ?? []);
+      setItems(listed);
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : String(problem));
     } finally {
       setListing(false);
     }
-  }, [base, request]);
+  }, [workflowId, request]);
 
-  // Opening the panel (or switching workflows under it) lists every key.
+  // Switching workflows under the open panel relists (List keys shows the
+  // spinner meanwhile); the first render already has the keys the button
+  // loaded.
+  const mounted = useRef(false);
   useEffect(() => {
-    setItems(null);
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     setExpanded({});
     setNotice("");
     void list("");
@@ -159,9 +179,7 @@ export function StoredDataPanel({ workflowId, request, onClose }: {
       )}
 
       <div className="stored-register">
-        {items === null ? (
-          <p className="stored-empty-line">{listing ? "Loading keys…" : "Keys could not be listed."}</p>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="stored-empty">
             <h3>{listedPrefix.current ? `No keys under ${listedPrefix.current}` : "No stored keys"}</h3>
             <p>Keys appear as this workflow&rsquo;s storage steps run. Store one below to try it.</p>
