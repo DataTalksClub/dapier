@@ -148,7 +148,7 @@ def test_login_device_polls_until_approved(isolated_home, monkeypatch):
     sleeps = []
     session = auth.login_device("https://api.example.test", sleeper=sleeps.append, timeout=30)
     assert session["token"] == "dapd_tok"
-    assert len(polls) == 3 and len(sleeps) == 2
+    assert len(polls) == 3 and len(sleeps) == 3
 
 
 def test_login_device_expired_and_timeout(isolated_home, monkeypatch):
@@ -185,7 +185,7 @@ def test_login_device_honors_slow_down(isolated_home, monkeypatch):
 
     with pytest.raises(KeyboardInterrupt):
         auth.login_device("https://api.example.test", sleeper=sleeper, timeout=60)
-    assert sleeps == [4, 6]
+    assert sleeps == [5, 10]
 
 
 def test_refresh_device_session_rotates(isolated_home, monkeypatch):

@@ -21,6 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Checkout shared device login
+        uses: actions/checkout@v6
+        with:
+          repository: DataTalksClub/auth
+          path: auth
       - uses: astral-sh/setup-uv@v7
       - uses: aws-actions/setup-sam@v2
       - name: Install Chromium for the console boot test

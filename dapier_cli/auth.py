@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 from . import config
 
@@ -89,6 +90,37 @@ class DeviceFlowUnavailable(Exception):
     """The API predates device pairing; fall back to the browser flow."""
 
 
+def _shared_device_login():
+    """The polling loop lives in DataTalksClub/auth."""
+    import importlib
+    import sys
+
+    try:
+        return importlib.import_module("dtc_device_login")
+    except ImportError:
+        pass
+    roots = []
+    if os.environ.get("DTC_AUTH_HOME"):
+        roots.append(Path(os.environ["DTC_AUTH_HOME"]))
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        roots.append(parent / "auth")
+        roots.append(parent.parent / "auth")
+        if parent.name == "git" or parent == Path("/"):
+            break
+    for root in roots:
+        if (root / "dtc_device_login" / "__init__.py").is_file():
+            sys.path.insert(0, str(root))
+            return importlib.import_module("dtc_device_login")
+    raise LoginError(
+        "Shared device login was not found. Clone DataTalksClub/auth next to this repo or set DTC_AUTH_HOME."
+    )
+
+
+def _wait_seconds(timeout, expires_in):
+    return _shared_device_login().wait_seconds(timeout, 0 if expires_in is None else expires_in)
+
+
 def _post_json(url, body, bearer=None, timeout=20):
     """POST JSON, returning ``(status, parsed_body)`` without leaking tokens."""
     headers = {"content-type": "application/json"}
@@ -110,47 +142,70 @@ def _post_json(url, body, bearer=None, timeout=20):
         return exc.code, data
 
 
-def _wait_seconds(timeout, expires_in):
-    """Never give up before the code does: wait out the pairing's full life."""
-    if expires_in:
-        return max(timeout, int(expires_in) + 15)
-    return timeout
+def _device_flow_poster(poster):
+    """Speak Dapier's device API to the shared RFC 8628 loop.
+
+    Start already uses device_code and user_code. The token route still
+    returns 200 with status pending, expired, or approved, and accepts only
+    the device code.
+    """
+
+    def wrapped(url, body):
+        if str(url).endswith("/device/token"):
+            outgoing = {"device_code": body.get("device_code", "")}
+        else:
+            outgoing = body
+        status, payload = poster(url, outgoing)
+        if not str(url).endswith("/device/token") or not isinstance(payload, dict):
+            return status, payload
+        state = payload.get("status")
+        if state == "pending" and payload.get("slow_down"):
+            return 400, {"error": "slow_down"}
+        if state == "pending":
+            return 400, {"error": "authorization_pending"}
+        if state == "expired":
+            return 400, {"error": "expired_token"}
+        if state == "approved":
+            return 200, {key: value for key, value in payload.items() if key != "status"}
+        return status, payload
+
+    return wrapped
 
 
 def login_device(api_url, *, timeout=900, sleeper=time.sleep, poster=None):
     """Pair this CLI with the operator identity; returns the device session."""
-    poster = poster or _post_json
-    base = api_url.rstrip("/")
-    status, pairing = poster(f"{base}/api/agent/device/start", {})
-    if status != 200 or not pairing.get("device_code") or not pairing.get("user_code"):
-        raise LoginError("This Dapier API did not offer device pairing")
-    interval = max(int(pairing.get("interval") or 2), 1)
-    expires_in = int(pairing.get("expires_in") or 0)
-    deadline = time.time() + _wait_seconds(timeout, expires_in)
-    print(f"Open:  {base}/device")
-    print(f"Code:  {pairing['user_code']}")
-    print(f"Waiting for approval (the code is valid for {max(expires_in // 60, 1)} minutes) ...", flush=True)
-    while time.time() < deadline:
-        status, result = poster(f"{base}/api/agent/device/token", {"device_code": pairing["device_code"]})
-        if status == 200 and result.get("status") == "approved":
-            if not result.get("token"):
-                raise LoginError("The API returned an empty device session")
-            session = {
-                "token": result["token"],
-                "kind": "device",
-                "subject": result.get("subject", ""),
-                "email": result.get("email", ""),
-                "expires_at": int(result.get("expires_at") or 0),
-                "obtained_at": int(time.time()),
-            }
-            config.save_session(session)
-            return session
-        if status == 200 and result.get("status") == "expired":
-            raise LoginError("The pairing code expired; run `dapier auth login` again")
-        if result.get("slow_down"):
-            interval += 2
-        sleeper(interval)
-    raise LoginError("Timed out waiting for approval; run `dapier auth login` again")
+    poster = _device_flow_poster(poster or _post_json)
+    flow = _shared_device_login()
+    try:
+        result = flow.device_login(
+            api_url,
+            poster,
+            start_path="/api/agent/device/start",
+            token_path="/api/agent/device/token",
+            sleeper=sleeper,
+            clock=time.time,
+            timeout=timeout,
+        )
+    except flow.DeviceLoginError as exc:
+        if exc.code == "invalid_response":
+            raise LoginError("This Dapier API did not offer device pairing") from None
+        if exc.code == "expired_token":
+            raise LoginError("The pairing code expired; run `dapier auth login` again") from None
+        if exc.code == "timeout":
+            raise LoginError("Timed out waiting for approval; run `dapier auth login` again") from None
+        raise LoginError(str(exc)) from None
+    if not result.get("token"):
+        raise LoginError("The API returned an empty device session")
+    session = {
+        "token": result["token"],
+        "kind": "device",
+        "subject": result.get("subject", ""),
+        "email": result.get("email", ""),
+        "expires_at": int(result.get("expires_at") or 0),
+        "obtained_at": int(time.time()),
+    }
+    config.save_session(session)
+    return session
 
 
 def revoke_session(api_url, session):
