@@ -1,9 +1,11 @@
 """DTC shared-auth login for the CLI.
 
 Default flow: device pairing (`login_device`) — the CLI shows a short code,
-the operator approves it on the console's /device page after signing in
+the operator reviews it (machine label, requesting IP, time left) and
+approves or denies it on the console's /device page after signing in
 with the DTC identity, and the CLI polls for a dapier-issued device
-session. No localhost listener is needed. The classic browser loopback
+session over the RFC 8628 error vocabulary. No localhost listener is
+needed. The classic browser loopback
 flow (`login`, used by `dapier auth login --browser`) signs in directly
 against the shared DTC issuer and stores DTC-issued tokens instead.
 """
@@ -117,6 +119,37 @@ def _shared_device_login():
     )
 
 
+def default_label():
+    """The machine label the operator reviews on the approval page."""
+    try:
+        import getpass
+        user = getpass.getuser()
+    except Exception:
+        user = ""
+    try:
+        import socket
+        host = socket.gethostname()
+    except Exception:
+        host = ""
+    return f"{user}@{host}".strip("@") or "dapier CLI"
+
+
+def rewrite_verification_uri(raw_uri, target_base_url):
+    """Rewrite a verification URI hosted on an internal hostname (a raw
+    Lambda URL) to the origin of the API URL the operator invoked,
+    keeping the path, query and hash intact."""
+    if not raw_uri or not target_base_url:
+        return raw_uri
+    try:
+        parsed = urllib.parse.urlparse(raw_uri)
+        target = urllib.parse.urlparse(target_base_url)
+        if parsed.scheme not in ("http", "https") or                 (parsed.netloc and parsed.netloc != target.netloc):
+            return f"{target.scheme or 'https'}://{target.netloc}{parsed.path}"                 f"{'?' + parsed.query if parsed.query else ''}"                 f"{'#' + parsed.fragment if parsed.fragment else ''}"
+        return raw_uri
+    except ValueError:
+        return raw_uri
+
+
 def _wait_seconds(timeout, expires_in):
     return _shared_device_login().wait_seconds(timeout, 0 if expires_in is None else expires_in)
 
@@ -142,46 +175,21 @@ def _post_json(url, body, bearer=None, timeout=20):
         return exc.code, data
 
 
-def _device_flow_poster(poster):
-    """Speak Dapier's device API to the shared RFC 8628 loop.
+def login_device(api_url, *, timeout=900, sleeper=time.sleep, poster=None, label=None):
+    """Pair this CLI with the operator identity; returns the device session.
 
-    Start already uses device_code and user_code. The token route still
-    returns 200 with status pending, expired, or approved, and accepts only
-    the device code.
+    The machine label travels in the start body so the operator can
+    review which machine is asking before approving it.
     """
-
-    def wrapped(url, body):
-        if str(url).endswith("/device/token"):
-            outgoing = {"device_code": body.get("device_code", "")}
-        else:
-            outgoing = body
-        status, payload = poster(url, outgoing)
-        if not str(url).endswith("/device/token") or not isinstance(payload, dict):
-            return status, payload
-        state = payload.get("status")
-        if state == "pending" and payload.get("slow_down"):
-            return 400, {"error": "slow_down"}
-        if state == "pending":
-            return 400, {"error": "authorization_pending"}
-        if state == "expired":
-            return 400, {"error": "expired_token"}
-        if state == "approved":
-            return 200, {key: value for key, value in payload.items() if key != "status"}
-        return status, payload
-
-    return wrapped
-
-
-def login_device(api_url, *, timeout=900, sleeper=time.sleep, poster=None):
-    """Pair this CLI with the operator identity; returns the device session."""
-    poster = _device_flow_poster(poster or _post_json)
     flow = _shared_device_login()
     try:
         result = flow.device_login(
             api_url,
-            poster,
+            poster or _post_json,
+            start_body={"label": label or default_label()},
             start_path="/api/agent/device/start",
             token_path="/api/agent/device/token",
+            present_uri=lambda uri: rewrite_verification_uri(uri, api_url),
             sleeper=sleeper,
             clock=time.time,
             timeout=timeout,

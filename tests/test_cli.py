@@ -95,24 +95,59 @@ def device_poster(script):
 def test_login_device_happy_path(isolated_home, monkeypatch, capsys):
     poster, calls = device_poster({
         "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH",
-                                "expires_in": 900, "interval": 2}),
-        "/device/token": (200, {"status": "approved", "token": "dapd_tok",
+                                "verification_uri": "https://api.example.test/device",
+                                "verification_uri_complete": "https://api.example.test/device?code=ABCD-EFGH",
+                                "expires_in": 900, "interval": 5}),
+        "/device/token": (200, {"token": "dapd_tok",
                                 "subject": "Google_1", "email": "op@datatalks.club",
                                 "expires_at": 4102444800}),
     })
     monkeypatch.setattr(auth, "_post_json", poster)
 
-    session = auth.login_device("https://api.example.test/", sleeper=lambda seconds: None)
+    session = auth.login_device("https://api.example.test/", sleeper=lambda seconds: None,
+                                label="grace@laptop")
 
     assert session == {"token": "dapd_tok", "kind": "device", "subject": "Google_1",
                        "email": "op@datatalks.club", "expires_at": 4102444800,
                        "obtained_at": session["obtained_at"]}
     assert config.load_session() == session
     assert calls[0]["url"] == "https://api.example.test/api/agent/device/start"
-    assert calls[1]["body"] == {"device_code": "dapd_secret"}
+    # The machine label travels in the start body for the operator to review.
+    assert calls[0]["body"] == {"label": "grace@laptop"}
+    assert calls[1]["body"] == {"grant_type": auth._shared_device_login().GRANT_TYPE,
+                                "device_code": "dapd_secret"}
     output = capsys.readouterr().out
-    assert "https://api.example.test/device" in output
+    assert "https://api.example.test/device?code=ABCD-EFGH" in output
+    assert "ABCD-EFGH" in output
     assert "valid for 15 minutes" in output
+
+
+def test_default_label_is_user_at_host(monkeypatch):
+    import getpass
+    import socket
+
+    monkeypatch.setattr(getpass, "getuser", lambda: "grace")
+    monkeypatch.setattr(socket, "gethostname", lambda: "build-box")
+    assert auth.default_label() == "grace@build-box"
+
+    def broken():
+        raise KeyError("no user")
+
+    monkeypatch.setattr(getpass, "getuser", broken)
+    assert auth.default_label() == "build-box"
+
+
+def test_rewrite_verification_uri_moves_a_lambda_host_to_the_api_origin():
+    assert auth.rewrite_verification_uri(
+        "https://raw.lambda-url.eu-west-1.on.aws/device?code=ABCD-EFGH",
+        "https://api.example.test",
+    ) == "https://api.example.test/device?code=ABCD-EFGH"
+    assert auth.rewrite_verification_uri(
+        "https://api.example.test/device?code=ABCD-EFGH",
+        "https://api.example.test",
+    ) == "https://api.example.test/device?code=ABCD-EFGH"
+    assert auth.rewrite_verification_uri("/device?code=ABCD-EFGH", "https://api.example.test") \
+        == "https://api.example.test/device?code=ABCD-EFGH"
 
 
 def test_login_device_waits_out_the_code_life():
@@ -139,9 +174,9 @@ def test_login_device_polls_until_approved(isolated_home, monkeypatch):
         if url.endswith("/device/token"):
             polls.append(body)
             if len(polls) >= 3:
-                return (200, {"status": "approved", "token": "dapd_tok",
+                return (200, {"token": "dapd_tok",
                               "subject": "Google_1", "email": "op@x", "expires_at": 4102444800})
-            return (200, {"status": "pending"})
+            return (400, {"error": "authorization_pending"})
         raise AssertionError(url)
 
     monkeypatch.setattr(auth, "_post_json", poster)
@@ -154,7 +189,7 @@ def test_login_device_polls_until_approved(isolated_home, monkeypatch):
 def test_login_device_expired_and_timeout(isolated_home, monkeypatch):
     poster, _ = device_poster({
         "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}),
-        "/device/token": (200, {"status": "expired"}),
+        "/device/token": (400, {"error": "expired_token"}),
     })
     monkeypatch.setattr(auth, "_post_json", poster)
     with pytest.raises(auth.LoginError, match="expired"):
@@ -163,7 +198,7 @@ def test_login_device_expired_and_timeout(isolated_home, monkeypatch):
     def pending_forever(url, body, bearer=None, timeout=20):
         if url.endswith("/device/start"):
             return 200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}
-        return (200, {"status": "pending"})
+        return (400, {"error": "authorization_pending"})
 
     monkeypatch.setattr(auth, "_post_json", pending_forever)
     with pytest.raises(auth.LoginError, match="Timed out"):
@@ -173,7 +208,7 @@ def test_login_device_expired_and_timeout(isolated_home, monkeypatch):
 def test_login_device_honors_slow_down(isolated_home, monkeypatch):
     poster, _ = device_poster({
         "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}),
-        "/device/token": (200, {"status": "pending", "slow_down": True}),
+        "/device/token": (429, {"error": "slow_down"}),
     })
     monkeypatch.setattr(auth, "_post_json", poster)
     sleeps = []
@@ -186,6 +221,16 @@ def test_login_device_honors_slow_down(isolated_home, monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         auth.login_device("https://api.example.test", sleeper=sleeper, timeout=60)
     assert sleeps == [5, 10]
+
+
+def test_login_device_reports_a_browser_denial(isolated_home, monkeypatch):
+    poster, _ = device_poster({
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH"}),
+        "/device/token": (400, {"error": "access_denied"}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+    with pytest.raises(auth.LoginError, match="denied"):
+        auth.login_device("https://api.example.test", sleeper=lambda s: None)
 
 
 def test_refresh_device_session_rotates(isolated_home, monkeypatch):
