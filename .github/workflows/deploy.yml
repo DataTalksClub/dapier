@@ -22,10 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Checkout shared device login
-        uses: actions/checkout@v6
-        with:
-          repository: DataTalksClub/auth
-          path: auth
+        run: git clone --depth 1 https://github.com/DataTalksClub/auth.git /tmp/dtc-auth
+      - name: Point the CLI at the shared device login
+        run: echo DTC_AUTH_HOME=/tmp/dtc-auth >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v7
       - uses: aws-actions/setup-sam@v2
       - name: Install Chromium for the console boot test
