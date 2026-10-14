@@ -1,0 +1,24 @@
+# The /ids helper from the ods-berlin-bot port: send /ids inside the ODS
+# Berlin group — from the Meetings topic — and the bot replies with the
+# chat id and forum topic id the announcement workflow posts to.
+# Delivers through the `ods-berlin` telegram hook (connection
+# telegram-ods-bot); any other message on that hook matches nothing.
+# chat_id is omitted on purpose: telegram_send answers the triggering chat.
+id: ods-berlin-chat-id
+enabled: true
+trigger:
+  connector: telegram
+  event: message.received
+  filters:
+    hook:
+      equals: ods-berlin
+    text:
+      equals: /ids
+actions:
+- id: report-ids
+  type: telegram_send
+  connection_id: telegram-ods-bot
+  message_thread_id: '{message_thread_id}'
+  text: |
+    chat_id: {chat_id}
+    message_thread_id: {message_thread_id}
