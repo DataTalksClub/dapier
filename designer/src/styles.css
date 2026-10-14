@@ -337,7 +337,7 @@ a.brand:hover span:last-child {
 }
 
 .yaml-text:focus {
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   box-shadow: 0 0 0 3px var(--dk-focus-ring);
   outline: none;
 }
@@ -445,13 +445,13 @@ a.brand:hover span:last-child {
 
 .status-message.error {
   background: var(--dk-danger-bg);
-  border-color: var(--dk-danger-border);
+  border-color: var(--dk-border-default);
   color: var(--dk-danger-text);
 }
 
 .status-message.ok {
   background: var(--dk-success-bg);
-  border-color: var(--dk-success-border);
+  border-color: var(--dk-border-default);
   color: var(--dk-success-text);
 }
 
@@ -508,7 +508,7 @@ a.brand:hover span:last-child {
 }
 
 .icon-button.active {
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   color: var(--dk-accent-default);
 }
 
@@ -534,7 +534,7 @@ select:disabled { opacity: .5; cursor: default; }
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   outline: 3px solid var(--dk-focus-ring);
   outline-offset: 2px;
 }
@@ -542,7 +542,7 @@ input:focus:not([type="checkbox"]),
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   box-shadow: 0 0 0 3px var(--dk-focus-ring);
 }
 input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
@@ -663,13 +663,13 @@ input[type="checkbox"], input[type="radio"] {
 
 .palette-button.accent {
   background: var(--dk-accent-soft);
-  border-color: var(--dk-accent-border);
+  border-color: var(--dk-border-default);
   color: var(--dk-accent-default);
 }
 
 .palette-button.accent:hover {
   background: var(--dk-accent-soft);
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   color: var(--dk-accent-default);
 }
 
@@ -1345,7 +1345,7 @@ input[type="checkbox"], input[type="radio"] {
    (.dk-button--danger) next to the safe "Dry run". The active toggle tint is
    local state. */
 .dk-button--secondary.active {
-  border-color: var(--dk-accent-default);
+  border-color: var(--dk-border-strong);
   color: var(--dk-accent-default);
 }
 
@@ -1460,7 +1460,7 @@ input[type="checkbox"], input[type="radio"] {
 }
 
 .test-step.failed {
-  border-color: var(--dk-danger-text);
+  border-color: var(--dk-border-strong);
 }
 
 .test-step-title {
@@ -1591,7 +1591,7 @@ input[type="checkbox"], input[type="radio"] {
   padding: 6px 8px;
   text-align: left;
 }
-.node-jump-item:hover, .node-jump-item.selected { background: var(--dk-accent-soft); border-color: var(--dk-accent-default); color: var(--dk-accent-default); }
+.node-jump-item:hover, .node-jump-item.selected { background: var(--dk-accent-soft); border-color: var(--dk-border-strong); color: var(--dk-accent-default); }
 .node-jump-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -2px; }
 
 /* {trigger.*} sample chips in the trigger inspector: click copies the
@@ -1611,7 +1611,7 @@ input[type="checkbox"], input[type="radio"] {
   font-size: var(--dk-text-xs);
   padding: 3px 8px;
 }
-.template-chip:hover { border-color: var(--dk-accent-default); color: var(--dk-accent-default); }
+.template-chip:hover { border-color: var(--dk-border-strong); color: var(--dk-accent-default); }
 
 /* Insert-from-previous picker: one group per prior step — its save-time id
    and canvas label, then the output templates as copyable chips. */
