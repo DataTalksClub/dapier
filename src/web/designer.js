@@ -22790,6 +22790,108 @@
     };
   }
   if (!globalThis.__dakitDialogDismiss) {
+    let openWhenReady = function(trigger, load2, render, options = {}) {
+      if (current && current.trigger === trigger) return current.promise;
+      if (current) current.abort();
+      dismissToast();
+      const controller = new AbortController();
+      const prior = { busy: trigger.getAttribute("aria-busy"), disabled: trigger.getAttribute("aria-disabled") };
+      const inline = (options.spinner || (trigger.matches(BUTTON) ? "inline" : "overlay")) === "inline";
+      let settled = false;
+      let timer = 0;
+      let resolve;
+      const promise = new Promise((done) => resolve = done);
+      const swallow = (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      const onKey = (event) => {
+        if (event.key !== "Escape" || overlay && overlay.open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        abort();
+      };
+      const onOverlayClose = () => {
+        if (!settled) abort();
+      };
+      const restore = () => {
+        settled = true;
+        clearTimeout(timer);
+        if (current === run) current = null;
+        document.removeEventListener("keydown", onKey, true);
+        trigger.removeEventListener("click", swallow, true);
+        if (prior.busy === null) trigger.removeAttribute("aria-busy");
+        else trigger.setAttribute("aria-busy", prior.busy);
+        if (prior.disabled === null) trigger.removeAttribute("aria-disabled");
+        else trigger.setAttribute("aria-disabled", prior.disabled);
+        if (overlay) {
+          overlay.removeEventListener("close", onOverlayClose);
+          if (overlay.open) overlay.close();
+        }
+      };
+      const abort = () => {
+        if (settled) return;
+        controller.abort();
+        const hadOverlay = overlay && overlay.open;
+        restore();
+        if (hadOverlay && focusable(trigger)) trigger.focus({ preventScroll: true });
+        resolve({ status: "aborted" });
+      };
+      const run = { trigger, promise, abort };
+      current = run;
+      trigger.setAttribute("aria-busy", "true");
+      trigger.setAttribute("aria-disabled", "true");
+      trigger.addEventListener("click", swallow, true);
+      document.addEventListener("keydown", onKey, true);
+      timer = setTimeout(
+        () => {
+          if (settled) return;
+          const el = getOverlay();
+          el.querySelector(".dk-loading__label").textContent = options.label || "Loading…";
+          el.setAttribute("aria-label", options.label || "Loading…");
+          el.addEventListener("close", onOverlayClose);
+          el.showModal();
+        },
+        inline ? ms("--dk-loading-delay-overlay", 500) : ms("--dk-loading-delay-busy", 150)
+      );
+      const retry = () => openWhenReady(trigger, load2, render, options);
+      Promise.resolve().then(() => load2(controller.signal)).then(
+        (data) => settled ? void 0 : Promise.resolve(render(data, controller.signal)).then((dialog) => [data, dialog])
+      ).then(
+        (out) => {
+          if (!out || settled) return;
+          const [data, dialog] = out;
+          const hadOverlay = overlay && overlay.open;
+          restore();
+          if (hadOverlay && focusable(trigger)) trigger.focus({ preventScroll: true });
+          if (dialog instanceof HTMLDialogElement) {
+            if (!dialog.open) dialog.showModal();
+            dialog.addEventListener(
+              "close",
+              () => {
+                if (focusable(trigger)) trigger.focus({ preventScroll: true });
+              },
+              { once: true }
+            );
+          }
+          resolve({ status: "open", dialog, data });
+        },
+        (error) => {
+          if (settled) return;
+          const hadOverlay = overlay && overlay.open;
+          restore();
+          if (hadOverlay && focusable(trigger)) trigger.focus({ preventScroll: true });
+          if (options.onError) {
+            options.onError(error, retry);
+          } else {
+            const custom = typeof options.errorMessage === "function" ? options.errorMessage(error) : options.errorMessage;
+            showToast(custom || "Couldn't load this. Check your connection and try again.", retry);
+          }
+          resolve({ status: "error", error });
+        }
+      );
+      return promise;
+    };
     globalThis.__dakitDialogDismiss = true;
     let pressed = null;
     document.addEventListener(
@@ -22805,6 +22907,54 @@
         event.target.close();
       }
     });
+    const BUTTON = ".dk-button, .dk-icon-button, button";
+    let current = null;
+    let overlay = null;
+    let toast = null;
+    const ms = (name, fallback) => {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const n = parseFloat(raw);
+      if (!Number.isFinite(n)) return fallback;
+      return /ms$/.test(raw) ? n : /s$/.test(raw) ? n * 1e3 : n;
+    };
+    const getOverlay = () => {
+      if (overlay && overlay.isConnected) return overlay;
+      overlay = document.createElement("dialog");
+      overlay.className = "dk-loading";
+      overlay.setAttribute("aria-busy", "true");
+      overlay.innerHTML = '<div class="dk-loading__body"><span class="dk-spinner dk-spinner--lg" aria-hidden="true"></span><span class="dk-loading__label"></span></div>';
+      overlay.tabIndex = -1;
+      document.body.append(overlay);
+      return overlay;
+    };
+    const dismissToast = () => {
+      if (toast) toast.remove();
+      toast = null;
+    };
+    const showToast = (message, retry) => {
+      dismissToast();
+      toast = document.createElement("div");
+      toast.className = "dk-toast dk-toast--danger";
+      toast.setAttribute("role", "alert");
+      toast.innerHTML = '<span class="dk-toast__message"></span><button type="button" class="dk-button dk-button--secondary dk-button--sm" data-dk-retry>Retry</button><button type="button" class="dk-icon-button" aria-label="Dismiss" data-dk-dismiss><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
+      toast.querySelector(".dk-toast__message").textContent = message;
+      const own = toast;
+      own.querySelector("[data-dk-retry]").addEventListener("click", () => {
+        dismissToast();
+        retry();
+      });
+      own.querySelector("[data-dk-dismiss]").addEventListener("click", dismissToast);
+      own.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          dismissToast();
+        }
+      });
+      const modals = [...document.querySelectorAll("dialog[open]")].filter((d) => d.matches(":modal"));
+      (modals[modals.length - 1] || document.body).append(own);
+    };
+    const focusable = (el) => el && el.isConnected && typeof el.focus === "function" && (el.tabIndex >= 0 || el.matches(BUTTON));
+    globalThis.dakitDialogs = { openWhenReady };
   }
   const EMPTY_SHAPES = [];
   const NEW_WORKFLOW_ID = "new-workflow";

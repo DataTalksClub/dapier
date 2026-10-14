@@ -336,10 +336,10 @@ a.brand:hover span:last-child {
   width: 100%;
 }
 
-.yaml-text:focus {
+.yaml-text:focus-visible {
   border-color: var(--dk-border-strong);
-  box-shadow: 0 0 0 3px var(--dk-focus-ring);
-  outline: none;
+  outline: 3px solid var(--dk-focus-ring);
+  outline-offset: 2px;
 }
 
 .id-input {
@@ -537,13 +537,6 @@ textarea:focus-visible {
   border-color: var(--dk-border-strong);
   outline: 3px solid var(--dk-focus-ring);
   outline-offset: 2px;
-}
-input:focus:not([type="checkbox"]),
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--dk-border-strong);
-  box-shadow: 0 0 0 3px var(--dk-focus-ring);
 }
 input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 
