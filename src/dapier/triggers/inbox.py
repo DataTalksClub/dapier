@@ -105,7 +105,7 @@ def _trim_event_data(data, limit=DATA_LIMIT):
     if not (isinstance(trimmed, dict) and trimmed.get("truncated")):
         return trimmed
     if isinstance(data, dict):
-        for key in ("s3", "message_id"):
+        for key in ("s3", "raw_mime", "message_id"):
             if data.get(key) is not None:
                 trimmed[key] = data[key]
     return trimmed
@@ -441,10 +441,14 @@ def _display_body(data):
     its own intake-capped rehydration.
     """
     content = email_body(data)
-    if not (isinstance(data, dict) and data.get("truncated")):
+    if not isinstance(data, dict):
         return content, False
-    pointer = data.get("s3")
+    pointer = data.get("s3") or data.get("raw_mime")
     if not isinstance(pointer, dict):
+        return content, False
+    # Relay events carry no inline body at all: an empty stored body with a
+    # raw pointer rebuilds here exactly like a truncated preview does.
+    if not (data.get("truncated") or not content):
         return content, False
     try:
         from .intake import email_ingress
@@ -666,7 +670,7 @@ def rehydrate(data):
     email copy its ``s3`` pointer names. Returns ``(data, None)``, or
     ``(None, error)`` when there is no pointer or the copy is unreadable —
     callers keep their explicit replay refusal in that case."""
-    pointer = data.get("s3") if isinstance(data, dict) else None
+    pointer = (data.get("s3") or data.get("raw_mime")) if isinstance(data, dict) else None
     if not pointer:
         return None, "The event data was too large to store; it cannot be replayed"
     from .intake import email_ingress
