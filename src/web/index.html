@@ -83,22 +83,22 @@
         </div>
       </header>
 
-      <nav id="page-tabs" class="page-tabs" hidden aria-label="Section">
-        <div class="page-tab-set" data-family="workflows">
-          <a class="view-link" href="/workflows" data-view="workflows" data-tab="list">Workflows</a>
-          <a class="view-link" href="/schedules" data-view="schedules">Schedules</a>
-          <a class="view-link" href="/workflows?tab=hooks" data-view="workflows" data-tab="hooks">Hooks</a>
-          <a class="view-link" href="/workflows?tab=polls" data-view="workflows" data-tab="polls">Polls</a>
-        </div>
-        <div class="page-tab-set" data-family="connections">
-          <a class="view-link" href="/connections" data-view="connections">Accounts</a>
-          <a class="view-link" href="/credentials" data-view="credentials">App setup</a>
-        </div>
-        <div class="page-tab-set" data-family="emails">
-          <a class="view-link" href="/emails" data-view="emails" data-tab="received">Received</a>
-          <a class="view-link" href="/emails?tab=addresses" data-view="emails" data-tab="addresses">Addresses</a>
-        </div>
-      </nav>
+      <div id="page-tabs" class="page-tabs" hidden>
+        <nav class="dk-tabs" data-family="workflows" aria-label="Workflow sections">
+          <a class="dk-tab view-link" href="/workflows" data-view="workflows" data-tab="list">Workflows</a>
+          <a class="dk-tab view-link" href="/schedules" data-view="schedules">Schedules</a>
+          <a class="dk-tab view-link" href="/workflows?tab=hooks" data-view="workflows" data-tab="hooks">Hooks</a>
+          <a class="dk-tab view-link" href="/workflows?tab=polls" data-view="workflows" data-tab="polls">Polls</a>
+        </nav>
+        <nav class="dk-tabs" data-family="connections" aria-label="Connection sections">
+          <a class="dk-tab view-link" href="/connections" data-view="connections">Accounts</a>
+          <a class="dk-tab view-link" href="/credentials" data-view="credentials">App setup</a>
+        </nav>
+        <nav class="dk-tabs" data-family="emails" aria-label="Email sections">
+          <a class="dk-tab view-link" href="/emails" data-view="emails" data-tab="received">Received</a>
+          <a class="dk-tab view-link" href="/emails?tab=addresses" data-view="emails" data-tab="addresses">Addresses</a>
+        </nav>
+      </div>
 
       <div id="loading" class="loading" hidden><span></span><span></span><span></span></div>
       <div id="notice" class="notice" role="status" hidden></div>

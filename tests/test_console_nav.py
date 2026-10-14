@@ -18,7 +18,7 @@ def _sidebar() -> str:
 
 
 def _page_tabs() -> str:
-    match = re.search(r'<nav id="page-tabs".*?</nav>', INDEX, re.S)
+    match = re.search(r'<div id="page-tabs".*?</nav>\s*</div>', INDEX, re.S)
     assert match, "page-tabs missing"
     return match.group(0)
 
@@ -54,7 +54,7 @@ def test_sidebar_lists_daily_pages_then_settings():
 
 def _family_labels(family: str) -> list[str]:
     match = re.search(
-        rf'<div class="page-tab-set" data-family="{family}">(.*?)</div>',
+        rf'<nav class="dk-tabs" data-family="{family}" aria-label="[^"]+">(.*?)</nav>',
         _page_tabs(),
         re.S,
     )
@@ -110,15 +110,20 @@ def test_workers_is_its_own_page_next_to_agents():
     assert "Path: /workers" in TEMPLATE
 
 
-def test_page_tabs_clip_vertical_overflow():
-    """overflow-x: auto computes overflow-y to auto unless y is set, and
-    the 2px tab underline then paints a thin vertical scrollbar."""
+def test_page_tabs_are_dakit_route_tabs():
+    """Each family strip is a dakit segmented control of route links: a
+    named <nav class="dk-tabs"> whose current link carries aria-current
+    (set by the router). The look is dakit's; app CSS doesn't restyle it."""
+    tabs = _page_tabs()
+    navs = re.findall(r'<nav class="dk-tabs" data-family="[^"]+" aria-label="([^"]+)">(.*?)</nav>', tabs, re.S)
+    assert len(navs) == 3
+    for _label, body in navs:
+        links = re.findall(r"<a [^>]*>", body)
+        assert links and all('class="dk-tab view-link"' in link for link in links)
+    assert "aria-current" in ROUTER
     css = pathlib.Path("src/web/app.css").read_text()
-    match = re.search(r"\.page-tabs \{[^}]+\}", css)
-    assert match, ".page-tabs rule missing"
-    block = match.group(0)
-    assert "overflow-x: auto" in block
-    assert "overflow-y: hidden" in block
+    assert ".page-tabs a" not in css
+    assert ".page-tab-set" not in css
 
 
 def test_family_tabs_keep_the_parent_header():

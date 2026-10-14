@@ -99,19 +99,6 @@ function emailTabFor(view, push, options) {
   return 'received';
 }
 
-/* A tab strip wider than the screen scrolls; it carries .is-clipped (a
-   trailing fade) while tabs remain hidden past its right edge. */
-function syncTabOverflow() {
-  const tabs = $('#page-tabs');
-  if (!tabs || tabs.hidden) return;
-  const hiddenRight = tabs.scrollWidth - tabs.clientWidth - tabs.scrollLeft > 1;
-  tabs.classList.toggle('is-clipped', hiddenRight);
-}
-window.addEventListener('resize', syncTabOverflow);
-document.addEventListener('scroll', (event) => {
-  if (event.target && event.target.id === 'page-tabs') syncTabOverflow();
-}, true);
-
 /* Family tabs swap the body under the strip: the Received / Addresses
    split works like the Workflows / Hooks / Polls split — one route per
    tab (?tab=addresses for the second), the header above the strip stays
@@ -132,10 +119,10 @@ function syncPageTabs(view, workflowTab, emailTab) {
   if (!tabs) return;
   const family = TAB_FAMILY[view];
   tabs.hidden = !family;
-  $$('.page-tab-set', tabs).forEach((set) => {
+  $$('nav[data-family]', tabs).forEach((set) => {
     set.hidden = set.dataset.family !== family;
   });
-  $$('.page-tabs a').forEach((link) => {
+  $$('a', tabs).forEach((link) => {
     const sameView = link.dataset.view === view;
     let sameTab = true;
     if (view === 'workflows') sameTab = (link.dataset.tab || 'list') === workflowTab;
@@ -143,9 +130,8 @@ function syncPageTabs(view, workflowTab, emailTab) {
     if (sameView && sameTab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
-  const current = $('.page-tabs a[aria-current="page"]');
-  if (current && !tabs.hidden) current.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  syncTabOverflow();
+  const current = $('a[aria-current="page"]', tabs);
+  if (current && !tabs.hidden) globalThis.dakitTabs?.reveal(current);
 }
 
 export async function setView(view, push = true, options = {}) {

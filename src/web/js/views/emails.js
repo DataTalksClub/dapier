@@ -250,7 +250,7 @@ function showReceivedTab() {
   const url = new URL(window.location.href);
   url.searchParams.delete('tab');
   history.replaceState(null, '', url);
-  $$('.page-tabs a').forEach((link) => {
+  $$('#page-tabs a').forEach((link) => {
     if (link.dataset.view !== 'emails') return;
     if ((link.dataset.tab || 'received') === 'received') link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
