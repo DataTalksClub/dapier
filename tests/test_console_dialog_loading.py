@@ -113,3 +113,28 @@ def test_failed_run_load_opens_nothing_and_retries_from_a_toast(browser_page):
     _wait_for(page, held, 2).fulfill(status=200, content_type="application/json", body=json.dumps(RUN))
     expect(page.locator("#run-dialog")).to_be_visible()
     expect(toast).to_have_count(0)
+
+
+def test_versions_from_the_row_menu_busy_the_more_button_until_loaded(browser_page):
+    from playwright.sync_api import expect
+
+    page, origin, scheme = browser_page
+    held = _held(page, "**/api/admin/designer/workflows/wf-one.yaml/versions")
+    page.goto(origin + "/workflows")
+    page.locator("#app").wait_for(state="visible")
+    more = page.locator(".workflow-list-row .row-more").first
+    more.click()
+    page.locator(".row-menu:popover-open .workflow-versions").click()
+    route = _wait_for(page, held)
+    expect(more).to_have_attribute("aria-busy", "true")
+    assert not _is_open(page, "#versions-dialog")
+    route.fulfill(status=200, content_type="application/json", body=json.dumps({"versions": [
+        {"revision": 2, "current": True, "published_at": "2026-10-14T10:00:00Z", "cause": "save", "enabled": True},
+        {"revision": 1, "published_at": "2026-10-13T10:00:00Z", "cause": "save", "enabled": True},
+    ]}))
+    dialog = page.locator("#versions-dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog.locator("tbody tr")).to_have_count(2)
+    expect(dialog).not_to_contain_text("Loading")
+    expect(more).not_to_have_attribute("aria-busy", "true")
+    _shot(page, f"versions-open-{scheme}")

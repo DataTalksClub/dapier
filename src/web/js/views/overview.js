@@ -2,7 +2,7 @@
 import { createOverviewLoader } from '../overview-loader.js';
 import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
-import { $, icons, showApp, notice, rowActions, whenMenusClosed } from '../ui.js';
+import { $, icons, showApp, notice, rowActions, whenMenusClosed, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, statusDot, runStatusLine, runStatusDot, runStatusTitle, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { icon } from '../icons.js';
@@ -561,16 +561,11 @@ export async function refresh() {
 
 /* Version history: every save, toggle, and rollback publishes a version
    record; Restore republishes an old one as the next revision. */
-async function loadVersions(file) {
-  $('#versions-detail').innerHTML = '<p class="sub">Loading…</p>';
-  $('#versions-feedback').hidden = true;
-  let data;
-  try {
-    data = await api(`/api/admin/designer/workflows/${encodeURIComponent(file)}/versions`);
-  } catch (error) {
-    $('#versions-detail').innerHTML = `<p class="sub">${escapeHtml(error.message)}</p>`;
-    return;
-  }
+function fetchVersions(file, signal) {
+  return api(`/api/admin/designer/workflows/${encodeURIComponent(file)}/versions`, { signal });
+}
+
+function renderVersions(data) {
   const rows = (data.versions || []).map((version) => `<tr>
     <td class="mono">v${version.revision}${version.current ? ' <span class="muted-cell">(current)</span>' : ''}</td>
     <td data-label="When" class="mono muted-cell">${escapeHtml(formatTimestamp(version.published_at) || version.published_at || '—')}</td>
@@ -600,13 +595,17 @@ async function loadVersions(file) {
   icons();
 }
 
-export async function openVersions(id) {
+export function openVersions(id, trigger) {
   const workflow = (state.data.workflows || []).find((item) => item.id === id);
-  if (!workflow || !workflow.source) return;
-  $('#versions-title').textContent = `Version history — ${workflow.id}`;
-  $('#versions-dialog').dataset.file = workflow.source;
-  $('#versions-dialog').showModal();
-  await loadVersions(workflow.source);
+  if (!workflow || !workflow.source) return undefined;
+  return openWhenReady(trigger, 'version history', (signal) => fetchVersions(workflow.source, signal), (data) => {
+    const dialog = $('#versions-dialog');
+    $('#versions-title').textContent = `Version history — ${workflow.id}`;
+    dialog.dataset.file = workflow.source;
+    $('#versions-feedback').hidden = true;
+    renderVersions(data);
+    return dialog;
+  });
 }
 
 export async function restoreVersion(button) {
@@ -635,7 +634,7 @@ export async function restoreVersion(button) {
       : `Restored v${revision}. The deploy pipeline publishes it in a few minutes.`;
     feedback.hidden = false;
     await refresh();
-    await loadVersions(file);
+    renderVersions(await fetchVersions(file));
   } catch (error) {
     feedback.textContent = error.message;
     feedback.hidden = false;

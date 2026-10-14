@@ -54,7 +54,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('click', (event) => {
   const button = event.target.closest('.workflow-versions');
   if (!button || button.disabled) return;
-  void openVersions(button.dataset.workflow);
+  void openVersions(button.dataset.workflow, button);
 });
 
 /* Download YAML: the canonical text the API renders from the stored
