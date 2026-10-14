@@ -116,30 +116,6 @@ export function openWorkflow(id) {
   icons();
 }
 
-/* The home status strip (dataops' segmented summary row): one dominant
-   inventory count plus the states that change what the operator does next.
-   Dots use the status language's triplet roles only. */
-function renderStatsStrip(workflows) {
-  const count = (predicate) => workflows.filter(predicate).length;
-  const strip = (dot, label, value) =>
-    `<div class="status-item"><span class="status-item-label">${dot}<span>${label}</span></span><span class="status-item-value">${value}</span></div>`;
-  const dot = (kind) => `<span class="status ${kind}"><span class="status-dot" aria-hidden="true"></span></span>`;
-  const none = '';
-  /* A zero never wears a status color: the danger dot only shows when
-     something is actually auto-paused. */
-  const on = count((w) => w.enabled && !w.auto_paused);
-  const paused = count((w) => w.auto_paused);
-  const off = count((w) => !w.enabled && !w.auto_paused);
-  const items = [
-    strip(none, 'Workflows', workflows.length),
-    strip(on ? dot('ok') : dot('off'), 'On', on),
-    strip(paused ? dot('err') : dot('off'), 'Auto-paused', paused),
-    strip(dot('off'), 'Off', off),
-  ];
-  $('#overview-stats').innerHTML = items.join('');
-  $('#overview-stats').hidden = workflows.length === 0;
-}
-
 function render(section) {
   const data = state.data;
   if (!data) return;
@@ -148,7 +124,6 @@ function render(section) {
     $('#home-workflow-count').textContent = `${data.workflows.length} workflow${data.workflows.length === 1 ? '' : 's'} · ${model.running} on`;
     $('#overview-workflows').innerHTML = model.workflows.slice(0, 5).map(workflowRow).join('');
     $('#overview-workflows-empty').hidden = data.workflows.length > 0;
-    renderStatsStrip(data.workflows);
   }
   /* Results name their workflows: wait for the workflow list so a row never
      flashes its raw id before the name arrives. */

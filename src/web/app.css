@@ -529,21 +529,6 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
    own dots carry the severity, the frame stays neutral. */
 .attention-panel { margin: 0; }
 .attention-panel[hidden] { display: none; }
-/* Home status strip — the family's segmented summary row (dataops
-   .home-status-strip): one bordered container, hairline-divided segments,
-   dot+label over the value. No card grid. */
-.status-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
-  background: var(--dk-bg-surface);
-}
-.status-item { display: flex; flex-direction: column; align-items: flex-start; gap: var(--dk-space-1); padding: var(--dk-space-3) var(--dk-space-4); }
-.status-item + .status-item { border-left: 1px solid var(--dk-border-default); }
-.status-item-label { display: flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.status-item-value { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); line-height: var(--dk-leading-tight); color: var(--dk-text-primary); font-variant-numeric: tabular-nums; }
 
 /* Home + register sections read as the family's panel: muted header band
    over divided rows, one container per question. */
@@ -1501,11 +1486,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .page-tools .field-hint { flex-basis: auto; margin: 0; }
   .last-updated { display: none; }
 
-  /* Home: the strip stays one segmented row; panels' rows stack. */
-  .status-item { padding: var(--dk-space-2) var(--dk-space-3); }
-  .status-item-label { font-size: var(--dk-text-xs); }
-  .status-item-value { font-size: var(--dk-text-md); }
-
   .section-head { margin-top: var(--dk-space-4); }
   .oauth-result { align-items: flex-start; flex-direction: column; }
   .oauth-result-actions { width: 100%; }
@@ -1740,11 +1720,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .home-panel > .section-head:has(.dk-button), .data-panel > .section-head:has(.dk-button) { padding-block: var(--dk-gap-block); }
 @media (max-width: 560px) {
   .home-problem { flex-direction: column; align-items: stretch; }
-  .status-strip { grid-template-columns: 1fr 1fr; }
-  /* The strip states the counts; the band keeps just its title and link. */
-  #home-workflow-count { display: none; }
-  .status-item:nth-child(3) { border-left: 0; }
-  .status-item:nth-child(n+3) { border-top: 1px solid var(--dk-border-default); }
   .home-workflow { grid-template-columns: minmax(0, 1fr); }
   .home-row-meta { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--dk-space-1) var(--dk-space-4); }
   .home-latest { min-width: 0; }
@@ -2191,12 +2166,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .service-account { padding: var(--dk-space-2) var(--dk-space-3); }
   .empty-state { padding: var(--dk-space-5) var(--dk-space-3); }
 
-  /* Home: the four counts share one row; a result reads status - workflow -
-     when on one line. */
-  .status-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .status-item { padding: var(--dk-space-2) var(--dk-space-3); }
-  .status-item:nth-child(3) { border-left: 1px solid var(--dk-border-default); }
-  .status-item:nth-child(n+3) { border-top: 0; }
+  /* Home: a result reads status - workflow - when on one line. */
   .home-result { grid-template-columns: auto minmax(0, 1fr) auto; }
   .home-result-when { grid-column: 3; grid-row: 1; }
   .home-result-status { white-space: nowrap; }
@@ -2336,11 +2306,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .setup-table td[data-label="Status"]::before { display: none; }
   .setup-table td[data-empty] { display: none; }
 
-  /* Home: four counts wrap mid-word at 375 — the strip keeps its designed
-     2x2, and results keep the two-line row that fits whole names. */
-  .status-strip { grid-template-columns: 1fr 1fr; }
-  .status-item:nth-child(3) { border-left: 0; }
-  .status-item:nth-child(n+3) { border-top: 1px solid var(--dk-border-default); }
+  /* Home: results keep the two-line row that fits whole names. */
   .home-result { grid-template-columns: 6.5rem minmax(0, 1fr); }
   .home-result-when { grid-column: 2; grid-row: 2; text-align: left; }
 }
@@ -2376,10 +2342,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 
   /* Tokens: the name wraps instead of clipping mid-word. */
   #token-table .cell-title .cell-name { white-space: normal; overflow-wrap: anywhere; }
-
-  /* Overview: keep the status | name | when-below card; only stop the
-     stat label from wrapping its count out of alignment. */
-  .status-item-label { white-space: nowrap; }
 }
 
 /* --- mobile: tooltip anchor fix (help tips) --------------------------------------
