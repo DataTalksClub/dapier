@@ -43,8 +43,10 @@ function renderList() {
   const rows = shown();
   const counts = { all: tasks.length, active: tasks.filter(t => ACTIVE.has(t.status)).length, attention: tasks.filter(t => FAILED.has(t.status)).length, completed: tasks.filter(t => t.status === 'succeeded').length };
   document.querySelectorAll('[data-agent-filter]').forEach(button => {
-    button.setAttribute('aria-pressed', String(button.dataset.agentFilter === filter));
-    button.querySelector('.dk-filter-chip__count').textContent = counts[button.dataset.agentFilter];
+    const on = button.dataset.agentFilter === filter;
+    button.setAttribute('aria-checked', String(on));
+    button.tabIndex = on ? 0 : -1;
+    button.querySelector('.dk-count').textContent = counts[button.dataset.agentFilter];
   });
   /* The filter chips carry the counts; the note only says what is partial. */
   $('#agent-runs-note').textContent = fetched ? (tasks.length === 200 ? 'Newest 200 loaded' : '') : 'Loading runs…';

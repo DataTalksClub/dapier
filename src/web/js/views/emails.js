@@ -15,7 +15,7 @@ import { openDesigner } from './designer.js';
 import { openRun } from './runs.js';
 import { openReplayConfirm } from './inbox.js';
 import { workflowName } from '../workflow-names.js';
-import { filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow, OUTCOMES, ago } from './activity.js';
+import { filterSegments, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow, OUTCOMES, ago } from './activity.js';
 
 /* Server-side outcome filters; Handled includes the runs that failed —
    a workflow took the message, and its failure is what needs attention. */
@@ -222,7 +222,7 @@ function renderMail() {
   note.classList.toggle('form-error', Boolean(mail.error));
   note.hidden = !note.textContent;
   $('#email-mail-footer').hidden = !mail.next;
-  $('#email-filter-chips').innerHTML = filterChips(CHIPS, mail.filter, 'email-filter');
+  $('#email-filter-chips').innerHTML = filterSegments(CHIPS, mail.filter, 'email-filter');
   $('#email-mail-summary').textContent = loaded
     ? `${events.length}${mail.next ? '+' : ''} message${events.length === 1 ? '' : 's'}` : '';
 }
@@ -603,7 +603,9 @@ function renderSenderPanel() {
   note.hidden = anyone;
   $('#email-from-mode').hidden = !named;
   $$('#email-from-mode [data-from-mode]').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button.dataset.fromMode === (anyone ? 'anyone' : 'allowlist')));
+    const on = button.dataset.fromMode === (anyone ? 'anyone' : 'allowlist');
+    button.setAttribute('aria-checked', String(on));
+    button.tabIndex = on ? 0 : -1;
   });
   $('#email-from-anyone').hidden = !anyone;
   $('#email-from-list').hidden = anyone;

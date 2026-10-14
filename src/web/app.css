@@ -1928,20 +1928,15 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .sched-warning { margin: 0; color: var(--dk-warning-text); font-size: var(--dk-text-md); }
 .sched-history { border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
 #schedule-detail-dialog { --dk-dialog-width: 680px; }
-[data-page="schedules"] .section-head .dk-cluster { margin-left: auto; }
+[data-page="schedules"] .section-head .dk-tabs { margin-left: auto; }
 
 /* --- Trigger family: Emails, Schedules, Hooks, Polls -----------------------------
-   One layout for the four trigger tabs (views/activity.js): filter chips and
+   One layout for the four trigger tabs (views/activity.js): outcome filters and
    the tab's actions in one toolbar; the activity register (what arrived and
    what happened) as the main column; the tab's sources beside it. Rows
    share one grid — when | what | outcome — and one outcome vocabulary. */
 .trigger-toolbar { justify-content: space-between; }
 .view > .page-tools.trigger-toolbar { justify-content: space-between; }
-/* Emails: the outcome filter chips take a full-width row in the Received
-   toolbar (the .dk-cluster wraps internally), so wide screens no longer
-   crowd the detail pane header. Received / Addresses live in the shared
-   family strip above, like Workflows / Hooks / Polls. */
-.view[data-page="emails"] .page-tools.trigger-toolbar #email-filter-chips { flex: 1 1 100%; max-width: 100%; }
 .trigger-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: var(--dk-gap-section); align-items: start; }
 .trigger-sources { display: grid; gap: var(--dk-gap-section); min-width: 0; }
 .trigger-sources .data-panel + .data-panel { margin-top: 0; }
@@ -2038,7 +2033,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .trigger-toolbar .dk-toolbar__end { margin-left: 0; }
   .source-head .row-more, .source-url .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .source-name { min-height: var(--dk-size-touch); min-width: var(--dk-size-touch); }
-  .trigger-toolbar .dk-filter-chip, .agent-toolbar .dk-filter-chip { min-width: var(--dk-size-touch); justify-content: center; }
 }
 @media (max-width: 560px) {
   /* Phone rows read like a card: what first with its status top-right,

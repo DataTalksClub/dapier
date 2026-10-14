@@ -17,7 +17,7 @@ import { $, $$, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
 import { workflowName } from '../workflow-names.js';
-import { OUTCOME_FILTERS, filterChips, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
+import { OUTCOME_FILTERS, filterSegments, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
 /* Optional poll extras beyond the form fields; merged into the PUT body and
    validated server-side (headers, cursor). Provider
@@ -189,7 +189,7 @@ function renderSummary() {
 }
 
 function render() {
-  $('#poll-outcome-chips').innerHTML = filterChips(OUTCOME_FILTERS, filter, 'poll-outcome');
+  $('#poll-outcome-chips').innerHTML = filterSegments(OUTCOME_FILTERS, filter, 'poll-outcome');
   $('#poll-table').innerHTML = polls.map(pollRow).join('');
   $('#poll-empty').hidden = polls.length > 0;
   $('#poll-workspace').hidden = polls.length === 0;

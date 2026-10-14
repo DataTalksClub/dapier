@@ -14,7 +14,7 @@ import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, jsonBlock } from '../format.js';
 import { openRun } from './runs.js';
 import { workflowName } from '../workflow-names.js';
-import { OUTCOME_FILTERS, filterChips, whenHtml, ago, runLinks, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
+import { OUTCOME_FILTERS, filterSegments, whenHtml, ago, runLinks, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
 const PAGE = 50;
 const TEST_SAMPLE = { event: 'test', message: 'Hello from Dapier', sent_by: 'Send test request' };
@@ -174,7 +174,7 @@ function renderNow() {
   const any = hooks.length > 0;
   $('#hook-empty').hidden = any || !loaded;
   $('#hooks-layout').hidden = !any;
-  $('#hooks-outcome-chips').innerHTML = filterChips(OUTCOME_FILTERS, outcomeFilter, 'hook-outcome');
+  $('#hooks-outcome-chips').innerHTML = filterSegments(OUTCOME_FILTERS, outcomeFilter, 'hook-outcome');
   if (!any) return;
   renderSummary();
   $('#hook-endpoints').innerHTML = hooks.map(endpointRow).join('');

@@ -14,7 +14,7 @@ import { api } from '../api.js';
 import { escapeHtml, pad2 } from '../format.js';
 import { workflowName } from '../workflow-names.js';
 import { openRun } from './runs.js';
-import { OUTCOME_FILTERS, filterChips, whenHtml, workflowNames, outcomeCell, activityRow } from './activity.js';
+import { OUTCOME_FILTERS, filterSegments, whenHtml, workflowNames, outcomeCell, activityRow } from './activity.js';
 
 let current = { schedules: [], now: null };
 let upcoming = { hours: 24, data: null };
@@ -96,7 +96,7 @@ function upcomingRow(entry) {
 
 function renderUpcoming() {
   const box = $('#sched-upcoming');
-  $('#sched-window-chips').innerHTML = filterChips([['24', '24 hours'], ['168', '7 days']], String(upcoming.hours), 'sched-window');
+  $('#sched-window-chips').innerHTML = filterSegments([['24', '24 hours'], ['168', '7 days']], String(upcoming.hours), 'sched-window');
   $('#sched-upcoming-zone').textContent = `Times in ${zoneName()}; ~ marks an estimated time.`;
   const data = upcoming.data;
   if (!data) { box.innerHTML = '<li class="source-row sched-quiet">Loading…</li>'; return; }
@@ -196,7 +196,7 @@ function fireRow(fire) {
 }
 
 function renderActivity() {
-  $('#sched-outcome-chips').innerHTML = filterChips(OUTCOME_FILTERS, filter, 'sched-filter');
+  $('#sched-outcome-chips').innerHTML = filterSegments(OUTCOME_FILTERS, filter, 'sched-filter');
   const fires = shownFires();
   $('#sched-fires').innerHTML = fires.map(fireRow).join('');
   $('#sched-fires').hidden = fires.length === 0;

@@ -140,7 +140,7 @@
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Hooks panes" data-workspace="hooks-layout"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="hooks-activity-pane" aria-selected="true" tabindex="0">Deliveries</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="hooks-sources-pane" aria-selected="false" tabindex="-1">Endpoints</button></div>
-          <div id="hooks-outcome-chips" class="dk-cluster" role="group" aria-label="Show deliveries"></div>
+          <div id="hooks-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter deliveries by outcome"></div>
           <div class="dk-toolbar__end">
             <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
             <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
@@ -148,7 +148,7 @@
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Polls panes" data-workspace="poll-workspace"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="poll-activity" aria-selected="true" tabindex="0">Picked up</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="poll-sources-pane" aria-selected="false" tabindex="-1">Polls</button></div>
-          <div id="poll-outcome-chips" class="dk-cluster" role="group" aria-label="Show picked-up items"></div>
+          <div id="poll-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter picked-up items by outcome"></div>
           <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>
         </div>
         <div data-workflow-panel="list">
@@ -259,7 +259,7 @@
 
       <section class="view" data-page="emails">
         <div class="page-tools dk-toolbar trigger-toolbar" data-email-tools="received">
-          <div id="email-filter-chips" class="dk-cluster" role="group" aria-label="Filter received email"></div>
+          <div id="email-filter-chips" class="dk-tabs" role="radiogroup" aria-label="Filter received email by outcome"></div>
         </div>
         <p id="email-load-error" class="form-error" role="alert"></p>
         <div id="email-workspace" class="trigger-workspace">
@@ -291,9 +291,11 @@
                 <h2 id="email-from-title">Who can write</h2>
               </div>
               <p id="email-from-note" class="sub panel-note">Used when an address has no sender policy of its own. Mail from anyone else is refused.</p>
-              <div id="email-from-mode" class="dk-cluster email-from-mode" role="group" aria-label="Who can write" hidden>
-                <button type="button" class="dk-filter-chip" data-from-mode="anyone" aria-pressed="false">Anyone</button>
-                <button type="button" class="dk-filter-chip" data-from-mode="allowlist" aria-pressed="true">Allowed senders</button>
+              <div id="email-from-mode" class="email-from-mode" hidden>
+                <div class="dk-tabs dk-tabs--sm" role="radiogroup" aria-label="Who can write">
+                  <button type="button" class="dk-tab" role="radio" data-from-mode="anyone" aria-checked="false" tabindex="-1">Anyone</button>
+                  <button type="button" class="dk-tab" role="radio" data-from-mode="allowlist" aria-checked="true" tabindex="0">Allowed senders</button>
+                </div>
               </div>
               <p id="email-from-anyone" class="sub panel-note" hidden>Anyone can mail this address. A message with no From is still refused.</p>
               <ul id="email-from-list" class="source-list"></ul>
@@ -310,11 +312,11 @@
         <div class="dk-toolbar page-tools register-toolbar agent-toolbar">
           <div class="dk-cluster toolbar-filters">
             <label class="toolbar-search"><span class="visually-hidden">Search agent runs</span><input id="agent-runs-search" type="search" placeholder="Search runs…"></label>
-            <div class="dk-cluster agent-filters" role="group" aria-label="Filter agent runs">
-              <button type="button" class="dk-filter-chip" data-agent-filter="all" aria-pressed="true">All <span class="dk-filter-chip__count">0</span></button>
-              <button type="button" class="dk-filter-chip" data-agent-filter="active" aria-pressed="false">Active <span class="dk-filter-chip__count">0</span></button>
-              <button type="button" class="dk-filter-chip" data-agent-filter="attention" aria-pressed="false">Needs attention <span class="dk-filter-chip__count">0</span></button>
-              <button type="button" class="dk-filter-chip" data-agent-filter="completed" aria-pressed="false">Succeeded <span class="dk-filter-chip__count">0</span></button>
+            <div class="dk-tabs agent-filters" role="radiogroup" aria-label="Filter agent runs by status">
+              <button type="button" class="dk-tab" role="radio" data-agent-filter="all" aria-checked="true" tabindex="0">All <span class="dk-count">0</span></button>
+              <button type="button" class="dk-tab" role="radio" data-agent-filter="active" aria-checked="false" tabindex="-1">Active <span class="dk-count">0</span></button>
+              <button type="button" class="dk-tab" role="radio" data-agent-filter="attention" aria-checked="false" tabindex="-1">Needs attention <span class="dk-count">0</span></button>
+              <button type="button" class="dk-tab" role="radio" data-agent-filter="completed" aria-checked="false" tabindex="-1">Succeeded <span class="dk-count">0</span></button>
             </div>
           </div>
           <div class="dk-toolbar__end"><p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p><a class="dk-button dk-button--secondary view-link" href="/workers" data-view="workers">Workers</a></div>
@@ -354,7 +356,7 @@
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Schedules panes" data-workspace="sched-panes"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="sched-activity-pane" aria-selected="true" tabindex="0">Fires</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="sched-sources-pane" aria-selected="false" tabindex="-1">Coming up</button></div>
-          <div id="sched-outcome-chips" class="dk-cluster" role="group" aria-label="Show fires"></div>
+          <div id="sched-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter fires by outcome"></div>
           <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
         <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
@@ -375,7 +377,7 @@
           </section>
           <aside id="sched-sources-pane" class="trigger-sources" aria-label="Coming up">
             <section class="data-panel" aria-labelledby="sched-upcoming-title">
-              <div class="section-head"><h2 id="sched-upcoming-title">Coming up</h2><div id="sched-window-chips" class="dk-cluster" role="group" aria-label="Upcoming window"></div></div>
+              <div class="section-head"><h2 id="sched-upcoming-title">Coming up</h2><div id="sched-window-chips" class="dk-tabs dk-tabs--sm" role="radiogroup" aria-label="Upcoming window"></div></div>
               <p id="sched-upcoming-zone" class="sub panel-note"></p>
               <ul id="sched-upcoming" class="source-list"></ul>
             </section>

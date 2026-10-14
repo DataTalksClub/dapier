@@ -21,8 +21,8 @@ export const OUTCOMES = {
   resumed: { kind: 'off', label: 'Resumed' },
 };
 
-/* The chips every tab offers, in this order; a tab adds Refused when it
-   has a sender list (Emails). */
+/* The outcome filters every tab offers, in this order; a tab adds Refused
+   when it has a sender list (Emails). */
 export const OUTCOME_FILTERS = [
   ['all', 'All'],
   ['handled', 'Handled'],
@@ -30,8 +30,14 @@ export const OUTCOME_FILTERS = [
   ['none', 'No workflow'],
 ];
 
-export function filterChips(filters, active, attribute) {
-  return filters.map(([value, label]) => `<button type="button" class="dk-filter-chip" data-${attribute}="${escapeHtml(value)}" aria-pressed="${value === active}">${escapeHtml(label)}</button>`).join('');
+/* Segments of a single-choice filter: the container is a dakit
+   `.dk-tabs` radiogroup with a stable id, so vendor/dakit-tabs.js keeps
+   keyboard focus on the same segment across this re-render. */
+export function filterSegments(filters, active, attribute) {
+  return filters.map(([value, label]) => {
+    const on = value === active;
+    return `<button type="button" class="dk-tab" role="radio" data-${attribute}="${escapeHtml(value)}" aria-checked="${on}" tabindex="${on ? 0 : -1}">${escapeHtml(label)}</button>`;
+  }).join('');
 }
 
 /* "4 min ago" for scanning; the exact time rides in the title. */
