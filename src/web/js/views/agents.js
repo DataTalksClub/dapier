@@ -107,8 +107,8 @@ function renderDetail() {
     </section>
     <details class="agent-log-section"><summary>Logs ${logs?.stderr ? '<span class="agent-log-hint">Error output available</span>' : ''}</summary>
       ${logs ? `${logs.truncated ? '<p class="sub">Only the end of the output was retained.</p>' : ''}
-        <div class="dk-cluster agent-log-tabs" role="group" aria-label="Log stream"><button type="button" class="dk-filter-chip" data-agent-stream="stdout" aria-pressed="true">Output</button><button type="button" class="dk-filter-chip" data-agent-stream="stderr" aria-pressed="false">Errors</button></div>
-        <pre class="agent-log-output" tabindex="0">${escapeHtml(logs.stdout || 'No output recorded.')}</pre>`
+        <div class="dk-tabs dk-tabs--sm agent-log-tabs" role="tablist" aria-label="Log stream"><button type="button" class="dk-tab" role="tab" id="agent-log-tab-stdout" data-agent-stream="stdout" aria-controls="agent-log-output" aria-selected="true" tabindex="0">Output</button><button type="button" class="dk-tab" role="tab" id="agent-log-tab-stderr" data-agent-stream="stderr" aria-controls="agent-log-output" aria-selected="false" tabindex="-1">Errors</button></div>
+        <pre id="agent-log-output" class="agent-log-output" role="tabpanel" aria-labelledby="agent-log-tab-stdout" tabindex="0">${escapeHtml(logs.stdout || 'No output recorded.')}</pre>`
         : `<p class="sub">${active ? 'Logs will be available after this run finishes.' : 'Detailed logs were not recorded for this run. Its available result is shown above.'}</p>`}
     </details>
     </div>`;
@@ -187,7 +187,8 @@ document.addEventListener('click', event => {
   if (event.target.closest('#agent-detail-retry') && selected) selectTask(selected);
   const stream = event.target.closest('[data-agent-stream]');
   if (stream && detail?.logs) {
-    document.querySelectorAll('[data-agent-stream]').forEach(button => button.setAttribute('aria-pressed', String(button === stream)));
+    document.querySelectorAll('[data-agent-stream]').forEach(button => button.setAttribute('aria-selected', String(button === stream)));
+    $('.agent-log-output').setAttribute('aria-labelledby', stream.id);
     $('.agent-log-output').textContent = detail.logs[stream.dataset.agentStream] || (stream.dataset.agentStream === 'stderr' ? 'No errors recorded.' : 'No output recorded.');
   }
 });
