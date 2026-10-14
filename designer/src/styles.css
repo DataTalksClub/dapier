@@ -266,37 +266,6 @@ a.brand:hover span:last-child {
   min-width: 0;
 }
 
-/* Canvas/YAML editor switch */
-.view-switch {
-  background: var(--dk-bg-muted);
-  border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-md);
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 2px;
-}
-
-.view-switch .view-option {
-  background: transparent;
-  border: 0;
-  border-radius: var(--dk-radius-sm);
-  color: var(--dk-text-muted);
-  font-size: var(--dk-text-sm);
-  font-weight: 600;
-  min-height: 28px;
-  padding: 0 12px;
-}
-
-.view-switch .view-option:hover:not(.active) {
-  color: var(--dk-text-primary);
-}
-
-.view-switch .view-option.active {
-  background: var(--dk-bg-surface);
-  color: var(--dk-text-primary);
-}
-
 /* YAML editor view */
 .yaml-editor {
   display: flex;
@@ -983,7 +952,6 @@ input[type="checkbox"], input[type="radio"] {
   .nav-toggle { grid-area: lead; width: 44px; height: 44px; }
   .topbar-title { display: contents; }
   .view-switch { grid-area: switch; justify-self: start; }
-  .view-switch .view-option { min-height: 44px; }
   .id-input { grid-area: title; min-height: 44px; }
   .save-problems { grid-area: hint; justify-self: start; font-size: var(--dk-text-xs); }
   .topbar-actions { grid-area: actions; }

@@ -22968,6 +22968,137 @@
     const focusable = (el) => el && el.isConnected && typeof el.focus === "function" && (el.tabIndex >= 0 || el.matches(BUTTON));
     globalThis.dakitDialogs = { openWhenReady };
   }
+  (function() {
+    if (globalThis.dakitTabs) return;
+    var GROUP = '.dk-tabs[role="tablist"], .dk-tabs[role="radiogroup"]';
+    var KEYS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: "first", End: "last" };
+    function segments(group) {
+      var role = group.getAttribute("role") === "radiogroup" ? "radio" : "tab";
+      return Array.prototype.filter.call(group.querySelectorAll('[role="' + role + '"]'), function(el) {
+        return el.closest(".dk-tabs") === group;
+      });
+    }
+    function enabled(el) {
+      return !el.hidden && !el.disabled && el.getAttribute("aria-disabled") !== "true";
+    }
+    function isSelected(el) {
+      return el.getAttribute("aria-selected") === "true" || el.getAttribute("aria-checked") === "true";
+    }
+    function sync(group) {
+      var all = segments(group);
+      var current = all.filter(function(el) {
+        return isSelected(el) && enabled(el);
+      })[0] || all.filter(enabled)[0];
+      all.forEach(function(el) {
+        el.setAttribute("tabindex", el === current ? "0" : "-1");
+      });
+      return current;
+    }
+    function syncAll(root2) {
+      var scope = root2 && root2.querySelectorAll ? root2 : document;
+      if (scope.matches && scope.matches(GROUP)) sync(scope);
+      Array.prototype.forEach.call(scope.querySelectorAll(GROUP), sync);
+    }
+    function reveal(el) {
+      var track = el.closest(".dk-tabs");
+      if (!track || track.scrollWidth <= track.clientWidth) return;
+      var left = el.offsetLeft - track.offsetLeft;
+      if (left < track.scrollLeft) track.scrollLeft = left - 8;
+      else if (left + el.offsetWidth > track.scrollLeft + track.clientWidth) track.scrollLeft = left + el.offsetWidth - track.clientWidth + 8;
+    }
+    function key(group) {
+      if (group.id) return "#" + CSS.escape(group.id);
+      var label = group.getAttribute("aria-label");
+      return label ? '.dk-tabs[aria-label="' + CSS.escape(label) + '"]' : null;
+    }
+    function follow(selector, index) {
+      var group = selector && document.querySelector(selector);
+      if (!group) return;
+      var target = segments(group)[index] || sync(group);
+      if (!target) return;
+      sync(group);
+      target.focus();
+      reveal(target);
+    }
+    function choose(group, target) {
+      var all = segments(group);
+      var index = all.indexOf(target);
+      var selector = key(group);
+      all.forEach(function(el) {
+        el.setAttribute("tabindex", el === target ? "0" : "-1");
+      });
+      target.focus();
+      reveal(target);
+      target.click();
+      if (target.isConnected && group.isConnected) {
+        sync(group);
+        return;
+      }
+      if (document.activeElement && document.activeElement !== document.body) return;
+      follow(selector, index);
+      requestAnimationFrame(function() {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        follow(selector, index);
+      });
+    }
+    document.addEventListener("keydown", function(event) {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+      var step = KEYS[event.key];
+      if (!step) return;
+      var group = event.target.closest && event.target.closest(GROUP);
+      if (!group) return;
+      var all = segments(group);
+      var from = all.indexOf(event.target);
+      if (from < 0) return;
+      var usable = all.filter(enabled);
+      if (!usable.length) return;
+      var target;
+      if (step === "first") target = usable[0];
+      else if (step === "last") target = usable[usable.length - 1];
+      else {
+        var rtl = getComputedStyle(group).direction === "rtl";
+        var dir = (event.key === "ArrowLeft" || event.key === "ArrowRight") && rtl ? -step : step;
+        for (var i = 1; i <= all.length; i += 1) {
+          var candidate = all[(from + dir * i + all.length * i) % all.length];
+          if (enabled(candidate)) {
+            target = candidate;
+            break;
+          }
+        }
+      }
+      event.preventDefault();
+      if (!target || target === event.target) return;
+      choose(group, target);
+    });
+    document.addEventListener("focusin", function(event) {
+      var group = event.target.closest && event.target.closest(GROUP);
+      if (group && !group.hasAttribute("data-dk-tabs-synced")) {
+        group.setAttribute("data-dk-tabs-synced", "");
+        sync(group);
+      }
+    });
+    document.addEventListener("click", function(event) {
+      var group = event.target.closest && event.target.closest(GROUP);
+      if (!group) return;
+      var seg = segments(group).filter(function(el) {
+        return el.contains(event.target);
+      })[0];
+      if (!seg || !enabled(seg) || !seg.isConnected) return;
+      segments(group).forEach(function(el) {
+        el.setAttribute("tabindex", el === seg ? "0" : "-1");
+      });
+    });
+    function init() {
+      syncAll(document);
+      Array.prototype.forEach.call(document.querySelectorAll(".dk-tabs"), function(track) {
+        var current = track.querySelector('[aria-current="page"], [aria-selected="true"], [aria-checked="true"]');
+        if (current) reveal(current);
+      });
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
+    globalThis.dakitTabs = { sync: syncAll, reveal };
+  })();
   const EMPTY_SHAPES = [];
   const NEW_WORKFLOW_ID = "new-workflow";
   function useMountedModal() {
@@ -26183,28 +26314,21 @@
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "topbar-title", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "view-switch", role: "group", "aria-label": "Editor view", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  type: "button",
-                  className: view === "canvas" ? "view-option active" : "view-option",
-                  "aria-pressed": view === "canvas",
-                  onClick: () => switchView("canvas"),
-                  children: "Canvas"
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  type: "button",
-                  className: view === "yaml" ? "view-option active" : "view-option",
-                  "aria-pressed": view === "yaml",
-                  onClick: () => switchView("yaml"),
-                  children: "YAML"
-                }
-              )
-            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-tabs view-switch", role: "tablist", "aria-label": "Editor view", children: ["canvas", "yaml"].map((option) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                className: "dk-tab",
+                role: "tab",
+                id: `designer-tab-${option}`,
+                "aria-controls": `designer-panel-${option}`,
+                "aria-selected": view === option,
+                tabIndex: view === option ? 0 : -1,
+                onClick: () => switchView(option),
+                children: option === "canvas" ? "Canvas" : "YAML"
+              },
+              option
+            )) }),
             !config.embedded && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -26364,7 +26488,7 @@
             ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-state", role: "status", children: "Saved" })
           ] })
         ] }),
-        view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", children: [
+        view === "yaml" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor", id: "designer-panel-yaml", role: "tabpanel", "aria-labelledby": "designer-tab-yaml", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "yaml-editor-bar", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mono-file", children: `workflows/${sourceName ?? `${workflowId}.yaml`}` }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "yaml-hint", children: "comments are not preserved on save" })
@@ -26379,7 +26503,7 @@
               onChange: (event) => setYamlText(event.target.value)
             }
           )
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", children: [
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "designer-body", id: "designer-panel-canvas", role: "tabpanel", "aria-labelledby": "designer-tab-canvas", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             WorkflowBoard,
             {

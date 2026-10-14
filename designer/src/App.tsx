@@ -13,6 +13,7 @@ import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterR
 import { StoredDataPanel, listStoredItems, workflowUsesStorage, type StoredItem } from "./StoredData";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
 import "../../src/web/vendor/dakit-dialogs.js";
+import "../../src/web/vendor/dakit-tabs.js";
 
 /** dakit's load-before-open helper (vendor/dakit-dialogs.js, docs/dialog-loading.md). */
 declare global {
@@ -3608,23 +3609,22 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             </button>
           )}
           <div className="topbar-title">
-            <div className="view-switch" role="group" aria-label="Editor view">
-              <button
-                type="button"
-                className={view === "canvas" ? "view-option active" : "view-option"}
-                aria-pressed={view === "canvas"}
-                onClick={() => switchView("canvas")}
-              >
-                Canvas
-              </button>
-              <button
-                type="button"
-                className={view === "yaml" ? "view-option active" : "view-option"}
-                aria-pressed={view === "yaml"}
-                onClick={() => switchView("yaml")}
-              >
-                YAML
-              </button>
+            <div className="dk-tabs view-switch" role="tablist" aria-label="Editor view">
+              {(["canvas", "yaml"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className="dk-tab"
+                  role="tab"
+                  id={`designer-tab-${option}`}
+                  aria-controls={`designer-panel-${option}`}
+                  aria-selected={view === option}
+                  tabIndex={view === option ? 0 : -1}
+                  onClick={() => switchView(option)}
+                >
+                  {option === "canvas" ? "Canvas" : "YAML"}
+                </button>
+              ))}
             </div>
             {/* Embedded in the console, the console's own h1 renames the
                workflow (see views/designer.js); standalone keeps an input. */}
@@ -3782,7 +3782,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         </header>
 
         {view === "yaml" ? (
-          <div className="yaml-editor">
+          <div className="yaml-editor" id="designer-panel-yaml" role="tabpanel" aria-labelledby="designer-tab-yaml">
             <div className="yaml-editor-bar">
               <span className="mono-file">{`workflows/${sourceName ?? `${workflowId}.yaml`}`}</span>
               <span className="yaml-hint">comments are not preserved on save</span>
@@ -3796,7 +3796,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
             />
           </div>
         ) : (
-        <div className="designer-body">
+        <div className="designer-body" id="designer-panel-canvas" role="tabpanel" aria-labelledby="designer-tab-canvas">
           <WorkflowBoard
             shapes={shapes}
             setShapes={setShapes}
