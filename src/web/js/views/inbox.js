@@ -2,7 +2,7 @@
    The API surfaces (GET /api/admin/triggers/inbox[/id], POST …/replay)
    existed before this view; the console just never rendered them. */
 import { state } from '../state.js';
-import { $, icons, notice } from '../ui.js';
+import { $, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, dataBlock, triggerEventLabel } from '../format.js';
 
@@ -75,14 +75,13 @@ export function renderInbox() {
   renderRows();
 }
 
-async function openEvent(inboxId) {
-  try {
-    const data = await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`);
+function openEvent(inboxId, trigger) {
+  const load = (signal) => api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`, { signal });
+  return openWhenReady(trigger, 'event', load, (data) => {
     const event = data.event || {};
     $('#inbox-event-title').textContent = triggerLabel(event);
-    const detail = $('#inbox-event-detail');
     const matched = event.matched || [];
-    detail.innerHTML = `
+    $('#inbox-event-detail').innerHTML = `
       <dl class="run-summary">
         <div><dt>Received</dt><dd class="mono">${escapeHtml(formatTimestamp(event.received_at) || '—')}</dd></div>
         <div><dt>Source</dt><dd><span class="mono clip" title="${escapeHtml(event.source || '')}">${escapeHtml(event.source || '—')}</span></dd></div>
@@ -92,10 +91,8 @@ async function openEvent(inboxId) {
       <h3 class="detail-heading">Event data</h3>
       ${dataBlock(event.data ?? event)}`;
     $('#inbox-replay-button').dataset.inbox = inboxId;
-    $('#inbox-event-dialog').showModal();
-  } catch (error) {
-    notice(error.message, true);
-  }
+    return $('#inbox-event-dialog');
+  });
 }
 
 document.addEventListener('click', async (event) => {
@@ -106,7 +103,7 @@ document.addEventListener('click', async (event) => {
     return;
   }
   const row = event.target.closest('.inbox-open');
-  if (row && row.dataset.inbox) openEvent(row.dataset.inbox);
+  if (row && row.dataset.inbox) void openEvent(row.dataset.inbox, row);
 });
 
 /* Shared with the Emails page: `after` runs once the replay is queued so

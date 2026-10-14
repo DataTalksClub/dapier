@@ -9,7 +9,7 @@
    Recent deliveries are the main content; each endpoint (URL, how requests
    are verified, which workflows run) sits beside them as compact cards. */
 import { state } from '../state.js';
-import { $, icons, notice, whenMenusClosed } from '../ui.js';
+import { $, icons, notice, whenMenusClosed, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, jsonBlock } from '../format.js';
 import { openRun } from './runs.js';
@@ -270,32 +270,34 @@ function runsBlock(row) {
     </li>`).join('')}</ul>`;
 }
 
-export async function openDelivery(deliveryId) {
-  try {
-    const row = (await api(`/api/admin/hook-triggers/deliveries/${encodeURIComponent(deliveryId)}`)).delivery || {};
-    openDeliveryId = deliveryId;
-    $('#hook-delivery-title').textContent = `Delivery to ${row.hook || 'hook'}`;
-    const facts = [
-      ['Received', formatTimestamp(row.received_at)],
-      ['Response', row.response_status],
-      ['Size', formatSize(row.size_bytes)],
-      ['Content type', row.content_type],
-      ['Event', row.kind && row.event ? `${row.kind} · ${row.event}` : null],
-      ['Delivery id', row.delivery_id],
-    ].filter(([, value]) => value !== null && value !== undefined && value !== '');
-    $('#hook-delivery-detail').innerHTML = `
-      <div class="hook-delivery-summary activity-outcome">${outcomeLine(row)}${row.test ? '<span class="dk-chip">test request</span>' : ''}</div>
-      <dl class="detail-list">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>
-      <section><h3 class="hook-section-title">Workflow runs</h3>${runsBlock(row)}</section>
-      <section><h3 class="hook-section-title">Request headers</h3>${headersBlock(row.headers)}</section>
-      ${row.query && Object.keys(row.query).length ? `<section><h3 class="hook-section-title">Query</h3>${jsonBlock(row.query)}</section>` : ''}
-      <section><h3 class="hook-section-title">Body</h3>${bodyBlock(row.body, row.truncated)}</section>`;
-    const dialog = $('#hook-delivery-dialog');
-    if (!dialog.open) dialog.showModal();
-    icons();
-  } catch (error) {
-    notice(error.message, true);
-  }
+export function openDelivery(deliveryId, trigger, { before } = {}) {
+  const load = (signal) => api(`/api/admin/hook-triggers/deliveries/${encodeURIComponent(deliveryId)}`, { signal });
+  return openWhenReady(trigger, 'delivery', load, (data) => {
+    if (before) before();
+    return renderDelivery(data.delivery || {}, deliveryId);
+  });
+}
+
+function renderDelivery(row, deliveryId) {
+  openDeliveryId = deliveryId;
+  $('#hook-delivery-title').textContent = `Delivery to ${row.hook || 'hook'}`;
+  const facts = [
+    ['Received', formatTimestamp(row.received_at)],
+    ['Response', row.response_status],
+    ['Size', formatSize(row.size_bytes)],
+    ['Content type', row.content_type],
+    ['Event', row.kind && row.event ? `${row.kind} · ${row.event}` : null],
+    ['Delivery id', row.delivery_id],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+  $('#hook-delivery-detail').innerHTML = `
+    <div class="hook-delivery-summary activity-outcome">${outcomeLine(row)}${row.test ? '<span class="dk-chip">test request</span>' : ''}</div>
+    <dl class="detail-list">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>
+    <section><h3 class="hook-section-title">Workflow runs</h3>${runsBlock(row)}</section>
+    <section><h3 class="hook-section-title">Request headers</h3>${headersBlock(row.headers)}</section>
+    ${row.query && Object.keys(row.query).length ? `<section><h3 class="hook-section-title">Query</h3>${jsonBlock(row.query)}</section>` : ''}
+    <section><h3 class="hook-section-title">Body</h3>${bodyBlock(row.body, row.truncated)}</section>`;
+  icons();
+  return $('#hook-delivery-dialog');
 }
 
 function confirmReplay(deliveryId) {
@@ -408,10 +410,10 @@ $('#hook-test-form').addEventListener('submit', async (event) => {
   }
 });
 
-$('#hook-test-view').addEventListener('click', () => {
+$('#hook-test-view').addEventListener('click', (event) => {
   if (!lastTestDelivery) return;
-  $('#hook-test-dialog').close();
-  void openDelivery(lastTestDelivery);
+  /* The test dialog stays up, its View button busy, until the delivery is in. */
+  void openDelivery(lastTestDelivery, event.currentTarget, { before: () => $('#hook-test-dialog').close() });
 });
 
 /* --- create / edit / delete --------------------------------------------------- */
@@ -592,7 +594,7 @@ $('[data-workflow-panel="hooks"]').addEventListener('click', (event) => {
   if (del && !del.disabled) return void deleteHook(del);
   if (target.closest('a, .row-menu, .row-more')) return undefined; // links and menus act on their own
   const row = target.closest('.activity-row[data-delivery]');
-  if (row) void openDelivery(row.dataset.delivery);
+  if (row) void openDelivery(row.dataset.delivery, row);
   return undefined;
 });
 
@@ -600,7 +602,7 @@ $('#hook-deliveries').addEventListener('keydown', (event) => {
   const row = event.target.closest('.activity-row[data-delivery]');
   if (row && (event.key === 'Enter' || event.key === ' ')) {
     event.preventDefault();
-    void openDelivery(row.dataset.delivery);
+    void openDelivery(row.dataset.delivery, row);
   }
 });
 

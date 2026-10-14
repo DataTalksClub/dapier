@@ -68,6 +68,14 @@ def browser_page(monkeypatch):
             return {"items": [ITEM]}
         if path == "/api/admin/poll-triggers":
             return {"polls": [POLL]}
+        if path == "/api/admin/hook-triggers":
+            return {"hooks": [{"hook_id": "intake", "kind": "webhook", "url": "https://example.com/hook/intake"}]}
+        if path == "/api/admin/hook-triggers/deliveries":
+            return {"deliveries": [{"delivery_id": "d-1", "hook": "intake", "kind": "webhook",
+                                    "received_at": "2026-10-14T10:00:00Z", "response_status": 200}]}
+        if path == "/api/admin/triggers/inbox":
+            return {"events": [{"inbox_id": "ev-1", "connector": "slack", "event": "message",
+                                "received_at": "2026-10-14T10:00:00Z", "matched": []}]}
         if path == "/api/admin/connections":
             return {"connections": [CONNECTION]}
         return original(path)
@@ -222,3 +230,30 @@ def test_poll_item_row_is_busy_until_its_event_is_in(browser_page):
     }))
     expect(page.locator("#poll-item-dialog")).to_be_visible()
     expect(page.locator("#poll-item-title")).to_have_text("Item one")
+
+
+@pytest.mark.parametrize("view, reveal, row_selector, pattern, body, dialog", [
+    ("/workflows?tab=hooks", None, '.activity-row[data-delivery="d-1"]', "**/api/admin/hook-triggers/deliveries/d-1",
+     {"delivery": {"delivery_id": "d-1", "hook": "intake", "response_status": 200}}, "#hook-delivery-dialog"),
+    ("/runs", "#runs-events-section > summary", '.inbox-open[data-inbox="ev-1"]', "**/api/admin/triggers/inbox/ev-1",
+     {"event": {"inbox_id": "ev-1", "connector": "slack", "event": "message"}}, "#inbox-event-dialog"),
+])
+def test_rows_that_open_a_fetched_dialog_go_busy_first(browser_page, view, reveal, row_selector, pattern, body, dialog):
+    from playwright.sync_api import expect
+
+    page, origin, _ = browser_page
+    held = _held(page, pattern)
+    page.goto(origin + view)
+    page.locator("#app").wait_for(state="visible")
+    if reveal:
+        page.locator(reveal).click()
+    row = page.locator(row_selector)
+    row.click()
+    route = _wait_for(page, held)
+    expect(row).to_have_attribute("aria-busy", "true")
+    expect(page.locator("dialog.dk-loading")).to_be_visible()  # rows get the overlay at the busy delay
+    assert not _is_open(page, dialog)
+    route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+    expect(page.locator(dialog)).to_be_visible()
+    expect(page.locator("dialog.dk-loading")).to_be_hidden()
+    expect(row).not_to_have_attribute("aria-busy", "true")
