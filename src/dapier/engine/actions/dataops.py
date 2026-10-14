@@ -306,6 +306,32 @@ def _leads_norm_url(url):
     return f"https://{host}" + (f"/{rest}" if rest else "")
 
 
+# Schema field names the extractor echoes when it invents a URL instead of
+# copying one from the email (live case: micro1 ->
+# https://www.micro1.ai/category/service/blurb/context). Two or more of
+# these as path segments means the URL was composed, not copied; a single
+# one (e.g. a real /category/ section) still passes.
+_SCHEMA_PATH_WORDS = frozenset({"category", "blurb", "context"})
+_PLACEHOLDER_PATH_RE = re.compile(r"tbd|placeholder", re.IGNORECASE)
+
+
+def _leads_placeholder_url(normalized):
+    """True when a normalized https URL looks composed, not copied.
+
+    The extractor must omit url when the email only links through a
+    redirect/tracking host, but it sometimes hallucinates one from the
+    schema field names or placeholder tokens instead (live cases:
+    .../category/service/blurb/context, .../tbd-placeholder-removed).
+    Forwarding those pollutes DataOps with junk leads, so the builder
+    drops the URL and keeps the sponsor name.
+    """
+    rest = normalized[len("https://"):].partition("/")[2]
+    segments = [seg.lower() for seg in rest.split("/") if seg]
+    if sum(seg in _SCHEMA_PATH_WORDS for seg in segments) >= 2:
+        return True
+    return any(_PLACEHOLDER_PATH_RE.search(seg) for seg in segments)
+
+
 def _extraction_data(action, steps):
     """The ai_complete reply shape for the sponsors step: prefer the
     configured ``extraction_step`` (default ``extract-sponsors``), else any
@@ -386,6 +412,8 @@ def _leads_intake_body(action, event, *, steps=None):
         if not name:
             continue
         url = _leads_norm_url(entry.get("url"))
+        if url is not None and _leads_placeholder_url(url):
+            url = None
         # Same link under different name readings is one sponsor: dedup on
         # the URL when there is one, else on the normalized name.
         key = url if url else f"name:{_leads_norm_name(name)}"

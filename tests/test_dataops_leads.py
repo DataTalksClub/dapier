@@ -146,6 +146,30 @@ class EnvelopeTests(unittest.TestCase):
         sponsors = body(steps=steps)["sponsors"]
         assert sponsors == [{"name": "A"}, {"name": "B"}, {"name": "C"}, {"name": "D"}]
 
+    def test_hallucinated_urls_are_omitted_name_kept(self):
+        # Live cases: the extractor composed URLs from the schema field
+        # names / placeholder tokens when the email only linked through a
+        # redirect. The sponsor name is honest; the URL is junk.
+        steps = extraction_steps(sponsors=[
+            {"name": "micro1",
+             "url": "https://www.micro1.ai/category/service/blurb/context"},
+            {"name": "Union.ai", "url": "https://union.ai/tbd-placeholder-removed"},
+        ])
+        sponsors = body(steps=steps)["sponsors"]
+        assert sponsors == [{"name": "micro1"}, {"name": "Union.ai"}]
+
+    def test_single_schema_word_path_segment_is_kept(self):
+        # A real section path (one schema-ish word) is not a hallucination.
+        steps = extraction_steps(sponsors=[
+            {"name": "Acme", "url": "https://acme.example/category/launch"},
+            {"name": "Beta", "url": "https://beta.example/"},
+        ])
+        sponsors = body(steps=steps)["sponsors"]
+        assert sponsors == [
+            {"name": "Acme", "url": "https://acme.example/category/launch"},
+            {"name": "Beta", "url": "https://beta.example"},
+        ]
+
     def test_duplicates_collapse_case_insensitively_first_wins(self):
         steps = extraction_steps(sponsors=[
             {"name": "Acme Cloud", "url": "https://acme.example/", "blurb": "first"},
