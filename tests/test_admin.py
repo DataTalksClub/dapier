@@ -785,6 +785,45 @@ def test_admin_run_replay_reinjects_the_original_event(monkeypatch):
     assert missing["statusCode"] == 404
 
 
+def test_admin_run_replay_recovers_raw_pointer_from_preview(monkeypatch):
+    """A clipped step input whose preview still names the raw MIME copy
+    replays: rows stored before the s3/raw_mime mirror keys existed keep
+    only {truncated, preview[, message_id]}."""
+    from email.message import EmailMessage
+    from unittest.mock import MagicMock
+
+    from src.dapier.triggers.intake import email_ingress
+
+    preview = ('{"route": "newsletter", "message_id": "<w1@example.com>"'
+               ', "raw_mime": {"bucket": "mail-bucket", "key": "raw/abc123"}}')
+    cookies = _configure_runs(monkeypatch, [{
+        "execution_id": "wf-1:extract:evt-old", "run_id": "wf-1:evt-old",
+        "workflow_id": "wf-1", "action_id": "extract", "action_type": "ai_complete",
+        "connector": "email", "event_type": "message.received", "status": "failed",
+        "started_at": "2026-09-25T10:00:00+00:00", "finished_at": "2026-09-25T10:00:01+00:00",
+        "error": "ai_complete is not configured",
+        "input": {"truncated": True, "preview": preview},
+    }])
+    message = EmailMessage()
+    message["From"] = "News <news@example.com>"
+    message["To"] = "newsletter@mail.example"
+    message["Subject"] = "Welcome!"
+    message["Message-ID"] = "<w1@example.com>"
+    message.set_content("hello subscriber")
+    s3 = MagicMock()
+    s3.get_object.return_value = {"Body": MagicMock(read=lambda: message.as_bytes())}
+    monkeypatch.setattr(email_ingress, "s3", s3)
+    calls = _configure_replay_queue(monkeypatch)
+
+    replayed = admin.route(operator_request("POST", "/api/admin/runs/wf-1%3Aevt-old/replay", cookies=cookies),
+                           "POST", "/api/admin/runs/wf-1%3Aevt-old/replay")
+
+    assert replayed["statusCode"] == 202
+    envelope = json.loads(calls[0]["MessageBody"])
+    assert envelope["correlation_id"] == "evt-old"
+    assert envelope["data"]["message_id"] == "<w1@example.com>"
+
+
 def test_admin_run_replay_requires_authentication(monkeypatch):
     _configure_runs(monkeypatch, [])
 

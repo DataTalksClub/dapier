@@ -1,11 +1,14 @@
 """Trigger inbox domain behavior: record, close-out, read, replay."""
 import json
+from email.message import EmailMessage
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
 from botocore.exceptions import ClientError
 
 from src.dapier.triggers import inbox
+from src.dapier.triggers.intake import email_ingress
 
 
 EVENT = {
@@ -293,6 +296,48 @@ def test_api_replay_rejects_truncated_data(table):
                                   data={"truncated": True, "preview": "..."})
     status, payload = inbox.api_replay("evt-big", queue=FakeQueue(), table_ref=table)
     assert status == 409
+
+
+def _preview_raw_message():
+    message = EmailMessage()
+    message["From"] = "News <news@example.com>"
+    message["To"] = "newsletter@mail.example"
+    message["Subject"] = "Welcome!"
+    message["Message-ID"] = "<welcome-1@example.com>"
+    message.set_content("hello subscriber")
+    return message.as_bytes()
+
+
+def test_pointer_from_preview_recovers_the_raw_copy():
+    preview = ('{"route": "newsletter", "body": {"text": {"value": "x"}}'
+               ', "raw_mime": {"bucket": "mail-bucket", "key": "raw/abc123"}}')
+    assert inbox.pointer_from_preview(preview) == {
+        "bucket": "mail-bucket", "key": "raw/abc123"}
+    # Processed part pointers are not raw MIME and must not qualify.
+    staged = '{"raw_mime": {"bucket": "b", "key": "processed/evt/body.html"}}'
+    assert inbox.pointer_from_preview(staged) is None
+    assert inbox.pointer_from_preview('{"truncated": true}') is None
+    assert inbox.pointer_from_preview(None) is None
+
+
+def test_api_replay_recovers_raw_pointer_from_preview(table, monkeypatch):
+    """Rows stored before the s3/raw_mime mirror keys existed keep only a
+    preview — the replay still works when the preview names the raw copy."""
+    preview = ('{"route": "newsletter", "message_id": "<welcome-1@example.com>"'
+               ', "raw_mime": {"bucket": "mail-bucket", "key": "raw/abc123"}}')
+    table.items["evt-old"] = dict(EVENT, inbox_id="evt-old",
+                                  connector="email", event="message.received",
+                                  data={"truncated": True, "preview": preview,
+                                        "message_id": "<welcome-1@example.com>"})
+    s3 = MagicMock()
+    s3.get_object.return_value = {"Body": MagicMock(read=lambda: _preview_raw_message())}
+    monkeypatch.setattr(email_ingress, "s3", s3)
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://queue")
+
+    status, payload = inbox.api_replay("evt-old", queue=FakeQueue(), table_ref=table)
+
+    assert status == 202
+    assert payload["replayed_from"] == "evt-old"
 
 
 def test_record_stores_20kb_data_and_replays_it(table, monkeypatch):

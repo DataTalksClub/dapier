@@ -665,12 +665,47 @@ def stored(inbox_id, *, table_ref=None):
     return _decode_numbers(item) if item else None
 
 
+_PREVIEW_BUCKET_RE = re.compile(r'"bucket"\s*:\s*"([^"]+)"')
+_PREVIEW_KEY_RE = re.compile(r'"key"\s*:\s*"([^"]+)"')
+
+
+def pointer_from_preview(preview):
+    """``{bucket, key}`` of the raw MIME copy named inside a clipped preview.
+
+    Rows stored before the s3/raw_mime mirror keys existed keep only
+    ``{truncated, preview[, message_id]}``; the preview is the head of the
+    event-data JSON, which usually still names the raw copy. Only ``raw/``
+    keys qualify — ``processed/`` part pointers are not raw MIME and would
+    not parse. Returns None when the pointer was clipped away too.
+    """
+    if not isinstance(preview, str):
+        return None
+    start = preview.find('"raw_mime"')
+    while start != -1:
+        brace = preview.find("{", start)
+        end = preview.find("}", brace) if brace != -1 else -1
+        if brace == -1 or end == -1 or end - brace > 400:
+            return None
+        chunk = preview[brace:end]
+        bucket = _PREVIEW_BUCKET_RE.search(chunk)
+        key = _PREVIEW_KEY_RE.search(chunk)
+        if bucket and key and key.group(1).startswith("raw/"):
+            return {"bucket": bucket.group(1), "key": key.group(1)}
+        start = preview.find('"raw_mime"', start + 1)
+    return None
+
+
 def rehydrate(data):
     """Full event data for a truncated stored row, rebuilt from the raw
     email copy its ``s3`` pointer names. Returns ``(data, None)``, or
     ``(None, error)`` when there is no pointer or the copy is unreadable —
     callers keep their explicit replay refusal in that case."""
     pointer = (data.get("s3") or data.get("raw_mime")) if isinstance(data, dict) else None
+    if not pointer and isinstance(data, dict):
+        # Rows stored before the s3/raw_mime mirror keys existed keep only
+        # {truncated, preview[, message_id]} — recover the raw copy's
+        # pointer from inside the preview when it survived the clip.
+        pointer = pointer_from_preview(data.get("preview"))
     if not pointer:
         return None, "The event data was too large to store; it cannot be replayed"
     from .intake import email_ingress

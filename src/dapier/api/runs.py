@@ -807,10 +807,14 @@ def _replay_data(data, original_event_id):
     from ..triggers import inbox as inbox_store
     from ..triggers.intake import email_ingress
 
-    pointer = data.get("s3")
+    pointer = data.get("s3") or data.get("raw_mime")
+    if not pointer:
+        pointer = inbox_store.pointer_from_preview(data.get("preview"))
     if not pointer:
         item = inbox_store.stored(original_event_id) or {}
-        pointer = (item.get("data") or {}).get("s3")
+        item_data = item.get("data") or {}
+        pointer = (item_data.get("s3") or item_data.get("raw_mime")
+                   or inbox_store.pointer_from_preview(item_data.get("preview")))
     if not pointer:
         return None, "The original event data was too large to store; it cannot be replayed"
     full, error = email_ingress.replay_data(pointer)
