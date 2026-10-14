@@ -1,7 +1,7 @@
 /* Connections view: a register of services, each with its own add button,
    and a list of services not connected yet. */
 import { state } from '../state.js';
-import { $, $$, notice, serviceMark, whenMenusClosed } from '../ui.js';
+import { $, $$, notice, serviceMark, whenMenusClosed, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, statusLine } from '../format.js';
 import { refresh } from './overview.js';
@@ -1204,37 +1204,33 @@ function renderDiscoverResource() {
   result.innerHTML = '';
 }
 
-async function openDiscover(connectionId) {
-  discoverCatalog = { connectionId, resources: [] };
-  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
-  $('#connection-discover-title').textContent = `Explore data — ${connection ? accountLabel(connection) : connectionId}`;
-  $('#connection-discover-meta').textContent = connection ? `${connection.provider} · ${connectionId}` : connectionId;
-  $('#discover-error').textContent = '';
-  $('#discover-result').hidden = true;
-  $('#discover-result').innerHTML = '';
-  $('#discover-resource').innerHTML = '<option value="">Loading…</option>';
-  $('#discover-resource-description').hidden = true;
-  $('#discover-params').hidden = true;
-  $('#discover-params').innerHTML = '';
-  $('#discover-run').disabled = true;
-  $('#connection-discover-dialog').showModal();
-  let catalog;
-  try {
-    catalog = await api(`/api/admin/connections/${encodeURIComponent(connectionId)}/discover`);
-  } catch (error) {
-    $('#discover-error').textContent = error.message;
-    return;
-  }
-  discoverCatalog.resources = catalog.resources || [];
-  if (!discoverCatalog.resources.length) {
-    $('#discover-resource').innerHTML = '<option value="">No discoverable resources</option>';
-    $('#discover-error').textContent = 'This provider exposes nothing to browse; use Test to check the connection instead.';
-    return;
-  }
-  $('#discover-resource').innerHTML = discoverCatalog.resources.map((resource) =>
-    `<option value="${escapeHtml(resource.name)}">${escapeHtml(resource.label || resource.name)}</option>`).join('');
-  $('#discover-run').disabled = false;
-  renderDiscoverResource();
+function openDiscover(connectionId, trigger) {
+  const load = (signal) => api(`/api/admin/connections/${encodeURIComponent(connectionId)}/discover`, { signal });
+  return openWhenReady(trigger, 'data catalog', load, (catalog) => {
+    discoverCatalog = { connectionId, resources: catalog.resources || [] };
+    const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+    $('#connection-discover-title').textContent = `Explore data — ${connection ? accountLabel(connection) : connectionId}`;
+    $('#connection-discover-meta').textContent = connection ? `${connection.provider} · ${connectionId}` : connectionId;
+    $('#discover-error').textContent = '';
+    $('#discover-result').hidden = true;
+    $('#discover-result').innerHTML = '';
+    $('#discover-resource-description').hidden = true;
+    $('#discover-params').hidden = true;
+    $('#discover-params').innerHTML = '';
+    const empty = !discoverCatalog.resources.length;
+    $('#discover-run').disabled = empty;
+    if (empty) {
+      $('#discover-resource').innerHTML = '<option value="">No discoverable resources</option>';
+      $('#discover-error').textContent = 'This provider exposes nothing to browse; use Test to check the connection instead.';
+    } else {
+      $('#discover-resource').innerHTML = discoverCatalog.resources.map((resource) =>
+        `<option value="${escapeHtml(resource.name)}">${escapeHtml(resource.label || resource.name)}</option>`).join('');
+      renderDiscoverResource();
+    }
+    /* The Manage dialog stays up (its button busy) until the catalog is in. */
+    $('#edit-connection-dialog').close();
+    return $('#connection-discover-dialog');
+  });
 }
 
 function renderDiscoverItems(data) {
@@ -1285,11 +1281,10 @@ $('#discover-run').addEventListener('click', async (event) => {
   }
 });
 
-$('#edit-connection-discover').addEventListener('click', () => {
+$('#edit-connection-discover').addEventListener('click', (event) => {
   const connectionId = $('#edit-connection-form').dataset.connectionId;
   if (!connectionId) return;
-  $('#edit-connection-dialog').close();
-  void openDiscover(connectionId);
+  void openDiscover(connectionId, event.currentTarget);
 });
 
 let shownGrants = [];

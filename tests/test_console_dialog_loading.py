@@ -23,6 +23,7 @@ RUN = {
 }
 WORKFLOW = {"id": "wf-one", "name": "wf-one", "source": "wf-one.yaml", "enabled": True,
             "trigger": {"connector": "manual", "event": "run"}, "actions": []}
+CONNECTION = {"connection_id": "slack-main", "provider": "slack", "status": "connected", "scopes": []}
 
 
 def _shot(page, name):
@@ -58,7 +59,9 @@ def browser_page(monkeypatch):
 
     def payload(path):
         if path.startswith("/api/admin/overview"):
-            return {"workflows": [WORKFLOW]}
+            return {"workflows": [WORKFLOW], "connections": [CONNECTION]}
+        if path == "/api/admin/connections":
+            return {"connections": [CONNECTION]}
         return original(path)
 
     monkeypatch.setattr(console_boot, "_api_payload", payload)
@@ -138,3 +141,30 @@ def test_versions_from_the_row_menu_busy_the_more_button_until_loaded(browser_pa
     expect(dialog).not_to_contain_text("Loading")
     expect(more).not_to_have_attribute("aria-busy", "true")
     _shot(page, f"versions-open-{scheme}")
+
+
+def test_explore_data_keeps_manage_open_until_the_catalog_is_in(browser_page):
+    from playwright.sync_api import expect
+
+    page, origin, scheme = browser_page
+    held = _held(page, "**/api/admin/connections/slack-main/discover")
+    page.goto(origin + "/connections")
+    page.locator("#app").wait_for(state="visible")
+    page.locator(".connection-edit").first.click()
+    explore = page.locator("#edit-connection-discover")
+    explore.click()
+    route = _wait_for(page, held)
+    expect(explore).to_have_attribute("aria-busy", "true")
+    expect(page.locator("#edit-connection-dialog")).to_be_visible()
+    assert not _is_open(page, "#connection-discover-dialog")
+    page.wait_for_timeout(250)  # past --dk-loading-delay-busy: the spinner shows
+    _shot(page, f"explore-busy-{scheme}")
+    route.fulfill(status=200, content_type="application/json", body=json.dumps({"resources": [
+        {"name": "channels", "label": "Channels", "description": "Public channels", "params": []},
+    ]}))
+    dialog = page.locator("#connection-discover-dialog")
+    expect(dialog).to_be_visible()
+    expect(page.locator("#edit-connection-dialog")).to_be_hidden()
+    expect(page.locator("#discover-resource option")).to_have_text(["Channels"])
+    expect(page.locator("#discover-run")).to_be_enabled()
+    _shot(page, f"explore-open-{scheme}")
