@@ -956,8 +956,10 @@ input[type="checkbox"], input[type="radio"] {
   .save-problems { grid-area: hint; justify-self: start; font-size: var(--dk-text-xs); }
   .topbar-actions { grid-area: actions; }
   /* Embedded in the console, the console's app bar already names the
-     workflow: no empty name row, the switch and actions share one row. */
-  .designer-topbar.embedded { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "switch actions" "hint hint"; grid-template-rows: auto; padding: 8px 12px; }
+     workflow: no empty name row. The Canvas/YAML track spans its own row
+     (dakit's phone segmented control), the actions sit on the next; one
+     shared row overflowed and the actions slid under the switch. */
+  .designer-topbar.embedded { grid-template-columns: minmax(0, 1fr); grid-template-areas: "switch" "actions" "hint"; grid-template-rows: auto; padding: 8px 12px; }
   .designer-topbar.embedded::after { content: none; }
   .designer-topbar.embedded .topbar-actions { justify-content: flex-end; flex-wrap: nowrap; gap: 8px; min-width: 0; }
   /* The switch keeps its accessible name; its On/Off word yields the room. */
