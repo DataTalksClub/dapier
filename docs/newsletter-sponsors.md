@@ -5,8 +5,8 @@ sponsor mentions and filed into the DataOps sponsors-leads intake
 (`POST /api/v1/intake/leads`, contract `2026-10-10`). Dapier is only the
 pipe — transport, extraction and formatting; sponsor records, outreach and
 review live in DataOps. The canonical definition is
-`workflows/newsletter-sponsors.yaml`, currently `enabled: false` — an
-example, not a live flow. Nothing in Dapier keeps sponsor state.
+`workflows/newsletter-sponsors.yaml`, live and `enabled: true`; the file
+mirrors the published definition. Nothing in Dapier keeps sponsor state.
 
 This mirrors the invoice intake (`docs/invoice-intake.md`,
 `workflows/invoice-intake.yaml`): Dapier never parses domain contents for
@@ -38,8 +38,9 @@ SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workfl
      the invoice intake. The envelope is built by
      engine.actions.dataops._leads_intake_body from the email event plus
      the extraction (normalization: trim, https-only URLs, within-email
-     dedup on name|url first-wins, 20-cap). on_fail: continue skips issues
-     with no forwardable sponsors instead of failing the run.
+     dedup on name|url first-wins, 20-cap). An issue with no forwardable
+     sponsors posts `sponsors: []`: DataOps records every issue on its
+     newsletter, sponsors or not. A forward failure fails the run.
 ```
 
 Each email is one SQS message, so concurrent newsletters file concurrently.
@@ -72,7 +73,8 @@ after a lost response is safe.
 }
 ```
 
-`version` is exactly `2026-10-10`. `sponsors` carries 1–20 entries;
+`version` is exactly `2026-10-10`. `sponsors` carries 0–20 entries (an
+empty array records an issue that had no paid placements);
 `url` is optional (omit when unknown or not `https:` — the builder drops
 junk URLs rather than failing); `category` is optional (one of
 tool/product/service/event/course/book/job/community/other, max 40);

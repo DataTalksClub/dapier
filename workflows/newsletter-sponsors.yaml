@@ -105,9 +105,8 @@ actions:
   # Normalization (trim, https-only URLs, within-email dedup, 20-cap) lives
   # in that builder — no code step needed (code steps see event data only).
   # Same auth as the invoice intake: the dapier/dataops secret lands in
-  # x-dataops-intake-secret. on_fail: continue skips issues whose
-  # extraction found no forwardable sponsors instead of failing the run.
+  # x-dataops-intake-secret. An issue with no forwardable sponsors posts
+  # sponsors: [] so DataOps records it as checked; a real failure fails the run.
   connection_id: dataops
   auth_secret_id: dapier/dataops
   extraction_step: extract-sponsors
-  on_fail: continue

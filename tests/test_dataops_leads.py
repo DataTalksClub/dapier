@@ -200,9 +200,15 @@ class EnvelopeTests(unittest.TestCase):
         assert body(steps=steps)["sponsors"] == [
             {"name": "Gamma", "url": "https://gamma.example"}]
 
-    def test_empty_sponsors_fails_loudly(self):
-        with self.assertRaisesRegex(ValueError, "no sponsors"):
-            body(steps=extraction_steps(sponsors=[]))
+    def test_empty_sponsors_posts_the_issue_with_no_sponsors(self):
+        envelope = body(steps=extraction_steps(sponsors=[]))
+        assert envelope["sponsors"] == []
+        assert envelope["newsletter"]["name"] == "Data Bites Weekly"
+        assert envelope["messageId"] == "<abc123@example.test>"
+
+    def test_sponsors_dropped_by_normalization_post_an_empty_list(self):
+        envelope = body(steps=extraction_steps(sponsors=[{"name": "  "}, "junk"]))
+        assert envelope["sponsors"] == []
 
     def test_more_than_twenty_sponsors_fails_loudly(self):
         sponsors = [{"name": f"Sponsor {i}"} for i in range(21)]

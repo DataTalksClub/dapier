@@ -19,7 +19,8 @@ STAGING_PREFIX = "transfer/"
 # Newsletter-sponsors leads intake (DataOps contract 2026-10-10). Dapier is
 # only the pipe: one LLM extraction plus this formatter; sponsor records,
 # dedup across emails, outreach and review live in DataOps. The intake
-# accepts 1-20 sponsors per POST and dedups per lead on
+# accepts 0-20 sponsors per POST — an issue with none is still recorded on
+# its newsletter (checked, no paid placements) — and dedups per lead on
 # sha256("lead:"+messageId+name+url), so this builder normalizes within one
 # email only (trim/collapse, https-only URLs, within-email dedup, caps) and
 # fails loudly on anything the intake would reject.
@@ -384,7 +385,8 @@ def _leads_intake_body(action, event, *, steps=None):
 
     Event metadata (messageId/sender/subject/date) comes from the email
     event; the newsletter name and sponsor mentions come from the
-    extraction step. Normalization is within-email only — cross-email
+    extraction step. An issue with no sponsors posts ``sponsors: []`` so
+    DataOps records it. Normalization is within-email only — cross-email
     dedup is the intake's idempotency rule. Raises ValueError (fails the
     step) on anything the intake would reject, so problems read loudly
     instead of posting a 4xx the autoretry would pace pointlessly."""
@@ -436,8 +438,6 @@ def _leads_intake_body(action, event, *, steps=None):
         if context:
             sponsor["context"] = context
         sponsors.append(sponsor)
-    if not sponsors:
-        raise ValueError("leads intake has no sponsors to forward (extraction found none)")
     if len(sponsors) > MAX_LEADS_SPONSORS:
         raise ValueError(
             f"leads intake accepts at most {MAX_LEADS_SPONSORS} sponsors, got {len(sponsors)}")
