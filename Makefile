@@ -1,4 +1,4 @@
-.PHONY: build deploy test plugin-test validate layer sync-dakit designer-install designer designer-build designer-console
+.PHONY: check-borders sync-dakit build deploy test plugin-test validate layer sync-dakit designer-install designer designer-build designer-console
 
 build: layer
 	scripts/build-sam.sh
@@ -47,12 +47,18 @@ designer-build:
 # Refresh the vendored dakit design system (src/web/vendor/) from the dakit
 # checkout next to this repo. Run after changing dakit tokens/styles, then
 # commit the result — the console serves the vendored copy, never ../dakit.
+DAKIT ?= ../dakit
 sync-dakit:
 	mkdir -p src/web/vendor/fonts
-	cp ../dakit/dist/dakit.css src/web/vendor/dakit.css
-	cp ../dakit/dist/tokens.css src/web/vendor/dakit-tokens.css
-	cp ../dakit/dist/dialogs.js src/web/vendor/dakit-dialogs.js
-	cp ../dakit/fonts/*.woff2 src/web/vendor/fonts/
+	cp $(DAKIT)/dist/dakit.css src/web/vendor/dakit.css
+	cp $(DAKIT)/dist/tokens.css src/web/vendor/dakit-tokens.css
+	cp $(DAKIT)/dist/dialogs.js src/web/vendor/dakit-dialogs.js
+	cp $(DAKIT)/fonts/*.woff2 src/web/vendor/fonts/
+	cp $(DAKIT)/scripts/check-borders.mjs src/web/vendor/check-borders.mjs
+
+# Fail on forbidden accent borders in the console (dakit "No colored edge accents").
+check-borders:
+	node src/web/vendor/check-borders.mjs src/web
 
 # Rebuild the bundle vendored into the console (src/web/designer.js/.css,
 # served at /designer). Run after changing designer sources.
