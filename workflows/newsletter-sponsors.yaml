@@ -1,4 +1,4 @@
-# Newsletter sponsor extraction (example — disabled).
+# Newsletter sponsor extraction (live).
 #
 # Follow the invoice-intake pattern (workflows/invoice-intake.yaml): Dapier
 # transports, extracts and forwards; DataOps owns the contents. This flow
@@ -7,12 +7,12 @@
 # (POST /api/v1/intake/leads, contract 2026-10-10). Nothing is stored in
 # Dapier: no sponsor store, no ledger, no review queue.
 #
-# Status: example only (`enabled: false`). Before enabling, confirm the
-# DataOps connection's url (API origin), the intake secret, and
-# the LLM_* env (docs/connectors/ai.md — Anthropic's OpenAI-compatible API
-# with model claude-sonnet-5-5; prefer a workspace-scoped key).
+# Live state: enabled. The DataOps connection carries the API origin and the
+# intake secret lives at dapier/dataops; the LLM runs on the `llm`
+# connection (model claude-sonnet-5-5). This file mirrors the live
+# definition — change it through save/publish, then sync here.
 id: newsletter-sponsors
-enabled: false
+enabled: true
 trigger:
   connector: email
   event: message.received
@@ -54,7 +54,9 @@ actions:
 
     Name the company, not the campaign title, when the company is visible.
     url must be https and the sponsor's own site; omit url when unknown,
-    http-only, mailto, a substack.com/redirect, or a tracking host.
+    http-only, mailto, a substack.com/redirect, or a tracking host. Copy each url verbatim from
+    the email body — never compose, guess, or autocomplete one from field
+    names, placeholders, or the sponsor's homepage.
     Omit empty url, blurb, and context. At most 20 sponsors; dedup on
     name+url. category is optional (tool, product, service, event, course,
     book, job, community, other) — omit it rather than guess.

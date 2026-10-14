@@ -1,10 +1,10 @@
 """Guard the shipped newsletter-sponsors workflow file.
 
 The canonical `workflows/newsletter-sponsors.yaml` must satisfy the same
-save-time validation the API enforces, stay disabled until sender-policy
-lands, and keep the extract-sponsors prompt pinned to the gold paid-only
-rules (contract 2026-10-10). Substrings only — the private labeled corpus
-is not in git.
+save-time validation the API enforces, stay enabled (it serves the live
+newsletter@ route), and keep the extract-sponsors prompt pinned to the gold
+paid-only rules (contract 2026-10-10). Substrings only — the private labeled
+corpus is not in git.
 """
 from pathlib import Path
 
@@ -31,7 +31,7 @@ def extract_action():
 def test_the_shipped_newsletter_sponsors_workflow_validates():
     workflow = parse_workflow(WORKFLOW_FILE.read_text())
     assert workflow["id"] == "newsletter-sponsors"
-    assert workflow["enabled"] is False
+    assert workflow["enabled"] is True
     assert workflow["trigger"]["connector"] == "email"
     assert workflow["trigger"]["event"] == "message.received"
     assert workflow["trigger"]["filters"]["route"]["equals"] == "newsletter"
@@ -76,6 +76,8 @@ def test_extract_sponsors_prompt_encodes_gold_paid_only_rules():
     assert "when in doubt, omit" in lowered
     assert "sponsor this newsletter" in lowered
     assert "substack.com/redirect" in lowered
+    # URLs are copied verbatim, never composed (hallucinated-URL guard).
+    assert "verbatim" in lowered
 
     # Body templating covers SES string html/text and Datamailer's
     # {html: {value: ...}} / body.text.value so the model sees the issue.
