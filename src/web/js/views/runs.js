@@ -1,7 +1,7 @@
 /* Runs view: one row per run (a workflow's handling of one trigger event),
    and the Zapier-style flow dialog: trigger → each action with its data. */
 import { state } from '../state.js';
-import { $, icons, notice } from '../ui.js';
+import { $, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, runStatusLine, resolvedLine, formatTimestamp, formatDuration, dataBlock, triggerEventLabel, sentenceCase } from '../format.js';
 import { workflowName, workflowLabelHtml } from '../workflow-names.js';
@@ -498,22 +498,25 @@ export function flow(data) {
   return `<ol class="flow">${cards.join('')}</ol>`;
 }
 
-export async function openRun(runId) {
-  $('#run-title').textContent = 'Run';
+export function openRun(runId, trigger) {
+  return openWhenReady(trigger, 'run', (signal) => loadRun(runId, signal), (data) => renderRun(data, runId));
+}
+
+function loadRun(runId, signal) {
+  return api(`/api/admin/runs/${encodeURIComponent(runId)}`, { signal });
+}
+
+/* Re-render the open run dialog in place after an action inside it (Mark
+   fixed, Cancel): the dialog stays open, the acting button carries the busy
+   state. */
+async function refreshRun(runId) {
+  renderRun(await loadRun(runId), runId);
+}
+
+function renderRun(data, runId) {
   $('#run-replay-result').hidden = true;
   $('#run-replay-result').textContent = '';
   $('#run-replay-result').classList.remove('error');
-  $('#run-actions').innerHTML = '';
-  $('#run-actions-start').innerHTML = '';
-  $('#run-detail').innerHTML = '<div class="dialog-state"><p>Loading the run…</p></div>';
-  $('#run-dialog').showModal();
-  let data;
-  try {
-    data = await api(`/api/admin/runs/${encodeURIComponent(runId)}`);
-  } catch (error) {
-    $('#run-detail').innerHTML = `<div class="dialog-state"><strong>This run could not be loaded</strong><p>The run service answered: ${escapeHtml(error.message)}</p><button class="dk-button dk-button--secondary run-retry" type="button" data-run="${escapeHtml(runId)}">Try again</button></div>`;
-    return;
-  }
   const run = data.run || {};
   const id = run.run_id || runId;
   $('#run-title').textContent = run.workflow_id ? workflowName(run.workflow_id) : 'Run';
@@ -543,12 +546,8 @@ export async function openRun(runId) {
     <dl class="run-summary">${summary.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
     <section class="run-flow" aria-label="Steps">${flow(data)}</section>`;
   icons();
+  return $('#run-dialog');
 }
-
-document.addEventListener('click', (event) => {
-  const button = event.target.closest('.run-retry');
-  if (button && button.dataset.run) void openRun(button.dataset.run);
-});
 
 /* Mark fixed retires a failure nothing will re-derive away: it stamps the
    run's steps server-side (the same route `dapier runs resolve` calls), so
@@ -567,7 +566,7 @@ document.addEventListener('click', async (event) => {
       method: 'POST',
       body: '{}',
     });
-    await openRun(runId); // re-render with the fixed verdict
+    await refreshRun(runId); // re-render with the fixed verdict
     const result = $('#run-replay-result');
     result.classList.remove('error');
     result.textContent = 'Marked fixed: this run keeps its failed status and error in history, '
@@ -599,7 +598,7 @@ document.addEventListener('click', async (event) => {
       method: 'POST',
       body: '{}',
     });
-    await openRun(runId); // re-render with the rolled-up status
+    await refreshRun(runId); // re-render with the rolled-up status
     const result = $('#run-replay-result');
     result.classList.remove('error');
     result.textContent = 'Run cancelled: the parked continuation is dropped and the remaining actions will not run.';

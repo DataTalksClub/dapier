@@ -31,7 +31,7 @@ def _runs_ctx():
     step_icons_start = RUNS_JS.index("const STEP_ICONS =")
     verdict_end = RUNS_JS.index("function triggerLabel(")
     card_start = RUNS_JS.index("export function stepCard(")
-    open_run_start = RUNS_JS.index("export async function openRun(")
+    open_run_start = RUNS_JS.index("export function openRun(")
 
     snippet = (
         RUNS_JS[step_icons_start:verdict_end]

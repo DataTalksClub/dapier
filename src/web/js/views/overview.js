@@ -680,7 +680,7 @@ export function openRowFor(event) {
   const workflowRow = event.target.closest('.workflow-open');
   if (workflowRow) return openWorkflow(workflowRow.dataset.workflow);
   const runRow = event.target.closest('.run-open');
-  if (runRow) return openRun(runRow.dataset.run);
+  if (runRow) return openRun(runRow.dataset.run, runRow);
 }
 
 /* Send the operator error digest now (POST /api/admin/errors/digest) — the

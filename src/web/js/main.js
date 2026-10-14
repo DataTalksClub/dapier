@@ -119,7 +119,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('.workflow-runs, .workflow-run-link');
   if (!button) return;
-  if (button.classList.contains('workflow-run-link')) return void openRun(button.dataset.run);
+  if (button.classList.contains('workflow-run-link')) return void openRun(button.dataset.run, button);
   if (!await setView('runs')) return;
   $('#runs-workflow-filter').value = button.dataset.workflow;
   $('#runs-status-filter').value = button.dataset.status || '';
@@ -307,7 +307,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const initialRefresh = refresh();
   if (initialView === 'runs') {
     const runId = new URLSearchParams(window.location.search).get('run');
-    if (runId) await openRun(runId);
+    if (runId) void openRun(runId); // no trigger: the loading overlay
   }
   if (initialView === 'costs') renderCosts();
   if (initialView === 'audit') refreshAudit();

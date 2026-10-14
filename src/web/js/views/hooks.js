@@ -579,7 +579,7 @@ $('[data-workflow-panel="hooks"]').addEventListener('click', (event) => {
   const target = event.target;
   if (target.closest('#hooks-clear-filter')) return void setFilter('');
   const runLink = target.closest('.activity-run');
-  if (runLink) return void openRun(runLink.dataset.run);
+  if (runLink) return void openRun(runLink.dataset.run, runLink);
   const filterButton = target.closest('[data-hook-filter]');
   if (filterButton) return void setFilter(filterButton.dataset.hookFilter);
   const copy = target.closest('.hook-copy');
@@ -619,7 +619,7 @@ $('#hook-delivery-dialog').addEventListener('click', (event) => {
     return;
   }
   const run = event.target.closest('.hook-open-run');
-  if (run) void openRun(run.dataset.run);
+  if (run) void openRun(run.dataset.run, run);
 });
 
 $('#hook-delivery-replay').addEventListener('click', () => {

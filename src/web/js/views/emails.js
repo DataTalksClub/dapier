@@ -726,7 +726,7 @@ $('.view[data-page="emails"]').addEventListener('click', async (event) => {
     return;
   }
   const run = event.target.closest('.email-run');
-  if (run) { event.stopPropagation(); void openRun(run.dataset.run); return; }
+  if (run) { event.stopPropagation(); void openRun(run.dataset.run, run); return; }
   const workflow = event.target.closest('.email-workflow');
   if (workflow) { void openDesigner(workflow.dataset.workflow); return; }
   const source = event.target.closest('#email-addresses .source-row');

@@ -400,7 +400,7 @@ $('[data-page="schedules"]').addEventListener('click', (event) => {
   if (name) { select(name.dataset.schedule); return; }
   const fire = event.target.closest('.activity-row[data-fire-schedule]');
   if (fire) {
-    if (fire.dataset.run) void openRun(fire.dataset.run);
+    if (fire.dataset.run) void openRun(fire.dataset.run, fire);
     else select(fire.dataset.fireSchedule);
   }
 });
@@ -410,7 +410,7 @@ $('#schedule-detail-dialog').addEventListener('click', (event) => {
   if (action) { void runAction(action.dataset.schedAction, action); return; }
   if (event.target.closest('.workflow-edit')) { $('#schedule-detail-dialog').close(); return; }
   const fire = event.target.closest('.activity-row[data-run]');
-  if (fire) void openRun(fire.dataset.run);
+  if (fire) void openRun(fire.dataset.run, fire);
 });
 
 document.addEventListener('keydown', (event) => {

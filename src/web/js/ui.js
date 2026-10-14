@@ -37,6 +37,27 @@ export function showStartupError(message) {
   $('#startup-retry').focus();
 }
 
+/* Load before open (dakit docs/dialog-loading.md): a dialog that needs
+   server data never opens half-loaded. The trigger goes busy while
+   load(signal) runs, render(data) fills the dialog and returns it, and only
+   then does it open; a slow load shows the dakit loading overlay, a failed
+   one a toast with Retry and no dialog. A load with no trigger (a deep
+   link) shows the overlay. `what` names the object for the overlay label
+   and the error toast ("run" → "Loading run…"). */
+export function openWhenReady(trigger, what, load, render, options = {}) {
+  /* A row-menu item hides with its menu on click; the row's "More" button
+     that opened the menu carries the busy state and gets focus back. */
+  const menu = trigger && trigger.closest('.row-menu[popover]');
+  if (menu) trigger = document.querySelector(`[popovertarget="${menu.id}"]`) || trigger;
+  const target = trigger || document.createElement('span');
+  return globalThis.dakitDialogs.openWhenReady(target, load, render, {
+    label: `Loading ${what}…`,
+    errorMessage: (error) => `Couldn't load the ${what}: ${error.message}`,
+    ...options,
+    ...(trigger ? {} : { spinner: 'overlay' }),
+  });
+}
+
 export function notice(message, error = false) {
   const element = $('#notice');
   element.textContent = message;
