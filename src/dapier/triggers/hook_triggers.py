@@ -557,12 +557,12 @@ def telegram_event_for(update):
 def _telegram_callback_data(update, hook_id):
     """The flattened event data for one callback_query update (see
     update_data). Key names match the message events for what they share
-    (hook, update_id, message_id, text, entities, chat_id, chat, from,
-    update) — the originating message, when Telegram attaches one — plus
-    the tap's own fields: ``id`` (what an answerCallbackQuery call echoes),
-    ``data`` (the button's payload string a workflow branches on) and
-    ``inline_message_id`` (present instead of ``message`` for keyboards on
-    messages sent via the inline mode)."""
+    (hook, update_id, message_id, message_thread_id, text, entities,
+    chat_id, chat, from, update) — the originating message, when Telegram
+    attaches one — plus the tap's own fields: ``id`` (what an
+    answerCallbackQuery call echoes), ``data`` (the button's payload string
+    a workflow branches on) and ``inline_message_id`` (present instead of
+    ``message`` for keyboards on messages sent via the inline mode)."""
     query = update.get("callback_query") or {}
     message = query.get("message") or {}
     chat = message.get("chat") or {}
@@ -574,6 +574,7 @@ def _telegram_callback_data(update, hook_id):
         "from": query.get("from") or {},
         "inline_message_id": query.get("inline_message_id"),
         "message_id": message.get("message_id"),
+        "message_thread_id": message.get("message_thread_id"),
         "text": message.get("text") or message.get("caption") or "",
         "entities": message.get("entities") or message.get("caption_entities") or [],
         "chat_id": chat.get("id"),
@@ -602,6 +603,7 @@ def update_data(update, hook_id):
         "hook": hook_id,
         "update_id": update.get("update_id"),
         "message_id": message.get("message_id"),
+        "message_thread_id": message.get("message_thread_id"),
         "text": message.get("text") or message.get("caption") or "",
         "entities": message.get("entities") or message.get("caption_entities") or [],
         "is_channel_post": bool(update.get("channel_post") or update.get("edited_channel_post")),

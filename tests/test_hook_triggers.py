@@ -247,6 +247,26 @@ class TelegramSaveTests(unittest.TestCase):
         self.assertEqual(data["text"], "")
         self.assertEqual(data["chat_id"], None)
 
+    def test_update_data_flattens_forum_topics(self):
+        """A message in a forum group flattens its topic id next to the chat
+        id, so a trigger-and-reply workflow can answer inside the same topic
+        (the ods-berlin-bot /ids port)."""
+        data = hook_triggers.update_data({
+            "update_id": 97,
+            "message": {
+                "message_id": 19010,
+                "text": "/ids",
+                "message_thread_id": 547,
+                "chat": {"id": -1001295648628, "title": "ODS Berlin",
+                         "type": "supergroup", "is_forum": True},
+                "from": {"id": 9, "first_name": "Ada"},
+            },
+        }, "ods-berlin")
+        self.assertEqual(data["chat_id"], -1001295648628)
+        self.assertEqual(data["message_thread_id"], 547)
+        self.assertEqual(data["text"], "/ids")
+        self.assertEqual(data["update"]["message"]["message_thread_id"], 547)
+
 
 class MailchimpTransport:
     """Records every Marketing API call behind a mailchimp trigger's
