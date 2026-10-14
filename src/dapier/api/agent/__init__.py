@@ -79,8 +79,10 @@ def _route(event, method, path):
         return device_start(event)
     if method == "POST" and path == "/api/agent/device/token":
         return device_token(event)
-    if method == "POST" and path == "/api/agent/device/confirm":
-        return device_confirm(event)
+    if method == "GET" and path == "/api/agent/device/pending":
+        return device_pending(event)
+    if method == "POST" and path == "/api/agent/device/approve":
+        return device_approve(event)
     if method == "POST" and path == "/api/agent/device/refresh":
         return device_refresh(event)
     if method == "POST" and path == "/api/agent/device/revoke":

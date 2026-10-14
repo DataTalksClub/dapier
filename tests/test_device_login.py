@@ -1,4 +1,10 @@
-"""Device pairing: storage logic and the /api/agent/device/* endpoints."""
+"""Device pairing: storage logic and the /api/agent/device/* endpoints.
+
+The wire matches the DataOps grant this flow was ported from: RFC 8628
+error vocabulary on the poll, review-then-decide in the browser, a
+shared five-attempt budget per pairing, and hashed codes everywhere at
+rest.
+"""
 
 import json
 import re
@@ -23,7 +29,7 @@ class FakeTable:
     _EXPRESSION_WORDS = {
         "SET", "REMOVE", "ADD", "DELETE", "AND", "OR", "NOT", "BETWEEN", "IN",
         "attribute_exists", "attribute_not_exists", "attribute_type",
-        "begins_with", "contains", "size",
+        "begins_with", "contains", "size", "if_not_exists",
     }
 
     def __init__(self):
@@ -54,24 +60,34 @@ class FakeTable:
         names = kwargs.get("ExpressionAttributeNames")
         self._check_expression(kwargs.get("UpdateExpression"), names)
         self._check_expression(kwargs.get("ConditionExpression"), names)
+        values = kwargs.get("ExpressionAttributeValues") or {}
         item = self.items.get(kwargs["Key"]["pk"])
-        condition = self._resolve(kwargs, kwargs.get("ConditionExpression") or "")
+        condition = self._resolve(kwargs, kwargs.get("ConditionExpression") or "").replace(" ", "")
         if "attribute_exists(pk)" in condition and item is None:
             raise KeyError(kwargs["Key"]["pk"])
-        if ":pending" in condition and (item is None or item.get("status") != "pending"):
+        if "status=:pending" in condition and (item is None or item.get("status") != "pending"):
             raise KeyError(kwargs["Key"]["pk"])
         if "attribute_not_exists(rotated_at)" in condition and item is not None \
                 and item.get("rotated_at"):
             raise KeyError(kwargs["Key"]["pk"])
-        values = kwargs.get("ExpressionAttributeValues") or {}
+        update = self._resolve(kwargs, kwargs.get("UpdateExpression") or "").replace(" ", "")
+        if item is None:
+            raise KeyError(kwargs["Key"]["pk"])
+        if "if_not_exists(attempts,:zero)+:one" in update:
+            item["attempts"] = int(item.get("attempts") or 0) + 1
         if ":approved" in values:
             item["status"] = values[":approved"]
             item["session"] = values[":session"]
+        if ":denied" in values:
+            item["status"] = values[":denied"]
+            item["decided_at"] = values[":decided"]
+        if ":spent" in values:
+            item["attempts"] = values[":spent"]
         if ":grace" in values:
             item["ttl"] = values[":grace"]
         if ":now" in values:
             item["rotated_at"] = values[":now"]
-        return {}
+        return {"Attributes": dict(item)} if kwargs.get("ReturnValues") == "ALL_NEW" else {}
 
     def delete_item(self, **kwargs):
         self.items.pop(kwargs["Key"]["pk"], None)
@@ -91,55 +107,122 @@ def store(monkeypatch):
     return fake
 
 
-def _device_event(path, body=None, source_ip="10.0.0.1"):
-    return {
-        "requestContext": {"http": {"method": "POST", "path": path, "sourceIp": source_ip}},
-        "body": json.dumps(body or {}),
+def _device_event(path, body=None, source_ip="10.0.0.1", method="POST"):
+    event = {
+        "requestContext": {"http": {"method": method, "path": path, "sourceIp": source_ip}},
+        "headers": {},
     }
+    if body is not None:
+        event["body"] = json.dumps(body)
+    return event
+
+
+def _start_pairing(label="grace@laptop", source_ip="10.0.0.1"):
+    response = agent_api.route(
+        _device_event("/api/agent/device/start", {"label": label}, source_ip=source_ip),
+        "POST", "/api/agent/device/start")
+    assert response["statusCode"] == 200
+    return json.loads(response["body"])
 
 
 def test_pairing_lifecycle_end_to_end(store):
-    device_code, view = device_sessions.start(table_ref=store)
+    device_code, view = device_sessions.start(table_ref=store, label="grace@laptop",
+                                              request_ip="203.0.113.9")
 
     assert view["user_code"].count("-") == 1
     left, right = view["user_code"].split("-")
     assert len(left) == len(right) == 4
+    assert all(char in device_sessions.USER_CODE_ALPHABET for char in left + right)
     assert device_code.startswith(device_sessions.PREFIX)
-    assert device_sessions.poll(device_code, table_ref=store) == {"status": "pending"}
+    assert device_sessions.poll(device_code, table_ref=store) == {
+        "error": "authorization_pending"}
 
-    assert device_sessions.approve(
-        view["user_code"].lower(), "Google_1", "op@datatalks.club", table_ref=store,
-    ) == "ok"
+    facts = device_sessions.lookup(view["user_code"], table_ref=store)
+    assert facts["label"] == "grace@laptop"
+    assert facts["request_ip"] == "203.0.113.9"
+    assert facts["expires_at"] > time.time()
+
+    outcome = device_sessions.decide(
+        view["user_code"].lower(), True, "Google_1", "op@datatalks.club", table_ref=store)
+    assert outcome == {"status": "approved", "label": "grace@laptop"}
 
     result = device_sessions.poll(device_code, table_ref=store)
-    assert result["status"] == "approved"
     assert result["token"].startswith(device_sessions.PREFIX)
     assert result["subject"] == "Google_1"
     assert result["email"] == "op@datatalks.club"
     assert result["expires_at"] > time.time()
     # Single delivery: the pairing is gone after the first successful poll.
-    assert device_sessions.poll(device_code, table_ref=store) == {"status": "expired"}
+    assert device_sessions.poll(device_code, table_ref=store) == {"error": "expired_token"}
 
     session = device_sessions.resolve(result["token"], table_ref=store)
     assert session == {"subject": "Google_1", "email": "op@datatalks.club"}
 
 
-def test_approve_rejects_unknown_and_expired_codes(store):
+def test_the_store_never_carries_a_plaintext_user_code(store):
     device_code, view = device_sessions.start(table_ref=store)
+    plain = view["user_code"].replace("-", "")
 
-    assert device_sessions.approve("ZZZZ-ZZZZ", "Google_1", "op@x", table_ref=store) == "invalid"
-    assert device_sessions.approve("short", "Google_1", "op@x", table_ref=store) == "invalid"
+    for pk, item in store.items.items():
+        assert plain not in pk
+        blob = json.dumps(item)
+        assert view["user_code"] not in blob and plain not in blob
+    pairing = store.items[f"pairing#{device_sessions._hash(device_code)}"]
+    canonical = view["user_code"]
+    assert pairing["user_code_hash"] == device_sessions._hash(canonical)
+    pointer_keys = [pk for pk in store.items if pk.startswith("usercode#")]
+    assert pointer_keys == [f"usercode#{device_sessions._hash(canonical)}"]
 
-    pairing_pk = f"pairing#{device_sessions._hash(device_code)}"
-    store.items[pairing_pk]["ttl"] = int(time.time()) - 1
-    assert device_sessions.approve(view["user_code"], "Google_1", "op@x", table_ref=store) == "invalid"
+
+def test_normalize_folds_case_and_separators_never_truncates():
+    assert device_sessions.normalize_user_code("abcd-efgh") == "ABCD-EFGH"
+    assert device_sessions.normalize_user_code(" bcdf ghjk ") == "BCDF-GHJK"
+    assert device_sessions.normalize_user_code("BCDF-GHJ") == ""
+    assert device_sessions.normalize_user_code("BCDFGHJKX") == ""
+
+
+def test_denied_grant_refuses_the_poll_and_dies(store):
+    device_code, view = device_sessions.start(table_ref=store)
+    outcome = device_sessions.decide(
+        view["user_code"], False, "Google_1", "op@x", table_ref=store)
+    assert outcome == {"status": "denied", "label": "Dapier CLI"}
+
+    assert device_sessions.poll(device_code, table_ref=store) == {"error": "access_denied"}
+    # The grant is spent: a second poll reads as an unknown code.
+    assert device_sessions.poll(device_code, table_ref=store) == {"error": "expired_token"}
+    # A late approve cannot resurrect a denied pairing.
+    assert device_sessions.decide(
+        view["user_code"], True, "Google_1", "op@x", table_ref=store) is None
+
+
+def test_the_attempt_budget_kills_guessed_codes(store):
+    _, view = device_sessions.start(table_ref=store)
+
+    for _ in range(device_sessions.DEVICE_MAX_ATTEMPTS):
+        assert device_sessions.lookup(view["user_code"], table_ref=store)
+    # At the budget the decision is refused...
+    assert device_sessions.decide(
+        view["user_code"], True, "Google_1", "op@x", table_ref=store) is None
+    # ...and one peek past it destroys the grant.
+    assert device_sessions.lookup(view["user_code"], table_ref=store) is None
+    assert not [pk for pk in store.items if pk.startswith(("pairing#", "usercode#"))]
+
+
+def test_labels_are_sanitized_for_the_operator(store):
+    _, view = device_sessions.start(table_ref=store, label="grace@laptop" + "g" * 90)
+    facts = device_sessions.lookup(view["user_code"], table_ref=store)
+    assert len(facts["label"]) == 80 and facts["label"].startswith("grace@laptop")
+
+    _, bare = device_sessions.start(table_ref=store, label=None)
+    assert device_sessions.lookup(bare["user_code"], table_ref=store)["label"] == "Dapier CLI"
 
 
 def test_approve_wins_exactly_once(store):
     device_code, view = device_sessions.start(table_ref=store)
 
-    assert device_sessions.approve(view["user_code"], "Google_1", "op@x", table_ref=store) == "ok"
-    assert device_sessions.approve(view["user_code"], "Google_2", "op2@x", table_ref=store) == "invalid"
+    assert device_sessions.decide(
+        view["user_code"], True, "Google_1", "op@x", table_ref=store)["status"] == "approved"
+    assert device_sessions.decide(
+        view["user_code"], True, "Google_2", "op2@x", table_ref=store) is None
 
 
 def test_resolve_rejects_unknown_and_expired_sessions(store):
@@ -177,35 +260,145 @@ def test_revoke_kills_the_session(store):
     assert device_sessions.revoke(token, table_ref=store) is False
 
 
-def test_device_endpoints_start_poll_confirm(monkeypatch, store):
+def test_device_endpoints_review_approve_poll(monkeypatch, store):
     monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
     monkeypatch.setattr(
         agent_api.session, "_session_payload",
         lambda event: {"sub": "op@datatalks.club", "subject": "Google_1"},
     )
 
-    response = agent_api.route(
-        _device_event("/api/agent/device/start"), "POST", "/api/agent/device/start")
-    assert response["statusCode"] == 200
-    pairing = json.loads(response["body"])
+    pairing = _start_pairing(label="grace@laptop")
+    assert pairing["verification_uri"].endswith("/device")
+    assert pairing["verification_uri_complete"] == \
+        pairing["verification_uri"] + f"?code={pairing['user_code']}"
+    assert pairing["interval"] == device_sessions.POLL_INTERVAL_SECONDS
 
     poll_event = _device_event("/api/agent/device/token", {"device_code": pairing["device_code"]})
     response = agent_api.route(poll_event, "POST", "/api/agent/device/token")
-    assert json.loads(response["body"]) == {"status": "pending"}
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"error": "authorization_pending"}
 
-    confirm_event = _device_event(
-        "/api/agent/device/confirm", {"user_code": pairing["user_code"].lower()})
-    response = agent_api.route(confirm_event, "POST", "/api/agent/device/confirm")
+    pending_event = _device_event(
+        "/api/agent/device/pending", method="GET")
+    pending_event["queryStringParameters"] = {"code": pairing["user_code"].lower()}
+    response = agent_api.route(pending_event, "GET", "/api/agent/device/pending")
     assert response["statusCode"] == 200
+    facts = json.loads(response["body"])
+    assert facts["label"] == "grace@laptop"
+    assert facts["request_ip"] == "10.0.0.1"
+    assert facts["server_now"] > time.time() - 60
+
+    approve_event = _device_event(
+        "/api/agent/device/approve", {"user_code": pairing["user_code"], "approve": True})
+    response = agent_api.route(approve_event, "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"status": "approved", "label": "grace@laptop"}
 
     response = agent_api.route(poll_event, "POST", "/api/agent/device/token")
+    assert response["statusCode"] == 200
     result = json.loads(response["body"])
-    assert result["status"] == "approved"
+    assert result["token"].startswith(device_sessions.PREFIX)
+
+    response = agent_api.route(poll_event, "POST", "/api/agent/device/token")
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"error": "expired_token"}
 
     event = {"headers": {"authorization": f"Bearer {result['token']}"}}
     subject, error = agent_api.authenticate(event)
     assert error is None and subject == "Google_1"
     assert event["_dtc_claims"] == {"sub": "Google_1", "email": "op@datatalks.club"}
+
+
+def test_deny_endpoint_refuses_the_poll(monkeypatch, store):
+    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
+    monkeypatch.setattr(
+        agent_api.session, "_session_payload",
+        lambda event: {"sub": "op@datatalks.club", "subject": "Google_1"},
+    )
+    pairing = _start_pairing()
+
+    deny = _device_event(
+        "/api/agent/device/approve", {"user_code": pairing["user_code"], "approve": False})
+    response = agent_api.route(deny, "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["status"] == "denied"
+
+    poll_event = _device_event("/api/agent/device/token", {"device_code": pairing["device_code"]})
+    response = agent_api.route(poll_event, "POST", "/api/agent/device/token")
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"error": "access_denied"}
+
+
+def test_review_and_decision_require_a_console_session(monkeypatch, store):
+    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
+    monkeypatch.setattr(agent_api.session, "_session_payload", lambda event: {})
+    pairing = _start_pairing()
+
+    pending_event = _device_event("/api/agent/device/pending", method="GET")
+    pending_event["queryStringParameters"] = {"code": pairing["user_code"]}
+    response = agent_api.route(pending_event, "GET", "/api/agent/device/pending")
+    assert response["statusCode"] == 401
+
+    response = agent_api.route(
+        _device_event("/api/agent/device/approve", {"user_code": pairing["user_code"]}),
+        "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 401
+
+
+def test_approve_rejects_cross_site_and_unknown_codes(monkeypatch, store):
+    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: False)
+    monkeypatch.setattr(
+        agent_api.session, "_session_payload",
+        lambda event: {"sub": "op@datatalks.club", "subject": "Google_1"},
+    )
+    response = agent_api.route(
+        _device_event("/api/agent/device/approve", {"user_code": "ABCD-EFGH"}),
+        "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 403
+
+    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
+    response = agent_api.route(
+        _device_event("/api/agent/device/approve", {"user_code": "ZZZZ-ZZZZ"}),
+        "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 404
+
+    pending_event = _device_event("/api/agent/device/pending", method="GET")
+    pending_event["queryStringParameters"] = {"code": "ZZZZ-ZZZZ"}
+    response = agent_api.route(pending_event, "GET", "/api/agent/device/pending")
+    assert response["statusCode"] == 404
+
+
+def test_poll_answers_unknown_codes_with_expired_token(store):
+    response = agent_api.route(
+        _device_event("/api/agent/device/token", {"device_code": "dapd_unknown"}),
+        "POST", "/api/agent/device/token")
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"error": "expired_token"}
+
+
+def test_poll_slow_downs_under_flood(monkeypatch, store):
+    for _ in range(120):
+        assert agent_api.route(
+            _device_event("/api/agent/device/token", {"device_code": "dapd_x"}),
+            "POST", "/api/agent/device/token")["statusCode"] in (400, 429)
+    response = agent_api.route(
+        _device_event("/api/agent/device/token", {"device_code": "dapd_x"}),
+        "POST", "/api/agent/device/token")
+    assert response["statusCode"] == 429
+    assert json.loads(response["body"]) == {"error": "slow_down"}
+
+
+def test_start_urls_follow_the_request_host(monkeypatch, store):
+    event = _device_event("/api/agent/device/start", {})
+    event["headers"] = {"x-forwarded-host": "dapier.dtcdev.click", "x-forwarded-proto": "https"}
+    body = json.loads(agent_api.route(event, "POST", "/api/agent/device/start")["body"])
+    assert body["verification_uri"] == "https://dapier.dtcdev.click/device"
+    assert body["verification_uri_complete"].startswith("https://dapier.dtcdev.click/device?code=")
+
+    event = _device_event("/api/agent/device/start", {})
+    event["headers"] = {"host": "localhost:3000"}
+    body = json.loads(agent_api.route(event, "POST", "/api/agent/device/start")["body"])
+    assert body["verification_uri"] == "http://localhost:3000/device"
 
 
 def test_device_bearer_qualifies_as_operator(monkeypatch, store):
@@ -216,17 +409,6 @@ def test_device_bearer_qualifies_as_operator(monkeypatch, store):
     subject, error = agent_api.authenticate(event)
     assert error is None
     assert agent_api._is_operator(event, subject) is True
-
-
-def test_confirm_requires_a_console_session(monkeypatch, store):
-    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
-    monkeypatch.setattr(agent_api.session, "_session_payload", lambda event: {})
-
-    response = agent_api.route(
-        _device_event("/api/agent/device/confirm", {"user_code": "ABCD-EFGH"}),
-        "POST", "/api/agent/device/confirm")
-
-    assert response["statusCode"] == 401
 
 
 def test_public_config_advertises_device_login():
