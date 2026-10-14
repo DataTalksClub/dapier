@@ -1945,7 +1945,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .trigger-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: var(--dk-gap-section); align-items: start; }
 .trigger-sources { display: grid; gap: var(--dk-gap-section); min-width: 0; }
 .trigger-sources .data-panel + .data-panel { margin-top: 0; }
-/* Phone: activity and its sources are two panes behind a two-chip switch,
+/* Phone: activity and its sources are two panes behind a dakit tablist,
    so the sources list is one tap away instead of under the whole feed. */
 .pane-switch { display: none; }
 .trigger-activity .dk-table-footer { justify-content: space-between; }
@@ -2029,10 +2029,9 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 
 @media (max-width: 860px) {
   .trigger-workspace { grid-template-columns: minmax(0, 1fr); }
-  /* The switch leads the toolbar as one full-width pair; the activity
+  /* The switch leads the toolbar on its own full-width row; the activity
      filters only show with the activity pane. */
-  .pane-switch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-gap-control); flex: 1 0 100%; }
-  .pane-switch .dk-filter-chip { justify-content: center; }
+  .pane-switch { display: flex; flex: 1 0 100%; }
   .trigger-toolbar[data-pane="sources"] > [id$="-chips"] { display: none; }
   .trigger-workspace[data-pane="activity"] > .trigger-sources,
   .trigger-workspace[data-pane="sources"] > .trigger-activity { display: none; }
@@ -2110,10 +2109,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .register-toolbar .toolbar-filters > label.toolbar-search { flex: 1 1 100%; max-width: none; }
   .register-toolbar .dk-toolbar__end { display: flex; flex-wrap: wrap; gap: var(--dk-gap-control); }
   .register-toolbar .dk-toolbar__end > .dk-button { width: auto; }
-  /* The pane switch (Deliveries/Endpoints, Fires/Coming
-     up) is a pair of labelled chips on one line, not a half-width pair. */
-  .pane-switch { display: flex; flex: 0 1 auto; }
-  .pane-switch .dk-filter-chip { flex: 0 0 auto; }
 
   /* Cards tighten: bands, rows and empty states drop a padding step so a
      phone screen holds several rows at once. */

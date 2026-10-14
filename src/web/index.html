@@ -139,7 +139,7 @@
           </div>
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
-          <div class="pane-switch" role="group" aria-label="Show" data-workspace="hooks-layout"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Deliveries</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Endpoints</button></div>
+          <div class="dk-tabs pane-switch" role="tablist" aria-label="Hooks panes" data-workspace="hooks-layout"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="hooks-activity-pane" aria-selected="true" tabindex="0">Deliveries</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="hooks-sources-pane" aria-selected="false" tabindex="-1">Endpoints</button></div>
           <div id="hooks-outcome-chips" class="dk-cluster" role="group" aria-label="Show deliveries"></div>
           <div class="dk-toolbar__end">
             <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
@@ -147,7 +147,7 @@
           </div>
         </div>
         <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
-          <div class="pane-switch" role="group" aria-label="Show" data-workspace="poll-workspace"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Picked up</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Polls</button></div>
+          <div class="dk-tabs pane-switch" role="tablist" aria-label="Polls panes" data-workspace="poll-workspace"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="poll-activity" aria-selected="true" tabindex="0">Picked up</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="poll-sources-pane" aria-selected="false" tabindex="-1">Polls</button></div>
           <div id="poll-outcome-chips" class="dk-cluster" role="group" aria-label="Show picked-up items"></div>
           <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>
         </div>
@@ -167,7 +167,7 @@
         <div data-workflow-panel="hooks" hidden>
         <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
         <div id="hooks-layout" class="trigger-workspace" data-pane="activity" hidden>
-          <section class="data-panel trigger-activity" aria-labelledby="hooks-activity-title">
+          <section id="hooks-activity-pane" class="data-panel trigger-activity" aria-labelledby="hooks-activity-title">
             <div class="section-head">
               <h2 id="hooks-activity-title">Deliveries</h2>
               <p id="hooks-summary" class="sub" role="status"></p>
@@ -177,7 +177,7 @@
             <ul id="hook-deliveries" class="activity-list" aria-label="Deliveries"></ul>
             <div id="hook-deliveries-footer" class="dk-table-footer" hidden><span>Requests rejected for a bad token or signature get a 401 and are not logged.</span><button id="hook-deliveries-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
           </section>
-          <aside class="trigger-sources" aria-label="Endpoints">
+          <aside id="hooks-sources-pane" class="trigger-sources" aria-label="Endpoints">
             <section class="data-panel" aria-labelledby="hooks-endpoints-title">
               <div class="section-head"><h2 id="hooks-endpoints-title">Endpoints</h2><p class="sub">Select one to see only its deliveries</p></div>
               <ul id="hook-endpoints" class="source-list"></ul>
@@ -193,7 +193,7 @@
             <div id="poll-activity-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
             <ul id="poll-activity-table" class="activity-list" aria-label="Picked-up items"></ul>
           </section>
-          <aside class="trigger-sources" aria-label="Polls">
+          <aside id="poll-sources-pane" class="trigger-sources" aria-label="Polls">
             <section id="poll-monitor" class="data-panel" aria-labelledby="poll-monitor-title">
               <div class="section-head"><h2 id="poll-monitor-title">Polls</h2><p id="poll-summary" class="sub" role="status"></p></div>
               <ul id="poll-table" class="source-list"></ul>
@@ -353,7 +353,7 @@
       </section>
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">
-          <div class="pane-switch" role="group" aria-label="Show" data-workspace="sched-panes"><button class="dk-filter-chip" type="button" data-pane="activity" aria-pressed="true">Fires</button><button class="dk-filter-chip" type="button" data-pane="sources" aria-pressed="false">Coming up</button></div>
+          <div class="dk-tabs pane-switch" role="tablist" aria-label="Schedules panes" data-workspace="sched-panes"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="sched-activity-pane" aria-selected="true" tabindex="0">Fires</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="sched-sources-pane" aria-selected="false" tabindex="-1">Coming up</button></div>
           <div id="sched-outcome-chips" class="dk-cluster" role="group" aria-label="Show fires"></div>
           <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
@@ -368,12 +368,12 @@
             </table></div>
           </section>
           <div id="sched-panes" class="trigger-workspace" data-pane="activity">
-          <section class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
+          <section id="sched-activity-pane" class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
             <div class="section-head"><h2 id="sched-fires-title">Fires</h2><p id="sched-fires-summary" class="sub" role="status"></p></div>
             <div id="sched-fires-empty" class="empty-state" hidden><h3>Nothing to show</h3><p></p></div>
             <ul id="sched-fires" class="activity-list" aria-label="Fires"></ul>
           </section>
-          <aside class="trigger-sources" aria-label="Coming up">
+          <aside id="sched-sources-pane" class="trigger-sources" aria-label="Coming up">
             <section class="data-panel" aria-labelledby="sched-upcoming-title">
               <div class="section-head"><h2 id="sched-upcoming-title">Coming up</h2><div id="sched-window-chips" class="dk-cluster" role="group" aria-label="Upcoming window"></div></div>
               <p id="sched-upcoming-zone" class="sub panel-note"></p>

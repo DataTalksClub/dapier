@@ -152,15 +152,16 @@ export function whenMenusClosed(root, paint) {
   return undefined;
 }
 
-/* Phone pane switch on the trigger workspaces (activity | sources). */
+/* Phone pane switch on the trigger workspaces (activity | sources): a
+   dakit tablist; vendor/dakit-tabs.js turns arrow keys into these clicks. */
 document.addEventListener('click', (event) => {
-  const chip = event.target.closest('.pane-switch [data-pane]');
-  if (!chip) return;
-  const group = chip.closest('.pane-switch');
+  const tab = event.target.closest('.pane-switch [data-pane]');
+  if (!tab) return;
+  const group = tab.closest('.pane-switch');
   const workspace = document.getElementById(group.dataset.workspace);
-  if (workspace) workspace.dataset.pane = chip.dataset.pane;
-  group.parentElement.dataset.pane = chip.dataset.pane;
-  chip.parentElement.querySelectorAll('[data-pane]').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button === chip));
+  if (workspace) workspace.dataset.pane = tab.dataset.pane;
+  group.parentElement.dataset.pane = tab.dataset.pane;
+  group.querySelectorAll('[data-pane]').forEach((button) => {
+    button.setAttribute('aria-selected', String(button === tab));
   });
 });

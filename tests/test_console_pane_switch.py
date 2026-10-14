@@ -10,12 +10,14 @@ CSS = (WEB / "app.css").read_text()
 
 
 def test_each_trigger_workspace_has_a_switch_naming_both_panes():
-    switches = re.findall(r'<div class="pane-switch"[^>]*data-workspace="([^"]+)">(.*?)</div>', HTML)
+    switches = re.findall(r'<div class="dk-tabs pane-switch" role="tablist" aria-label="[^"]+" data-workspace="([^"]+)">(.*?)</div>', HTML)
     assert {ws for ws, _ in switches} == {"hooks-layout", "poll-workspace", "sched-panes"}
     for workspace, body in switches:
         assert f'id="{workspace}" class="trigger-workspace" data-pane="activity"' in HTML
-        assert 'data-pane="activity" aria-pressed="true"' in body
-        assert 'data-pane="sources" aria-pressed="false"' in body
+        assert 'role="tab" data-pane="activity"' in body and 'aria-selected="true" tabindex="0"' in body
+        assert 'role="tab" data-pane="sources"' in body and 'aria-selected="false" tabindex="-1"' in body
+        for pane in re.findall(r'aria-controls="([^"]+)"', body):
+            assert f'id="{pane}"' in HTML
 
 
 def test_emails_uses_family_tabs_not_a_pane_switch():
