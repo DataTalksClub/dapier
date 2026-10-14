@@ -13,7 +13,7 @@
    Item detail + Replay reuse /api/admin/triggers/inbox/<id>[/replay]
    (dapier inbox show|replay). */
 import { state } from '../state.js';
-import { $, $$, icons, notice } from '../ui.js';
+import { $, $$, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
 import { workflowName } from '../workflow-names.js';
@@ -395,14 +395,20 @@ $('#poll-reset-form').addEventListener('submit', async (event) => {
 
 /* --- picked-up item detail + replay -------------------------------------------------------- */
 
-async function openItem(inboxId) {
+/* The full event comes from the inbox; when that read fails, an item the
+   activity list already holds opens from what it has. */
+function openItem(inboxId, trigger) {
   const cached = items.find((item) => item.inbox_id === inboxId) || {};
-  let event = cached;
-  try {
-    event = { ...cached, ...((await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`)).event || {}) };
-  } catch (error) {
-    if (!cached.inbox_id) return void notice(error.message, true);
-  }
+  const load = (signal) => api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`, { signal })
+    .then((data) => ({ ...cached, ...(data.event || {}) }))
+    .catch((error) => {
+      if (!cached.inbox_id || signal.aborted) throw error;
+      return cached;
+    });
+  return openWhenReady(trigger, 'item', load, (event) => renderItem(event, cached, inboxId));
+}
+
+function renderItem(event, cached, inboxId) {
   const data = event.data && typeof event.data === 'object' ? event.data : {};
   const runs = cached.runs || (event.matched || []).map((flow) => `${flow}:${inboxId}`);
   $('#poll-item-title').textContent = cached.title || data.title || data.name || data.item_id || 'Picked-up item';
@@ -418,9 +424,8 @@ async function openItem(inboxId) {
     <h3 class="poll-subhead">What the poll found</h3>
     ${dataBlock(data)}`;
   $('#poll-item-replay').dataset.inbox = inboxId;
-  const dialog = $('#poll-item-dialog');
-  if (!dialog.open) dialog.showModal();
   icons();
+  return $('#poll-item-dialog');
 }
 
 function confirmReplay() {
@@ -527,26 +532,21 @@ $('#poll-form').addEventListener('submit', async (event) => {
    documented example. Goes through POST /api/admin/discover with the
    generic poll connector, whose fetch runs the stored poll's own page
    fetch (HTTP or provider source) without advancing its cursor. */
-async function pullSample(pollId) {
-  const dialog = $('#poll-sample-dialog');
-  $('#poll-sample-title').textContent = `Sample — ${pollId}`;
-  $('#poll-sample-meta').textContent = 'Pulling…';
-  $('#poll-sample-data').textContent = '';
-  dialog.showModal();
-  try {
-    const result = await api('/api/admin/discover', {
-      method: 'POST',
-      body: JSON.stringify({ connector: 'poll', event: pollId }),
-    });
+function pullSample(pollId, trigger) {
+  const load = (signal) => api('/api/admin/discover', {
+    method: 'POST',
+    body: JSON.stringify({ connector: 'poll', event: pollId }),
+    signal,
+  });
+  return openWhenReady(trigger, 'sample', load, (result) => {
     const sample = result.sample || {};
+    $('#poll-sample-title').textContent = `Sample — ${pollId}`;
     $('#poll-sample-meta').textContent =
       `${result.connector || 'poll'} · ${sample.event || ''} · ${result.source || 'sample'}`
       + (sample.occurred_at ? ` · ${sample.occurred_at}` : '');
     $('#poll-sample-data').textContent = JSON.stringify(sample.data ?? sample, null, 2);
-  } catch (error) {
-    $('#poll-sample-meta').textContent = '';
-    $('#poll-sample-data').textContent = error.message;
-  }
+    return $('#poll-sample-dialog');
+  });
 }
 
 function confirmDelete(name) {
@@ -584,7 +584,7 @@ document.addEventListener('click', (event) => {
     if (action === 'check') return void pollNow(actionButton);
     if (action === 'toggle') return void togglePoll(actionButton);
     if (action === 'reset') return openReset(name);
-    if (action === 'sample') return void pullSample(name);
+    if (action === 'sample') return void pullSample(name, actionButton);
     if (action === 'edit') return openPollDialog(findPoll(name));
     if (action === 'delete') return void deletePoll(actionButton);
   }
@@ -606,7 +606,7 @@ document.addEventListener('click', (event) => {
     return void openPollDetail(pollLink.dataset.poll);
   }
   const itemRowEl = event.target.closest('.poll-item-open, .activity-row[data-inbox]');
-  if (itemRowEl && itemRowEl.closest('[data-workflow-panel="polls"], #poll-detail-dialog')) return void openItem(itemRowEl.dataset.inbox);
+  if (itemRowEl && itemRowEl.closest('[data-workflow-panel="polls"], #poll-detail-dialog')) return void openItem(itemRowEl.dataset.inbox, itemRowEl);
   const pollRowEl = event.target.closest('.poll-open');
   if (pollRowEl) return void openPollDetail(pollRowEl.dataset.poll);
 });
@@ -616,7 +616,7 @@ document.addEventListener('keydown', (event) => {
   const row = event.target.closest('.activity-row[data-inbox]');
   if (!row || event.target !== row || !row.closest('[data-workflow-panel="polls"], #poll-detail-dialog')) return;
   event.preventDefault();
-  void openItem(row.dataset.inbox);
+  void openItem(row.dataset.inbox, row);
 });
 
 /* Entering the Polls tab (tab link, back/forward) fetches fresh state. */

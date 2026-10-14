@@ -23,6 +23,10 @@ RUN = {
 }
 WORKFLOW = {"id": "wf-one", "name": "wf-one", "source": "wf-one.yaml", "enabled": True,
             "trigger": {"connector": "manual", "event": "run"}, "actions": []}
+POLL = {"poll_id": "feed", "name": "feed", "source": "http", "url": "https://example.com/feed",
+        "health": "ok", "interval_seconds": 300, "enabled": True}
+ITEM = {"inbox_id": "in-1", "poll": "feed", "title": "Item one", "item_id": "item-1",
+        "received_at": "2026-10-14T10:00:00Z", "status": "processed"}
 CONNECTION = {"connection_id": "slack-main", "provider": "slack", "status": "connected", "scopes": []}
 
 
@@ -60,6 +64,10 @@ def browser_page(monkeypatch):
     def payload(path):
         if path.startswith("/api/admin/overview"):
             return {"workflows": [WORKFLOW], "connections": [CONNECTION]}
+        if path == "/api/admin/poll-triggers/activity":
+            return {"items": [ITEM]}
+        if path == "/api/admin/poll-triggers":
+            return {"polls": [POLL]}
         if path == "/api/admin/connections":
             return {"connections": [CONNECTION]}
         return original(path)
@@ -168,3 +176,49 @@ def test_explore_data_keeps_manage_open_until_the_catalog_is_in(browser_page):
     expect(page.locator("#discover-resource option")).to_have_text(["Channels"])
     expect(page.locator("#discover-run")).to_be_enabled()
     _shot(page, f"explore-open-{scheme}")
+
+
+def _open_poll(page, origin):
+    page.goto(origin + "/workflows?tab=polls")
+    page.locator("#app").wait_for(state="visible")
+    page.locator(".poll-open").first.click()
+    from playwright.sync_api import expect
+    expect(page.locator("#poll-detail-dialog")).to_be_visible()
+
+
+def test_poll_sample_opens_with_the_sample_in_it(browser_page):
+    from playwright.sync_api import expect
+
+    page, origin, scheme = browser_page
+    held = _held(page, "**/api/admin/discover")
+    _open_poll(page, origin)
+    sample = page.locator('#poll-detail-dialog [data-poll-action="sample"]')
+    sample.click()
+    route = _wait_for(page, held)
+    expect(sample).to_have_attribute("aria-busy", "true")
+    assert not _is_open(page, "#poll-sample-dialog")
+    route.fulfill(status=200, content_type="application/json", body=json.dumps({
+        "connector": "poll", "source": "live", "sample": {"event": "feed", "data": {"title": "Item one"}},
+    }))
+    expect(page.locator("#poll-sample-dialog")).to_be_visible()
+    expect(page.locator("#poll-sample-meta")).to_have_text("poll · feed · live")
+    expect(page.locator("#poll-sample-data")).to_contain_text('"title": "Item one"')
+    _shot(page, f"poll-sample-{scheme}")
+
+
+def test_poll_item_row_is_busy_until_its_event_is_in(browser_page):
+    from playwright.sync_api import expect
+
+    page, origin, _ = browser_page
+    held = _held(page, "**/api/admin/triggers/inbox/in-1")
+    _open_poll(page, origin)
+    row = page.locator('#poll-detail-dialog .activity-row[data-inbox="in-1"]')
+    row.click()
+    route = _wait_for(page, held)
+    expect(row).to_have_attribute("aria-busy", "true")
+    assert not _is_open(page, "#poll-item-dialog")
+    route.fulfill(status=200, content_type="application/json", body=json.dumps({
+        "event": {"inbox_id": "in-1", "data": {"poll": "feed", "title": "Item one"}},
+    }))
+    expect(page.locator("#poll-item-dialog")).to_be_visible()
+    expect(page.locator("#poll-item-title")).to_have_text("Item one")
