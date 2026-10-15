@@ -97,7 +97,10 @@ def _stage_attachments(message, event_id):
         if payload is None:
             continue
         safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", filename or f"attachment-{index + 1}")
-        object_key = f"relay-attachments/{event_id}/attachments/{index + 1:03d}-{safe_name}"
+        from ..triggers.intake import email_ingress
+
+        object_key = (f"{email_ingress.STAGED_ATTACHMENT_PREFIX}{event_id}"
+                      f"/attachments/{index + 1:03d}-{safe_name}")
         try:
             client.put_object(
                 Bucket=bucket, Key=object_key, Body=payload,

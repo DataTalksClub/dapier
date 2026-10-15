@@ -19,6 +19,14 @@ BODY_LIMIT = 60_000
 # newsletter cannot dominate the detail payload.
 DISPLAY_BODY_LIMIT = 500_000
 
+# The worker stages rehydrated attachment parts into the mail bucket under
+# this prefix (connectors.ingress._stage_attachments). Those objects are
+# message parts, not messages: the bucket's ObjectCreated trigger must skip
+# them, or every staged attachment re-enters the intake as a header-less
+# "email" that the sender allow-list then refuses (and an attached .eml
+# would run a phantom second delivery).
+STAGED_ATTACHMENT_PREFIX = "relay-attachments/"
+
 
 def _body(message, *prefer, limit=BODY_LIMIT):
     """One decoded body part (``"plain"`` or ``"html"``), capped, or None."""
@@ -138,6 +146,8 @@ def handler(event, _context):
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
+        if key.startswith(STAGED_ATTACHMENT_PREFIX):
+            continue
         raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
         message = parse_message(raw)
         if os.environ.get("LEGACY_INBOUND_BUCKET") == bucket:

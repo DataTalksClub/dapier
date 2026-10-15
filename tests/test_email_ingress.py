@@ -125,6 +125,42 @@ def test_a_legacy_object_without_message_id_uses_the_key_as_id(monkeypatch):
     assert envelope["event_id"] == "email:raw/no-id-1"
 
 
+def test_staged_attachment_objects_do_not_reenter_the_intake(monkeypatch):
+    s3 = MagicMock()
+    queue = MagicMock()
+    monkeypatch.setattr(email_ingress, "s3", s3)
+    monkeypatch.setattr(email_ingress, "queue", queue)
+    email_ingress.handler({"Records": [
+        {"s3": {"bucket": {"name": "dapier-mail-inbound"},
+                "object": {"key": email_ingress.STAGED_ATTACHMENT_PREFIX
+                           + "replay-4b689feb/attachments/005-Rechnung_1.pdf"}}}]},
+        None)
+
+    s3.get_object.assert_not_called()
+    queue.send_message.assert_not_called()
+
+
+def test_stager_keys_live_under_the_intake_skip_prefix(monkeypatch):
+    from email.message import EmailMessage
+
+    from src.dapier.connectors import ingress as ingress_module
+
+    s3 = MagicMock()
+    monkeypatch.setattr(ingress_module, "_s3", lambda: s3)
+    monkeypatch.setenv("MAIL_BUCKET", "stage-bucket")
+    message = EmailMessage()
+    message.add_attachment(b"%PDF-1.4", maintype="application",
+                           subtype="pdf", filename="Rechnung 1.pdf")
+
+    staged = ingress_module._stage_attachments(message, "replay-4b689feb")
+
+    assert staged[0]["s3"]["key"].startswith(
+        email_ingress.STAGED_ATTACHMENT_PREFIX
+        + "replay-4b689feb/attachments/")
+    assert staged[0]["s3"]["key"].endswith("-Rechnung_1.pdf")
+
+
+
 if __name__ == "__main__":
     import pytest
 
