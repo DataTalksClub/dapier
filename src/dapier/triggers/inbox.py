@@ -729,7 +729,7 @@ def replay_event(item):
         if error:
             return None, error
     event_id = f"inbox-replay-{uuid.uuid4()}"
-    return {
+    event = {
         "schema_version": "1.0",
         "id": event_id,
         "correlation_id": item.get("inbox_id"),
@@ -738,7 +738,14 @@ def replay_event(item):
         "source": item.get("source"),
         "occurred_at": _now_iso(),
         "data": data if isinstance(data, dict) else {},
-    }, None
+    }
+    if event["connector"] == "email" and event["event"] == "message.received":
+        # The contract carries the intake-resolved route label the stored
+        # flat data lacks, so a replayed email matches routed flows again.
+        from .intake import email_ingress
+
+        event.update(email_ingress.contract_fields(event["data"], event_id))
+    return event, None
 
 
 def api_replay(inbox_id, *, queue=None, table_ref=None):

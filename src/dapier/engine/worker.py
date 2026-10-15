@@ -605,6 +605,12 @@ def _resume_run(resume, *, queue=None):
         logger.info("resume envelope carries nothing to run; dropping",
                     extra={"run_id": resume.get("run_id")})
         return None
+    # A replay-from-step envelope carries the freshly minted replay event,
+    # which for email carries the inbound contract; normalize it through
+    # the same path as a fresh delivery so its templates read the routed
+    # shape (a parked delay's event is already normalized and passes
+    # through unchanged).
+    event = normalize_payload(event)
     if float(resume.get("resume_at") or 0.0) > time.time():
         return _enqueue_resume(
             workflow_id, event, resume["resume_at"],

@@ -869,7 +869,7 @@ def replay_event(run_id, steps):
         if error:
             return None, error
     event_id = f"replay-{uuid.uuid4()}"
-    return {
+    event = {
         "schema_version": "1.0",
         "id": event_id,
         "correlation_id": original_event_id,
@@ -878,7 +878,19 @@ def replay_event(run_id, steps):
         "source": first.get("connector"),
         "occurred_at": datetime.now(timezone.utc).isoformat(),
         "data": data if isinstance(data, dict) else {},
-    }, None
+    }
+    if event["connector"] == "email" and event["event"] == "message.received":
+        # A routed email flow matches on the route label the intake
+        # resolves and reads attachments the intake staged from the raw
+        # copy — neither lives in the recorded flat data, so without the
+        # contract a replayed email matches no workflow at all (the live
+        # 2026-10-15 case). The worker's email normalizer re-runs on the
+        # contract and rebuilds the rich event; data stays for the
+        # trigger-sample view.
+        from ..triggers.intake import email_ingress
+
+        event.update(email_ingress.contract_fields(event["data"], event_id))
+    return event, None
 
 
 def _queue():

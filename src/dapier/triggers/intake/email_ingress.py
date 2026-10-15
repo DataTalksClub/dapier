@@ -50,6 +50,36 @@ def data_from_message(message, pointer, limit=BODY_LIMIT):
     }
 
 
+def contract_fields(data, event_id):
+    """The inbound-email v1 contract fields for a rebuilt email event.
+
+    A replay rebuilds the flat intake data, but routed flows key on what
+    the intake resolves around it: the route label, the sender and
+    recipient shapes, and attachments staged from the raw copy at delivery
+    time. Merging these fields into a replay envelope makes the worker's
+    email normalizer re-run on it exactly as on a live delivery — the
+    worker rehydrates the body and stages the attachments from the
+    ``raw_mime`` copy — while ``data`` stays for the sample and reading
+    views.
+    """
+    to = str(data.get("to") or "")
+    sender = str(data.get("from") or "")
+    fields = {
+        "contract": "inbound-email",
+        "version": 1,
+        "event_id": event_id,
+        "route": to,
+        "message_id": data.get("message_id"),
+        "sender": {"header": sender, "addresses": _addresses(sender)},
+        "recipients": {"addresses": _addresses(to)},
+        "subject": data.get("subject"),
+    }
+    pointer = data.get("s3") or data.get("raw_mime")
+    if isinstance(pointer, dict) and pointer.get("bucket") and pointer.get("key"):
+        fields["raw_mime"] = {"bucket": pointer["bucket"], "key": pointer["key"]}
+    return fields
+
+
 def replay_data(pointer, limit=BODY_LIMIT):
     """Rebuild stored email event data from its raw s3 copy, for replay.
 

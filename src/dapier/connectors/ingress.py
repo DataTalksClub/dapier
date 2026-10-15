@@ -182,7 +182,7 @@ def _normalize_email(payload):
     return {
         "schema_version": "1.0",
         "id": payload["event_id"],
-        "correlation_id": payload["event_id"],
+        "correlation_id": payload.get("correlation_id") or payload["event_id"],
         "connector": "email",
         "event": "message.received",
         "source": label,

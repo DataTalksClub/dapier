@@ -202,3 +202,69 @@ def test_replay_data_rejects_an_unusable_pointer():
     data, error = email_ingress.replay_data({"bucket": "b"})
     assert data is None
     assert "pointer" in error
+
+
+def test_runs_replay_email_carries_the_contract(monkeypatch):
+    """A routed email flow matches on the intake-resolved route label and
+    reads attachments the intake staged from the raw copy — the contract
+    fields put both back on a replayed envelope and the worker's email
+    normalizer rebuilds the routed event from it (the live 2026-10-15
+    case: the replayed Lidl invoice matched no workflow without them)."""
+    from src.dapier.connectors.ingress import normalize_event
+
+    steps = [{"connector": "email", "event_type": "message.received",
+              "input": {"truncated": True, "preview": "..." * 100}}]
+    monkeypatch.setattr(
+        inbox, "stored",
+        lambda inbox_id, **kwargs: {
+            "inbox_id": inbox_id,
+            "data": {"truncated": True, "preview": "...", "s3": POINTER},
+        })
+    monkeypatch.setattr(email_ingress, "s3", _s3_mock(_raw()))
+
+    event, error = runs_api.replay_event(
+        "invoice-intake:email:<big-1@example.test>", steps)
+
+    assert error is None
+    assert event["contract"] == "inbound-email"
+    assert event["event_id"] == event["id"]
+    assert event["route"] == "agents@dtcdev.click"
+    assert event["raw_mime"] == POINTER
+    assert event["sender"]["addresses"] == ["billing@example.test"]
+    assert event["recipients"]["addresses"] == ["agents@dtcdev.click"]
+    assert event["correlation_id"] == "email:<big-1@example.test>"
+    # The flat data stays for the trigger-sample and reading views.
+    assert event["data"]["s3"] == POINTER
+    # The worker's normalizer rebuilds the routed event from the envelope.
+    normalized = normalize_event(event)
+    assert normalized["data"]["route"] == "agents"
+    assert normalized["id"] == event["id"]
+    assert normalized["correlation_id"] == "email:<big-1@example.test>"
+
+
+def test_inbox_replay_email_carries_the_contract(table, monkeypatch):
+    inbox.record(_oversized_event(), table_ref=table)
+    monkeypatch.setattr(email_ingress, "s3", _s3_mock(_raw()))
+    queue = FakeQueue()
+    monkeypatch.setenv("EVENT_QUEUE_URL", "https://queue")
+
+    status, payload = inbox.api_replay(
+        "email:<big-1@example.test>", queue=queue, table_ref=table)
+
+    assert status == 202
+    sent = json.loads(queue.messages[0][1])
+    assert sent["contract"] == "inbound-email"
+    assert sent["route"] == "agents@dtcdev.click"
+    assert sent["event_id"] == sent["id"]
+    assert sent["correlation_id"] == "email:<big-1@example.test>"
+    assert sent["data"]["s3"] == POINTER
+
+
+def test_runs_replay_non_email_stays_plain(monkeypatch):
+    steps = [{"connector": "webhook", "event_type": "received",
+              "input": {"body": "ping"}}]
+    event, error = runs_api.replay_event("webhook-catch:evt-9", steps)
+
+    assert error is None
+    assert "contract" not in event
+    assert event["data"] == {"body": "ping"}

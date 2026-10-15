@@ -421,5 +421,59 @@ def test_cli_replay_without_flag_sends_empty_body(isolated_home, monkeypatch):
     assert calls == [("POST", "/api/agent/runs/wf-1%3Aevt-1/replay", {})]
 
 
+def test_worker_resume_normalizes_a_replayed_email_event(monkeypatch):
+    """A replay-from-step envelope carries the freshly minted replay event,
+    which for email also carries the inbound contract; the resume runs it
+    through the same normalization as a fresh delivery, so branch
+    templates read the routed shape (route label, staged attachments) and
+    not the flat recorded data."""
+    from src.dapier.connectors.ingress import normalize_event
+
+    email_items = [
+        {"execution_id": "wf-1:find:evt-1", "run_id": RUN_ID,
+         "workflow_id": "wf-1", "action_id": "find", "action_type": "http_request",
+         "connector": "email", "event_type": "message.received", "status": "completed",
+         "started_at": "2026-09-25T10:00:00+00:00",
+         "finished_at": "2026-09-25T10:00:01+00:00",
+         "input": {"to": "invoice@dtcdev.click", "subject": "Rechnung",
+                   "message_id": "<m-1@example.test>", "route": "find"},
+         "output": {"rows": 3, "match": "INV-9001"}},
+        {"execution_id": "wf-1:post:evt-1", "run_id": RUN_ID,
+         "workflow_id": "wf-1", "action_id": "post", "action_type": "webhook",
+         "connector": "email", "event_type": "message.received", "status": "failed",
+         "started_at": "2026-09-25T10:00:01+00:00",
+         "finished_at": "2026-09-25T10:00:02+00:00",
+         "input": {"to": "invoice@dtcdev.click", "subject": "Rechnung"},
+         "output": None, "error": "webhook returned HTTP 500"},
+    ]
+    (status, payload), messages = replay(monkeypatch, items=email_items,
+                                         from_step="post")
+    assert status == 202
+
+    seen = {}
+
+    def run_connector(action, event, wf, steps=None):
+        seen.setdefault("event", event)
+        return {"sent": True}
+
+    monkeypatch.setattr(worker, "_run_connector", run_connector)
+    _configure_worker(monkeypatch, calls := [])
+
+    resume_message = json.loads(messages[0]["MessageBody"])
+    resume_message["dapier_resume"]["resume_at"] = time.time() - 1
+    result = worker.handler({"Records": [{"messageId": "m1",
+                                          "body": json.dumps(resume_message)}]}, None)
+
+    assert result == {"batchItemFailures": []}
+    # The event the resumed branch sees is the normalized routed shape.
+    event = seen["event"]
+    assert event["data"]["route"] == "invoice"
+    assert event["data"]["recipients"]["matched"] == ["invoice@dtcdev.click"]
+    assert event["id"] == payload["run_id"].split(":", 1)[1]
+    # Normalization is a no-op for an already-normalized event: a parked
+    # delay's resume re-normalizes to the same thing.
+    assert normalize_event(event) == event
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
