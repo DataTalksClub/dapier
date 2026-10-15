@@ -163,6 +163,12 @@ schema: <schema>}}`; the parsed object lands in `data`
 
 ### Errors
 
+For email events, `ai_complete` resolves stored text/HTML body references
+before rendering the prompt, including the `html` alias. The stored trigger
+is unchanged. Unreadable references, invalid UTF-8 and bodies above 2 MB
+fail before an AI request; they do not produce a successful empty extraction.
+Legacy inline email bodies need no storage read.
+
 Transport problems fail the step like any HTTP action: HTTP 4xx/5xx,
 timeouts and unreadable responses raise the webhook/http_request `HttpError`
 (with the status and the server's `Retry-After` hint attached), so

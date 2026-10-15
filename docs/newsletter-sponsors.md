@@ -31,7 +31,12 @@ SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workfl
      returns {ok: false, ...} for the chain to branch on. Datamailer
      stores `data.body` as `{html: {value: ...}}` and SES intake stores
      string `html`/`text`; the prompt lists both so the model sees the
-     issue either way.
+     issue either way. Before rendering, `ai_complete` loads referenced
+     UTF-8 text/HTML parts from storage into a private copy of the event.
+     This also covers HTML-only messages. Unreadable parts, invalid UTF-8,
+     or parts over 2 MB fail the step before contacting the model; missing
+     content must not become a successful empty sponsor result. A slim
+     event with only a raw MIME reference is decoded before rendering.
   2. forward-leads — dataops POST to the DataOps connection origin plus
      `/api/v1/intake/leads` with the
      dapier/dataops secret as x-dataops-intake-secret, the same auth as
@@ -48,6 +53,13 @@ The intake dedups per lead on `sha256("lead:"+messageId+name+url)`:
 exact/cosmetic replays return `duplicate`; the same identity with changed
 content returns `409 idempotency-conflict` (first write wins). Retrying
 after a lost response is safe.
+
+For audit purposes, distinguish a completed run from a verified extraction.
+Older runs may have rendered only body-reference metadata. Check that the
+model received the body before accepting an empty array as evidence of no
+sponsors. The redacted referenced-body regression fixture exercises the
+shipped prompt with a closing placement beyond 60 KB; its completion is
+stubbed, so it verifies transport rather than model accuracy.
 
 ## Leads contract (implemented in DataOps)
 

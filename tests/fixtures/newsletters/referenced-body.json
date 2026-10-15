@@ -1,0 +1,20 @@
+{
+  "note": "Redacted reconstruction of October 2026 inbound-email v1 failures. Addresses, IDs, object paths and ad copy are synthetic; no tracking links or source MIME retained.",
+  "event": {
+    "connector": "email",
+    "event": "message.received",
+    "data": {
+      "sender": {"header": "Example Weekly <news@example.test>"},
+      "subject": "Example Weekly: agents",
+      "message_id": "<fixture@example.test>",
+      "body": {
+        "text": {"content_type": "text/plain", "s3": {"bucket": "fixture-mail", "key": "text.txt"}},
+        "html": {"content_type": "text/html", "s3": {"bucket": "fixture-mail", "key": "html.txt"}}
+      },
+      "html": {"content_type": "text/html", "s3": {"bucket": "fixture-mail", "key": "html.txt"}}
+    }
+  },
+  "text": "Editorial roundup.\nSponsored by Example Cloud\nRun your workflows with Example Cloud.\nhttps://cloud.example.test/\n",
+  "html": "<p>Editorial roundup.</p><h2>Sponsored by Example Cloud</h2><a href=\"https://cloud.example.test/\">Run your workflows</a>",
+  "expected_sponsors": [{"name": "Example Cloud", "url": "https://cloud.example.test/"}]
+}

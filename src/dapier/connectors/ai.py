@@ -285,6 +285,8 @@ def run_ai_complete(action, event, *, steps=None, transport=None, workflow_id=""
     config = _configuration(action)
     key = config["token"]
     base_url = config["base_url"].rstrip("/")
+    from .email_content import materialize_email
+    event = materialize_email(event)
     prompt = render(action.get("prompt") or "", event, steps).strip()
     if not prompt:
         raise ValueError("ai_complete requires a rendered prompt")
