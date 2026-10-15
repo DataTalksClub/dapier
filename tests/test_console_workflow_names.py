@@ -143,8 +143,8 @@ def test_designer_header_edits_the_name_not_the_id():
     assert "input.maxLength = MAX_NAME_LENGTH" in js
     assert "input.scrollLeft = 0" in js
     css = (WEB / "app.css").read_text()
-    block = css[css.index(".topbar h1 .title-input"):]
-    block = block[:block.index("#designer-back")]
+    block = css[css.index(".page-header h1 .title-input"):]
+    block = block[:block.index("}") + 1]
     assert "width: 100%" in block and "max-width: none" in block
     assert "width: 320px" not in block and "max-width: 38vw" not in block
     # The header carries no id line under the name.

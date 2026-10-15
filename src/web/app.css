@@ -26,14 +26,6 @@
 .clip { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 
-/* One measure for every page header and its content: the 70rem register
-   measure. The designer and agents canvases are the full-bleed exceptions
-   (dakit/docs/family.md). */
-:root {
-  --content-wide: 70rem;
-  --page-gutter: var(--dk-space-8);
-}
-
 /* --- buttons ------------------------------------------------------------- */
 /* Buttons are dakit's own .dk-button vocabulary (vendor/dakit.css): one
    primary per view, quiet secondaries, danger separated and labelled.
@@ -121,141 +113,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
 .login-formless .form-error { min-height: 0; }
 .login-foot { margin: 0 auto; padding: var(--dk-space-5) var(--dk-space-6); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 
-/* --- shell: the family's 268px sidebar + main canvas ----------------------- */
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--dk-size-sidebar) minmax(0, 1fr); }
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  /* a short window scrolls the nav (below) inside the column instead of
-     spilling items onto the page */
-  min-width: 0;
-  overflow: hidden;
-  /* the sidebar plane reads --dk-bg-muted, matching the canonical dataops
-     shell (family.md's recipe says bg-page — reconciled in docs/family-review) */
-  background: var(--dk-bg-muted);
-  border-right: 1px solid var(--dk-border-default);
-  /* 24px top: the brand row and the page h1 share one band */
-  padding: var(--dk-space-6) var(--dk-space-3) var(--dk-space-4);
-  z-index: 20;
-}
-.sidebar-backdrop { display: none; }
-/* Product mark + workspace name, the family's sidebar header. The close
-   button exists only in the drawer and sits at the far end. */
-.brand { display: flex; align-items: center; gap: var(--dk-space-3); min-height: var(--dk-size-control-lg); margin-bottom: var(--dk-space-4); padding: 0 var(--dk-space-1); font-size: var(--dk-text-lg); }
-.workspace-mark {
-  display: grid;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: var(--dk-radius-md);
-  background: var(--dk-accent-default);
-  color: var(--dk-text-on-accent);
-  font-size: var(--dk-text-lg);
-  font-weight: var(--dk-weight-bold);
-}
-.sidebar-close { display: none; margin-left: auto; }
-.sidebar nav { display: grid; align-content: start; gap: var(--dk-space-1); margin-bottom: var(--dk-space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dk-border-default) transparent; }
-.nav-group-label {
-  margin: var(--dk-space-4) var(--dk-space-2) var(--dk-space-1);
-  color: var(--dk-text-muted);
-  font-size: var(--dk-text-xs);
-  font-weight: var(--dk-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-/* Icon + text rows; the filled row is the only selection signal — no rail. */
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--dk-space-2);
-  height: 32px;
-  flex: none;
-  min-width: 0;
-  padding: 0 var(--dk-space-3);
-  border-radius: var(--dk-radius-md);
-  color: var(--dk-text-primary);
-  font-size: var(--dk-text-body);
-  font-weight: var(--dk-weight-medium);
-  text-align: left;
-  text-decoration: none;
-}
-.nav-item:hover { color: var(--dk-text-primary); background: var(--dk-bg-hover); }
-.nav-item.active, .nav-item[aria-current="page"] { background: var(--dk-accent-soft); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); }
-/* The nav scrolls, so an outset ring would be clipped at its edges: rows
-   inset the ring (family focus recipe for full-bleed rows). */
-.nav-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
-.nav-item svg { width: 20px; height: 20px; flex: none; }
-.nav-count {
-  margin-left: auto;
-  min-width: 1.25em;
-  padding: 0 var(--dk-space-2);
-  border-radius: var(--dk-radius-full);
-  background: var(--dk-danger-bg);
-  color: var(--dk-danger-text);
-  font-size: var(--dk-text-xs);
-  font-weight: var(--dk-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.6;
-  text-align: center;
-}
-.sidebar-foot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--dk-space-2);
-  min-width: 0;
-  border-top: 1px solid var(--dk-border-default);
-  padding: var(--dk-space-3) var(--dk-space-1) 0;
-}
-/* Global utilities and the account trigger: the footer is the shell's only
-   global strip — there is no top toolbar on desktop. One shrinkable column,
-   so a long name or the "Updated" stamp never pushes past the sidebar edge. */
-.sidebar-foot-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--dk-space-1); }
-.sidebar-foot .nav-item { width: 100%; flex: auto; border: 0; background: transparent; cursor: pointer; font-family: inherit; }
-.sidebar-tool-button .last-updated { margin-left: auto; font-size: var(--dk-text-xs); font-weight: var(--dk-weight-regular); }
-.sidebar-account-button { width: 100%; min-width: 0; justify-content: flex-start; }
-.sidebar-account-button .account-button-name { flex: 1 1 auto; min-width: 0; max-width: none; text-align: left; }
-.account-button.mobile-account-button { display: none; }
-.environment { display: inline-flex; align-items: center; gap: var(--dk-space-2); padding: 0 var(--dk-space-3); font-size: var(--dk-text-xs); color: var(--dk-text-muted); white-space: nowrap; }
-.env-dot { width: 8px; height: 8px; flex: none; border-radius: var(--dk-radius-full); background: var(--dk-accent-default); }
-.sidebar .icon-button { border-color: transparent; color: var(--dk-text-muted); }
-.sidebar .icon-button:hover { border-color: transparent; background: var(--dk-bg-hover); color: var(--dk-text-primary); }
-
-/* --- page header / views ---------------------------------------------------
-   One header pattern: a 32px/700 h1 and a one-line muted description, the
-   primary action on the same row at the right; header and content share
-   one 70rem measure, so the h1 and the content start on the same edge and
-   the action ends where the content ends. */
-main { min-width: 0; padding: 0 var(--page-gutter) var(--dk-space-8); }
-.topbar {
-  width: min(var(--content-wide), 100%);
-  margin: 0 auto;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--dk-space-4);
-  padding: var(--dk-space-6) 0 0;
-}
-.topbar-title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--dk-space-1); }
-.topbar h1 { font-size: var(--dk-text-page); font-weight: var(--dk-weight-bold); letter-spacing: -.02em; line-height: var(--dk-leading-tight); }
-#view-description { margin: 0; font-size: var(--dk-text-md); line-height: var(--dk-leading-normal); color: var(--dk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar-title:has(#view-description:empty) { gap: 0; }
+/* --- shell and page header ----------------------------------------------
+   The app shell is dakit's (docs/shell.md: .dk-shell, .dk-sidebar rail and
+   drawer, .dk-main as the only scroller, .dk-page-header). The console adds
+   only what is its own: the designer's back button beside the h1, and the
+   views that swap under one header. */
+/* The kit leaves icon drawing to the app: dapier's one stroke style. */
+.dk-sidebar svg, .dk-topbar svg, .dk-account-menu svg, .page-header svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dk-nav-item__icon svg { width: 20px; height: 20px; }
+.page-title-row { display: flex; align-items: center; gap: var(--dk-space-2); min-width: 0; }
+.designer-back { display: none; flex: none; }
+body[data-view="designer"] .designer-back { display: inline-grid; }
+.page-header-actions .dk-button svg { width: 16px; height: 16px; }
 .view { display: none; }
-.view.active { display: block; padding-top: var(--dk-gap-section); width: min(var(--content-wide), 100%); margin: 0 auto; }
-.page-tabs { width: min(var(--content-wide), 100%); margin: var(--dk-gap-section) auto 0; }
-/* Auto margins center regular views, but width:auto shrink-wraps a flex
-   child around the iframe's intrinsic width. The editor fills the main. */
-body[data-view="designer"] .view.active { padding-top: 0; width: 100%; }
+.view.active { display: block; min-width: 0; }
 body[data-view="designer"] #page-tabs { display: none; }
-/* agents runs the same full-bleed canvas: width:auto shrink-wraps inside the
-   flex main, so the whole workspace visibly re-sizes while a run loads */
-body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space-4); }
 /* Toolbars: page-tools is the shell's toolbar hook (it stays visible while
    a view's data is pending). Gaps follow the dakit roles. */
 .page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-gap-control); margin: 0; padding: 0; min-width: 0; }
@@ -273,197 +145,9 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
 .register-toolbar .toolbar-filters { flex: 1 1 520px; }
 .register-toolbar .toolbar-filters > label { flex: 0 1 184px; min-width: 132px; }
 .register-toolbar .toolbar-filters > label.toolbar-search { flex: 1 1 220px; max-width: 320px; }
-/* The bar's account twin exists only in the phone app bar. */
-.top-actions { display: none; margin-left: auto; align-items: center; gap: var(--dk-gap-control); }
-.last-updated { font-size: var(--dk-text-sm); color: var(--dk-text-muted); white-space: nowrap; }
-.menu-toggle { display: none; }
-
-/* Family account chrome: identity, appearance, and sign-out in the sidebar
-   footer popover; the mobile top bar keeps an avatar-only twin trigger. */
-.account-button {
-  display: inline-flex;
-  min-height: var(--dk-size-control-md);
-  align-items: center;
-  justify-content: center;
-  gap: var(--dk-space-2);
-  border: 0;
-  border-radius: var(--dk-radius-md);
-  background: transparent;
-  color: var(--dk-text-primary);
-  padding: var(--dk-space-1) var(--dk-space-2);
-  font-size: var(--dk-text-md);
-  font-weight: var(--dk-weight-semibold);
-}
-.account-button:hover { background: var(--dk-bg-hover); }
-.account-avatar {
-  display: inline-grid;
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: var(--dk-radius-full);
-  background: var(--dk-accent-default);
-  color: var(--dk-text-on-accent);
-  font-size: var(--dk-text-xs);
-  font-weight: var(--dk-weight-bold);
-  letter-spacing: 0.02em;
-  line-height: 1;
-}
-.account-button-name {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.account-chevron {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--dk-text-muted);
-}
-.account-menu {
-  position: fixed;
-  left: 16px;
-  bottom: 150px;
-  z-index: 30;
-  width: min(380px, calc(100vw - 32px));
-  max-height: calc(100vh - 170px);
-  overflow: auto;
-  border: 1px solid var(--dk-border-default);
-  border-radius: var(--dk-radius-lg);
-  background: var(--dk-bg-surface);
-  box-shadow: var(--dk-shadow-overlay);
-}
-.account-menu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--dk-space-3);
-  border-bottom: 1px solid var(--dk-border-default);
-  background: var(--dk-bg-muted);
-  min-height: 54px;
-  padding: var(--dk-space-2) var(--dk-space-3) var(--dk-space-2) var(--dk-space-4);
-}
-.account-menu-header strong {
-  color: var(--dk-text-heading);
-  font-size: var(--dk-text-lg);
-}
-.account-menu-close { flex: none; }
-.account-menu-icon svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.account-menu-body { display: grid; }
-.account-section-label {
-  margin: 0;
-  border-bottom: 1px solid var(--dk-border-default);
-  background: var(--dk-bg-muted);
-  color: var(--dk-text-muted);
-  padding: var(--dk-space-2) var(--dk-space-4);
-  font-size: var(--dk-text-sm);
-  font-weight: var(--dk-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.account-identity {
-  display: grid;
-  grid-template-columns: var(--dk-size-control-lg) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--dk-space-3);
-  border-bottom: 1px solid var(--dk-border-default);
-  background: var(--dk-bg-surface);
-  padding: var(--dk-space-3) var(--dk-space-4);
-}
-.account-avatar-large {
-  width: var(--dk-size-control-lg);
-  height: var(--dk-size-control-lg);
-  flex-basis: var(--dk-size-control-lg);
-  font-size: var(--dk-text-body);
-}
-.account-identity-copy { display: grid; min-width: 0; }
-.account-identity-copy small,
-.account-identity-copy > span {
-  color: var(--dk-text-muted);
-  font-size: var(--dk-text-sm);
-}
-.account-identity-copy strong,
-.account-identity-copy > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.account-identity-copy strong {
-  color: var(--dk-text-heading);
-  font-size: var(--dk-text-body);
-}
-.account-menu-item {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--dk-space-3);
-  width: 100%;
-  min-height: 54px;
-  border: 0;
-  border-bottom: 1px solid var(--dk-border-default);
-  border-radius: 0;
-  background: var(--dk-bg-surface);
-  color: var(--dk-text-primary);
-  padding: var(--dk-space-3) var(--dk-space-4);
-  text-align: left;
-}
-.account-menu-item:hover { background: var(--dk-bg-hover); }
-.account-menu-item > span:nth-child(2) { display: grid; gap: var(--dk-space-1); }
-.account-menu-item strong { color: var(--dk-text-heading); font-size: var(--dk-text-body); }
-.account-menu-item small {
-  display: block;
-  color: var(--dk-text-muted);
-  font-size: var(--dk-text-sm);
-  font-weight: 400;
-}
-.account-menu-icon {
-  display: grid;
-  place-items: center;
-  color: var(--dk-text-muted);
-}
-.account-theme-label {
-  color: var(--dk-text-heading);
-  font-weight: var(--dk-weight-semibold);
-}
-.account-toggle-track {
-  display: flex;
-  width: 36px;
-  height: 20px;
-  align-items: center;
-  border-radius: var(--dk-radius-full);
-  background: var(--dk-border-strong);
-  padding: 2px; /* icon nudge: the knob's inset inside its track */
-}
-.account-toggle-track span {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--dk-radius-full);
-  background: var(--dk-text-on-deep);
-}
-.account-theme-toggle[aria-pressed="true"] .account-toggle-track {
-  background: var(--dk-accent-default);
-}
-.account-theme-toggle[aria-pressed="true"] .account-toggle-track span {
-  transform: translateX(16px);
-}
-/* Sign-out is its own section: a gap and a rule part it from Appearance. */
-.account-sign-out { margin-top: var(--dk-space-2); border-top: 1px solid var(--dk-border-default); }
-.account-sign-out,
-.account-sign-out strong,
-.account-sign-out .account-menu-icon {
-  color: var(--dk-danger-text);
-}
-
-.loading { height: 2px; display: flex; gap: var(--dk-space-1); margin: 0 calc(-1 * var(--page-gutter)); overflow: hidden; }
+/* The refresh progress line rides the top edge of the viewport, outside the
+   page flow, so showing it never shifts the content below. */
+.loading { position: fixed; inset: 0 0 auto; z-index: 30; height: 2px; display: flex; gap: var(--dk-space-1); overflow: hidden; pointer-events: none; }
 .loading span { flex: 1; background: var(--dk-accent-default); opacity: .12; animation: pulse 1s infinite alternate ease-in-out; }
 .loading span:nth-child(2) { animation-delay: .18s; }
 .loading span:nth-child(3) { animation-delay: .36s; }
@@ -472,10 +156,10 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
    dakit base layer shortens durations; this removes the loops outright). */
 @media (prefers-reduced-motion: reduce) {
   .loading span { animation: none; opacity: .5; }
-  .sidebar, .help-tip::after, .account-toggle-track span { transition: none !important; }
+  .help-tip::after { transition: none !important; }
 }
 
-.notice { width: min(var(--content-wide), 100%); margin: var(--dk-space-4) auto 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-accent-soft); padding: var(--dk-space-3) var(--dk-space-4); font-size: var(--dk-text-md); color: var(--dk-text-primary); }
+.notice { margin: 0; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-accent-soft); padding: var(--dk-space-3) var(--dk-space-4); font-size: var(--dk-text-md); color: var(--dk-text-primary); }
 .notice.error { border-color: var(--dk-border-default); background: var(--dk-danger-bg); color: var(--dk-danger-text); }
 .notice a { margin-left: var(--dk-space-1); color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
 .dialog-feedback { flex: none; border-top: 1px solid var(--dk-border-default); background: var(--dk-accent-soft); padding: var(--dk-space-3) var(--dk-space-5); color: var(--dk-text-primary); font-size: var(--dk-text-md); }
@@ -1223,16 +907,12 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .json-raw .json-block { max-height: 300px; }
 
 /* --- embedded designer -------------------------------------------------------- */
-/* The canvas is the view: main becomes a flex column pinned to the dynamic
-   viewport so the frame gets exactly what the real topbar leaves — no page
-   scroll, no dead band below, whatever the topbar wraps to (design-contract
-   "The designer canvas"). */
-body[data-view="designer"] main {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  padding-bottom: 0;
-}
+/* The canvas is the view: while the designer is open .dk-main stops
+   scrolling and becomes a flex column, so the frame gets exactly what the
+   page header leaves — no page scroll, no dead band below, whatever the
+   header wraps to (design-contract "The designer canvas"). */
+body[data-view="designer"] .dk-main { display: flex; flex-direction: column; overflow: hidden; padding-bottom: var(--dk-space-4); }
+body[data-view="designer"] .dk-main__inner { flex: 1 1 auto; min-height: 0; width: 100%; max-width: none; }
 section.view[data-page="designer"].active {
   display: flex;
   flex-direction: column;
@@ -1242,22 +922,22 @@ section.view[data-page="designer"].active {
 }
 /* The designer keeps the family header: the workflow's name as the h1 (it
    renames in place), its id as the description line. */
-body[data-view="designer"] .topbar h1 {
+body[data-view="designer"] .page-header h1 {
   display: flex;
   align-items: center;
   gap: var(--dk-space-2);
   min-width: 0;
   width: 100%;
 }
-body[data-view="designer"] .topbar h1 .view-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-view="designer"] .page-header h1 .view-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The h1 doubles as the workflow rename affordance (the human name; the id
    never changes there); the edit saves with the draft. */
-body[data-view="designer"] .topbar h1.renamable { cursor: text; }
-body[data-view="designer"] .topbar h1.renamable:hover .view-title-text {
+body[data-view="designer"] .page-header h1.renamable { cursor: text; }
+body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   text-decoration: underline dashed var(--dk-text-muted);
   text-underline-offset: 5px;
 }
-.topbar h1 .title-input {
+.page-header h1 .title-input {
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--dk-border-strong);
@@ -1275,9 +955,6 @@ body[data-view="designer"] .topbar h1.renamable:hover .view-title-text {
   padding: 0 0 2px;
   width: 100%;
 }
-#designer-back { display: none; border-color: transparent; }
-body[data-view="designer"] #designer-back { display: inline-flex; }
-#designer-back:hover { border-color: transparent; background: var(--dk-bg-muted); }
 .designer-embed {
   display: flex;
   flex: 1;
@@ -1292,38 +969,10 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   background: var(--dk-bg-page);
 }
 
-/* --- drawer behaviour (≤860) --------------------------------------------------- */
+/* --- phones and narrow windows (≤860) -------------------------------------
+   The shell's own mobile layout (app bar, drawer, 16px gutter) is dakit's
+   at ≤820px; these rules size the console's content for small screens. */
 @media (max-width: 860px) {
-  .app-shell { grid-template-columns: 1fr; }
-  /* One 16px gutter on phones for the header, tabs, toolbar, cards and
-     detail panes alike. */
-  :root { --page-gutter: var(--dk-space-4); }
-  main { padding: 0 var(--page-gutter) var(--dk-space-7); }
-  /* Mobile page anatomy (family.md): a fixed 64px app bar — menu, title,
-     account — with the page description in the content column below the
-     bar's full-bleed hairline. */
-  .topbar {
-    position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "lead title actions" "desc desc desc";
-    grid-template-rows: 64px auto;
-    align-items: center;
-    column-gap: var(--dk-gap-control);
-    row-gap: 0;
-    width: 100%;
-    padding: 0;
-  }
-  .topbar::after { content: ""; position: absolute; top: 64px; left: calc(-1 * var(--page-gutter)); right: calc(-1 * var(--page-gutter)); border-bottom: 1px solid var(--dk-border-default); }
-  .topbar-title { display: contents; }
-  .topbar h1 { grid-area: title; font-size: var(--dk-text-xl); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  body[data-view="designer"] .topbar h1:has(.title-input) { overflow: visible; }
-  #menu-toggle, #designer-back { grid-area: lead; }
-  .top-actions { grid-area: actions; display: flex; }
-  #view-description { grid-area: desc; align-self: start; margin: var(--dk-space-4) 0 0; }
-  body[data-view="designer"] .topbar { padding: 0; }
-  .view.active { padding-top: var(--dk-gap-block); }
-  .page-tabs { width: 100%; margin-top: var(--dk-gap-block); }
   /* Empty header rows collapse so the designer's frame keeps no dead band. */
   #view-description:empty { display: none; }
   /* Every phone control meets the 44px touch scale: buttons, text inputs,
@@ -1337,31 +986,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .row-menu-item { min-height: var(--dk-size-touch); }
   .dk-input, .dk-select, .dk-textarea { min-height: var(--dk-size-touch); }
   .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  /* the drawer's own controls outrank the generic bump — re-assert here */
-  .sidebar .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
-  .sidebar-backdrop:not([hidden]) { position: fixed; display: block; inset: 0; z-index: 19; width: 100%; height: 100dvh; border: 0; background: var(--dk-bg-backdrop); cursor: pointer; }
-  .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: var(--dk-size-sidebar);
-    /* the drawer's brand row sits in the same 64px band as the app bar */
-    padding-top: var(--dk-space-3);
-    visibility: hidden;
-    transform: translateX(-100%);
-    transition: transform .2s ease, visibility 0s linear .2s;
-  }
-  /* The drawer is a touch surface: nav rows go to 44px. */
-  .nav-item { height: var(--dk-size-touch); }
-  .sidebar.open {
-    visibility: visible;
-    transform: translateX(0);
-    transition-delay: 0s;
-    box-shadow: var(--dk-shadow-overlay);
-  }
-  .sidebar-close { display: inline-grid; }
-  .menu-toggle { display: inline-grid; }
-  .account-button { min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); }
   /* The register toolbar stacks: search on its own row, filters two up,
      actions after them at the start. */
   /* The register toolbar becomes one two-up grid: search across, then the
@@ -1377,53 +1001,12 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   .agent-toolbar .agent-workers-strip { align-self: center; }
 }
 
-/* Family account trigger: avatar only in the 64px top bar at ≤820px. */
-@media (max-width: 820px) {
-  /* Only the top-bar twin collapses to the bare avatar; the sidebar rows in
-     the drawer keep their labels at the touch scale. */
-  .top-actions .account-button-name,
-  .top-actions .account-chevron { display: none; }
-  .top-actions .account-button { width: var(--dk-size-touch); padding: 0; }
-  .account-button.mobile-account-button { display: inline-flex; }
-  .sidebar-foot .nav-item,
-  .sidebar-foot .account-button { min-height: var(--dk-size-touch); }
-  .account-menu {
-    inset: 0;
-    top: 0;
-    right: 0;
-    z-index: 60;
-    width: 100%;
-    max-height: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .account-menu-header {
-    display: grid;
-    grid-template-columns: var(--dk-size-touch) minmax(0, 1fr) var(--dk-size-touch);
-    min-height: 64px;
-    padding: 0 var(--dk-space-2);
-  }
-  .account-menu-header strong {
-    grid-column: 2;
-    grid-row: 1;
-    text-align: center;
-  }
-  .account-menu-close {
-    grid-column: 1;
-    grid-row: 1;
-    width: var(--dk-size-touch);
-    height: var(--dk-size-touch);
-  }
-}
-
 /* --- mobile (≤560): stacked ledger rows ---------------------------------------- */
 @media (max-width: 560px) {
-  body[data-view="designer"] .topbar h1 { font-size: var(--dk-text-xl); }
   /* The canvas gets the height: the id line folds away on phones. */
   body[data-view="designer"] #view-description { display: none; }
   .page-tools .field-hint { flex-basis: auto; margin: 0; }
-  .last-updated { display: none; }
+  #last-updated { display: none; }
 
   .section-head { margin-top: var(--dk-space-4); }
   .oauth-result { align-items: flex-start; flex-direction: column; }

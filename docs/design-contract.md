@@ -26,19 +26,21 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
 
 ## Pinned recipes (verify against dakit/docs/family.md)
 
-- **Shell**: 268px sidebar (`--dk-size-sidebar`) on `--dk-bg-muted` with a
-  right hairline; uppercase muted group labels; icon+text nav rows; the
-  selected page is the filled `--dk-accent-soft` row only — no rail, no
-  stripe. Mobile ≤860px: one top bar + modal drawer (scrim, Escape, focus
-  trap, restoration).
-- **Account chrome**: identity, appearance, and sign-out live in an Account
-  popover opened from the sidebar footer trigger (avatar initial + display
-  name + chevron; an avatar-only twin sits in the mobile top bar at ≤820px).
-  Overlay uses `--dk-radius-lg` and `--dk-shadow-overlay`. The sidebar footer
-  also holds the region label and the refresh row; theme and sign-out exist
-  only inside the popover.
-- **Page anatomy**: one 32px `h1` + one-line muted description; primary
-  actions in the header band; content in one bordered container with muted
+- **Shell**: dakit's app shell, markup and behaviour (`docs/shell.md`,
+  `vendor/shell.js`): a 240px navigation-only sidebar on `--dk-bg-muted`
+  (brand row, two labelled nav groups, one account row + collapse toggle at
+  the foot), a working 56px icon rail with tooltips, and on phones (≤820px)
+  a 48px app bar plus a navigation-only modal drawer. The selected page is
+  the `--dk-accent-soft` fill only. `.dk-main` is the only scroller. No bell:
+  dapier has no actionable notification feed.
+- **Account chrome**: the account row opens dakit's upward disclosure
+  (`.dk-menu.dk-account-menu`): identity, the Dark mode switch (the only
+  theme control), the region in the meta row, Sign out. No destinations.
+  On phones the same trigger moves into the app bar.
+- **Refresh**: the global Refresh and its mono "Updated" stamp sit in the
+  page header's actions (`docs/shell.md` §13).
+- **Page anatomy**: one `.dk-page-header` (22px `h1` + one-line muted
+  description); creates ride on their collection, not the header; content in one bordered container with muted
   header bands and hairline-divided rows; Home is the strip-and-panels
   anatomy, not a dashboard grid.
 - **Controls**: `--dk-size-control-*` heights (34px desktop, 44px touch);

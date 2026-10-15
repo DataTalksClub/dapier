@@ -352,8 +352,9 @@ function renderErrors() {
   $('#overview-errors-panel').classList.toggle('is-empty', rows.length === 0);
   const badge = $('#nav-runs-count');
   if (badge) {
-    badge.hidden = total <= 0;
-    badge.textContent = total > 0 ? String(total) : '';
+    /* dakit .dk-count: hidden at 0, 99+ cap (a 0 is never shown). */
+    if (globalThis.dakitShell) globalThis.dakitShell.setCount(badge, total);
+    else { badge.hidden = total <= 0; badge.textContent = total > 0 ? String(total) : ''; }
     badge.title = total > 0
       ? `${total} failed run${total === 1 ? '' : 's'} in the last 7 days still to fix`
       : '';

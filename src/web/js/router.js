@@ -126,8 +126,7 @@ export async function setView(view, push = true, options = {}) {
   if (emailTab) document.body.dataset.emailTab = emailTab;
   else delete document.body.dataset.emailTab;
   const navView = NAV_FOR[view] || view;
-  $$('.nav-item').forEach((item) => {
-    item.classList.toggle('active', item.dataset.view === navView);
+  $$('.dk-sidebar .dk-nav-item').forEach((item) => {
     if (item.dataset.view === navView) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   });
@@ -158,13 +157,13 @@ export async function setView(view, push = true, options = {}) {
     || [view[0].toUpperCase() + view.slice(1), ''];
   $('#view-title').textContent = title;
   $('#view-description').textContent = description;
-  $('.sidebar').classList.remove('open');
-  $('#menu-toggle')?.setAttribute('aria-expanded', 'false');
   if (!push && ['/inbox', '/usage'].includes(window.location.pathname)) history.replaceState(null, '', `/runs${window.location.search}`);
   if (!push && window.location.pathname === '/triggers') history.replaceState(null, '', '/workflows?tab=hooks');
   if (!push && window.location.pathname === '/storage') history.replaceState(null, '', '/workflows');
   if (push) history.pushState(null, '', pathFor(view, workflowTab, emailTab));
   rememberedUrl = `${window.location.pathname}${window.location.search}`;
-  window.scrollTo(0, 0);
+  /* .dk-main is the shell's only scroller (the page itself never scrolls). */
+  const main = $('#main-content');
+  if (main) main.scrollTop = 0;
   return true;
 }

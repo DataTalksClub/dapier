@@ -1,9 +1,10 @@
-"""Family account chrome: identity, theme, and sign-out live in the sidebar."""
+"""dakit account chrome (docs/shell.md §5.4, §6): one account row at the
+foot of the sidebar opens an upward disclosure with identity, the Dark
+mode switch, the region, and Sign out — no destinations in it."""
 import json
 import re
 import shutil
 import subprocess
-from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -18,105 +19,64 @@ THEME_JS = (ROOT / "src/web/js/theme.js").read_text()
 MAIN_JS = (ROOT / "src/web/js/main.js").read_text()
 
 
-class TopActions(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.markup = ""
-        self.account_label = None
-        self.account_haspopup = None
-        self._depth = 0
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        classes = attrs.get("class", "").split()
-        if "top-actions" in classes:
-            self._depth = 1
-        elif self._depth:
-            self._depth += 1
-        if "account-button" in classes:
-            self.account_label = attrs.get("aria-label")
-            self.account_haspopup = attrs.get("aria-haspopup")
-        if self._depth:
-            self.markup += tag + " " + " ".join(f'{key}="{value}"' for key, value in attrs.items()) + "\n"
-
-    def handle_endtag(self, tag):
-        if self._depth:
-            self._depth -= 1
+def _foot():
+    return INDEX.split('<div class="dk-sidebar__foot">', 1)[1].split("</aside>", 1)[0]
 
 
-def test_sidebar_foot_holds_region_status_refresh_and_account_trigger():
-    assert 'id="theme-toggle"' not in INDEX
-    assert 'id="logout"' not in INDEX
-    foot = INDEX.split('class="sidebar-foot">', 1)[1].split('id="account-menu"', 1)[0]
-    assert "eu-west-1" in foot
-    assert 'id="refresh"' in foot
-    assert 'id="last-updated"' in foot
-    assert 'id="account-button"' in foot
-    assert "account-button-name" in foot
-    assert "theme-toggle" not in foot
-    assert "Sign out" not in foot
-    assert "logout" not in foot
-    assert "moon" not in foot
+def _menu():
+    return INDEX.split('<div id="account-menu"', 1)[1].split('<div id="dk-live"', 1)[0]
 
 
-def test_account_triggers_live_in_the_sidebar_and_mobile_topbar():
-    parser = TopActions()
-    parser.feed(INDEX)
-    assert parser.account_label == "Account"
-    assert parser.account_haspopup == "true"
-    assert 'id="mobile-account-button"' in parser.markup
-    assert "account-avatar" in parser.markup
-    # The desktop trigger and the global utilities left the top bar.
-    assert 'id="account-button"' not in parser.markup
-    assert 'id="refresh"' not in parser.markup
-    assert 'id="last-updated"' not in parser.markup
-    assert "account-button-name" not in parser.markup
+def test_sidebar_foot_is_one_account_row_and_the_collapse_toggle():
+    foot = _foot()
+    buttons = re.findall(r'<button [^>]*id="([^"]+)"', foot)
+    assert buttons == ["account-button", "sidebar-toggle"]
+    assert 'class="dk-account-trigger"' in foot
+    assert 'data-dk-popover-trigger="account-menu"' in foot
+    assert 'aria-controls="account-menu"' in foot
+    assert 'data-dk-sidebar-toggle' in foot
+    # Region, refresh and "Updated" left the sidebar (shell.md §5.4, §13).
+    for gone in ("eu-west-1", 'id="refresh"', 'id="last-updated"', "Sign out", "Dark mode"):
+        assert gone not in foot
 
 
-def test_account_popover_has_family_sections_without_dataops_only_ones():
-    menu = INDEX.split('id="account-menu"', 1)[1].split('id="user-confirm-dialog"', 1)[0]
-    assert "Signed in as" in menu
-    assert "Appearance" in menu
-    assert "Dark mode" in menu
-    assert 'id="account-theme-toggle"' in menu
-    assert "account-toggle-track" in menu
-    assert "Sign out" in menu
-    assert "End this browser session." in menu
-    assert "Show work for" not in menu
-    assert "Workspace" not in menu
-    assert "Version" not in menu
-    assert "data-lucide" not in menu
-    assert 'viewBox="0 0 24 24"' in menu
-    assert 'stroke-width="1.8"' in menu
+def test_account_menu_is_a_dakit_disclosure_without_destinations():
+    menu = _menu()
+    assert 'class="dk-menu dk-account-menu"' in INDEX
+    assert "data-dk-popover" in INDEX.split('<div id="account-menu"', 1)[1].split(">", 1)[0]
+    assert "dk-menu__identity" in menu
+    assert 'role="switch"' in menu and "data-dk-theme-toggle" in menu
+    assert "Dark mode" in menu and "dk-switch" in menu
+    assert "dk-menu__meta" in menu and "eu-west-1" in menu
+    assert "dk-menu__item--danger" in menu and "Sign out" in menu
+    # A menu, not a dialog: no header band, no close button, no subtitles,
+    # and no destinations (every page lives in the sidebar nav).
+    assert 'role="dialog"' not in menu
+    assert "account-menu-close" not in menu and "aria-label=\"Close" not in menu
+    assert "<small>" not in menu and "Signed in as" not in menu
+    assert "<a " not in menu
 
 
-def test_theme_still_uses_dakit_key_and_account_module_is_wired():
+def test_theme_and_popover_behaviour_come_from_the_kit():
+    assert INDEX.count('<script src="/assets/vendor/shell.js"></script>') == 1
     assert "dakit-theme" in THEME_JS
-    assert "export function setTheme" in THEME_JS
-    assert "export function toggleTheme" in THEME_JS
+    assert "data-dk-theme-toggle" in THEME_JS
     assert "from './account.js'" in MAIN_JS
     assert "bindAccountChrome()" in MAIN_JS
     assert "applyAccountIdentity(me)" in MAIN_JS
-    assert "$('#logout')" not in MAIN_JS
-    assert "$('#theme-toggle')" not in MAIN_JS
-    assert "toggleTheme()" in ACCOUNT_JS
     assert "/auth/logout" in ACCOUNT_JS
-    response = _static("/assets/js/account.js")
+    assert "confirmDesignerLeave" in ACCOUNT_JS
+    # The console no longer reimplements open/close, Esc or outside clicks.
+    assert "addEventListener('keydown'" not in ACCOUNT_JS
+    assert "Escape" not in ACCOUNT_JS
+    response = _static("/assets/vendor/shell.js")
     assert response is not None and response["statusCode"] == 200
 
 
-def test_account_css_uses_family_tokens_and_mobile_avatar_only():
-    account_css = CSS.split("/* Family account chrome", 1)[1].split(".loading {", 1)[0]
-    account_css += CSS.split("@media (max-width: 820px)", 1)[1].split("@media", 1)[0]
-    hex_colors = re.findall(r"#[0-9a-fA-F]{3,8}", account_css)
-    assert hex_colors == [], hex_colors
-    assert "--dk-radius-lg" in account_css
-    assert "--dk-shadow-overlay" in account_css
-    assert "--dk-danger-text" in account_css
-    assert "lucide" not in account_css.lower()
-    assert ".account-button-name" in account_css
-    assert ".account-chevron" in account_css
-    assert "display: none" in account_css
+def test_old_account_and_sidebar_css_is_gone():
+    for selector in (".account-menu", ".account-button", ".account-avatar", ".sidebar-foot",
+                     ".app-shell", ".topbar", ".menu-toggle", ".nav-count", ".workspace-mark"):
+        assert selector not in CSS, selector
 
 
 def test_identity_helpers_derive_name_and_initials_from_email():
@@ -154,4 +114,3 @@ console.log(JSON.stringify([
     assert result[0] == {"name": "Alexey Grigorev", "email": "alexey@datatalks.club", "initials": "AG"}
     assert result[1] == {"name": "Grace", "email": "grace@datatalks.club", "initials": "G"}
     assert result[2] == {"name": "Operator", "email": "", "initials": "O"}
-

@@ -46,40 +46,55 @@
     </div>
   </section>
 
-  <div id="app" class="app-shell" hidden>
-    <aside id="main-sidebar" class="sidebar">
-      <div class="brand"><span class="workspace-mark" aria-hidden="true">D</span><span class="wordmark">Dapier</span><button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close menu"><i data-lucide="x"></i></button></div>
-      <nav aria-label="Main navigation">
-        <a class="nav-item active" href="/" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Home</span></a>
-        <a class="nav-item" href="/workflows" data-view="workflows"><i data-lucide="workflow"></i><span>Workflows</span></a>
-        <a class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span></a>
-        <a class="nav-item" href="/runs" data-view="runs"><i data-lucide="list-checks"></i><span>Runs</span><span id="nav-runs-count" class="nav-count" hidden></span></a>
-        <a class="nav-item" href="/agents" data-view="agents"><i data-lucide="bot"></i><span>Agents</span></a>
-        <a class="nav-item" href="/workers" data-view="workers"><i data-lucide="server"></i><span>Workers</span></a>
-        <a class="nav-item" href="/connections" data-view="connections"><i data-lucide="plug-zap"></i><span>Connections</span></a>
-        <p class="nav-group-label">Settings</p>
-        <a class="nav-item" href="/tokens" data-view="tokens"><i data-lucide="key-square"></i><span>Access</span></a>
-        <a class="nav-item" href="/costs" data-view="costs"><i data-lucide="database"></i><span>Costs</span></a>
-        <a class="nav-item" href="/audit" data-view="audit"><i data-lucide="scroll-text"></i><span>Audit</span></a>
-      </nav>
-      <div class="sidebar-foot">
-        <span class="environment mono"><span class="env-dot" aria-hidden="true"></span>eu-west-1</span>
-        <div class="sidebar-foot-actions">
-          <button id="refresh" class="nav-item sidebar-tool-button" type="button" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i><span>Refresh</span><span id="last-updated" class="last-updated"></span></button>
-          <button id="account-button" class="account-button sidebar-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span><span class="account-button-name" data-account-name>Account</span><svg class="account-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div id="app" class="dk-shell" data-app="dapier" data-sidebar="expanded" hidden>
+    <a class="dk-skip-link" href="#main-content">Skip to content</a>
+    <header class="dk-topbar">
+      <button id="menu-toggle" class="dk-icon-button" type="button" data-dk-drawer-toggle aria-controls="main-sidebar" aria-expanded="false" aria-label="Open navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M4 7h16M4 12h16M4 17h16'/></svg></button>
+      <a class="dk-topbar__title view-link" href="/" data-target="overview">Dapier</a>
+      <div class="dk-topbar__end"></div>
+    </header>
+    <aside id="main-sidebar" class="dk-sidebar" aria-label="Workspace">
+      <div class="dk-sidebar__head">
+        <a class="dk-brand view-link" href="/" data-target="overview"><span class="dk-brand__tile" aria-hidden="true">D</span><span class="dk-brand__name">Dapier</span></a>
+        <button id="sidebar-close" class="dk-icon-button dk-sidebar__close" type="button" data-dk-drawer-close aria-label="Close navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='m6 6 12 12M18 6 6 18'/></svg></button>
+      </div>
+      <nav class="dk-sidebar__nav" aria-label="Primary">
+        <div class="dk-nav-group" aria-labelledby="nav-group-workspace">
+          <div class="dk-nav-group__label" id="nav-group-workspace">Workspace</div>
+          <a class="dk-nav-item nav-item" href="/" data-view="overview"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width='7' height='9' x='3' y='3' rx='1.01'/><rect width='7' height='5' x='14' y='3' rx='1.01'/><rect width='7' height='9' x='14' y='12' rx='1.01'/><rect width='7' height='5' x='3' y='16' rx='1.01'/></svg></span><span class="dk-nav-item__label">Home</span></a>
+          <a class="dk-nav-item nav-item" href="/workflows" data-view="workflows"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width='8' height='8' x='3' y='3' rx='2'/><path d='M 7 11 v 4 a2 2 0 0 0 2 2 h 4'/><rect width='8' height='8' x='13' y='13' rx='2'/></svg></span><span class="dk-nav-item__label">Workflows</span></a>
+          <a class="dk-nav-item nav-item" href="/emails" data-view="emails"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='m 22 7 -8.98 5.73 a2 2 0 0 1 -2.01 0 L 2 7'/><rect x='2' y='4' width='20' height='16' rx='2'/></svg></span><span class="dk-nav-item__label">Emails</span></a>
+          <a class="dk-nav-item nav-item" href="/runs" data-view="runs"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 13 5 h 8'/><path d='M 13 12 h 8'/><path d='M 13 19 h 8'/><path d='m 3 17 2 2 4 -4'/><path d='m 3 7 2 2 4 -4'/></svg></span><span class="dk-nav-item__label">Runs</span><span id="nav-runs-count" class="dk-count" hidden></span></a>
+          <a class="dk-nav-item nav-item" href="/agents" data-view="agents"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 12 8 V 4 H 8'/><rect width='16' height='12' x='4' y='8' rx='2'/><path d='M 2 14 h 2'/><path d='M 20 14 h 2'/><path d='M 15 13 v 2'/><path d='M 9 13 v 2'/></svg></span><span class="dk-nav-item__label">Agents</span></a>
+          <a class="dk-nav-item nav-item" href="/workers" data-view="workers"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width='20' height='8' x='2' y='2' rx='2' ry='2'/><rect width='20' height='8' x='2' y='14' rx='2' ry='2'/><line x1='6' x2='6.01' y1='6' y2='6'/><line x1='6' x2='6.01' y1='18' y2='18'/></svg></span><span class="dk-nav-item__label">Workers</span></a>
+          <a class="dk-nav-item nav-item" href="/connections" data-view="connections"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 6.3 20.29 a2.4 2.4 0 0 0 3.41 0 L 12 18 l -6 -6 -2.29 2.29 a2.4 2.4 0 0 0 0 3.41 Z'/><path d='m 2 22 3 -3'/><path d='M 7.5 13.5 10 11'/><path d='M 10.5 16.5 13 14'/><path d='m 18 3 -4 4 h 6 l -4 4'/></svg></span><span class="dk-nav-item__label">Connections</span></a>
         </div>
+        <div class="dk-nav-group" aria-labelledby="nav-group-settings">
+          <div class="dk-nav-group__label" id="nav-group-settings">Settings</div>
+          <a class="dk-nav-item nav-item" href="/tokens" data-view="tokens"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 12.4 2.7 a2.5 2.5 0 0 1 3.41 0 l 5.5 5.5 a2.5 2.5 0 0 1 0 3.41 l -3.71 3.71 a2.5 2.5 0 0 1 -3.41 0 L 8.7 9.79 a2.5 2.5 0 0 1 0 -3.41 z'/><path d='m 14 7 3 3'/><path d='m 9.4 10.61 -6.81 6.81 A2 2 0 0 0 2 18.83 V 21 a1.01 1.01 0 0 0 1.01 1.01 h 3 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 1.01 a1.01 1.01 0 0 0 1.01 -1.01 v -1.01 a1.01 1.01 0 0 1 1.01 -1.01 h 0.17 a2 2 0 0 0 1.41 -0.58 l 0.81 -0.81'/></svg></span><span class="dk-nav-item__label">Access</span></a>
+          <a class="dk-nav-item nav-item" href="/costs" data-view="costs"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx='12' cy='5' rx='9' ry='3'/><path d='M 3 5 V 19 A9 3 0 0 0 21 19 V 5'/><path d='M 3 12 A9 3 0 0 0 21 12'/></svg></span><span class="dk-nav-item__label">Costs</span></a>
+          <a class="dk-nav-item nav-item" href="/audit" data-view="audit"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 15 12 h -5'/><path d='M 15 8 h -5'/><path d='M 19 17 V 5 a2 2 0 0 0 -2 -2 H 4'/><path d='M 8 21 h 12 a2 2 0 0 0 2 -2 v -1.01 a1.01 1.01 0 0 0 -1.01 -1.01 H 11 a1.01 1.01 0 0 0 -1.01 1.01 v 1.01 a2 2 0 1 1 -4 0 V 5 a2 2 0 1 0 -4 0 v 2 a1.01 1.01 0 0 0 1.01 1.01 h 3'/></svg></span><span class="dk-nav-item__label">Audit</span></a>
+        </div>
+      </nav>
+      <div class="dk-sidebar__foot">
+        <button id="account-button" class="dk-account-trigger" type="button" data-dk-popover-trigger="account-menu" aria-haspopup="true" aria-controls="account-menu" aria-expanded="false" aria-label="Account"><span class="dk-avatar dk-avatar--sm" data-account-avatar aria-hidden="true">?</span><span class="dk-account-trigger__name" data-account-name>Account</span><svg class="dk-account-trigger__chev" viewBox="0 0 24 24" aria-hidden="true"><path d='m7 15 5 5 5-5M7 9l5-5 5 5'/></svg></button>
+        <button id="sidebar-toggle" class="dk-icon-button dk-sidebar__toggle" type="button" data-dk-sidebar-toggle aria-controls="main-sidebar" aria-expanded="true" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x='3' y='3' width='18' height='18' rx='2'/><path d='M9 3v18'/></svg></button>
       </div>
     </aside>
+    <div class="dk-scrim" data-dk-drawer-close hidden></div>
 
-    <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
-
-    <main>
-      <header class="topbar">
-        <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu" aria-expanded="false" aria-controls="main-sidebar"><i data-lucide="menu"></i></button>
-        <button id="designer-back" class="icon-button designer-back" type="button" aria-label="Back to workflows" title="Back to workflows"><i data-lucide="arrow-left"></i></button>
-        <div class="topbar-title"><h1 id="view-title">Home</h1><p id="view-description" class="sub"></p></div>
-        <div class="top-actions">
-          <button id="mobile-account-button" class="account-button mobile-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span></button>
+    <main class="dk-main" id="main-content" tabindex="-1"><div class="dk-main__inner">
+      <header class="dk-page-header page-header">
+        <div class="dk-page-header__main">
+          <div class="page-title-row">
+            <button id="designer-back" class="dk-icon-button designer-back" type="button" aria-label="Back to workflows"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='m 12 19 -7 -7 7 -7'/><path d='M 19 12 H 5'/></svg></button>
+            <h1 id="view-title" class="dk-page-header__title">Home</h1>
+          </div>
+          <p id="view-description" class="dk-page-header__subtitle"></p>
+        </div>
+        <div class="dk-page-header__actions page-header-actions">
+          <span id="last-updated" class="dk-page-header__meta"></span>
+          <button id="refresh" class="dk-button dk-button--secondary dk-button--sm" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 3 12 a9 9 0 0 1 9 -9 9.75 9.75 0 0 1 6.74 2.75 L 21 8'/><path d='M 21 3 v 5 h -5'/><path d='M 21 12 a9 9 0 0 1 -9 9 9.75 9.75 0 0 1 -6.74 -2.75 L 3 16'/><path d='M 8 16 H 3 v 5'/></svg><span>Refresh</span></button>
         </div>
       </header>
 
@@ -451,23 +466,17 @@
           <div class="dk-table-footer"><span id="audit-log-note" title="Records are kept for 90 days.">Up to 25 events</span><button id="audit-log-load-more" class="dk-button dk-button--secondary dk-button--sm" type="button" hidden>Load more</button></div>
         </div>
       </section>
-    </main>
+    </div></main>
 
-    <div id="account-menu" class="account-menu" hidden role="dialog" aria-modal="false" aria-labelledby="account-menu-title">
-      <header class="account-menu-header">
-        <strong id="account-menu-title">Account</strong>
-        <button id="account-menu-close" class="icon-button account-menu-close" type="button" aria-label="Close account menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-      </header>
-      <div class="account-menu-body">
-        <section class="account-identity" aria-live="polite">
-          <span class="account-avatar account-avatar-large" data-account-actor-avatar aria-hidden="true">?</span>
-          <span class="account-identity-copy"><small>Signed in as</small><strong data-account-actor-name>Account</strong><span data-account-actor-email hidden></span></span>
-        </section>
-        <p class="account-section-label">Appearance</p>
-        <button id="account-theme-toggle" class="account-menu-item account-theme-toggle" type="button" aria-pressed="false"><span class="account-menu-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></svg></span><span class="account-theme-label">Dark mode</span><span class="account-toggle-track" aria-hidden="true"><span></span></span></button>
-        <button id="account-sign-out" class="account-menu-item account-sign-out" type="button"><span class="account-menu-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/></svg></span><span><strong>Sign out</strong><small>End this browser session.</small></span></button>
-      </div>
+    <div id="account-menu" class="dk-menu dk-account-menu" data-dk-popover hidden aria-label="Account">
+      <section class="dk-menu__identity" aria-live="polite"><strong class="dk-menu__name" data-account-actor-name>Account</strong><span class="dk-menu__email" data-account-actor-email hidden></span></section>
+      <hr class="dk-menu__sep">
+      <button id="account-theme-toggle" class="dk-menu__item" type="button" role="switch" aria-checked="false" data-dk-theme-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z'/></svg><span>Dark mode</span><span class="dk-switch" aria-hidden="true"></span></button>
+      <div class="dk-menu__meta"><span>Region</span><span>eu-west-1</span></div>
+      <hr class="dk-menu__sep">
+      <button id="account-sign-out" class="dk-menu__item dk-menu__item--danger" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M10 4H5v16h5M14 8l4 4-4 4M18 12H9'/></svg><span>Sign out</span></button>
     </div>
+    <div id="dk-live" class="dk-visually-hidden" aria-live="polite"></div>
   </div>
 
 
@@ -1017,5 +1026,6 @@
       </div>
     </form>
   </dialog>
+  <script src="/assets/vendor/shell.js"></script>
 </body>
 </html>

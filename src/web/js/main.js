@@ -173,18 +173,12 @@ document.addEventListener('keydown', (event) => {
   openRowFor(event);
 });
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
-function closeMobileMenu(restoreFocus = false) {
-  const sidebar = $('.sidebar');
-  const wasOpen = sidebar.classList.contains('open');
-  sidebar.classList.remove('open');
-  sidebar.removeAttribute('role');
-  sidebar.removeAttribute('aria-modal');
-  sidebar.removeAttribute('aria-label');
-  $('#sidebar-backdrop').hidden = true;
-  $('main').inert = false;
-  $('#menu-toggle').setAttribute('aria-expanded', 'false');
-  $('#menu-toggle').setAttribute('aria-label', 'Open menu');
-  if (wasOpen && restoreFocus) $('#menu-toggle').focus();
+/* The mobile drawer is dakit's (shell.js: scrim, inert, focus trap, Esc).
+   In-app navigation prevents the link's default, which shell.js reads as
+   "not a navigation", so the console closes the drawer itself. */
+function closeMobileMenu() {
+  const shell = $('.dk-shell');
+  if (shell) globalThis.dakitShell?.toggleDrawer(shell, false);
 }
 
 $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', async (event) => {
@@ -194,7 +188,7 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   event.preventDefault();
   // The designer's leave prompt lives in main. Remove the drawer's inert
   // layer before the asynchronous guard can show that prompt.
-  closeMobileMenu(true);
+  closeMobileMenu();
   const target = link.dataset.view || link.dataset.target;
   const tab = link.dataset.tab;
   if (!await setView(target, true, tab ? { tab } : {})) return;
@@ -213,7 +207,7 @@ $('#overview-attention').addEventListener('click', async (event) => {
   const link = event.target.closest('.view-link');
   if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
   event.preventDefault();
-  closeMobileMenu(true);
+  closeMobileMenu();
   if (!await setView(link.dataset.target)) return;
   if (link.dataset.runStatus) {
     $('#runs-status-filter').value = link.dataset.runStatus;
@@ -226,7 +220,7 @@ $('#overview-attention').addEventListener('click', async (event) => {
 });
 window.addEventListener('popstate', async () => {
   const view = viewFromPath(window.location.pathname);
-  closeMobileMenu(true);
+  closeMobileMenu();
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
     if (view === 'agents') renderAgentTasks();
@@ -261,35 +255,6 @@ $('#startup-retry').addEventListener('click', async () => {
     $('#startup-retry').disabled = false;
   }
 });
-$('#menu-toggle').addEventListener('click', () => {
-  const open = $('.sidebar').classList.toggle('open');
-  if (open) {
-    $('.sidebar').setAttribute('role', 'dialog');
-    $('.sidebar').setAttribute('aria-modal', 'true');
-    $('.sidebar').setAttribute('aria-label', 'Main menu');
-  } else {
-    $('.sidebar').removeAttribute('role');
-    $('.sidebar').removeAttribute('aria-modal');
-    $('.sidebar').removeAttribute('aria-label');
-  }
-  $('#sidebar-backdrop').hidden = !open;
-  $('main').inert = open;
-  $('#menu-toggle').setAttribute('aria-expanded', String(open));
-  $('#menu-toggle').setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-  if (open) $('.sidebar .nav-item').focus();
-});
-$('#sidebar-backdrop').addEventListener('click', () => closeMobileMenu(true));
-$('#sidebar-close').addEventListener('click', () => closeMobileMenu(true));
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && $('.sidebar').classList.contains('open')) closeMobileMenu(true);
-  if (event.key === 'Tab' && $('.sidebar').classList.contains('open')) {
-    const items = $$('.sidebar a[href], .sidebar button:not([disabled])').filter((item) => !item.hidden && getComputedStyle(item).display !== 'none');
-    const first = items[0], last = items[items.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  }
-});
-window.matchMedia('(min-width: 861px)').addEventListener('change', (event) => { if (event.matches) closeMobileMenu(); });
 bindAccountChrome();
 
 window.addEventListener('DOMContentLoaded', async () => {

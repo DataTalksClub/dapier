@@ -12,7 +12,7 @@ TEMPLATE = pathlib.Path("template.yaml").read_text()
 
 
 def _sidebar() -> str:
-    match = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', INDEX, re.S)
+    match = re.search(r'<nav class="dk-sidebar__nav" aria-label="Primary">(.*?)</nav>', INDEX, re.S)
     assert match, "sidebar nav missing"
     return match.group(1)
 
@@ -25,7 +25,7 @@ def _page_tabs() -> str:
 
 def test_sidebar_lists_daily_pages_then_settings():
     sidebar = _sidebar()
-    labels = re.findall(r"<span>([^<]+)</span>", sidebar)
+    labels = re.findall(r'<span class="dk-nav-item__label">([^<]+)</span>', sidebar)
     assert labels == [
         "Home",
         "Workflows",
@@ -66,7 +66,7 @@ def test_folded_pages_are_family_tabs_not_sidebar_items():
     sidebar = _sidebar()
     tabs = _page_tabs()
     for href in ("/schedules", "/credentials"):
-        assert f'class="nav-item" href="{href}"' not in sidebar
+        assert f'href="{href}"' not in sidebar
         assert href in tabs
     assert 'href="/workflows?tab=hooks"' in tabs
     assert 'href="/workflows?tab=polls"' in tabs
@@ -85,7 +85,7 @@ def test_emails_is_its_own_sidebar_page():
     """Emails is a sidebar page with its own family strip: Received /
     Addresses tabs under one header, like Workflows / Hooks / Polls."""
     sidebar = _sidebar()
-    assert 'class="nav-item" href="/emails" data-view="emails"><i data-lucide="mail"></i><span>Emails</span>' in sidebar
+    assert re.search(r'<a class="dk-nav-item nav-item" href="/emails" data-view="emails">.*?<span class="dk-nav-item__label">Emails</span></a>', sidebar)
     assert sidebar.index('href="/workflows"') < sidebar.index('href="/emails"') < sidebar.index('href="/runs"')
     tabs = _page_tabs()
     assert 'href="/emails"' in tabs
@@ -100,7 +100,7 @@ def test_workers_is_its_own_page_next_to_agents():
     """Workers left the Agents tab strip for its own sidebar entry. The
     route stays /workers, so old links to the former tab still land."""
     sidebar = _sidebar()
-    assert 'class="nav-item" href="/workers" data-view="workers"><i data-lucide="server"></i><span>Workers</span>' in sidebar
+    assert re.search(r'<a class="dk-nav-item nav-item" href="/workers" data-view="workers">.*?<span class="dk-nav-item__label">Workers</span></a>', sidebar)
     assert sidebar.index('href="/agents"') < sidebar.index('href="/workers"') < sidebar.index('href="/connections"')
     assert "workers: 'agents'" not in ROUTER
     assert "agents: 'agents'" not in ROUTER
@@ -142,9 +142,13 @@ def test_family_tabs_keep_the_parent_header():
 
 def test_page_header_holds_no_actions():
     """dakit "Action placement": the page header is title and description;
-    no view's toolbar is hoisted into its top-right corner."""
-    header = INDEX.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
-    assert "dk-button" not in header
+    no view's toolbar is hoisted into its top-right corner. The one
+    exception is dakit shell.md §13's for dapier: the global Refresh and
+    its "Updated" stamp moved from the sidebar foot to the page header."""
+    header = INDEX.split('<header class="dk-page-header page-header">', 1)[1].split("</header>", 1)[0]
+    buttons = re.findall(r'<button [^>]*class="dk-button[^"]*"[^>]*>', header)
+    assert [re.search(r'id="([^"]+)"', b).group(1) for b in buttons] == ["refresh"]
+    assert 'id="last-updated"' in header
     assert 'id="topbar-tools"' not in INDEX
     assert "primary-tools" not in INDEX
     assert "mountPageTools" not in ROUTER

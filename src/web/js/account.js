@@ -1,8 +1,10 @@
-/* Family account chrome: identity, appearance, and sign-out live in a
-   sidebar-footer popover. Theme still persists under dakit-theme; sign-out
-   still goes through /auth/logout after the designer leave prompt. */
+/* dakit account chrome (docs/shell.md §6): the account row at the foot of
+   the sidebar opens an upward disclosure with identity, the Dark mode
+   switch, the region, and Sign out. Theme persists under dakit-theme
+   (shell.js; theme.js keeps following the OS until the operator picks);
+   sign-out goes through /auth/logout after the designer leave prompt. */
 import { $, $$ } from './ui.js';
-import { currentTheme, toggleTheme } from './theme.js';
+import './theme.js';
 import { confirmDesignerLeave } from './views/designer.js';
 
 export function accountInitials(name) {
@@ -46,83 +48,28 @@ export function accountIdentity(me) {
   return { name, email, initials: accountInitials(name) };
 }
 
-export function syncThemeToggle() {
-  const button = $('#account-theme-toggle');
-  if (!button) return;
-  const dark = currentTheme() === 'dark';
-  const label = button.querySelector('.account-theme-label');
-  button.setAttribute('aria-pressed', String(dark));
-  button.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
-  button.setAttribute('aria-label', button.title);
-  if (label) label.textContent = dark ? 'Light mode' : 'Dark mode';
-}
-
 export function applyAccountIdentity(me) {
   const { name, email, initials: glyph } = accountIdentity(me);
   $$('[data-account-avatar]').forEach((node) => { node.textContent = glyph; });
   $$('[data-account-name]').forEach((node) => { node.textContent = name; });
+  const trigger = $('#account-button');
+  if (trigger) trigger.setAttribute('aria-label', `Account, ${name}`);
   const actorName = $('[data-account-actor-name]');
-  const actorAvatar = $('[data-account-actor-avatar]');
   const actorEmail = $('[data-account-actor-email]');
   if (actorName) actorName.textContent = name;
-  if (actorAvatar) actorAvatar.textContent = glyph;
   if (actorEmail) {
     actorEmail.textContent = email;
     actorEmail.hidden = !email;
   }
 }
 
+/* The disclosure itself (open/close, Esc, outside click, focus, arrows) and
+   the Dark mode switch are dakit's shell.js (data-dk-popover-trigger,
+   data-dk-theme-toggle); the console adds only sign-out, which must pass
+   the designer's unsaved-changes prompt first. */
 export function bindAccountChrome() {
-  const buttons = $$('.account-button');
-  const menu = $('#account-menu');
-  const close = $('#account-menu-close');
-  const theme = $('#account-theme-toggle');
-  const signOut = $('#account-sign-out');
-  let opener = null;
-
-  function isOpen() {
-    return Boolean(menu) && !menu.hidden;
-  }
-
-  function closeMenu() {
-    if (!menu || menu.hidden) return;
-    menu.hidden = true;
-    for (const trigger of buttons) trigger.setAttribute('aria-expanded', 'false');
-    if (opener && opener.isConnected) opener.focus();
-    opener = null;
-  }
-
-  function openMenu() {
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : buttons[0];
-    syncThemeToggle();
-    menu.hidden = false;
-    for (const trigger of buttons) trigger.setAttribute('aria-expanded', 'true');
-    close.focus();
-  }
-
-  for (const trigger of buttons) {
-    trigger.addEventListener('click', () => { if (isOpen()) closeMenu(); else openMenu(); });
-  }
-  close.addEventListener('click', closeMenu);
-  theme.addEventListener('click', (event) => {
-    event.stopPropagation();
-    toggleTheme();
-    syncThemeToggle();
-  });
-  signOut.addEventListener('click', async () => {
+  $('#account-sign-out').addEventListener('click', async () => {
+    globalThis.dakitShell?.closePopovers({ restoreFocus: false });
     if (await confirmDesignerLeave()) window.location.assign('/auth/logout');
   });
-  document.addEventListener('click', (event) => {
-    if (!isOpen()) return;
-    if (menu.contains(event.target) || buttons.some((trigger) => trigger.contains(event.target))) return;
-    closeMenu();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !isOpen()) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    closeMenu();
-  }, true);
-  syncThemeToggle();
-  return { closeMenu, isOpen };
 }

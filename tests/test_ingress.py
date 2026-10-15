@@ -171,7 +171,7 @@ def test_console_views_serve_index_html():
 
 def test_every_nav_link_resolves_to_a_served_page():
     index = ingress._static("/")
-    nav_links = re.findall(r'class="nav-item[^"]*" href="([^"]+)"', index["body"])
+    nav_links = re.findall(r'class="dk-nav-item[^"]*" href="([^"]+)"', index["body"])
     assert len(nav_links) >= 6, nav_links
     for path in nav_links:
         response = ingress._static(path)
