@@ -60,6 +60,29 @@ class StrictTable:
         return self._table.update_item(**kwargs)
 
     @property
+    def name(self):
+        return self._table.name
+
+    @property
+    def meta(self):
+        client = self._table.meta.client
+
+        class _Client:
+            def transact_write_items(self, TransactItems):
+                for entry in TransactItems:
+                    (_, spec), = entry.items()
+                    names = spec.get("ExpressionAttributeNames")
+                    _check_expression(spec.get("UpdateExpression"), names)
+                    _check_expression(spec.get("ConditionExpression"), names)
+                return client.transact_write_items(TransactItems=TransactItems)
+
+        class _Meta:
+            pass
+
+        _Meta.client = _Client()
+        return _Meta()
+
+    @property
     def items(self):
         return {item["pk"]: item for item in self._table.scan()["Items"]}
 

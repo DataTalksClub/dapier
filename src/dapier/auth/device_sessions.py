@@ -20,14 +20,17 @@ shaped like the DataOps implementation this was ported from:
    identity a loopback DTC ID token carries, so grants, operator checks,
    and audit records are unchanged.
 
-Only hashes are stored as keys - the pairing hash, the user-code hash,
-the session-token hash - so a table dump never yields a usable
-credential, and the pairing row never carries the plaintext user code.
-The plaintext session token rests on the pending pairing just long
-enough for one poll (the pairing TTL bounds the window), which is the
-unavoidable exposure of a brokered device flow. Sessions expire after
-SESSION_TTL_SECONDS; ``refresh`` rotates them and ``revoke`` kills them
-immediately.
+Nothing usable is ever persisted in plaintext: the pairing, user-code
+and session rows are keyed by hashes, the pairing never carries the
+user code, and the session bearer never touches the table at all. An
+approval records only the decision and the approving identity; the
+winning poll generates the bearer in memory and, in ONE DynamoDB
+transaction, consumes the approved, unexpired grant and creates the
+session row keyed by the bearer's hash. Only a committed transaction
+returns the bearer, so exactly one poll ever receives it, and a losing,
+stale or late poll writes nothing (revocations and rotations stand).
+Sessions expire after SESSION_TTL_SECONDS; ``refresh`` rotates them and
+``revoke`` kills them immediately.
 """
 
 import base64
@@ -146,17 +149,14 @@ def _pairing_for_code(store, code, now=None):
     return pairing
 
 
-def _delete_grant(store, pairing):
-    store.delete_item(Key={"pk": pairing["pk"]})
-    user_code_hash = pairing.get("user_code_hash")
-    if user_code_hash:
-        store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
-
-
 def _conditional_failure(error):
-    """True when DynamoDB refused a write on its condition."""
+    """True when DynamoDB refused a write on its condition (a plain
+    conditional write, or a transaction cancelled by one)."""
     response = getattr(error, "response", None) or {}
     code = (response.get("Error") or {}).get("Code")
+    if code == "TransactionCanceledException":
+        return any((reason or {}).get("Code") == "ConditionalCheckFailed"
+                   for reason in response.get("CancellationReasons") or [])
     return code == "ConditionalCheckFailedException" \
         or type(error).__name__ == "ConditionalCheckFailedException"
 
@@ -253,18 +253,14 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
     names = dict(_GUARD_NAMES)
     values = _guard_values(now)
     if approve:
-        # The approval is one conditional write and creates no session row:
-        # the CLI's poll mints the session when it collects the token. A
-        # losing approval (or a crash here) therefore never strands a live
-        # credential, and the decided row is the only state to protect.
-        token = _secret()
-        names["#s"] = "session"
+        # The approval records the decision and who made it — no bearer,
+        # no token: the winning poll mints the session (see poll()).
+        names["#sub"] = "subject"
+        names["#em"] = "email"
         values[":approved"] = "approved"
-        values[":session"] = {
-            "token": token, "subject": str(subject), "email": str(email or ""),
-            "expires_at": int(time.time()) + SESSION_TTL_SECONDS,
-        }
-        update = "SET #st = :approved, #s = :session, #a = if_not_exists(#a, :zero) + :one"
+        values[":subject"] = str(subject)
+        values[":email"] = str(email or "")
+        update = "SET #st = :approved, #sub = :subject, #em = :email, #a = if_not_exists(#a, :zero) + :one"
     else:
         names["#d"] = "decided_at"
         values[":denied"] = "denied"
@@ -324,45 +320,103 @@ def allow(kind, subject, limit, *, window=LIMIT_WINDOW_SECONDS, table_ref=None, 
     return True, 0
 
 
+def _grant_state(store, key, now):
+    """The RFC 8628 answer for a grant as it stands now (no writes)."""
+    current = store.get_item(Key=key).get("Item")
+    if not current or current.get("kind") != "pairing" or _expired(current, now):
+        return {"error": "expired_token"}
+    if current.get("status") == "pending":
+        return {"error": "authorization_pending"}
+    if current.get("status") == "denied":
+        return {"error": "access_denied"}
+    return {"error": "expired_token"}
+
+
 def poll(device_code, table_ref=None):
     """CLI poll over the RFC 8628 vocabulary.
 
     Returns ``{"error": ...}`` for pending/denied/expired outcomes, or the
-    approved payload exactly once - the pairing is consumed by delivery.
+    approved payload exactly once. Delivery is one transaction: delete the
+    grant on condition it is still approved and unexpired, and put the new
+    session row on condition its key is unused. The bearer exists only in
+    this call's memory until that commit, and only a committed transaction
+    returns it; any poll that loses (a concurrent or stale one, an expired
+    grant at the final write) writes nothing and reports the grant's state.
     """
     store = table_ref or table()
     if not device_code or not str(device_code).startswith(PREFIX):
         return {"error": "expired_token"}
-    pairing = store.get_item(Key={"pk": f"pairing#{_hash(device_code)}"}).get("Item")
-    if not pairing or pairing.get("kind") != "pairing" or _expired(pairing):
+    key = {"pk": f"pairing#{_hash(device_code)}"}
+    pairing = store.get_item(Key=key).get("Item")
+    if not pairing or pairing.get("kind") != "pairing" or _expired(pairing, time.time()):
         if pairing:
-            _delete_grant(store, pairing)
+            _delete_if(store, pairing, "#t <= :now", {"#t": "ttl"}, {":now": int(time.time())})
         return {"error": "expired_token"}
     status = pairing.get("status")
     if status == "pending":
         return {"error": "authorization_pending"}
+    if status == "denied":
+        # Report the denial once: whoever's conditional delete lands.
+        if _delete_if(store, pairing, "#st = :denied", {"#st": "status"}, {":denied": "denied"}):
+            return {"error": "access_denied"}
+        return _grant_state(store, key, time.time())
     if status != "approved":
-        _delete_grant(store, pairing)
-        return {"error": "access_denied"}
-    session = pairing.get("session") or {}
-    # The session row is created here, at delivery, from the decision the
-    # approval recorded (an idempotent put: a retried poll after a lost
-    # response re-creates the same row). Then the grant is consumed.
-    store.put_item(Item={
-        "pk": f"session#{_hash(session.get('token', ''))}",
-        "kind": "session",
-        "subject": str(session.get("subject", "")),
-        "email": str(session.get("email", "")),
-        "created_at": _now_iso(),
-        "ttl": int(session.get("expires_at", 0)),
-    })
-    _delete_grant(store, pairing)
+        return {"error": "expired_token"}
+
+    token = _secret()  # in memory only until the transaction commits
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
+    now = int(time.time())
+    try:
+        store.meta.client.transact_write_items(TransactItems=[
+            {"Delete": {
+                "TableName": store.name,
+                "Key": key,
+                "ConditionExpression": "#st = :approved AND #t > :now",
+                "ExpressionAttributeNames": {"#st": "status", "#t": "ttl"},
+                "ExpressionAttributeValues": {":approved": "approved", ":now": now},
+            }},
+            {"Put": {
+                "TableName": store.name,
+                "Item": {
+                    "pk": f"session#{_hash(token)}",
+                    "kind": "session",
+                    "subject": str(pairing.get("subject", "")),
+                    "email": str(pairing.get("email", "")),
+                    "created_at": _now_iso(),
+                    "ttl": expires_at,
+                },
+                "ConditionExpression": "attribute_not_exists(#pk)",
+                "ExpressionAttributeNames": {"#pk": "pk"},
+            }},
+        ])
+    except Exception as error:
+        if not _conditional_failure(error):
+            raise
+        return _grant_state(store, key, time.time())
+    user_code_hash = pairing.get("user_code_hash")
+    if user_code_hash:
+        store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
     return {
-        "token": session.get("token", ""),
-        "subject": session.get("subject", ""),
-        "email": session.get("email", ""),
-        "expires_at": int(session.get("expires_at", 0)),
+        "token": token,
+        "subject": pairing.get("subject", ""),
+        "email": pairing.get("email", ""),
+        "expires_at": expires_at,
     }
+
+
+def _delete_if(store, pairing, condition, names, values):
+    """Delete the grant (and its pointer) only if ``condition`` still holds."""
+    try:
+        store.delete_item(Key={"pk": pairing["pk"]}, ConditionExpression=condition,
+                          ExpressionAttributeNames=names, ExpressionAttributeValues=values)
+    except Exception as error:
+        if _conditional_failure(error):
+            return False
+        raise
+    user_code_hash = pairing.get("user_code_hash")
+    if user_code_hash:
+        store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
+    return True
 
 
 def _session_item(subject, email):
