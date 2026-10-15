@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import boto3
 
 CREDENTIAL_SPECS = {
+    "typefully": {"credential_id": "typefully", "fields": ("api_key",)},
     "taskdeck": {"credential_id": "taskdeck", "fields": ("token",)},
     "slack": {"credential_id": "slack", "fields": ("token",)},
     "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
@@ -163,6 +164,11 @@ def api_save_credential(provider, body):
         if not re.fullmatch(r"[A-Za-z0-9/+=]{40}", secret_access_key):
             return 400, {"error": "Enter a valid AWS secret access key"}
         secret_value = {"access_key_id": access_key_id, "secret_access_key": secret_access_key}
+    elif provider == "typefully":
+        api_key = body.get("api_key")
+        if not isinstance(api_key, str) or not re.fullmatch(r"[!-~]{20,2048}", api_key.strip()):
+            return 400, {"error": "Enter a valid Typefully API key"}
+        secret_value = {"api_key": api_key.strip()}
     elif provider == "openrouter":
         api_key = str(body.get("api_key", "")).strip()
         if not re.fullmatch(r"sk-or-[A-Za-z0-9_-]{20,}", api_key):

@@ -6,6 +6,7 @@ import { refresh } from './overview.js';
 
 /* The fields each provider stores; the API validates the values. */
 const PROVIDERS = {
+  typefully: { name: 'Typefully', fields: [{ key: 'api_key', label: 'API key' }] },
   taskdeck: { name: 'Taskdeck status', fields: [{ key: 'token', label: 'Bearer token' }] },
   slack: { name: 'Slack bot', fields: [{ key: 'token', label: 'Bot token' }] },
   mailchimp: { name: 'Mailchimp', fields: [{ key: 'api_key', label: 'API key' }] },
@@ -17,7 +18,7 @@ const PROVIDERS = {
 };
 
 /* Credential-backed providers with a health check (pseudo connections). */
-const TESTABLE = new Set(['mailchimp', 'aws', 'openrouter']);
+const TESTABLE = new Set(['mailchimp', 'aws', 'openrouter', 'typefully']);
 
 function providerName(provider) {
   if (PROVIDERS[provider]) return PROVIDERS[provider].name;

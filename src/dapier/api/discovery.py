@@ -77,7 +77,7 @@ def _load(connection_id, connections_table):
 # credential_id, so s3's key resolution falls back to the default "aws"
 # credential. "mailchimp" resolves the stored Mailchimp API key the same
 # way, and "openrouter" the stored OpenRouter key behind the decision step.
-PSEUDO_CONNECTION_PROVIDERS = {"aws": "s3", "s3": "s3", "mailchimp": "mailchimp",
+PSEUDO_CONNECTION_PROVIDERS = {"typefully": "typefully", "aws": "s3", "s3": "s3", "mailchimp": "mailchimp",
                                "openrouter": "openrouter"}
 
 
