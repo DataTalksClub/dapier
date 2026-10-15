@@ -389,10 +389,11 @@
         </div>
       </section>
       <section class="view" data-page="tokens">
-        <div class="page-tools primary-tools">
-          <button id="new-token" class="dk-button dk-button--primary" type="button">New token</button>
-        </div>
-        <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p></div>
+        <header class="page-tools dk-collection-header">
+          <div class="dk-collection-header__lead" id="tokens-lead"><h2 id="tokens-title" class="dk-collection-header__title">API tokens</h2></div>
+          <div class="dk-collection-header__trail"><span id="token-count" class="dk-collection-header__meta"></span></div>
+        </header>
+        <div id="token-empty" class="empty-state" hidden><h3>No API tokens</h3><p>Issue one per machine consumer, then grant its subject access to connections.</p><button id="token-empty-create" class="dk-button dk-button--secondary" type="button">Create the first token</button></div>
         <div class="table-wrap register">
           <table class="token-table">
             <colgroup><col class="col-token"><col class="col-prefix"><col class="col-agent"><col class="col-when"><col class="col-when"><col class="col-status"><col class="col-action"></colgroup>

@@ -13,6 +13,8 @@ import tests.test_console_boot as console_boot
 
 WORKFLOW = {"id": "wf-one", "name": "wf-one", "source": "wf-one.yaml", "enabled": True,
             "trigger": {"connector": "manual", "event": "run"}, "actions": []}
+TOKEN = {"token_id": "scheduler", "token_prefix": "dap_9f2", "agent": "scheduler",
+         "created_at": "2026-09-30T09:00:00Z"}
 
 
 @pytest.fixture
@@ -24,7 +26,7 @@ def console(monkeypatch):
 
     def payload(path):
         if path.startswith("/api/admin/overview"):
-            return {"workflows": [WORKFLOW], "runs": []}
+            return {"workflows": [WORKFLOW], "runs": [], "api_tokens": [TOKEN]}
         return original(path)
 
     monkeypatch.setattr(console_boot, "_api_payload", payload)
@@ -83,3 +85,17 @@ def test_home_create_follows_your_workflows_title(console):
 
     page.keyboard.press("c")
     page.wait_for_url("**/workflows/new")
+
+
+def test_tokens_create_follows_the_api_tokens_title(console):
+    from playwright.sync_api import expect
+
+    page = console("/tokens")
+    create = page.locator("#new-token")
+    _assert_dakit_create(create, "New token")
+    assert _lead_children(page, "#tokens-lead") == ["tokens-title", "new-token"]
+    expect(page.locator("#token-count")).to_have_text("1 token · 1 active")
+    _assert_page_header_has_no_actions(page)
+
+    page.keyboard.press("c")
+    expect(page.locator("#token-dialog")).to_be_visible()

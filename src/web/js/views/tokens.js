@@ -1,5 +1,5 @@
 /* API tokens view: operator-issued bearer tokens for agents. */
-import { $, $$, notice } from '../ui.js';
+import { $, $$, notice, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
 import { refresh } from './overview.js';
@@ -46,6 +46,10 @@ function renderGrantConnections() {
 }
 
 function renderTokens(tokens) {
+  const active = tokens.filter((token) => !token.revoked_at).length;
+  $('#token-count').textContent = tokens.length
+    ? `${tokens.length} token${tokens.length === 1 ? '' : 's'} · ${active} active`
+    : '';
   $('#token-empty').hidden = tokens.length > 0;
   $('.table-wrap', $('[data-page=tokens]')).hidden = tokens.length === 0;
   $('#token-table').innerHTML = tokens.map((token) => {
@@ -151,12 +155,16 @@ $('#token-copy').addEventListener('click', async () => {
   }
 });
 
-$('#new-token').addEventListener('click', () => {
+function openTokenDialog() {
   const form = $('#token-form');
   form.reset();
   $('#token-error').textContent = '';
   $('#token-dialog').showModal();
   form.token_id.focus();
-});
+}
+
+/* "API tokens [+ New token]": the page's one create, on its collection. */
+collectionCreate($('#tokens-lead'), { id: 'new-token', label: 'New token', onClick: openTokenDialog });
+$('#token-empty-create').addEventListener('click', openTokenDialog);
 
 export { renderTokens };
