@@ -392,11 +392,12 @@ async function openEmail(inboxId, { updateUrl = true } = {}) {
   try {
     const event = (await api(`/api/admin/triggers/inbox/${encodeURIComponent(inboxId)}`)).event || {};
     if (seq !== detailSeq || openInboxId !== inboxId) return;
-    detail = event;
+    detail = { ...event, inbox_id: event.inbox_id || inboxId };
     renderRead();
   } catch (error) {
     if (seq !== detailSeq || openInboxId !== inboxId) return;
     if (!listedEvent(inboxId)) {
+      $('#email-read-title').textContent = 'Message not available';
       $('#email-read').innerHTML = `<div class="dk-callout dk-callout--danger" role="alert"><div class="dk-callout__body"><p class="dk-callout__title">This message could not be loaded</p><p>${escapeHtml(error.message)}</p></div></div>`;
     }
   }
@@ -426,23 +427,24 @@ function clearSelection() {
 function pickMail() {
   if (state.view !== 'emails') return;
   const ids = new Set((mail.events || []).map((event) => event.inbox_id));
-  if (openInboxId && !ids.has(openInboxId)) {
+  const fromUrl = new URLSearchParams(window.location.search).get('mail');
+  /* A message the list no longer holds stays open only while the URL
+     names it (a deep link, or one reached through Load more). */
+  if (openInboxId && !ids.has(openInboxId) && openInboxId !== fromUrl) {
     openInboxId = null;
     detail = null;
-    setMailUrl(null);
   }
-  const fromUrl = new URLSearchParams(window.location.search).get('mail');
   /* An explicit ?mail= deep link always reads on Received. Otherwise the
      Addresses tab stays put — no auto-selecting a hidden row. */
-  if (fromUrl && ids.has(fromUrl)) showReceivedTab();
+  if (fromUrl) showReceivedTab();
   else if (addressesActive()) { renderRead(); return; }
-  /* The URL is the selection. Without one, a desktop opens the newest
-     message in place; a phone shows the list. */
+  /* The URL is the selection, resolved through the detail endpoint whether
+     or not the message is on the loaded page. Without one, a desktop opens
+     the newest message in place; a phone shows the list. */
   const desktop = window.matchMedia(DESKTOP).matches;
-  const id = (fromUrl && ids.has(fromUrl) && fromUrl)
-    || (desktop ? (openInboxId || (mail.events || [])[0]?.inbox_id) : null);
+  const id = fromUrl || (desktop ? ((ids.has(openInboxId) && openInboxId) || (mail.events || [])[0]?.inbox_id) : null);
   if (!id) { if (openInboxId) clearSelection(); else renderRead(); return; }
-  if (id !== openInboxId) void openEmail(id);
+  if (id !== openInboxId) void openEmail(id, { updateUrl: !fromUrl });
   else if (!detail) void openEmail(id, { updateUrl: false });
   else renderRead();
 }
