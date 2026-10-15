@@ -78,7 +78,6 @@
         <button id="menu-toggle" class="icon-button menu-toggle" title="Menu" aria-label="Open menu" aria-expanded="false" aria-controls="main-sidebar"><i data-lucide="menu"></i></button>
         <button id="designer-back" class="icon-button designer-back" type="button" aria-label="Back to workflows" title="Back to workflows"><i data-lucide="arrow-left"></i></button>
         <div class="topbar-title"><h1 id="view-title">Home</h1><p id="view-description" class="sub"></p></div>
-        <div id="topbar-tools"></div>
         <div class="top-actions">
           <button id="mobile-account-button" class="account-button mobile-account-button" type="button" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"><span class="account-avatar" data-account-avatar aria-hidden="true">?</span></button>
         </div>
@@ -132,7 +131,7 @@
       </section>
 
       <section class="view" data-page="workflows">
-        <div class="page-tools primary-tools dk-toolbar register-toolbar workflow-toolbar" data-panel-tools="list">
+        <div class="page-tools dk-toolbar register-toolbar workflow-toolbar" data-panel-tools="list">
           <div class="dk-cluster toolbar-filters workflow-filters"><label class="toolbar-search"><span class="visually-hidden">Find a workflow</span><input id="workflow-search" type="search" placeholder="Search workflows…"></label></div>
           <div class="dk-toolbar__end">
             <button id="import-yaml" class="dk-button dk-button--secondary" type="button">Import YAML</button>
@@ -141,7 +140,7 @@
             <a id="new-workflow" class="dk-button dk-button--primary" href="/workflows/new">New workflow</a>
           </div>
         </div>
-        <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
+        <div class="page-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Hooks panes" data-workspace="hooks-layout"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="hooks-activity-pane" aria-selected="true" tabindex="0">Deliveries</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="hooks-sources-pane" aria-selected="false" tabindex="-1">Endpoints</button></div>
           <div id="hooks-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter deliveries by outcome"></div>
           <div class="dk-toolbar__end">
@@ -149,7 +148,7 @@
             <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
           </div>
         </div>
-        <div class="page-tools primary-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
+        <div class="page-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Polls panes" data-workspace="poll-workspace"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="poll-activity" aria-selected="true" tabindex="0">Picked up</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="poll-sources-pane" aria-selected="false" tabindex="-1">Polls</button></div>
           <div id="poll-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter picked-up items by outcome"></div>
           <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>

@@ -70,6 +70,7 @@ def _assert_page_header_has_no_actions(page):
     from playwright.sync_api import expect
 
     expect(page.locator(".topbar .dk-button")).to_have_count(0)
+    expect(page.locator("#topbar-tools")).to_have_count(0)
 
 
 def test_home_create_follows_your_workflows_title(console):

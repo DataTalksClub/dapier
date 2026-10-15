@@ -127,19 +127,27 @@ def test_page_tabs_are_dakit_route_tabs():
 
 
 def test_family_tabs_keep_the_parent_header():
-    """Switching Accounts / App setup (or Workflows / Schedules) swaps the body under the tab strip, not the title or
-    primary action above it."""
+    """Switching Accounts / App setup (or Workflows / Schedules) swaps the body under the tab strip, not the title
+    above it."""
     assert "FAMILY_META" in ROUTER
     assert "connections: ['Connections'" in ROUTER
     assert "workflows: ['Workflows'" in ROUTER
     assert "credentials: ['App setup'" not in ROUTER
-    assert "if (TAB_FAMILY[view?.dataset.page]) return;" in ROUTER
     html = INDEX
     # Adding lives on each service group now, not in a page-level header button.
     assert 'id="add-connection"' not in html
     assert 'id="pull-trigger-sample"' not in html
     assert 'id="trigger-sample-dialog"' not in html
-    assert 'class="page-tools primary-tools"' not in html.split('data-page="connections"')[1].split('data-page="credentials"')[0]
+
+
+def test_page_header_holds_no_actions():
+    """dakit "Action placement": the page header is title and description;
+    no view's toolbar is hoisted into its top-right corner."""
+    header = INDEX.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+    assert "dk-button" not in header
+    assert 'id="topbar-tools"' not in INDEX
+    assert "primary-tools" not in INDEX
+    assert "mountPageTools" not in ROUTER
 
 
 def test_parent_nav_highlights_folded_views():

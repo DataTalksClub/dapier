@@ -23,28 +23,6 @@ let rememberedUrl = `${window.location.pathname}${window.location.search}`;
 export function setViewGuard(guard) { viewGuard = guard; }
 export function rememberViewUrl(url) { rememberedUrl = url; }
 
-/* The title row has an empty middle. A standalone view's .page-tools fills
-   it, and comes back to the view before the next one is mounted so inactive
-   pages keep their controls. Family tabs (Connections, Workflows, Emails)
-   keep their actions in the body — the header above the tabs stays still. */
-let mountedTools = null;
-function mountPageTools() {
-  if (mountedTools) {
-    mountedTools.home.prepend(mountedTools.node);
-    mountedTools = null;
-  }
-  const view = document.querySelector('.view.active');
-  if (TAB_FAMILY[view?.dataset.page]) return;
-  /* Only a page's primary actions join the topbar (title left, actions
-     right). Filter and search bars stay in the content column, above the
-     register they control. */
-  const tools = view?.querySelector(':scope > .page-tools.primary-tools:not([hidden])');
-  const slot = $('#topbar-tools');
-  if (!tools || !slot) return;
-  mountedTools = { node: tools, home: view };
-  slot.replaceChildren(tools);
-}
-
 export function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');
   if (name === 'inbox' || name === 'usage') return 'runs'; // compatibility with saved inbox links
@@ -187,7 +165,6 @@ export async function setView(view, push = true, options = {}) {
   if (!push && window.location.pathname === '/storage') history.replaceState(null, '', '/workflows');
   if (push) history.pushState(null, '', pathFor(view, workflowTab, emailTab));
   rememberedUrl = `${window.location.pathname}${window.location.search}`;
-  mountPageTools();
   window.scrollTo(0, 0);
   return true;
 }

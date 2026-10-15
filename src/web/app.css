@@ -246,9 +246,6 @@ main { min-width: 0; padding: 0 var(--page-gutter) var(--dk-space-8); }
 .topbar h1 { font-size: var(--dk-text-page); font-weight: var(--dk-weight-bold); letter-spacing: -.02em; line-height: var(--dk-leading-tight); }
 #view-description { margin: 0; font-size: var(--dk-text-md); line-height: var(--dk-leading-normal); color: var(--dk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-title:has(#view-description:empty) { gap: 0; }
-#topbar-tools { flex: none; min-width: 0; display: flex; align-items: center; justify-content: flex-end; }
-#topbar-tools:empty { display: none; }
-#topbar-tools > .page-tools { justify-content: flex-end; }
 .view { display: none; }
 .view.active { display: block; padding-top: var(--dk-gap-section); width: min(var(--content-wide), 100%); margin: 0 auto; }
 .page-tabs { width: min(var(--content-wide), 100%); margin: var(--dk-gap-section) auto 0; }
@@ -268,11 +265,9 @@ body[data-view="designer"] .topbar { width: 100%; padding-bottom: var(--dk-space
 .page-tools .field-hint { margin: 0; white-space: nowrap; }
 .page-tools.section-head { margin: 0; padding: 0; flex: 1; }
 /* In-flow toolbars keep the block gap above the register they control.
-   Standalone pages hoist .primary-tools into the header row; family tabs
-   keep theirs here so the header above the tabs stays still. The agents
-   tab strip flows into its workspace and opts out. */
+   The page header holds no actions (dakit "Action placement"): every
+   create rides on its collection. */
 .view > .page-tools { margin-bottom: var(--dk-gap-block); }
-.view > .page-tools.primary-tools { justify-content: flex-end; }
 /* The register toolbar (dakit .dk-toolbar): search and filters left,
    actions right, one row that wraps as a unit. */
 .register-toolbar .toolbar-filters { flex: 1 1 520px; }
@@ -1305,14 +1300,14 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   :root { --page-gutter: var(--dk-space-4); }
   main { padding: 0 var(--page-gutter) var(--dk-space-7); }
   /* Mobile page anatomy (family.md): a fixed 64px app bar — menu, title,
-     account — with the page description and the primary action in the
-     content column below the bar's full-bleed hairline. */
+     account — with the page description in the content column below the
+     bar's full-bleed hairline. */
   .topbar {
     position: relative;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "lead title actions" "desc desc desc" "tools tools tools";
-    grid-template-rows: 64px auto auto;
+    grid-template-areas: "lead title actions" "desc desc desc";
+    grid-template-rows: 64px auto;
     align-items: center;
     column-gap: var(--dk-gap-control);
     row-gap: 0;
@@ -1326,10 +1321,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   #menu-toggle, #designer-back { grid-area: lead; }
   .top-actions { grid-area: actions; display: flex; }
   #view-description { grid-area: desc; align-self: start; margin: var(--dk-space-4) 0 0; }
-  /* The primary action is the first control under the description, sized
-     to its label. */
-  #topbar-tools { grid-area: tools; align-self: start; justify-content: flex-start; margin-top: var(--dk-gap-control); }
-  #topbar-tools > .page-tools { justify-content: flex-start; }
   body[data-view="designer"] .topbar { padding: 0; }
   .view.active { padding-top: var(--dk-gap-block); }
   .page-tabs { width: 100%; margin-top: var(--dk-gap-block); }
@@ -1431,16 +1422,6 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
   body[data-view="designer"] .topbar h1 { font-size: var(--dk-text-xl); }
   /* The canvas gets the height: the id line folds away on phones. */
   body[data-view="designer"] #view-description { display: none; }
-  #topbar-tools > .page-tools {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-  }
-  /* A lone primary action keeps its label width (header pattern). */
-  #topbar-tools > .page-tools.primary-tools { display: flex; }
-  .page-tools .register-summary,
-  .page-tools .sub { grid-column: 1 / -1; }
-  #topbar-tools > .page-tools.section-head { gap: var(--dk-space-1) var(--dk-space-2); }
   .page-tools .field-hint { flex-basis: auto; margin: 0; }
   .last-updated { display: none; }
 
@@ -2092,12 +2073,6 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .data-panel > .section-head .sub,
   .service-panel > .section-head .sub { white-space: normal; overflow-wrap: anywhere; }
 
-  /* Toolbars: controls size to their labels and wrap as a row — a lone
-     button no longer takes a full-width band. */
-  #topbar-tools > .page-tools { display: flex; flex-wrap: wrap; }
-  #topbar-tools > .page-tools .dk-button { flex: 0 0 auto; }
-  #topbar-tools > .page-tools .register-summary,
-  #topbar-tools > .page-tools .sub { flex-basis: 100%; }
   /* Register toolbars (runs, connections, agents, workflows): the 860 block
      grids every control into full-width columns; here they size to their
      labels and wrap - search takes the full line, filters flow two-three
