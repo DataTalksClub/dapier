@@ -17438,6 +17438,9 @@
   const nodeColor = "var(--dk-accent-default)";
   const triggerColor = "var(--dk-accent-default)";
   const noteColor = "var(--dk-border-strong)";
+  const boxStroke = "var(--dk-border-strong)";
+  const boxStrokeWidth = "1";
+  const selectedFill = "var(--dk-accent-soft)";
   const handleColor = "var(--dk-accent-default)";
   const shapeLabelSize = 16;
   const minZoom = 0.25;
@@ -22174,7 +22177,6 @@
             ),
             shapes.map((shape) => {
               const selected = shape.id === selectedId;
-              const strokeWidth = selected ? "3" : "2";
               const color = shapeColor(shape);
               if (shape.type === "node") {
                 if (shape.data?.isBranchPlaceholder) {
@@ -22206,8 +22208,8 @@
                             height: shape.height,
                             rx: "6",
                             fill: "var(--dk-bg-muted)",
-                            stroke: "var(--dk-border-strong)",
-                            strokeWidth: "1.5",
+                            stroke: boxStroke,
+                            strokeWidth: boxStrokeWidth,
                             strokeDasharray: "5 4"
                           }
                         ),
@@ -22256,9 +22258,9 @@
                             width: shape.width,
                             height: shape.height,
                             rx: "26",
-                            fill: "var(--dk-bg-surface)",
-                            stroke: selected ? color : "var(--dk-border-strong)",
-                            strokeWidth: selected ? "2.5" : "1.5"
+                            fill: selected ? selectedFill : "var(--dk-bg-surface)",
+                            stroke: boxStroke,
+                            strokeWidth: boxStrokeWidth
                           }
                         ),
                         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -22287,7 +22289,7 @@
                           {
                             x: shape.x + 48,
                             y: shape.y + shape.height / 2 + 4,
-                            fill: "var(--dk-text-secondary)",
+                            fill: "var(--dk-text-muted)",
                             fontSize: "13",
                             fontWeight: "500",
                             children: "Union · branches rejoin"
@@ -22322,9 +22324,9 @@
                           width: shape.width,
                           height: shape.height,
                           rx: "6",
-                          fill: "var(--dk-bg-surface)",
-                          stroke: color,
-                          strokeWidth
+                          fill: selected ? selectedFill : "var(--dk-bg-surface)",
+                          stroke: boxStroke,
+                          strokeWidth: boxStrokeWidth
                         }
                       ),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x + 14, y: shape.y + (shape.height - 36) / 2, width: "36", height: "36", rx: "5", fill: "var(--dk-accent-soft)" }),
@@ -22356,14 +22358,14 @@
                             x: shape.x + shape.width - badgeWidth / 2 - 10,
                             y: shape.y + 20,
                             textAnchor: "middle",
-                            fill: "var(--dk-accent-text)",
+                            fill: "var(--dk-accent-default)",
                             fontSize: "10",
                             fontWeight: "600",
                             children: branchBadge
                           }
                         )
                       ] }),
-                      /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 62, y: shape.y + (subtitle ? 40 : 53), fill: selected ? "var(--dk-accent-default)" : "var(--dk-text-primary)", fontSize: subtitle ? 15 : 13, fontWeight: "500", children: [
                         /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                         displayLabel(title)
                       ] }),
@@ -22378,7 +22380,7 @@
                   event.stopPropagation();
                   openEditor(shape);
                 }, children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: "var(--dk-bg-muted)", stroke: noteColor, strokeWidth }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: "4", fill: selected ? selectedFill : "var(--dk-bg-muted)", stroke: noteColor, strokeWidth: boxStrokeWidth }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("text", { x: shape.x + 14, y: shape.y + 30, fill: "var(--dk-text-primary)", fontSize: shapeLabelSize, fontWeight: "500", children: [
                     shape.label && /* @__PURE__ */ jsxRuntimeExports.jsx("title", { children: shape.label }),
                     shape.label ? displayLabel(shape.label) : ""
@@ -22420,9 +22422,7 @@
                         width: pillW,
                         height: pillH,
                         rx: "11",
-                        fill: "var(--dk-bg-surface)",
-                        stroke: "var(--dk-border-strong)",
-                        strokeWidth: "1.5"
+                        fill: "var(--dk-bg-hover)"
                       }
                     ),
                     /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -22431,7 +22431,7 @@
                         x: midpoint.x,
                         y: midpoint.y + 4,
                         textAnchor: "middle",
-                        fill: "var(--dk-text-secondary)",
+                        fill: "var(--dk-text-muted)",
                         fontSize: "11",
                         fontWeight: "600",
                         children: pillText

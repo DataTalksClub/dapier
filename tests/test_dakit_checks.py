@@ -51,3 +51,19 @@ def test_app_element_rules_never_override_kit_components():
                     and head and head != ":root" and 'not([class*="dk-"])' not in selector and "[type=" not in selector:
                 bare.append(selector)
     assert bare == [], bare
+
+
+def test_every_dk_token_the_app_reads_exists():
+    """A var(--dk-…) that the kit does not define resolves to nothing — in
+    SVG that is black fill on the dark theme (the Designer's old
+    --dk-text-secondary / --dk-accent-text). Every --dk-* role the app or
+    Designer reads must be defined by the vendored kit or set by the app."""
+    kit = (ROOT / VENDOR / "dakit.css").read_text()
+    sources = [p for p in (ROOT / "designer/src").rglob("*") if p.suffix in {".ts", ".tsx", ".css"}]
+    sources += [ROOT / "src/web/app.css", ROOT / "src/web/public.css"]
+    sources += list((ROOT / "src/web/js").rglob("*.js"))
+    sources += list((ROOT / "src/web").glob("*.html"))
+    text = "\n".join(p.read_text() for p in sources)
+    defined = set(re.findall(r"(--dk-[a-z0-9-]+)\s*:", kit + "\n" + text))
+    used = set(re.findall(r"var\(\s*(--dk-[a-z0-9-]+)", text))
+    assert sorted(used - defined) == []

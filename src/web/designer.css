@@ -3573,12 +3573,13 @@ input[type="checkbox"], input[type="radio"] {
 .branch-placeholder-node rect {
   transition: stroke 0.15s ease, fill 0.15s ease;
 }
+/* Hover fills, never outlines in accent: canvas boxes keep a neutral 1px
+   perimeter in every state (dakit "No accent borders"). */
 .branch-placeholder-node:hover rect {
   fill: var(--dk-bg-hover);
-  stroke: var(--dk-accent-default);
 }
 .union-join-node:hover > rect:first-of-type {
-  stroke: var(--dk-accent-default);
+  fill: var(--dk-bg-hover);
 }
 
 .rule-builder {

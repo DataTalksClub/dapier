@@ -6,6 +6,12 @@ export const nodeColor = "var(--dk-accent-default)";
 /* Triggers read by their icon, not a status hue: status colours are for status. */
 export const triggerColor = "var(--dk-accent-default)";
 export const noteColor = "var(--dk-border-strong)";
+/* Every canvas box (node, note, union) draws this neutral 1px perimeter in
+   every state; selection is the accent-soft fill plus accent title text.
+   Accent colour is for icons and connector lines, never a box outline. */
+export const boxStroke = "var(--dk-border-strong)";
+export const boxStrokeWidth = "1";
+export const selectedFill = "var(--dk-accent-soft)";
 export const handleColor = "var(--dk-accent-default)";
 export const shapeLabelSize = 16;
 export const minZoom = 0.25;

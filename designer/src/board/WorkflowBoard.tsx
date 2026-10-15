@@ -14,7 +14,7 @@ import {
 } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { ConnectionHandle, nodeColor, noteColor, handleColor, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt, openingViewport, wheelViewport } from "./geometry";
+import { ConnectionHandle, nodeColor, noteColor, handleColor, boxStroke, boxStrokeWidth, selectedFill, shapeLabelSize, minZoom, maxZoom, shapeColor, centerOf, findNodeAt, isNodeShape, displayLabel, connectionHandles, nearestConnectionHandle, connectionHandleById, connectorEndpoints, refreshArrowsForMovedShape, findConnectorAt, openingViewport, wheelViewport } from "./geometry";
 import type { Viewport } from "./geometry";
 import { PaletteKind, paletteLabel, nodeDataForKind, nodeIcon, nodeTitle, nodeSubtitle } from "./nodes";
 import { PickerMode, StepPicker } from "./StepPicker";
@@ -761,7 +761,6 @@ export function WorkflowBoard({
         )}
         {shapes.map((shape) => {
           const selected = shape.id === selectedId;
-          const strokeWidth = selected ? "3" : "2";
           const color = shapeColor(shape);
 
           if (shape.type === "node") {
@@ -792,8 +791,8 @@ export function WorkflowBoard({
                     height={shape.height}
                     rx="6"
                     fill="var(--dk-bg-muted)"
-                    stroke="var(--dk-border-strong)"
-                    strokeWidth="1.5"
+                    stroke={boxStroke}
+                    strokeWidth={boxStrokeWidth}
                     strokeDasharray="5 4"
                   />
                   <Plus
@@ -833,9 +832,9 @@ export function WorkflowBoard({
                     width={shape.width}
                     height={shape.height}
                     rx="26"
-                    fill="var(--dk-bg-surface)"
-                    stroke={selected ? color : "var(--dk-border-strong)"}
-                    strokeWidth={selected ? "2.5" : "1.5"}
+                    fill={selected ? selectedFill : "var(--dk-bg-surface)"}
+                    stroke={boxStroke}
+                    strokeWidth={boxStrokeWidth}
                   />
                   <rect
                     x={shape.x + 12}
@@ -855,7 +854,7 @@ export function WorkflowBoard({
                   <text
                     x={shape.x + 48}
                     y={shape.y + shape.height / 2 + 4}
-                    fill="var(--dk-text-secondary)"
+                    fill="var(--dk-text-muted)"
                     fontSize="13"
                     fontWeight="500"
                   >
@@ -892,9 +891,9 @@ export function WorkflowBoard({
                   width={shape.width}
                   height={shape.height}
                   rx="6"
-                  fill="var(--dk-bg-surface)"
-                  stroke={color}
-                  strokeWidth={strokeWidth}
+                  fill={selected ? selectedFill : "var(--dk-bg-surface)"}
+                  stroke={boxStroke}
+                  strokeWidth={boxStrokeWidth}
                 />
                 <rect x={shape.x + 14} y={shape.y + (shape.height - 36) / 2} width="36" height="36" rx="5" fill="var(--dk-accent-soft)" />
                 <Icon
@@ -918,7 +917,7 @@ export function WorkflowBoard({
                       x={shape.x + shape.width - badgeWidth / 2 - 10}
                       y={shape.y + 20}
                       textAnchor="middle"
-                      fill="var(--dk-accent-text)"
+                      fill="var(--dk-accent-default)"
                       fontSize="10"
                       fontWeight="600"
                     >
@@ -926,7 +925,7 @@ export function WorkflowBoard({
                     </text>
                   </g>
                 )}
-                <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill="var(--dk-text-primary)" fontSize={subtitle ? 15 : 13} fontWeight="500">
+                <text x={shape.x + 62} y={shape.y + (subtitle ? 40 : 53)} fill={selected ? "var(--dk-accent-default)" : "var(--dk-text-primary)"} fontSize={subtitle ? 15 : 13} fontWeight="500">
                   <title>{shape.label}</title>
                   {displayLabel(title)}
                 </text>
@@ -942,7 +941,7 @@ export function WorkflowBoard({
           if (shape.type === "note") {
             return (
               <g key={shape.id} onDoubleClick={(event) => { event.stopPropagation(); openEditor(shape); }}>
-                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill="var(--dk-bg-muted)" stroke={noteColor} strokeWidth={strokeWidth} />
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="4" fill={selected ? selectedFill : "var(--dk-bg-muted)"} stroke={noteColor} strokeWidth={boxStrokeWidth} />
                 <text x={shape.x + 14} y={shape.y + 30} fill="var(--dk-text-primary)" fontSize={shapeLabelSize} fontWeight="500">
                   {shape.label && <title>{shape.label}</title>}
                   {shape.label ? displayLabel(shape.label) : ""}
@@ -987,15 +986,13 @@ export function WorkflowBoard({
                       width={pillW}
                       height={pillH}
                       rx="11"
-                      fill="var(--dk-bg-surface)"
-                      stroke="var(--dk-border-strong)"
-                      strokeWidth="1.5"
+                      fill="var(--dk-bg-hover)"
                     />
                     <text
                       x={midpoint.x}
                       y={midpoint.y + 4}
                       textAnchor="middle"
-                      fill="var(--dk-text-secondary)"
+                      fill="var(--dk-text-muted)"
                       fontSize="11"
                       fontWeight="600"
                     >
