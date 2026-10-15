@@ -535,33 +535,30 @@ tr.inbox-open { cursor: pointer; }
    those two colors are the same blob if you can't tell them apart. Slightly
    larger than surrounding text so the Latest run column reads at a glance. */
 .status { display: inline-flex; align-items: center; gap: var(--dk-space-2); font-size: var(--dk-text-md); color: var(--dk-text-primary); white-space: nowrap; }
+/* Status marks: one small stroke glyph per state, so states differ by
+   shape as well as colour (check, cross, progress, warning, dashed off).
+   The glyph is a mask painted in the state's theme role, so it remaps with
+   the theme like the label beside it; it is decorative (aria-hidden). */
 .status-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: auto;
+  --status-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25' stroke-dasharray='2.5 2.4'/%3E%3C/svg%3E");
+  display: inline-block;
   flex: none;
+  width: 16px;
+  height: 16px;
   border-radius: 0;
-  background: transparent;
-  font-size: 1.15em;
-  line-height: 1;
+  background: currentColor;
+  color: var(--dk-text-muted);
+  -webkit-mask: var(--status-mark) center / contain no-repeat;
+  mask: var(--status-mark) center / contain no-repeat;
 }
-.status-dot::before { content: "○"; }
-.status.ok .status-dot { background: transparent; font-size: 1.35em; }
-.status.ok .status-dot::before { content: "✅"; }
+.status.ok .status-dot { --status-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Cpath d='m5.25 8.25 1.9 1.9 3.6-3.8'/%3E%3C/svg%3E"); color: var(--dk-success-text); }
 .status.run { color: var(--dk-info-text); }
-.status.run .status-dot { background: transparent; }
-.status.run .status-dot::before { content: "🔵"; }
+.status.run .status-dot { --status-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Ccircle cx='8' cy='8' r='2.75' fill='black' stroke='none'/%3E%3C/svg%3E"); color: var(--dk-info-text); }
 .status.err { color: var(--dk-danger-text); }
-.status.err .status-dot { background: transparent; font-size: 1.35em; }
-.status.err .status-dot::before { content: "❌"; }
+.status.err .status-dot { --status-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Cpath d='m5.9 5.9 4.2 4.2m0-4.2-4.2 4.2'/%3E%3C/svg%3E"); color: var(--dk-danger-text); }
 .status.warn { color: var(--dk-warning-text); }
-.status.warn .status-dot { background: transparent; }
-.status.warn .status-dot::before { content: "⚠️"; }
+.status.warn .status-dot { --status-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2 14.5 13.5h-13Z'/%3E%3Cpath d='M8 6.5v3M8 11.6v.1'/%3E%3C/svg%3E"); color: var(--dk-warning-text); }
 .status.off { color: var(--dk-text-muted); }
-.status.off .status-dot { background: transparent; }
-.status.off .status-dot::before { content: "○"; }
 
 /* --- empty state --------------------------------------------------------------- */
 /* One empty-state pattern: inside the register's own container (the frame
