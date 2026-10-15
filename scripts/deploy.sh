@@ -46,8 +46,14 @@ DomainName: "dapier.dtcdev.click"
 DomainCertificateArn: "arn:aws:acm:eu-west-1:817685572750:certificate/df237eb8-9d9a-4d48-8aa3-2fbe99018cd9"
 HostedZoneId: "Z05963572WVWFHDQZH5NE"
 HtmlRendererImageUri: "817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer:20260712-lambda"
-InboundEmailTopicArn: "arn:aws:sns:eu-west-1:817685572750:relay-sandbox-inbound-email-events"
-DatamailerInboundBucketName: "relay-sandbox-817685572750-eu-west-1-inbound-mail"
+# The 2026-10-15 intake cutover: dtcdev.click mail is received and
+# processed by the main-account email-intake root (aws-infra
+# main/email-intake), which publishes the events dapier's queue policy
+# allows. Do not reset these to the former Relay sandbox values — that
+# re-points the EventQueue policy at a topic nothing publishes to and the
+# inbox goes dark.
+InboundEmailTopicArn: "arn:aws:sns:us-east-1:387546586013:dapier-main-inbound-email-events"
+DatamailerInboundBucketName: "dapier-main-387546586013-inbound-mail"
 AuthBaseUrl: "https://auth.dtcdev.click"
 AuthClientId: "$AUTH_CLIENT_ID"
 AuthIssuer: "$AUTH_ISSUER"
