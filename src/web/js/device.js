@@ -183,6 +183,9 @@ function ago(ms) {
 
 function renderReview(display, grant) {
   const offset = Date.now() - (grant.server_now || Date.now() / 1000) * 1000; // server clock → local
+  const remaining = () => Math.max(0, Math.round((grant.expires_at * 1000 - (Date.now() - offset)) / 1000));
+  // Already expired on arrival: say so, and never start a countdown.
+  if (remaining() === 0) { renderError("expired"); return; }
   const started = new Date(grant.created_at);
   const startedAgo = Number.isNaN(started.getTime()) ? "" : ago(Date.now() - offset - started.getTime());
   const warn = grant.same_network === false;
@@ -211,7 +214,8 @@ function renderReview(display, grant) {
   const expires = card.querySelector("#expires");
   let announced = false;
   const tick = () => {
-    const left = Math.max(0, Math.round((grant.expires_at * 1000 - (Date.now() - offset)) / 1000));
+    if (!expires.isConnected) { clearInterval(timer); timer = null; return; }
+    const left = remaining();
     expires.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
     if (left <= 60) {
       expires.insertAdjacentHTML("beforeend", ' <span class="dk-badge dk-badge--warning">ending</span>');
@@ -224,15 +228,17 @@ function renderReview(display, grant) {
   const approve = card.querySelector("#approve");
   const deny = card.querySelector("#deny");
   card.querySelector("#ack")?.addEventListener("change", (event) => { approve.disabled = !event.target.checked; });
-  approve.addEventListener("click", () => decide(display, true, approve, deny));
-  deny.addEventListener("click", () => decide(display, false, approve, deny));
+  approve.addEventListener("click", () => decide(display, grant, true, approve, deny));
+  deny.addEventListener("click", () => decide(display, grant, false, approve, deny));
 }
 
 /* Both decisions go through the same endpoint and the same guards; the
-   first click disables both, so neither can be sent twice. */
-function decide(display, approve, approveButton, denyButton) {
+   first click disables both, so neither can be sent twice. A decision
+   that fails is never re-sent behind the person's back: recovery returns
+   to Review (same facts, same countdown) for a fresh, explicit choice. */
+function decide(display, grant, approve, approveButton, denyButton) {
   const mine = ++seq;
-  lastAction = null;
+  lastAction = () => renderReview(display, grant);
   approveButton.disabled = denyButton.disabled = true;
   const busy = approve ? approveButton : denyButton;
   busy.textContent = approve ? "Authorizing…" : "Denying…";
@@ -241,7 +247,7 @@ function decide(display, approve, approveButton, denyButton) {
     method: "POST",
     body: JSON.stringify({ user_code: display, approve }),
   }).then((result) => { if (mine === seq) renderResult(result.status); })
-    .catch((error) => { if (mine === seq) fail(error); });
+    .catch((error) => { if (mine === seq) fail(error, { recoverLabel: "Back to review" }); });
 }
 
 /* ---- Result ---- */
@@ -268,16 +274,17 @@ const ERRORS = {
   network: [`Couldn’t reach ${APP}`, "", "Check your connection and try again. Your code is still valid until it expires.", "Try again"],
 };
 
-function fail(error) {
+function fail(error, { recoverLabel = "" } = {}) {
   const status = error && error.status;
   if (status === 404 || status === 409) renderError("notfound");
   else if (status === 401) { actor = null; renderIdentity(); renderError("signin"); }
-  else if (status === 429) renderError("ratelimited", { retryAfter: error.retryAfter });
-  else renderError("network");
+  else if (status === 429) renderError("ratelimited", { retryAfter: error.retryAfter, label: recoverLabel });
+  else renderError("network", { label: recoverLabel });
 }
 
-function renderError(kind, { retryAfter = 0 } = {}) {
-  const [title, tone, sentence, action] = ERRORS[kind];
+function renderError(kind, { retryAfter = 0, label = "" } = {}) {
+  const [title, tone, sentence, defaultAction] = ERRORS[kind];
+  const action = label || defaultAction;
   paint(`${head(title, "")}
     <div class="dk-auth-card__body">
       <div class="dk-callout${tone ? ` dk-callout--${tone}` : ""}" role="alert"><div class="dk-callout__body"><span>${sentence}</span></div></div>
@@ -300,7 +307,7 @@ function renderError(kind, { retryAfter = 0 } = {}) {
     const tick = () => {
       const seconds = Math.max(0, Math.ceil((until - Date.now()) / 1000));
       recover.disabled = seconds > 0;
-      recover.innerHTML = seconds ? `Try again <span class="dk-mono">(${seconds}s)</span>` : "Try again";
+      recover.innerHTML = seconds ? `${esc(action)} <span class="dk-mono">(${seconds}s)</span>` : esc(action);
       if (!seconds) { clearInterval(timer); timer = null; }
     };
     tick();
