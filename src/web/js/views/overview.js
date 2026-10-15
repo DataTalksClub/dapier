@@ -468,6 +468,9 @@ async function searchWorkflows() {
    workflows [+ New workflow]". main.js's [data-new-workflow] handler opens
    the designer. */
 collectionCreate($('#home-workflows-lead'), { id: 'home-new-workflow', label: 'New workflow', data: { newWorkflow: '' } });
+/* The Workflows list: the create follows the search that scopes the table;
+   Import YAML and Export all trail. */
+collectionCreate($('#workflow-toolbar-lead'), { id: 'new-workflow', label: 'New workflow', data: { newWorkflow: '' } });
 
 $('#workflow-search').addEventListener('input', () => {
   clearTimeout(searchWorkflows.timer);

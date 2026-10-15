@@ -237,10 +237,11 @@ window.addEventListener('popstate', async () => {
 });
 
 /* Edit-in-designer and New workflow open the designer inside the console;
-   the plain hrefs stay as the fallback for full-page loads. */
+   the plain hrefs (edit, empty states) stay as the fallback for full-page
+   loads. */
 function designerClick(event) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-  const target = event.target.closest('#workflow-edit, #new-workflow, [data-new-workflow]');
+  const target = event.target.closest('#workflow-edit, [data-new-workflow]');
   if (!target) return;
   event.preventDefault();
   if (target.id === 'workflow-edit') $('#workflow-dialog').close();

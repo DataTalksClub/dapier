@@ -1469,10 +1469,20 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 }
 
 /* --- Workflows list -----------------------------------------------------------
-   One toolbar (search and filters left, Import / Export / New right), the
+   One toolbar (search and New left, Import / Export right), the
    register below at the block gap, the count in its footer band. */
 .workflow-toolbar .toolbar-filters > label { flex: 0 1 160px; }
 .workflow-toolbar .toolbar-filters > label.toolbar-search { flex: 1 1 200px; max-width: 280px; }
+/* The create follows the search that scopes the table (dakit "Action
+   placement"): [Search][+ New workflow] ... [Import YAML][Export all]. On
+   phones the search and the create share the first row. */
+.workflow-toolbar > .dk-collection-header__lead { flex: 1 1 auto; flex-wrap: nowrap; gap: var(--dk-gap-control); }
+.workflow-toolbar > .dk-collection-header__lead > .toolbar-filters { display: flex; flex: 0 1 280px; min-width: 0; }
+.workflow-toolbar > .dk-collection-header__lead > .toolbar-filters > label.toolbar-search { flex: 1 1 auto; max-width: none; }
+@media (max-width: 860px) {
+  .workflow-toolbar > .dk-collection-header__lead { grid-column: 1 / -1; }
+  .workflow-toolbar > .dk-collection-header__lead > .toolbar-filters { flex: 1 1 auto; }
+}
 #workflow-table-wrap table { table-layout: fixed; }
 #workflow-table-wrap th.select-col, #workflow-table-wrap td.select-col { padding-left: var(--dk-space-4); padding-right: 0; }
 #workflow-table-wrap tbody tr:has(.workflow-select:checked) td { background: var(--dk-accent-soft); }

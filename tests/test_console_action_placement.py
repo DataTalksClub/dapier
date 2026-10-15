@@ -100,3 +100,21 @@ def test_tokens_create_follows_the_api_tokens_title(console):
 
     page.keyboard.press("c")
     expect(page.locator("#token-dialog")).to_be_visible()
+
+
+def test_workflows_create_follows_the_list_search(console):
+    from playwright.sync_api import expect
+
+    page = console("/workflows")
+    create = page.locator("#new-workflow")
+    _assert_dakit_create(create, "New workflow")
+    assert _lead_children(page, "#workflow-toolbar-lead")[1:] == ["new-workflow"]
+    expect(page.locator("#workflow-toolbar-lead > .toolbar-filters #workflow-search")).to_have_count(1)
+    # Import and export are secondary and trail the toolbar.
+    end = page.locator('[data-panel-tools="list"] .dk-toolbar__end')
+    expect(end.locator(".dk-button")).to_have_text(["Import YAML", "Export all"])
+    expect(end.locator(".dk-button--primary")).to_have_count(0)
+    _assert_page_header_has_no_actions(page)
+
+    page.keyboard.press("c")
+    page.wait_for_url("**/workflows/new")

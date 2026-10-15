@@ -181,9 +181,12 @@ def test_every_nav_link_resolves_to_a_served_page():
 def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
     index = ingress._static("/")["body"]
     workflows_view = re.search(r'data-page="workflows".*?</section>', index, re.S).group(0)
-    new_link = re.search(r'<a id="new-workflow" class="dk-button dk-button--primary" href="([^"]+)">(.*?)</a>', workflows_view, re.S)
-    assert new_link and new_link.group(1) == "/workflows/new"
-    assert re.sub(r"<[^>]+>", "", new_link.group(2)).strip() == "New workflow"
+    # New workflow is a dakit collection create after the list's search
+    # (built in overview.js); main.js opens the designer for [data-new-workflow].
+    assert 'id="workflow-toolbar-lead"' in workflows_view
+    overview = ingress._static("/assets/js/views/overview.js")["body"]
+    assert "collectionCreate($('#workflow-toolbar-lead'), { id: 'new-workflow', label: 'New workflow', data: { newWorkflow: '' } });" in overview
+    assert "[data-new-workflow]" in ingress._static("/assets/js/main.js")["body"]
     assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
 
     # The workflow dialog deep-links the designer with the workflow source.
