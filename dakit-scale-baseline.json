@@ -43,13 +43,6 @@
     "padding: 8px 6px": 2,
     "row-gap: 6px": 1
   },
-  "src/web/app.css": {
-    "margin-block: calc((var(--dk-size-touch) - 1.4em) / -2)": 1,
-    "margin-top: -10px": 2,
-    "margin: 0 0 0 calc(-1 * var(--agent-sep))": 1,
-    "margin: 0 0 0 calc(-1 * var(--email-sep))": 1,
-    "padding: 0 0 2px": 1
-  },
   "src/web/public.css": {
     "font-size: clamp(18px, 2.5vw, 22px)": 1,
     "font-size: clamp(36px, 6vw, 52px)": 1,

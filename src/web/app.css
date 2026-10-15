@@ -715,10 +715,10 @@ label:not([class*="dk-"]):has(> input[type="checkbox"]) { display: flex; align-i
 #email-mail-scroll > .panel-note { margin: 0; padding: var(--dk-space-3) var(--dk-space-4); }
 .email-read-body { display: grid; gap: var(--dk-space-5); }
 .email-read-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
-.email-read-meta { --email-sep: var(--dk-space-2); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: 0; margin: 0 0 0 calc(-1 * var(--email-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--email-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.email-read-meta { --email-sep: var(--dk-space-2); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: 0; margin: 0; min-width: 0; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .email-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .email-meta-item::before { content: "·"; flex: none; width: var(--email-sep); text-align: center; color: var(--dk-text-faint); }
-.email-read-meta > .status { margin-left: var(--email-sep); flex: none; font-size: var(--dk-text-sm); }
+.email-read-meta > .status { flex: none; font-size: var(--dk-text-sm); }
 .email-meta-sep { flex: none; margin: 0 var(--dk-space-1); color: var(--dk-text-faint); }
 .email-meta-sep + .email-meta-item::before { content: none; }
 .email-read-head .email-technical { border-top: 0; padding: 0; justify-self: stretch; }
@@ -939,7 +939,7 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   min-height: 0;
   min-width: 0;
   outline: none;
-  padding: 0 0 2px;
+  padding: 0 0 var(--dk-space-1);
   width: 100%;
 }
 .designer-embed {
@@ -1143,7 +1143,7 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   .workflow-toolbar .toolbar-filters > label.toolbar-search { max-width: none; }
   /* The name's 44px hit area overhangs its line instead of padding the row,
      so the name→id spacing is set by the text, not the checkbox or menu. */
-  .workflow-list-row .cell-name { box-sizing: border-box; min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); margin-block: calc((var(--dk-size-touch) - 1.4em) / -2); }
+  .workflow-list-row .cell-name { box-sizing: border-box; min-width: var(--dk-size-touch); min-height: var(--dk-size-touch); display: inline-flex; align-items: center; }
   .workflow-list-row button.cell-name { padding-block: calc((var(--dk-size-touch) - 1.4em) / 2); }
   .workflow-state-control .dk-button { height: var(--dk-size-touch); font-size: var(--dk-text-sm); padding: 0 var(--dk-space-3); }
   .workflow-switch { min-height: var(--dk-size-touch); }
@@ -1387,11 +1387,10 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
 /* The compact head: a heading-size title held to two lines, one meta
    line. Exact times, engine and ids sit in a Details popover on the name. */
 .agent-detail-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
-/* Each part after the status leads with a "·" in a fixed slot. The line
-   starts one slot left of the column and clips that slot, so a part that
-   wraps to a new line never starts with a stray dot. */
-.agent-detail-meta { --agent-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0 0 0 calc(-1 * var(--agent-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--agent-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
-.agent-detail-meta > .status { margin-left: var(--agent-sep); font-size: var(--dk-text-sm); }
+/* Each part after the status leads with a "·" in a fixed slot (no
+   negative-margin clipping: dakit's grid bans it). */
+.agent-detail-meta { --agent-sep: var(--dk-space-5); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--dk-space-1); margin: 0; min-width: 0; font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+.agent-detail-meta > .status { font-size: var(--dk-text-sm); }
 .agent-meta-item { display: flex; align-items: center; min-width: 0; max-width: 100%; white-space: nowrap; }
 .agent-meta-item::before { content: "·"; flex: none; width: var(--agent-sep); text-align: center; color: var(--dk-text-faint); }
 /* A long workflow name ends in an ellipsis (the id rides in its title). */
@@ -1726,7 +1725,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .sched-table td { display: block; height: auto; min-width: 0; padding: 0; border: 0; }
   .sched-table td.cell-title { grid-column: 1; grid-row: 1; }
   .sched-table td.cell-title::before, .sched-table td[data-label="State"]::before { content: none; }
-  .sched-table td[data-label="State"] { grid-column: 2; grid-row: 1; justify-self: end; margin-top: -10px; }
+  .sched-table td[data-label="State"] { grid-column: 2; grid-row: 1; justify-self: end; align-self: start; }
   .sched-table .cell-title .sub code { display: none; }
   .sched-table td[data-label="Starts"] { grid-column: 1 / -1; grid-row: 2; font-size: var(--dk-text-sm); }
   .sched-table td[data-label="Latest fire"] { grid-column: 1 / -1; grid-row: 3; font-size: var(--dk-text-sm); }
