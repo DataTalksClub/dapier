@@ -688,36 +688,26 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 #email-addresses .source-row { cursor: pointer; }
 #email-addresses .source-row:hover { background: var(--dk-bg-hover); }
 #email-addresses .source-row.is-selected:hover { background: var(--dk-accent-soft); }
-/* Reading pane: list beside the selected message, like Agents. */
-.email-mail-workspace { display: grid; grid-template-columns: min(24rem, 42%) minmax(0, 1fr); gap: var(--dk-gap-section); align-items: start; }
-.email-mail-workspace > .data-panel + .data-panel { margin-top: 0; }
-.email-mail-sidebar { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.email-mail-sidebar > .section-head, .email-mail-sidebar > .panel-note, .email-mail-sidebar > .dk-table-footer { flex: none; }
-.email-mail-sidebar .activity-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-.activity-row.is-selected { background: var(--dk-accent-soft); }
-/* The list is a mailbox sidebar: sender + subject, status top-right. */
-.email-mail-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--dk-space-1); }
-.email-mail-sidebar .activity-main { grid-column: 1; grid-row: 1; }
-.email-mail-sidebar .activity-outcome { display: contents; }
-.email-mail-sidebar .activity-outcome .status { grid-column: 2; grid-row: 1; align-self: start; }
-.email-mail-sidebar .activity-when { grid-column: 1 / -1; grid-row: 2; }
-.email-mail-sidebar .activity-outcome .activity-note { grid-column: 1 / -1; grid-row: 3; }
-.email-mail-sidebar .activity-outcome .activity-error { grid-column: 1 / -1; grid-row: 4; }
-.email-mail-sidebar .activity-to { display: none; }
-.email-mail-sidebar .activity-primary > :first-child:not(:only-child) { max-width: 100%; }
-#email-read { min-width: 0; }
-#email-read > .dialog-state { padding: var(--dk-space-7) var(--dk-pad-panel); }
-.email-back { display: none; }
-.email-read-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); display: grid; gap: var(--dk-space-5); }
+/* Received is a dakit list–detail split; the list runs a little wider
+   than the kit default so sender and subject stay readable. A row: sender
+   and time, the subject, then the outcome (status + who handled it). */
+.email-split { --dk-split-list: 384px; }
+.email-item-line { justify-content: space-between; align-items: baseline; }
+.email-item-from { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.email-item-when { flex: none; color: var(--dk-text-muted); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-regular); }
+.email-item-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); }
+.email-item-outcome .status { font-size: var(--dk-text-sm); }
+.email-item-outcome .activity-note, .email-item-outcome .activity-error { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.email-item-outcome .activity-error { color: var(--dk-danger-text); }
+#email-mail-scroll > .panel-note { margin: 0; padding: var(--dk-space-3) var(--dk-space-4); }
+.email-read-body { display: grid; gap: var(--dk-space-5); }
 .email-read-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
-.email-subject-row { justify-self: stretch; display: flex; align-items: center; gap: var(--dk-gap-control); min-width: 0; }
-.email-subject-row h2 { flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); }
-.email-subject-row > .status { flex: none; font-size: var(--dk-text-sm); }
 .email-read-meta { --email-sep: var(--dk-space-2); justify-self: stretch; display: flex; flex-wrap: wrap; align-items: center; row-gap: 0; margin: 0 0 0 calc(-1 * var(--email-sep)); min-width: 0; clip-path: inset(-8px -8px -8px var(--email-sep)); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .email-meta-item { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .email-meta-item::before { content: "·"; flex: none; width: var(--email-sep); text-align: center; color: var(--dk-text-faint); }
-.email-meta-item:first-child::before { content: none; }
-.email-meta-sep { flex: none; color: var(--dk-text-faint); }
+.email-read-meta > .status { margin-left: var(--email-sep); flex: none; font-size: var(--dk-text-sm); }
+.email-meta-sep { flex: none; margin: 0 var(--dk-space-1); color: var(--dk-text-faint); }
+.email-meta-sep + .email-meta-item::before { content: none; }
 .email-read-head .email-technical { border-top: 0; padding: 0; justify-self: stretch; }
 .email-read-head .email-technical summary { display: inline-flex; gap: var(--dk-space-2); min-height: var(--dk-size-control-sm); font-size: var(--dk-text-sm); font-weight: var(--dk-weight-medium); color: var(--dk-text-muted); cursor: pointer; }
 .email-read-head .email-technical summary:hover { color: var(--dk-text-primary); }
@@ -757,26 +747,10 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-files .mono { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: var(--dk-text-md); }
 .email-muted { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 .email-read-actions { display: flex; flex-wrap: wrap; gap: var(--dk-gap-control); }
-@media (min-width: 861px) {
-  body[data-view="emails"] main { display: flex; flex-direction: column; height: 100dvh; padding-bottom: var(--dk-space-6); }
-  body[data-view="emails"] section.view[data-page="emails"].active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-  body[data-view="emails"] .trigger-toolbar { flex: none; }
-  body[data-view="emails"] .trigger-workspace { flex: 1; min-height: 18rem; align-items: stretch; grid-template-columns: minmax(0, 1fr); }
-  body[data-view="emails"] .trigger-workspace > [hidden] { display: none; }
-  .email-mail-workspace { flex: 1; min-height: 18rem; align-items: stretch; }
-  .email-mail-sidebar, #email-read { min-height: 0; }
-  #email-read { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-}
 @media (max-width: 860px) {
   .sender-row .sender-remove { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .sender-add input { height: var(--dk-size-touch); }
   .panel-note .text-link { min-height: var(--dk-size-touch); }
-  .email-mail-workspace { grid-template-columns: minmax(0, 1fr); }
-  #email-read { display: none; }
-  .email-mail-workspace.has-selection #email-read { display: block; }
-  .email-mail-workspace.has-selection .email-mail-sidebar { display: none; }
-  .email-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
-  .email-read-body { padding: var(--dk-space-4); }
   .email-read-head .email-technical summary { min-height: var(--dk-size-touch); }
   .email-read-head .email-technical dl { grid-template-columns: minmax(0, 1fr); }
   .email-read-head .email-technical dd { margin-bottom: var(--dk-space-3); }

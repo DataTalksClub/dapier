@@ -5,7 +5,11 @@
    "Who can write" panel to that address's sender policy (or the default).
    Rows come from the trigger inbox
    (GET /api/admin/triggers/inbox?connector=email), the same API behind
-   `dapier emails received`; flows are still edited only in the designer. */
+   `dapier emails received`; flows are still edited only in the designer.
+   Received is dakit's list–detail split (docs/list-detail.md): ?mail= is
+   the selection (pushState for a pick, replaceState for the desktop
+   auto-pick), each pane scrolls on its own, and phones show one pane at a
+   time with Back returning to the row it came from. */
 import { state } from '../state.js';
 import { $, $$, icons, notice, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
@@ -15,7 +19,7 @@ import { openDesigner } from './designer.js';
 import { openRun } from './runs.js';
 import { openReplayConfirm } from './inbox.js';
 import { workflowName } from '../workflow-names.js';
-import { filterSegments, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow, OUTCOMES, ago } from './activity.js';
+import { filterSegments, whenHtml, workflowNames, outcomeCell, sourceRow, OUTCOMES, ago } from './activity.js';
 
 /* Server-side outcome filters; Handled includes the runs that failed —
    a workflow took the message, and its failure is what needs attention. */
@@ -34,6 +38,10 @@ let selectedKey = null;
 let openInboxId = null;
 let detail = null;
 let detailSeq = 0;
+let lastOpened = null;
+let listScrollTop = 0;
+const DESKTOP = '(min-width: 821px)';
+const split = () => $('.email-split');
 
 /* ---- formatting ------------------------------------------------------- */
 
@@ -183,31 +191,28 @@ function mailRow(event) {
   const feedback = isFeedback(event);
   const from = feedback ? `${email.feedback === 'bounce' ? 'Bounce' : 'Complaint'} report` : senderName(email);
   const subject = mailTitle(event);
-  const to = (email.to || []).join(', ');
   const attachments = (email.attachments || []).filter((item) => !item.inline).length;
-  return activityRow({
-    attrs: `data-inbox="${escapeHtml(event.inbox_id)}" data-outcome="${escapeHtml(event.outcome || '')}"`,
-    label: `Open ${subject}`,
-    when: whenHtml(event.received_at),
-    primary: `<span title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>${to ? `<span class="activity-to mono" title="${escapeHtml(to)}">to ${escapeHtml(to)}</span>` : ''}`,
-    secondary: `${escapeHtml(feedback
-      ? `${email.feedback === 'bounce' ? 'Bounced' : 'Complaint'}: ${(email.recipients || []).join(', ') || 'unknown recipient'}`
-      : subject)}${attachments ? ` · ${attachments} attachment${attachments === 1 ? '' : 's'}` : ''}`,
-    outcome: outcomeHtml(event),
-    selected: event.inbox_id === openInboxId,
-  });
+  const line = `${escapeHtml(feedback
+    ? `${email.feedback === 'bounce' ? 'Bounced' : 'Complaint'}: ${(email.recipients || []).join(', ') || 'unknown recipient'}`
+    : subject)}${attachments ? ` · ${attachments} attachment${attachments === 1 ? '' : 's'}` : ''}`;
+  const selected = event.inbox_id === openInboxId;
+  return `<li><a class="dk-split__item email-item" href="/emails?mail=${encodeURIComponent(event.inbox_id)}" data-inbox="${escapeHtml(event.inbox_id)}" data-outcome="${escapeHtml(event.outcome || '')}"${selected ? ' aria-current="true"' : ''}>
+    <span class="dk-split__name email-item-line"><span class="email-item-from" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span><span class="dk-mono email-item-when">${whenHtml(event.received_at)}</span></span>
+    <span class="email-item-subject">${line}</span>
+    <span class="dk-split__meta email-item-outcome">${outcomeHtml(event)}</span>
+  </a></li>`;
 }
 
 function emptyMessage() {
   const first = (config.addresses || [])[0];
-  if (mail.filter === 'refused') return '<h3>Nothing refused</h3><p>Mail from senders outside the allowed list shows up here.</p>';
-  if (mail.filter === 'none') return '<h3>Nothing unmatched</h3><p>Every message reached a workflow.</p>';
-  if (mail.filter === 'failed') return '<h3>Nothing failed</h3><p>Messages whose workflow run failed show up here.</p>';
-  if (mail.filter === 'handled') return '<h3>Nothing handled yet</h3><p>Messages a workflow ran for show up here.</p>';
+  if (mail.filter === 'refused') return '<p class="dk-empty__title">Nothing refused</p><p class="dk-empty__desc">Mail from senders outside the allowed list shows up here.</p>';
+  if (mail.filter === 'none') return '<p class="dk-empty__title">Nothing unmatched</p><p class="dk-empty__desc">Every message reached a workflow.</p>';
+  if (mail.filter === 'failed') return '<p class="dk-empty__title">Nothing failed</p><p class="dk-empty__desc">Messages whose workflow run failed show up here.</p>';
+  if (mail.filter === 'handled') return '<p class="dk-empty__title">Nothing handled yet</p><p class="dk-empty__desc">Messages a workflow ran for show up here.</p>';
   if (first) {
-    return `<h3>No email received yet</h3><p>Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>`;
+    return `<p class="dk-empty__title">No email received yet</p><p class="dk-empty__desc">Send a message to <span class="mono">${escapeHtml(first.address)}</span> from an allowed sender — it shows up here within seconds.</p>`;
   }
-  return '<h3>No email received yet</h3><p>Add an email trigger with an address filter in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>, then send a message to that address.</p>';
+  return '<p class="dk-empty__title">No email received yet</p><p class="dk-empty__desc">Add an email trigger with an address filter in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>, then send a message to that address.</p>';
 }
 
 function renderMail() {
@@ -227,11 +232,12 @@ function renderMail() {
     ? `${events.length}${mail.next ? '+' : ''} message${events.length === 1 ? '' : 's'}` : '';
 }
 
-function setMailUrl(id) {
+function setMailUrl(id, { push = false } = {}) {
   if (state.view !== 'emails') return;
   const url = new URL(window.location.href);
   if (id) url.searchParams.set('mail', id); else url.searchParams.delete('mail');
-  history.replaceState(null, '', url);
+  if (url.href === window.location.href) return;
+  if (push) history.pushState(null, '', url); else history.replaceState(null, '', url);
 }
 
 /* Family tabs (router.js) swap Received / Addresses under the shared
@@ -299,7 +305,6 @@ function runsHtml(event) {
 
 function readHtml(event) {
   const email = event.email || {};
-  const title = mailTitle(event);
   const from = isFeedback(event) ? (email.from || '') : senderName(email);
   const to = (email.to || []).join(', ');
   const when = event.received_at
@@ -330,9 +335,7 @@ function readHtml(event) {
   const workflow = runsHtml(event);
   return `<div class="email-read-body">
     <div class="email-read-head">
-      <button class="email-back dk-button dk-button--secondary dk-button--sm" type="button">Back to received</button>
-      <div class="email-subject-row"><h2 tabindex="-1" title="${escapeHtml(title)}">${escapeHtml(title)}</h2>${outcomeBadge(event)}</div>
-      <p class="email-read-meta">${from ? `<span class="email-meta-item" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>` : ''}${from && to ? '<span class="email-meta-sep" aria-hidden="true">→</span>' : ''}${to ? `<span class="email-meta-item mono" title="${escapeHtml(to)}">${escapeHtml(to)}</span>` : ''}${when ? `<span class="email-meta-item">${when}</span>` : ''}</p>
+      <p class="email-read-meta">${outcomeBadge(event)}${from ? `<span class="email-meta-item" title="${escapeHtml(email.from || '')}">${escapeHtml(from)}</span>` : ''}${from && to ? '<span class="email-meta-sep" aria-hidden="true">→</span>' : ''}${to ? `<span class="email-meta-item mono" title="${escapeHtml(to)}">${escapeHtml(to)}</span>` : ''}${when ? `<span class="email-meta-item">${when}</span>` : ''}</p>
       <details class="email-technical"><summary>Details</summary><dl>${headers}</dl></details>
       ${workflow ? `<section class="email-workflow" aria-labelledby="email-outcome-heading">
         <h3 id="email-outcome-heading">Workflow</h3>
@@ -351,17 +354,21 @@ function readHtml(event) {
   </div>`;
 }
 
+function showReadPane(open) {
+  $('#email-read-head').hidden = !open;
+  $('#email-read').hidden = !open;
+  $('#email-read-empty').hidden = open;
+  globalThis.dakitSplit?.show(split(), open ? 'detail' : 'list', { focus: false, resetScroll: false });
+}
+
 function renderRead() {
   const panel = $('#email-read');
-  const workspace = $('.email-mail-workspace');
-  if (workspace) workspace.classList.toggle('has-selection', Boolean(openInboxId));
-  if (!openInboxId) {
-    panel.innerHTML = '<div class="dialog-state"><strong>Select a message</strong><p>Read the email and see which workflow ran.</p></div>';
-    return;
-  }
+  showReadPane(Boolean(openInboxId));
+  if (!openInboxId) return;
   const event = (detail && detail.inbox_id === openInboxId) ? detail : listedEvent(openInboxId);
+  $('#email-read-title').textContent = event ? mailTitle(event) : 'Message';
   if (!event) {
-    panel.innerHTML = '<div class="dialog-state" role="status"><p>Loading the message…</p></div>';
+    panel.innerHTML = '<p class="sub" role="status">Loading the message…</p>';
     return;
   }
   panel.innerHTML = readHtml(event);
@@ -377,6 +384,7 @@ async function openEmail(inboxId, { updateUrl = true } = {}) {
     detail = null;
     $('#email-read').scrollTop = 0;
   }
+  lastOpened = inboxId;
   if (updateUrl) setMailUrl(inboxId);
   renderMail();
   renderRead();
@@ -389,11 +397,13 @@ async function openEmail(inboxId, { updateUrl = true } = {}) {
   } catch (error) {
     if (seq !== detailSeq || openInboxId !== inboxId) return;
     if (!listedEvent(inboxId)) {
-      $('#email-read').innerHTML = `<div class="dialog-state"><strong>This message could not be loaded</strong><p>${escapeHtml(error.message)}</p><button class="email-back dk-button dk-button--secondary" type="button">Back to received</button></div>`;
+      $('#email-read').innerHTML = `<div class="dk-callout dk-callout--danger" role="alert"><div class="dk-callout__body"><p class="dk-callout__title">This message could not be loaded</p><p>${escapeHtml(error.message)}</p></div></div>`;
     }
   }
 }
 
+/* Nothing selected. From Back (phones), the list returns where it was with
+   focus on the row it came from; the selection leaves the URL. */
 function clearSelection() {
   ++detailSeq;
   openInboxId = null;
@@ -401,6 +411,16 @@ function clearSelection() {
   setMailUrl(null);
   renderMail();
   renderRead();
+  const scroller = $('#email-mail-scroll');
+  scroller.scrollTop = listScrollTop;
+  if (window.matchMedia(DESKTOP).matches || !lastOpened) return;
+  const row = [...document.querySelectorAll('#email-mail-list [data-inbox]')].find((item) => item.dataset.inbox === lastOpened);
+  if (!row) return;
+  const top = row.offsetTop - scroller.offsetTop;
+  if (top < scroller.scrollTop || top + row.offsetHeight > scroller.scrollTop + scroller.clientHeight) {
+    scroller.scrollTop = Math.max(0, top - scroller.clientHeight / 3);
+  }
+  row.focus({ preventScroll: true });
 }
 
 function pickMail() {
@@ -416,12 +436,14 @@ function pickMail() {
      Addresses tab stays put — no auto-selecting a hidden row. */
   if (fromUrl && ids.has(fromUrl)) showReceivedTab();
   else if (addressesActive()) { renderRead(); return; }
-  const desktop = window.matchMedia('(min-width: 861px)').matches;
+  /* The URL is the selection. Without one, a desktop opens the newest
+     message in place; a phone shows the list. */
+  const desktop = window.matchMedia(DESKTOP).matches;
   const id = (fromUrl && ids.has(fromUrl) && fromUrl)
-    || openInboxId
-    || (desktop ? (mail.events || [])[0]?.inbox_id : null);
-  if (id && id !== openInboxId) void openEmail(id);
-  else if (id && id === openInboxId && !detail) void openEmail(id, { updateUrl: false });
+    || (desktop ? (openInboxId || (mail.events || [])[0]?.inbox_id) : null);
+  if (!id) { if (openInboxId) clearSelection(); else renderRead(); return; }
+  if (id !== openInboxId) void openEmail(id);
+  else if (!detail) void openEmail(id, { updateUrl: false });
   else renderRead();
 }
 
@@ -641,6 +663,7 @@ function renderEmailsNow(data) {
   config = data || {};
   $('#email-domain-hint').textContent = config.domain ? `*@${config.domain}` : 'the receiving domain';
   $('#email-load-error').textContent = config.error || '';
+  $('#email-load-error').hidden = !config.error;
   renderAddressList();
   renderSenderPanel();
   if (mail.events && mail.events.length === 0) renderMail();
@@ -702,7 +725,16 @@ $('#email-filter-chips').addEventListener('click', (event) => {
 $('#email-mail-more').addEventListener('click', () => fetchMail({ append: true }));
 
 $('.view[data-page="emails"]').addEventListener('click', async (event) => {
-  if (event.target.closest('.email-back')) { clearSelection(); return; }
+  const back = event.target.closest('.email-back');
+  if (back) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mail');
+    history.pushState(null, '', url);
+    clearSelection();
+    return;
+  }
   const replay = event.target.closest('#email-replay');
   if (replay) {
     if (!openInboxId) return;
@@ -743,13 +775,13 @@ $('.view[data-page="emails"]').addEventListener('click', async (event) => {
     } catch (_) { notice('Copy is not available here; select the address instead.', true); }
     return;
   }
-  const row = event.target.closest('.activity-row[data-inbox]');
-  if (row) {
-    void openEmail(row.dataset.inbox).then(() => {
-      if (openInboxId === row.dataset.inbox && window.matchMedia('(max-width: 860px)').matches) {
-        $('#email-read h2')?.focus();
-      }
-    });
+  const row = event.target.closest('a.email-item[data-inbox]');
+  if (row && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) {
+    event.preventDefault();
+    listScrollTop = $('#email-mail-scroll').scrollTop;
+    setMailUrl(row.dataset.inbox, { push: true });
+    void openEmail(row.dataset.inbox, { updateUrl: false });
+    globalThis.dakitSplit?.show(split(), 'detail'); // a phone moves focus to the subject
   }
 });
 
@@ -761,11 +793,4 @@ window.addEventListener('popstate', () => {
   if (state.view === 'emails') void fetchMail();
 });
 
-document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  const row = event.target.closest('#email-mail-list .activity-row');
-  if (!row || event.target !== row) return;
-  event.preventDefault();
-  void openEmail(row.dataset.inbox);
-});
 document.addEventListener('dapier:workflows-loaded', () => { if (mail.events) renderMail(); renderEmails(config); });

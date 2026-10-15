@@ -82,16 +82,25 @@ def test_emails_reading_pane_matches_the_agent_runs_layout():
     router = (WEB / "js" / "router.js").read_text()
     assert "EMAIL_TABS" in router and "applyEmailTab" in router
     assert 'href="/emails?tab=addresses"' in html
+    # Received is a dakit list–detail split (docs/list-detail.md).
+    assert '<div class="dk-split email-split" data-dk-split="emails-received" data-email-panel="received" data-view="list">' in page
+    assert 'class="dk-split__back email-back" href="/emails" aria-label="Back to Received"' in page
+    assert 'id="email-read-empty" class="dk-split__empty"' in page
     css = (WEB / "app.css").read_text()
-    assert ".email-mail-workspace { display: grid;" in css
-    assert ".email-mail-workspace.has-selection #email-read { display: block; }" in css
-    assert ".email-mail-workspace.has-selection .email-mail-sidebar { display: none; }" in css
-    assert ".email-mail-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto;" in css
-    assert ".activity-row .activity-outcome { display: contents; }" in css
+    for gone in (".email-mail-workspace", ".email-mail-sidebar", ".activity-row.is-selected",
+                 'body[data-view="emails"] main', ".email-back", ".email-subject-row"):
+        assert gone not in css, gone
+    assert ".email-split { --dk-split-list: 384px; }" in css
     js = (WEB / "js" / "views" / "emails.js").read_text()
     assert "email-outcome-heading" in js
     assert "email-body-heading" in js
     assert "searchParams.set('mail'" in js
+    # Rows are links; a pick pushes history; Back clears the selection.
+    assert 'class="dk-split__item email-item" href="/emails?mail=' in js
+    assert "history.pushState(null, '', url)" in js
+    assert "dakitSplit?.show(split(), 'detail')" in js
+    # split.js owns row keyboard; the page-level Enter/Space handler is gone.
+    assert "event.key !== 'Enter' && event.key !== ' '" not in js
 
 
 def test_emails_view_uses_the_shared_inbox_and_sender_apis():
@@ -106,3 +115,51 @@ def test_emails_view_uses_the_shared_inbox_and_sender_apis():
     assert "selectAddress(" in js
     for outcome in ("'handled'", "'failed'", "'refused'", "'unmatched'"):
         assert outcome in js
+
+
+def test_phone_back_returns_to_the_row_and_list_position():
+    import pytest
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+    import tests.test_console_boot as boot
+
+    events = [{"inbox_id": f"email#{n}", "received_at": "2026-10-15T08:00:00Z", "outcome": "handled",
+               "runs": [], "email": {"from": f"Sender {n} <s{n}@example.com>", "from_address": f"s{n}@example.com",
+                                     "to": ["inbox@example.com"], "subject": f"Subject {n}", "text": "Body"}}
+              for n in range(30)]
+    real = boot._api_payload
+
+    def payload(path):
+        if path == "/api/admin/triggers/inbox":
+            return {"events": events, "paging": {}}
+        if path.startswith("/api/admin/triggers/inbox/"):
+            key = path.rsplit("/", 1)[1].replace("%23", "#")
+            return {"event": next(e for e in events if e["inbox_id"] == key)}
+        return real(path)
+
+    boot._api_payload = payload
+    try:
+        with boot.console_server() as origin, sync_playwright() as playwright:
+            browser = boot._chromium(playwright)
+            page = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True,
+                                       is_mobile=True, bypass_csp=True).new_page()
+            page.goto(origin + "/emails", wait_until="domcontentloaded")
+            row = page.locator('a[data-inbox="email#20"]')
+            row.wait_for(timeout=10_000)
+            assert page.locator(".email-split").get_attribute("data-view") == "list"
+            row.scroll_into_view_if_needed()
+            before = page.evaluate("document.querySelector('#email-mail-scroll').scrollTop")
+            assert before > 0
+            row.click()
+            page.wait_for_function("document.querySelector('.email-split').dataset.view === 'detail'")
+            assert "mail=email%2320" in page.url
+            assert page.evaluate("document.activeElement.id") == "email-read-title"
+            assert page.locator("#email-read-title").inner_text() == "Subject 20"
+            page.locator(".email-back").click()
+            page.wait_for_function("document.querySelector('.email-split').dataset.view === 'list'")
+            assert "mail=" not in page.url
+            assert page.evaluate("document.activeElement.dataset.inbox") == "email#20"
+            assert abs(page.evaluate("document.querySelector('#email-mail-scroll').scrollTop") - before) < 2
+            browser.close()
+    finally:
+        boot._api_payload = real

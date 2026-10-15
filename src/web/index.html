@@ -273,56 +273,58 @@
         </section>
       </section>
 
-      <section class="view" data-page="emails">
+      <section class="view dk-fill" data-page="emails">
         <div class="page-tools dk-toolbar trigger-toolbar" data-email-tools="received">
           <div id="email-filter-chips" class="dk-tabs" role="radiogroup" aria-label="Filter received email by outcome"></div>
         </div>
-        <p id="email-load-error" class="form-error" role="alert"></p>
-        <div id="email-workspace" class="trigger-workspace">
-          <div class="email-mail-workspace trigger-activity" data-email-panel="received">
-            <section class="data-panel email-mail-sidebar" aria-labelledby="email-mail-title">
-              <div class="section-head">
-                <h2 id="email-mail-title">Received</h2>
-                <p id="email-mail-summary" class="sub" role="status"></p>
-              </div>
+        <p id="email-load-error" class="form-error" role="alert" hidden></p>
+        <div class="dk-split email-split" data-dk-split="emails-received" data-email-panel="received" data-view="list">
+          <section class="dk-split__list" aria-labelledby="email-mail-title">
+            <header class="dk-split__head"><h2 class="dk-split__title" id="email-mail-title">Received</h2><span id="email-mail-summary" class="dk-split__count" role="status"></span></header>
+            <div id="email-mail-scroll" class="dk-split__scroll">
               <p id="email-mail-note" class="sub panel-note">Loading received email…</p>
-              <div id="email-mail-empty" class="empty-state" hidden></div>
-              <ul id="email-mail-list" class="activity-list" aria-label="Received email"></ul>
-              <div id="email-mail-footer" class="dk-table-footer" hidden><span>Mail from the last 30 days</span><button id="email-mail-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
-            </section>
-            <article id="email-read" class="data-panel" aria-label="Selected email"><div class="dialog-state"><strong>Select a message</strong><p>Read the email and see which workflow ran.</p></div></article>
-          </div>
-          <aside class="trigger-sources" aria-label="Addresses and senders" data-email-panel="addresses" hidden>
-            <section class="data-panel" aria-labelledby="email-addresses-title">
-              <div class="section-head">
-                <h2 id="email-addresses-title">Addresses</h2>
-                <p class="sub">Mail to <span id="email-domain-hint" class="mono"></span></p>
-              </div>
-              <p class="sub panel-note">An address exists when a workflow has an email trigger with an address filter. Change one in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>.</p>
-              <div id="email-empty" class="empty-state" hidden><p>No receiving addresses yet.</p></div>
-              <ul id="email-addresses" class="source-list"></ul>
-            </section>
-            <section class="data-panel" aria-labelledby="email-from-title">
-              <div class="section-head">
-                <h2 id="email-from-title">Who can write</h2>
-              </div>
-              <p id="email-from-note" class="sub panel-note">Used when an address has no sender policy of its own. Mail from anyone else is refused.</p>
-              <div id="email-from-mode" class="email-from-mode" hidden>
-                <div class="dk-tabs dk-tabs--sm" role="radiogroup" aria-label="Who can write">
-                  <button type="button" class="dk-tab" role="radio" data-from-mode="anyone" aria-checked="false" tabindex="-1">Anyone</button>
-                  <button type="button" class="dk-tab" role="radio" data-from-mode="allowlist" aria-checked="true" tabindex="0">Allowed senders</button>
-                </div>
-              </div>
-              <p id="email-from-anyone" class="sub panel-note" hidden>Anyone can mail this address. A message with no From is still refused.</p>
-              <ul id="email-from-list" class="source-list"></ul>
-              <form id="email-from-add" class="dk-table-footer sender-add" autocomplete="off">
-                <label class="visually-hidden" for="email-from-address">Sender address</label>
-                <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
-                <button class="dk-button dk-button--secondary dk-button--sm" type="submit">Add sender</button>
-              </form>
-            </section>
-          </aside>
+              <div id="email-mail-empty" class="dk-empty dk-empty--compact" hidden></div>
+              <ul id="email-mail-list" class="dk-split__items" aria-label="Received email"></ul>
+            </div>
+            <div id="email-mail-footer" class="dk-split__foot" hidden><span>Mail from the last 30 days</span><button id="email-mail-more" class="dk-button dk-button--secondary dk-button--sm" type="button">Load more</button></div>
+            <div class="dk-split__handle"></div>
+          </section>
+          <section id="email-read-pane" class="dk-split__detail" aria-label="Selected email">
+            <header id="email-read-head" class="dk-split__head" hidden><a class="dk-split__back email-back" href="/emails" aria-label="Back to Received"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Received</a><h2 id="email-read-title" class="dk-split__title" tabindex="-1"></h2></header>
+            <div id="email-read" class="dk-split__scroll" hidden></div>
+            <div id="email-read-empty" class="dk-split__empty"><div class="dk-empty"><p class="dk-empty__title">Select a message</p><p class="dk-empty__desc">Read the email and see which workflow ran.</p></div></div>
+          </section>
         </div>
+        <aside class="trigger-sources email-addresses" aria-label="Addresses and senders" data-email-panel="addresses" hidden>
+          <section class="data-panel" aria-labelledby="email-addresses-title">
+            <div class="section-head">
+              <h2 id="email-addresses-title">Addresses</h2>
+              <p class="sub">Mail to <span id="email-domain-hint" class="mono"></span></p>
+            </div>
+            <p class="sub panel-note">An address exists when a workflow has an email trigger with an address filter. Change one in <a class="text-link view-link" href="/workflows" data-target="workflows">Workflows</a>.</p>
+            <div id="email-empty" class="empty-state" hidden><p>No receiving addresses yet.</p></div>
+            <ul id="email-addresses" class="source-list"></ul>
+          </section>
+          <section class="data-panel" aria-labelledby="email-from-title">
+            <div class="section-head">
+              <h2 id="email-from-title">Who can write</h2>
+            </div>
+            <p id="email-from-note" class="sub panel-note">Used when an address has no sender policy of its own. Mail from anyone else is refused.</p>
+            <div id="email-from-mode" class="email-from-mode" hidden>
+              <div class="dk-tabs dk-tabs--sm" role="radiogroup" aria-label="Who can write">
+                <button type="button" class="dk-tab" role="radio" data-from-mode="anyone" aria-checked="false" tabindex="-1">Anyone</button>
+                <button type="button" class="dk-tab" role="radio" data-from-mode="allowlist" aria-checked="true" tabindex="0">Allowed senders</button>
+              </div>
+            </div>
+            <p id="email-from-anyone" class="sub panel-note" hidden>Anyone can mail this address. A message with no From is still refused.</p>
+            <ul id="email-from-list" class="source-list"></ul>
+            <form id="email-from-add" class="dk-table-footer sender-add" autocomplete="off">
+              <label class="visually-hidden" for="email-from-address">Sender address</label>
+              <input id="email-from-address" name="address" type="email" class="mono-input" placeholder="name@example.com" required>
+              <button class="dk-button dk-button--secondary dk-button--sm" type="submit">Add sender</button>
+            </form>
+          </section>
+        </aside>
       </section>
       <section class="view dk-fill" data-page="agents">
         <div class="dk-toolbar page-tools agent-toolbar">
