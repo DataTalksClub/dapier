@@ -134,6 +134,12 @@ export async function setView(view, push = true, options = {}) {
   if (view === 'workflows') applyWorkflowTab(workflowTab);
   if (view === 'emails') applyEmailTab(emailTab);
   syncPageTabs(view, workflowTab, emailTab);
+  /* A list–detail split on an inactive view (or tab) carries [hidden], so
+     dakit's height rules (.dk-main:has(.dk-split:not([hidden]))) apply only
+     while one is on screen. */
+  $$('.view .dk-split').forEach((split) => {
+    split.hidden = !split.closest('.view.active') || (split.dataset.emailPanel && split.dataset.emailPanel !== emailTab);
+  });
   /* Family tabs swap the body under the strip, not the page header above
      it. Child views (App setup, Hooks…) keep their own routes; the
      title stays the parent page. */

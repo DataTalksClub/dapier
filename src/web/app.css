@@ -119,7 +119,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
    only what is its own: the designer's back button beside the h1, and the
    views that swap under one header. */
 /* The kit leaves icon drawing to the app: dapier's one stroke style. */
-.dk-sidebar svg, .dk-topbar svg, .dk-account-menu svg, .page-header svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dk-sidebar svg, .dk-topbar svg, .dk-account-menu svg, .page-header svg, .dk-split__back svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .dk-nav-item__icon svg { width: 20px; height: 20px; }
 .page-title-row { display: flex; align-items: center; gap: var(--dk-space-2); min-width: 0; }
 .designer-back { display: none; flex: none; }
@@ -997,8 +997,6 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   .register-toolbar .dk-toolbar__end > .dk-button { width: 100%; }
   /* A lone filter beside search takes the row rather than half of it. */
   .connection-toolbar .toolbar-filters > label:not(.toolbar-search) { grid-column: 1 / -1; }
-  .agent-toolbar .agent-filters { grid-column: 1 / -1; }
-  .agent-toolbar .agent-workers-strip { align-self: center; }
 }
 
 /* --- mobile (≤560): stacked ledger rows ---------------------------------------- */
@@ -1379,49 +1377,29 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
    worker status + Workers), then the list panel and the detail panel. On
    desktop the workspace fills the window below the toolbar and each pane
    scrolls on its own; the page itself stays put. */
-.agent-toolbar .toolbar-filters > label.toolbar-search { flex: 0 1 260px; }
 .agent-filters { flex: 0 1 auto; }
 .page-tools .agent-workers-strip, .agent-workers-strip { flex: 0 1 auto; min-width: 0; margin: 0; font-size: var(--dk-text-sm); white-space: normal; }
-.agent-workspace > .data-panel + .data-panel { margin-top: 0; }
 .agent-workers-strip .status { font-size: var(--dk-text-sm); }
-.agent-workspace { display: grid; grid-template-columns: min(22rem, 40%) minmax(0, 1fr); gap: var(--dk-gap-section); align-items: start; }
-.agent-run-sidebar { display: flex; flex-direction: column; overflow: hidden; }
-.agent-run-sidebar > .section-head { flex: none; }
+/* Agents is a dakit list–detail split under its status filters; the view
+   is a .dk-fill column so the split takes the height the toolbar leaves. */
+.view.dk-fill.active { display: flex; }
 @media (min-width: 861px) {
-  /* Two columns that can never overlap: search + chips wrap inside the
-     first, the worker status and Workers sit in the second. */
+  /* Two columns that can never overlap: the chips wrap inside the first,
+     the worker status and Workers sit in the second. */
   .agent-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .agent-toolbar .dk-toolbar__end { flex-wrap: nowrap; justify-content: flex-end; min-width: 0; max-width: 20rem; }
-  /* The viewport-tall frame (the designer's recipe): main is the window,
-     the view a column, the workspace takes what the toolbar leaves. */
-  body[data-view="agents"] main { display: flex; flex-direction: column; height: 100dvh; padding-bottom: var(--dk-space-6); }
-  body[data-view="agents"] section.view[data-page="agents"].active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-  .agent-toolbar { flex: none; }
-  .agent-workspace { flex: 1; min-height: 18rem; align-items: stretch; }
-  .agent-run-sidebar, #agent-run-detail { min-height: 0; }
-  #agent-run-detail { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 }
-.agent-run-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-.agent-run-item { display: grid; gap: var(--dk-space-1); width: 100%; padding: var(--dk-space-3) var(--dk-space-4); border: 0; border-bottom: 1px solid var(--dk-border-default); background: transparent; color: var(--dk-text-primary); font: inherit; text-align: left; cursor: pointer; }
-.agent-run-item:last-child { border-bottom: 0; }
-.agent-run-item:hover { background: var(--dk-bg-hover); }
-.agent-run-item:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: -3px; }
-.agent-run-item.selected { background: var(--dk-accent-soft); }
-.agent-run-line { display: flex; justify-content: space-between; align-items: baseline; gap: var(--dk-gap-control); min-width: 0; }
-.agent-run-line strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); line-height: 1.4; }
-.agent-run-item.selected strong { color: var(--dk-accent-default); }
-.agent-run-line .status { flex: none; font-size: var(--dk-text-sm); }
-.agent-run-meta { display: flex; justify-content: space-between; gap: var(--dk-gap-control); min-width: 0; color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
-.agent-run-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-run-meta time { flex: none; }
-#agent-run-detail { min-width: 0; }
-#agent-run-detail > .dialog-state { padding: var(--dk-space-7) var(--dk-pad-panel); }
-.agent-back { display: none; }
-.agent-detail-body { padding: var(--dk-space-5) var(--dk-space-6) var(--dk-space-6); }
+/* A run row: title then status on the name line, workflow then time below. */
+.agent-run-line { justify-content: space-between; align-items: baseline; }
+.agent-run-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-run-line .status { flex: none; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-regular); }
+.agent-run-meta { flex-wrap: nowrap; justify-content: space-between; }
+.agent-run-meta > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-run-meta > span:last-child { flex: none; }
+.agent-detail-body { display: grid; }
 /* The compact head: a heading-size title held to two lines, one meta
    line. Exact times, engine and ids sit in a Details popover on the name. */
 .agent-detail-head { display: grid; justify-items: start; gap: var(--dk-space-2); }
-.agent-detail-head h2 { justify-self: stretch; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--dk-text-lg); line-height: 1.4; font-weight: var(--dk-weight-semibold); overflow-wrap: anywhere; }
 /* Each part after the status leads with a "·" in a fixed slot. The line
    starts one slot left of the column and clips that slot, so a part that
    wraps to a new line never starts with a stray dot. */
@@ -1474,18 +1452,11 @@ body:has(#agent-task-details:popover-open) .agent-details-toggle::after,
 .agent-log-output { margin: var(--dk-space-3) 0 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); font: var(--dk-text-sm)/1.7 var(--dk-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 480px; overflow-y: auto; }
 @media (max-width: 860px) {
   /* One pane at a time: the list, or the selected run with Back. */
-  .agent-workspace { grid-template-columns: minmax(0, 1fr); }
-  #agent-run-detail { display: none; }
-  .agent-workspace.has-selection #agent-run-detail { display: block; }
-  .agent-workspace.has-selection .agent-run-sidebar { display: none; }
-  .agent-back { display: inline-flex; margin-bottom: var(--dk-space-2); }
   .agent-detail-meta .text-link { line-height: var(--dk-size-touch); }
   .agent-details-toggle, .connection-details-toggle { min-height: var(--dk-size-touch); }
-  .agent-detail-body { padding: var(--dk-space-4); }
   .agent-log-section summary { min-height: var(--dk-size-touch); }
   .agent-details-pop dl, .connection-details-pop dl { grid-template-columns: minmax(0, 1fr); }
   .agent-details-pop dd, .connection-details-pop dd { margin-bottom: var(--dk-space-2); }
-  .agent-toolbar .toolbar-filters > label.toolbar-search { flex-basis: 100%; }
 }
 
 /* Keep pending views navigable without presenting unloaded data as empty. */

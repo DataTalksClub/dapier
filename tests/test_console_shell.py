@@ -21,7 +21,9 @@ def browser():
 
 
 def _open(browser, origin, path="/", **context):
-    page = browser.new_context(**context).new_page()
+    # bypass_csp: wait_for_function polls string predicates through eval,
+    # which the console CSP (script-src 'self') forbids.
+    page = browser.new_context(bypass_csp=True, **context).new_page()
     errors = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.goto(origin + path, wait_until="domcontentloaded")

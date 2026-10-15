@@ -1,4 +1,8 @@
-/* A run inbox: scan activity, select a task, read its outcome. */
+/* A run inbox: scan activity, select a task, read its outcome. The list and
+   the run sit in dakit's list–detail split (docs/list-detail.md): the URL's
+   ?task= is the selection (pushState for a pick, replaceState for the
+   desktop auto-pick), each pane scrolls on its own, and on phones one pane
+   shows at a time with Back returning to the row it came from. */
 import { $, notice } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
@@ -13,6 +17,9 @@ const FAILED = new Set(['failed', 'timed_out', 'interrupted']);
 const LABELS = { claimed: 'Starting', starting: 'Starting', started: 'Running' };
 let tasks = [], selected = null, detail = null, filter = 'all', search = '', fetched = false;
 let listSeq = 0, detailSeq = 0;
+let lastOpened = null, listScrollTop = 0;
+const DESKTOP = '(min-width: 821px)';
+const split = () => $('.agent-split');
 
 function title(task) {
   if (!task.email_subject?.trim() && task.workflow && workflowName(task.workflow) !== task.workflow) {
@@ -49,17 +56,21 @@ function renderList() {
     button.querySelector('.dk-count').textContent = counts[button.dataset.agentFilter];
   });
   /* The filter chips carry the counts; the note only says what is partial. */
-  $('#agent-runs-note').textContent = fetched ? (tasks.length === 200 ? 'Newest 200 loaded' : '') : 'Loading runs…';
-  $('#agent-runs-list').innerHTML = rows.length ? rows.map(task => `<button type="button" class="agent-run-item ${task.task_id === selected ? 'selected' : ''}" data-agent-task="${escapeHtml(task.task_id).replace(/"/g, '&quot;')}" aria-current="${task.task_id === selected ? 'true' : 'false'}">
-    <span class="agent-run-line"><strong title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</strong>${badge(task)}</span>
-    <span class="agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span>${when(task.created_at)}</span>
-  </button>`).join('') : `<div class="dialog-state"><strong>${tasks.length ? 'No matching runs' : 'No agent runs yet'}</strong><p>${tasks.length ? 'Try another status or search.' : 'Runs appear here when a workflow starts an agent.'}</p></div>`;
+  $('#agent-runs-note').textContent = fetched ? (tasks.length === 200 ? 'Newest 200' : '') : 'Loading runs…';
+  $('#agent-runs-list').innerHTML = rows.length ? rows.map(task => {
+    const id = escapeHtml(task.task_id).replace(/"/g, '&quot;');
+    return `<li><a class="dk-split__item agent-run-item" href="/agents?task=${encodeURIComponent(task.task_id)}" data-agent-task="${id}"${task.task_id === selected ? ' aria-current="true"' : ''}>
+    <span class="dk-split__name agent-run-line"><span class="agent-run-title" title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</span>${badge(task)}</span>
+    <span class="dk-split__meta agent-run-meta"><span title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Agent run')}</span><span class="dk-mono">${when(task.created_at)}</span></span>
+  </a></li>`;
+  }).join('') : `<li class="dk-empty dk-empty--compact"><p class="dk-empty__title">${tasks.length ? 'No matching runs' : 'No agent runs yet'}</p><p class="dk-empty__desc">${tasks.length ? 'Try another status or search.' : 'Runs appear here when a workflow starts an agent.'}</p></li>`;
 }
-function setTaskUrl(id) {
+function setTaskUrl(id, { push = false } = {}) {
   if (state.view !== 'agents') return;
   const url = new URL(window.location.href);
   if (id) url.searchParams.set('task', id); else url.searchParams.delete('task');
-  history.replaceState(null, '', url);
+  if (url.href === window.location.href) return;
+  if (push) history.pushState(null, '', url); else history.replaceState(null, '', url);
 }
 function resultText(task) {
   try {
@@ -69,15 +80,21 @@ function resultText(task) {
   return task.summary || task.error || '';
 }
 
+function showDetailPane(open) {
+  $('#agent-run-head').hidden = !open;
+  $('#agent-run-detail').hidden = !open;
+  $('#agent-run-empty').hidden = open;
+  globalThis.dakitSplit?.show(split(), open ? 'detail' : 'list', { focus: false, resetScroll: false });
+}
+
 function renderDetail() {
   const panel = $('#agent-run-detail');
-  $('.agent-workspace').classList.toggle('has-selection', Boolean(selected));
-  if (!selected) {
-    panel.innerHTML = '<div class="dialog-state"><strong>Select a run</strong><p>Read its result and check what happened.</p></div>';
-    return;
-  }
+  showDetailPane(Boolean(selected));
+  if (!selected) return;
   const task = detail;
-  if (!task) { panel.innerHTML = '<div class="dialog-state" role="status"><p>Loading the run…</p></div>'; return; }
+  const listed = tasks.find(t => t.task_id === selected);
+  $('#agent-run-title').textContent = task ? title(task) : listed ? title(listed) : 'Agent run';
+  if (!task) { panel.innerHTML = '<p class="sub" role="status">Loading the run…</p>'; return; }
   const active = ACTIVE.has(task.status), failed = FAILED.has(task.status), result = resultText(task);
   const logs = task.logs;
   const startedLabel = task.started_at ? 'Started' : task.status === 'queued' ? 'Queued' : 'Created';
@@ -86,8 +103,6 @@ function renderDetail() {
      in a Gmail-style Details popover on the workflow name. */
   panel.innerHTML = `<div class="agent-detail-body">
     <div class="agent-detail-head">
-      <button class="agent-back dk-button dk-button--secondary dk-button--sm" type="button">Back to runs</button>
-      <h2 tabindex="-1" title="${escapeHtml(title(task))}">${escapeHtml(title(task))}</h2>
       <p class="agent-detail-meta">${badge(task)}<span class="agent-meta-item"><a class="text-link" href="/workflows/${encodeURIComponent(task.workflow || '')}" title="${escapeHtml(task.workflow || '')}">${escapeHtml(task.workflow ? workflowName(task.workflow) : 'Workflow')}</a><button class="agent-details-toggle" type="button" popovertarget="agent-task-details" aria-haspopup="dialog">Details</button></span><span class="agent-meta-item">${startedLabel}&nbsp;${when(task.started_at || task.created_at)}</span><span class="agent-meta-item mono">${escapeHtml(duration(task))}</span></p>
       <div id="agent-task-details" class="agent-details-pop" popover role="dialog" aria-label="Details"><dl>
         <dt>${startedLabel}</dt><dd class="mono">${escapeHtml(formatTimestamp(task.started_at || task.created_at) || '—')}</dd>
@@ -120,6 +135,7 @@ async function selectTask(id, { updateUrl = true } = {}) {
   const detailsOpen = !changed && Boolean(document.getElementById('agent-task-details')?.matches(':popover-open'));
   selected = id;
   if (changed) { detail = null; $('#agent-run-detail').scrollTop = 0; }
+  if (id) lastOpened = id;
   const seq = ++detailSeq;
   renderList(); renderDetail();
   if (updateUrl) setTaskUrl(id);
@@ -130,7 +146,7 @@ async function selectTask(id, { updateUrl = true } = {}) {
     if (detailsOpen) document.getElementById('agent-task-details')?.showPopover();
   } catch (error) {
     if (seq !== detailSeq) return;
-    $('#agent-run-detail').innerHTML = `<div class="dialog-state"><strong>This run could not be loaded</strong><p>The task service answered: ${escapeHtml(error.message)}</p><div class="dk-cluster"><button class="agent-back dk-button dk-button--secondary" type="button">Back to runs</button><button class="dk-button dk-button--secondary" id="agent-detail-retry" type="button">Try again</button></div></div>`;
+    $('#agent-run-detail').innerHTML = `<div class="dk-callout dk-callout--danger" role="alert"><div class="dk-callout__body"><p class="dk-callout__title">This run could not be loaded</p><p>The task service answered: ${escapeHtml(error.message)}</p></div><div class="dk-callout__actions"><button class="dk-button dk-button--secondary dk-button--sm" id="agent-detail-retry" type="button">Try again</button></div></div>`;
   }
 }
 /* Tasks run on a worker — a machine running `dapier worker`. When work is
@@ -165,25 +181,58 @@ export async function renderAgentTasks({ quiet = false } = {}) {
     tasks = data.tasks || []; fetched = true; renderList();
     renderWorkerNote(tasks, seq);
     if (state.view !== 'agents') return;
-    const fromUrl = state.view === 'agents' ? new URLSearchParams(window.location.search).get('task') : null;
-    const id = fromUrl || selected || (window.matchMedia('(min-width: 861px)').matches ? (tasks.find(t => ACTIVE.has(t.status)) || tasks[0])?.task_id : null);
-    if (id && (!quiet || id !== selected || !detail || ACTIVE.has(detail.status))) await selectTask(id, { updateUrl: state.view === 'agents' });
+    /* The URL is the selection. Without one, a desktop opens the first
+       active (else newest) run in place; a phone shows the list. */
+    const fromUrl = new URLSearchParams(window.location.search).get('task');
+    const desktop = window.matchMedia(DESKTOP).matches;
+    const id = fromUrl || (desktop ? (selected || (tasks.find(t => ACTIVE.has(t.status)) || tasks[0])?.task_id) : null);
+    if (!id) { closeTask(); return; }
+    if (!quiet || id !== selected || !detail || ACTIVE.has(detail.status)) await selectTask(id);
     else renderDetail();
   } catch (error) {
     if (seq !== listSeq) return;
-    if (!fetched) $('#agent-runs-list').innerHTML = '<div class="dialog-state"><strong>Agent runs could not be loaded</strong><p>The task service did not answer. Use Refresh to try again.</p></div>';
+    if (!fetched) $('#agent-runs-list').innerHTML = '<li class="dk-empty dk-empty--compact"><p class="dk-empty__title">Agent runs could not be loaded</p><p class="dk-empty__desc">The task service did not answer. Use Refresh to try again.</p></li>';
     if (!quiet) notice(error.message, true);
   }
 }
 $('#agent-runs-search').addEventListener('input', event => { search = event.target.value.trim().toLowerCase(); renderList(); });
+/* Back (phones): the list returns where it was, focus on the row it came
+   from. The selection leaves the URL, so a reload lands on the list too. */
+function closeTask() {
+  ++detailSeq;
+  selected = null; detail = null;
+  setTaskUrl(null);
+  renderList(); renderDetail();
+  const scroller = $('#agent-runs-scroll');
+  scroller.scrollTop = listScrollTop;
+  const row = lastOpened && [...document.querySelectorAll('#agent-runs-list [data-agent-task]')].find(r => r.dataset.agentTask === lastOpened);
+  if (row && !window.matchMedia(DESKTOP).matches) {
+    const top = row.offsetTop - scroller.offsetTop;
+    if (top < scroller.scrollTop || top + row.offsetHeight > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = Math.max(0, top - scroller.clientHeight / 3);
+    row.focus({ preventScroll: true });
+  }
+}
+
 document.addEventListener('click', event => {
   const filterButton = event.target.closest('[data-agent-filter]');
   if (filterButton) { filter = filterButton.dataset.agentFilter; renderList(); }
-  const row = event.target.closest('[data-agent-task]');
-  if (row) selectTask(row.dataset.agentTask).then(() => {
-    if (selected === row.dataset.agentTask && window.matchMedia('(max-width: 860px)').matches) $('#agent-run-detail h2')?.focus();
-  });
-  if (event.target.closest('.agent-back')) { ++detailSeq; selected = null; detail = null; setTaskUrl(null); renderList(); renderDetail(); $('#agent-runs-search').focus(); }
+  const row = event.target.closest('a[data-agent-task]');
+  if (row && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) {
+    event.preventDefault();
+    listScrollTop = $('#agent-runs-scroll').scrollTop;
+    const id = row.dataset.agentTask;
+    setTaskUrl(id, { push: true });
+    selectTask(id, { updateUrl: false });
+    globalThis.dakitSplit?.show(split(), 'detail'); // a phone moves focus to the run's title
+  }
+  const back = event.target.closest('.agent-back');
+  if (back && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
+    event.preventDefault();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('task');
+    history.pushState(null, '', url);
+    closeTask();
+  }
   if (event.target.closest('#agent-detail-retry') && selected) selectTask(selected);
   const stream = event.target.closest('[data-agent-stream]');
   if (stream && detail?.logs) {

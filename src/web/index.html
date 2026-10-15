@@ -324,10 +324,9 @@
           </aside>
         </div>
       </section>
-      <section class="view" data-page="agents">
-        <div class="dk-toolbar page-tools register-toolbar agent-toolbar">
+      <section class="view dk-fill" data-page="agents">
+        <div class="dk-toolbar page-tools agent-toolbar">
           <div class="dk-cluster toolbar-filters">
-            <label class="toolbar-search"><span class="visually-hidden">Search agent runs</span><input id="agent-runs-search" type="search" placeholder="Search runs…"></label>
             <div class="dk-tabs agent-filters" role="radiogroup" aria-label="Filter agent runs by status">
               <button type="button" class="dk-tab" role="radio" data-agent-filter="all" aria-checked="true" tabindex="0">All <span class="dk-count">0</span></button>
               <button type="button" class="dk-tab" role="radio" data-agent-filter="active" aria-checked="false" tabindex="-1">Active <span class="dk-count">0</span></button>
@@ -337,12 +336,18 @@
           </div>
           <div class="dk-toolbar__end"><p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p><a class="dk-button dk-button--secondary view-link" href="/workers" data-view="workers">Workers</a></div>
         </div>
-        <div class="agent-workspace">
-          <section class="data-panel agent-run-sidebar" aria-labelledby="agent-runs-title">
-            <div class="section-head"><h2 id="agent-runs-title">Runs</h2><p id="agent-runs-note" class="sub" role="status">Loading runs…</p></div>
-            <div id="agent-runs-list" class="agent-run-list"></div>
+        <div class="dk-split agent-split" data-dk-split="agent-runs" data-view="list">
+          <section class="dk-split__list" aria-labelledby="agent-runs-title">
+            <header class="dk-split__head"><h2 class="dk-split__title" id="agent-runs-title">Runs</h2><span id="agent-runs-note" class="dk-split__count" role="status">Loading runs…</span></header>
+            <div class="dk-split__tools"><input id="agent-runs-search" class="dk-input" type="search" placeholder="Search runs" aria-label="Search agent runs"></div>
+            <div id="agent-runs-scroll" class="dk-split__scroll"><ul id="agent-runs-list" class="dk-split__items" aria-label="Agent runs"></ul></div>
+            <div class="dk-split__handle"></div>
           </section>
-          <article id="agent-run-detail" class="data-panel" aria-label="Selected agent run"><div class="dialog-state"><strong>Select a run</strong><p>Read its result and check what happened.</p></div></article>
+          <section id="agent-run-pane" class="dk-split__detail" aria-label="Selected agent run">
+            <header id="agent-run-head" class="dk-split__head" hidden><a class="dk-split__back agent-back" href="/agents" aria-label="Back to Runs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Runs</a><h2 id="agent-run-title" class="dk-split__title" tabindex="-1"></h2></header>
+            <div id="agent-run-detail" class="dk-split__scroll" hidden></div>
+            <div id="agent-run-empty" class="dk-split__empty"><div class="dk-empty"><p class="dk-empty__title">Select a run</p><p class="dk-empty__desc">Read its result and check what happened.</p></div></div>
+          </section>
         </div>
       </section>
       <section class="view" data-page="workers">
@@ -1027,5 +1032,6 @@
     </form>
   </dialog>
   <script src="/assets/vendor/shell.js"></script>
+  <script src="/assets/vendor/split.js"></script>
 </body>
 </html>
