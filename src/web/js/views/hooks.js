@@ -9,7 +9,7 @@
    Recent deliveries are the main content; each endpoint (URL, how requests
    are verified, which workflows run) sits beside them as compact cards. */
 import { state } from '../state.js';
-import { $, icons, notice, whenMenusClosed, openWhenReady } from '../ui.js';
+import { $, icons, notice, whenMenusClosed, openWhenReady, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, formatTimestamp, jsonBlock } from '../format.js';
 import { openRun } from './runs.js';
@@ -456,7 +456,10 @@ function openHookDialog(hook) {
   if (!hook) form.name.focus();
 }
 
-$('#new-hook').addEventListener('click', () => openHookDialog(null));
+/* The create follows the toolbar's filters (dakit "Action placement"), so
+   it shows with either phone pane; the empty state repeats it. */
+collectionCreate($('#hooks-toolbar-lead'), { id: 'new-hook', label: 'New hook', onClick: () => openHookDialog(null) });
+$('#hook-empty-create').addEventListener('click', () => openHookDialog(null));
 $('#hook-send-test').addEventListener('click', () => openTest(null));
 
 $('#hook-form').elements.kind.addEventListener('change', (event) => {

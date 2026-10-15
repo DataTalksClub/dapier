@@ -17,7 +17,9 @@ TOKEN = {"token_id": "scheduler", "token_prefix": "dap_9f2", "agent": "scheduler
          "created_at": "2026-09-30T09:00:00Z"}
 
 SCHEDULE = {"schedule_id": "nightly-backup", "expression": "cron(0 3 * * ? *)", "enabled": True}
-DATA = {"schedules": [SCHEDULE]}
+HOOK = {"hook_id": "intake", "kind": "webhook", "url": "https://example.com/hook/intake"}
+POLL = {"poll_id": "feed", "source": "http", "url": "https://example.com/feed", "enabled": True}
+DATA = {"schedules": [SCHEDULE], "hooks": [HOOK], "polls": [POLL]}
 
 
 @pytest.fixture
@@ -28,6 +30,14 @@ def console(monkeypatch):
     original = console_boot._api_payload
 
     def payload(path):
+        if path == "/api/admin/hook-triggers":
+            return {"hooks": list(DATA["hooks"])}
+        if path.startswith("/api/admin/hook-triggers/deliveries"):
+            return {"deliveries": []}
+        if path == "/api/admin/poll-triggers":
+            return {"polls": list(DATA["polls"])}
+        if path.startswith("/api/admin/poll-triggers/activity"):
+            return {"items": []}
         if path == "/api/admin/schedule-triggers":
             return {"schedules": list(DATA["schedules"])}
         if path.startswith("/api/admin/overview"):
@@ -152,3 +162,47 @@ def test_empty_schedules_keep_the_header_create_and_repeat_it(console, monkeypat
     expect(repeat).to_have_class("dk-button dk-button--secondary")
     repeat.click()
     expect(page.locator("#schedule-dialog")).to_be_visible()
+
+
+@pytest.mark.parametrize("tab, chips, create_id, label, dialog", [
+    ("hooks", "hooks-outcome-chips", "new-hook", "New hook", "#hook-dialog"),
+])
+def test_trigger_tab_create_follows_its_filters(console, tab, chips, create_id, label, dialog):
+    from playwright.sync_api import expect
+
+    page = console(f"/workflows?tab={tab}")
+    create = page.locator(f"#{create_id}")
+    _assert_dakit_create(create, label)
+    assert _lead_children(page, f"#{tab}-toolbar-lead") == [chips, create_id]
+    expect(page.locator(f'[data-panel-tools="{tab}"] .dk-toolbar__end .dk-button--primary')).to_have_count(0)
+    _assert_page_header_has_no_actions(page)
+
+    page.keyboard.press("c")
+    expect(page.locator(dialog)).to_be_visible()
+
+
+@pytest.mark.parametrize("tab, empty, repeat, dialog", [
+    ("hooks", "#hook-empty", "#hook-empty-create", "#hook-dialog"),
+])
+def test_empty_trigger_tab_repeats_its_create(console, monkeypatch, tab, empty, repeat, dialog):
+    from playwright.sync_api import expect
+
+    monkeypatch.setitem(DATA, tab, [])
+    page = console(f"/workflows?tab={tab}")
+    expect(page.locator(empty)).to_be_visible()
+    expect(page.locator(f"#{tab}-toolbar-lead .dk-collection-create")).to_be_visible()
+    expect(page.locator(repeat)).to_have_class("dk-button dk-button--secondary")
+    page.locator(repeat).click()
+    expect(page.locator(dialog)).to_be_visible()
+
+
+def test_phone_trigger_toolbar_keeps_the_create_on_both_panes(console):
+    from playwright.sync_api import expect
+
+    page = console("/workflows?tab=hooks")
+    page.set_viewport_size({"width": 390, "height": 844})
+    create = page.locator("#new-hook")
+    expect(create).to_be_visible()
+    page.locator('[data-panel-tools="hooks"] .pane-switch [data-pane="sources"]').click()
+    expect(page.locator("#hooks-outcome-chips")).to_be_hidden()
+    expect(create).to_be_visible()

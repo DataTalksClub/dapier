@@ -143,10 +143,9 @@
         </div>
         <div class="page-tools dk-toolbar trigger-toolbar" data-panel-tools="hooks" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Hooks panes" data-workspace="hooks-layout"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="hooks-activity-pane" aria-selected="true" tabindex="0">Deliveries</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="hooks-sources-pane" aria-selected="false" tabindex="-1">Endpoints</button></div>
-          <div id="hooks-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter deliveries by outcome"></div>
+          <div class="dk-collection-header__lead" id="hooks-toolbar-lead"><div id="hooks-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter deliveries by outcome"></div></div>
           <div class="dk-toolbar__end">
             <button id="hook-send-test" class="dk-button dk-button--secondary" type="button">Send test request</button>
-            <button id="new-hook" class="dk-button dk-button--primary" type="button">New hook</button>
           </div>
         </div>
         <div class="page-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
@@ -168,7 +167,7 @@
         </div>
         </div>
         <div data-workflow-panel="hooks" hidden>
-        <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p></div>
+        <div id="hook-empty" class="empty-state" hidden><h3>No hooks yet</h3><p>Create one to let an external service start a workflow with a webhook call or a Telegram message.</p><button id="hook-empty-create" class="dk-button dk-button--secondary" type="button">Create the first hook</button></div>
         <div id="hooks-layout" class="trigger-workspace" data-pane="activity" hidden>
           <section id="hooks-activity-pane" class="data-panel trigger-activity" aria-labelledby="hooks-activity-title">
             <div class="section-head">

@@ -14,7 +14,7 @@ CLI = (ROOT / "dapier_cli" / "commands" / "hooks.py").read_text()
 def test_hooks_panel_has_deliveries_endpoints_and_dialogs():
     for marker in ('id="hook-deliveries"', 'id="hook-endpoints"', 'id="hooks-outcome-chips"',
                    'id="hook-delivery-dialog"', 'id="hook-delivery-replay"',
-                   'id="hook-test-dialog"', 'id="hook-send-test"', 'id="new-hook"',
+                   'id="hook-test-dialog"', 'id="hook-send-test"', 'id="hooks-toolbar-lead"',
                    'id="hook-dialog"'):
         assert marker in HTML, marker
     assert 'id="hook-table"' not in HTML  # the old definitions-only table is gone

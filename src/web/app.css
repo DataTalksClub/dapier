@@ -2023,7 +2023,10 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   /* The switch leads the toolbar on its own full-width row; the activity
      filters only show with the activity pane. */
   .pane-switch { display: flex; flex: 1 0 100%; }
-  .trigger-toolbar[data-pane="sources"] > [id$="-chips"] { display: none; }
+  .trigger-toolbar[data-pane="sources"] [id$="-chips"] { display: none; }
+  /* The filters take their own row; the create (first) and the tab's
+     secondary actions share the next one. */
+  .trigger-toolbar > .dk-collection-header__lead { display: contents; }
   .trigger-workspace[data-pane="activity"] > .trigger-sources,
   .trigger-workspace[data-pane="sources"] > .trigger-activity { display: none; }
   .trigger-toolbar .dk-toolbar__end { margin-left: 0; }
