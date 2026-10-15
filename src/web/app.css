@@ -1055,7 +1055,7 @@ label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: v
 .email-detail-block > .sub { margin: 0; }
 .email-detail-block .detail-error { margin: 0; overflow-wrap: anywhere; font-size: var(--dk-text-sm); }
 .email-body { display: grid; gap: var(--dk-space-3); min-width: 0; }
-.email-body-frame { width: 100%; min-height: 20rem; height: 40rem; max-height: 100rem; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: #fff; }
+.email-body-frame { width: 100%; min-height: 20rem; height: 40rem; max-height: 100rem; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: white; } /* email HTML is authored for white paper in either theme */
 .email-body-text { margin: 0; padding: var(--dk-space-4); background: var(--dk-bg-inset); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
 .email-body-text { font: var(--dk-text-body)/1.7 var(--dk-font-sans); }
 .email-body-empty { color: var(--dk-text-muted); font-size: var(--dk-text-md); }

@@ -1,4 +1,4 @@
-.PHONY: check-borders sync-dakit build deploy test plugin-test validate layer sync-dakit designer-install designer designer-build designer-console
+.PHONY: check-dakit sync-dakit build deploy test plugin-test validate layer sync-dakit designer-install designer designer-build designer-console
 
 build: layer
 	scripts/build-sam.sh
@@ -54,9 +54,22 @@ DAKIT_FILES = dakit.css dialogs.js tabs.js collection.js shell.js split.js devic
 sync-dakit:
 	node $(DAKIT)/scripts/sync.mjs --dest src/web/vendor --files $(DAKIT_FILES)
 
-# Fail on forbidden accent borders in the console (dakit "No colored edge accents").
-check-borders:
-	node src/web/vendor/check-borders.mjs src/web
+# App-authored styles the dakit checkers judge. The generated designer bundle
+# (src/web/designer.js/.css) is checked through its sources in designer/src.
+DAKIT_CHECK_PATHS = src/web/app.css src/web/public.css src/web/device.css \
+	src/web/index.html src/web/device.html src/web/designer.html \
+	src/web/public-home.html src/web/privacy.html src/web/terms.html \
+	src/web/js designer/src
+
+# The vendored copy matches its lock; no accent borders, no raw colours, and
+# spacing/type on the scales (existing off-scale debt lives in
+# dakit-scale-baseline.json, which may only shrink). `make test` runs these
+# through tests/test_dakit_checks.py.
+check-dakit:
+	node src/web/vendor/sync.mjs --check --dest src/web/vendor
+	node src/web/vendor/check-borders.mjs src/web designer/src
+	node src/web/vendor/check-colors.mjs $(DAKIT_CHECK_PATHS)
+	node src/web/vendor/check-scale.mjs --baseline dakit-scale-baseline.json $(DAKIT_CHECK_PATHS)
 
 # Rebuild the bundle vendored into the console (src/web/designer.js/.css,
 # served at /designer). Run after changing designer sources.
