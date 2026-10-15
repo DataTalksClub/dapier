@@ -162,6 +162,30 @@ def test_runs_replay_rehydrates_from_the_inbox_row(monkeypatch):
     assert event["data"]["s3"] == POINTER
 
 
+def test_runs_replay_carries_the_pointer_in_a_later_step(monkeypatch):
+    """Live 2026-10-15 case: the clipped event ran during the intake outage,
+    was re-executed against the raw/recovery envelope, and only a later
+    step's recorded input carries the raw_mime pointer — that pointer is
+    as good as the first step's."""
+    steps = [
+        {"connector": "email", "event_type": "message.received",
+         "input": {"truncated": True, "preview": "..." * 100}},
+        {"action_id": "route.then.file-to-dataops", "event_type": "message.received",
+         "input": {"message_id": "<big-1@example.test>", "truncated": False,
+                   "raw_mime": POINTER}},
+    ]
+    monkeypatch.setattr(inbox, "stored", lambda inbox_id, **kwargs: None)
+    monkeypatch.setattr(email_ingress, "s3", _s3_mock(_raw()))
+
+    event, error = runs_api.replay_event(
+        "invoice-intake:email:<big-1@example.test>", steps)
+
+    assert error is None
+    assert event["correlation_id"] == "email:<big-1@example.test>"
+    assert event["data"]["message_id"] == "<big-1@example.test>"
+    assert event["data"]["s3"] == POINTER
+
+
 def test_runs_replay_refuses_when_the_inbox_row_has_no_pointer(monkeypatch):
     steps = [{"connector": "email", "event_type": "message.received",
               "input": {"truncated": True, "preview": "..." * 100}}]

@@ -799,22 +799,43 @@ def api_get(run_id, visible=None):
     }
 
 
-def _replay_data(data, original_event_id):
+def _raw_pointer(data):
+    """The raw-copy pointer a recorded event data carries, if any: either a
+    live ``s3``/``raw_mime`` reference or the pointer staged inside a
+    clipping preview."""
+    from ..triggers import inbox as inbox_store
+
+    if not isinstance(data, dict):
+        return None
+    return (data.get("s3") or data.get("raw_mime")
+            or inbox_store.pointer_from_preview(data.get("preview")))
+
+
+def _replay_data(data, original_event_id, steps=()):
     """Full trigger data for a clipped step input, rebuilt from the raw
-    email copy the event's inbox row points at. Returns ``(data, None)``,
-    or ``(None, error)`` — no pointer, unreadable copy — and the caller
-    keeps its explicit replay refusal."""
+    email copy a pointer names. Returns ``(data, None)``, or
+    ``(None, error)`` — no pointer, unreadable copy — and the caller keeps
+    its explicit replay refusal.
+
+    The first recorded step's input is checked first, then every later
+    step: an event re-executed against a re-pointed envelope keeps its
+    original clipped trigger in the early steps while later steps record
+    the full data, raw pointer included (live case: the Oct 14 Lidl invoice
+    ran clipped, was replayed from raw/recovery, and only the dataops step
+    carried the ``raw_mime`` reference)."""
     from ..triggers import inbox as inbox_store
     from ..triggers.intake import email_ingress
 
-    pointer = data.get("s3") or data.get("raw_mime")
+    pointer = _raw_pointer(data)
     if not pointer:
-        pointer = inbox_store.pointer_from_preview(data.get("preview"))
+        for step in steps:
+            pointer = _raw_pointer(step.get("input")
+                                   if isinstance(step, dict) else None)
+            if pointer:
+                break
     if not pointer:
         item = inbox_store.stored(original_event_id) or {}
-        item_data = item.get("data") or {}
-        pointer = (item_data.get("s3") or item_data.get("raw_mime")
-                   or inbox_store.pointer_from_preview(item_data.get("preview")))
+        pointer = _raw_pointer(item.get("data") or {})
     if not pointer:
         return None, "The original event data was too large to store; it cannot be replayed"
     full, error = email_ingress.replay_data(pointer)
@@ -844,7 +865,7 @@ def replay_event(run_id, steps):
         return None, "This run's event data was not recorded; it cannot be replayed"
     data = first.get("input")
     if isinstance(data, dict) and data.get("truncated"):
-        data, error = _replay_data(data, original_event_id)
+        data, error = _replay_data(data, original_event_id, steps)
         if error:
             return None, error
     event_id = f"replay-{uuid.uuid4()}"
