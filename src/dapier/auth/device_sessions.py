@@ -274,6 +274,41 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
     return {"status": "approved" if approve else "denied", "label": pairing.get("label", "")}
 
 
+# Per-account budgets for the browser half, shared by every Lambda instance:
+# a fixed window counter in this same table (expired by its ttl), so a cold
+# start or a second concurrent instance never hands out a fresh budget.
+PEEK_LIMIT = 20
+DECISION_LIMIT = 10
+LIMIT_WINDOW_SECONDS = 600
+
+
+def allow(kind, subject, limit, *, window=LIMIT_WINDOW_SECONDS, table_ref=None, now=None):
+    """Spend one unit of ``subject``'s ``kind`` budget for this window.
+
+    Returns ``(True, 0)`` when allowed, else ``(False, retry_after_seconds)``.
+    The subject is hashed into the key; the count is incremented atomically
+    under a ``< limit`` condition, so concurrent callers cannot overspend.
+    """
+    store = table_ref or table()
+    now = now if now is not None else time.time()
+    bucket = int(now // window)
+    window_end = (bucket + 1) * window
+    try:
+        store.update_item(
+            Key={"pk": f"ratelimit#{kind}#{_hash(str(subject))}#{bucket}"},
+            UpdateExpression="SET #c = if_not_exists(#c, :zero) + :one, #t = :expires, #k = :kind",
+            ConditionExpression="attribute_not_exists(#c) OR #c < :limit",
+            ExpressionAttributeNames={"#c": "count", "#t": "ttl", "#k": "kind"},
+            ExpressionAttributeValues={":zero": 0, ":one": 1, ":limit": int(limit),
+                                       ":expires": window_end + window, ":kind": "ratelimit"},
+        )
+    except Exception as error:
+        if not _conditional_failure(error):
+            raise
+        return False, max(1, int(window_end - now))
+    return True, 0
+
+
 def poll(device_code, table_ref=None):
     """CLI poll over the RFC 8628 vocabulary.
 

@@ -602,3 +602,45 @@ def test_an_expired_pairing_cannot_be_decided_even_if_still_stored(store):
     assert device_sessions.decide(view["user_code"], True, "Google_1", "op@x", table_ref=store, now=later) is None
     assert device_sessions.lookup(view["user_code"], table_ref=store, now=later) is None
     assert not [pk for pk in store.items if pk.startswith("session#")]
+
+
+def test_the_peek_budget_is_shared_across_handler_instances(monkeypatch, store):
+    """Two Lambda instances (module state reset between them, as on a cold
+    start or a second concurrent container) draw on one account budget,
+    and unknown codes spend it too."""
+    _signed_in(monkeypatch)
+    event = _device_event("/api/agent/device/pending", method="GET")
+    event["queryStringParameters"] = {"code": "ZZZZ-ZZZZ"}
+    first = [agent_api.route(event, "GET", "/api/agent/device/pending")["statusCode"] for _ in range(12)]
+    agent_api.reset_rate_limits()  # a different instance: no process-local memory
+    second = [agent_api.route(event, "GET", "/api/agent/device/pending")["statusCode"] for _ in range(9)]
+    assert first == [404] * 12
+    assert second == [404] * 8 + [429]
+    limited = agent_api.route(event, "GET", "/api/agent/device/pending")
+    assert 0 < int(limited["headers"]["retry-after"]) <= device_sessions.LIMIT_WINDOW_SECONDS
+    # Another account has its own budget.
+    monkeypatch.setattr(agent_api.session, "_session_payload",
+                        lambda event: {"sub": "other@datatalks.club", "subject": "Google_2"})
+    assert agent_api.route(event, "GET", "/api/agent/device/pending")["statusCode"] == 404
+    counters = [item for pk, item in store.items.items() if pk.startswith("ratelimit#peek#")]
+    assert counters and all("Google_1" not in pk for pk in store.items)
+    assert all(int(item["ttl"]) > time.time() for item in counters)
+
+
+def test_the_decision_budget_is_shared_across_handler_instances(monkeypatch, store):
+    _signed_in(monkeypatch)
+    body = {"user_code": "ZZZZ-ZZZZ", "approve": False}
+    codes = []
+    for n in range(11):
+        if n == 5:
+            agent_api.reset_rate_limits()
+        codes.append(agent_api.route(_device_event("/api/agent/device/approve", body),
+                                     "POST", "/api/agent/device/approve")["statusCode"])
+    assert codes == [404] * 10 + [429]
+
+
+def test_the_window_rolls_over(store):
+    for _ in range(3):
+        assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1000)[0]
+    assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1000) == (False, 200)
+    assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1200)[0]

@@ -112,15 +112,19 @@ def device_pending(event):
     toward the pairing's attempt budget; a spent pairing reads as a
     404, indistinguishable from an unknown or expired code. Peeks are
     also rate-limited per signed-in account, so one browser cannot sweep
-    the code space across many pairings.
+    the code space across many pairings; that budget lives in the shared
+    table (device_sessions.allow), not in this Lambda instance.
     """
     payload = session._session_payload(event)
     if not payload:
         return _no_store(_json_response(401, {"error": "Sign in to approve this device"}))
     subject = payload.get("subject") or payload.get("sub")
-    if not _check_rate_key(("device-peek", str(subject)), 20, window=600):
+    # Every peek counts, valid code or not: the pairing budget cannot limit
+    # guesses at codes that do not exist, this shared account budget does.
+    allowed, retry_after = device_sessions.allow("peek", subject, device_sessions.PEEK_LIMIT)
+    if not allowed:
         return _no_store(_json_response(429, {"error": "Too many attempts; wait a few minutes"},
-                                        headers={"retry-after": "60"}))
+                                        headers={"retry-after": str(retry_after)}))
     params = event.get("queryStringParameters") or {}
     facts = device_sessions.lookup(str(params.get("code", "")))
     if not facts:
@@ -152,9 +156,10 @@ def device_approve(event):
         return _no_store(_json_response(401, {"error": "Sign in to approve this device"}))
     subject = payload.get("subject") or payload.get("sub")
     email = payload.get("sub", "")
-    if not _check_rate_key(("device-approve", str(subject)), 10, window=600):
+    allowed, retry_after = device_sessions.allow("decide", subject, device_sessions.DECISION_LIMIT)
+    if not allowed:
         return _no_store(_json_response(429, {"error": "Too many attempts; wait a few minutes"},
-                                        headers={"retry-after": "60"}))
+                                        headers={"retry-after": str(retry_after)}))
     try:
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError):
