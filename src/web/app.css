@@ -65,9 +65,13 @@ svg.icon { width: 20px; height: 20px; flex: none; }
 }
 .text-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-/* --- forms ---------------------------------------------------------------- */
-label { display: grid; gap: var(--dk-space-2); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
-input, select {
+/* --- forms ----------------------------------------------------------------
+   App CSS is unlayered, so a bare element rule here beats every rule in
+   dakit's @layer dk.components. The console's base form rules therefore
+   skip kit-classed elements (.dk-check, .dk-input, .dk-label…) and leave
+   them to the kit. */
+label:not([class*="dk-"]) { display: grid; gap: var(--dk-space-2); font-size: var(--dk-text-md); font-weight: var(--dk-weight-medium); color: var(--dk-text-primary); }
+input:not([class*="dk-"]), select:not([class*="dk-"]) {
   height: var(--dk-size-control-md);
   width: 100%;
   border: 1px solid var(--dk-border-default);
@@ -77,9 +81,9 @@ input, select {
   font-size: var(--dk-text-md);
   color: var(--dk-text-primary);
 }
-input:hover:not(:disabled):not([type="checkbox"]), select:hover:not(:disabled) { border-color: var(--dk-border-strong); }
+input:hover:not(:disabled):not([type="checkbox"]):not([class*="dk-"]), select:hover:not(:disabled):not([class*="dk-"]) { border-color: var(--dk-border-strong); }
 input::placeholder, textarea::placeholder { color: var(--dk-text-muted); opacity: 1; }
-textarea {
+textarea:not([class*="dk-"]) {
   width: 100%;
   min-height: var(--dk-size-control-md);
   border: 1px solid var(--dk-border-default);
@@ -90,11 +94,11 @@ textarea {
   color: var(--dk-text-primary);
 }
 /* Chevron, offset and clearance come from the dakit bundle's base layer. */
-select:disabled { opacity: .5; cursor: default; }
+select:not([class*="dk-"]):disabled { opacity: .5; cursor: default; }
 /* The family focus recipe (vendor/dakit.css base + components): a 3px ring
    at 2px offset on :focus-visible, nothing else. Mirrors the vendored bundle —
    update together. */
-input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; border-color: var(--dk-border-strong); }
+input:not([class*="dk-"]):focus-visible, select:not([class*="dk-"]):focus-visible, textarea:not([class*="dk-"]):focus-visible { outline: 3px solid var(--dk-focus-ring); outline-offset: 2px; border-color: var(--dk-border-strong); }
 .mono-input { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
 /* Masked secret input: bullets like type=password, but the browser's password
    manager never sees a password field (see hardenSecretInputs in app.js). */
@@ -671,7 +675,7 @@ dialog form { display: contents; }
 /* Checkboxes opt out of the text-input sizing above — otherwise the dialog
    "Enabled" control renders as a full-width control-height browser-blue box. */
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
-label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: var(--dk-space-2); }
+label:not([class*="dk-"]):has(> input[type="checkbox"]) { display: flex; align-items: center; gap: var(--dk-space-2); }
 /* --- Emails: the trigger family's mailbox (layout in "Trigger family") ---- */
 .activity-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-regular); color: var(--dk-text-muted); }
 .panel-note { margin: 0; padding: var(--dk-space-3) var(--dk-space-4) 0; font-size: var(--dk-text-sm); }
@@ -952,7 +956,7 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   /* Every phone control meets the 44px touch scale: buttons, text inputs,
      selects and textareas everywhere (dialogs included). */
   .dk-button { height: var(--dk-size-touch); }
-  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea { min-height: var(--dk-size-touch); }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([class*="dk-"]), select:not([class*="dk-"]), textarea:not([class*="dk-"]) { min-height: var(--dk-size-touch); }
   .text-link { min-height: var(--dk-size-touch); }
   button.cell-name { min-height: var(--dk-size-touch); }
   .json-raw summary { display: flex; align-items: center; min-height: var(--dk-size-touch); }
