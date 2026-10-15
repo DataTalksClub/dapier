@@ -122,6 +122,26 @@ class LeaseBusy(Exception):
     """
 
 
+def _note_email_event():
+    """Feed EmailEventsQuietAlarm: one datapoint per email event consumed.
+
+    Email intake breaks upstream leave no backlog to alarm on — nothing
+    arrives, so every queue metric reads zero and healthy. Twelve quiet
+    hours page the operator. Emission must never fail the record: an
+    unexported datapoint is a missed alarm, a raised one is a dropped
+    email.
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch").put_metric_data(
+            Namespace="Dapier/Triggers",
+            MetricData=[{"MetricName": "EmailEventsReceived",
+                         "Value": 1, "Unit": "Count"}])
+    except Exception:
+        logger.info("email event metric emission failed", exc_info=True)
+
+
 def normalize_payload(payload):
     """SES envelope unwrap, then per-connector normalization
     (src/dapier/connectors/ingress.py)."""
@@ -948,6 +968,8 @@ def handler(event, _context):
                 _resume_run(payload[RESUME_KEY])
                 continue
             payload = normalize_payload(payload)
+            if payload.get("connector") == "email":
+                _note_email_event()
             inbox_id = inbox.record(payload)
             from ..triggers.email_from import rejected as _sender_rejected
 

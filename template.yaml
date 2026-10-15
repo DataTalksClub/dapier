@@ -729,6 +729,12 @@ Resources:
             Effect: Allow
             Action: sts:AssumeRole
             Resource: !Ref AwsAssumableRoleArns
+        - Statement:
+            # Feeds EmailEventsQuietAlarm: one datapoint per email event the
+            # engine consumes, so twelve quiet hours page the alarm topic.
+            Effect: Allow
+            Action: [cloudwatch:PutMetricData]
+            Resource: '*'
         - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
         # Outbound identity for verified Anthropic LLM connections. Only the worker
         # may mint these tokens; the Anthropic rule pins this role's exact ARN.
@@ -917,6 +923,28 @@ Resources:
 
   AlarmTopic:
     Type: AWS::SNS::Topic
+
+  # Email intake has no queue backlog to alarm on when it breaks upstream:
+  # nothing arrives, so every queue metric reads zero and healthy. The
+  # worker emits one EmailEventsReceived datapoint per email event it
+  # consumes; twelve quiet hours page the operator.
+  EmailEventsQuietAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: >
+        No email event reached the workflow engine for 12 hours — email
+        intake is dark somewhere between SES receipt, the raw-mail bucket,
+        the intake Lambda, and the event queue.
+      Namespace: Dapier/Triggers
+      MetricName: EmailEventsReceived
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 12
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
 
   AlarmNotifyFunction:
     Type: AWS::Serverless::Function

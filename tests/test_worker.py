@@ -859,3 +859,26 @@ def test_recovered_output_reads_back_as_plain_numbers(monkeypatch):
     step = worker._quota_pending("wf", "classify", EVENT)
     assert step.output == {"confidence": 0.93, "steps": 2}
     json.dumps(step.output)
+
+
+def test_email_events_feed_the_quiet_alarm_metric(monkeypatch):
+    calls = []
+
+    class _CW:
+        def put_metric_data(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(boto3, "client", lambda service: _CW())
+    worker._note_email_event()
+
+    assert calls == [{"Namespace": "Dapier/Triggers",
+                      "MetricData": [{"MetricName": "EmailEventsReceived",
+                                      "Value": 1, "Unit": "Count"}]}]
+
+
+def test_a_metric_failure_never_raises(monkeypatch):
+    def _boom(service):
+        raise RuntimeError("cloudwatch down")
+
+    monkeypatch.setattr(boto3, "client", _boom)
+    worker._note_email_event()

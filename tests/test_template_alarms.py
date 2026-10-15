@@ -75,10 +75,39 @@ class EventQueueAlarmTests(unittest.TestCase):
         self.assertEqual("notBreaching", props["TreatMissingData"])
 
     def test_queue_alarms_match_existing_alarm_shape(self):
-        for props in self.alarms.values():
-            self.assertTrue(props["AlarmDescription"])
-            self.assertIn(props["Namespace"], ("AWS/SQS", "AWS/Lambda"))
-            self.assertEqual("notBreaching", props["TreatMissingData"])
+        for name, props in self.alarms.items():
+            self.assertTrue(props["AlarmDescription"], name)
+            self.assertIn(props["Namespace"], ("AWS/SQS", "AWS/Lambda", "Dapier/Triggers"), name)
+            quiet = props["Namespace"] == "Dapier/Triggers"
+            self.assertEqual("breaching" if quiet else "notBreaching",
+                             props["TreatMissingData"], name)
+
+
+class EmailQuietAlarmTests(unittest.TestCase):
+    """Twelve hours without a single consumed email event pages the operator.
+
+    An intake-side break (SES receipt rule, raw bucket notification, the
+    intake Lambda, the event queue policy) leaves no backlog anywhere: the
+    queue is simply empty, so the existing queue alarms stay green. The
+    worker feeds this alarm one datapoint per email event it consumes.
+    """
+
+    def setUp(self):
+        self.props = load_alarms()["EmailEventsQuietAlarm"]
+
+    def test_pages_after_twelve_quiet_hours(self):
+        self.assertEqual("Dapier/Triggers", self.props["Namespace"])
+        self.assertEqual("EmailEventsReceived", self.props["MetricName"])
+        self.assertEqual("Sum", self.props["Statistic"])
+        self.assertEqual(3600, self.props["Period"])
+        self.assertEqual(12, self.props["EvaluationPeriods"])
+        self.assertEqual(1, self.props["Threshold"])
+        self.assertEqual("LessThanThreshold", self.props["ComparisonOperator"])
+        self.assertEqual("breaching", self.props["TreatMissingData"])
+
+    def test_alarm_and_recovery_notify_the_alarm_topic(self):
+        self.assertEqual([{"Ref": "AlarmTopic"}], self.props["AlarmActions"])
+        self.assertEqual([{"Ref": "AlarmTopic"}], self.props["OKActions"])
 
 
 if __name__ == "__main__":
