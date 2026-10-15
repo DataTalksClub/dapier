@@ -45,7 +45,7 @@ def test_console_javascript_modules_parse():
         )
         if proc.returncode != 0:
             failed.append(f"{path.relative_to(WEB.parents[1])}: {proc.stderr.strip()}")
-    for path in (WEB / "js" / "theme-init.js", WEB / "vendor" / "dakit-dialogs.js", WEB / "vendor" / "dakit-tabs.js"):
+    for path in (WEB / "js" / "theme-init.js", WEB / "vendor" / "dakit-dialogs.js", WEB / "vendor" / "dakit-tabs.js", WEB / "vendor" / "dakit-collection.js"):
         proc = subprocess.run(
             ["node", "--check"],
             input=path.read_text(),

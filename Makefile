@@ -54,6 +54,7 @@ sync-dakit:
 	cp $(DAKIT)/dist/tokens.css src/web/vendor/dakit-tokens.css
 	cp $(DAKIT)/dist/dialogs.js src/web/vendor/dakit-dialogs.js
 	cp $(DAKIT)/dist/tabs.js src/web/vendor/dakit-tabs.js
+	cp $(DAKIT)/dist/collection.js src/web/vendor/dakit-collection.js
 	cp $(DAKIT)/fonts/*.woff2 src/web/vendor/fonts/
 	cp $(DAKIT)/scripts/check-borders.mjs src/web/vendor/check-borders.mjs
 

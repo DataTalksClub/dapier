@@ -99,6 +99,7 @@ def _static(path):
         "/assets/vendor/dakit.css": ("vendor/dakit.css", "text/css; charset=utf-8"),
         "/assets/vendor/dakit-dialogs.js": ("vendor/dakit-dialogs.js", "text/javascript; charset=utf-8"),
         "/assets/vendor/dakit-tabs.js": ("vendor/dakit-tabs.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/dakit-collection.js": ("vendor/dakit-collection.js", "text/javascript; charset=utf-8"),
         # dakit.css references its fonts as url("../fonts/…"), which resolves
         # against /assets/vendor/ to /assets/fonts/… — alias the vendored
         # files there so the bundle's own @font-faces resolve.
