@@ -393,9 +393,10 @@ def poll(device_code, table_ref=None):
         if not _conditional_failure(error):
             raise
         return _grant_state(store, key, time.time())
-    user_code_hash = pairing.get("user_code_hash")
-    if user_code_hash:
-        store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
+    # Nothing may run between the commit and returning the bearer: the
+    # grant is consumed and the session exists, so a failing extra write
+    # here would strand an undeliverable session. (The approval already
+    # removed the user-code pointer.)
     return {
         "token": token,
         "subject": pairing.get("subject", ""),

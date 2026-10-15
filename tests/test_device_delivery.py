@@ -273,3 +273,17 @@ def test_api_audit_and_logs_omit_codes_and_bearer(store, monkeypatch, caplog, ca
     captured = capsys.readouterr()
     logs = json.dumps(events, default=str) + caplog.text + captured.out + captured.err
     assert all(secret not in logs for secret in (code, code.replace("-", ""), device_code, token))
+
+
+def test_nothing_after_the_commit_can_withhold_the_bearer(store):
+    """Review m6: once the transaction commits, the poll returns the bearer;
+    no follow-up write (a failing delete here) can strand the session."""
+    device_code, _ = approved(store)
+
+    def crash():
+        raise Crash("delete_item fails after the delivery commit")
+
+    result = d.poll(device_code, table_ref=Hook(store, "delete_item", crash))
+    assert d.resolve(result["token"], table_ref=store)["subject"] == "winner"
+    assert len(rows(store, "session")) == 1
+    assert rows(store, "usercode") == []          # approval removed the pointer
