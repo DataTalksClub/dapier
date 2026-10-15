@@ -139,7 +139,7 @@ a.brand:hover span:last-child {
 .workflow-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--dk-space-1);
 }
 
 /* Nav rows: icon + text, min-height 32px, the filled row is the only
@@ -168,13 +168,13 @@ a.brand:hover span:last-child {
 
 .workflow-item > svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--dk-space-1);
 }
 
 .workflow-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--dk-space-1);
   min-width: 0;
 }
 
@@ -191,7 +191,7 @@ a.brand:hover span:last-child {
   flex-wrap: wrap;
   font-family: var(--dk-font-mono);
   font-size: var(--dk-text-xs);
-  gap: 5px;
+  gap: var(--dk-space-1);
 }
 
 .workflow-item.active .workflow-meta {
@@ -203,7 +203,7 @@ a.brand:hover span:last-child {
   border-radius: var(--dk-radius-sm);
   color: var(--dk-text-muted);
   font-size: var(--dk-text-xs);
-  padding: 1px 5px;
+  padding: var(--dk-space-1) var(--dk-space-1);
   position: absolute;
   right: var(--dk-space-2);
   top: var(--dk-space-1);
@@ -216,7 +216,7 @@ a.brand:hover span:last-child {
   content: "";
   display: inline-block;
   height: 7px;
-  margin-right: 5px;
+  margin-right: var(--dk-space-1);
   width: 7px;
 }
 .workflow-disabled.state-off::before { background: var(--dk-text-faint); }
@@ -230,9 +230,9 @@ a.brand:hover span:last-child {
   color: var(--dk-text-faint);
   display: flex;
   font-size: var(--dk-text-xs);
-  gap: 6px;
+  gap: var(--dk-space-1);
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: var(--dk-space-2);
 }
 
 .git-dirty {
@@ -269,7 +269,7 @@ a.brand:hover span:last-child {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: var(--dk-space-3);
   min-width: 0;
 }
 
@@ -277,7 +277,7 @@ a.brand:hover span:last-child {
 .yaml-editor {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dk-space-1);
   min-height: 0;
   min-width: 0;
   padding: 12px 16px 16px;
@@ -306,7 +306,7 @@ a.brand:hover span:last-child {
   font-size: var(--dk-text-md);
   line-height: 1.55;
   min-height: 0;
-  padding: 14px;
+  padding: var(--dk-space-3);
   resize: none;
   white-space: pre;
   width: 100%;
@@ -357,7 +357,7 @@ a.brand:hover span:last-child {
   flex-direction: row;
   font-size: var(--dk-text-sm);
   font-weight: 500;
-  gap: 6px;
+  gap: var(--dk-space-1);
   margin-right: 4px;
   white-space: nowrap;
 }
@@ -415,8 +415,8 @@ a.brand:hover span:last-child {
   display: inline-flex;
   font-size: var(--dk-text-sm);
   font-weight: var(--dk-weight-medium);
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--dk-space-1);
+  padding: var(--dk-space-1) var(--dk-space-2);
 }
 
 .status-message.error {
@@ -523,7 +523,7 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
   flex-direction: column;
   font-size: var(--dk-text-sm);
   font-weight: 500;
-  gap: 5px;
+  gap: var(--dk-space-1);
 }
 
 .inspector input:not([type="checkbox"]):not([type="radio"]),
@@ -531,11 +531,11 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
 .inspector textarea {
   width: 100%;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--dk-text-md);
 }
 .inspector input:not([type="checkbox"]):not([type="radio"]),
 .inspector select { min-height: 36px; }
-.inspector label { min-width: 0; line-height: 1.4; gap: 6px; }
+.inspector label { min-width: 0; line-height: 1.4; gap: var(--dk-space-1); }
 
 .inspector textarea {
   min-height: 112px;
@@ -544,14 +544,14 @@ input::placeholder, textarea::placeholder { color: var(--dk-text-faint); }
   border-radius: var(--dk-radius-sm);
   color: var(--dk-text-primary);
   font: var(--dk-text-sm)/1.5 var(--dk-font-mono);
-  padding: 7px 9px;
+  padding: var(--dk-space-2) var(--dk-space-2);
   resize: vertical;
 }
 
 .check-label {
   align-items: center !important;
   flex-direction: row !important;
-  gap: 6px !important;
+  gap: var(--dk-space-1) !important;
   text-transform: none !important;
 }
 
@@ -570,7 +570,7 @@ input[type="checkbox"], input[type="radio"] {
 }
 .inspector .check-label {
   min-height: 32px;
-  gap: 9px !important;
+  gap: var(--dk-space-2) !important;
   cursor: pointer;
   color: var(--dk-text-primary);
 }
@@ -596,14 +596,14 @@ input[type="checkbox"], input[type="radio"] {
   background: var(--dk-bg-surface);
   border-bottom: 1px solid var(--dk-border-default);
   display: flex;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: var(--dk-space-2);
+  padding: var(--dk-space-1) var(--dk-space-2);
   z-index: 5;
 }
 
 .palette-actions {
   display: flex;
-  gap: 7px;
+  gap: var(--dk-space-2);
 }
 
 /* The three palette intents (+ Trigger, + Step, Note). Everything beyond
@@ -618,7 +618,7 @@ input[type="checkbox"], input[type="radio"] {
   display: inline-flex;
   font-size: var(--dk-text-sm);
   font-weight: var(--dk-weight-medium);
-  gap: 6px;
+  gap: var(--dk-space-1);
   height: var(--dk-size-control-sm);
   padding: 0 var(--dk-space-3);
   white-space: nowrap;
@@ -671,8 +671,8 @@ input[type="checkbox"], input[type="radio"] {
   border-bottom: 1px solid var(--dk-border-default);
   color: var(--dk-text-faint);
   display: flex;
-  gap: 9px;
-  padding: 10px 12px;
+  gap: var(--dk-space-2);
+  padding: var(--dk-space-2) var(--dk-space-3);
 }
 
 .step-picker-head input {
@@ -688,13 +688,13 @@ input[type="checkbox"], input[type="radio"] {
 .step-picker-body {
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 6px 10px;
+  padding: var(--dk-space-1) var(--dk-space-1) var(--dk-space-2);
 }
 
 .step-picker-empty {
   color: var(--dk-text-muted);
   font-size: var(--dk-text-md);
-  padding: 14px 10px;
+  padding: var(--dk-space-3) var(--dk-space-2);
 }
 
 .step-group { margin-top: 4px; }
@@ -708,7 +708,7 @@ input[type="checkbox"], input[type="radio"] {
   display: flex;
   font-size: var(--dk-text-xs);
   font-weight: 600;
-  gap: 6px;
+  gap: var(--dk-space-1);
   letter-spacing: 0;
   padding: 8px 8px 4px;
 }
@@ -735,8 +735,8 @@ input[type="checkbox"], input[type="radio"] {
   color: var(--dk-text-primary);
   cursor: pointer;
   display: flex;
-  gap: 10px;
-  padding: 7px 10px;
+  gap: var(--dk-space-2);
+  padding: var(--dk-space-2) var(--dk-space-2);
   text-align: left;
   width: 100%;
 }
@@ -823,8 +823,8 @@ input[type="checkbox"], input[type="radio"] {
   bottom: 14px;
   box-shadow: var(--dk-shadow-overlay);
   display: flex;
-  gap: 3px;
-  padding: 3px;
+  gap: var(--dk-space-1);
+  padding: var(--dk-space-1);
   position: absolute;
   right: 14px;
   z-index: 15;
@@ -845,7 +845,7 @@ input[type="checkbox"], input[type="radio"] {
   font-size: var(--dk-text-xs);
   height: 28px;
   min-width: 42px;
-  padding: 0 6px;
+  padding: 0 var(--dk-space-1);
 }
 
 
@@ -866,7 +866,7 @@ input[type="checkbox"], input[type="radio"] {
   font-size: 13.5px; /* canvas density exception */
   font-weight: 500;
   line-height: 1.15;
-  padding: 1px 6px 2px;
+  padding: var(--dk-space-1) var(--dk-space-1) var(--dk-space-1);
   position: fixed;
   text-align: center;
   transform: translate(-50%, -50%);
@@ -880,7 +880,7 @@ input[type="checkbox"], input[type="radio"] {
   box-shadow: var(--dk-shadow-overlay);
   max-height: min(520px, calc(100vh - 32px));
   overflow: auto;
-  padding: 6px;
+  padding: var(--dk-space-1);
   position: fixed;
   z-index: 10;
 }
@@ -1015,7 +1015,7 @@ input[type="checkbox"], input[type="radio"] {
     border-left: 0;
     border-top: 0;
     max-height: none;
-    padding: 12px 14px;
+    padding: var(--dk-space-3) var(--dk-space-3);
   }
   .inspector.empty { display: none; }
   .inspector-close {
@@ -1033,12 +1033,12 @@ input[type="checkbox"], input[type="radio"] {
   .icon-button { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .inspector-close { width: var(--dk-size-touch); height: var(--dk-size-touch); }
   .inspector-head::before { left: -14px; }
-  .topbar-actions { row-gap: 6px; }
+  .topbar-actions { row-gap: var(--dk-space-1); }
   .topbar-actions .dk-button { min-height: 44px; }
   .topbar-actions .check-label { min-height: 44px; }
   .topbar-title .id-input { flex: 1; min-width: 0; width: auto; }
   .test-panel {
-    inset: 10px;
+    inset: var(--dk-space-2);
     max-height: none;
     max-width: none;
     width: auto;
@@ -1077,7 +1077,7 @@ input[type="checkbox"], input[type="radio"] {
   overflow-y: auto;
   min-width: 0;
   min-height: 0;
-  padding: 18px 20px;
+  padding: var(--dk-space-4) var(--dk-space-5);
 }
 
 /* Identity first: the kind marker repeats the node's canvas stroke color so
@@ -1085,7 +1085,7 @@ input[type="checkbox"], input[type="radio"] {
 .inspector-head {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   margin-bottom: 12px;
   position: relative;
 }
@@ -1118,7 +1118,7 @@ input[type="checkbox"], input[type="radio"] {
   border-top: 1px solid var(--dk-border-default);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--dk-space-3);
   padding: 16px 0;
   flex-shrink: 0;
 }
@@ -1133,7 +1133,7 @@ input[type="checkbox"], input[type="radio"] {
 .inspector-empty {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dk-space-1);
 }
 
 .inspector-hint {
@@ -1163,7 +1163,7 @@ input[type="checkbox"], input[type="radio"] {
 .field-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dk-space-1);
 }
 
 .field-label {
@@ -1189,7 +1189,7 @@ input[type="checkbox"], input[type="radio"] {
   color: var(--dk-text-muted);
   font-size: var(--dk-text-sm);
   font-weight: 500;
-  padding: 7px 0;
+  padding: var(--dk-space-2) 0;
   width: 100%;
 }
 
@@ -1214,7 +1214,7 @@ input[type="checkbox"], input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: var(--dk-space-2);
 }
 
 .branch-head {
@@ -1227,7 +1227,7 @@ input[type="checkbox"], input[type="radio"] {
   border-radius: var(--dk-radius-sm);
   font-size: var(--dk-text-xs);
   font-weight: 600;
-  padding: 2px 8px;
+  padding: var(--dk-space-1) var(--dk-space-2);
 }
 
 .branch-badge-then {
@@ -1254,7 +1254,7 @@ input[type="checkbox"], input[type="radio"] {
 .branch-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dk-space-1);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1285,7 +1285,7 @@ input[type="checkbox"], input[type="radio"] {
 .branch-step {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -1326,11 +1326,11 @@ input[type="checkbox"], input[type="radio"] {
   box-shadow: var(--dk-shadow-overlay);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--dk-space-2);
   max-height: calc(100vh - 110px);
   max-width: min(460px, calc(100vw - 48px));
   overflow-y: auto;
-  padding: 14px;
+  padding: var(--dk-space-3);
   position: fixed;
   right: 316px;
   top: 70px;
@@ -1362,7 +1362,7 @@ input[type="checkbox"], input[type="radio"] {
   flex-direction: column;
   font-size: var(--dk-text-sm);
   font-weight: 500;
-  gap: 6px;
+  gap: var(--dk-space-1);
 }
 
 .test-event {
@@ -1400,7 +1400,7 @@ input[type="checkbox"], input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 10px;
+  padding-top: var(--dk-space-2);
 }
 
 .test-summary {
@@ -1421,7 +1421,7 @@ input[type="checkbox"], input[type="radio"] {
   border-radius: var(--dk-radius-sm);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dk-space-1);
   padding: 8px;
 }
 
@@ -1472,7 +1472,7 @@ input[type="checkbox"], input[type="radio"] {
    Browse… sits beside the field it fills. */
 .discover-field {
   display: flex;
-  gap: 6px;
+  gap: var(--dk-space-1);
 }
 
 .discover-field input {
@@ -1512,8 +1512,8 @@ input[type="checkbox"], input[type="radio"] {
   color: var(--dk-text-primary);
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 8px 6px;
+  gap: 0;
+  padding: var(--dk-space-2) var(--dk-space-1);
   text-align: left;
 }
 
@@ -1536,9 +1536,9 @@ input[type="checkbox"], input[type="radio"] {
 .node-jump {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--dk-space-1);
   border-bottom: 1px solid var(--dk-border-default);
-  padding: 10px 12px 12px;
+  padding: var(--dk-space-2) var(--dk-space-3) var(--dk-space-3);
 }
 .node-jump p {
   margin: 0 0 4px;
@@ -1553,7 +1553,7 @@ input[type="checkbox"], input[type="radio"] {
   cursor: pointer;
   font: inherit;
   font-size: var(--dk-text-sm);
-  padding: 6px 8px;
+  padding: var(--dk-space-1) var(--dk-space-2);
   text-align: left;
 }
 .node-jump-item:hover, .node-jump-item.selected { background: var(--dk-accent-soft); border-color: var(--dk-border-strong); color: var(--dk-accent-default); }
@@ -1574,7 +1574,7 @@ input[type="checkbox"], input[type="radio"] {
   cursor: pointer;
   font-family: var(--dk-font-mono);
   font-size: var(--dk-text-xs);
-  padding: 3px 8px;
+  padding: var(--dk-space-1) var(--dk-space-2);
 }
 .template-chip:hover { border-color: var(--dk-border-strong); color: var(--dk-accent-default); }
 
@@ -1584,8 +1584,8 @@ input[type="checkbox"], input[type="radio"] {
   border-bottom: 1px solid var(--dk-border-default);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 6px;
+  gap: var(--dk-space-1);
+  padding: var(--dk-space-2) var(--dk-space-1);
 }
 
 .step-templates-head {
@@ -1617,7 +1617,7 @@ input[type="checkbox"], input[type="radio"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
+  padding: var(--dk-space-2) var(--dk-space-3);
 }
 
 /* "?" cheat sheet: the picker dialog idiom over a keys/description list. */
@@ -1634,7 +1634,7 @@ input[type="checkbox"], input[type="radio"] {
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  padding: 7px 6px;
+  padding: var(--dk-space-2) var(--dk-space-1);
 }
 
 .shortcut-keys {
@@ -1649,7 +1649,7 @@ input[type="checkbox"], input[type="radio"] {
   border-radius: var(--dk-radius-sm);
   font-family: var(--dk-font-mono);
   font-size: var(--dk-text-xs);
-  padding: 2px 6px;
+  padding: var(--dk-space-1) var(--dk-space-1);
   white-space: nowrap;
 }
 
@@ -1662,7 +1662,7 @@ input[type="checkbox"], input[type="radio"] {
 
 /* Long instructions are prose: readable leading, a larger field, and a wide editor. */
 .prompt-field { min-width: 0; }
-.prompt-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.prompt-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: var(--dk-space-2); }
 .prompt-expand { padding: 0; border: 0; background: transparent; color: var(--dk-accent-default); font: 500 var(--dk-text-sm) var(--dk-font-sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .inspector .prompt-inline { min-height: 240px; width: 100%; font: var(--dk-text-body)/1.65 var(--dk-font-sans); padding: 12px; resize: vertical; }
 .prompt-editor-dialog { --dk-dialog-width: 920px; }
@@ -1670,11 +1670,11 @@ input[type="checkbox"], input[type="radio"] {
 .prompt-editor-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .prompt-editor-dialog .prompt-expanded { display: block; width: 100%; max-width: 72ch; height: min(56vh, 580px); min-height: 200px; margin: 0 auto; padding: 20px; color: var(--dk-text-primary); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); font: var(--dk-text-lg)/1.7 var(--dk-font-sans); resize: vertical; }
 @media (max-width: 600px) {
-  .prompt-editor-dialog .prompt-expanded { padding: 14px; height: 50vh; }
+  .prompt-editor-dialog .prompt-expanded { padding: var(--dk-space-3); height: 50vh; }
 }
 
 @media (max-width: 720px) {
-  .board-toolbar { flex-wrap: wrap; gap: 6px; }
+  .board-toolbar { flex-wrap: wrap; gap: var(--dk-space-1); }
   .inspector-head::before { left: -16px; }
 }
 
@@ -1820,7 +1820,7 @@ input[type="checkbox"], input[type="radio"] {
 .branch-row-interactive {
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px;
+  padding: var(--dk-space-1) var(--dk-space-1);
 }
 
 .branch-row-select {
@@ -1846,7 +1846,7 @@ input[type="checkbox"], input[type="radio"] {
   align-items: center;
   display: flex;
   flex-shrink: 0;
-  gap: 2px;
+  gap: var(--dk-space-1);
 }
 
 .branch-row-btn {
