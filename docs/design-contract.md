@@ -10,7 +10,7 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
 ## How the family is consumed
 
 - The console serves a **vendored copy** of the built bundle:
-  `src/web/vendor/dakit.css` + `src/web/vendor/dakit-tokens.css` (+ fonts).
+  `src/web/vendor/dakit.css` (tokens included, + fonts).
   Never link `../dakit` from the app. After changing dakit, run
   `make sync-dakit` and commit the refreshed vendor files; the copies must
   stay byte-identical to `dakit/dist`.

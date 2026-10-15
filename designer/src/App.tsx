@@ -12,10 +12,10 @@ import { localConfig, type DesignerConfig } from "./config";
 import type { CodeTestReport, ConnectionOption, DiagramShape, DraftInfo, FilterRule, GitStatus, NodeData, Point, TestRunResult, Workflow, WorkflowSummary } from "./types";
 import { StoredDataPanel, listStoredItems, workflowUsesStorage, type StoredItem } from "./StoredData";
 import { initHistory, pushHistory, undoHistory, redoHistory, type DraftSnapshot, type HistoryState } from "./history";
-import "../../src/web/vendor/dakit-dialogs.js";
-import "../../src/web/vendor/dakit-tabs.js";
+import "../../src/web/vendor/dialogs.js";
+import "../../src/web/vendor/tabs.js";
 
-/** dakit's load-before-open helper (vendor/dakit-dialogs.js, docs/dialog-loading.md). */
+/** dakit's load-before-open helper (vendor/dialogs.js, docs/dialog-loading.md). */
 declare global {
   var dakitDialogs: {
     openWhenReady<T>(

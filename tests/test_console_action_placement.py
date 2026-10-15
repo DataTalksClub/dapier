@@ -1,7 +1,7 @@
 """dakit "Action placement": a create rides on the collection it creates
 into, right after that collection's title (or after the filters that scope
 its toolbar), never in the page header's top-right corner. The buttons are
-dakit's own (vendor/dakit-collection.js), and `c` presses the visible one."""
+dakit's own (vendor/collection.js), and `c` presses the visible one."""
 from __future__ import annotations
 
 import os

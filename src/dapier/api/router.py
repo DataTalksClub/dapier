@@ -97,12 +97,19 @@ def _static(path):
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),
         # The dakit design system, vendored (make sync-dakit refreshes it).
         "/assets/vendor/dakit.css": ("vendor/dakit.css", "text/css; charset=utf-8"),
-        "/assets/vendor/dakit-dialogs.js": ("vendor/dakit-dialogs.js", "text/javascript; charset=utf-8"),
-        "/assets/vendor/dakit-tabs.js": ("vendor/dakit-tabs.js", "text/javascript; charset=utf-8"),
-        "/assets/vendor/dakit-collection.js": ("vendor/dakit-collection.js", "text/javascript; charset=utf-8"),
-        # dakit.css references its fonts as url("../fonts/…"), which resolves
-        # against /assets/vendor/ to /assets/fonts/… — alias the vendored
-        # files there so the bundle's own @font-faces resolve.
+        "/assets/vendor/dialogs.js": ("vendor/dialogs.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/tabs.js": ("vendor/tabs.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/collection.js": ("vendor/collection.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/shell.js": ("vendor/shell.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/split.js": ("vendor/split.js", "text/javascript; charset=utf-8"),
+        "/assets/vendor/device-code.js": ("vendor/device-code.js", "text/javascript; charset=utf-8"),
+        # The vendored dakit.css references its fonts as url("./fonts/…"),
+        # i.e. /assets/vendor/fonts/…; the designer bundle inlines the same
+        # @font-faces into /assets/designer.css, where they resolve to
+        # /assets/fonts/…. Both point at the one vendored copy.
+        "/assets/vendor/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
+        "/assets/vendor/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
+        "/assets/vendor/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),
         "/assets/fonts/inter-var.woff2": ("vendor/fonts/inter-var.woff2", "font/woff2"),
         "/assets/fonts/ibm-plex-mono-400.woff2": ("vendor/fonts/ibm-plex-mono-400.woff2", "font/woff2"),
         "/assets/fonts/ibm-plex-mono-500.woff2": ("vendor/fonts/ibm-plex-mono-500.woff2", "font/woff2"),

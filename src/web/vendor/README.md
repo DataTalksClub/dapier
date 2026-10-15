@@ -1,16 +1,22 @@
 # vendor/
 
-Vendored copies of the **dakit** design system (`../dakit` in your checkout):
-`dakit.css` is its built bundle (tokens, base styles, components),
-`dakit-dialogs.js` is the backdrop-click dismissal helper (load once per
-page), `dakit-tabs.js` the segmented-control keyboard helper (roving
-tabindex and arrow keys for `.dk-tabs` tablists and radiogroups; load once
-per page), `dakit-collection.js` the collection-header builder
-(`globalThis.dakitCollection`: a create button rides right after its
-collection's title, and `c` clicks the page's one `data-dk-create`; load once
-per page), and `fonts/` the self-hosted Inter and IBM Plex Mono faces it
-references (SIL OFL).
+Vendored copy of the **dakit** design system (`../dakit` in your checkout),
+written by dakit's own `sync.mjs` (`make sync-dakit`) and pinned by
+`dakit.lock.json` (version, source commit, SHA-256 of every file):
 
-Regenerate with `make sync-dakit` after changing dakit, and commit the
+- `dakit.css` — the built bundle (tokens, base styles, components); its
+  `@font-face` URLs point at `./fonts/` (self-hosted Inter and IBM Plex Mono,
+  SIL OFL).
+- `shell.js` — app shell behaviour (sidebar collapse/rail, mobile drawer,
+  account popover, theme switch, copy buttons).
+- `split.js` — list–detail split (`.dk-split`): row keyboard, Back focus.
+- `dialogs.js`, `tabs.js`, `collection.js` — dialog dismissal, segmented
+  control keyboard, collection-header create button and `c` shortcut.
+- `device-code.js` — ES module: device-login code normalising/formatting.
+- `check-borders.mjs`, `check-colors.mjs`, `check-scale.mjs`, `sync.mjs` —
+  the checkers `make check-dakit` / `make test` run, and the lock verifier.
+
+Regenerate with `make sync-dakit` after changing dakit, rebuild the designer
+bundle (`make designer-console`, it inlines `dakit.css`), and commit the
 result — deploys build from this repo only. The copies are served verbatim
 (`/assets/vendor/…`); edit dakit, never these files.

@@ -40,6 +40,6 @@ def test_agent_filter_counts_ride_inside_the_segment():
 
 
 def test_tabs_helper_loads_once_per_page():
-    assert HTML.count('src="/assets/vendor/dakit-tabs.js"') == 1
+    assert HTML.count('src="/assets/vendor/tabs.js"') == 1
     app = (ROOT / "designer" / "src" / "App.tsx").read_text()
-    assert app.count('vendor/dakit-tabs.js"') == 1
+    assert app.count('vendor/tabs.js"') == 1

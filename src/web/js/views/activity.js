@@ -31,7 +31,7 @@ export const OUTCOME_FILTERS = [
 ];
 
 /* Segments of a single-choice filter: the container is a dakit
-   `.dk-tabs` radiogroup with a stable id, so vendor/dakit-tabs.js keeps
+   `.dk-tabs` radiogroup with a stable id, so vendor/tabs.js keeps
    keyboard focus on the same segment across this re-render. */
 export function filterSegments(filters, active, attribute) {
   return filters.map(([value, label]) => {

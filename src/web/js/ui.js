@@ -153,7 +153,7 @@ export function whenMenusClosed(root, paint) {
 }
 
 /* Phone pane switch on the trigger workspaces (activity | sources): a
-   dakit tablist; vendor/dakit-tabs.js turns arrow keys into these clicks. */
+   dakit tablist; vendor/tabs.js turns arrow keys into these clicks. */
 document.addEventListener('click', (event) => {
   const tab = event.target.closest('.pane-switch [data-pane]');
   if (!tab) return;
@@ -168,7 +168,7 @@ document.addEventListener('click', (event) => {
 
 /* dakit "Action placement": a collection's create rides right after its
    title (or after the filters that scope it), never in the page header.
-   The button is dakit's own (vendor/dakit-collection.js): "+ Label", small,
+   The button is dakit's own (vendor/collection.js): "+ Label", small,
    primary unless `variant` says otherwise; the page's one shortcut create
    carries data-dk-create and `c` presses it. Appended to `lead`, the
    collection header's (or toolbar's) .dk-collection-header__lead. */

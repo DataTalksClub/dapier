@@ -45,18 +45,14 @@ designer-build:
 	cd designer && npm run build
 
 # Refresh the vendored dakit design system (src/web/vendor/) from the dakit
-# checkout next to this repo. Run after changing dakit tokens/styles, then
-# commit the result — the console serves the vendored copy, never ../dakit.
+# checkout next to this repo: dakit's own sync tool copies the built bundle,
+# the JS helpers, fonts and the checkers, and records checksums in
+# dakit.lock.json. Rebuild the designer bundle afterwards (it inlines
+# vendor/dakit.css) and commit everything — deploys serve the vendored copy.
 DAKIT ?= ../dakit
+DAKIT_FILES = dakit.css dialogs.js tabs.js collection.js shell.js split.js device-code.js
 sync-dakit:
-	mkdir -p src/web/vendor/fonts
-	cp $(DAKIT)/dist/dakit.css src/web/vendor/dakit.css
-	cp $(DAKIT)/dist/tokens.css src/web/vendor/dakit-tokens.css
-	cp $(DAKIT)/dist/dialogs.js src/web/vendor/dakit-dialogs.js
-	cp $(DAKIT)/dist/tabs.js src/web/vendor/dakit-tabs.js
-	cp $(DAKIT)/dist/collection.js src/web/vendor/dakit-collection.js
-	cp $(DAKIT)/fonts/*.woff2 src/web/vendor/fonts/
-	cp $(DAKIT)/scripts/check-borders.mjs src/web/vendor/check-borders.mjs
+	node $(DAKIT)/scripts/sync.mjs --dest src/web/vendor --files $(DAKIT_FILES)
 
 # Fail on forbidden accent borders in the console (dakit "No colored edge accents").
 check-borders:
