@@ -165,3 +165,17 @@ document.addEventListener('click', (event) => {
     button.setAttribute('aria-selected', String(button === tab));
   });
 });
+
+/* dakit "Action placement": a collection's create rides right after its
+   title (or after the filters that scope it), never in the page header.
+   The button is dakit's own (vendor/dakit-collection.js): "+ Label", small,
+   primary unless `variant` says otherwise; the page's one shortcut create
+   carries data-dk-create and `c` presses it. Appended to `lead`, the
+   collection header's (or toolbar's) .dk-collection-header__lead. */
+export function collectionCreate(lead, { id, label, onClick, variant, shortcut, data = {} }) {
+  const button = globalThis.dakitCollection.createButton({ label, onClick, variant, shortcut });
+  if (id) button.id = id;
+  Object.assign(button.dataset, data);
+  lead.append(button);
+  return button;
+}

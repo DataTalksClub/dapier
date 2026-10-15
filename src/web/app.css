@@ -1674,6 +1674,11 @@ body[data-view="designer"] #designer-back { display: inline-flex; }
 .home-create-actions .dk-button.workflow-run-link:hover { border-color: var(--dk-border-control-hover); background: var(--dk-bg-hover); }
 .home-panel > .section-head { flex-wrap: nowrap; }
 .home-panel > .section-head h2 { flex: none; }
+/* A band that is a dakit collection header ("Your workflows [+ New
+   workflow] ... 7 workflows") wraps as a unit: the title and its create
+   stay together, the meta and secondary links trail. */
+.home-panel > .section-head.dk-collection-header,
+.data-panel > .section-head.dk-collection-header { flex-wrap: wrap; }
 /* A band that holds a control keeps the block gap around it. */
 .home-panel > .section-head:has(.dk-button), .data-panel > .section-head:has(.dk-button) { padding-block: var(--dk-gap-block); }
 @media (max-width: 560px) {

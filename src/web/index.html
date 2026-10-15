@@ -111,14 +111,16 @@
         <div class="table-wrap"><table><thead><tr><th>When</th><th>Provider / model</th><th>Workflow / test</th><th>Tokens in / out</th><th>USD</th><th>Source</th></tr></thead><tbody id="costs-rows"></tbody></table></div>
       </section>
       <section class="view active" data-page="overview">
-        <div class="page-tools primary-tools"><a class="dk-button dk-button--primary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         <div id="overview-attention" class="attention-panel" aria-live="polite"></div>
         <section class="home-panel" id="overview-errors-panel" aria-labelledby="overview-errors-title">
           <div class="section-head"><h2 id="overview-errors-title">Failures to fix</h2><p id="overview-errors-empty" class="sub" hidden title="A failure a successful replay settled, or one marked fixed, drops out of this list.">None in the last 7 days</p><button id="overview-errors-send-digest" class="dk-button dk-button--secondary dk-button--sm" type="button">Send digest now</button></div>
           <div id="overview-errors-table" class="table-wrap"><table class="home-errors-table"><colgroup><col class="col-wf"><col class="col-count"><col class="col-when"><col></colgroup><thead><tr><th>Workflow</th><th class="num">Failed</th><th>Last failure</th><th>Error</th></tr></thead><tbody id="overview-errors"></tbody></table></div>
         </section>
         <section class="home-panel" aria-labelledby="home-workflows-title">
-          <div class="section-head"><h2 id="home-workflows-title">Your workflows</h2><p class="sub" id="home-workflow-count"></p><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows</a></div>
+          <header class="section-head dk-collection-header">
+            <div class="dk-collection-header__lead" id="home-workflows-lead"><h2 id="home-workflows-title" class="dk-collection-header__title">Your workflows</h2></div>
+            <div class="dk-collection-header__trail"><span class="dk-collection-header__meta" id="home-workflow-count"></span><a class="text-link view-link" href="/workflows" data-target="workflows">All workflows</a></div>
+          </header>
           <div id="overview-workflows" class="home-workflows"></div>
           <div id="overview-workflows-empty" class="empty-state" hidden><h3>Make your first automation</h3><p>Create a workflow. Connect the accounts it needs, test it, then publish.</p><a class="dk-button dk-button--secondary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
         </section>

@@ -2,7 +2,7 @@
 import { createOverviewLoader } from '../overview-loader.js';
 import { homeModel } from '../home-model.js';
 import { state } from '../state.js';
-import { $, icons, showApp, notice, rowActions, whenMenusClosed, openWhenReady } from '../ui.js';
+import { $, icons, showApp, notice, rowActions, whenMenusClosed, openWhenReady, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, statusDot, runStatusLine, runStatusDot, runStatusTitle, statusLabel, triggerLabel, configRows, pad2, formatTimestamp } from '../format.js';
 import { icon } from '../icons.js';
@@ -463,6 +463,11 @@ async function searchWorkflows() {
   }
   renderWorkflows();
 }
+
+/* Home's one create sits on the collection it creates into: "Your
+   workflows [+ New workflow]". main.js's [data-new-workflow] handler opens
+   the designer. */
+collectionCreate($('#home-workflows-lead'), { id: 'home-new-workflow', label: 'New workflow', data: { newWorkflow: '' } });
 
 $('#workflow-search').addEventListener('input', () => {
   clearTimeout(searchWorkflows.timer);
