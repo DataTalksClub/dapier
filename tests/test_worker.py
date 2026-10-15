@@ -100,6 +100,23 @@ def test_is_pending_raises_leasebusy_while_lease_is_live(monkeypatch):
         worker._is_pending("youtube-slack", "notify", EVENT)
 
 
+def test_mark_reused_row_never_blocks_takeover(monkeypatch):
+    """A reused row with no lease_until could never satisfy _is_pending's
+    ``lease_until < now`` takeover branch (a missing attribute compares
+    false), so a replay-from-step into a condition branch wedged in
+    LeaseBusy until the record dead-lettered (live 2026-10-15, Lidl
+    invoice replay). Reused rows must be born takeable."""
+    calls = []
+    _patch_table(monkeypatch, calls)
+
+    now = int(time.time())
+    worker._mark_reused("invoice-intake", EVENT, action_id="route.then.email-date")
+    item = calls[0][1]["Item"]
+    assert item["status"] == "reused"
+    assert int(item["lease_until"]) <= now
+    assert int(item["expires_at"]) > now
+
+
 def test_mark_completed_sets_finished(monkeypatch):
     calls = []
     _patch_table(monkeypatch, calls)

@@ -563,6 +563,13 @@ def _mark_reused(workflow_id, event, *, action_id, action_type=None, output=None
         "event_type": event.get("event"),
         "correlation_id": event.get("correlation_id") or event.get("id"),
         "status": "reused",
+        # Already expired on purpose: when the resumed segment re-executes a
+        # step that also carries a reused marker (the from-step sits inside a
+        # condition branch), _is_pending's takeover branch needs
+        # ``lease_until < now`` to succeed. A row without the attribute can
+        # never be taken over — a live case pinned this replay in LeaseBusy
+        # until the record dead-lettered.
+        "lease_until": now,
         "started_at": _now_iso(),
         "finished_at": _now_iso(),
         "expires_at": now + 90 * 86400,
