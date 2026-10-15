@@ -70,7 +70,7 @@ def test_workspace_shows_its_tail(js):
 def test_engine_and_capabilities_render_as_separate_items():
     """The old cell glued capabilities and engine into one run of text
     ("Noneclaude"); the engine is now its own badge."""
-    assert 'class="dk-badge worker-engine"' in SOURCE
+    assert 'class="dk-badge badge-muted worker-engine"' in SOURCE
     assert 'class="worker-capabilities"' in SOURCE
     assert "|| 'None'" not in SOURCE
 

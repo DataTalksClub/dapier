@@ -140,7 +140,7 @@ function endpointRow(hook) {
 
 function deliveryRow(row) {
   const id = escapeHtml(row.delivery_id);
-  const badges = [row.test && '<span class="dk-chip">test</span>', row.replay && '<span class="dk-chip">replay</span>'].filter(Boolean).join('');
+  const badges = [row.test && '<span class="dk-badge badge-muted">test</span>', row.replay && '<span class="dk-badge badge-muted">replay</span>'].filter(Boolean).join('');
   const facts = [KIND_LABEL[row.kind] ? `${KIND_LABEL[row.kind]} ${row.kind === 'webhook' ? 'request' : 'update'}` : 'Request', formatSize(row.size_bytes),
     row.response_status ? `answered ${row.response_status}` : ''].filter((part) => part && part !== '—');
   return activityRow({
@@ -290,7 +290,7 @@ function renderDelivery(row, deliveryId) {
     ['Delivery id', row.delivery_id],
   ].filter(([, value]) => value !== null && value !== undefined && value !== '');
   $('#hook-delivery-detail').innerHTML = `
-    <div class="hook-delivery-summary activity-outcome">${outcomeLine(row)}${row.test ? '<span class="dk-chip">test request</span>' : ''}</div>
+    <div class="hook-delivery-summary activity-outcome">${outcomeLine(row)}${row.test ? '<span class="dk-badge badge-muted">test request</span>' : ''}</div>
     <dl class="detail-list">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>
     <section><h3 class="hook-section-title">Workflow runs</h3>${runsBlock(row)}</section>
     <section><h3 class="hook-section-title">Request headers</h3>${headersBlock(row.headers)}</section>

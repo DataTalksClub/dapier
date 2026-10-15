@@ -531,8 +531,8 @@ function senderChip(route) {
 function addressItem({ label, kind = '', copy = '', handlers, route = '' }) {
   const off = handlers.filter((handler) => handler.status && handler.status !== 'enabled').length;
   const chips = [];
-  if (kind) chips.push(`<span class="dk-chip">${escapeHtml(kind)}</span>`);
-  else chips.push(`<span class="dk-chip">${escapeHtml(senderChip(route))}</span>`);
+  if (kind) chips.push(`<span class="dk-badge badge-muted">${escapeHtml(kind)}</span>`);
+  else chips.push(`<span class="dk-badge badge-muted">${escapeHtml(senderChip(route))}</span>`);
   return sourceRow({
     attrs: `data-email-select="${escapeHtml(route)}"`,
     selected: Boolean(route) && selectedKey === route,

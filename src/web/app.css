@@ -76,11 +76,16 @@ input:not([class*="dk-"]), select:not([class*="dk-"]) {
   width: 100%;
   border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
-  background: var(--dk-bg-page);
-  padding: 0 var(--dk-space-3);
+  /* background-color and padding-left only: the kit's base layer gives every
+     select its chevron (background-image) and the right padding that clears
+     it, and an unlayered shorthand here would wipe both. */
+  background-color: var(--dk-bg-page);
+  padding-block: 0;
+  padding-left: var(--dk-space-3);
   font-size: var(--dk-text-md);
   color: var(--dk-text-primary);
 }
+input:not([class*="dk-"]) { padding-right: var(--dk-space-3); }
 input:hover:not(:disabled):not([type="checkbox"]):not([class*="dk-"]), select:hover:not(:disabled):not([class*="dk-"]) { border-color: var(--dk-border-strong); }
 input::placeholder, textarea::placeholder { color: var(--dk-text-muted); opacity: 1; }
 textarea:not([class*="dk-"]) {
@@ -116,6 +121,10 @@ input:not([class*="dk-"]):focus-visible, select:not([class*="dk-"]):focus-visibl
 
 .login-formless .form-error { min-height: 0; }
 .login-foot { margin: 0 auto; padding: var(--dk-space-5) var(--dk-space-6); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
+
+/* Data reads as data: every time the console prints (absolute or "3 h
+   ago") is mono, tabular, and never splits across lines on a phone. */
+.dk-main time, .worker-started { font-family: var(--dk-font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* --- shell and page header ----------------------------------------------
    The app shell is dakit's (docs/shell.md: .dk-shell, .dk-sidebar rail and
@@ -581,6 +590,9 @@ tr.inbox-open { cursor: pointer; }
 .worker-stack > .worker-clip, .worker-status > .cell-sub { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .worker-status > .status { white-space: nowrap; }
 .worker-task { font-weight: var(--dk-weight-medium); }
+/* A neutral label (test, replay, engine, sender count): dakit badges are
+   fill-only, so the neutral one is a muted fill with no perimeter. */
+.badge-muted { color: var(--dk-text-muted); background: var(--dk-bg-hover); }
 .worker-engine { font-family: var(--dk-font-mono); font-weight: var(--dk-weight-medium); }
 .worker-capabilities { font-family: var(--dk-font-mono); font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
 .worker-path { font-size: var(--dk-text-sm); color: var(--dk-text-muted); }
@@ -1069,9 +1081,9 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
 .workflow-id { display: block; margin-top: var(--dk-space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
 .workflow-label .workflow-id { font-weight: var(--dk-weight-regular); }
 .cell-tags { display: flex; flex-wrap: nowrap; gap: var(--dk-space-1); margin-top: var(--dk-space-1); overflow: hidden; }
-.tag-chip { display: inline-block; flex: none; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--dk-space-2); border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-full); background: var(--dk-bg-muted); color: var(--dk-text-primary); font-size: var(--dk-text-xs); line-height: 1.6; white-space: nowrap; }
+.tag-chip { display: inline-block; flex: none; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--dk-space-2); border-radius: var(--dk-radius-full); background: var(--dk-bg-hover); color: var(--dk-text-primary); font-size: var(--dk-text-xs); line-height: 1.6; white-space: nowrap; }
 /* The folder chip: dashed, so the flat folder reads as a container. */
-.folder-chip { border-style: dashed; font-weight: var(--dk-weight-semibold); }
+.folder-chip { font-weight: var(--dk-weight-semibold); }
 /* Apps: brand marks in small bordered tiles, the middle collapsed to +N. */
 .app-strip { display: inline-flex; align-items: center; gap: var(--dk-space-1); vertical-align: middle; }
 .app-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); }
@@ -1493,7 +1505,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 .activity-primary > :first-child:not(:only-child) { max-width: 60%; }
 .activity-primary > :first-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-primary .mono { font-weight: var(--dk-weight-medium); }
-.activity-primary .dk-chip { flex: none; font-weight: var(--dk-weight-regular); }
+.activity-primary .badge-muted { flex: none; font-weight: var(--dk-weight-regular); }
 .activity-secondary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 .activity-outcome { display: grid; justify-items: start; gap: var(--dk-space-1); min-width: 0; }
 .activity-outcome .status { max-width: 100%; }

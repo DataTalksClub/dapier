@@ -188,7 +188,7 @@ function fireRow(fire) {
     attrs: `data-fire-schedule="${escapeHtml(fire.schedule_id)}"${run ? ` data-run="${escapeHtml(run.run_id)}"` : ''}`,
     label: run ? `Open the run from ${fire.schedule_id}` : `Open ${fire.schedule_id}`,
     when: whenHtml(fire.at),
-    primary: `<span class="mono">${escapeHtml(fire.schedule_id)}</span>${fire.manual ? '<span class="dk-chip">Run now</span>' : ''}`,
+    primary: `<span class="mono">${escapeHtml(fire.schedule_id)}</span>${fire.manual ? '<span class="dk-badge badge-muted">Run now</span>' : ''}`,
     secondary: escapeHtml(fire.manual ? `Started by hand${byLine(fire)}`
       : fire.outcome === 'paused' || fire.outcome === 'resumed' ? 'Schedule changed' : 'On schedule'),
     outcome: fireOutcome(fire),
