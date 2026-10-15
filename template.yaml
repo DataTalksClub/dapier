@@ -29,6 +29,13 @@ Parameters:
       Legacy datamailer raw bucket that still receives dtcdev.click inbound
       mail from the us-east-1 SES receipt rule; its objects publish through
       EmailIngressFunction until the relay cutover retires the bucket.
+  LegacyInboundEmailTopicArn:
+    Type: String
+    Default: arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events
+    Description: >
+      Datamailer SNS topic the us-east-1 SES receipt rule still publishes
+      inbound events to; allowed alongside the pinned topic so mail keeps
+      flowing until the relay cutover retires the legacy chain.
   InboundEmailTopicArn:
     Type: String
     Default: arn:aws:sns:eu-west-1:817685572750:relay-sandbox-inbound-email-events
@@ -916,7 +923,9 @@ Resources:
             Resource: !GetAtt EventQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !Ref InboundEmailTopicArn
+                aws:SourceArn:
+                  - !Ref InboundEmailTopicArn
+                  - !Ref LegacyInboundEmailTopicArn
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue
