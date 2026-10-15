@@ -1,486 +1,334 @@
 /* Device-pairing approval for `dapier auth login` (see /device).
 
-   Two steps, matching the family's device-login flow: the person
-   reviews what is asking (machine label, requesting IP, age, time
-   left) and Deny is exactly as easy as Authorize. A ?code= link only
-   fills the field — it never approves. One card, one state at a time;
-   focus moves to the step heading after every state change, and a
-   stray Enter never grants access. */
-(function () {
-  "use strict";
+   dakit's device-login page (docs/device-login.md): one .dk-auth-card,
+   one state at a time — Enter the code, Review what is asking (machine
+   label, requesting IP, age, time left, a different-network warning) and
+   Deny or Authorize with equal weight, then a Result. A ?code= link only
+   fills the field; it never looks up or approves. Focus moves to the
+   state's heading after every change, so a stray Enter never grants
+   access. Code normalising and the code field come from the vendored
+   dakit device-code.js; validation accepts exactly the alphabet the
+   server issues (dakit's canonical one). */
+import {
+  USER_CODE_ALPHABET,
+  normalizeUserCode,
+  formatUserCode,
+  describeUserCodeError,
+  bindCodeInput,
+} from "/assets/vendor/device-code.js";
 
-  // The alphabet the server issues codes from. Validation must accept
-  // every code the server can issue; lowercase is folded, never offending.
-  var ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789";
-  var CODE_LENGTH = 8;
-  var SEPARATORS = /[\s\-–—._]/g;
-  var CODE_LIFETIME_MINUTES = 15;
+/* ---- canonical host ---- */
 
-  /* ---- canonical host ---- */
+// The CLI can be pointed at a raw API host; this page is only useful on
+// the canonical console origin, where the sign-in session cookie lives.
+// Raw AWS API hosts bounce there (keeping the code); every other host --
+// canonical, localhost, a custom domain -- is left alone.
+var CANONICAL_ORIGIN = "https://dapier.dtcdev.click";
 
-  // The CLI can be pointed at a raw API host; this page is only useful on
-  // the canonical console origin, where the sign-in session cookie lives.
-  // Raw AWS API hosts bounce there (keeping the code); every other host --
-  // canonical, localhost, a custom domain -- is left alone.
-  var CANONICAL_ORIGIN = "https://dapier.dtcdev.click";
+function isRawApiHost(hostname) {
+  return typeof hostname === "string" &&
+    (hostname.indexOf(".lambda-url.") !== -1 ||
+     hostname.slice(-7) === ".on.aws" ||
+     hostname.indexOf(".execute-api.") !== -1);
+}
 
-  function isRawApiHost(hostname) {
-    return typeof hostname === "string" &&
-      (hostname.indexOf(".lambda-url.") !== -1 ||
-       hostname.slice(-7) === ".on.aws" ||
-       hostname.indexOf(".execute-api.") !== -1);
-  }
+function canonicalDeviceRedirect(hostname, rawCode) {
+  if (!isRawApiHost(hostname)) return null;
+  return CANONICAL_ORIGIN + "/device" +
+    (rawCode ? "?code=" + encodeURIComponent(rawCode) : "");
+}
 
-  function canonicalDeviceRedirect(hostname, rawCode) {
-    if (!isRawApiHost(hostname)) return null;
-    return CANONICAL_ORIGIN + "/device" +
-      (rawCode ? "?code=" + encodeURIComponent(rawCode) : "");
-  }
+/* ---- end canonical host ---- */
 
-  /* ---- end canonical host ---- */
+const APP = "Dapier";
+const CLI = "dapier";
+const CODE_LIFETIME_MINUTES = 15;   // device_sessions.PAIRING_TTL_SECONDS
+const SESSION_LIFETIME_DAYS = 30;   // device_sessions.SESSION_TTL_SECONDS
 
-  var title = document.getElementById("device-title");
-  var lede = document.getElementById("device-lede");
-  var body = document.getElementById("device-body");
-  var foot = document.getElementById("device-foot");
-  var identity = document.getElementById("device-identity");
+const card = document.getElementById("device-card");
+const identity = document.getElementById("device-identity");
 
-  var code = "";
-  var actor = null;
-  var grant = null;
-  var phase = "enter";
-  var pending = "";
-  var failure = null;
-  var timer = null;
-  var serverOffset = 0;
-  var sequence = 0;
-  var retryAt = 0;
-  var lastAction = null;
-  var prefilled = false;
+let actor = null;      // the signed-in email, or null
+let code = "";         // the code as typed / reviewed (display form)
+let prefilled = false;
+let seq = 0;           // request sequencing: a stale response never paints
+let timer = null;
+let lastAction = null; // what "Try again" repeats
 
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+const ICONS = {
+  check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2"/><path d="M12 9v4M12 17h.01"/>',
+};
 
-  function stopTimer() {
-    if (timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
-  }
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
 
-  /* ---- the code: fold case and separators, never truncate ---- */
+function icon(name, cls) {
+  return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+}
 
-  function compact(raw) {
-    return String(raw || "").toUpperCase().replace(SEPARATORS, "");
-  }
-
-  function formatCode(raw) {
-    var value = compact(raw);
-    var out = value.slice(0, 4);
-    if (value.length > 4) out += "-" + value.slice(4, CODE_LENGTH);
-    if (value.length > CODE_LENGTH) out += "-" + value.slice(CODE_LENGTH);
-    return out;
-  }
-
-  function normalizeCode(raw) {
-    var value = compact(raw);
-    var offending = "";
-    for (var i = 0; i < value.length; i++) {
-      var char = value[i];
-      if ((char < "A" || char > "Z") && (char < "0" || char > "9")) continue;
-      if (ALPHABET.indexOf(char) === -1 && !offending) offending = char;
-    }
-    if (!value) return { ok: false, error: "empty", display: "", length: 0 };
-    if (value.length < CODE_LENGTH)
-      return { ok: false, error: "too_short", display: formatCode(value), length: value.length };
-    if (value.length > CODE_LENGTH)
-      return { ok: false, error: "too_long", display: formatCode(value), length: value.length };
-    if (offending)
-      return { ok: false, error: "invalid_char", display: formatCode(value),
-               length: value.length, offending: offending };
-    return { ok: true, code: value, display: formatCode(value), length: value.length };
-  }
-
-  function describeError(result) {
-    if (result.error === "too_short")
-      return "Codes have 8 characters. This one has " + result.length + ".";
-    if (result.error === "too_long")
-      return "Codes have 8 characters. This one has " + result.length +
-        ". Check for an extra character.";
-    if (result.error === "invalid_char")
-      return "Codes don\u2019t use \u201C" + result.offending +
-        "\u201D. Check the code in your terminal.";
-    return "";
-  }
-
-  /* ---- plumbing ---- */
-
-  function api(path, options) {
-    options = options || {};
-    return fetch(path, {
-      method: options.method || "GET",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: options.body ? { "content-type": "application/json" } : {},
-      body: options.body,
-    }).then(function (response) {
-      var retryAfter = Number(response.headers.get("retry-after")) || 60;
-      return response.json().catch(function () { return {}; }).then(function (data) {
-        if (!response.ok) {
-          var error = new Error((data && data.error) || "Request failed");
-          error.status = response.status;
-          error.retryAfter = retryAfter;
-          throw error;
-        }
-        return data;
-      });
-    });
-  }
-
-  function setLede(text) {
-    lede.textContent = text;
-  }
-
-  function render(focus) {
-    stopTimer();
-    body.replaceChildren();
-    foot.replaceChildren();
-    title.classList.remove("device-ok");
-    if (failure) renderFailure();
-    else if (phase === "review") renderReview();
-    else if (phase === "approved" || phase === "denied") renderResult();
-    else renderEnter();
-    if (focus !== false) title.focus({ preventScroll: true });
-  }
-
-  /* ---- states ---- */
-
-  function renderEnter() {
-    title.textContent = "Authorize a device";
-    setLede("A dapier CLI asked to sign in as you. Enter the code shown in your terminal.");
-    var form = el("form", "device-form");
-    var field = el("div", "device-field");
-    var label = el("label", "", "Device code");
-    label.htmlFor = "pair-code";
-    var input = el("input");
-    input.id = "pair-code";
-    input.type = "text";
-    input.value = code;
-    input.placeholder = "XXXX-XXXX";
-    input.autocomplete = "off";
-    input.autocapitalize = "characters";
-    input.spellcheck = false;
-    input.enterKeyHint = "go";
-    input.setAttribute("aria-describedby", "pair-hint pair-error");
-    var hint = el("p", "device-hint",
-      prefilled ? "Check that this matches your terminal exactly." : "");
-    hint.id = "pair-hint";
-    var error = el("p", "device-error");
-    error.id = "pair-error";
-    error.setAttribute("role", "alert");
-    field.append(label, input, hint, error);
-    var actions = el("div", "device-actions");
-    var submit = el("button", "device-primary", "Continue");
-    submit.type = "submit";
-    actions.append(submit);
-    form.append(field, actions);
-
-    function update(submitted) {
-      var result = normalizeCode(input.value);
-      submit.disabled = !result.ok || Boolean(pending) || !actor;
-      submit.setAttribute("aria-busy", String(Boolean(pending)));
-      error.textContent =
-        !result.ok && (submitted || (result.error !== "too_short" && result.error !== "empty"))
-          ? describeError(result) : "";
-      input.setAttribute("aria-invalid", error.textContent ? "true" : "false");
-    }
-    input.addEventListener("input", function () {
-      var caretAtEnd = input.selectionStart === input.value.length;
-      code = input.value;
-      input.value = formatCode(input.value);
-      if (caretAtEnd) input.setSelectionRange(input.value.length, input.value.length);
-      sequence++; // an edit cancels any in-flight lookup
-      pending = "";
-      submit.textContent = "Continue";
-      update(false);
-    });
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      update(true);
-      if (!submit.disabled) lookup();
-    });
-    body.append(form);
-    update(false);
-  }
-
-  function renderReview() {
-    title.textContent = "Authorize this device?";
-    setLede("It will be able to act as " + (actor || "your signed-in account") +
-      " in dapier for 30 days, until you sign it out.");
-
-    var started = new Date(grant.created_at);
-    var minutes = Math.max(0, Math.floor((Date.now() + serverOffset - started.getTime()) / 60000));
-    var facts = el("dl", "device-facts");
-    [["Code", code, false],
-     ["Machine", grant.label || "unknown machine", true],
-     ["Requested from", grant.request_ip || "unknown", false],
-     ["Started", started.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) +
-       " \u00B7 " + minutes + " min ago", false],
-     ["Expires in", "", false]].forEach(function (row) {
-      var dd = el("dd", "device-mono");
-      dd.append(el("span", "", row[1]));
-      if (row[2]) dd.append(el("small", "device-reported", "reported by the machine"));
-      if (row[0] === "Expires in") {
-        dd.id = "device-countdown";
-        dd.setAttribute("aria-live", "off");
+function api(path, options = {}) {
+  return fetch(path, {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: options.body ? { "content-type": "application/json" } : {},
+    body: options.body,
+  }).then((response) => {
+    const retryAfter = Number(response.headers.get("retry-after")) || 60;
+    return response.json().catch(() => ({})).then((data) => {
+      if (!response.ok) {
+        const error = new Error((data && data.error) || "Request failed");
+        error.status = response.status;
+        error.retryAfter = retryAfter;
+        throw error;
       }
-      facts.append(el("dt", "", row[0]), dd);
+      return data;
     });
-    body.append(facts);
+  });
+}
 
-    var actions = el("div", "device-actions device-actions--split");
-    var deny = el("button", "device-secondary", pending === "deny" ? "Denying\u2026" : "Deny");
-    var approve = el("button", "device-primary",
-      pending === "approve" ? "Authorizing\u2026" : "Authorize");
-    deny.type = "button";
-    approve.type = "button";
-    deny.disabled = Boolean(pending);
-    approve.disabled = Boolean(pending);
-    if (pending) {
-      deny.setAttribute("aria-busy", "true");
-      approve.setAttribute("aria-busy", "true");
+function signInHref() {
+  return "/auth/login?next=" + encodeURIComponent("/device" + (code ? "?code=" + formatUserCode(code) : ""));
+}
+
+/* The identity line: which account the grant goes to, and a way out. */
+function renderIdentity() {
+  identity.innerHTML = actor
+    ? `${esc(actor)} · <a href="${esc(signInHref())}">Switch account</a>`
+    : `Not signed in · <a href="${esc(signInHref())}">Sign in</a>`;
+}
+
+function paint(html, { focusTitle = true } = {}) {
+  clearInterval(timer);
+  timer = null;
+  card.innerHTML = html;
+  if (focusTitle) card.querySelector(".dk-auth-card__title")?.focus();
+}
+
+function head(title, lede, { iconHtml = "", status = false } = {}) {
+  return `<div class="dk-auth-card__head"${status ? ' role="status"' : ""}>
+    <h1 class="dk-auth-card__title" id="card-title" tabindex="-1">${iconHtml}${title}</h1>
+    ${lede ? `<p class="dk-auth-card__lede">${lede}</p>` : ""}</div>`;
+}
+
+/* ---- Enter ---- */
+
+function renderEnter({ error = "" } = {}) {
+  paint(`${head("Authorize a device", `${APP} CLI asked to sign in as you. Enter the code shown in your terminal.`)}
+    <form class="dk-auth-card__body" id="enter" novalidate>
+      <div>
+        <label class="dk-label" for="device-code">Device code</label>
+        <input class="dk-input dk-code-input" id="device-code" name="code" placeholder="XXXX-XXXX"
+          autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="go"
+          aria-describedby="code-hint code-error" value="${esc(formatUserCode(code))}">
+        <p class="dk-hint" id="code-hint"${prefilled ? "" : " hidden"}>Check that this matches your terminal exactly.</p>
+        <p class="dk-field-error" id="code-error" role="alert"${error ? "" : " hidden"}>${esc(error)}</p>
+      </div>
+      <div class="dk-auth-card__actions"><button class="dk-button dk-button--primary dk-button--lg" type="submit" id="continue">Continue</button></div>
+    </form>`, { focusTitle: prefilled || Boolean(error) });
+  const input = card.querySelector("#device-code");
+  const button = card.querySelector("#continue");
+  const errorEl = card.querySelector("#code-error");
+  let result = normalizeUserCode(code);
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.hidden = !message;
+    input.setAttribute("aria-invalid", String(Boolean(message)));
+  };
+  const sync = () => { button.disabled = !result.ok; };
+  input.addEventListener("dk-code-change", (event) => {
+    result = event.detail;
+    code = input.value;
+    seq++; // an edit cancels any in-flight lookup
+    button.textContent = "Continue";
+    button.removeAttribute("aria-busy");
+    sync();
+    // Too long and invalid characters show while typing; too short waits.
+    showError(result.error === "too_long" || result.error === "invalid_char" ? describeUserCodeError(result) : "");
+  });
+  bindCodeInput(input, { alphabet: USER_CODE_ALPHABET });
+  if (error) input.setAttribute("aria-invalid", "true");
+  sync();
+  if (!prefilled && !error) input.focus();
+  card.querySelector("#enter").addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!result.ok) { showError(describeUserCodeError(result)); input.focus(); return; }
+    if (!actor) { renderError("signin"); return; }
+    lookup(result.display, button);
+  });
+}
+
+function lookup(display, button) {
+  const mine = ++seq;
+  code = display;
+  lastAction = () => lookup(display);
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Checking…";
+    button.setAttribute("aria-busy", "true");
+  }
+  api("/api/agent/device/pending?code=" + encodeURIComponent(display))
+    .then((grant) => { if (mine === seq) renderReview(display, grant); })
+    .catch((error) => { if (mine === seq) fail(error); });
+}
+
+/* ---- Review ---- */
+
+function ago(ms) {
+  const minutes = Math.max(0, Math.floor(ms / 60000));
+  return minutes < 1 ? "just now" : minutes === 1 ? "1 min ago" : `${minutes} min ago`;
+}
+
+function renderReview(display, grant) {
+  const offset = Date.now() - (grant.server_now || Date.now() / 1000) * 1000; // server clock → local
+  const started = new Date(grant.created_at);
+  const startedAgo = Number.isNaN(started.getTime()) ? "" : ago(Date.now() - offset - started.getTime());
+  const warn = grant.same_network === false;
+  paint(`${head("Authorize this device?", `It will be able to act as <strong>${esc(actor || "your account")}</strong> in ${APP} for ${SESSION_LIFETIME_DAYS} days, until you sign it out.`)}
+    <div class="dk-auth-card__body">
+      <dl class="dk-dl device-facts">
+        <dt>Code</dt><dd class="dk-mono">${esc(display)}</dd>
+        <dt>Machine</dt><dd><span class="dk-mono">${esc(grant.label || "unknown machine")}</span><span class="dk-dl__note">reported by the machine</span></dd>
+        <dt>Requested from</dt><dd class="dk-mono">${esc(grant.request_ip || "unknown")}</dd>
+        <dt>Started</dt><dd class="dk-mono">${Number.isNaN(started.getTime()) ? "—" : `${esc(started.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))} · ${esc(startedAgo)}`}</dd>
+        <dt>Expires in</dt><dd class="dk-mono" id="expires"></dd>
+      </dl>
+      ${warn ? `<div class="dk-callout dk-callout--warning" id="net-warning">
+        ${icon("alert", "dk-callout__icon")}
+        <div class="dk-callout__body">
+          <span class="dk-callout__title">This request came from a different network.</span>
+          <span>Only continue if you started this login yourself on that machine.</span>
+          <label class="dk-check"><input type="checkbox" id="ack"> I started this login on that machine</label>
+        </div></div>` : ""}
+      <div class="dk-auth-card__actions">
+        <button class="dk-button dk-button--secondary dk-button--lg" type="button" id="deny">Deny</button>
+        <button class="dk-button dk-button--primary dk-button--lg" type="button" id="approve"${warn ? ' disabled aria-describedby="net-warning"' : ""}>Authorize</button>
+      </div>
+    </div>
+    <div class="dk-auth-card__foot"><span>Didn’t start this? Deny it. Nothing is shared.</span><span>Wrong account? <a href="${esc(signInHref())}">Switch account</a></span></div>`);
+  const expires = card.querySelector("#expires");
+  let announced = false;
+  const tick = () => {
+    const left = Math.max(0, Math.round((grant.expires_at * 1000 - (Date.now() - offset)) / 1000));
+    expires.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+    if (left <= 60) {
+      expires.insertAdjacentHTML("beforeend", ' <span class="dk-badge dk-badge--warning">ending</span>');
+      if (!announced) { announced = true; globalThis.dakitShell?.announce("One minute left to decide"); }
     }
-    deny.addEventListener("click", function () { decide(false); });
-    approve.addEventListener("click", function () { decide(true); });
-    actions.append(deny, approve);
-    body.append(actions);
+    if (left === 0 && !card.querySelector("[aria-busy]")) renderError("expired");
+  };
+  tick();
+  timer = setInterval(tick, 1000);
+  const approve = card.querySelector("#approve");
+  const deny = card.querySelector("#deny");
+  card.querySelector("#ack")?.addEventListener("change", (event) => { approve.disabled = !event.target.checked; });
+  approve.addEventListener("click", () => decide(display, true, approve, deny));
+  deny.addEventListener("click", () => decide(display, false, approve, deny));
+}
 
-    foot.append(el("p", "", "Didn\u2019t start this? Deny it. Nothing is shared."));
+/* Both decisions go through the same endpoint and the same guards; the
+   first click disables both, so neither can be sent twice. */
+function decide(display, approve, approveButton, denyButton) {
+  const mine = ++seq;
+  lastAction = null;
+  approveButton.disabled = denyButton.disabled = true;
+  const busy = approve ? approveButton : denyButton;
+  busy.textContent = approve ? "Authorizing…" : "Denying…";
+  busy.setAttribute("aria-busy", "true");
+  api("/api/agent/device/approve", {
+    method: "POST",
+    body: JSON.stringify({ user_code: display, approve }),
+  }).then((result) => { if (mine === seq) renderResult(result.status); })
+    .catch((error) => { if (mine === seq) fail(error); });
+}
 
-    var tick = function () {
-      var countdown = document.getElementById("device-countdown");
-      if (!countdown) return;
-      var seconds = Math.max(0, Math.ceil((grant.expires_at * 1000 - Date.now() - serverOffset) / 1000));
-      countdown.textContent = Math.floor(seconds / 60) + ":" +
-        String(seconds % 60).padStart(2, "0");
-      countdown.classList.toggle("device-expiring", seconds < 60);
-      if (!seconds && !pending) {
-        failure = {
-          kind: "expired", title: "Code expired", tone: "device-err",
-          message: "Codes last " + CODE_LIFETIME_MINUTES +
-            " minutes. Run `dapier auth login` again for a new one.",
-          action: "Enter another code",
-        };
-        render();
-      }
+/* ---- Result ---- */
+
+function renderResult(status) {
+  if (status === "approved") {
+    paint(`${head("Device authorized", "Return to your terminal. The CLI finishes signing in within a few seconds.", { iconHtml: icon("check", "dk-auth-card__icon--success"), status: true })}
+      <div class="dk-auth-card__body">
+        <div class="dk-code-block"><pre><code>${CLI} auth logout</code></pre><button class="dk-button dk-button--secondary dk-button--sm" type="button" data-dk-copy>Copy</button></div>
+        <p class="dk-hint">Run this on that machine to sign it out.</p>
+      </div>`);
+  } else {
+    paint(head("Request denied", `Nothing was authorized and the code no longer works. If you meant to sign in, run <code>${CLI} auth login</code> again.`, { status: true }));
+  }
+}
+
+/* ---- Errors: one sentence each, and one way forward ---- */
+
+const ERRORS = {
+  notfound: ["Code not found", "danger", `This code is wrong, expired, or already used. Run <code>${CLI} auth login</code> again for a new one.`, "Enter another code"],
+  expired: ["Code expired", "danger", `Codes last ${CODE_LIFETIME_MINUTES} minutes. Run <code>${CLI} auth login</code> again for a new one.`, "Enter another code"],
+  ratelimited: ["Slow down", "warning", "Too many codes tried from this account. Wait a few minutes and try again.", "Try again"],
+  signin: ["Sign in to continue", "warning", `Sign in to ${APP} to authorize this device. You’ll come back here with your code.`, "Sign in"],
+  network: [`Couldn’t reach ${APP}`, "", "Check your connection and try again. Your code is still valid until it expires.", "Try again"],
+};
+
+function fail(error) {
+  const status = error && error.status;
+  if (status === 404 || status === 409) renderError("notfound");
+  else if (status === 401) { actor = null; renderIdentity(); renderError("signin"); }
+  else if (status === 429) renderError("ratelimited", { retryAfter: error.retryAfter });
+  else renderError("network");
+}
+
+function renderError(kind, { retryAfter = 0 } = {}) {
+  const [title, tone, sentence, action] = ERRORS[kind];
+  paint(`${head(title, "")}
+    <div class="dk-auth-card__body">
+      <div class="dk-callout${tone ? ` dk-callout--${tone}` : ""}" role="alert"><div class="dk-callout__body"><span>${sentence}</span></div></div>
+      <div class="dk-auth-card__actions"><button class="dk-button dk-button--secondary dk-button--lg" type="button" id="recover">${action}</button></div>
+    </div>`);
+  const recover = card.querySelector("#recover");
+  recover.addEventListener("click", () => {
+    if (kind === "signin") { window.location.assign(signInHref()); return; }
+    if (kind === "notfound" || kind === "expired") {
+      seq++;
+      code = "";
+      prefilled = false;
+      renderEnter();
+      return;
+    }
+    if (lastAction) lastAction(); else renderEnter();
+  });
+  if (kind === "ratelimited") {
+    const until = Date.now() + retryAfter * 1000;
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+      recover.disabled = seconds > 0;
+      recover.innerHTML = seconds ? `Try again <span class="dk-mono">(${seconds}s)</span>` : "Try again";
+      if (!seconds) { clearInterval(timer); timer = null; }
     };
-    timer = setInterval(tick, 1000);
     tick();
+    timer = setInterval(tick, 1000);
   }
+}
 
-  function renderResult() {
-    var approved = phase === "approved";
-    title.textContent = approved ? "Device authorized" : "Request denied";
-    setLede(approved
-      ? "Return to your terminal. The CLI finishes signing in within a few seconds."
-      : "Nothing was authorized and the code no longer works. " +
-        "If you meant to sign in, run `dapier auth login` again.");
-    if (!approved) return;
-    title.classList.add("device-ok");
-    var command = el("div", "device-command");
-    var pre = el("pre");
-    var line = el("code", "", "dapier auth logout");
-    pre.append(line);
-    var copy = el("button", "device-secondary device-copy", "Copy");
-    copy.type = "button";
-    copy.addEventListener("click", function () {
-      if (navigator.clipboard) navigator.clipboard.writeText("dapier auth logout");
-      copy.textContent = "Copied";
+/* ---- boot ---- */
+
+function refreshIdentity() {
+  return fetch("/api/admin/me", { credentials: "same-origin", cache: "no-store" })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((me) => { actor = (me && (me.email || me.username)) || null; })
+    .catch(() => { actor = null; })
+    .then(() => {
+      renderIdentity();
     });
-    command.append(pre, copy, el("p", "device-hint", "Run this on that machine to sign it out."));
-    body.append(command);
-  }
+}
 
-  function renderFailure() {
-    title.textContent = failure.title;
-    setLede("");
-    var alert = el("div", "device-callout" + (failure.tone ? " " + failure.tone : ""));
-    alert.setAttribute("role", "alert");
-    alert.append(el("span", "", failure.message));
-    body.append(alert);
-    var actions = el("div", "device-actions");
-    var recovery = el("button", "device-primary", failure.action);
-    recovery.type = "button";
-    recovery.addEventListener("click", function () {
-      if (failure.kind === "signin") {
-        window.location.assign(signInHref());
-        return;
-      }
-      if (failure.kind === "notfound" || failure.kind === "expired") {
-        sequence++;
-        code = "";
-        grant = null;
-        phase = "enter";
-        prefilled = false;
-        failure = null;
-        render();
-        return;
-      }
-      failure = null;
-      lastAction();
-    });
-    actions.append(recovery);
-    body.append(actions);
-    if (failure.kind === "ratelimit" && retryAt > Date.now()) {
-      var tick = function () {
-        var seconds = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
-        recovery.disabled = seconds > 0;
-        recovery.textContent = seconds ? "Try again (" + seconds + "s)" : "Try again";
-        if (!seconds) stopTimer();
-      };
-      tick();
-      timer = setInterval(tick, 1000);
-    }
-  }
-
-  /* ---- actions ---- */
-
-  function lookup() {
-    if (pending || !actor) return;
-    var result = normalizeCode(code);
-    if (!result.ok) return;
-    var token = ++sequence;
-    pending = "lookup";
-    lastAction = lookup;
-    var submit = body.querySelector('button[type="submit"]');
-    if (submit) {
-      submit.disabled = true;
-      submit.textContent = "Checking\u2026";
-      submit.setAttribute("aria-busy", "true");
-    }
-    api("/api/agent/device/pending?code=" + encodeURIComponent(result.display))
-      .then(function (data) {
-        if (token !== sequence) return;
-        pending = "";
-        grant = data;
-        code = result.display;
-        serverOffset = (data.server_now || Date.now() / 1000) * 1000 - Date.now();
-        phase = "review";
-        render();
-      })
-      .catch(function (error) {
-        if (token !== sequence) return;
-        pending = "";
-        fail(error);
-      });
-  }
-
-  function decide(approve) {
-    if (pending || phase !== "review") return;
-    var token = ++sequence;
-    pending = approve ? "approve" : "deny";
-    render(false);
-    api("/api/agent/device/approve", {
-      method: "POST",
-      body: JSON.stringify({ user_code: code, approve: approve }),
-    }).then(function (result) {
-      if (token !== sequence) return;
-      pending = "";
-      phase = result.status;
-      grant = null;
-      render();
-    }).catch(function (error) {
-      if (token !== sequence) return;
-      pending = "";
-      fail(error);
-    });
-  }
-
-  function fail(error) {
-    if (error && (error.status === 404 || error.status === 409))
-      failure = {
-        kind: "notfound", title: "Code not found", tone: "device-err",
-        message: "This code is wrong, expired, or already used. " +
-          "Run `dapier auth login` again for a new one.",
-        action: "Enter another code",
-      };
-    else if (error && error.status === 401) {
-      actor = null;
-      updateIdentity();
-      failure = {
-        kind: "signin", title: "Sign in to continue", tone: "device-warn",
-        message: "Sign in to dapier to authorize this device. You\u2019ll come back here with your code.",
-        action: "Sign in",
-      };
-    } else if (error && error.status === 429) {
-      retryAt = Date.now() + (error.retryAfter || 60) * 1000;
-      failure = {
-        kind: "ratelimit", title: "Slow down", tone: "device-warn",
-        message: "Too many codes tried from this account. Wait a few minutes and try again.",
-        action: "Try again",
-      };
-    } else
-      failure = {
-        kind: "network", title: "Couldn\u2019t reach dapier", tone: "",
-        message: "Check your connection and try again. Your code is still valid until it expires.",
-        action: "Try again",
-      };
-    render();
-  }
-
-  /* ---- identity ---- */
-
-  function signInHref() {
-    return "/auth/login?next=" + encodeURIComponent("/device" + (code ? "?code=" + code : ""));
-  }
-
-  function updateIdentity() {
-    identity.replaceChildren();
-    identity.append(el("span", "",
-      actor ? "Signed in as " + actor + ". Approve only if the code matches your terminal."
-            : "Sign in to approve this dapier CLI request."));
-    var link = el("a", "", actor ? "Switch account" : "Sign in");
-    link.href = signInHref();
-    identity.append(document.createTextNode(" "));
-    identity.append(link);
-  }
-
-  function refreshIdentity() {
-    fetch("/api/admin/me", { credentials: "same-origin", cache: "no-store" })
-      .then(function (response) {
-        if (!response.ok) throw new Error("anonymous");
-        return response.json();
-      })
-      .then(function (me) {
-        if (!me || !me.username) throw new Error("anonymous");
-        actor = me.username;
-        updateIdentity();
-        var submit = body.querySelector('button[type="submit"]');
-        if (submit && phase === "enter" && !pending)
-          submit.disabled = !normalizeCode(code).ok;
-      })
-      .catch(function () {
-        actor = null;
-        updateIdentity();
-        var submit = body.querySelector('button[type="submit"]');
-        if (submit && phase === "enter") submit.disabled = true;
-      });
-  }
-
-  var params = new URLSearchParams(window.location.search);
-  code = formatCode(params.get("code") || "");
-  prefilled = Boolean(code);
-  var bounce = canonicalDeviceRedirect(window.location.hostname, code);
-  if (bounce) {
-    window.location.replace(bounce);
-    return;
-  }
+var params = new URLSearchParams(window.location.search);
+code = formatUserCode(params.get("code") || "");
+prefilled = Boolean(code);
+var bounce = canonicalDeviceRedirect(window.location.hostname, code);
+if (bounce) {
+  window.location.replace(bounce);
+} else {
+  // The code never lingers in history once it is in the field.
   if (code) history.replaceState(null, "", "/device");
-  updateIdentity();
-  render();
+  renderEnter();
   refreshIdentity();
-})();
+}

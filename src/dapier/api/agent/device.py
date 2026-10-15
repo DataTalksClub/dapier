@@ -125,6 +125,11 @@ def device_pending(event):
     facts = device_sessions.lookup(str(params.get("code", "")))
     if not facts:
         return _no_store(_json_response(404, {"error": "Unknown or expired code"}))
+    # The page warns (and asks for an acknowledgement) when the browser
+    # reviewing the request is not on the network that started it — the
+    # device-code phishing shape (dakit device-login.md §4.2).
+    caller = _client_ip(event)
+    facts["same_network"] = bool(caller) and caller == facts.get("request_ip")
     facts["server_now"] = int(time.time())
     return _no_store(_json_response(200, facts))
 

@@ -56,7 +56,7 @@ sync-dakit:
 
 # App-authored styles the dakit checkers judge. The generated designer bundle
 # (src/web/designer.js/.css) is checked through its sources in designer/src.
-DAKIT_CHECK_PATHS = src/web/app.css src/web/public.css src/web/device.css \
+DAKIT_CHECK_PATHS = src/web/app.css src/web/public.css \
 	src/web/index.html src/web/device.html src/web/designer.html \
 	src/web/public-home.html src/web/privacy.html src/web/terms.html \
 	src/web/js designer/src

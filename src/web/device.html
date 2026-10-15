@@ -5,24 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
-<title>Authorize device — dapier</title>
+<title>Authorize device — Dapier</title>
 <script src="/assets/js/theme-init.js"></script>
 <link rel="icon" href="/assets/favicon.svg">
 <link rel="stylesheet" href="/assets/vendor/dakit.css">
-<link rel="stylesheet" href="/assets/app.css">
-<link rel="stylesheet" href="/assets/device.css">
 </head>
 <body>
-<main class="device-card">
-  <p id="device-identity" class="device-fineprint" role="status">Checking your signed-in identity…</p>
-  <header class="device-head">
-    <h1 id="device-title" tabindex="-1">Authorize a device</h1>
-    <p id="device-lede" class="device-lede">A <code>dapier</code> CLI asked to sign in as you.
-    Enter the code shown in your terminal.</p>
+<div class="dk-auth-page">
+  <header class="dk-auth-page__bar">
+    <a class="dk-auth-page__brand" href="/">Dapier</a>
+    <p class="dk-auth-page__identity" id="device-identity" role="status">Checking your signed-in identity…</p>
   </header>
-  <div id="device-body"></div>
-  <footer id="device-foot" class="device-fineprint"></footer>
-</main>
-<script src="/assets/js/device.js"></script>
+  <main class="dk-auth-page__main">
+    <section class="dk-auth-card" id="device-card" aria-labelledby="card-title">
+      <div class="dk-auth-card__head"><h1 class="dk-auth-card__title" id="card-title" tabindex="-1">Authorize a device</h1>
+      <p class="dk-auth-card__lede">Loading…</p></div>
+    </section>
+  </main>
+</div>
+<div id="dk-live" class="dk-visually-hidden" aria-live="polite"></div>
+<script type="module" src="/assets/js/device.js"></script>
+<script src="/assets/vendor/shell.js"></script>
 </body>
 </html>

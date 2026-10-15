@@ -552,3 +552,17 @@ def test_peeks_are_rate_limited_per_account(monkeypatch, store):
     assert statuses[20] == 429
     limited = agent_api.route(pending_event, "GET", "/api/agent/device/pending")
     assert limited["headers"]["retry-after"]
+
+
+def test_review_facts_say_whether_the_reviewer_shares_the_requesting_network(monkeypatch, store):
+    _signed_in(monkeypatch)
+    pairing = _start_pairing(source_ip="203.0.113.7")
+    for reviewer_ip, same in (("203.0.113.7", True), ("198.51.100.23", False)):
+        event = _device_event("/api/agent/device/pending", method="GET", source_ip=reviewer_ip)
+        event["queryStringParameters"] = {"code": pairing["user_code"]}
+        response = agent_api.route(event, "GET", "/api/agent/device/pending")
+        assert response["statusCode"] == 200
+        facts = json.loads(response["body"])
+        assert facts["same_network"] is same
+        assert facts["request_ip"] == "203.0.113.7"
+        assert "user_code" not in facts and "device_code" not in facts

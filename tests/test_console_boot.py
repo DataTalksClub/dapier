@@ -24,7 +24,7 @@ import pytest
 from src.dapier.api.router import _static
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "web"
-CLASSIC_SCRIPTS = {"theme-init.js", "device.js"}
+CLASSIC_SCRIPTS = {"theme-init.js"}
 
 
 def test_console_javascript_modules_parse():

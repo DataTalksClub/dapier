@@ -14,7 +14,7 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
   Never link `../dakit` from the app. After changing dakit, run
   `make sync-dakit` and commit the refreshed vendor files; the copies must
   stay byte-identical to `dakit/dist`.
-- All app CSS (`src/web/app.css`, `designer.css`, `public.css`, `device.css`)
+- All app CSS (`src/web/app.css`, `designer.css`, `public.css`; the /device page is pure dakit)
   is written against `--dk-*` tokens only. No app-local hex values, radii, or
   shadows. The sanctioned exceptions are provider brand marks
   (Google/Slack/Zoom logos, full color) and the dapier remap of the token

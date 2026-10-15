@@ -54,7 +54,6 @@ def _static(path):
         DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
         # The CLI device-pairing page (dapier auth login).
         "/device": ("device.html", "text/html; charset=utf-8"),
-        "/assets/device.css": ("device.css", "text/css; charset=utf-8"),
         "/assets/js/device.js": ("js/device.js", "text/javascript; charset=utf-8"),
         "/assets/app.css": ("app.css", "text/css; charset=utf-8"),
         "/assets/public.css": ("public.css", "text/css; charset=utf-8"),
