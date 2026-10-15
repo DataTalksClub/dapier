@@ -153,24 +153,43 @@ def _delete_grant(store, pairing):
         store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
 
 
-def _bump_attempts(store, pairing):
-    """Atomic if_not_exists increment (the DataOps attempt counter)."""
-    result = store.update_item(
-        Key={"pk": pairing["pk"]},
-        UpdateExpression="SET #a = if_not_exists(#a, :zero) + :one",
-        ExpressionAttributeNames={"#a": "attempts"},
-        ExpressionAttributeValues={":zero": 0, ":one": 1},
-        ReturnValues="ALL_NEW",
-    )
-    attributes = (result or {}).get("Attributes") or {}
-    return int(attributes.get("attempts") or 0)
+def _conditional_failure(error):
+    """True for DynamoDB's ConditionalCheckFailedException (boto3 or a fake)."""
+    response = getattr(error, "response", None) or {}
+    return (response.get("Error") or {}).get("Code") == "ConditionalCheckFailedException" \
+        or type(error).__name__ == "ConditionalCheckFailedException"
+
+
+# The one guard every peek and decision passes, evaluated by DynamoDB in the
+# same write that spends the attempt: still pending, not expired, and under
+# the shared budget. The counter is incremented in place, never assigned from
+# a value read earlier, so concurrent peeks and decisions can never spend more
+# than DEVICE_MAX_ATTEMPTS between them.
+_GUARD = ("attribute_exists(#pk) AND #st = :pending AND #ttl > :now "
+          "AND (attribute_not_exists(#a) OR #a < :max)")
+_GUARD_NAMES = {"#pk": "pk", "#st": "status", "#ttl": "ttl", "#a": "attempts"}
+
+
+def _guard_values(now):
+    return {":pending": "pending", ":now": int(now), ":max": DEVICE_MAX_ATTEMPTS,
+            ":zero": 0, ":one": 1}
+
+
+def _spend_or_destroy(store, pairing, error):
+    """A failed guard: past the budget, the grant is destroyed."""
+    if not _conditional_failure(error):
+        raise error
+    current = store.get_item(Key={"pk": pairing["pk"]}).get("Item")
+    if current and int(current.get("attempts") or 0) >= DEVICE_MAX_ATTEMPTS:
+        _delete_grant(store, current)
 
 
 def lookup(user_code, table_ref=None, now=None):
     """The approval page's review facts for one pending pairing, or None.
 
-    Every peek counts toward the attempt budget; past it the pairing is
-    destroyed and later peeks look like unknown codes.
+    Every peek atomically spends one attempt from the pairing's shared
+    budget; past it the pairing is destroyed and later peeks look like
+    unknown codes.
     """
     code = normalize_user_code(user_code)
     if not code:
@@ -180,8 +199,16 @@ def lookup(user_code, table_ref=None, now=None):
     pairing = _pairing_for_code(store, code, now)
     if not pairing or pairing.get("status") != "pending":
         return None
-    if _bump_attempts(store, pairing) > DEVICE_MAX_ATTEMPTS:
-        _delete_grant(store, pairing)
+    try:
+        store.update_item(
+            Key={"pk": pairing["pk"]},
+            UpdateExpression="SET #a = if_not_exists(#a, :zero) + :one",
+            ConditionExpression=_GUARD,
+            ExpressionAttributeNames=_GUARD_NAMES,
+            ExpressionAttributeValues=_guard_values(now),
+        )
+    except Exception as error:
+        _spend_or_destroy(store, pairing, error)
         return None
     return {
         "label": pairing.get("label", ""),
@@ -194,8 +221,10 @@ def lookup(user_code, table_ref=None, now=None):
 def decide(user_code, approve, subject, email, table_ref=None, now=None):
     """Record the operator's decision on a pending pairing.
 
-    Returns ``{"status": "approved"|"denied", "label": ...}`` or None when
-    the code is unknown, expired, spent, or past its attempt budget.
+    The decision spends one attempt under the same atomic guard as a peek,
+    so a decision racing a peek can never exceed the budget. Returns
+    ``{"status": "approved"|"denied", "label": ...}`` or None when the code
+    is unknown, expired, spent, or past its attempt budget.
     """
     code = normalize_user_code(user_code)
     if not code or not subject:
@@ -205,50 +234,40 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
     pairing = _pairing_for_code(store, code, now)
     if not pairing or pairing.get("status") != "pending":
         return None
-    if int(pairing.get("attempts") or 0) >= DEVICE_MAX_ATTEMPTS:
-        return None
-    spent = int(pairing.get("attempts") or 0) + 1
     token = None
+    names = dict(_GUARD_NAMES)
+    values = _guard_values(now)
     try:
         if approve:
             token, expires_at = _put_session(store, subject, email)
-            store.update_item(
-                Key={"pk": pairing["pk"]},
-                # SESSION and STATUS are DynamoDB reserved words: bare names in
-                # expressions raise ValidationException, so map every attribute.
-                UpdateExpression="SET #st = :approved, #s = :session, #a = :spent",
-                ConditionExpression="attribute_exists(#pk) AND #st = :pending",
-                ExpressionAttributeNames={
-                    "#pk": "pk", "#st": "status", "#s": "session", "#a": "attempts",
-                },
-                ExpressionAttributeValues={
-                    ":approved": "approved",
-                    ":pending": "pending",
-                    ":session": {
-                        "token": token, "subject": str(subject), "email": str(email or ""),
-                        "expires_at": expires_at,
-                    },
-                    ":spent": spent,
-                },
-            )
+            names["#s"] = "session"
+            values[":approved"] = "approved"
+            values[":session"] = {
+                "token": token, "subject": str(subject), "email": str(email or ""),
+                "expires_at": expires_at,
+            }
+            update = "SET #st = :approved, #s = :session, #a = if_not_exists(#a, :zero) + :one"
         else:
-            store.update_item(
-                Key={"pk": pairing["pk"]},
-                UpdateExpression="SET #st = :denied, #d = :decided, #a = :spent",
-                ConditionExpression="attribute_exists(#pk) AND #st = :pending",
-                ExpressionAttributeNames={
-                    "#pk": "pk", "#st": "status", "#d": "decided_at", "#a": "attempts",
-                },
-                ExpressionAttributeValues={
-                    ":denied": "denied", ":pending": "pending",
-                    ":decided": _now_iso(), ":spent": spent,
-                },
-            )
-    except Exception:
+            names["#d"] = "decided_at"
+            values[":denied"] = "denied"
+            values[":decided"] = _now_iso()
+            update = "SET #st = :denied, #d = :decided, #a = if_not_exists(#a, :zero) + :one"
+        store.update_item(
+            Key={"pk": pairing["pk"]},
+            UpdateExpression=update,
+            ConditionExpression=_GUARD,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+    except Exception as error:
         if token is not None:
-            # Lost the approval race: drop the session we just minted so no
-            # orphan credential outlives the pairing that lost it.
+            # Lost the race (or the budget): drop the session we just minted
+            # so no orphan credential outlives the pairing that lost it.
             store.delete_item(Key={"pk": f"session#{_hash(token)}"})
+        try:
+            _spend_or_destroy(store, pairing, error)
+        except Exception:
+            pass
         return None
     if approve:
         store.delete_item(Key={"pk": f"usercode#{_hash(code)}"})

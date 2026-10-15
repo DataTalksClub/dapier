@@ -16,81 +16,57 @@ from src.dapier.api import agent as agent_api
 from src.dapier.auth import device_sessions
 
 
-class FakeTable:
-    """pk-keyed table honoring the conditions device_sessions relies on.
+_EXPRESSION_WORDS = {
+    "SET", "REMOVE", "ADD", "DELETE", "AND", "OR", "NOT", "BETWEEN", "IN",
+    "attribute_exists", "attribute_not_exists", "attribute_type",
+    "begins_with", "contains", "size", "if_not_exists",
+}
 
-    Unlike real DynamoDB, moto accepts bare attribute names in expressions
-    even reserved ones (session, ttl, status …) — the bug that made every
-    live approval fail with "Unknown or expired code". So this fake enforces
-    what the real service does not: every attribute in an expression must be
-    a #placeholder.
+
+def _check_expression(expression, names):
+    """Every attribute in an expression must be a #placeholder.
+
+    Real DynamoDB rejects reserved words (session, ttl, status …) used bare;
+    moto accepts them — the bug that once made every live approval fail with
+    "Unknown or expired code". So the store below enforces what moto does not.
     """
+    for word in re.findall(r"[#:]?[A-Za-z_][A-Za-z0-9_]*", expression or ""):
+        if word.startswith(("#", ":")) or word in _EXPRESSION_WORDS:
+            continue
+        if word not in set((names or {}).values()):
+            raise ValueError(f"bare attribute in expression: {word}")
 
-    _EXPRESSION_WORDS = {
-        "SET", "REMOVE", "ADD", "DELETE", "AND", "OR", "NOT", "BETWEEN", "IN",
-        "attribute_exists", "attribute_not_exists", "attribute_type",
-        "begins_with", "contains", "size", "if_not_exists",
-    }
 
-    def __init__(self):
-        self.items = {}
+class StrictTable:
+    """A moto DynamoDB table (real conditional-write semantics) behind the
+    placeholder check above. ``items`` is a read-only snapshot by key."""
 
-    @staticmethod
-    def _check_expression(expression, names):
-        for word in re.findall(r"[#:]?[A-Za-z_][A-Za-z0-9_]*", expression or ""):
-            if word.startswith(("#", ":")) or word in FakeTable._EXPRESSION_WORDS:
-                continue
-            if word not in set((names or {}).values()):
-                raise ValueError(f"bare attribute in expression: {word}")
-
-    def _resolve(self, kwargs, expression):
-        for placeholder, attribute in (kwargs.get("ExpressionAttributeNames") or {}).items():
-            expression = expression.replace(placeholder, attribute)
-        return expression
+    def __init__(self, table):
+        self._table = table
 
     def put_item(self, **kwargs):
-        item = kwargs["Item"]
-        self.items[item["pk"]] = dict(item)
+        return self._table.put_item(**kwargs)
 
     def get_item(self, **kwargs):
-        item = self.items.get(kwargs["Key"]["pk"])
-        return {"Item": dict(item)} if item else {}
+        return self._table.get_item(**kwargs)
+
+    def delete_item(self, **kwargs):
+        return self._table.delete_item(**kwargs)
 
     def update_item(self, **kwargs):
         names = kwargs.get("ExpressionAttributeNames")
-        self._check_expression(kwargs.get("UpdateExpression"), names)
-        self._check_expression(kwargs.get("ConditionExpression"), names)
-        values = kwargs.get("ExpressionAttributeValues") or {}
-        item = self.items.get(kwargs["Key"]["pk"])
-        condition = self._resolve(kwargs, kwargs.get("ConditionExpression") or "").replace(" ", "")
-        if "attribute_exists(pk)" in condition and item is None:
-            raise KeyError(kwargs["Key"]["pk"])
-        if "status=:pending" in condition and (item is None or item.get("status") != "pending"):
-            raise KeyError(kwargs["Key"]["pk"])
-        if "attribute_not_exists(rotated_at)" in condition and item is not None \
-                and item.get("rotated_at"):
-            raise KeyError(kwargs["Key"]["pk"])
-        update = self._resolve(kwargs, kwargs.get("UpdateExpression") or "").replace(" ", "")
-        if item is None:
-            raise KeyError(kwargs["Key"]["pk"])
-        if "if_not_exists(attempts,:zero)+:one" in update:
-            item["attempts"] = int(item.get("attempts") or 0) + 1
-        if ":approved" in values:
-            item["status"] = values[":approved"]
-            item["session"] = values[":session"]
-        if ":denied" in values:
-            item["status"] = values[":denied"]
-            item["decided_at"] = values[":decided"]
-        if ":spent" in values:
-            item["attempts"] = values[":spent"]
-        if ":grace" in values:
-            item["ttl"] = values[":grace"]
-        if ":now" in values:
-            item["rotated_at"] = values[":now"]
-        return {"Attributes": dict(item)} if kwargs.get("ReturnValues") == "ALL_NEW" else {}
+        _check_expression(kwargs.get("UpdateExpression"), names)
+        _check_expression(kwargs.get("ConditionExpression"), names)
+        return self._table.update_item(**kwargs)
 
-    def delete_item(self, **kwargs):
-        self.items.pop(kwargs["Key"]["pk"], None)
+    @property
+    def items(self):
+        return {item["pk"]: item for item in self._table.scan()["Items"]}
+
+    def expire(self, pk):
+        self._table.update_item(Key={"pk": pk}, UpdateExpression="SET #t = :t",
+                                ExpressionAttributeNames={"#t": "ttl"},
+                                ExpressionAttributeValues={":t": int(time.time()) - 1})
 
 
 @pytest.fixture(autouse=True)
@@ -102,9 +78,17 @@ def clean_rate_limits():
 
 @pytest.fixture
 def store(monkeypatch):
-    fake = FakeTable()
-    monkeypatch.setattr(device_sessions, "table", lambda: fake)
-    return fake
+    import boto3
+    from moto import mock_aws
+
+    with mock_aws():
+        table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
+            TableName="device-sessions", BillingMode="PAY_PER_REQUEST",
+            KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}])
+        strict = StrictTable(table)
+        monkeypatch.setattr(device_sessions, "table", lambda: strict)
+        yield strict
 
 
 def _device_event(path, body=None, source_ip="10.0.0.1", method="POST"):
@@ -164,7 +148,7 @@ def test_the_store_never_carries_a_plaintext_user_code(store):
 
     for pk, item in store.items.items():
         assert plain not in pk
-        blob = json.dumps(item)
+        blob = json.dumps(item, default=str)
         assert view["user_code"] not in blob and plain not in blob
     pairing = store.items[f"pairing#{device_sessions._hash(device_code)}"]
     canonical = view["user_code"]
@@ -232,7 +216,7 @@ def test_resolve_rejects_unknown_and_expired_sessions(store):
     assert device_sessions.resolve("dap_", table_ref=store) is None
 
     session_pk = f"session#{device_sessions._hash(token)}"
-    store.items[session_pk]["ttl"] = int(time.time()) - 1
+    store.expire(session_pk)
     assert device_sessions.resolve(token, table_ref=store) is None
 
 
@@ -248,7 +232,7 @@ def test_refresh_rotates_and_blocks_replay(store):
     assert device_sessions.refresh(token, table_ref=store) is None
 
     old_pk = f"session#{device_sessions._hash(token)}"
-    store.items[old_pk]["ttl"] = int(time.time()) - 1
+    store.expire(old_pk)
     assert device_sessions.resolve(token, table_ref=store) is None
 
 
@@ -566,3 +550,55 @@ def test_review_facts_say_whether_the_reviewer_shares_the_requesting_network(mon
         assert facts["same_network"] is same
         assert facts["request_ip"] == "203.0.113.7"
         assert "user_code" not in facts and "device_code" not in facts
+
+
+class _PeekBeforeDecision:
+    """Interleaves: the moment a decision is about to write, another browser
+    spends a peek first (the race the review reproduced)."""
+
+    def __init__(self, store, user_code):
+        self._store, self._code, self._fired = store, user_code, False
+        self.peeked = None
+
+    def __getattr__(self, name):
+        return getattr(self._store, name)
+
+    def update_item(self, **kwargs):
+        if not self._fired and ":pending" in (kwargs.get("ExpressionAttributeValues") or {}) \
+                and "#st" in kwargs.get("UpdateExpression", ""):
+            self._fired = True
+            self.peeked = device_sessions.lookup(self._code, table_ref=self._store)
+        return self._store.update_item(**kwargs)
+
+
+@pytest.mark.parametrize("approve", [True, False])
+def test_a_peek_racing_the_decision_cannot_exceed_the_budget(store, approve):
+    device_code, view = device_sessions.start(table_ref=store)
+    for _ in range(device_sessions.DEVICE_MAX_ATTEMPTS - 1):
+        assert device_sessions.lookup(view["user_code"], table_ref=store) is not None
+    racing = _PeekBeforeDecision(store, view["user_code"])
+    outcome = device_sessions.decide(view["user_code"], approve, "Google_1", "op@x", table_ref=racing)
+    # The interleaved fifth peek took the last attempt; the decision, a sixth
+    # operation, is refused by the atomic guard and the grant is destroyed.
+    assert racing.peeked is not None
+    assert outcome is None
+    assert not [pk for pk in store.items if pk.startswith("session#")]
+    assert device_sessions.poll(device_code, table_ref=store) == {"error": "expired_token"}
+
+
+def test_the_counter_is_incremented_in_place_never_assigned(store):
+    _, view = device_sessions.start(table_ref=store)
+    device_sessions.lookup(view["user_code"], table_ref=store)
+    device_sessions.lookup(view["user_code"], table_ref=store)
+    outcome = device_sessions.decide(view["user_code"], False, "Google_1", "op@x", table_ref=store)
+    assert outcome["status"] == "denied"
+    pairing = next(item for pk, item in store.items.items() if pk.startswith("pairing#"))
+    assert int(pairing["attempts"]) == 3
+
+
+def test_an_expired_pairing_cannot_be_decided_even_if_still_stored(store):
+    _, view = device_sessions.start(table_ref=store)
+    later = time.time() + device_sessions.PAIRING_TTL_SECONDS + 1
+    assert device_sessions.decide(view["user_code"], True, "Google_1", "op@x", table_ref=store, now=later) is None
+    assert device_sessions.lookup(view["user_code"], table_ref=store, now=later) is None
+    assert not [pk for pk in store.items if pk.startswith("session#")]
