@@ -13,7 +13,7 @@
    Item detail + Replay reuse /api/admin/triggers/inbox/<id>[/replay]
    (dapier inbox show|replay). */
 import { state } from '../state.js';
-import { $, $$, icons, notice, openWhenReady } from '../ui.js';
+import { $, $$, icons, notice, openWhenReady, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
 import { workflowName } from '../workflow-names.js';
@@ -481,7 +481,10 @@ function openPollDialog(poll) {
   if (!poll) form.name.focus();
 }
 
-$('#new-poll').addEventListener('click', () => openPollDialog(null));
+/* The create follows the toolbar's filters (dakit "Action placement"), so
+   it shows with either phone pane; the empty state repeats it. */
+collectionCreate($('#polls-toolbar-lead'), { id: 'new-poll', label: 'New poll', onClick: () => openPollDialog(null) });
+$('#poll-empty-create').addEventListener('click', () => openPollDialog(null));
 
 $('#poll-form').addEventListener('submit', async (event) => {
   event.preventDefault();

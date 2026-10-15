@@ -166,6 +166,7 @@ def test_empty_schedules_keep_the_header_create_and_repeat_it(console, monkeypat
 
 @pytest.mark.parametrize("tab, chips, create_id, label, dialog", [
     ("hooks", "hooks-outcome-chips", "new-hook", "New hook", "#hook-dialog"),
+    ("polls", "poll-outcome-chips", "new-poll", "New poll", "#poll-dialog"),
 ])
 def test_trigger_tab_create_follows_its_filters(console, tab, chips, create_id, label, dialog):
     from playwright.sync_api import expect
@@ -183,6 +184,7 @@ def test_trigger_tab_create_follows_its_filters(console, tab, chips, create_id, 
 
 @pytest.mark.parametrize("tab, empty, repeat, dialog", [
     ("hooks", "#hook-empty", "#hook-empty-create", "#hook-dialog"),
+    ("polls", "#poll-empty", "#poll-empty-create", "#poll-dialog"),
 ])
 def test_empty_trigger_tab_repeats_its_create(console, monkeypatch, tab, empty, repeat, dialog):
     from playwright.sync_api import expect

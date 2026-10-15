@@ -150,8 +150,7 @@
         </div>
         <div class="page-tools dk-toolbar trigger-toolbar" data-panel-tools="polls" hidden>
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Polls panes" data-workspace="poll-workspace"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="poll-activity" aria-selected="true" tabindex="0">Picked up</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="poll-sources-pane" aria-selected="false" tabindex="-1">Polls</button></div>
-          <div id="poll-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter picked-up items by outcome"></div>
-          <div class="dk-toolbar__end"><button id="new-poll" class="dk-button dk-button--primary" type="button">New poll</button></div>
+          <div class="dk-collection-header__lead" id="polls-toolbar-lead"><div id="poll-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter picked-up items by outcome"></div></div>
         </div>
         <div data-workflow-panel="list">
         <div id="workflow-empty" class="empty-state" hidden><h3>No workflows yet</h3><p>Create a workflow to connect a trigger to your first action.</p><a class="dk-button dk-button--secondary" href="/workflows/new" data-new-workflow>Create workflow</a></div>
@@ -188,7 +187,7 @@
         </div>
         </div>
         <div data-workflow-panel="polls" hidden>
-        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API, feed, or folder for new items, for example an orders feed or a YouTube channel.</p></div>
+        <div id="poll-empty" class="empty-state" hidden><h3>No poll triggers</h3><p>Create one to watch an API, feed, or folder for new items, for example an orders feed or a YouTube channel.</p><button id="poll-empty-create" class="dk-button dk-button--secondary" type="button">Create the first poll</button></div>
         <div id="poll-workspace" class="trigger-workspace" data-pane="activity" hidden>
           <section id="poll-activity" class="data-panel trigger-activity" aria-labelledby="poll-activity-title">
             <div class="section-head"><h2 id="poll-activity-title">Picked up</h2><p id="poll-activity-summary" class="sub" role="status"></p></div>
