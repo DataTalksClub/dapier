@@ -39,9 +39,11 @@ import time
 from datetime import datetime, timezone
 
 PREFIX = "dapd_"
-# No vowels and no confusable pairs: codes are read aloud and retyped by
-# hand, and must never spell a word (the DataOps alphabet, ported).
-USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
+# No vowels and no confusable characters (no L/V, no 0/1): codes are read
+# aloud and retyped by hand, and must never spell a word. This is dakit's
+# canonical USER_CODE_ALPHABET (device-code.js), which the /device page
+# validates against, so the server never issues a code the page rejects.
+USER_CODE_ALPHABET = "BCDFGHJKMNPQRSTWXZ23456789"
 USER_CODE_LENGTH = 8
 PAIRING_TTL_SECONDS = 15 * 60
 SESSION_TTL_SECONDS = 30 * 86400

@@ -92,7 +92,7 @@ def device_token(event):
     """CLI poll: RFC 8628 outcomes; the approved payload is delivered once."""
     ip = _client_ip(event)
     if not _check_rate_key(("device-poll", ip), 120, window=300):
-        return _no_store(_json_response(429, {"error": "slow_down"}))
+        return _no_store(_json_response(429, {"error": "slow_down"}, headers={"retry-after": "5"}))
     try:
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError):
@@ -110,15 +110,21 @@ def device_pending(event):
 
     Review facts only — never the pairing's secrets. Each peek counts
     toward the pairing's attempt budget; a spent pairing reads as a
-    404, indistinguishable from an unknown or expired code.
+    404, indistinguishable from an unknown or expired code. Peeks are
+    also rate-limited per signed-in account, so one browser cannot sweep
+    the code space across many pairings.
     """
     payload = session._session_payload(event)
     if not payload:
-        return _json_response(401, {"error": "Sign in to approve this device"})
+        return _no_store(_json_response(401, {"error": "Sign in to approve this device"}))
+    subject = payload.get("subject") or payload.get("sub")
+    if not _check_rate_key(("device-peek", str(subject)), 20, window=600):
+        return _no_store(_json_response(429, {"error": "Too many attempts; wait a few minutes"},
+                                        headers={"retry-after": "60"}))
     params = event.get("queryStringParameters") or {}
     facts = device_sessions.lookup(str(params.get("code", "")))
     if not facts:
-        return _json_response(404, {"error": "Unknown or expired code"})
+        return _no_store(_json_response(404, {"error": "Unknown or expired code"}))
     facts["server_now"] = int(time.time())
     return _no_store(_json_response(200, facts))
 
@@ -129,32 +135,36 @@ def device_approve(event):
     Cookie-authenticated on purpose: the browser supplies the DTC identity
     that the pairing inherits. Not operator-gated — matching the loopback
     login, any DTC account may pair its own identity; grants still gate
-    every action. Deny is exactly as reachable as approve. Never returns
-    the session token; the CLI collects it by presenting its secret
-    device code.
+    every action. Deny is exactly as reachable as approve, and the body
+    must say which one (``"approve": true|false``) — a decision is never
+    inferred. Both outcomes are audited. Never returns the session token;
+    the CLI collects it by presenting its secret device code.
     """
     if not session._csrf_ok(event, "POST"):
-        return _json_response(403, {"error": "Cross-site request rejected"})
+        return _no_store(_json_response(403, {"error": "Cross-site request rejected"}))
     payload = session._session_payload(event)
     if not payload:
-        return _json_response(401, {"error": "Sign in to approve this device"})
+        return _no_store(_json_response(401, {"error": "Sign in to approve this device"}))
     subject = payload.get("subject") or payload.get("sub")
     email = payload.get("sub", "")
     if not _check_rate_key(("device-approve", str(subject)), 10, window=600):
-        return _json_response(429, {"error": "Too many attempts; wait a few minutes"})
+        return _no_store(_json_response(429, {"error": "Too many attempts; wait a few minutes"},
+                                        headers={"retry-after": "60"}))
     try:
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError):
-        return _json_response(400, {"error": "Invalid request"})
-    user_code = str(body.get("user_code", "")) if isinstance(body, dict) else ""
-    approve = body.get("approve") is not False if isinstance(body, dict) else True
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("approve"), bool):
+        return _no_store(_json_response(400, {"error": "Say approve: true or false"}))
+    user_code = str(body.get("user_code", ""))
+    approve = body["approve"]
     outcome = device_sessions.decide(user_code, approve, subject, email)
     if not outcome:
         audit.emit("device-login", audit.DEVICE_LOGIN, str(subject), outcome="denied-invalid-code")
-        return _json_response(404, {"error": "That code is not waiting for confirmation."})
+        return _no_store(_json_response(404, {"error": "That code is not waiting for confirmation."}))
     audit.emit("device-login", audit.DEVICE_LOGIN, str(subject),
                outcome="ok" if outcome["status"] == "approved" else "denied")
-    return _json_response(200, outcome)
+    return _no_store(_json_response(200, outcome))
 
 
 def device_refresh(event):
@@ -173,4 +183,4 @@ def device_revoke(event):
     """Revoke the caller's device session (dapier auth logout)."""
     token = _bearer(event)
     revoked = device_sessions.revoke(token) if token.startswith(device_sessions.PREFIX) else False
-    return _json_response(200, {"revoked": bool(revoked)})
+    return _no_store(_json_response(200, {"revoked": bool(revoked)}))

@@ -352,13 +352,13 @@ def test_approve_rejects_cross_site_and_unknown_codes(monkeypatch, store):
         lambda event: {"sub": "op@datatalks.club", "subject": "Google_1"},
     )
     response = agent_api.route(
-        _device_event("/api/agent/device/approve", {"user_code": "ABCD-EFGH"}),
+        _device_event("/api/agent/device/approve", {"user_code": "ABCD-EFGH", "approve": True}),
         "POST", "/api/agent/device/approve")
     assert response["statusCode"] == 403
 
     monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
     response = agent_api.route(
-        _device_event("/api/agent/device/approve", {"user_code": "ZZZZ-ZZZZ"}),
+        _device_event("/api/agent/device/approve", {"user_code": "ZZZZ-ZZZZ", "approve": True}),
         "POST", "/api/agent/device/approve")
     assert response["statusCode"] == 404
 
@@ -439,3 +439,116 @@ def test_refresh_and_revoke_endpoints(monkeypatch, store):
     response = agent_api.route(event, "POST", "/api/agent/device/revoke")
     assert json.loads(response["body"]) == {"revoked": True}
     assert device_sessions.resolve(body["token"], table_ref=store) is None
+
+
+def _signed_in(monkeypatch):
+    monkeypatch.setattr(agent_api.session, "_csrf_ok", lambda event, method: True)
+    monkeypatch.setattr(
+        agent_api.session, "_session_payload",
+        lambda event: {"sub": "op@datatalks.club", "subject": "Google_1"},
+    )
+
+
+def _audits(monkeypatch):
+    events = []
+    monkeypatch.setattr(agent_api.audit, "emit",
+                        lambda *args, **kwargs: events.append((args, kwargs)))
+    return events
+
+
+def test_codes_come_from_the_canonical_family_alphabet(store):
+    # dakit's device-code.js validates against this alphabet (no vowels,
+    # no L/V, no 0/1); the server must never issue a code it would reject.
+    assert device_sessions.USER_CODE_ALPHABET == "BCDFGHJKMNPQRSTWXZ23456789"
+    for _ in range(50):
+        _, view = device_sessions.start(table_ref=store)
+        assert re.fullmatch(r"[BCDFGHJKMNPQRSTWXZ2-9]{4}-[BCDFGHJKMNPQRSTWXZ2-9]{4}",
+                            view["user_code"])
+
+
+def test_the_decision_must_be_explicit(monkeypatch, store):
+    """A body without approve: true|false decides nothing."""
+    _signed_in(monkeypatch)
+    pairing = _start_pairing()
+    for body in ({"user_code": pairing["user_code"]},
+                 {"user_code": pairing["user_code"], "approve": "yes"},
+                 {"user_code": pairing["user_code"], "approve": None}):
+        response = agent_api.route(
+            _device_event("/api/agent/device/approve", body), "POST", "/api/agent/device/approve")
+        assert response["statusCode"] == 400
+    poll_event = _device_event("/api/agent/device/token", {"device_code": pairing["device_code"]})
+    response = agent_api.route(poll_event, "POST", "/api/agent/device/token")
+    assert json.loads(response["body"]) == {"error": "authorization_pending"}
+
+
+def test_deny_is_recorded_and_audited_without_the_code(monkeypatch, store):
+    _signed_in(monkeypatch)
+    events = _audits(monkeypatch)
+    pairing = _start_pairing()
+    response = agent_api.route(
+        _device_event("/api/agent/device/approve",
+                      {"user_code": pairing["user_code"], "approve": False}),
+        "POST", "/api/agent/device/approve")
+    assert response["statusCode"] == 200
+    row = store.items[f"pairing#{device_sessions._hash(pairing['device_code'])}"]
+    assert row["status"] == "denied" and row["decided_at"]
+    assert [(args[1], kwargs["outcome"]) for args, kwargs in events] == [
+        (agent_api.audit.DEVICE_LOGIN, "denied")]
+    plain = pairing["user_code"].replace("-", "")
+    for args, kwargs in events:
+        blob = json.dumps([args, kwargs], default=str)
+        assert pairing["user_code"] not in blob and plain not in blob
+    # Nothing at rest carries the plaintext code after the decision either.
+    for pk, item in store.items.items():
+        blob = pk + json.dumps(item, default=str)
+        assert pairing["user_code"] not in blob and plain not in blob
+
+
+def test_deny_and_authorize_share_one_route_and_one_guard(monkeypatch, store):
+    """Deny is as reachable as Authorize: same endpoint, same checks."""
+    _signed_in(monkeypatch)
+    for approve in (True, False):
+        pairing = _start_pairing()
+        response = agent_api.route(
+            _device_event("/api/agent/device/approve",
+                          {"user_code": pairing["user_code"], "approve": approve}),
+            "POST", "/api/agent/device/approve")
+        assert response["statusCode"] == 200
+        assert json.loads(response["body"])["status"] == ("approved" if approve else "denied")
+
+
+def test_every_device_response_is_no_store(monkeypatch, store):
+    _signed_in(monkeypatch)
+    pairing = _start_pairing()
+    pending_event = _device_event("/api/agent/device/pending", method="GET")
+    pending_event["queryStringParameters"] = {"code": "ZZZZ-ZZZZ"}
+    responses = [
+        agent_api.route(pending_event, "GET", "/api/agent/device/pending"),
+        agent_api.route(_device_event("/api/agent/device/approve", {"user_code": "ZZZZ-ZZZZ",
+                                                                    "approve": True}),
+                        "POST", "/api/agent/device/approve"),
+        agent_api.route(_device_event("/api/agent/device/approve", {"user_code": "x"}),
+                        "POST", "/api/agent/device/approve"),
+        agent_api.route(_device_event("/api/agent/device/approve",
+                                      {"user_code": pairing["user_code"], "approve": False}),
+                        "POST", "/api/agent/device/approve"),
+        agent_api.route(_device_event("/api/agent/device/token", {"device_code": "dapd_x"}),
+                        "POST", "/api/agent/device/token"),
+    ]
+    monkeypatch.setattr(agent_api.session, "_session_payload", lambda event: {})
+    pending_event["queryStringParameters"] = {"code": pairing["user_code"]}
+    responses.append(agent_api.route(pending_event, "GET", "/api/agent/device/pending"))
+    for response in responses:
+        assert response["headers"].get("cache-control") == "no-store", response
+
+
+def test_peeks_are_rate_limited_per_account(monkeypatch, store):
+    _signed_in(monkeypatch)
+    pending_event = _device_event("/api/agent/device/pending", method="GET")
+    pending_event["queryStringParameters"] = {"code": "ZZZZ-ZZZZ"}
+    statuses = [agent_api.route(pending_event, "GET", "/api/agent/device/pending")["statusCode"]
+                for _ in range(21)]
+    assert statuses[:20] == [404] * 20
+    assert statuses[20] == 429
+    limited = agent_api.route(pending_event, "GET", "/api/agent/device/pending")
+    assert limited["headers"]["retry-after"]
