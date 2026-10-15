@@ -78,6 +78,53 @@ def test_body_parts_are_capped_at_the_publish_limit(monkeypatch):
     assert len(envelope["data"]["html"]) == email_ingress.BODY_LIMIT
 
 
+LEGACY_BUCKET = "datamailer-sandbox-817685572750-inbound-mail"
+
+
+def _deliver_legacy(monkeypatch, raw, key="raw/legacy-1"):
+    monkeypatch.setenv("LEGACY_INBOUND_BUCKET", LEGACY_BUCKET)
+    return _deliver(monkeypatch, raw, bucket=LEGACY_BUCKET, key=key)
+
+
+def test_legacy_datamailer_object_publishes_the_relay_contract(monkeypatch):
+    envelope, _ = _deliver_legacy(monkeypatch, _message())
+
+    assert envelope["contract"] == "inbound-email"
+    assert envelope["version"] == 1
+    assert envelope["event_id"] == "email:<m-4137@example.test>"
+    assert envelope["route"] == "todo@dtcdev.click"
+    assert envelope["message_id"] == "<m-4137@example.test>"
+    assert envelope["sender"] == {"header": "Acme Billing <billing@example.test>",
+                                  "addresses": ["billing@example.test"]}
+    assert envelope["recipients"] == {"addresses": ["todo@dtcdev.click"]}
+    assert envelope["subject"] == "Invoice #4137 - September"
+    assert envelope["raw_mime"] == {"bucket": LEGACY_BUCKET, "key": "raw/legacy-1"}
+
+
+def test_the_contract_normalizes_to_a_routeable_event(monkeypatch):
+    from src.dapier.connectors import ingress as ingress_module
+
+    envelope, _ = _deliver_legacy(monkeypatch, _message())
+    event = ingress_module.normalize_event(envelope)
+
+    assert event["connector"] == "email"
+    assert event["source"] == "todo"
+    assert event["data"]["route"] == "todo"
+    assert event["data"]["raw_mime"] == {"bucket": LEGACY_BUCKET, "key": "raw/legacy-1"}
+
+
+def test_a_legacy_object_without_message_id_uses_the_key_as_id(monkeypatch):
+    message = EmailMessage()
+    message["From"] = "a@example.test"
+    message["To"] = "agents@dtcdev.click"
+    message["Subject"] = "no id"
+    message.set_content("hello")
+
+    envelope, _ = _deliver_legacy(monkeypatch, message.as_bytes(), key="raw/no-id-1")
+
+    assert envelope["event_id"] == "email:raw/no-id-1"
+
+
 if __name__ == "__main__":
     import pytest
 
