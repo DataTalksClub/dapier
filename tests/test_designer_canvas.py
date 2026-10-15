@@ -63,3 +63,45 @@ def test_canvas_boxes_keep_neutral_1px_perimeters_and_real_tokens(theme):
         assert state["black"] == [], state["texts"]
     # The selected step reads as selected through its fill alone.
     assert selected["soft"] in selected["fills"]
+
+
+def test_standalone_designer_loads_the_kit_once_with_no_inline_script():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "src/web/designer.html").read_text()
+    assert "vendor/dakit.css" not in html          # designer.css inlines the bundle
+    assert html.count('href="/assets/designer.css"') == 1
+    assert '<script src="/assets/vendor/shell.js"></script>' in html
+    assert '<script src="/assets/js/theme-init.js"></script>' in html
+    assert "<script>" not in html                    # CSP: script-src 'self'
+
+
+def test_standalone_designer_sits_in_the_kit_topbar_shell():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with console_server() as origin, sync_playwright() as playwright:
+        browser = _chromium(playwright)
+        try:
+            page = browser.new_context(viewport={"width": 1280, "height": 800}, bypass_csp=True).new_page()
+            page.route("**/api/**", designer_fixture.route)
+            page.goto(origin + "/designer/app?workflow=invoice-triage.yaml", wait_until="domcontentloaded")
+            bar = page.locator(".dk-shell--topbar .dk-shell__bar")
+            bar.wait_for(timeout=15_000)
+            assert page.locator('.dk-shell__nav [aria-current="page"]').inner_text() == "Designer"
+            assert page.locator(".workspace-mark").count() == 0   # no accent letter block
+            trigger = page.locator("#account-button")
+            page.wait_for_function("document.querySelector('#account-button').getAttribute('aria-label') === 'Account, Grace Hopper'")
+            trigger.focus()
+            page.keyboard.press("Enter")
+            menu = page.locator("#account-menu")
+            assert menu.is_visible()
+            assert "Sign out" in menu.inner_text() and "Dark mode" in menu.inner_text()
+            page.keyboard.press("Escape")
+            assert menu.is_hidden()
+            assert page.evaluate("document.activeElement.id") == "account-button"
+            # Framed by the console, the console's shell is the chrome.
+            page.goto(origin + "/designer/app?embed=1&workflow=invoice-triage.yaml", wait_until="domcontentloaded")
+            page.locator("svg text", has_text="Union").first.wait_for(timeout=15_000)
+            assert page.locator(".dk-shell").count() == 0
+        finally:
+            browser.close()

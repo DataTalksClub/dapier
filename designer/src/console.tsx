@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { ConsoleShell } from "./ConsoleShell";
 import "./styles.css";
 
 // Console entry: mounted by src/web/designer.html at /designer/app. Saves go
@@ -44,7 +45,7 @@ window.addEventListener("storage", (event) => {
 const root = document.getElementById("designer-root");
 if (root) {
   const embedded = new URLSearchParams(window.location.search).get("embed") === "1";
-  createRoot(root).render(
+  const app = (
     <App
       config={{
         apiBase: "/api/admin/designer",
@@ -56,4 +57,7 @@ if (root) {
       }}
     />
   );
+  // Standalone, the designer sits in dakit's topbar shell; framed by the
+  // console's /designer view, the console shell is the chrome.
+  createRoot(root).render(embedded ? app : <ConsoleShell>{app}</ConsoleShell>);
 }

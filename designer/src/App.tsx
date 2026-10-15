@@ -3551,9 +3551,8 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
           aria-modal={navOpen || undefined}
           aria-label="Workflows"
         >
-        {config.mode === "console" ? (
-          <a className="brand brand-link" href="/"><span className="workspace-mark" aria-hidden="true">D</span><span>← Console · Designer</span></a>
-        ) : (
+        {/* Console mode: the dakit topbar (ConsoleShell) carries the brand. */}
+        {config.mode !== "console" && (
           <div className="brand"><span className="workspace-mark" aria-hidden="true">D</span><span>Workflow designer</span></div>
         )}
         <button className="dk-button dk-button--secondary sidebar-action" type="button" onClick={newWorkflowSafely}>

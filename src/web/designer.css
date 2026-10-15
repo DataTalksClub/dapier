@@ -1886,6 +1886,11 @@ button {
   height: 100%;
 }
 
+/* Standalone console mode: the designer fills dakit's topbar shell main. */
+.designer-console-shell > .dk-main { padding: 0; overflow: hidden; }
+.designer-console-shell .dk-shell__bar svg,
+.designer-console-shell .dk-account-menu svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
 /* Embedded mode: the console provides the navigation, so the canvas gets the
    whole frame instead of the sidebar column. */
 .designer-shell.embedded {
@@ -1922,11 +1927,13 @@ a.brand:hover span:last-child {
   text-decoration: underline;
 }
 
+/* Local-mode brand tile: neutral, like dakit's rail tile (no accent block). */
 .workspace-mark {
   align-items: center;
-  background: var(--dk-accent-default);
+  background: var(--dk-bg-surface);
+  border: 1px solid var(--dk-border-default);
   border-radius: var(--dk-radius-md);
-  color: var(--dk-text-on-accent);
+  color: var(--dk-text-heading);
   display: inline-grid;
   flex: none;
   font-size: var(--dk-text-lg);

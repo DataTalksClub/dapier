@@ -26242,10 +26242,7 @@
           "aria-modal": navOpen || void 0,
           "aria-label": "Workflows",
           children: [
-            config.mode === "console" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("a", { className: "brand brand-link", href: "/", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "← Console · Designer" })
-            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
+            config.mode !== "console" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "workspace-mark", "aria-hidden": "true", children: "D" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Workflow designer" })
             ] }),
@@ -26696,6 +26693,70 @@
       )
     ] });
   }
+  function identity(me) {
+    const email = (me?.email || (me?.username?.includes("@") ? me.username : "") || "").trim();
+    const local = email.includes("@") ? email.slice(0, email.indexOf("@")) : "";
+    const name = (me?.name || local.split(/[._-]+/).filter(Boolean).map((word) => word[0].toUpperCase() + word.slice(1)).join(" ") || "Account").trim();
+    const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
+    return { name, email, initials };
+  }
+  const svgProps = { viewBox: "0 0 24 24", "aria-hidden": true };
+  function ConsoleShell({ children }) {
+    const [me, setMe] = reactExports.useState(null);
+    reactExports.useEffect(() => {
+      fetch("/api/admin/me", { credentials: "same-origin", cache: "no-store" }).then((response) => response.ok ? response.json() : null).then(setMe).catch(() => setMe(null));
+    }, []);
+    const { name, email, initials } = identity(me);
+    const dark = document.documentElement.dataset.theme === "dark";
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-shell dk-shell--topbar designer-console-shell", "data-app": "dapier-designer", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("a", { className: "dk-skip-link", href: "#designer-main-content", children: "Skip to content" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "dk-shell__bar", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("a", { className: "dk-brand", href: "/", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-brand__name", children: "Dapier" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "dk-shell__nav", "aria-label": "Primary", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("a", { className: "dk-nav-item", href: "/workflows", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-nav-item__label", children: "Workflows" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("a", { className: "dk-nav-item", href: "/designer/app", "aria-current": "page", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-nav-item__label", children: "Designer" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("a", { className: "dk-nav-item", href: "/runs", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-nav-item__label", children: "Runs" }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "dk-shell__end", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            id: "account-button",
+            className: "dk-account-trigger dk-account-trigger--compact",
+            type: "button",
+            "data-dk-popover-trigger": "account-menu",
+            "aria-haspopup": "true",
+            "aria-controls": "account-menu",
+            "aria-expanded": "false",
+            "aria-label": `Account, ${name}`,
+            children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-avatar dk-avatar--sm", "aria-hidden": "true", children: initials })
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "dk-main designer-host", id: "designer-main-content", tabIndex: -1, children }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { id: "account-menu", className: "dk-menu dk-account-menu", "data-dk-popover": true, hidden: true, "aria-label": "Account", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "dk-menu__identity", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "dk-menu__name", children: name }),
+          email && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-menu__email", children: email })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("hr", { className: "dk-menu__sep" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-menu__item", type: "button", role: "switch", "aria-checked": dark, "data-dk-theme-toggle": true, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { ...svgProps, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Dark mode" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "dk-switch", "aria-hidden": "true" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "dk-menu__meta", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Region" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "eu-west-1" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("hr", { className: "dk-menu__sep" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "dk-menu__item dk-menu__item--danger", type: "button", onClick: () => window.location.assign("/auth/logout"), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { ...svgProps, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10 4H5v16h5M14 8l4 4-4 4M18 12H9" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign out" })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: "dk-live", className: "dk-visually-hidden", "aria-live": "polite" })
+    ] });
+  }
   const THEME_KEY = "dakit-theme";
   const LEGACY_THEME_KEY = "dapier-theme";
   function storedTheme() {
@@ -26723,20 +26784,19 @@
   const root = document.getElementById("designer-root");
   if (root) {
     const embedded = new URLSearchParams(window.location.search).get("embed") === "1";
-    clientExports.createRoot(root).render(
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        App,
-        {
-          config: {
-            apiBase: "/api/admin/designer",
-            mode: "console",
-            embedded,
-            onUnauthorized: () => {
-              (embedded && window.top ? window.top : window).location.assign("/auth/login");
-            }
+    const app = /* @__PURE__ */ jsxRuntimeExports.jsx(
+      App,
+      {
+        config: {
+          apiBase: "/api/admin/designer",
+          mode: "console",
+          embedded,
+          onUnauthorized: () => {
+            (embedded && window.top ? window.top : window).location.assign("/auth/login");
           }
         }
-      )
+      }
     );
+    clientExports.createRoot(root).render(embedded ? app : /* @__PURE__ */ jsxRuntimeExports.jsx(ConsoleShell, { children: app }));
   }
 })();
