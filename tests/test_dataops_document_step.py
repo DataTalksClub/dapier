@@ -6,7 +6,7 @@ receives one document per email.
 """
 import hashlib
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -102,6 +102,33 @@ def test_without_document_step_every_document_attachment_is_forwarded():
     assert [d["filename"] for d in envelope["documents"]] == ["invoice.pdf", "Receipt.pdf"]
     assert envelope["documents"][0]["checksum"] == "sha256:" + "a" * 64
     assert stage.call_count == 2
+
+
+def test_the_staging_key_never_carries_whitespace():
+    """Live 2026-10-15 outage follow-up: DataOps parses the storageUri and
+    rejects keys with whitespace, so a raw mail filename like
+    "Rechnung 3513284497.pdf" must be sanitized in the staged object key
+    while the manifest keeps the original filename verbatim."""
+    steps = {"route.then.make-document": {
+        "output": {"merged": False, "filename": "Rechnung 3513284497.pdf",
+                   "output": {"bucket": "mail", "key": "msg/r.pdf"}}}}
+    s3 = MagicMock()
+    request = MagicMock(return_value={})
+    with patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
+         patch("src.dapier.engine.actions.base._connected_connection",
+               return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
+         patch("src.dapier.engine.actions.dataops._s3_bytes", return_value=BODY), \
+         patch("boto3.client", return_value=s3), \
+         patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch("src.dapier.engine.actions.base._json_request", request):
+        run_dataops(ACTION, EVENT, steps=steps)
+    key = s3.put_object.call_args.kwargs["Key"]
+    assert key.startswith("transfer/email/")
+    assert not any(ch.isspace() or ch == "?" for ch in key)
+    assert key.endswith("/Rechnung_3513284497.pdf")
+    document = request.call_args.args[1]["documents"][0]
+    assert document["filename"] == "Rechnung 3513284497.pdf"
+    assert document["storageUri"] == f"s3://staging/{key}"
 
 
 def test_the_registry_lists_document_step():

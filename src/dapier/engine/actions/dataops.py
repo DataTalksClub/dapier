@@ -40,6 +40,19 @@ def _s3():
     return boto3.client("s3")
 
 
+def _safe_staging_key(key):
+    """Make an object key referenceable by the intake's s3:// grammar.
+
+    The intake parses the storageUri and rejects keys that contain
+    whitespace or '?' ("Rechnung 3513284497.pdf" fails), so raw mail
+    filenames cannot ride into the staging key as-is. Only the physical
+    key is sanitized: the manifest's ``filename`` field keeps the original
+    name, and the intake sanitizes that itself when it copies the object.
+    The per-key digest keeps different contents apart, so two names that
+    sanitize to the same segment can never collide."""
+    return "/".join(re.sub(r"[\s?]+", "_", segment) for segment in key.split("/"))
+
+
 def _stage_document(key, body, content_type, checksum):
     """Copy a document into the DataOps staging bucket and return its URI.
 
@@ -49,7 +62,7 @@ def _stage_document(key, body, content_type, checksum):
     metadata because that is where the intake expects to find it."""
     bucket = os.environ["DATAOPS_EMAIL_DOCUMENTS_BUCKET"]
     digest = checksum.split(":", 1)[1] if checksum.startswith("sha256:") else checksum
-    key = f"{STAGING_PREFIX}{key}"
+    key = _safe_staging_key(f"{STAGING_PREFIX}{key}")
     _s3().put_object(
         Bucket=bucket, Key=key, Body=body, ContentType=content_type,
         Metadata={"sha256": digest}, ServerSideEncryption="AES256",
