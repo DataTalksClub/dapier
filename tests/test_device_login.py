@@ -552,23 +552,38 @@ def test_review_facts_say_whether_the_reviewer_shares_the_requesting_network(mon
         assert "user_code" not in facts and "device_code" not in facts
 
 
-class _PeekBeforeDecision:
-    """Interleaves: the moment a decision is about to write, another browser
-    spends a peek first (the race the review reproduced)."""
+class _Interleave:
+    """Runs ``winner`` against the real store the moment the wrapped
+    operation is about to make its guarded conditional write (a peek's or a
+    decision's): the race orders the review reproduced."""
 
-    def __init__(self, store, user_code):
-        self._store, self._code, self._fired = store, user_code, False
-        self.peeked = None
+    def __init__(self, store, winner):
+        self._store, self._winner, self.fired, self.result = store, winner, False, None
 
     def __getattr__(self, name):
         return getattr(self._store, name)
 
+    def _fire(self):
+        if not self.fired:
+            self.fired = True
+            self.result = self._winner(self._store)
+
     def update_item(self, **kwargs):
-        if not self._fired and ":pending" in (kwargs.get("ExpressionAttributeValues") or {}) \
-                and "#st" in kwargs.get("UpdateExpression", ""):
-            self._fired = True
-            self.peeked = device_sessions.lookup(self._code, table_ref=self._store)
+        if ":pending" in (kwargs.get("ExpressionAttributeValues") or {}):
+            self._fire()
         return self._store.update_item(**kwargs)
+
+
+def _peek(code):
+    return lambda store: device_sessions.lookup(code, table_ref=store)
+
+
+def _decide(code, approve, subject="Google_1"):
+    return lambda store: device_sessions.decide(code, approve, subject, "op@x", table_ref=store)
+
+
+def _sessions(store):
+    return [pk for pk in store.items if pk.startswith("session#")]
 
 
 @pytest.mark.parametrize("approve", [True, False])
@@ -576,11 +591,11 @@ def test_a_peek_racing_the_decision_cannot_exceed_the_budget(store, approve):
     device_code, view = device_sessions.start(table_ref=store)
     for _ in range(device_sessions.DEVICE_MAX_ATTEMPTS - 1):
         assert device_sessions.lookup(view["user_code"], table_ref=store) is not None
-    racing = _PeekBeforeDecision(store, view["user_code"])
+    racing = _Interleave(store, _peek(view["user_code"]))
     outcome = device_sessions.decide(view["user_code"], approve, "Google_1", "op@x", table_ref=racing)
     # The interleaved fifth peek took the last attempt; the decision, a sixth
     # operation, is refused by the atomic guard and the grant is destroyed.
-    assert racing.peeked is not None
+    assert racing.result is not None
     assert outcome is None
     assert not [pk for pk in store.items if pk.startswith("session#")]
     assert device_sessions.poll(device_code, table_ref=store) == {"error": "expired_token"}
@@ -644,3 +659,54 @@ def test_the_window_rolls_over(store):
         assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1000)[0]
     assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1000) == (False, 200)
     assert device_sessions.allow("peek", "s", 3, table_ref=store, now=1200)[0]
+
+
+@pytest.mark.parametrize("winner", ["approve", "deny"])
+@pytest.mark.parametrize("loser", ["peek", "approve", "deny"])
+def test_a_losing_request_never_destroys_the_winning_decision(store, winner, loser):
+    """Review M6: four peeks, then a fifth operation (the loser) reads the
+    pending pairing; just before its conditional write, a decision (the
+    winner) lands and spends the last attempt. The loser must fail without
+    touching the decided row, and no session may be stranded."""
+    device_code, view = device_sessions.start(table_ref=store)
+    code = view["user_code"]
+    for _ in range(device_sessions.DEVICE_MAX_ATTEMPTS - 1):
+        assert device_sessions.lookup(code, table_ref=store) is not None
+    racing = _Interleave(store, _decide(code, winner == "approve", subject="Winner_1"))
+    if loser == "peek":
+        lost = device_sessions.lookup(code, table_ref=racing)
+    else:
+        lost = device_sessions.decide(code, loser == "approve", "Loser_2", "l@x", table_ref=racing)
+    assert racing.fired and racing.result == {
+        "status": "approved" if winner == "approve" else "denied", "label": "Dapier CLI"}
+    assert lost is None
+    pairing = store.items[f"pairing#{device_sessions._hash(device_code)}"]
+    assert pairing["status"] == ("approved" if winner == "approve" else "denied")
+    # Nobody holds a credential yet: the session row is minted at delivery.
+    assert _sessions(store) == []
+    if winner == "approve":
+        # The winner's CLI still collects its token, and exactly one session exists.
+        result = device_sessions.poll(device_code, table_ref=store)
+        assert result["subject"] == "Winner_1" and result["token"]
+        assert device_sessions.resolve(result["token"], table_ref=store)["subject"] == "Winner_1"
+        assert len(_sessions(store)) == 1
+    else:
+        assert device_sessions.poll(device_code, table_ref=store) == {"error": "access_denied"}
+        assert _sessions(store) == []
+
+
+def test_a_lost_approval_leaves_no_session_row(store):
+    """Session creation and the move to approved are one transaction."""
+    _, view = device_sessions.start(table_ref=store)
+    device_sessions.decide(view["user_code"], False, "Google_1", "op@x", table_ref=store)
+    assert device_sessions.decide(view["user_code"], True, "Google_2", "x@x", table_ref=store) is None
+    assert _sessions(store) == []
+
+
+def test_an_exhausted_pending_grant_is_still_destroyed(store):
+    device_code, view = device_sessions.start(table_ref=store)
+    for _ in range(device_sessions.DEVICE_MAX_ATTEMPTS):
+        assert device_sessions.lookup(view["user_code"], table_ref=store) is not None
+    assert device_sessions.lookup(view["user_code"], table_ref=store) is None
+    assert not [pk for pk in store.items if pk.startswith(("pairing#", "usercode#"))]
+    assert device_sessions.poll(device_code, table_ref=store) == {"error": "expired_token"}

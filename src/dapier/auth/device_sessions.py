@@ -154,9 +154,10 @@ def _delete_grant(store, pairing):
 
 
 def _conditional_failure(error):
-    """True for DynamoDB's ConditionalCheckFailedException (boto3 or a fake)."""
+    """True when DynamoDB refused a write on its condition."""
     response = getattr(error, "response", None) or {}
-    return (response.get("Error") or {}).get("Code") == "ConditionalCheckFailedException" \
+    code = (response.get("Error") or {}).get("Code")
+    return code == "ConditionalCheckFailedException" \
         or type(error).__name__ == "ConditionalCheckFailedException"
 
 
@@ -176,12 +177,27 @@ def _guard_values(now):
 
 
 def _spend_or_destroy(store, pairing, error):
-    """A failed guard: past the budget, the grant is destroyed."""
+    """A failed guard. Only an exhausted grant that is *still pending* is
+    destroyed, and that predicate is enforced by DynamoDB in the delete
+    itself: a losing peek or decision never removes or alters a pairing a
+    winner already approved or denied (its CLI still has to collect it).
+    The request whose delete lands owns the pointer cleanup too."""
     if not _conditional_failure(error):
         raise error
-    current = store.get_item(Key={"pk": pairing["pk"]}).get("Item")
-    if current and int(current.get("attempts") or 0) >= DEVICE_MAX_ATTEMPTS:
-        _delete_grant(store, current)
+    try:
+        store.delete_item(
+            Key={"pk": pairing["pk"]},
+            ConditionExpression="attribute_exists(#pk) AND #st = :pending AND #a >= :max",
+            ExpressionAttributeNames={"#pk": "pk", "#st": "status", "#a": "attempts"},
+            ExpressionAttributeValues={":pending": "pending", ":max": DEVICE_MAX_ATTEMPTS},
+        )
+    except Exception as cleanup_error:
+        if _conditional_failure(cleanup_error):
+            return  # decided by someone else, or budget not spent: leave it
+        raise
+    user_code_hash = pairing.get("user_code_hash")
+    if user_code_hash:
+        store.delete_item(Key={"pk": f"usercode#{user_code_hash}"})
 
 
 def lookup(user_code, table_ref=None, now=None):
@@ -234,24 +250,27 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
     pairing = _pairing_for_code(store, code, now)
     if not pairing or pairing.get("status") != "pending":
         return None
-    token = None
     names = dict(_GUARD_NAMES)
     values = _guard_values(now)
+    if approve:
+        # The approval is one conditional write and creates no session row:
+        # the CLI's poll mints the session when it collects the token. A
+        # losing approval (or a crash here) therefore never strands a live
+        # credential, and the decided row is the only state to protect.
+        token = _secret()
+        names["#s"] = "session"
+        values[":approved"] = "approved"
+        values[":session"] = {
+            "token": token, "subject": str(subject), "email": str(email or ""),
+            "expires_at": int(time.time()) + SESSION_TTL_SECONDS,
+        }
+        update = "SET #st = :approved, #s = :session, #a = if_not_exists(#a, :zero) + :one"
+    else:
+        names["#d"] = "decided_at"
+        values[":denied"] = "denied"
+        values[":decided"] = _now_iso()
+        update = "SET #st = :denied, #d = :decided, #a = if_not_exists(#a, :zero) + :one"
     try:
-        if approve:
-            token, expires_at = _put_session(store, subject, email)
-            names["#s"] = "session"
-            values[":approved"] = "approved"
-            values[":session"] = {
-                "token": token, "subject": str(subject), "email": str(email or ""),
-                "expires_at": expires_at,
-            }
-            update = "SET #st = :approved, #s = :session, #a = if_not_exists(#a, :zero) + :one"
-        else:
-            names["#d"] = "decided_at"
-            values[":denied"] = "denied"
-            values[":decided"] = _now_iso()
-            update = "SET #st = :denied, #d = :decided, #a = if_not_exists(#a, :zero) + :one"
         store.update_item(
             Key={"pk": pairing["pk"]},
             UpdateExpression=update,
@@ -260,10 +279,6 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
             ExpressionAttributeValues=values,
         )
     except Exception as error:
-        if token is not None:
-            # Lost the race (or the budget): drop the session we just minted
-            # so no orphan credential outlives the pairing that lost it.
-            store.delete_item(Key={"pk": f"session#{_hash(token)}"})
         try:
             _spend_or_destroy(store, pairing, error)
         except Exception:
@@ -326,10 +341,22 @@ def poll(device_code, table_ref=None):
     status = pairing.get("status")
     if status == "pending":
         return {"error": "authorization_pending"}
-    _delete_grant(store, pairing)
     if status != "approved":
+        _delete_grant(store, pairing)
         return {"error": "access_denied"}
     session = pairing.get("session") or {}
+    # The session row is created here, at delivery, from the decision the
+    # approval recorded (an idempotent put: a retried poll after a lost
+    # response re-creates the same row). Then the grant is consumed.
+    store.put_item(Item={
+        "pk": f"session#{_hash(session.get('token', ''))}",
+        "kind": "session",
+        "subject": str(session.get("subject", "")),
+        "email": str(session.get("email", "")),
+        "created_at": _now_iso(),
+        "ttl": int(session.get("expires_at", 0)),
+    })
+    _delete_grant(store, pairing)
     return {
         "token": session.get("token", ""),
         "subject": session.get("subject", ""),
@@ -338,18 +365,23 @@ def poll(device_code, table_ref=None):
     }
 
 
-def _put_session(store, subject, email):
+def _session_item(subject, email):
     token = _secret()
-    now = int(time.time())
-    store.put_item(Item={
+    item = {
         "pk": f"session#{_hash(token)}",
         "kind": "session",
         "subject": str(subject),
         "email": str(email or ""),
         "created_at": _now_iso(),
-        "ttl": now + SESSION_TTL_SECONDS,
-    })
-    return token, now + SESSION_TTL_SECONDS
+        "ttl": int(time.time()) + SESSION_TTL_SECONDS,
+    }
+    return token, item
+
+
+def _put_session(store, subject, email):
+    token, item = _session_item(subject, email)
+    store.put_item(Item=item)
+    return token, item["ttl"]
 
 
 def create_session(subject, email, table_ref=None):
