@@ -69,12 +69,16 @@ a:hover { color: var(--dk-accent-hover); }
 }
 
 h1, h2, h3 { line-height: 1.2; }
+/* Public-typography exception (rollout coordinator decision, 2026-10-15): the
+   marketing headline and lede sizes stay fluid clamp() values, baselined in
+   dakit-scale-baseline.json. The kit type scale stops at --dk-text-page (32px)
+   and has no display step; do not add new raw font sizes here. */
 h1 { max-width: 760px; margin: 0; font-size: clamp(40px, 7vw, 68px); font-weight: 500; letter-spacing: -.045em; }
 h2 { margin: var(--dk-space-8) 0 12px; font-size: var(--dk-text-xl); font-weight: var(--dk-weight-semibold); letter-spacing: -.02em; }
 h3 { margin: 0 0 8px; font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
 p { margin: 0 0 16px; }
 
-.lede { max-width: 690px; margin-top: var(--dk-space-6); color: var(--dk-text-muted); font-size: clamp(18px, 2.5vw, 22px); }
+.lede { max-width: 690px; margin-top: var(--dk-space-6); color: var(--dk-text-muted); font-size: clamp(18px, 2.5vw, 22px); } /* public-typography exception, see above */
 .intro { max-width: 720px; margin-top: var(--dk-space-4); color: var(--dk-text-muted); font-size: var(--dk-text-lg); }
 .hero { padding-bottom: 56px; border-bottom: 1px solid var(--dk-border-default); }
 .feature-grid { margin-top: 32px; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); overflow: hidden; }
@@ -86,7 +90,7 @@ p { margin: 0 0 16px; }
 .callout p:last-child { margin-bottom: 0; }
 
 .legal-page { max-width: 760px; }
-.legal-page h1 { font-size: clamp(36px, 6vw, 52px); }
+.legal-page h1 { font-size: clamp(36px, 6vw, 52px); } /* public-typography exception, see h1 */
 .legal-page h2 { margin-top: var(--dk-space-7); font-size: var(--dk-text-xl); }
 .legal-page ul { padding-left: var(--dk-space-6); }
 .legal-page li { margin: var(--dk-space-2) 0; }

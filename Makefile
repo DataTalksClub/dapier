@@ -63,7 +63,10 @@ DAKIT_CHECK_PATHS = src/web/app.css src/web/public.css \
 
 # The vendored copy matches its lock; no accent borders, no raw colours, and
 # spacing/type on the scales (existing off-scale debt lives in
-# dakit-scale-baseline.json, which may only shrink). `make test` runs these
+# dakit-scale-baseline.json, which may only shrink;
+# its 4 remaining entries are approved exceptions: the designer canvas
+# 13.5px density step, and the 3 fluid clamp() headline/lede sizes on the
+# public marketing pages — see the comment in src/web/public.css). `make test` runs these
 # through tests/test_dakit_checks.py.
 check-dakit:
 	node src/web/vendor/sync.mjs --check --dest src/web/vendor
