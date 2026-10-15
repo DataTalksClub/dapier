@@ -360,18 +360,20 @@
         <div class="page-tools dk-toolbar trigger-toolbar">
           <div class="dk-tabs pane-switch" role="tablist" aria-label="Schedules panes" data-workspace="sched-panes"><button class="dk-tab" type="button" role="tab" data-pane="activity" aria-controls="sched-activity-pane" aria-selected="true" tabindex="0">Fires</button><button class="dk-tab" type="button" role="tab" data-pane="sources" aria-controls="sched-sources-pane" aria-selected="false" tabindex="-1">Coming up</button></div>
           <div id="sched-outcome-chips" class="dk-tabs" role="radiogroup" aria-label="Filter fires by outcome"></div>
-          <div class="dk-toolbar__end"><button id="new-schedule" class="dk-button dk-button--primary" type="button">New schedule</button></div>
         </div>
-        <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p></div>
+        <section id="sched-register" class="data-panel" aria-labelledby="sched-register-title">
+          <header class="section-head dk-collection-header">
+            <div class="dk-collection-header__lead" id="sched-register-lead"><h2 id="sched-register-title" class="dk-collection-header__title">Schedules</h2></div>
+            <div class="dk-collection-header__trail"><span id="sched-summary" class="dk-collection-header__meta" role="status"></span></div>
+          </header>
+          <div id="schedule-empty" class="empty-state" hidden><h3>No schedules</h3><p>Create one to run a workflow every morning, every fifteen minutes, or on any cron schedule.</p><button id="schedule-empty-create" class="dk-button dk-button--secondary" type="button">Create the first schedule</button></div>
+          <div id="sched-table-wrap" class="table-wrap"><table class="sched-table">
+            <colgroup><col class="sched-col-name"><col class="sched-col-starts"><col class="sched-col-fire"><col class="sched-col-state"></colgroup>
+            <thead><tr><th>Schedule</th><th>Starts</th><th>Latest fire</th><th>State</th></tr></thead>
+            <tbody id="sched-list"></tbody>
+          </table></div>
+        </section>
         <div id="sched-workspace" class="sched-workspace" hidden>
-          <section class="data-panel" aria-labelledby="sched-register-title">
-            <div class="section-head"><h2 id="sched-register-title">Schedules</h2><p id="sched-summary" class="sub" role="status"></p></div>
-            <div class="table-wrap"><table class="sched-table">
-              <colgroup><col class="sched-col-name"><col class="sched-col-starts"><col class="sched-col-fire"><col class="sched-col-state"></colgroup>
-              <thead><tr><th>Schedule</th><th>Starts</th><th>Latest fire</th><th>State</th></tr></thead>
-              <tbody id="sched-list"></tbody>
-            </table></div>
-          </section>
           <div id="sched-panes" class="trigger-workspace" data-pane="activity">
           <section id="sched-activity-pane" class="data-panel trigger-activity" aria-labelledby="sched-fires-title">
             <div class="section-head"><h2 id="sched-fires-title">Fires</h2><p id="sched-fires-summary" class="sub" role="status"></p></div>

@@ -9,7 +9,7 @@
    /api/admin/schedule-triggers routes `dapier schedules` drives through
    /api/agent; this file only renders it. */
 import { state } from '../state.js';
-import { $, $$, notice } from '../ui.js';
+import { $, $$, notice, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, pad2 } from '../format.js';
 import { workflowName } from '../workflow-names.js';
@@ -262,8 +262,12 @@ function renderDetail() {
 function renderAll() {
   const has = current.schedules.length > 0;
   $('#schedule-empty').hidden = has;
+  $('#sched-table-wrap').hidden = !has;
   $('#sched-workspace').hidden = !has;
-  if (!has) return;
+  if (!has) {
+    $('#sched-summary').textContent = '';
+    return;
+  }
   renderActivity();
   renderUpcoming();
   renderList();
@@ -354,7 +358,10 @@ function openDialog(item) {
   if (!item) form.name.focus();
 }
 
-$('#new-schedule').addEventListener('click', () => openDialog(null));
+/* "Schedules [+ New schedule] ... 2 schedules": the create rides on the
+   register it creates into; the empty state repeats it. */
+collectionCreate($('#sched-register-lead'), { id: 'new-schedule', label: 'New schedule', onClick: () => openDialog(null) });
+$('#schedule-empty-create').addEventListener('click', () => openDialog(null));
 
 $('#schedule-form').addEventListener('submit', async (event) => {
   event.preventDefault();

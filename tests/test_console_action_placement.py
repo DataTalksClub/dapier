@@ -16,6 +16,9 @@ WORKFLOW = {"id": "wf-one", "name": "wf-one", "source": "wf-one.yaml", "enabled"
 TOKEN = {"token_id": "scheduler", "token_prefix": "dap_9f2", "agent": "scheduler",
          "created_at": "2026-09-30T09:00:00Z"}
 
+SCHEDULE = {"schedule_id": "nightly-backup", "expression": "cron(0 3 * * ? *)", "enabled": True}
+DATA = {"schedules": [SCHEDULE]}
+
 
 @pytest.fixture
 def console(monkeypatch):
@@ -25,6 +28,8 @@ def console(monkeypatch):
     original = console_boot._api_payload
 
     def payload(path):
+        if path == "/api/admin/schedule-triggers":
+            return {"schedules": list(DATA["schedules"])}
         if path.startswith("/api/admin/overview"):
             return {"workflows": [WORKFLOW], "runs": [], "api_tokens": [TOKEN]}
         return original(path)
@@ -118,3 +123,32 @@ def test_workflows_create_follows_the_list_search(console):
 
     page.keyboard.press("c")
     page.wait_for_url("**/workflows/new")
+
+
+def test_schedules_create_follows_the_schedules_register_title(console):
+    from playwright.sync_api import expect
+
+    page = console("/schedules")
+    create = page.locator("#new-schedule")
+    _assert_dakit_create(create, "New schedule")
+    assert _lead_children(page, "#sched-register-lead") == ["sched-register-title", "new-schedule"]
+    expect(page.locator("#sched-summary")).to_have_text("1 schedule")
+    # The fires toolbar keeps only its filters.
+    expect(page.locator('[data-page="schedules"] > .dk-toolbar .dk-button')).to_have_count(0)
+    _assert_page_header_has_no_actions(page)
+
+    page.keyboard.press("c")
+    expect(page.locator("#schedule-dialog")).to_be_visible()
+
+
+def test_empty_schedules_keep_the_header_create_and_repeat_it(console, monkeypatch):
+    from playwright.sync_api import expect
+
+    monkeypatch.setitem(DATA, "schedules", [])
+    page = console("/schedules")
+    expect(page.locator("#schedule-empty")).to_be_visible()
+    _assert_dakit_create(page.locator("#new-schedule"), "New schedule")
+    repeat = page.locator("#schedule-empty-create")
+    expect(repeat).to_have_class("dk-button dk-button--secondary")
+    repeat.click()
+    expect(page.locator("#schedule-dialog")).to_be_visible()

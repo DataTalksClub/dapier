@@ -16,6 +16,6 @@ def test_console_schedules_view_drives_the_shared_endpoints():
     for command in ('"upcoming"', '"run"', '"pause"', '"resume"', '"show"'):
         assert command in cli
     for anchor in ('id="sched-workspace"', 'id="sched-upcoming"', 'id="sched-list"',
-                   'id="sched-fires"', 'id="schedule-detail-dialog"', 'id="new-schedule"',
+                   'id="sched-fires"', 'id="schedule-detail-dialog"', 'id="sched-register-lead"',
                    'data-sched-action="run"', 'data-sched-action="delete"', 'data-sched-action="edit"'):
         assert anchor in html
