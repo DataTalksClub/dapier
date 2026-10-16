@@ -342,7 +342,7 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .service-accounts { list-style: none; margin: 0; padding: 0; }
 /* Full rows and shared-sign-in references share one grid: name + Details,
    status, Manage. Extra sign-in/usage copy lives in the Details popover. */
-.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 7rem; align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
+.service-account { display: grid; grid-template-columns: minmax(0, 1fr) 9rem minmax(12rem, max-content); align-items: center; gap: var(--dk-space-2) var(--dk-gap-control); padding: var(--dk-pad-panel); border-bottom: 1px solid var(--dk-border-default); }
 .service-account:last-child, .service-ref:last-child { border-bottom: 0; }
 .service-account-main { min-width: 0; }
 .service-account-identity { display: flex; align-items: center; min-width: 0; }
@@ -351,14 +351,9 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .connection-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
 .service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
 .service-account-actions { justify-content: flex-end; gap: var(--dk-gap-control); }
-/* Remove / Finish setup / Reconnect plus Manage need more than the action
-   column: they take a second line under status and action, still ending
-   on the right edge. */
-.service-account.has-remove .service-account-main,
-.service-account.has-many-actions .service-account-main { grid-row: 1 / span 2; }
-.service-account.has-remove .service-account-actions,
-.service-account.has-many-actions .service-account-actions { grid-column: 2 / -1; grid-row: 2; }
-.service-account.has-remove, .service-account.has-many-actions { align-items: start; }
+/* Keep status and every action on the name line on desktop. The action
+   track fits Test / Manage and grows for unfinished setup controls; phone
+   rows place these controls below the identity in the media query. */
 /* A shared sign-in seen from its other services: same chrome, quieter name. */
 .service-ref { padding-block: var(--dk-space-3); }
 .service-ref .connection-name { font-weight: var(--dk-weight-medium); }
