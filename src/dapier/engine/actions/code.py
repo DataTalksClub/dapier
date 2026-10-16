@@ -189,6 +189,8 @@ def _capped_text(text, limit=_OUTPUT_PART_LIMIT):
 
 def run_code(action, event, steps=None):
     """Execute the snippet and return what happened for the run record."""
+    from ...connectors.email_content import materialize_email
+
     source = action.get("code")
     if not isinstance(source, str) or not source.strip():
         raise ValueError("code action needs a non-empty 'code' source")
@@ -196,7 +198,7 @@ def run_code(action, event, steps=None):
     exec_code, tail_code = _compile_snippet(source)
 
     stdout = io.StringIO()
-    sandbox = _sandbox_for(event.get("data") or {}, stdout, steps)
+    sandbox = _sandbox_for(materialize_email(event).get("data") or {}, stdout, steps)
     outcome = {}
     thread = threading.Thread(
         target=_run, args=(sandbox, exec_code, tail_code, outcome),
@@ -273,6 +275,8 @@ def _js_script(source, data, steps=None):
 def run_js(action, event, steps=None):
     """Execute the JavaScript snippet and return what happened for the run
     record — the same ``{"result", "stdout"}`` shape as the Python flavor."""
+    from ...connectors.email_content import materialize_email
+
     source = action.get("code")
     if not isinstance(source, str) or not source.strip():
         raise ValueError("js action needs a non-empty 'code' source")
@@ -293,7 +297,7 @@ def run_js(action, event, steps=None):
     context = MiniRacer()
     context.set_hard_memory_limit(_JS_MEMORY_LIMIT_BYTES)
     try:
-        raw = context.eval(_js_script(source, event.get("data") or {}, steps), timeout_sec=timeout)
+        raw = context.eval(_js_script(source, materialize_email(event).get("data") or {}, steps), timeout_sec=timeout)
     except JSTimeoutException:
         raise RuntimeError(
             f"code step timed out after {timeout:g}s (limit {MAX_TIMEOUT_SECONDS:g}s)"
