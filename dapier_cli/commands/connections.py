@@ -1,20 +1,12 @@
-"""Implementations of the `dapier connections` and `dapier token` commands."""
+"""Implementations of the `dapier connections` commands."""
 
-import json, os, subprocess, sys, time, webbrowser
+import json, sys, time, webbrowser
 from datetime import datetime
 from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["TOKEN_ENV_VARS", "TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "resolve_connection_id", "token_exec", "token_write"]
-
-
-# Documented child-process variables. The provider-specific alias exists so
-# existing upload tooling works; DAPIER_ACCESS_TOKEN is always set too.
-TOKEN_ENV_VARS = {
-    "youtube": ("DAPIER_ACCESS_TOKEN", "YOUTUBE_ACCESS_TOKEN"),
-    "dropbox": ("DAPIER_ACCESS_TOKEN", "DROPBOX_ACCESS_TOKEN"),
-}
+__all__ = ["TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "resolve_connection_id"]
 
 
 def _local_expiry(item):
@@ -263,65 +255,6 @@ def connections_edit(api_url, connection_id, *, scopes=None,
     print(f"Updated {connection_id}.")
     if "scopes" in body:
         print("Reconnect it to grant the updated scopes.")
-    return 0
-
-
-def _fetch_token(api_url, connection_id, agent, debug=False):
-    """Return ``(connection_view, token_data)`` after verifying the account binding."""
-    view = api.call(api_url, "GET",
-                    f"/api/agent/connections/{connection_id}?agent={agent}", debug=debug)
-    expected = {value for value in (view.get("expected_account_id"), view.get("verified_account_id")) if value}
-    if not expected:
-        raise api.ApiError(
-            f"Connection {connection_id} has no verified provider account; "
-            "ask an operator to connect it first", status=4,
-        )
-    token = api.call(api_url, "POST", "/api/agent/token",
-                     {"connection_id": connection_id, "agent": agent}, debug=debug)
-    if token.get("provider_account_id") not in expected:
-        raise api.ApiError(
-            f"Provider account {token.get('provider_account_id')} does not match "
-            f"connection {connection_id}; refusing to hand out the token",
-            status=4,
-        )
-    return view, token
-
-
-def token_exec(api_url, connection_id, agent, argv, debug=False):
-    if not argv:
-        print("No command given after `--`.")
-        return 2
-    view, token = _fetch_token(api_url, connection_id, agent, debug)
-    names = TOKEN_ENV_VARS.get(view.get("provider", ""), ("DAPIER_ACCESS_TOKEN",))
-    env = dict(os.environ)
-    for name in names:
-        env[name] = token["access_token"]
-    # The token lives only in the child's environment; it is never printed,
-    # never placed in argv, and the parent environment is left untouched.
-    completed = subprocess.run(argv, env=env)
-    return completed.returncode
-
-
-def token_write(api_url, connection_id, agent, output, force=False, debug=False):
-    _, token = _fetch_token(api_url, connection_id, agent, debug)
-    flags = os.O_WRONLY | os.O_CREAT | (os.O_TRUNC if force else os.O_EXCL)
-    try:
-        fd = os.open(output, flags, 0o600)
-    except FileExistsError:
-        print(f"Refusing to overwrite {output} (pass --force to replace it).")
-        return 2
-    try:
-        with os.fdopen(fd, "w") as handle:
-            from src.dapier.private_files import protect
-
-            protect(output)
-            handle.write(token["access_token"] + "\n")
-    finally:
-        try:
-            os.chmod(output, 0o600)
-        except OSError:
-            pass
-    print(output)
     return 0
 
 

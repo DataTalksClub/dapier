@@ -1,5 +1,4 @@
 import base64
-import subprocess
 import sys
 import time
 import webbrowser
@@ -313,92 +312,6 @@ def test_logout_revokes_device_session(isolated_home, monkeypatch):
     assert config.load_session() is None
 
 
-VIEW = {
-    "connection_id": "youtube-personal",
-    "provider": "youtube",
-    "expected_account_id": "UC1",
-    "verified_account_id": "UC1",
-}
-TOKEN = {"access_token": "live-token-value", "provider_account_id": "UC1"}
-
-
-def fake_api(monkeypatch, view=None, token=None):
-    calls = []
-
-    def fake_call(api_url, method, path, body=None, **kwargs):
-        calls.append((method, path))
-        if path.startswith("/api/agent/connections/"):
-            return dict(view if view is not None else VIEW)
-        assert path == "/api/agent/token"
-        return dict(token if token is not None else TOKEN)
-
-    monkeypatch.setattr(commands.api, "call", fake_call)
-    return calls
-
-
-def test_token_exec_child_env_only(monkeypatch, capsys):
-    captured = {}
-
-    def fake_run(argv, env=None):
-        captured["argv"] = argv
-        captured["env"] = dict(env)
-        assert "live-token-value" not in str(argv)
-
-        class Done:
-            returncode = 7
-
-        return Done()
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    fake_api(monkeypatch)
-    code = commands.token_exec("https://api.example.test", "youtube-personal",
-                               "buildcamp-uploader", ["printenv"])
-    assert code == 7
-    assert captured["env"]["YOUTUBE_ACCESS_TOKEN"] == "live-token-value"
-    assert captured["env"]["DAPIER_ACCESS_TOKEN"] == "live-token-value"
-    assert os.environ.get("YOUTUBE_ACCESS_TOKEN") is None
-    assert os.environ.get("DAPIER_ACCESS_TOKEN") is None
-    out, _ = capsys.readouterr()
-    assert "live-token-value" not in out
-
-
-def test_token_exec_rejects_account_mismatch(monkeypatch):
-    fake_api(monkeypatch, token={"access_token": "t", "provider_account_id": "UC-EVIL"})
-    with pytest.raises(ApiError):
-        commands.token_exec("https://api.example.test", "youtube-personal",
-                            "buildcamp-uploader", ["cmd"])
-
-
-def test_token_exec_rejects_unverified_connection(monkeypatch):
-    view = dict(VIEW, expected_account_id=None, verified_account_id=None)
-    fake_api(monkeypatch, view=view)
-    with pytest.raises(ApiError):
-        commands.token_exec("https://api.example.test", "youtube-personal",
-                            "buildcamp-uploader", ["cmd"])
-
-
-def test_token_write_private_file(monkeypatch, tmp_path, capsys):
-    fake_api(monkeypatch)
-    output = str(tmp_path / "token.txt")
-    assert commands.token_write("https://api.example.test", "youtube-personal",
-                                "buildcamp-uploader", output) == 0
-    assert open(output).read() == "live-token-value\n"
-    if os.name == "nt":
-        from pathlib import Path
-        from src.dapier.private_files import require_private
-        require_private(Path(output))
-    else:
-        assert stat.S_IMODE(os.stat(output).st_mode) == 0o600
-    out, _ = capsys.readouterr()
-    assert out.strip() == output
-    assert "live-token-value" not in out
-    # Refuses to overwrite by default.
-    assert commands.token_write("https://api.example.test", "youtube-personal",
-                                "buildcamp-uploader", output) == 2
-    assert commands.token_write("https://api.example.test", "youtube-personal",
-                                "buildcamp-uploader", output, force=True) == 0
-
-
 def test_main_auth_status_exit_codes(isolated_home, capsys):
     assert main.main(["auth", "status"]) == 3
     config.save_session({"id_token": "x", "subject": "s", "email": "e",
@@ -406,22 +319,6 @@ def test_main_auth_status_exit_codes(isolated_home, capsys):
     assert main.main(["auth", "status"]) == 0
     out, _ = capsys.readouterr()
     assert "id_token" not in out and "\"x\"" not in out
-
-
-def test_main_token_exec_parsing(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(commands, "resolve_connection_id",
-                        lambda api_url, words, agent=None, debug=False: " ".join(words))
-
-    def fake_exec(api_url, connection_id, agent, argv, debug=False):
-        seen.update(connection_id=connection_id, agent=agent, argv=argv)
-        return 0
-
-    monkeypatch.setattr(commands, "token_exec", fake_exec)
-    assert main.main(["token", "exec", "youtube-personal", "--agent", "buildcamp-uploader",
-                      "--", "echo", "hi"]) == 0
-    assert seen == {"connection_id": "youtube-personal", "agent": "buildcamp-uploader",
-                    "argv": ["echo", "hi"]}
 
 
 def test_import_rejects_missing_files(isolated_home):

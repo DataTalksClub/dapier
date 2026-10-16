@@ -78,7 +78,7 @@ def test_new_connection_gets_opaque_id():
         records.validate_connection_id("resolve")
 
 
-def test_cli_resolves_reference_before_token_exec(monkeypatch):
+def test_cli_resolves_reference_before_connection_show(monkeypatch):
     from dapier_cli import commands, main
 
     calls, seen = [], {}
@@ -87,16 +87,15 @@ def test_cli_resolves_reference_before_token_exec(monkeypatch):
         calls.append(path)
         return {"connection_id": "google-sheets"}
 
-    def fake_exec(api_url, connection_id, agent, argv, debug=False):
-        seen.update(connection_id=connection_id, argv=argv)
+    def fake_show(api_url, connection_id, agent=None, debug=False):
+        seen.update(connection_id=connection_id, agent=agent)
         return 0
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    monkeypatch.setattr(commands, "token_exec", fake_exec)
-    assert main.main(["token", "exec", "drive", "datatalks", "--agent", "a",
-                      "--", "echo", "hi"]) == 0
+    monkeypatch.setattr(commands, "connections_show", fake_show)
+    assert main.main(["connections", "show", "drive", "datatalks", "--agent", "a"]) == 0
     assert calls == ["/api/agent/connections/resolve?ref=drive+datatalks&agent=a"]
-    assert seen == {"connection_id": "google-sheets", "argv": ["echo", "hi"]}
+    assert seen == {"connection_id": "google-sheets", "agent": "a"}
 
 
 def test_cli_prints_candidates_on_ambiguity(monkeypatch):

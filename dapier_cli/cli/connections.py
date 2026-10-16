@@ -1,8 +1,8 @@
-"""The `dapier connections` and `dapier token` nouns."""
+"""The `dapier connections` noun."""
 
 from .. import commands
 
-GROUPS = ("connections", "token",)
+GROUPS = ("connections",)
 
 REF_HELP = ("the connection: '<service> <account>' such as 'drive alexey@example.com' "
             "or 'drive datatalks' (any unique part of the account), a bare service "
@@ -86,18 +86,6 @@ def register(sub):
     test_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
     conn_sub.add_parser("send-expiry-digest",
                         help="Render and email the connection expiry digest now (operator)")
-    token_p = sub.add_parser("token", help="Short-lived provider access tokens")
-    token_sub = token_p.add_subparsers(dest="command", required=True)
-    exec_p = token_sub.add_parser(
-        "exec", help="Run a command with a fresh token in its environment",
-        description="Example: dapier token exec drive datatalks --agent A -- <command>")
-    exec_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
-    exec_p.add_argument("--agent", required=True)
-    write_p = token_sub.add_parser("write", help="Write a fresh token to a private file")
-    write_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
-    write_p.add_argument("--agent", required=True)
-    write_p.add_argument("--output", required=True)
-    write_p.add_argument("--force", action="store_true")
 
 
 def _connection_id(args, api_url, debug, agent=None):
@@ -107,15 +95,6 @@ def _connection_id(args, api_url, debug, agent=None):
 
 
 def run(args, api_url, debug, child=None):
-    if args.group == "token":
-            connection_id = _connection_id(args, api_url, debug, agent=args.agent)
-            if args.command == "exec":
-                return commands.token_exec(api_url, connection_id, args.agent,
-                                           list(child or []), debug)
-            if args.command == "write":
-                return commands.token_write(api_url, connection_id, args.agent,
-                                            args.output, args.force, debug)
-            return 2
     if args.command == "list":
         return commands.connections_list(api_url, debug, limit=args.limit,
                                          next_token=args.next_token,
