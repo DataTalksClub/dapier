@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Read-only Gmail / Calendar / Drive puller for a Dapier-issued access token.
+"""Read-only Gmail / Calendar / Drive puller with an in-script Dapier token.
 
-Run it as the child of `dapier token exec`, which puts a fresh Google access
-token in DAPIER_ACCESS_TOKEN for this process only:
+The script fetches a short-lived Google access token itself (via dtoken.py,
+next to this file) and keeps it in a local variable — nothing in the
+environment, argv, or on disk:
 
-    uv run dapier token exec gmail datatalks --agent admin-os -- \
-        python3 .agents/skills/google-data-pull/gpull.py gmail list --q "newer_than:7d" --max 20
+    python3 .agents/skills/google-data-pull/gpull.py \
+        --as "gmail datatalks" --agent admin-os \
+        gmail list --q "newer_than:7d" --max 20
 
 Standard library only. Every Google request is a GET (plus the POST to the
 tokeninfo endpoint, which reads token metadata); the request helper refuses
@@ -23,6 +25,12 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import dtoken
+except ImportError:  # pragma: no cover - helper lives next to this script
+    dtoken = None
 
 GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me"
 CALENDAR = "https://www.googleapis.com/calendar/v3"
@@ -42,12 +50,13 @@ class ApiError(Exception):
     pass
 
 
+_ACCESS_TOKEN = ""
+
+
 def _token():
-    token = os.environ.get("DAPIER_ACCESS_TOKEN")
-    if not token:
-        sys.exit("DAPIER_ACCESS_TOKEN is not set: run this under "
-                 "`uv run dapier token exec <service> <account> --agent <agent> -- ...`")
-    return token
+    if not _ACCESS_TOKEN:
+        raise RuntimeError("no Dapier token: main() fetches it before dispatch")
+    return _ACCESS_TOKEN
 
 
 def request(url, params=None, *, raw=False, form=None):
@@ -307,6 +316,9 @@ def cmd_sheet_values(args):
 
 def build_parser():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    p.add_argument("--as", dest="as_ref", required=True,
+                   help="Connection reference, e.g. 'gmail datatalks'")
+    p.add_argument("--agent", required=True, help="Agent holding the grant, e.g. admin-os")
     sub = p.add_subparsers(dest="service", required=True)
 
     sub.add_parser("whoami", help="Token's account, scopes, seconds left").set_defaults(fn=cmd_whoami)
@@ -376,8 +388,18 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if dtoken is None:
+        sys.exit("dtoken.py is missing next to gpull.py")
+    global _ACCESS_TOKEN
     try:
-        args.fn(args)
+        _ACCESS_TOKEN = dtoken.dapier_token(args.as_ref, args.agent)
+    except dtoken.DapierError as exc:
+        sys.exit(str(exc))
+    try:
+        try:
+            args.fn(args)
+        finally:
+            _ACCESS_TOKEN = ""
     except ApiError as exc:
         sys.exit(str(exc))
     except BrokenPipeError:
