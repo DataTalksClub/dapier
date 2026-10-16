@@ -263,7 +263,7 @@ actions:
     output_bucket_env: RENDER_ARTIFACTS_BUCKET
   - id: file-to-dataops
     type: dataops
-    connection_id: dropbox
+    connection_id: dataops
     auth_secret_id: dapier/dataops
     document_step: route.then.make-document
   - id: build-filename
@@ -305,7 +305,7 @@ actions:
       steps:
         route.then.email-date:
           output:
-            formatted: 2026-10-04
+            formatted: '2026-10-04'
         route.then.clean-subject:
           output:
             result:
@@ -323,7 +323,7 @@ actions:
       steps:
         route.then.email-date:
           output:
-            formatted: 2026-10-04
+            formatted: '2026-10-04'
         route.then.clean-subject:
           output:
             result:
@@ -337,7 +337,7 @@ actions:
             status: accepted
             invoices:
             - counterparty: Acme Ltd
-              transactionDate: 2026-09-30
+              transactionDate: '2026-09-30'
               invoiceNumber: INV-1
       expected:
         filename: 2026-09-30-Acme Ltd-INV-1-abcdef123456.pdf
@@ -345,7 +345,7 @@ actions:
       steps:
         route.then.email-date:
           output:
-            formatted: 2026-10-04
+            formatted: '2026-10-04'
         route.then.clean-subject:
           output:
             result:

@@ -103,7 +103,7 @@ actions:
     steps:
       email-date:
         output:
-          formatted: 2026-10-04
+          formatted: '2026-10-04'
       clean-subject:
         output:
           result:
@@ -118,7 +118,7 @@ actions:
     steps:
       email-date:
         output:
-          formatted: 2026-10-04
+          formatted: '2026-10-04'
       clean-subject:
         output:
           result:
@@ -129,7 +129,7 @@ actions:
           status: accepted
           invoices:
           - counterparty: Google Play
-            transactionDate: 2026-10-02
+            transactionDate: '2026-10-02'
             invoiceNumber: GPA-123
     expected:
       filename: 2026-10-02-Google Play-GPA-123-839f39e8a3ba.pdf

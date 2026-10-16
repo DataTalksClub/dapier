@@ -104,6 +104,7 @@ def test_attachment_branch_builds_and_archives_one_document():
     # file; the archive takes the builder's filename, falling back to the
     # subject/checksum form when the intake returns no preview.
     assert intake["document_step"] == "route.then.make-document"
+    assert intake["connection_id"] == "dataops"
     assert "steps.route.then.build-filename" in archive["filename"]
     assert archive["source"] == "step"
     assert archive["step"] == "route.then.make-document"
