@@ -47,7 +47,7 @@ def test_emails_page_is_a_mailbox_of_received_mail():
 
 def test_emails_reading_pane_renders_html_sandboxed():
     """HTML bodies render like a mail client: a sandboxed iframe whose
-    srcdoc is assigned as a property after innerHTML (never interpolated
+    document is populated after loading a separate CSP (never interpolated
     into the page string), scripts blocked, links forced to a new tab,
     plain text kept as the collapsed fallback."""
     js = (WEB / "js" / "views" / "emails.js").read_text()
@@ -55,10 +55,10 @@ def test_emails_reading_pane_renders_html_sandboxed():
     assert "allow-same-origin" in js
     assert "EMAIL_FRAME_SANDBOX" in js
     assert "'allow-scripts'" not in js and '"allow-scripts"' not in js
-    assert "frame.srcdoc" in js or ".srcdoc =" in js
+    assert "frame.src = '/email-message.html'" in js
     assert "wireEmailFrame(" in js
     assert 'target", "_blank"' in js or "target', '_blank'" in js
-    assert "prepareSrcdoc(" in js
+    assert "prepareEmailDocument(" in js
     # The old escaped-source dump is gone: HTML renders, it is not printed.
     assert "Original HTML" not in js
     assert "email-body-html" not in js

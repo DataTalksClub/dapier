@@ -122,27 +122,31 @@ function htmlToText(html) {
   return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-/* The raw message HTML is never interpolated into the page string below:
-   renderRead assigns it to the iframe's srcdoc property after innerHTML,
-   so no quoting or `</iframe>` breakout applies. The sandbox grants no
-   script permission — scripts, forms and top navigation stay blocked while
-   links (rewritten to _blank via <base>) may open a new tab. */
+/* A separate blank document has a mail-only CSP: srcdoc would inherit the
+   console CSP and silently block sender styles and images. It contains no
+   message data until the parent fills its DOM; scripts/forms remain blocked
+   by both the frame sandbox and its HTTP CSP. */
 const EMAIL_FRAME_SANDBOX = 'allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 
-function prepareSrcdoc(html) {
-  const base = '<base target="_blank" rel="noopener">';
-  const style = '<style>img{max-width:100%;height:auto}body{margin:0;padding:16px;overflow-wrap:anywhere}</style>';
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (match) => `${match}${base}${style}`);
-  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (match) => `${match}<head>${base}${style}</head>`);
-  return `<head>${base}${style}</head>${html}`;
+function prepareEmailDocument(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, iframe, frame, object, embed, base, meta[http-equiv], form').forEach((node) => node.remove());
+  doc.querySelectorAll('a[href]').forEach((link) => {
+    const href = link.getAttribute('href').trim();
+    if (!/^(https?:|mailto:|tel:|#)/i.test(href)) link.removeAttribute('href');
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+  const style = doc.createElement('style');
+  style.textContent = 'html{overflow:hidden}body{margin:0;padding:16px;box-sizing:border-box;font-family:Arial,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}';
+  doc.head.prepend(style);
+  return doc;
 }
 
 function bodyHtml(event) {
   const { text, html, truncated, rehydrated } = bodies(event);
   if (html) {
-    const note = rehydrated
-      ? '<p class="sub">Full message restored from the raw copy for display. Replay uses the same raw copy.</p>'
-      : (truncated ? '<p class="sub">Only the stored portion of this message is shown.</p>' : '');
+    const note = truncated && !rehydrated ? '<p class="sub">Only the stored portion of this message is shown.</p>' : '';
     const readable = text || htmlToText(html);
     const plain = readable && readable !== html
       ? `<details class="email-html-alt"><summary>Plain text</summary><pre class="email-body-text">${escapeHtml(readable)}</pre></details>`
@@ -163,25 +167,31 @@ function wireEmailFrame(panel, event) {
   if (!frame) return;
   const { html } = bodies(event);
   if (!html) return;
-  frame.srcdoc = prepareSrcdoc(html);
-  const fit = () => {
-    try {
-      const doc = frame.contentDocument;
-      if (!doc) return;
-      /* Links must open a new tab, never navigate the console. The
-         <base> above covers well-formed mail; enforce it per link too. */
-      doc.querySelectorAll('a[href]').forEach((link) => {
-        link.setAttribute('target', '_blank');
-        link.setAttribute('rel', 'noopener');
+  frame.addEventListener('load', () => {
+    const doc = frame.contentDocument;
+    if (!doc || frame.contentWindow.location.pathname !== '/email-message.html') return;
+    const mail = prepareEmailDocument(html);
+    doc.replaceChild(doc.importNode(mail.documentElement, true), doc.documentElement);
+    let pending;
+    const fit = () => {
+      if (!frame.isConnected) return;
+      cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(() => {
+        // Measure the body, not the document viewport: the latter can never
+        // shrink below the previous frame height after a width change.
+        frame.style.height = `${Math.ceil(Math.max(doc.body.getBoundingClientRect().height, doc.body.scrollHeight) + frame.offsetHeight - frame.clientHeight)}px`;
       });
-      const height = Math.min(
-        Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0, 320),
-        1600,
-      );
-      frame.style.height = `${height}px`;
-    } catch (_) { /* opaque frame: keep the default height */ }
-  };
-  frame.addEventListener('load', fit, { once: false });
+    };
+    const observer = new ResizeObserver(() => {
+      if (!frame.isConnected) observer.disconnect();
+      else fit();
+    });
+    observer.observe(doc.body);
+    doc.addEventListener('load', fit, true); // late images and stylesheets
+    doc.fonts?.ready.then(fit);
+    fit();
+  }, { once: true });
+  frame.src = '/email-message.html';
 }
 
 /* ---- received list ---------------------------------------------------- */

@@ -41,6 +41,7 @@ def _static(path):
     # CSP only allows with an explicit style-src exception on its page, and
     # the console's /designer view embeds it, so it opts into frame-ancestors
     # 'self' while every other page refuses all framing.
+    email_frame = path == "/email-message.html"
     embed = path == DESIGNER_APP_VIEW
     style_src = "'self' 'unsafe-inline'" if embed else "'self'"
     frame_ancestors = "'self'" if embed else "'none'"
@@ -52,6 +53,7 @@ def _static(path):
         "/privacy": ("privacy.html", "text/html; charset=utf-8"),
         "/terms": ("terms.html", "text/html; charset=utf-8"),
         DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
+        "/email-message.html": ("email-message.html", "text/html; charset=utf-8"),
         # The CLI device-pairing page (dapier auth login).
         "/device": ("device.html", "text/html; charset=utf-8"),
         "/assets/js/device.js": ("js/device.js", "text/javascript; charset=utf-8"),
@@ -146,6 +148,19 @@ def _static(path):
             "referrer-policy": "same-origin",
         },
     )
+    if email_frame:
+        # Sender CSS and remote images belong only to the sandboxed mail
+        # document. Never relax the console CSP to display an email.
+        response["headers"].update({
+            "content-security-policy": (
+                "default-src 'none'; script-src 'none'; "
+                "style-src 'unsafe-inline' https:; img-src https: data:; "
+                "font-src https: data:; frame-ancestors 'self'; "
+                "base-uri 'none'; form-action 'none'; sandbox allow-same-origin "
+                "allow-popups allow-popups-to-escape-sandbox"
+            ),
+            "referrer-policy": "no-referrer",
+        })
     response.update(extra)
     return response
 
