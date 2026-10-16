@@ -110,10 +110,14 @@ def run_dataops(action, event, *, steps=None):
             timeout=action.get("timeout_seconds", 15),
         )
     except urllib.error.HTTPError as exc:
-        # Intake is idempotent per (recipientRoute, messageId). A replay of
-        # an already-filed document is 409, not a failed run.
+        # Exact duplicate intakes return 200 with their invoice previews.
+        # A 409 means that the immutable source changed; swallowing it would
+        # lose the preview and make a broken handoff appear successful.
         if exc.code == 409:
-            return {"already_exists": True, "status": 409}
+            raise ValueError(
+                "DataOps source conflict: this message was filed with different "
+                "content; repair the original source before retrying"
+            ) from exc
         raise
 
 
