@@ -1,5 +1,20 @@
 # Amazon S3 connector (the `aws` credential)
 
+`s3_upload` also accepts `runtime_identity: true` for buckets explicitly
+listed in the deployment's `S3_RUNTIME_UPLOAD_BUCKETS` environment variable.
+Omit `credential_id` and `connection_id` in this mode. The API and worker
+execution roles must have `s3:PutObject` on the destination; other buckets
+are rejected before a source download. The action is available in the
+console designer and through CLI/API workflow definitions.
+
+`workflows/aisl-recording-agent.yaml` starts with this mode to archive only
+TRANSCRIPT files from `recording.transcript_completed`, authenticating the
+Zoom download through `zoom-api`. The retained, encrypted, versioned private
+bucket is `dapier-zoom-transcripts-817685572750`; keys are
+`<meeting_id>/<start_time>/<recording_file_id>.vtt`. This archive covers all
+Zoom calls independently of the AISL agent and does not store video. The
+Zoom app must subscribe to the transcript-ready event.
+
 S3 actions use the configured `aws` credential. Operators can select an IAM
 role that Dapier assumes with its Lambda execution identity, or retain a legacy
 access key pair. The names `aws` and `s3` are pseudo connections backed by the

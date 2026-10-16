@@ -21,6 +21,8 @@ success, not an error.
 import mimetypes
 import os
 
+import boto3
+
 from src.dapier.connections import aws as aws_credentials
 from src.dapier.connections import credentials, tokens
 from src.dapier.engine.actions import base
@@ -130,11 +132,22 @@ def run_s3_upload(action, event, *, transport=None, steps=None, s3_client=None):
         raise ValueError("s3_upload requires a bucket")
     key = _object_key(action, event, steps)
     content_type = _content_type(action, event, steps)
-    config = _aws_config(action)
+    runtime = action.get("runtime_identity", False)
+    if isinstance(runtime, str):
+        runtime = runtime.strip().lower() == "true"
+    if runtime:
+        allowed = {name.strip() for name in os.environ.get("S3_RUNTIME_UPLOAD_BUCKETS", "").split(",") if name.strip()}
+        if bucket not in allowed:
+            raise ValueError("bucket is not allowed for runtime S3 uploads")
+        if action.get("credential_id") or action.get("connection_id"):
+            raise ValueError("runtime_identity cannot be combined with an AWS credential or connection")
+        config = None
+    else:
+        config = _aws_config(action)
     body = _source_body(action, event, steps, transport=transport)
     client = s3_client
     if client is None:
-        client = aws_credentials.client("s3", config)
+        client = boto3.client("s3") if runtime else aws_credentials.client("s3", config)
     kwargs = {"Bucket": bucket, "Key": key, "Body": body}
     omit = action.get("omit_content_type", False)
     if isinstance(omit, str):

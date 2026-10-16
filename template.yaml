@@ -132,6 +132,7 @@ Globals:
     Environment:
       Variables:
         AWS_ASSUMABLE_ROLE_ARNS: !Join [",", !Ref AwsAssumableRoleArns]
+        S3_RUNTIME_UPLOAD_BUCKETS: !Ref ZoomTranscriptsBucket
         EVENT_QUEUE_URL: !Ref EventQueue
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         CREDENTIALS_TABLE: !Ref CredentialsTable
@@ -284,6 +285,13 @@ Resources:
               - Effect: Allow
                 Action: s3:PutObject
                 Resource: !Sub 'arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*'
+        - PolicyName: dapier-api-transcript-upload
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub '${ZoomTranscriptsBucket.Arn}/*'
         # Every table the API reads and writes at full CRUD, one document.
         # The per-table DynamoDBCrudPolicy documents carried exactly these
         # actions (streams reads included for parity with the SAM policy).
@@ -825,6 +833,10 @@ Resources:
             TableName: !Ref ExecutionsTable
         - S3CrudPolicy:
             BucketName: !Ref RenderArtifactsBucket
+        - Statement:
+            Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub '${ZoomTranscriptsBucket.Arn}/*'
         - S3CrudPolicy:
             BucketName: !Ref DataOpsEmailDocumentsBucket
         - S3ReadPolicy:
@@ -1388,6 +1400,26 @@ Resources:
         - {AttributeName: pk, KeyType: HASH}
       TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
       PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+
+  ZoomTranscriptsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-zoom-transcripts-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration:
+        Status: Enabled
 
   MailBucket:
     Type: AWS::S3::Bucket

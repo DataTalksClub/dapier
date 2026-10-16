@@ -2,6 +2,8 @@
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 from src.dapier.connectors.registry import action_specs, run_action
 from plugins.aws.runners.s3 import run_s3_upload
 
@@ -215,6 +217,35 @@ class RegistryDispatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_runtime_upload_uses_execution_identity_without_provider_credentials(monkeypatch):
+    monkeypatch.setenv("S3_RUNTIME_UPLOAD_BUCKETS", "private-archive")
+    s3 = FakeS3()
+    action = {"bucket": "private-archive", "key": "meeting/transcript.vtt",
+              "runtime_identity": True, "source_url": "https://example.test/transcript"}
+    with patch("boto3.client", return_value=s3) as client, \
+         patch("src.dapier.connections.credentials.get_credential", side_effect=AssertionError("provider credentials must not be read")):
+        output = run_s3_upload(action, {}, transport=FakeTransport(body=b"WEBVTT"))
+    client.assert_called_once_with("s3")
+    assert output["bytes"] == 6
+    assert s3.objects[("private-archive", "meeting/transcript.vtt")][0] == b"WEBVTT"
+
+
+def test_runtime_upload_rejects_unapproved_bucket_before_download(monkeypatch):
+    monkeypatch.setenv("S3_RUNTIME_UPLOAD_BUCKETS", "private-archive")
+    transport = FakeTransport()
+    with pytest.raises(ValueError, match="not allowed"):
+        run_s3_upload({"bucket": "other-bucket", "key": "transcript.vtt", "runtime_identity": True,
+                       "source_url": "https://example.test/transcript"}, {}, transport=transport)
+    assert transport.calls == []
+
+
+def test_runtime_upload_rejects_mixed_credentials(monkeypatch):
+    monkeypatch.setenv("S3_RUNTIME_UPLOAD_BUCKETS", "private-archive")
+    with pytest.raises(ValueError, match="cannot be combined"):
+        run_s3_upload({"bucket": "private-archive", "key": "transcript.vtt", "runtime_identity": True,
+                       "credential_id": "aws"}, {})
 
 
 def test_object_metadata_uses_head_without_content_download_or_custom_metadata():

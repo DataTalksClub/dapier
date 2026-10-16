@@ -1,30 +1,52 @@
 # Zoom recording router: a Zoom cloud recording.transcript_completed webhook fires a
 # decision step (one typed call to OpenRouter's decisions endpoint, keyed by
 # the stored openrouter credential) that classifies the
-# recording into exactly one bucket and runs the matching agent in its own
+# recording after its transcript is archived and runs the matching agent in its own
 # workspace: one-on-one calls land in the zoom-calls repo, AI Shipping Labs
 # sessions go through the platform's recording pipeline.
 # Reference copy of the live workflow (save/publish via `dapier workflows`).
 id: aisl-recording-agent
 description: >
-  A Zoom cloud recording with a ready transcript is classified (one-on-one
-  call vs AI Shipping Labs event) and routed to the matching headless agent,
-  each running in its own workspace.
+  Archive every ready Zoom transcript in private S3, then classify the
+  recording and process AI Shipping Labs sessions or one-on-one calls.
+  DataTalks.Club and other recordings need no further action.
 enabled: true
 notify: [alexey@datatalks.club]
 actions:
+  - id: recording-files
+    type: for_each
+    list: video_files
+    item: recording_file
+    actions:
+      - id: transcript-only
+        type: filter
+        field: recording_file.file_type
+        operator: equals
+        value: TRANSCRIPT
+      - id: archive-transcript
+        type: s3_upload
+        runtime_identity: true
+        bucket: dapier-zoom-transcripts-817685572750
+        key: '{meeting_id}/{start_time}/{recording_file.id}.vtt'
+        key_mode: exact
+        source_url: '{recording_file.download_url}'
+        source_connection_id: zoom-api
+        content_type: text/vtt
   - id: classify-recording
     type: decision
     mode: switch
     system: |
       You route Zoom cloud recordings for Alexey. Answer with exactly one
-      choice. "ai-shipping-labs" is an AI Shipping Labs session: a cohort
+      choice: "one-on-one", "ai-shipping-labs", or "otherwise". "ai-shipping-labs" is an AI Shipping Labs session: a cohort
       lecture, workshop, guest talk, or any call whose meeting is linked to
       an AI Shipping Labs event. "one-on-one" is a recorded call between
       Alexey and one other person: a 1x1 discussion, mentoring session,
-      interview, or sync.
+      interview, or sync. "otherwise" covers DataTalks.Club videos (courses,
+      community talks, webinars, podcasts, and workshops) and anything that
+      does not clearly belong to either processing branch.
     prompt: |
       Classify this Zoom cloud recording into exactly one bucket.
+      Its transcript has already been archived in S3.
       - meeting_id: {meeting_id}
       - topic: {topic}
       - host_id: {host_id}
@@ -32,9 +54,16 @@ actions:
       Choose "ai-shipping-labs" when the topic, host, or naming suggests an
       AI Shipping Labs session (AISL, shipping labs, cohort, workshop,
       lecture). Choose "one-on-one" when it is a recorded call with a single
-      other participant.
-    choices: [one-on-one, ai-shipping-labs]
+      other participant. Choose "otherwise" for DataTalks.Club/DTC sessions
+      or when neither category is clearly supported. A workshop alone is
+      not evidence of AI Shipping Labs; DataTalks.Club sessions are otherwise.
+    choices: [one-on-one, ai-shipping-labs, otherwise]
     cases:
+      - choice: otherwise
+        description: >
+          DataTalks.Club videos and other recordings. The transcript is
+          already archived; no further processing is needed.
+        actions: []
       - choice: one-on-one
         description: >
           A recorded call between Alexey and one other person (1x1 discussion,

@@ -305,8 +305,12 @@ def test_aisl_recording_agent_workflow_files_are_valid_and_in_sync():
     wf_text = wf_path.read_text(encoding="utf-8")
     assert docs_text == wf_text
     parsed = designer_store.parse_workflow(wf_text)
-    decision = parsed["actions"][0]
+    assert parsed["actions"][0]["type"] == "for_each"
+    decision = parsed["actions"][1]
     assert decision["type"] == "decision"
+    assert "otherwise" in decision["choices"]
+    otherwise = next(case for case in decision["cases"] if case["choice"] == "otherwise")
+    assert otherwise["actions"] == []
     descriptions = {case["choice"]: case.get("description") for case in decision["cases"]}
     assert descriptions["one-on-one"] and "one other person" in descriptions["one-on-one"]
     assert descriptions["ai-shipping-labs"] and "AI Shipping Labs" in descriptions["ai-shipping-labs"]

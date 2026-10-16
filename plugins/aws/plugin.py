@@ -43,10 +43,12 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_s3_upload(action, event, steps=steps),
     required=frozenset({"bucket", "key"}),
     optional=frozenset({
-        "credential_id", "connection_id",
+        "credential_id", "connection_id", "runtime_identity",
         "source_url", "source_connection_id", "source_s3", "content_type", "key_mode", "omit_content_type",
     }),
     fields=(
+        {"key": "runtime_identity", "label": "Use deployment identity", "type": "boolean", "default": "false",
+         "help": "Upload to a deployment-approved bucket using Dapier's execution role; omit Credential ID and Connection ID"},
         {"key": "credential_id", "label": "Credential ID", "placeholder": "aws (default)"},
         {"key": "bucket", "label": "Bucket", "placeholder": "datatalks-mailchimp-backup", "required": True,
          "discover": {"resource": "s3.buckets"}},
