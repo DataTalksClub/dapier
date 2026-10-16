@@ -1,4 +1,4 @@
-# Zoom recording router: a Zoom cloud recording.completed webhook fires a
+# Zoom recording router: a Zoom cloud recording.transcript_completed webhook fires a
 # decision step (one typed call to OpenRouter's decisions endpoint, keyed by
 # the stored openrouter credential) that classifies the
 # recording into exactly one bucket and runs the matching agent in its own
@@ -7,7 +7,7 @@
 # Reference copy of the live workflow (save/publish via `dapier workflows`).
 id: aisl-recording-agent
 description: >
-  A new Zoom cloud recording is classified by a decision step (one-on-one
+  A Zoom cloud recording with a ready transcript is classified (one-on-one
   call vs AI Shipping Labs event) and routed to the matching headless agent,
   each running in its own workspace.
 enabled: true
@@ -47,7 +47,7 @@ actions:
             notify_from: agents@dtcdev.click
             prompt: |
               You are the one-on-one Zoom recording processor. A Zoom cloud
-              recording just completed. Work autonomously and finish with a
+              recording transcript is ready. Work autonomously and finish with a
               report; do not ask questions.
 
               Recording event from Zoom:
@@ -97,7 +97,7 @@ actions:
             notify_from: agents@dtcdev.click
             prompt: |
               You are the AI Shipping Labs recording processor. A Zoom cloud
-              recording just completed. Work autonomously and finish with a
+              recording transcript is ready. Work autonomously and finish with a
               report; do not ask questions.
 
               Recording event from Zoom:
@@ -119,7 +119,7 @@ actions:
               anything.
 
               2. Recording pipeline: read the event's recording fields first. If
-              recording_s3_url is already set, skip to step 4. Otherwise POST
+              recording_s3_url is already set, skip to step 3. Otherwise POST
               /api/events/<slug>/sync-transcript - the platform re-lists the Zoom
               recording, stores the MP4 download and transcript URLs, and enqueues
               the S3 upload itself. Only if no upload starts, POST
@@ -128,8 +128,9 @@ actions:
               API error. Never download or upload the video yourself; never touch
               AWS credentials for the video.
 
-              3. Transcript: ensure the transcript is stored. sync-transcript queues
-              transcript ingest when the parsed text is missing; poll until
+              3. Transcript: if transcript_text is missing, POST
+              /api/events/<slug>/sync-transcript to queue transcript ingest,
+              even when the video was already uploaded. Poll until
               transcript_text is present, or report that Zoom produced no
               transcript.
 
@@ -155,4 +156,4 @@ actions:
               blocker.
 trigger:
   connector: zoom
-  event: recording.completed
+  event: recording.transcript_completed
