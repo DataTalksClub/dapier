@@ -242,6 +242,48 @@ def test_runs_replay_email_carries_the_contract(monkeypatch):
     assert normalized["correlation_id"] == "email:<big-1@example.test>"
 
 
+def test_runs_replay_email_carries_the_contract_from_the_rich_shape(monkeypatch):
+    """A record small enough to store whole keeps the normalized event
+    shape (sender/recipients objects, bare route label) rather than the
+    flat intake data. The contract fallbacks must read that shape, or the
+    replayed envelope carries an empty sender and the route's allow-list
+    refuses it (the live 2026-10-16 newsletter replays of the Oct-13
+    records)."""
+    from src.dapier.connectors.ingress import normalize_event
+
+    steps = [{"connector": "email", "event_type": "message.received",
+              "input": {
+                  "route": "newsletter",
+                  "message_id": "<orig@example.test>",
+                  "sender": {"header": "AINews <news@example.test>",
+                             "addresses": ["news@example.test"]},
+                  "recipients": {"addresses": ["newsletter@dtcdev.click"],
+                                 "matched": ["newsletter@dtcdev.click"],
+                                 "to": "newsletter@dtcdev.click"},
+                  "subject": "Issue 42",
+                  "date": "Tue, 13 Oct 2026 11:04:13 +0000",
+                  "body": {"text": {"value": "body"}},
+                  "raw_mime": POINTER,
+              }}]
+
+    event, error = runs_api.replay_event(
+        "newsletter-sponsors:email:<orig@example.test>", steps)
+
+    assert error is None
+    assert event["contract"] == "inbound-email"
+    assert event["route"] == "newsletter@dtcdev.click"
+    assert event["sender"]["header"] == "AINews <news@example.test>"
+    assert event["sender"]["addresses"] == ["news@example.test"]
+    assert event["recipients"]["addresses"] == ["newsletter@dtcdev.click"]
+    assert event["date"] == "Tue, 13 Oct 2026 11:04:13 +0000"
+    assert event["raw_mime"] == POINTER
+    # The worker's normalizer rebuilds the routed event from the envelope.
+    normalized = normalize_event(event)
+    assert normalized["data"]["route"] == "newsletter"
+    assert normalized["data"]["sender"]["addresses"] == ["news@example.test"]
+    assert normalized["data"]["date"] == "Tue, 13 Oct 2026 11:04:13 +0000"
+
+
 def test_inbox_replay_email_carries_the_contract(table, monkeypatch):
     inbox.record(_oversized_event(), table_ref=table)
     monkeypatch.setattr(email_ingress, "s3", _s3_mock(_raw()))

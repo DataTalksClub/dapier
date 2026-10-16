@@ -72,6 +72,21 @@ def contract_fields(data, event_id):
     """
     to = str(data.get("to") or "")
     sender = str(data.get("from") or "")
+    # A record small enough to store whole keeps the normalized event shape
+    # (sender/recipients objects, bare route label) instead of the flat
+    # intake data, so the sender/recipient/route reads fall back to that
+    # shape - without it a legacy replay carries an empty sender and the
+    # route's allow-list refuses it (the 2026-10-16 newsletter case).
+    sender_obj = data.get("sender") if isinstance(data.get("sender"), dict) else {}
+    recipients_obj = (
+        data.get("recipients") if isinstance(data.get("recipients"), dict) else {})
+    if not sender:
+        sender = str(sender_obj.get("header") or "")
+    if not to:
+        addresses = recipients_obj.get("addresses") or []
+        to = str(recipients_obj.get("to") or (addresses[0] if addresses else ""))
+    if not to:
+        to = str(data.get("route") or "")
     fields = {
         "contract": "inbound-email",
         "version": 1,
@@ -81,6 +96,11 @@ def contract_fields(data, event_id):
         "sender": {"header": sender, "addresses": _addresses(sender)},
         "recipients": {"addresses": _addresses(to)},
         "subject": data.get("subject"),
+        # The email's own Date header when the record kept it, so a replayed
+        # event reports the original receipt time rather than the replay
+        # moment. Flat rebuilds have no date and fall back to occurred_at
+        # in the worker's normalizer.
+        "date": data.get("date"),
     }
     pointer = data.get("s3") or data.get("raw_mime")
     if isinstance(pointer, dict) and pointer.get("bucket") and pointer.get("key"):
