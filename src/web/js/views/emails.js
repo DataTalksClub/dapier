@@ -169,7 +169,7 @@ function wireEmailFrame(panel, event) {
   if (!html) return;
   frame.addEventListener('load', () => {
     const doc = frame.contentDocument;
-    if (!doc || frame.contentWindow.location.pathname !== '/email-message.html') return;
+    if (!doc || frame.contentWindow.location.pathname !== '/assets/email-message.html') return;
     const mail = prepareEmailDocument(html);
     doc.replaceChild(doc.importNode(mail.documentElement, true), doc.documentElement);
     let pending;
@@ -191,7 +191,7 @@ function wireEmailFrame(panel, event) {
     doc.fonts?.ready.then(fit);
     fit();
   }, { once: true });
-  frame.src = '/email-message.html';
+  frame.src = '/assets/email-message.html';
 }
 
 /* ---- received list ---------------------------------------------------- */

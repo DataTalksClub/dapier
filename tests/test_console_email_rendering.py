@@ -1,11 +1,20 @@
 """Mail gets its own CSP, keeps sender styles and grows with its content."""
+from pathlib import Path
+
 import pytest
 
 from src.dapier.api.router import _static
 
 
+def test_mail_document_uses_the_deployed_asset_gateway():
+    # Lambda static responses alone do not ensure API Gateway forwards the URL.
+    template = (Path(__file__).resolve().parents[1] / "template.yaml").read_text()
+    assert "Path: '/assets/{proxy+}'" in template
+    assert _static("/assets/email-message.html")["statusCode"] == 200
+
+
 def test_mail_document_has_an_isolated_policy():
-    response = _static('/email-message.html')
+    response = _static('/assets/email-message.html')
     policy = response['headers']['content-security-policy']
     assert "script-src 'none'" in policy
     assert "style-src 'unsafe-inline' https:" in policy

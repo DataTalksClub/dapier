@@ -41,7 +41,7 @@ def _static(path):
     # CSP only allows with an explicit style-src exception on its page, and
     # the console's /designer view embeds it, so it opts into frame-ancestors
     # 'self' while every other page refuses all framing.
-    email_frame = path == "/email-message.html"
+    email_frame = path == "/assets/email-message.html"
     embed = path == DESIGNER_APP_VIEW
     style_src = "'self' 'unsafe-inline'" if embed else "'self'"
     frame_ancestors = "'self'" if embed else "'none'"
@@ -53,7 +53,7 @@ def _static(path):
         "/privacy": ("privacy.html", "text/html; charset=utf-8"),
         "/terms": ("terms.html", "text/html; charset=utf-8"),
         DESIGNER_APP_VIEW: ("designer.html", "text/html; charset=utf-8"),
-        "/email-message.html": ("email-message.html", "text/html; charset=utf-8"),
+        "/assets/email-message.html": ("email-message.html", "text/html; charset=utf-8"),
         # The CLI device-pairing page (dapier auth login).
         "/device": ("device.html", "text/html; charset=utf-8"),
         "/assets/js/device.js": ("js/device.js", "text/javascript; charset=utf-8"),

@@ -55,7 +55,7 @@ def test_emails_reading_pane_renders_html_sandboxed():
     assert "allow-same-origin" in js
     assert "EMAIL_FRAME_SANDBOX" in js
     assert "'allow-scripts'" not in js and '"allow-scripts"' not in js
-    assert "frame.src = '/email-message.html'" in js
+    assert "frame.src = '/assets/email-message.html'" in js
     assert "wireEmailFrame(" in js
     assert 'target", "_blank"' in js or "target', '_blank'" in js
     assert "prepareEmailDocument(" in js
