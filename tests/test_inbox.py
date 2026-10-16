@@ -243,11 +243,10 @@ def test_api_list_orders_received_at_ties_by_inbox_id(table):
         ["evt-c", "evt-b", "evt-a"]
 
 
-def test_api_list_pages_stop_at_the_bounded_window(table):
-    """The documented trade: the scan window stays bounded, so events older
-    than it age out of the list (each stays reachable through api_get). The
-    fake serves rows in insertion order, so the window holds the oldest 150
-    here and the walk never reads the remaining rows."""
+def test_api_list_walks_the_whole_retention_window(table):
+    """The list scans the retention window in pages and sorts newest-first,
+    so every stored event is reachable through paging — a fresh row can no
+    longer vanish behind an arbitrary single-scan-page slice (Oct-16)."""
     for index in range(200):
         seed_event(table, f"evt-{index:03d}",
                    f"2026-09-27T10:{index // 60:02d}:{index % 60:02d}+00:00")
@@ -260,8 +259,9 @@ def test_api_list_pages_stop_at_the_bounded_window(table):
         seen.extend(event["inbox_id"] for event in page["events"])
         token = page["paging"]["next"]
 
-    assert len(seen) == 150  # the scan window, not the whole table
+    assert len(seen) == 200  # the whole table, not one scan page
     assert len(seen) == len(set(seen))
+    assert seen[0] == "evt-199"  # newest first
 
 
 def test_api_get_returns_the_stored_envelope(table):

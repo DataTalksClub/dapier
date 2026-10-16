@@ -35,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 TABLE_ENV = "TRIGGER_INBOX_TABLE"
 RETENTION_DAYS = 30
+# api_list reads the inbox in pages of SCAN_PAGE up to SCAN_WINDOW_ITEMS rows
+# before sorting newest-first (see api_list).
+SCAN_PAGE = 300
+SCAN_WINDOW_ITEMS = 4000
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 200
 
@@ -539,9 +543,9 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
     call passes it back as ``next_token`` and the window starts strictly
-    after that row, so the connector filter and paging compose. The scanned
-    window stays bounded like every list call — events older than the window
-    age out of the list but stay reachable through api_get.
+    after that row, so the connector filter and paging compose. The scan
+    covers the whole retention window up to SCAN_WINDOW_ITEMS rows — events
+    past that cap age out of the list but stay reachable through api_get.
 
     ``visible`` (an auth.visibility.Visibility, None = unrestricted)
     read-filters the list, G17 Phase 2: a non-operator keeps the events that
@@ -564,8 +568,21 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
         return 400, {"error": f"Unknown outcome {', '.join(unknown)}; use "
                               f"{', '.join(sorted(set(OUTCOMES.values())))}"}
     owners = visibility.owners_for(visible)
-    items = (table_ref if table_ref is not None else _table()).scan(
-        Limit=max(limit * 6, 150)).get("Items", [])
+    # Scan the whole retention window (paginated, item-capped) before
+    # sorting: a single-page scan reads an arbitrary slice of the hash-key
+    # space, so freshly written rows could be invisible until enough older
+    # rows aged out — the Oct-16 incident where handled mail "went missing".
+    # At current volume (retention-bounded, tens of rows/day) the cap never
+    # binds; past it, promote a received_at GSI rather than raising it.
+    table = table_ref if table_ref is not None else _table()
+    items = []
+    page = table.scan(Limit=SCAN_PAGE)
+    while True:
+        items.extend(page.get("Items", []))
+        if len(items) >= SCAN_WINDOW_ITEMS or "LastEvaluatedKey" not in page:
+            break
+        page = table.scan(ExclusiveStartKey=page["LastEvaluatedKey"],
+                          Limit=SCAN_PAGE)
     events = [_view(item) for item in items]
     if connector:
         # One connector, or a family of them (the hook delivery log reads
