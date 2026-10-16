@@ -291,7 +291,9 @@ actions:
       tx_date = str(preview.get("transactionDate") or preview.get("transaction_date") or "").strip()
       use_date = tx_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tx_date) \
           else (str(date or "").strip() or "undated")
-      vendor = _slug(preview.get("counterparty")) or _slug(subject) or "Invoice"
+      vendor = _slug(preview.get("counterparty"))
+      if not vendor:
+          raise ValueError("DataOps has no extracted company; refusing an email-subject archive name")
       inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
       key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
       parts = [use_date, vendor]
@@ -301,7 +303,7 @@ actions:
           parts.append(key)
       output = {"filename": "-".join(parts) + ".pdf"}
     tests:
-    - name: no DataOps preview falls back to subject and checksum
+    - name: a missing company stops archival
       steps:
         route.then.email-date:
           output:
@@ -317,8 +319,7 @@ actions:
         route.then.file-to-dataops:
           output:
             status: accepted
-      expected:
-        filename: 2026-10-04-Acme-abcdef123456.pdf
+      expected_error: no extracted company
     - name: a DataOps preview names vendor, invoice date and number
       steps:
         route.then.email-date:
@@ -387,6 +388,8 @@ actions:
       if not html:
           part = body.get("text") if isinstance(body.get("text"), dict) else {}
           text = str(part.get("value") or "")
+          if not text.strip():
+              raise ValueError("Email body is empty or not loaded; refusing a blank PDF")
           for old, new in (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;")):
               text = text.replace(old, new)
           html = f"<pre>{text}</pre>"

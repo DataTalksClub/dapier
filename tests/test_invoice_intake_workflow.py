@@ -101,8 +101,8 @@ def test_attachment_branch_builds_and_archives_one_document():
     assert make_document["type"] == "merge_pdfs"
     assert make_document["plan_step"] == "triage"
     # DataOps runs before the archive so its invoice preview can name the
-    # file; the archive takes the builder's filename, falling back to the
-    # subject/checksum form when the intake returns no preview.
+    # file. The archive requires the company preview; it must never silently
+    # fall back to an email subject that looks like a successful filing.
     assert intake["document_step"] == "route.then.make-document"
     assert intake["connection_id"] == "dataops"
     assert "steps.route.then.build-filename" in archive["filename"]
@@ -153,3 +153,13 @@ def test_body_only_branch_strips_and_renders():
     assert "Forwarded message" not in result["html"]
     assert "googleplay-noreply" not in result["html"]
     assert "Order total: 0.99 EUR" in result["html"]
+
+
+def test_missing_body_never_turns_into_a_blank_pdf():
+    import pytest
+    from src.dapier.engine.actions.code import run_code
+
+    strip_forwarded = find_action(shipped_workflow(), "strip-forwarded")
+    for body in ({}, {"html": None, "text": {"value": "  "}}):
+        with pytest.raises(RuntimeError, match="refusing a blank PDF"):
+            run_code(strip_forwarded, {"data": {"body": body}})

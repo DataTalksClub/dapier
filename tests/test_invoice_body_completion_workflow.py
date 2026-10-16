@@ -27,8 +27,8 @@ def test_archive_identity_and_duplicate_skip():
     workflow = shipped_workflow()
     ids = [action["id"] for action in workflow["actions"]]
     # DataOps runs before the archive so its invoice preview can name the
-    # file; replays complete through the intake's 409-as-already_exists and
-    # the archive's skip_existing instead of a skip-duplicate filter.
+    # file. Missing metadata must stop archival rather than silently using
+    # the email subject. Exact duplicates retain the intake preview.
     assert ids == [
         "email-date", "clean-subject", "intake-rendered", "build-filename",
         "archive-rendered",
@@ -59,10 +59,13 @@ def test_archive_identity_and_duplicate_skip():
         "clean-subject": {"output": output},
         "intake-rendered": {"output": {"status": "accepted"}},
     }
+    with pytest.raises(RuntimeError, match="no extracted company"):
+        run_code(build_filename, event, steps=steps)
+    steps["intake-rendered"]["output"]["invoices"] = [{
+        "counterparty": "Google Play", "transactionDate": "2026-10-02",
+    }]
     filename = run_code(build_filename, event, steps=steps)["result"]["filename"]
-    assert filename == (
-        "2026-10-04-Your Google Play Order Receipt from Oct 2, 2026-839f39e8a3ba.pdf"
-    )
+    assert filename == "2026-10-02-Google Play-839f39e8a3ba.pdf"
     assert render(archive["filename"], event, {
         "build-filename": {"output": {"result": {"filename": filename}}},
     }) == filename

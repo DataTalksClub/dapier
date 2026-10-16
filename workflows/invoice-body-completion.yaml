@@ -1,8 +1,8 @@
 # Paired with invoice-intake's body branch: the renderer reports
 # job.completed with the source event's route, so a rendered invoice body
 # completes through this flow. DataOps goes first; its invoice preview
-# (when the intake returns one) names the Dropbox file via build-filename,
-# falling back to the email subject and checksum.
+# names the Dropbox file via build-filename. Missing company metadata
+# stops the run rather than archiving under the email subject.
 id: invoice-body-completion
 enabled: true
 trigger:
@@ -89,7 +89,9 @@ actions:
     tx_date = str(preview.get("transactionDate") or preview.get("transaction_date") or "").strip()
     use_date = tx_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tx_date) \
         else (str(date or "").strip() or "undated")
-    vendor = _slug(preview.get("counterparty")) or _slug(subject) or "Invoice"
+    vendor = _slug(preview.get("counterparty"))
+    if not vendor:
+        raise ValueError("DataOps has no extracted company; refusing an email-subject archive name")
     inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
     key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
     parts = [use_date, vendor]
@@ -99,7 +101,7 @@ actions:
         parts.append(key)
     output = {"filename": "-".join(parts) + ".pdf"}
   tests:
-  - name: no DataOps preview falls back to subject and checksum
+  - name: a missing company stops archival
     steps:
       email-date:
         output:
@@ -112,8 +114,7 @@ actions:
       intake-rendered:
         output:
           status: accepted
-    expected:
-      filename: 2026-10-04-Your Google Play Order Receipt from Oct 2, 2026-839f39e8a3ba.pdf
+    expected_error: no extracted company
   - name: a DataOps preview names vendor, invoice date and number
     steps:
       email-date:
