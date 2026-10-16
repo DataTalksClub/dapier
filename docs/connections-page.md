@@ -95,7 +95,8 @@ email is "Not signed in", never a fake Drive account.
   every OAuth row that needs it (Google, YouTube, Dropbox, Zoom) —
   already lapsed, or still connected but expiring soon. Slack and
   Telegram paste a new token in Manage. Provider access tokens are
-  CLI-only (`dapier token exec|write`); the console does not reveal them.
+  fetched in-script (the `google-data-pull` skill's `dtoken.py`); the
+  console does not reveal them.
   Trigger samples are CLI-only (`dapier triggers sample`); this page has
   no Pull sample toolbar button. Expiry reminder email is the daily
   ConnectionDigestFunction schedule, not a send-now button on this page.

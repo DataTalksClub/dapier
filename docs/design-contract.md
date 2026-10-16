@@ -67,9 +67,9 @@ a direction dapier deliberately left on 2026-10-02 when it joined the family.)
 - The workflows list expresses On/Off with a switch (it is the toggle, not a
   status readout); run status comes from the dot+word "Latest run" read.
 - Connections rows carry Manage (and Finish setup / Reconnect when the
-  grant needs it). Provider access tokens stay on the CLI
-  (`dapier token exec|write`); the console does not reveal them.
-  Treatments live in [`connections-page.md`](connections-page.md).
+  grant needs it). Provider access tokens are fetched in-script (the
+  `google-data-pull` skill's `dtoken.py`); the console does not reveal
+  them. Treatments live in [`connections-page.md`](connections-page.md).
 - The standalone designer's footer shows the working-copy git state
   (branch + clean/dirty). It is local tool chrome for the operator who
   commits workflows, not a family-shell element.

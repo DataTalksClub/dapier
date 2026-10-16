@@ -316,8 +316,12 @@ dapier auth login
 dapier connections list
 dapier connections show youtube datatalks
 dapier connections connect youtube datatalks --agent buildcamp-uploader
-dapier token exec drive alexey@datatalks.club --agent buildcamp-uploader -- <command>
-dapier token write youtube datatalks --agent buildcamp-uploader --output <private-file>
+dapier connections test drive alexey@datatalks.club
+```
+
+Scripts needing a provider token fetch it in-script (short-lived, local
+variable only) via the `dtoken.py` helper in the `google-data-pull` skill —
+there is no `token exec` anymore.
 ```
 
 Connections are named by **service + account**: `drive alexey@datatalks.club`,
@@ -328,11 +332,10 @@ candidates instead of guessing. The API resolves the reference
 connection accepts it. Internal connection ids still resolve but are never
 needed.
 
-`token exec` puts a fresh access token only in the child's environment (as
-`DAPIER_ACCESS_TOKEN` plus `YOUTUBE_ACCESS_TOKEN`/`DROPBOX_ACCESS_TOKEN`) and
-never prints it. `token write` creates a `0600` file and refuses to overwrite
-without `--force`. Both commands verify the returned provider account ID
-against the connection's bound account before handing anything out.
+Scripts fetch a fresh access token in-script via `POST /api/agent/token`
+(see the `google-data-pull` skill's `dtoken.py` helper): the helper verifies
+the returned provider account ID against the connection's bound account
+before returning it, and the token lives only in a local variable.
 
 Email flows are defined only in **Workflows**. The Emails console page is a
 mailbox of what Dapier received and what happened to each message: handled by

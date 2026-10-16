@@ -11,11 +11,11 @@ account is **production platform access**, not a claim about the token owner's
 identity or permissions. Token grants restrict which Dapier agents can use the
 connection; they do not narrow the underlying CMP token's privileges.
 
-After granting the connection to an agent, use
-`uv run dapier token exec cmp-production --agent course-telegram-management -- python your_cmp_script.py`.
-The child reads `DAPIER_ACCESS_TOKEN` and sends `Authorization: Token <value>`
-to CMP. Do not log it. Course changes remain the responsibility of CMP and
-require operator authorization; connection setup makes no course changes.
+After granting the connection to an agent, fetch the token in-script (see
+the `google-data-pull` skill's `dtoken.py` helper) and send
+`Authorization: Token <value>` to CMP from a local variable. Do not log it.
+Course changes remain the responsibility of CMP and require operator
+authorization; connection setup makes no course changes.
 
 
 ## Read-only workflow action

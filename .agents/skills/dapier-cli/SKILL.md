@@ -36,10 +36,14 @@ directly.
 
 ## Command groups
 
-`auth`, `connections`, `token`, `credentials`, `grants`, `tokens`,
+`auth`, `connections`, `credentials`, `grants`, `tokens`,
 `oauth-clients`, `overview`, `usage`, `quota`, `errors`, `agent-tasks`,
 `workers`, `worker`, `catalog`, `runs`, `inbox`, `audit`, `storage`,
 `workflows`, `webhooks`, `schedules`, `polls`, `emails`.
+
+Scripts needing a provider token fetch it in-script via the `dtoken.py`
+helper in the `google-data-pull` skill — there is no `token exec`
+anymore.
 
 (`triggers` and `hooks` are aliases that point at `emails`/`webhooks`.)
 

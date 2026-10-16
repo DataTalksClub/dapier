@@ -1,4 +1,4 @@
-"""Console fresh-token route: operator parity for the CLI's token exec/write."""
+"""Console fresh-token route: operator parity for the in-script token fetch."""
 
 import json
 import time

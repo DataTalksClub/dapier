@@ -194,12 +194,12 @@ def delete_connection(event, connection_id, operator):
     return http._json_response(status, payload)
 
 def issue_connection_token(connection_id, operator):
-    """Console mirror of the CLI's fresh provider access token (same domain call).
+    """Console mirror of the in-script fresh provider access token (same domain call).
 
-    `dapier token exec|write` mint short-lived provider tokens through
-    /api/agent/token; this gives the Connections view the same outcome
-    without the CLI. The value is only ever returned to an operator session
-    and never persisted.
+    Scripts mint short-lived provider tokens through /api/agent/token;
+    this gives the Connections view the same outcome without the CLI.
+    The value is only ever returned to an operator session and never
+    persisted.
     """
     from ...connections import tokens as token_lifecycle
     from ...connections.records import BindingError

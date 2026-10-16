@@ -243,7 +243,7 @@ agent access before using a connection:
 ```sh
 uv run dapier grants save grant.json
 # {"connection_id":"youtube","subject":"subject-9","agent":"buildcamp","operations":["read","write"]}
-uv run dapier token exec youtube --agent buildcamp -- yt-dlp --version
+uv run dapier connections test youtube --agent buildcamp
 ```
 
 Connection statuses:

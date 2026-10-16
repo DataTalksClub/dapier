@@ -126,18 +126,16 @@ dapier auth logout
 dapier connections list
 dapier connections show youtube-personal
 dapier connections connect youtube-personal
-dapier token exec youtube-personal --agent buildcamp-uploader -- <command>
-dapier token write youtube-personal --agent buildcamp-uploader --output <private-file>
+python3 gpull.py --as "youtube buildcamp" --agent buildcamp-uploader whoami
 ```
 
-`token exec` starts the child process with a fresh provider access token in a
-documented environment variable and clears it when the process exits. It
-never prints the token. `token write` creates a private file (mode 0600 on
-POSIX; owner-only ACL on Windows), refuses to overwrite by default, and
-returns only its path. Access tokens should have the provider's normal short
-lifetime. Neither command returns refresh tokens or client secrets. The CLI
-must not place credentials in command-line arguments, shell history, debug
-output, an `.env` file, or the deployed AI Shipping Labs website.
+Scripts fetch a fresh provider access token in-script (see the
+`google-data-pull` skill's `dtoken.py` helper) and keep it in a local
+variable, never printed or persisted. Access tokens should have the
+provider's normal short lifetime. The flow never returns refresh tokens or
+client secrets. Scripts must not place credentials in command-line
+arguments, shell history, debug output, an `.env` file, or the deployed AI
+Shipping Labs website.
 
 The API authenticates the CLI using DTC-issued identity, checks the
 connection grant, refreshes the provider token when necessary, and returns
@@ -197,9 +195,10 @@ as called for in [#1680](https://github.com/AI-Shipping-Labs/website/issues/1680
 3. Connecting `youtube-personal` with the DataTalksClub account, or vice versa,
    is rejected before the connection is marked ready. Reconnect and token
    refresh cannot silently change the bound provider account.
-4. `token exec` for one granted connection supplies a fresh access token only
-   to its child process; requests for a different connection are denied. Token
-   values do not appear in logs, CLI status, exceptions, or process arguments.
+4. An in-script fetch for one granted connection returns a fresh access
+    token only to that script; requests for a different connection are
+    denied. Token values do not appear in logs, CLI status, exceptions, or
+    process arguments.
 5. Expired access tokens refresh, refresh-token rotation is preserved, and
    concurrent requests cannot regress the stored secret version. Revocation
    makes subsequent token requests fail.

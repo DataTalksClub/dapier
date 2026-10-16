@@ -761,7 +761,7 @@ export function openEditConnection(connectionId) {
   const cliRef = (connection.refs || [])[0];
   $('#edit-connection-cli').hidden = !cliRef;
   $('#edit-connection-cli').innerHTML = cliRef
-    ? `From the CLI: <code>dapier token exec ${escapeHtml(cliRef)} --agent …</code>` : '';
+    ? `From a script: fetch the token in-script for <code>${escapeHtml(cliRef)} --agent …</code> (see the google-data-pull skill)` : '';
   $('#edit-advanced').open = false;
 
   $('#edit-zoom-setup').hidden = !zoomWebhook;

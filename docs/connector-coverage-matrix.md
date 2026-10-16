@@ -138,9 +138,10 @@ webhook — used by trigger setup flows.
   hooks|schedules|polls list|save|delete`, console `/triggers` (hooks +
   polls) and `/schedules`, over the existing `/api/{admin,agent}/*-triggers`
   routes.
-- Fresh provider token is CLI-only (`dapier token exec|write` over
-  `POST /api/{admin,agent}/connections/{id}/token`). The console does
-  not reveal provider access tokens.
+- Fresh provider tokens are fetched in-script (`POST
+  /api/{admin,agent}/connections/{id}/token`, see the `google-data-pull`
+  skill's `dtoken.py`). The console does not reveal provider access
+  tokens.
 - Designer: the "Insert from previous steps" output picker
   (`{steps.<id>.output.*}` chips).
 - Actions: `http_request` auth variety (`auth_type: basic|bearer|api_key`),
