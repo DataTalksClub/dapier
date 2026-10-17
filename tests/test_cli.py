@@ -91,6 +91,45 @@ def device_poster(script):
     return poster, calls
 
 
+def test_login_device_replaces_the_stored_account(isolated_home, monkeypatch):
+    """A new device login is the stored identity. The previous account
+    does not stay behind just because its session file already exists."""
+    config.save_session({
+        "id_token": "alexey-token", "subject": "Google_alexey",
+        "email": "alexey@datatalks.club", "expires_at": 4102444800, "obtained_at": 1,
+    })
+    poster, _ = device_poster({
+        "/device/start": (200, {"device_code": "dapd_secret", "user_code": "TQ62-SD46",
+                                "expires_in": 900, "interval": 5}),
+        "/device/token": (200, {"token": "dapd_orin", "status": "approved",
+                                "subject": "Google_orin", "email": "orin@datatalks.club",
+                                "expires_at": 4102444800}),
+    })
+    monkeypatch.setattr(auth, "_post_json", poster)
+
+    session = auth.login_device("https://api.example.test/", sleeper=lambda seconds: None)
+
+    stored = config.load_session()
+    assert stored["email"] == "orin@datatalks.club"
+    assert stored["token"] == "dapd_orin"
+    assert stored is not None and "alexey-token" not in json.dumps(stored)
+    assert session["email"] == "orin@datatalks.club"
+
+
+def test_logout_forgets_a_browser_session(isolated_home, monkeypatch):
+    config.save_session({
+        "id_token": "alexey-token", "subject": "Google_alexey",
+        "email": "alexey@datatalks.club", "expires_at": 4102444800, "obtained_at": 1,
+    })
+    monkeypatch.setattr(auth, "revoke_session", lambda api_url, session: None)
+
+    import argparse
+    code = cli_auth.run(argparse.Namespace(command="logout"), "https://api.example.test")
+
+    assert code == 0
+    assert config.load_session() is None
+
+
 def test_login_device_happy_path(isolated_home, monkeypatch, capsys):
     poster, calls = device_poster({
         "/device/start": (200, {"device_code": "dapd_secret", "user_code": "ABCD-EFGH",

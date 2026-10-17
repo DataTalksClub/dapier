@@ -106,6 +106,57 @@ def test_no_plaintext_code_or_bearer_is_ever_stored(store):
 
 # --- M7: one delivery, losers write nothing ------------------------------------
 
+def test_winning_poll_retries_with_low_level_attribute_values(store):
+    """The real DynamoDB client rejects resource-shaped transaction items.
+
+    That rejection happens before the request is sent, so the approval is
+    already stored, the browser says the device is authorized, and the CLI
+    never receives a token. The retry must be the low-level shape the
+    client validates.
+    """
+    from boto3.dynamodb.types import TypeDeserializer
+    from botocore.exceptions import ParamValidationError
+    from botocore.validate import ParamValidator
+
+    device_code, _ = approved(store)
+    client = store.meta.client
+    seen = []
+    original = client.transact_write_items
+    decoder = TypeDeserializer()
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        key = kwargs["TransactItems"][0]["Delete"]["Key"]["pk"]
+        if isinstance(key, str):
+            raise ParamValidationError(report="plain values are not AttributeValues")
+        # Moto's transaction backend cannot use the low-level key as a dict
+        # key. Apply the committed effect the way DynamoDB would, after the
+        # payload has passed the same validator the client uses.
+        shape = client.meta.service_model.operation_model("TransactWriteItems").input_shape
+        report = ParamValidator().validate(kwargs, shape)
+        assert not report.has_errors(), report.generate_report()
+        pairing_key = decoder.deserialize(key)
+        item = {name: decoder.deserialize(value)
+                for name, value in kwargs["TransactItems"][1]["Put"]["Item"].items()}
+        store.delete_item(Key={"pk": pairing_key})
+        store.put_item(Item=item)
+        return {}
+
+    client.transact_write_items = spy
+    result = d.poll(device_code, table_ref=store)
+
+    assert result["status"] == "approved"
+    assert result["email"]
+    assert d.resolve(result["token"], table_ref=store)["subject"] == result["subject"]
+    assert len(seen) == 2
+    assert isinstance(seen[0]["TransactItems"][0]["Delete"]["Key"]["pk"], str)
+    delete = seen[1]["TransactItems"][0]["Delete"]
+    assert delete["Key"]["pk"]["S"].startswith("pairing#")
+    assert delete["ExpressionAttributeValues"][":approved"] == {"S": "approved"}
+    assert "N" in delete["ExpressionAttributeValues"][":now"]
+    assert original  # the resource client remains what moto tests call first
+
+
 def test_sequential_polls_deliver_once(store):
     device_code, _ = approved(store)
     first = d.poll(device_code, table_ref=store)

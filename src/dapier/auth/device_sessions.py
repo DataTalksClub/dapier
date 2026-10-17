@@ -41,6 +41,9 @@ import secrets
 import time
 from datetime import datetime, timezone
 
+from boto3.dynamodb.types import TypeSerializer
+from botocore.exceptions import ParamValidationError
+
 PREFIX = "dapd_"
 # No vowels and no confusable characters (no L/V, no 0/1): codes are read
 # aloud and retyped by hand, and must never spell a word. This is dakit's
@@ -56,6 +59,43 @@ DEVICE_MAX_ATTEMPTS = 5
 # Grace window for the rotated-out token after a refresh, so a CLI that
 # races itself (or two processes sharing a session file) is not locked out.
 ROTATION_GRACE_SECONDS = 120
+_SERIALIZER = TypeSerializer()
+
+
+def _typed_map(mapping):
+    """Low-level AttributeValues. The DynamoDB client rejects the plain
+    values the resource API accepts."""
+    return {key: _SERIALIZER.serialize(value) for key, value in mapping.items()}
+
+
+def _low_level_transact(items):
+    """The same TransactItems in the shape ``transact_write_items`` validates."""
+    converted = []
+    for entry in items:
+        (op, spec), = entry.items()
+        spec = dict(spec)
+        if "Key" in spec:
+            spec["Key"] = _typed_map(spec["Key"])
+        if "Item" in spec:
+            spec["Item"] = _typed_map(spec["Item"])
+        if spec.get("ExpressionAttributeValues"):
+            spec["ExpressionAttributeValues"] = _typed_map(spec["ExpressionAttributeValues"])
+        converted.append({op: spec})
+    return converted
+
+
+def _commit_delivery(store, items):
+    """Commit the delivery transaction.
+
+    Moto accepts the resource-shaped items the rest of this module writes.
+    The real client rejects them during parameter validation, before
+    DynamoDB runs, which is why an approved device never produced a token.
+    On that rejection, send the low-level attribute values.
+    """
+    try:
+        store.meta.client.transact_write_items(TransactItems=items)
+    except ParamValidationError:
+        store.meta.client.transact_write_items(TransactItems=_low_level_transact(items))
 
 
 def table():
@@ -367,7 +407,7 @@ def poll(device_code, table_ref=None):
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     now = int(time.time())
     try:
-        store.meta.client.transact_write_items(TransactItems=[
+        _commit_delivery(store, [
             {"Delete": {
                 "TableName": store.name,
                 "Key": key,
@@ -399,6 +439,10 @@ def poll(device_code, table_ref=None):
     # removed the user-code pointer.)
     return {
         "token": token,
+        # ``status`` is what CLIs that predate the shared poll loop look
+        # for on a 200. Without it they ignore the token and wait out the
+        # code. The shared loop treats any 200 without ``error`` as success.
+        "status": "approved",
         "subject": pairing.get("subject", ""),
         "email": pairing.get("email", ""),
         "expires_at": expires_at,
